@@ -26,15 +26,11 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_core::*;
-use kamu_datasets::CreateDatasetUseCase;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -64,32 +60,49 @@ async fn create_catalog_with_local_workspace(
     let catalog = {
         let mut b = dill::CatalogBuilder::new();
 
-        b.add::<DependencyGraphServiceImpl>()
-            .add::<DidGeneratorDefault>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add_value(current_account_subject)
-            .add_value(predefined_accounts_config)
-            .add_value(tenancy_config)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .add::<ViewDatasetUseCaseImpl>()
-            .add::<DummyOutboxImpl>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<QueryServiceImpl>()
-            .add::<ObjectStoreRegistryImpl>()
-            .add::<ObjectStoreBuilderLocalFs>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<LoginPasswordAuthProvider>()
-            .add::<PredefinedAccountsRegistrator>()
-            .add::<DatabaseTransactionRunner>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
-            .add::<AccountServiceImpl>()
-            .add::<InMemoryAccountRepository>();
+        b.add_builder(
+            messaging_outbox::OutboxImmediateImpl::builder()
+                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+        )
+        .bind::<dyn Outbox, OutboxImmediateImpl>()
+        .add::<DependencyGraphServiceImpl>()
+        .add::<DidGeneratorDefault>()
+        .add::<InMemoryDatasetDependencyRepository>()
+        .add_value(current_account_subject)
+        .add_value(predefined_accounts_config)
+        .add_value(tenancy_config)
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
+        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add::<CreateDatasetUseCaseImpl>()
+        .add::<CreateDatasetUseCaseHelper>()
+        .add::<ViewDatasetUseCaseImpl>()
+        .add::<SystemTimeSourceDefault>()
+        .add::<QueryServiceImpl>()
+        .add::<ObjectStoreRegistryImpl>()
+        .add::<ObjectStoreBuilderLocalFs>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<LoginPasswordAuthProvider>()
+        .add::<PredefinedAccountsRegistrator>()
+        .add::<DatabaseTransactionRunner>()
+        .add::<DatasetEntryServiceImpl>()
+        .add::<InMemoryDatasetEntryRepository>()
+        .add::<DatasetReferenceServiceImpl>()
+        .add::<InMemoryDatasetReferenceRepository>()
+        .add::<AccountServiceImpl>()
+        .add::<InMemoryAccountRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
+
+        register_message_dispatcher::<DatasetLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        );
+
+        register_message_dispatcher::<DatasetReferenceMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+        );
 
         b.build()
     };

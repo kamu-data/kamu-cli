@@ -20,13 +20,14 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets_inmem::InMemoryDatasetReferenceRepository;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetEntryWriter,
-    DependencyGraphWriter,
+    DatasetReferenceServiceImpl,
     MockDatasetEntryWriter,
-    MockDependencyGraphWriter,
 };
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -253,11 +254,7 @@ fn copy_dataset_files(
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain() {
-    let harness = PullTestHarness::new(
-        TenancyConfig::SingleTenant,
-        MockDatasetEntryWriter::new(),
-        MockDependencyGraphWriter::new(),
-    );
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 
     // A - B - C
     create_graph(
@@ -313,11 +310,7 @@ async fn test_pull_batching_chain() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_chain_multi_tenant() {
-    let harness = PullTestHarness::new(
-        TenancyConfig::MultiTenant,
-        MockDatasetEntryWriter::new(),
-        MockDependencyGraphWriter::new(),
-    );
+    let harness = PullTestHarness::new(TenancyConfig::MultiTenant, MockDatasetEntryWriter::new());
 
     // XA - YB - ZC
     create_graph(
@@ -373,11 +366,7 @@ async fn test_pull_batching_chain_multi_tenant() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_batching_complex() {
-    let harness = PullTestHarness::new(
-        TenancyConfig::SingleTenant,
-        MockDatasetEntryWriter::new(),
-        MockDependencyGraphWriter::new(),
-    );
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 
     //    / C \
     // A <     > > E
@@ -446,21 +435,7 @@ async fn test_pull_batching_complex_with_remote() {
         .times(1)
         .returning(|_, _, _| Ok(()));
 
-    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer
-        .expect_create_dataset_node()
-        .times(1)
-        .returning(|_| Ok(()));
-    mock_dependency_graph_writer
-        .expect_update_dataset_node_dependencies()
-        .times(1)
-        .returning(|_, _, _| Ok(()));
-
-    let harness = PullTestHarness::new(
-        TenancyConfig::SingleTenant,
-        mock_dataset_entry_writer,
-        mock_dependency_graph_writer,
-    );
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
 
     // (A) - (E) - F - G
     // (B) --/    /   /
@@ -610,11 +585,7 @@ async fn test_pull_batching_complex_with_remote() {
 
 #[tokio::test]
 async fn test_sync_from() {
-    let harness = PullTestHarness::new(
-        TenancyConfig::SingleTenant,
-        MockDatasetEntryWriter::new(),
-        MockDependencyGraphWriter::new(),
-    );
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("foo"), names![])], names!()).await;
@@ -643,11 +614,7 @@ async fn test_sync_from() {
 
 #[tokio::test]
 async fn test_sync_from_url_and_local_ref() {
-    let harness = PullTestHarness::new(
-        TenancyConfig::SingleTenant,
-        MockDatasetEntryWriter::new(),
-        MockDependencyGraphWriter::new(),
-    );
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
@@ -676,11 +643,7 @@ async fn test_sync_from_url_and_local_ref() {
 
 #[tokio::test]
 async fn test_sync_from_url_and_local_multi_tenant_ref() {
-    let harness = PullTestHarness::new(
-        TenancyConfig::MultiTenant,
-        MockDatasetEntryWriter::new(),
-        MockDependencyGraphWriter::new(),
-    );
+    let harness = PullTestHarness::new(TenancyConfig::MultiTenant, MockDatasetEntryWriter::new());
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
@@ -709,11 +672,7 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
 
 #[tokio::test]
 async fn test_sync_from_url_only() {
-    let harness = PullTestHarness::new(
-        TenancyConfig::SingleTenant,
-        MockDatasetEntryWriter::new(),
-        MockDependencyGraphWriter::new(),
-    );
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
@@ -742,11 +701,7 @@ async fn test_sync_from_url_only() {
 
 #[tokio::test]
 async fn test_sync_from_url_only_multi_tenant_case() {
-    let harness = PullTestHarness::new(
-        TenancyConfig::MultiTenant,
-        MockDatasetEntryWriter::new(),
-        MockDependencyGraphWriter::new(),
-    );
+    let harness = PullTestHarness::new(TenancyConfig::MultiTenant, MockDatasetEntryWriter::new());
 
     let _remote_tmp_dir =
         create_graph_remote("kamu.dev", &harness, vec![(n!("bar"), names![])], names!()).await;
@@ -781,17 +736,7 @@ async fn test_sync_from_url_same_id_different_aliases() {
         .times(1)
         .returning(|_, _, _| Ok(()));
 
-    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer
-        .expect_create_dataset_node()
-        .times(1)
-        .returning(|_| Ok(()));
-
-    let harness = PullTestHarness::new(
-        TenancyConfig::SingleTenant,
-        mock_dataset_entry_writer,
-        mock_dependency_graph_writer,
-    );
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
@@ -830,17 +775,7 @@ async fn test_sync_from_same_url_different_accounts() {
         .times(1)
         .returning(|_, _, _| Ok(()));
 
-    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer
-        .expect_create_dataset_node()
-        .times(1)
-        .returning(|_| Ok(()));
-
-    let harness = PullTestHarness::new(
-        TenancyConfig::MultiTenant,
-        mock_dataset_entry_writer,
-        mock_dependency_graph_writer,
-    );
+    let harness = PullTestHarness::new(TenancyConfig::MultiTenant, mock_dataset_entry_writer);
 
     let _remote_tmp_dir = create_graph_remote(
         "kamu.dev",
@@ -887,7 +822,6 @@ impl PullTestHarness {
     fn new(
         tenancy_config: TenancyConfig,
         mock_dataset_entry_writer: MockDatasetEntryWriter,
-        mock_dependency_graph_writer: MockDependencyGraphWriter,
     ) -> Self {
         let base_repo_harness = BaseRepoHarness::builder()
             .tenancy_config(tenancy_config)
@@ -913,14 +847,15 @@ impl PullTestHarness {
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
             .add::<CreateDatasetUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>()
+            .add::<AppendDatasetMetadataBatchUseCaseImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .add_value(mock_dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-            .add_value(mock_dependency_graph_writer)
-            .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
-            .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+            .add::<DatasetReferenceServiceImpl>()
+            .add::<InMemoryDatasetReferenceRepository>()
             .build();
 
         Self {

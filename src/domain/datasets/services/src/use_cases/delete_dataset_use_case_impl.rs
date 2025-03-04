@@ -22,7 +22,7 @@ use kamu_datasets::{
 };
 use messaging_outbox::{Outbox, OutboxExt};
 
-use crate::{DatasetEntryWriter, DependencyGraphWriter};
+use crate::DatasetEntryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +34,6 @@ pub struct DeleteDatasetUseCaseImpl {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -45,7 +44,6 @@ impl DeleteDatasetUseCaseImpl {
         dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
-        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
@@ -54,7 +52,6 @@ impl DeleteDatasetUseCaseImpl {
             dataset_storage_unit_writer,
             dataset_action_authorizer,
             dependency_graph_service,
-            dependency_graph_writer,
             outbox,
         }
     }
@@ -153,11 +150,6 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Do actual delete
         self.dataset_storage_unit_writer
             .delete_dataset(&dataset_handle.id)
-            .await?;
-
-        // Remove graph node
-        self.dependency_graph_writer
-            .remove_dataset_node(&dataset_handle.id)
             .await?;
 
         // Notify interested parties

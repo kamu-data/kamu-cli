@@ -18,8 +18,7 @@ use kamu_datasets::{
     CreateDatasetUseCaseOptions,
 };
 
-use crate::utils::DatasetCreateHelper;
-use crate::DependencyGraphWriter;
+use crate::utils::CreateDatasetUseCaseHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,20 +26,17 @@ use crate::DependencyGraphWriter;
 #[interface(dyn CreateDatasetUseCase)]
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
-    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
-    dataset_create_helper: Arc<DatasetCreateHelper>,
+    create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
 impl CreateDatasetUseCaseImpl {
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
-        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
-        dataset_create_helper: Arc<DatasetCreateHelper>,
+        create_helper: Arc<CreateDatasetUseCaseHelper>,
     ) -> Self {
         Self {
             current_account_subject,
-            dependency_graph_writer,
-            dataset_create_helper,
+            create_helper,
         }
     }
 }
@@ -63,12 +59,10 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         };
 
         // Adjust alias for current tenancy configuration
-        let canonical_alias = self
-            .dataset_create_helper
-            .canonical_dataset_alias(dataset_alias);
+        let canonical_alias = self.create_helper.canonical_dataset_alias(dataset_alias);
 
         // Dataset entry goes first, this guarantees name collision check
-        self.dataset_create_helper
+        self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
                 &logged_account_id,
@@ -76,28 +70,19 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             )
             .await?;
 
-        // Graph node is created
-        // TODO:
-        //  - separate in-memory and database-level updates
-        //  - database-level update may be a part of current transaction
-        //  - in-memory update should only happen if database-level update is committed
-        self.dependency_graph_writer
-            .create_dataset_node(&seed_block.event.dataset_id)
-            .await?;
-
         // Make storage level dataset (no HEAD yet)
         let store_result = self
-            .dataset_create_helper
+            .create_helper
             .store_dataset(&canonical_alias, seed_block)
             .await?;
 
         // Set initial dataset HEAD
-        self.dataset_create_helper
+        self.create_helper
             .set_created_head(&store_result.dataset_id, &store_result.seed)
             .await?;
 
         // Notify interested parties the dataset was created
-        self.dataset_create_helper
+        self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
                 &canonical_alias.dataset_name,

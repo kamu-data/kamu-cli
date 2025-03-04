@@ -21,7 +21,7 @@ use kamu_datasets::{
 };
 use time_source::SystemTimeSource;
 
-use crate::utils::DatasetCreateHelper;
+use crate::utils::CreateDatasetUseCaseHelper;
 use crate::DependencyGraphWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +35,7 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
-    dataset_create_helper: Arc<DatasetCreateHelper>,
+    create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
 impl CreateDatasetFromSnapshotUseCaseImpl {
@@ -46,7 +46,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
         did_generator: Arc<dyn DidGenerator>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
-        dataset_create_helper: Arc<DatasetCreateHelper>,
+        create_helper: Arc<CreateDatasetUseCaseHelper>,
     ) -> Self {
         Self {
             catalog,
@@ -55,7 +55,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
             did_generator,
             dataset_registry,
             dependency_graph_writer,
-            dataset_create_helper,
+            create_helper,
         }
     }
 }
@@ -84,9 +84,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .await?;
 
         // Adjust alias for current tenancy configuration
-        let canonical_alias = self
-            .dataset_create_helper
-            .canonical_dataset_alias(&snapshot.name);
+        let canonical_alias = self.create_helper.canonical_dataset_alias(&snapshot.name);
 
         // Make a seed block
         let system_time = self.system_time_source.now();
@@ -97,7 +95,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         );
 
         // Dataset entry goes first, this guarantees name collision check
-        self.dataset_create_helper
+        self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
                 &logged_account_id,
@@ -107,7 +105,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
 
         // Make storage level dataset (no HEAD yet)
         let store_result = self
-            .dataset_create_helper
+            .create_helper
             .store_dataset(&canonical_alias, seed_block)
             .await?;
 
@@ -140,17 +138,8 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .int_err()?;
 
         // Set initial dataset HEAD
-        self.dataset_create_helper
+        self.create_helper
             .set_created_head(&store_result.dataset_id, &append_result.proposed_head)
-            .await?;
-
-        // Graph node is created
-        // TODO:
-        //  - separate in-memory and database-level updates
-        //  - database-level update may be a part of current transaction
-        //  - in-memory update should only happen if database-level update is committed
-        self.dependency_graph_writer
-            .create_dataset_node(&store_result.dataset_id)
             .await?;
 
         // Note: modify dependencies only after `set_ref` succeeds.
@@ -166,7 +155,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         }
 
         // Notify interested parties the dataset was created
-        self.dataset_create_helper
+        self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
                 &canonical_alias.dataset_name,

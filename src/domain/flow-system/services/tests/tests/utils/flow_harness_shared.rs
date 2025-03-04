@@ -15,7 +15,13 @@ use dill::*;
 use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_core::*;
-use kamu_datasets::{DatasetEntry, DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
+use kamu_datasets::{
+    DatasetEntry,
+    DatasetEntryCreatedListener,
+    DatasetEntryRemovalListener,
+    DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_datasets_services::{DependencyGraphServiceImpl, DependencyGraphWriter};
@@ -49,7 +55,7 @@ pub(crate) const SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS: i64 = SCHEDULING_ALI
 pub(crate) struct FlowHarness {
     pub catalog: Catalog,
     pub outbox: Arc<dyn Outbox>,
-    pub dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
+    pub dependency_graph_service: Arc<DependencyGraphServiceImpl>,
     pub fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
     pub fake_system_time_source: FakeSystemTimeSource,
 
@@ -151,7 +157,7 @@ impl FlowHarness {
 
         Self {
             outbox: catalog.get_one().unwrap(),
-            dependency_graph_writer: catalog.get_one().unwrap(),
+            dependency_graph_service: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
 
             flow_agent: catalog.get_one().unwrap(),
@@ -179,8 +185,8 @@ impl FlowHarness {
             name: dataset_alias.dataset_name,
         });
 
-        self.dependency_graph_writer
-            .create_dataset_node(&dataset_id)
+        self.dependency_graph_service
+            .on_dataset_entry_created(&dataset_id)
             .await
             .unwrap();
 
@@ -205,11 +211,11 @@ impl FlowHarness {
             name: dataset_alias.dataset_name,
         });
 
-        self.dependency_graph_writer
-            .create_dataset_node(&dataset_id)
+        self.dependency_graph_service
+            .on_dataset_entry_created(&dataset_id)
             .await
             .unwrap();
-        self.dependency_graph_writer
+        self.dependency_graph_service
             .update_dataset_node_dependencies(&self.catalog, &dataset_id, input_ids)
             .await
             .unwrap();
@@ -224,8 +230,8 @@ impl FlowHarness {
     }
 
     pub async fn issue_dataset_deleted(&self, dataset_id: &odf::DatasetID) {
-        self.dependency_graph_writer
-            .remove_dataset_node(dataset_id)
+        self.dependency_graph_service
+            .on_dataset_entry_removed(dataset_id)
             .await
             .unwrap();
 
