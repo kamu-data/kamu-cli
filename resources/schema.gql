@@ -674,6 +674,11 @@ type DatasetCollaborationMut {
 	unsetRoles(accountId: [AccountID!]!): UnsetRoleResult!
 }
 
+type DatasetCollaborationPermissions {
+	canView: Boolean!
+	canUpdate: Boolean!
+}
+
 type DatasetConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -747,6 +752,11 @@ type DatasetEnvVarsMut {
 	deleteEnvVariable(id: DatasetEnvVarID!): DeleteDatasetEnvVarResult!
 }
 
+type DatasetEnvVarsPermissions {
+	canView: Boolean!
+	canUpdate: Boolean!
+}
+
 type DatasetFlowConfigs {
 	"""
 	Returns defined configuration for a flow of specified type
@@ -818,6 +828,17 @@ type DatasetFlowsMut {
 	configs: DatasetFlowConfigsMut!
 	runs: DatasetFlowRunsMut!
 	triggers: DatasetFlowTriggersMut!
+}
+
+type DatasetFlowsPermissions {
+	canView: Boolean!
+	canRun: Boolean!
+}
+
+type DatasetGeneralPermissions {
+	canRename: Boolean!
+	canSetVisibility: Boolean!
+	canDelete: Boolean!
 }
 
 scalar DatasetID
@@ -899,6 +920,10 @@ type DatasetMetadataMut {
 	updateReadme(content: String): UpdateReadmeResult!
 }
 
+type DatasetMetadataPermissions {
+	canCommit: Boolean!
+}
+
 type DatasetMut {
 	"""
 	Access to the mutable metadata of the dataset
@@ -937,11 +962,11 @@ type DatasetMut {
 scalar DatasetName
 
 type DatasetPermissions {
-	canView: Boolean!
-	canDelete: Boolean!
-	canRename: Boolean!
-	canCommit: Boolean!
-	canSchedule: Boolean!
+	collaboration: DatasetCollaborationPermissions!
+	envVars: DatasetEnvVarsPermissions!
+	flows: DatasetFlowsPermissions!
+	general: DatasetGeneralPermissions!
+	metadata: DatasetMetadataPermissions!
 }
 
 type DatasetPushStatus {
