@@ -22,7 +22,7 @@ use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset, make_dataset_ac
 
 #[derive(Debug)]
 pub struct Dataset {
-    state: DatasetState,
+    dataset_request_state: DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -31,7 +31,7 @@ impl Dataset {
     #[graphql(skip)]
     pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
         Self {
-            state: DatasetState::new(owner, dataset_handle),
+            dataset_request_state: DatasetRequestState::new(owner, dataset_handle),
         }
     }
 
@@ -74,30 +74,39 @@ impl Dataset {
 
     /// Unique identifier of the dataset
     async fn id(&self) -> DatasetID {
-        (&self.state.dataset_handle.id).into()
+        (&self.dataset_request_state.dataset_handle.id).into()
     }
 
     /// Symbolic name of the dataset.
     /// Name can change over the dataset's lifetime. For unique identifier use
     /// `id()`.
     async fn name(&self) -> DatasetName {
-        (&self.state.dataset_handle.alias.dataset_name).into()
+        (&self.dataset_request_state
+            .dataset_handle
+            .alias
+            .dataset_name
+            )
+            .into()
     }
 
     /// Returns the user or organization that owns this dataset
     async fn owner(&self) -> &Account {
-        &self.state.owner
+        &self.dataset_request_state.owner
     }
 
     /// Returns dataset alias (user + name)
     async fn alias(&self) -> DatasetAlias {
-        (&self.state.dataset_handle.alias).into()
+        (&self.dataset_request_state
+            .dataset_handle
+            .alias
+            )
+            .into()
     }
 
     /// Returns the kind of dataset (Root or Derivative)
     #[tracing::instrument(level = "info", name = Dataset_kind, skip_all)]
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let summary = self.state.dataset_summary(ctx).await?;
+        let summary = self.dataset_request_state.dataset_summary(ctx).await?;
 
         Ok(summary.kind.into())
     }
@@ -107,7 +116,7 @@ impl Dataset {
     async fn visibility(&self, ctx: &Context<'_>) -> Result<DatasetVisibilityOutput> {
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 
-        let resolved_dataset = self.state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         let properties = rebac_svc
             .get_dataset_properties(resolved_dataset.get_id())
             .await
@@ -127,7 +136,7 @@ impl Dataset {
         // TODO: Eliminate cloning
         //       GQL: Dataset: cache `ResolvedDataset`
         //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetData::new(self.state.dataset_handle.clone())
+        DatasetData::new(self.dataset_request_state.dataset_handle.clone())
     }
 
     /// Access to the metadata of the dataset
@@ -135,7 +144,7 @@ impl Dataset {
         // TODO: Eliminate cloning
         //       GQL: Dataset: cache `ResolvedDataset`
         //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetMetadata::new(self.state.dataset_handle.clone())
+        DatasetMetadata::new(self.dataset_request_state.dataset_handle.clone())
     }
 
     /// Access to the environment variable of this dataset
@@ -146,7 +155,9 @@ impl Dataset {
         // TODO: Eliminate cloning
         //       GQL: Dataset: cache `ResolvedDataset`
         //       https://github.com/kamu-data/kamu-cli/issues/1114
-        Ok(DatasetEnvVars::new(self.state.dataset_handle.clone()))
+        Ok(DatasetEnvVars::new(
+            self.dataset_request_state.dataset_handle.clone(),
+        ))
     }
 
     /// Access to the flow configurations of this dataset
@@ -154,14 +165,14 @@ impl Dataset {
         // TODO: Eliminate cloning
         //       GQL: Dataset: cache `ResolvedDataset`
         //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetFlows::new(self.state.dataset_handle.clone())
+        DatasetFlows::new(self.dataset_request_state.dataset_handle.clone())
     }
 
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     #[tracing::instrument(level = "info", name = Dataset_created_at, skip_all)]
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let resolved_dataset = self.state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
         use odf::dataset::MetadataChainExt;
         Ok(resolved_dataset
@@ -177,7 +188,7 @@ impl Dataset {
     /// Creation time of the most recent metadata block in the chain
     #[tracing::instrument(level = "info", name = Dataset_last_updated_at, skip_all)]
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let resolved_dataset = self.state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
         use odf::dataset::MetadataChainExt;
         Ok(resolved_dataset
@@ -190,7 +201,10 @@ impl Dataset {
     /// Permissions of the current user
     #[tracing::instrument(level = "info", name = Dataset_permissions, skip_all)]
     async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
-        let allowed_actions = self.state.allowed_dataset_actions(ctx).await?;
+        let allowed_actions = self
+            .dataset_request_state
+            .allowed_dataset_actions(ctx)
+            .await?;
         let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
 
@@ -205,7 +219,7 @@ impl Dataset {
 
     /// Access to the dataset collaboration data
     async fn collaboration(&self) -> DatasetCollaboration {
-        DatasetCollaboration::new(&self.state)
+        DatasetCollaboration::new(&self.dataset_request_state)
     }
 
     /// Various endpoints for interacting with data
@@ -215,13 +229,17 @@ impl Dataset {
         // TODO: Eliminate cloning
         //       GQL: Dataset: cache `ResolvedDataset`
         //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetEndpoints::new(&self.state.owner, self.state.dataset_handle.clone(), config)
+        DatasetEndpoints::new(
+            &self.dataset_request_state.owner,
+            self.dataset_request_state.dataset_handle.clone(),
+            config,
+        )
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub(crate) struct DatasetState {
+pub(crate) struct DatasetRequestState {
     owner: Account,
     dataset_handle: odf::DatasetHandle,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
@@ -229,7 +247,7 @@ pub(crate) struct DatasetState {
     dataset_summary: OnceCell<odf::DatasetSummary>,
 }
 
-impl DatasetState {
+impl DatasetRequestState {
     pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
         Self {
             owner,
