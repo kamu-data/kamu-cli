@@ -1,6 +1,16 @@
-actor UserActor {}
+actor UserActor {
+    # Fields:
+    # - account_id: String
+    # - anonymous: bool
+    # - is_admin: bool
+}
 
 resource DatasetResource {
+    # Fields:
+    # - owner_account_id: String
+    # - allows_public_read: bool
+    # - authorized_users: Dictionary<account_id: String, role: String>
+
     permissions = ["read", "write"];
 }
 
