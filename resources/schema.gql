@@ -143,6 +143,31 @@ enum AccountType {
 	ORGANIZATION
 }
 
+type AccountWithRole {
+	account: Account!
+	role: DatasetAccessRole!
+}
+
+type AccountWithRoleConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [AccountWithRole!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [AccountWithRoleEdge!]!
+}
+
+type AccountWithRoleEdge {
+	node: AccountWithRole!
+}
+
 type Accounts {
 	"""
 	Returns account by its ID
@@ -605,12 +630,38 @@ type Dataset {
 	"""
 	permissions: DatasetPermissions!
 	"""
+	Access to the dataset collaboration data
+	"""
+	collaboration: DatasetCollaboration!
+	"""
 	Various endpoints for interacting with data
 	"""
 	endpoints: DatasetEndpoints!
 }
 
+enum DatasetAccessRole {
+	"""
+	Role opening the possibility for read-only access
+	"""
+	READER
+	"""
+	Role opening to modify dataset data
+	"""
+	EDITOR
+	"""
+	Role to maintain the dataset
+	"""
+	MAINTAINER
+}
+
 scalar DatasetAlias
+
+type DatasetCollaboration {
+	"""
+	Accounts (and their roles) that have access to the dataset
+	"""
+	accountRoles(page: Int, perPage: Int): AccountWithRoleConnection!
+}
 
 type DatasetConnection {
 	"""
