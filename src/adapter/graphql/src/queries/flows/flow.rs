@@ -56,8 +56,8 @@ impl Flow {
     }
 
     /// Description of key flow parameters
-    async fn description(&self) -> FlowDescription {
-        self.description.clone()
+    async fn description(&self) -> &FlowDescription {
+        &self.description
     }
 
     /// Status of the flow

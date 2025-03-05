@@ -32,8 +32,8 @@ impl ViewDatasetEnvVar {
     }
 
     /// Key of the dataset environment variable
-    async fn key(&self) -> String {
-        self.env_var.key.clone()
+    async fn key(&self) -> &String {
+        &self.env_var.key
     }
 
     /// Non secret value of dataset environment variable
