@@ -7,131 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ops::Deref;
 
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetID
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetID<'a>(Cow<'a, odf::DatasetID>);
-
-impl From<odf::DatasetID> for DatasetID<'_> {
-    fn from(value: odf::DatasetID) -> Self {
-        Self(Cow::Owned(value))
-    }
-}
-
-impl<'a> From<&'a odf::DatasetID> for DatasetID<'a> {
-    fn from(value: &'a odf::DatasetID) -> Self {
-        Self(Cow::Borrowed(value))
-    }
-}
-
-impl From<DatasetID<'_>> for odf::DatasetID {
-    fn from(val: DatasetID) -> Self {
-        val.0.into_owned()
-    }
-}
-
-impl From<DatasetID<'_>> for String {
-    fn from(val: DatasetID<'_>) -> Self {
-        val.0.to_string()
-    }
-}
-
-impl Deref for DatasetID<'_> {
-    type Target = odf::DatasetID;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for DatasetID<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for DatasetID<'_> {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::DatasetID::from_did_str(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetName
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetName<'a>(Cow<'a, odf::DatasetName>);
-
-impl From<odf::DatasetName> for DatasetName<'_> {
-    fn from(value: odf::DatasetName) -> Self {
-        Self(Cow::Owned(value))
-    }
-}
-
-impl<'a> From<&'a odf::DatasetName> for DatasetName<'a> {
-    fn from(value: &'a odf::DatasetName) -> Self {
-        Self(Cow::Borrowed(value))
-    }
-}
-
-impl From<DatasetName<'_>> for odf::DatasetName {
-    fn from(val: DatasetName<'_>) -> Self {
-        val.0.into_owned()
-    }
-}
-
-impl From<DatasetName<'_>> for String {
-    fn from(val: DatasetName<'_>) -> Self {
-        val.0.to_string()
-    }
-}
-
-impl Deref for DatasetName<'_> {
-    type Target = odf::DatasetName;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for DatasetName<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for DatasetName<'_> {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::DatasetName::try_from(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
+simple_string_scalar!(DatasetID, odf::DatasetID, from_did_str);
+simple_string_scalar!(DatasetName, odf::DatasetName);
+simple_string_scalar!(DatasetAlias, odf::DatasetAlias);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetRefAny
@@ -230,66 +115,6 @@ impl ScalarType for DatasetRef {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
             let val = odf::DatasetRef::try_from(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetAlias
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetAlias<'a>(Cow<'a, odf::DatasetAlias>);
-
-impl From<odf::DatasetAlias> for DatasetAlias<'_> {
-    fn from(value: odf::DatasetAlias) -> Self {
-        Self(Cow::Owned(value))
-    }
-}
-
-impl<'a> From<&'a odf::DatasetAlias> for DatasetAlias<'a> {
-    fn from(value: &'a odf::DatasetAlias) -> Self {
-        Self(Cow::Borrowed(value))
-    }
-}
-
-impl From<DatasetAlias<'_>> for odf::DatasetAlias {
-    fn from(val: DatasetAlias<'_>) -> Self {
-        val.0.into_owned()
-    }
-}
-
-impl From<DatasetAlias<'_>> for String {
-    fn from(val: DatasetAlias) -> Self {
-        val.0.to_string()
-    }
-}
-
-impl Deref for DatasetAlias<'_> {
-    type Target = odf::DatasetAlias;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for DatasetAlias<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for DatasetAlias<'_> {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::DatasetAlias::try_from(value.as_str())?;
             Ok(val.into())
         } else {
             Err(InputValueError::expected_type(value))
