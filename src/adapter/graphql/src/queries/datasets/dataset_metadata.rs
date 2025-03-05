@@ -289,7 +289,7 @@ impl DatasetMetadata {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 enum DependencyDatasetResult {
     Accessible(DependencyDatasetResultAccessible),
@@ -308,7 +308,7 @@ impl DependencyDatasetResult {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DependencyDatasetResultAccessible {
     pub dataset: Dataset,
@@ -321,7 +321,7 @@ impl DependencyDatasetResultAccessible {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DependencyDatasetResultNotAccessible {
     pub id: DatasetID,

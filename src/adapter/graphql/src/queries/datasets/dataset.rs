@@ -17,7 +17,7 @@ use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Dataset {
     owner: Account,
     dataset_handle: odf::DatasetHandle,
@@ -209,7 +209,7 @@ impl Dataset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Debug, Clone, PartialEq, Eq)]
+#[derive(Union, Debug, PartialEq, Eq)]
 pub enum DatasetVisibilityOutput {
     Private(PrivateDatasetVisibility),
     Public(PublicDatasetVisibility),
@@ -227,13 +227,13 @@ impl DatasetVisibilityOutput {
     }
 }
 
-#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
 #[graphql(input_name = "PrivateDatasetVisibilityInput")]
 pub struct PrivateDatasetVisibility {
     _dummy: Option<String>,
 }
 
-#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
 #[graphql(input_name = "PublicDatasetVisibilityInput")]
 pub struct PublicDatasetVisibility {
     pub anonymous_available: bool,
@@ -241,7 +241,7 @@ pub struct PublicDatasetVisibility {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetPermissions {
     can_view: bool,
     can_delete: bool,

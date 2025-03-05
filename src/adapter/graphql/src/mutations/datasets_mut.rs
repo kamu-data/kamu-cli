@@ -169,14 +169,14 @@ impl DatasetsMut {
 // CreateDatasetResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateDatasetResult {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision),
 }
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateDatasetFromSnapshotResult {
     Success(CreateDatasetResultSuccess),
@@ -191,7 +191,7 @@ pub enum CreateDatasetFromSnapshotResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultSuccess {
     pub dataset: Dataset,
@@ -206,7 +206,7 @@ impl CreateDatasetResultSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultNameCollision {
     pub account_name: Option<AccountName>,
@@ -222,14 +222,14 @@ impl CreateDatasetResultNameCollision {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct CreateDatasetResultInvalidSnapshot {
     pub message: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultMissingInputs {
     // TODO: Input can be referenced by ID or by name
