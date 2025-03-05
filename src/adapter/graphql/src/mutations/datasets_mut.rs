@@ -26,7 +26,11 @@ pub struct DatasetsMut;
 impl DatasetsMut {
     /// Returns a mutable dataset by its ID
     #[tracing::instrument(level = "info", name = DatasetsMut_by_id, skip_all, fields(%dataset_id))]
-    async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<DatasetMut>> {
+    async fn by_id(
+        &self,
+        ctx: &Context<'_>,
+        dataset_id: DatasetID<'_>,
+    ) -> Result<Option<DatasetMut>> {
         let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
         let hdl = dataset_registry
             .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
@@ -41,7 +45,7 @@ impl DatasetsMut {
         &self,
         ctx: &Context<'_>,
         dataset_kind: DatasetKind,
-        dataset_alias: DatasetAlias,
+        dataset_alias: DatasetAlias<'_>,
         // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
         //       https://github.com/kamu-data/kamu-cli/issues/780
         dataset_visibility: Option<DatasetVisibility>,
@@ -169,18 +173,18 @@ impl DatasetsMut {
 // CreateDatasetResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CreateDatasetResult {
+pub enum CreateDatasetResult<'a> {
     Success(CreateDatasetResultSuccess),
-    NameCollision(CreateDatasetResultNameCollision),
+    NameCollision(CreateDatasetResultNameCollision<'a>),
 }
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CreateDatasetFromSnapshotResult {
+pub enum CreateDatasetFromSnapshotResult<'a> {
     Success(CreateDatasetResultSuccess),
-    NameCollision(CreateDatasetResultNameCollision),
+    NameCollision(CreateDatasetResultNameCollision<'a>),
     Malformed(MetadataManifestMalformed),
     UnsupportedVersion(MetadataManifestUnsupportedVersion),
     InvalidSnapshot(CreateDatasetResultInvalidSnapshot),
@@ -191,7 +195,7 @@ pub enum CreateDatasetFromSnapshotResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultSuccess {
     pub dataset: Dataset,
@@ -206,15 +210,15 @@ impl CreateDatasetResultSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct CreateDatasetResultNameCollision {
-    pub account_name: Option<AccountName>,
-    pub dataset_name: DatasetName,
+pub struct CreateDatasetResultNameCollision<'a> {
+    pub account_name: Option<AccountName<'a>>,
+    pub dataset_name: DatasetName<'a>,
 }
 
 #[ComplexObject]
-impl CreateDatasetResultNameCollision {
+impl CreateDatasetResultNameCollision<'_> {
     async fn message(&self) -> String {
         format!("Dataset with name '{}' already exists", self.dataset_name)
     }
@@ -222,14 +226,14 @@ impl CreateDatasetResultNameCollision {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct CreateDatasetResultInvalidSnapshot {
     pub message: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultMissingInputs {
     // TODO: Input can be referenced by ID or by name

@@ -23,8 +23,8 @@ use crate::utils::check_logged_account_id_match;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
-    account_id: AccountID,
-    account_name: AccountName,
+    account_id: AccountID<'static>,
+    account_name: AccountName<'static>,
     full_account_info: OnceCell<kamu_accounts::Account>,
 }
 
@@ -37,7 +37,7 @@ pub enum AccountType {
 #[Object]
 impl Account {
     #[graphql(skip)]
-    pub(crate) fn new(account_id: AccountID, account_name: AccountName) -> Self {
+    pub(crate) fn new(account_id: AccountID<'static>, account_name: AccountName<'static>) -> Self {
         Self {
             account_id,
             account_name,
@@ -122,7 +122,10 @@ impl Account {
 
     #[graphql(skip)]
     #[inline]
-    async fn get_full_account_info(&self, ctx: &Context<'_>) -> Result<&kamu_accounts::Account> {
+    async fn get_full_account_info<'a>(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<&'a kamu_accounts::Account> {
         self.full_account_info
             .get_or_try_init(|| self.resolve_full_account_info(ctx))
             .await
@@ -144,12 +147,10 @@ impl Account {
     }
 
     /// Account name to display
-    async fn display_name(&self, ctx: &Context<'_>) -> Result<AccountDisplayName> {
+    async fn display_name<'a>(&'a self, ctx: &Context<'_>) -> Result<AccountDisplayName<'a>> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
-        Ok(AccountDisplayName::from(
-            full_account_info.display_name.clone(),
-        ))
+        Ok((&full_account_info.display_name).into())
     }
 
     /// Account type

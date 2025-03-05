@@ -11,17 +11,17 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetState {
     /// Globally unique identity of the dataset
-    pub id: DatasetID,
+    pub id: DatasetID<'static>,
 
     /// Alias to be used in the query
     pub alias: String,
 
     /// Last block hash of the input datasets that was or should be considered
     /// during the query planning
-    pub block_hash: Option<Multihash>,
+    pub block_hash: Option<Multihash<'static>>,
 }
 
 impl DatasetState {

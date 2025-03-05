@@ -203,7 +203,7 @@ pub(crate) async fn ensure_flow_preconditions(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct FlowPreconditionsNotMet {
     pub preconditions: String,
@@ -216,7 +216,7 @@ impl FlowPreconditionsNotMet {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub(crate) struct FlowIncompatibleDatasetKind {
     pub expected_dataset_kind: DatasetKind,

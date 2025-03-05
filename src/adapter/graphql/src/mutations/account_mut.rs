@@ -13,7 +13,7 @@ use kamu_accounts::{Account, AccountRepository, UpdateAccountError};
 use super::AccountFlowsMut;
 use crate::prelude::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct AccountMut {
     account: Account,
 }
@@ -92,7 +92,7 @@ impl UpdateEmailSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct UpdateEmailInvalid {
     pub dummy: bool,
@@ -107,7 +107,7 @@ impl UpdateEmailInvalid {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct UpdateEmailNonUnique {
     pub dummy: bool,

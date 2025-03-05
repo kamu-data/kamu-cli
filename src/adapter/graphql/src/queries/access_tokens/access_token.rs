@@ -15,7 +15,6 @@ use crate::queries::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
 pub struct ViewAccessToken {
     token: ViewKamuAccessToken,
 }
@@ -29,12 +28,12 @@ impl ViewAccessToken {
 
     /// Unique identifier of the access token
     async fn id(&self) -> AccessTokenID {
-        self.token.id.into()
+        (&self.token.id).into()
     }
 
     /// Name of the access token
-    async fn name(&self) -> String {
-        self.token.token_name.clone()
+    async fn name(&self) -> &String {
+        &self.token.token_name
     }
 
     /// Date of token creation
@@ -57,20 +56,20 @@ impl ViewAccessToken {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
-pub struct CreatedAccessToken {
+#[derive(Debug)]
+pub struct CreatedAccessToken<'a> {
     token: KamuAccessToken,
-    account_id: AccountID,
+    account_id: AccountID<'a>,
     token_name: String,
 }
 
 #[Object]
-impl CreatedAccessToken {
+impl<'a> CreatedAccessToken<'a> {
     #[graphql(skip)]
-    pub fn new(token: KamuAccessToken, account_id: &AccountID, token_name: &str) -> Self {
+    pub fn new(token: KamuAccessToken, account_id: AccountID<'a>, token_name: &str) -> Self {
         Self {
             token,
-            account_id: account_id.clone(),
+            account_id,
             token_name: token_name.to_string(),
         }
     }
@@ -81,13 +80,13 @@ impl CreatedAccessToken {
     }
 
     /// Name of the access token
-    async fn name(&self) -> String {
-        self.token_name.clone()
+    async fn name(&self) -> &String {
+        &self.token_name
     }
 
     /// Composed original token
-    async fn composed(&self) -> String {
-        self.token.composed_token.to_string()
+    async fn composed(&self) -> &String {
+        &self.token.composed_token
     }
 
     /// Access token account owner
@@ -98,15 +97,17 @@ impl CreatedAccessToken {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct CreateAccessTokenResultSuccess {
-    pub token: CreatedAccessToken,
+pub struct CreateAccessTokenResultSuccess<'a> {
+    pub token: CreatedAccessToken<'a>,
 }
 
 #[ComplexObject]
-impl CreateAccessTokenResultSuccess {
+impl CreateAccessTokenResultSuccess<'_> {
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

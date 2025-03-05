@@ -23,7 +23,6 @@ use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
 pub struct Flow {
     flow_state: Box<fs::FlowState>,
     description: FlowDescription,
@@ -57,8 +56,8 @@ impl Flow {
     }
 
     /// Description of key flow parameters
-    async fn description(&self) -> FlowDescription {
-        self.description.clone()
+    async fn description(&self) -> &FlowDescription {
+        &self.description
     }
 
     /// Status of the flow

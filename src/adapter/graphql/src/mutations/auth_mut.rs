@@ -53,7 +53,7 @@ impl AuthMut {
     async fn create_access_token(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
+        account_id: AccountID<'static>,
         token_name: String,
     ) -> Result<CreateTokenResult> {
         check_logged_account_id_match(ctx, &account_id)?;
@@ -65,7 +65,7 @@ impl AuthMut {
             .await
         {
             Ok(created_token) => Ok(CreateTokenResult::Success(CreateAccessTokenResultSuccess {
-                token: CreatedAccessToken::new(created_token, &account_id, &token_name),
+                token: CreatedAccessToken::new(created_token, account_id, &token_name),
             })),
             Err(err) => match err {
                 CreateAccessTokenError::Duplicate(_) => Ok(CreateTokenResult::DuplicateName(
@@ -82,7 +82,7 @@ impl AuthMut {
     async fn revoke_access_token(
         &self,
         ctx: &Context<'_>,
-        token_id: AccessTokenID,
+        token_id: AccessTokenID<'static>,
     ) -> Result<RevokeResult> {
         check_access_token_valid(ctx, &token_id).await?;
 
@@ -145,7 +145,7 @@ impl From<kamu_accounts::GetAccountInfoError> for GqlError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub(crate) struct LoginResponse {
     access_token: String,
     account: Account,
@@ -164,19 +164,19 @@ impl From<kamu_accounts::LoginResponse> for LoginResponse {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum RevokeResult {
-    Success(RevokeResultSuccess),
-    AlreadyRevoked(RevokeResultAlreadyRevoked),
+pub enum RevokeResult<'a> {
+    Success(RevokeResultSuccess<'a>),
+    AlreadyRevoked(RevokeResultAlreadyRevoked<'a>),
 }
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct RevokeResultSuccess {
-    pub token_id: AccessTokenID,
+pub struct RevokeResultSuccess<'a> {
+    pub token_id: AccessTokenID<'a>,
 }
 
 #[ComplexObject]
-impl RevokeResultSuccess {
+impl RevokeResultSuccess<'_> {
     async fn message(&self) -> String {
         "Access token revoked successfully".to_string()
     }
@@ -184,12 +184,12 @@ impl RevokeResultSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct RevokeResultAlreadyRevoked {
-    pub token_id: AccessTokenID,
+pub struct RevokeResultAlreadyRevoked<'a> {
+    pub token_id: AccessTokenID<'a>,
 }
 
 #[ComplexObject]
-impl RevokeResultAlreadyRevoked {
+impl RevokeResultAlreadyRevoked<'_> {
     async fn message(&self) -> String {
         format!("Access token with id {} already revoked", self.token_id)
     }
@@ -197,14 +197,14 @@ impl RevokeResultAlreadyRevoked {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CreateTokenResult {
-    Success(CreateAccessTokenResultSuccess),
+pub enum CreateTokenResult<'a> {
+    Success(CreateAccessTokenResultSuccess<'a>),
     DuplicateName(CreateAccessTokenResultDuplicate),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateAccessTokenResultDuplicate {
     pub token_name: String,
@@ -216,3 +216,5 @@ impl CreateAccessTokenResultDuplicate {
         format!("Access token with {} name already exists", self.token_name)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

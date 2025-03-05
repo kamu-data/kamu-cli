@@ -180,7 +180,7 @@ pub(crate) fn check_logged_account_id_match(
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_id == account_id.clone().into() {
+        if logged_account.account_id == **account_id {
             return Ok(());
         }
     };
@@ -194,7 +194,7 @@ pub(crate) fn check_logged_account_id_match(
 
 pub(crate) async fn check_access_token_valid(
     ctx: &Context<'_>,
-    token_id: &AccessTokenID,
+    token_id: &AccessTokenID<'_>,
 ) -> Result<(), GqlError> {
     let (current_account_subject, access_token_service) = from_catalog_n!(
         ctx,
@@ -213,7 +213,7 @@ pub(crate) async fn check_access_token_valid(
         })?;
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_id == existing_access_token.account_id.clone() {
+        if logged_account.account_id == existing_access_token.account_id {
             return Ok(());
         }
     };
@@ -233,7 +233,7 @@ pub(crate) fn check_logged_account_name_match(
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_name == odf::AccountName::from(account_name.clone()) {
+        if logged_account.account_name == **account_name {
             return Ok(());
         }
     };

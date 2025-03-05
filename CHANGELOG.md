@@ -16,6 +16,7 @@ Recommendation: for ease of reading, use the following order:
 - Simple Transfer Protocol & Smart Transfer Protocol use `AppendDatasetMetadataBatchUseCase`
 - SQLite: protection against database locking, in case of parallel execution of `kamu` commands.
   - Based on `journal_mode=WAL`
+- GQL: speeding up work by reducing allocations
 ### Fixed
 - API server correctly logs unknown routes
 - GQL: `Search::query()`: fix regression resulting in unstable ordering of search results

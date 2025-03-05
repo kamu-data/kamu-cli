@@ -7,138 +7,42 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::ops::Deref;
 
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountID
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct AccountID(odf::AccountID);
-
-impl From<odf::AccountID> for AccountID {
-    fn from(value: odf::AccountID) -> Self {
-        AccountID(value)
-    }
-}
-
-impl From<AccountID> for odf::AccountID {
-    fn from(val: AccountID) -> Self {
-        val.0
-    }
-}
-
-impl From<&AccountID> for odf::AccountID {
-    fn from(val: &AccountID) -> Self {
-        val.0.clone()
-    }
-}
-
-impl From<AccountID> for String {
-    fn from(val: AccountID) -> Self {
-        val.0.to_string()
-    }
-}
-
-impl Deref for AccountID {
-    type Target = odf::AccountID;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for AccountID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for AccountID {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::AccountID::from_did_str(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountName
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AccountName(odf::AccountName);
-
-impl From<odf::AccountName> for AccountName {
-    fn from(value: odf::AccountName) -> Self {
-        Self(value)
-    }
-}
-
-impl From<AccountName> for odf::AccountName {
-    fn from(val: AccountName) -> Self {
-        val.0
-    }
-}
-
-impl Deref for AccountName {
-    type Target = odf::AccountName;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for AccountName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for AccountName {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::AccountName::try_from(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
+simple_string_scalar!(AccountID, odf::AccountID, from_did_str);
+simple_string_scalar!(AccountName, odf::AccountName);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountDisplayName
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AccountDisplayName(kamu_accounts::AccountDisplayName);
+pub struct AccountDisplayName<'a>(Cow<'a, kamu_accounts::AccountDisplayName>);
 
-impl From<kamu_accounts::AccountDisplayName> for AccountDisplayName {
+impl From<kamu_accounts::AccountDisplayName> for AccountDisplayName<'_> {
     fn from(value: kamu_accounts::AccountDisplayName) -> Self {
-        Self(value)
+        Self(Cow::Owned(value))
     }
 }
 
-impl From<AccountDisplayName> for kamu_accounts::AccountDisplayName {
-    fn from(val: AccountDisplayName) -> Self {
-        val.0
+impl<'a> From<&'a kamu_accounts::AccountDisplayName> for AccountDisplayName<'a> {
+    fn from(value: &'a kamu_accounts::AccountDisplayName) -> Self {
+        Self(Cow::Borrowed(value))
     }
 }
 
-impl Deref for AccountDisplayName {
+impl From<AccountDisplayName<'_>> for kamu_accounts::AccountDisplayName {
+    fn from(val: AccountDisplayName<'_>) -> Self {
+        val.0.into_owned()
+    }
+}
+
+impl Deref for AccountDisplayName<'_> {
     type Target = kamu_accounts::AccountDisplayName;
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -146,7 +50,7 @@ impl Deref for AccountDisplayName {
 }
 
 #[Scalar]
-impl ScalarType for AccountDisplayName {
+impl ScalarType for AccountDisplayName<'_> {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
             let val = kamu_accounts::AccountDisplayName::from(value.as_str());

@@ -48,7 +48,7 @@ impl Datasets {
 
     /// Returns dataset by its ID
     #[tracing::instrument(level = "info", name = Datasets_by_id, skip_all, fields(%dataset_id))]
-    async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
+    async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID<'_>) -> Result<Option<Dataset>> {
         let dataset_id: odf::DatasetID = dataset_id.into();
 
         self.by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
@@ -59,8 +59,8 @@ impl Datasets {
     async fn by_owner_and_name(
         &self,
         ctx: &Context<'_>,
-        account_name: AccountName,
-        dataset_name: DatasetName,
+        account_name: AccountName<'_>,
+        dataset_name: DatasetName<'_>,
     ) -> Result<Option<Dataset>> {
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
@@ -90,7 +90,7 @@ impl Datasets {
         use futures::TryStreamExt;
 
         let account_owned_datasets_stream =
-            dataset_registry.all_dataset_handles_by_owner(&account_name.clone().into());
+            dataset_registry.all_dataset_handles_by_owner(account_name);
         let readable_dataset_handles_stream = dataset_action_authorizer
             .filtered_datasets_stream(account_owned_datasets_stream, DatasetAction::Read);
         let mut accessible_datasets_handles = readable_dataset_handles_stream
@@ -116,7 +116,7 @@ impl Datasets {
     async fn by_account_id(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
+        account_id: AccountID<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
@@ -146,7 +146,7 @@ impl Datasets {
     async fn by_account_name(
         &self,
         ctx: &Context<'_>,
-        account_name: AccountName,
+        account_name: AccountName<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
@@ -166,3 +166,5 @@ impl Datasets {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(Dataset, DatasetConnection, DatasetEdge);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

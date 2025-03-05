@@ -24,7 +24,7 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Clone)]
+#[derive(Union)]
 pub(crate) enum FlowDescription {
     #[graphql(flatten)]
     Dataset(FlowDescriptionDataset),
@@ -32,17 +32,17 @@ pub(crate) enum FlowDescription {
     System(FlowDescriptionSystem),
 }
 
-#[derive(Union, Clone)]
+#[derive(Union)]
 pub(crate) enum FlowDescriptionSystem {
     GC(FlowDescriptionSystemGC),
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionSystemGC {
     dummy: bool,
 }
 
-#[derive(Union, Clone)]
+#[derive(Union)]
 pub(crate) enum FlowDescriptionDataset {
     PollingIngest(FlowDescriptionDatasetPollingIngest),
     PushIngest(FlowDescriptionDatasetPushIngest),
@@ -51,53 +51,53 @@ pub(crate) enum FlowDescriptionDataset {
     Reset(FlowDescriptionDatasetReset),
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPollingIngest {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     ingest_result: Option<FlowDescriptionUpdateResult>,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPushIngest {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     source_name: Option<String>,
     input_records_count: u64,
     ingest_result: Option<FlowDescriptionUpdateResult>,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetExecuteTransform {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     transform_result: Option<FlowDescriptionUpdateResult>,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetHardCompaction {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     compaction_result: Option<FlowDescriptionDatasetHardCompactionResult>,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetReset {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     reset_result: Option<FlowDescriptionResetResult>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Clone)]
+#[derive(Union)]
 pub(crate) enum FlowDescriptionUpdateResult {
     UpToDate(FlowDescriptionUpdateResultUpToDate),
     Success(FlowDescriptionUpdateResultSuccess),
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionUpdateResultUpToDate {
     /// The value indicates whether the api cache was used
     uncacheable: bool,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionUpdateResultSuccess {
     num_blocks: u64,
     num_records: u64,
@@ -150,20 +150,20 @@ impl FlowDescriptionUpdateResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug)]
 enum FlowDescriptionDatasetHardCompactionResult {
     NothingToDo(FlowDescriptionHardCompactionNothingToDo),
     Success(FlowDescriptionHardCompactionSuccess),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 struct FlowDescriptionHardCompactionSuccess {
     original_blocks_count: u64,
     resulting_blocks_count: u64,
-    new_head: Multihash,
+    new_head: Multihash<'static>,
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct FlowDescriptionHardCompactionNothingToDo {
     pub _dummy: String,
@@ -205,9 +205,9 @@ impl FlowDescriptionDatasetHardCompactionResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 struct FlowDescriptionResetResult {
-    new_head: Multihash,
+    new_head: Multihash<'static>,
 }
 
 impl FlowDescriptionResetResult {

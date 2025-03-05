@@ -29,7 +29,7 @@ use crate::queries::Dataset;
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
-    pub prev_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<Multihash<'static>>,
     /// Last offset of the previous data slice, if any. Must be equal to the
     /// last non-empty `newData.offsetInterval.end`.
     pub prev_offset: Option<u64>,
@@ -162,7 +162,7 @@ impl From<odf::metadata::AttachmentsEmbedded> for AttachmentsEmbedded {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Checkpoint {
     /// Hash sum of the checkpoint file.
-    pub physical_hash: Multihash,
+    pub physical_hash: Multihash<'static>,
     /// Size of checkpoint file in bytes.
     pub size: u64,
 }
@@ -213,9 +213,9 @@ impl Into<odf::metadata::CompressionFormat> for CompressionFormat {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DataSlice {
     /// Logical hash sum of the data in this slice.
-    pub logical_hash: Multihash,
+    pub logical_hash: Multihash<'static>,
     /// Hash sum of the data part file.
-    pub physical_hash: Multihash,
+    pub physical_hash: Multihash<'static>,
     /// Data slice produced by the transaction.
     pub offset_interval: OffsetInterval,
     /// Size of data file in bytes.
@@ -272,7 +272,7 @@ impl Into<odf::metadata::DatasetKind> for DatasetKind {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetSnapshot {
     /// Alias of the dataset.
-    pub name: DatasetAlias,
+    pub name: DatasetAlias<'static>,
     /// Type of the dataset.
     pub kind: DatasetKind,
     /// An array of metadata events that will be used to populate the chain.
@@ -472,7 +472,7 @@ pub struct ExecuteTransform {
     pub query_inputs: Vec<ExecuteTransformInput>,
     /// Hash of the checkpoint file used to restore transformation state, if
     /// any.
-    pub prev_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<Multihash<'static>>,
     /// Last offset of the previous data slice, if any. Must be equal to the
     /// last non-empty `newData.offsetInterval.end`.
     pub prev_offset: Option<u64>,
@@ -511,18 +511,18 @@ impl From<odf::metadata::ExecuteTransform> for ExecuteTransform {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteTransformInput {
     /// Input dataset identifier.
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     /// Last block of the input dataset that was previously incorporated into
     /// the derivative transformation, if any. Must be equal to the last
     /// non-empty `newBlockHash`. Together with `newBlockHash` defines a
     /// half-open `(prevBlockHash, newBlockHash]` interval of blocks that will
     /// be considered in this transaction.
-    pub prev_block_hash: Option<Multihash>,
+    pub prev_block_hash: Option<Multihash<'static>>,
     /// Hash of the last block that will be incorporated into the derivative
     /// transformation. When present, defines a half-open `(prevBlockHash,
     /// newBlockHash]` interval of blocks that will be considered in this
     /// transaction.
-    pub new_block_hash: Option<Multihash>,
+    pub new_block_hash: Option<Multihash<'static>>,
     /// Last data record offset in the input dataset that was previously
     /// incorporated into the derivative transformation, if any. Must be equal
     /// to the last non-empty `newOffset`. Together with `newOffset` defines a
@@ -860,7 +860,7 @@ pub struct MetadataBlock {
     /// System time when this block was written.
     pub system_time: DateTime<Utc>,
     /// Hash sum of the preceding block.
-    pub prev_block_hash: Option<Multihash>,
+    pub prev_block_hash: Option<Multihash<'static>>,
     /// Block sequence number, starting from zero at the seed block.
     pub sequence_number: u64,
     /// Event data.
@@ -1497,7 +1497,7 @@ impl From<odf::metadata::RequestHeader> for RequestHeader {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Seed {
     /// Unique identity of the dataset.
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     /// Type of the dataset.
     pub dataset_kind: DatasetKind,
 }
@@ -1875,7 +1875,7 @@ impl From<odf::metadata::TransformSql> for TransformSql {
 /// Describes a derivative transformation input
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum TransformInputDataset {
     Accessible(TransformInputDatasetAccessible),
@@ -1894,7 +1894,7 @@ impl TransformInputDataset {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct TransformInputDatasetAccessible {
     pub dataset: Dataset,
@@ -1907,10 +1907,10 @@ impl TransformInputDatasetAccessible {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct TransformInputDatasetNotAccessible {
-    pub dataset_ref: DatasetRef,
+    pub dataset_ref: DatasetRef<'static>,
 }
 
 #[ComplexObject]
@@ -1923,7 +1923,7 @@ impl TransformInputDatasetNotAccessible {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 #[graphql(complex)]
 pub struct TransformInput {
-    pub dataset_ref: DatasetRef,
+    pub dataset_ref: DatasetRef<'static>,
     pub alias: String,
 }
 
@@ -1952,9 +1952,9 @@ impl From<odf::metadata::TransformInput> for TransformInput {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequest {
     /// Unique identifier of the output dataset.
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     /// Alias of the output dataset, for logging purposes only.
-    pub dataset_alias: DatasetAlias,
+    pub dataset_alias: DatasetAlias<'static>,
     /// System time to use for new records.
     pub system_time: DateTime<Utc>,
     /// Vocabulary of the output dataset.
@@ -2002,9 +2002,9 @@ impl From<odf::metadata::TransformRequest> for TransformRequest {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequestInput {
     /// Unique identifier of the dataset.
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     /// Alias of the output dataset, for logging purposes only.
-    pub dataset_alias: DatasetAlias,
+    pub dataset_alias: DatasetAlias<'static>,
     /// An alias of this input to be used in queries.
     pub query_alias: String,
     /// Vocabulary of the input dataset.

@@ -19,7 +19,7 @@ pub struct Accounts;
 impl Accounts {
     /// Returns account by its ID
     #[tracing::instrument(level = "info", name = Accounts_by_id, skip_all, fields(%account_id))]
-    async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID) -> Result<Option<Account>> {
+    async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID<'_>) -> Result<Option<Account>> {
         let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let account_id: odf::AccountID = account_id.into();
@@ -31,7 +31,7 @@ impl Accounts {
 
     /// Returns account by its name
     #[tracing::instrument(level = "info", name = Accounts_by_name, skip_all, fields(%name))]
-    async fn by_name(&self, ctx: &Context<'_>, name: AccountName) -> Result<Option<Account>> {
+    async fn by_name(&self, ctx: &Context<'_>, name: AccountName<'_>) -> Result<Option<Account>> {
         let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
 
         let account_name: odf::AccountName = name.into();

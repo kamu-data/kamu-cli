@@ -24,7 +24,7 @@ use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DatasetMut {
     dataset_handle: odf::DatasetHandle,
 }
@@ -58,7 +58,11 @@ impl DatasetMut {
     /// Rename the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
     #[tracing::instrument(level = "info", name = DatasetMut_rename, skip_all)]
-    async fn rename(&self, ctx: &Context<'_>, new_name: DatasetName) -> Result<RenameResult> {
+    async fn rename(
+        &self,
+        ctx: &Context<'_>,
+        new_name: DatasetName<'static>,
+    ) -> Result<RenameResult<'_>> {
         if self
             .dataset_handle
             .alias
@@ -77,7 +81,7 @@ impl DatasetMut {
             .await
         {
             Ok(_) => Ok(RenameResult::Success(RenameResultSuccess {
-                old_name: self.dataset_handle.alias.dataset_name.clone().into(),
+                old_name: (&self.dataset_handle.alias.dataset_name).into(),
                 new_name,
             })),
             Err(RenameDatasetError::NameCollision(e)) => {
@@ -105,11 +109,11 @@ impl DatasetMut {
             .await
         {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
-                deleted_dataset: self.dataset_handle.alias.clone().into(),
+                deleted_dataset: (&self.dataset_handle.alias).into(),
             })),
             Err(DeleteDatasetError::DanglingReference(e)) => Ok(DeleteResult::DanglingReference(
                 DeleteResultDanglingReference {
-                    not_deleted_dataset: self.dataset_handle.alias.clone().into(),
+                    not_deleted_dataset: (&self.dataset_handle.alias).into(),
                     dangling_child_refs: e
                         .children
                         .iter()
@@ -196,49 +200,49 @@ impl DatasetMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum RenameResult {
-    Success(RenameResultSuccess),
-    NoChanges(RenameResultNoChanges),
-    NameCollision(RenameResultNameCollision),
+pub enum RenameResult<'a> {
+    Success(RenameResultSuccess<'a>),
+    NoChanges(RenameResultNoChanges<'a>),
+    NameCollision(RenameResultNameCollision<'a>),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct RenameResultSuccess {
-    pub old_name: DatasetName,
-    pub new_name: DatasetName,
+pub struct RenameResultSuccess<'a> {
+    pub old_name: DatasetName<'a>,
+    pub new_name: DatasetName<'a>,
 }
 
 #[ComplexObject]
-impl RenameResultSuccess {
+impl RenameResultSuccess<'_> {
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct RenameResultNoChanges {
-    pub preserved_name: DatasetName,
+pub struct RenameResultNoChanges<'a> {
+    pub preserved_name: DatasetName<'a>,
 }
 
 #[ComplexObject]
-impl RenameResultNoChanges {
+impl RenameResultNoChanges<'_> {
     async fn message(&self) -> String {
         "No changes".to_string()
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct RenameResultNameCollision {
-    pub colliding_alias: DatasetAlias,
+pub struct RenameResultNameCollision<'a> {
+    pub colliding_alias: DatasetAlias<'a>,
 }
 
 #[ComplexObject]
-impl RenameResultNameCollision {
+impl RenameResultNameCollision<'_> {
     async fn message(&self) -> String {
         format!("Dataset '{}' already exists", self.colliding_alias)
     }
@@ -246,35 +250,35 @@ impl RenameResultNameCollision {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum DeleteResult {
-    Success(DeleteResultSuccess),
-    DanglingReference(DeleteResultDanglingReference),
+pub enum DeleteResult<'a> {
+    Success(DeleteResultSuccess<'a>),
+    DanglingReference(DeleteResultDanglingReference<'a>),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DeleteResultSuccess {
-    pub deleted_dataset: DatasetAlias,
+pub struct DeleteResultSuccess<'a> {
+    pub deleted_dataset: DatasetAlias<'a>,
 }
 
 #[ComplexObject]
-impl DeleteResultSuccess {
+impl DeleteResultSuccess<'_> {
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DeleteResultDanglingReference {
-    pub not_deleted_dataset: DatasetAlias,
-    pub dangling_child_refs: Vec<DatasetRef>,
+pub struct DeleteResultDanglingReference<'a> {
+    pub not_deleted_dataset: DatasetAlias<'a>,
+    pub dangling_child_refs: Vec<DatasetRef<'a>>,
 }
 
 #[ComplexObject]
-impl DeleteResultDanglingReference {
+impl DeleteResultDanglingReference<'_> {
     async fn message(&self) -> String {
         format!(
             "Dataset '{}' has {} dangling reference(s)",
@@ -315,15 +319,15 @@ impl SetDatasetVisibilityResultSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum SetWatermarkResult {
+pub enum SetWatermarkResult<'a> {
     UpToDate(SetWatermarkUpToDate),
-    Updated(SetWatermarkUpdated),
+    Updated(SetWatermarkUpdated<'a>),
     IsDerivative(SetWatermarkIsDerivative),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct SetWatermarkUpToDate {
     pub _dummy: String,
@@ -336,20 +340,20 @@ impl SetWatermarkUpToDate {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct SetWatermarkUpdated {
-    pub new_head: Multihash,
+pub struct SetWatermarkUpdated<'a> {
+    pub new_head: Multihash<'a>,
 }
 
 #[ComplexObject]
-impl SetWatermarkUpdated {
+impl SetWatermarkUpdated<'_> {
     async fn message(&self) -> String {
         "Updated".to_string()
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct SetWatermarkIsDerivative {
     pub message: String,
 }

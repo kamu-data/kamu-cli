@@ -110,3 +110,87 @@ macro_rules! simple_scalar {
 pub(crate) use simple_scalar;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! simple_string_scalar {
+    ($name: ident, $source_type: ty) => {
+        crate::scalars::__simple_string_scalar_general!($name, $source_type);
+        crate::scalars::__simple_string_scalar_scalar_type!($name, $source_type, try_from);
+    };
+    ($name: ident, $source_type: ty, $source_parse_method: ident) => {
+        crate::scalars::__simple_string_scalar_general!($name, $source_type);
+        crate::scalars::__simple_string_scalar_scalar_type!(
+            $name,
+            $source_type,
+            $source_parse_method
+        );
+    };
+}
+
+macro_rules! __simple_string_scalar_general {
+    ($name: ident, $source_type: ty) => {
+        #[derive(Clone, Debug, PartialEq, Eq)]
+        pub struct $name<'a>(std::borrow::Cow<'a, $source_type>);
+
+        impl From<$source_type> for $name<'_> {
+            fn from(value: $source_type) -> Self {
+                Self(std::borrow::Cow::Owned(value))
+            }
+        }
+
+        impl<'a> From<&'a $source_type> for $name<'a> {
+            fn from(value: &'a $source_type) -> Self {
+                Self(std::borrow::Cow::Borrowed(value))
+            }
+        }
+
+        impl From<$name<'_>> for $source_type {
+            fn from(val: $name) -> Self {
+                val.0.into_owned()
+            }
+        }
+
+        impl From<$name<'_>> for String {
+            fn from(val: $name<'_>) -> Self {
+                val.0.to_string()
+            }
+        }
+
+        impl std::ops::Deref for $name<'_> {
+            type Target = $source_type;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl std::fmt::Display for $name<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+    };
+}
+
+macro_rules! __simple_string_scalar_scalar_type {
+    ($name: ident, $source_type: ty, $source_parse_method: ident) => {
+        #[async_graphql::Scalar]
+        impl async_graphql::ScalarType for $name<'_> {
+            fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+                if let async_graphql::Value::String(value) = &value {
+                    let val = <$source_type>::$source_parse_method(value.as_str())?;
+                    Ok(val.into())
+                } else {
+                    Err(async_graphql::InputValueError::expected_type(value))
+                }
+            }
+
+            fn to_value(&self) -> async_graphql::Value {
+                async_graphql::Value::String(self.0.to_string())
+            }
+        }
+    };
+}
+
+pub(crate) use simple_string_scalar;
+use {__simple_string_scalar_general, __simple_string_scalar_scalar_type};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

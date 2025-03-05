@@ -17,7 +17,7 @@ use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Dataset {
     owner: Account,
     dataset_handle: odf::DatasetHandle,
@@ -73,14 +73,14 @@ impl Dataset {
 
     /// Unique identifier of the dataset
     async fn id(&self) -> DatasetID {
-        self.dataset_handle.id.clone().into()
+        (&self.dataset_handle.id).into()
     }
 
     /// Symbolic name of the dataset.
     /// Name can change over the dataset's lifetime. For unique identifier use
     /// `id()`.
     async fn name(&self) -> DatasetName {
-        self.dataset_handle.alias.dataset_name.clone().into()
+        (&self.dataset_handle.alias.dataset_name).into()
     }
 
     /// Returns the user or organization that owns this dataset
@@ -90,7 +90,7 @@ impl Dataset {
 
     /// Returns dataset alias (user + name)
     async fn alias(&self) -> DatasetAlias {
-        self.dataset_handle.alias.clone().into()
+        (&self.dataset_handle.alias).into()
     }
 
     /// Returns the kind of dataset (Root or Derivative)
@@ -209,7 +209,7 @@ impl Dataset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Debug, Clone, PartialEq, Eq)]
+#[derive(Union, Debug, PartialEq, Eq)]
 pub enum DatasetVisibilityOutput {
     Private(PrivateDatasetVisibility),
     Public(PublicDatasetVisibility),
@@ -227,13 +227,13 @@ impl DatasetVisibilityOutput {
     }
 }
 
-#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
 #[graphql(input_name = "PrivateDatasetVisibilityInput")]
 pub struct PrivateDatasetVisibility {
     _dummy: Option<String>,
 }
 
-#[derive(SimpleObject, InputObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
 #[graphql(input_name = "PublicDatasetVisibilityInput")]
 pub struct PublicDatasetVisibility {
     pub anonymous_available: bool,
@@ -241,7 +241,7 @@ pub struct PublicDatasetVisibility {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetPermissions {
     can_view: bool,
     can_delete: bool,

@@ -81,26 +81,19 @@ impl DatasetEnvVarsMut {
     async fn delete_env_variable(
         &self,
         ctx: &Context<'_>,
-        id: DatasetEnvVarID,
+        id: DatasetEnvVarID<'static>,
     ) -> Result<DeleteDatasetEnvVarResult> {
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
-        match dataset_env_var_service
-            .delete_dataset_env_var(&id.clone().into())
-            .await
-        {
+        match dataset_env_var_service.delete_dataset_env_var(&id).await {
             Ok(_) => Ok(DeleteDatasetEnvVarResult::Success(
-                DeleteDatasetEnvVarResultSuccess {
-                    env_var_id: id.clone(),
-                },
+                DeleteDatasetEnvVarResultSuccess { env_var_id: id },
             )),
             Err(err) => match err {
                 DeleteDatasetEnvVarError::NotFound(_) => Ok(DeleteDatasetEnvVarResult::NotFound(
-                    DeleteDatasetEnvVarResultNotFound {
-                        env_var_id: id.clone(),
-                    },
+                    DeleteDatasetEnvVarResultNotFound { env_var_id: id },
                 )),
                 DeleteDatasetEnvVarError::Internal(internal_err) => {
                     Err(GqlError::Internal(internal_err))
@@ -112,7 +105,7 @@ impl DatasetEnvVarsMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum UpsertDatasetEnvVarResult {
     Created(UpsertDatasetEnvVarResultCreated),
@@ -120,7 +113,7 @@ pub enum UpsertDatasetEnvVarResult {
     UpToDate(UpsertDatasetEnvVarUpToDate),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UpsertDatasetEnvVarUpToDate;
 
 #[Object]
@@ -130,7 +123,7 @@ impl UpsertDatasetEnvVarUpToDate {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct UpsertDatasetEnvVarResultCreated {
     pub env_var: ViewDatasetEnvVar,
@@ -143,7 +136,7 @@ impl UpsertDatasetEnvVarResultCreated {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct UpsertDatasetEnvVarResultUpdated {
     pub env_var: ViewDatasetEnvVar,
@@ -156,15 +149,15 @@ impl UpsertDatasetEnvVarResultUpdated {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct SaveDatasetEnvVarResultDuplicate {
+pub struct SaveDatasetEnvVarResultDuplicate<'a> {
     pub dataset_env_var_key: String,
-    pub dataset_name: DatasetName,
+    pub dataset_name: DatasetName<'a>,
 }
 
 #[ComplexObject]
-impl SaveDatasetEnvVarResultDuplicate {
+impl SaveDatasetEnvVarResultDuplicate<'_> {
     pub async fn message(&self) -> String {
         format!(
             "Environment variable with {} key for dataset {} already exists",
@@ -175,70 +168,72 @@ impl SaveDatasetEnvVarResultDuplicate {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum DeleteDatasetEnvVarResult {
-    Success(DeleteDatasetEnvVarResultSuccess),
-    NotFound(DeleteDatasetEnvVarResultNotFound),
+pub enum DeleteDatasetEnvVarResult<'a> {
+    Success(DeleteDatasetEnvVarResultSuccess<'a>),
+    NotFound(DeleteDatasetEnvVarResultNotFound<'a>),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DeleteDatasetEnvVarResultSuccess {
-    pub env_var_id: DatasetEnvVarID,
+pub struct DeleteDatasetEnvVarResultSuccess<'a> {
+    pub env_var_id: DatasetEnvVarID<'a>,
 }
 
 #[ComplexObject]
-impl DeleteDatasetEnvVarResultSuccess {
+impl DeleteDatasetEnvVarResultSuccess<'_> {
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DeleteDatasetEnvVarResultNotFound {
-    pub env_var_id: DatasetEnvVarID,
+pub struct DeleteDatasetEnvVarResultNotFound<'a> {
+    pub env_var_id: DatasetEnvVarID<'a>,
 }
 
 #[ComplexObject]
-impl DeleteDatasetEnvVarResultNotFound {
+impl DeleteDatasetEnvVarResultNotFound<'_> {
     pub async fn message(&self) -> String {
-        format!("Environment variable with {} id not found", self.env_var_id,)
+        format!("Environment variable with {} id not found", self.env_var_id)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum ModifyDatasetEnvVarResult {
-    Success(ModifyDatasetEnvVarResultSuccess),
-    NotFound(ModifyDatasetEnvVarResultNotFound),
+pub enum ModifyDatasetEnvVarResult<'a> {
+    Success(ModifyDatasetEnvVarResultSuccess<'a>),
+    NotFound(ModifyDatasetEnvVarResultNotFound<'a>),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct ModifyDatasetEnvVarResultSuccess {
-    pub env_var_id: DatasetEnvVarID,
+pub struct ModifyDatasetEnvVarResultSuccess<'a> {
+    pub env_var_id: DatasetEnvVarID<'a>,
 }
 
 #[ComplexObject]
-impl ModifyDatasetEnvVarResultSuccess {
+impl ModifyDatasetEnvVarResultSuccess<'_> {
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct ModifyDatasetEnvVarResultNotFound {
-    pub env_var_id: DatasetEnvVarID,
+pub struct ModifyDatasetEnvVarResultNotFound<'a> {
+    pub env_var_id: DatasetEnvVarID<'a>,
 }
 
 #[ComplexObject]
-impl ModifyDatasetEnvVarResultNotFound {
+impl ModifyDatasetEnvVarResultNotFound<'_> {
     pub async fn message(&self) -> String {
-        format!("Environment variable with {} id not found", self.env_var_id,)
+        format!("Environment variable with {} id not found", self.env_var_id)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -23,7 +23,11 @@ pub struct AccountsMut;
 impl AccountsMut {
     /// Returns a mutable account by its id
     #[tracing::instrument(level = "info", name = AccountsMut_by_id, skip_all, fields(%account_id))]
-    async fn by_id(&self, ctx: &Context<'_>, account_id: AccountID) -> Result<Option<AccountMut>> {
+    async fn by_id(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID<'_>,
+    ) -> Result<Option<AccountMut>> {
         check_logged_account_id_match(ctx, &account_id)?;
 
         let account_service = from_catalog_n!(ctx, dyn AccountService);
@@ -37,7 +41,7 @@ impl AccountsMut {
     async fn by_name(
         &self,
         ctx: &Context<'_>,
-        account_name: AccountName,
+        account_name: AccountName<'_>,
     ) -> Result<Option<AccountMut>> {
         check_logged_account_name_match(ctx, &account_name)?;
 

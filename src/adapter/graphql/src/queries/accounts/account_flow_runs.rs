@@ -63,11 +63,14 @@ impl AccountFlowRuns {
                         InitiatorFilterInput::System(_) => {
                             Some(kamu_flow_system::InitiatorFilter::System)
                         }
-                        InitiatorFilterInput::Accounts(account_ids) => Some(
-                            kamu_flow_system::InitiatorFilter::Account(HashSet::from_iter(
-                                account_ids.iter().map(Into::into).collect::<Vec<_>>(),
-                            )),
-                        ),
+                        InitiatorFilterInput::Accounts(account_ids) => {
+                            Some(kamu_flow_system::InitiatorFilter::Account(
+                                account_ids
+                                    .into_iter()
+                                    .map(Into::into)
+                                    .collect::<HashSet<_>>(),
+                            ))
+                        }
                     },
                     None => None,
                 },
@@ -144,7 +147,7 @@ pub struct AccountFlowFilters {
     by_flow_type: Option<DatasetFlowType>,
     by_status: Option<FlowStatus>,
     by_initiator: Option<InitiatorFilterInput>,
-    by_dataset_ids: Vec<DatasetID>,
+    by_dataset_ids: Vec<DatasetID<'static>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

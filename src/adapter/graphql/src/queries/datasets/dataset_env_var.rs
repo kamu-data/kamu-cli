@@ -14,7 +14,7 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ViewDatasetEnvVar {
     env_var: DatasetEnvVar,
 }
@@ -32,8 +32,8 @@ impl ViewDatasetEnvVar {
     }
 
     /// Key of the dataset environment variable
-    async fn key(&self) -> String {
-        self.env_var.key.clone()
+    async fn key(&self) -> &String {
+        &self.env_var.key
     }
 
     /// Non secret value of dataset environment variable
@@ -51,3 +51,5 @@ impl ViewDatasetEnvVar {
         self.env_var.secret_nonce.is_some()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
