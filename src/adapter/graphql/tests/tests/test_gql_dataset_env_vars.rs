@@ -8,19 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use dill::Component;
 use indoc::indoc;
-use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
+use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
-use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
 
-use crate::utils::authentication_catalogs;
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -308,57 +303,22 @@ async fn test_modify_dataset_env_var() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct DatasetEnvVarsHarness {
-    _tempdir: tempfile::TempDir,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
 }
 
 impl DatasetEnvVarsHarness {
     async fn new() -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
 
         let catalog_base = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
-            b.add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<DidGeneratorDefault>()
-            .add_value(DatasetEnvVarsConfig::sample())
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<CreateDatasetUseCaseHelper>()
-            .add::<ViewDatasetUseCaseImpl>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add::<DatabaseTransactionRunner>()
-            .add::<DatasetEnvVarServiceImpl>()
-            .add::<InMemoryDatasetEnvVarRepository>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
-            .add::<DatasetReferenceServiceImpl>()
-            .add::<InMemoryDatasetReferenceRepository>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
-
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-            );
-
-            register_message_dispatcher::<DatasetReferenceMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-            );
+            b.add_value(DatasetEnvVarsConfig::sample())
+                .add::<DatasetEnvVarServiceImpl>()
+                .add::<InMemoryDatasetEnvVarRepository>();
 
             b.build()
         };
@@ -366,7 +326,7 @@ impl DatasetEnvVarsHarness {
         let (_, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         Self {
-            _tempdir: tempdir,
+            base_gql_harness,
             catalog_authorized,
         }
     }
