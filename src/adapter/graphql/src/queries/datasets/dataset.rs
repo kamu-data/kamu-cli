@@ -207,7 +207,9 @@ impl Dataset {
             .await?;
         let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
-        let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
+        // TODO: Private Datasets: uncomment when Maintain is integrated
+        // let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
+        let can_maintain = can_write;
 
         Ok(DatasetPermissions {
             collaboration: DatasetCollaborationPermissions {
