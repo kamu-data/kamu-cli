@@ -213,7 +213,7 @@ impl CreateDatasetResultSuccess {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultNameCollision {
-    pub account_name: Option<AccountName>,
+    pub account_name: Option<AccountName<'static>>,
     pub dataset_name: DatasetName<'static>,
 }
 

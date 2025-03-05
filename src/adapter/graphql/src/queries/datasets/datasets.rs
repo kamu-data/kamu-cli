@@ -59,7 +59,7 @@ impl Datasets {
     async fn by_owner_and_name(
         &self,
         ctx: &Context<'_>,
-        account_name: AccountName,
+        account_name: AccountName<'_>,
         dataset_name: DatasetName<'_>,
     ) -> Result<Option<Dataset>> {
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
@@ -146,7 +146,7 @@ impl Datasets {
     async fn by_account_name(
         &self,
         ctx: &Context<'_>,
-        account_name: AccountName,
+        account_name: AccountName<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {

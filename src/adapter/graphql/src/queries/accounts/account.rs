@@ -24,7 +24,7 @@ use crate::utils::check_logged_account_id_match;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
     account_id: AccountID<'static>,
-    account_name: AccountName,
+    account_name: AccountName<'static>,
     full_account_info: OnceCell<kamu_accounts::Account>,
 }
 
@@ -37,7 +37,7 @@ pub enum AccountType {
 #[Object]
 impl Account {
     #[graphql(skip)]
-    pub(crate) fn new(account_id: AccountID<'static>, account_name: AccountName) -> Self {
+    pub(crate) fn new(account_id: AccountID<'static>, account_name: AccountName<'static>) -> Self {
         Self {
             account_id,
             account_name,

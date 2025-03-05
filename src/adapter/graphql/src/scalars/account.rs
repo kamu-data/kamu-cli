@@ -14,54 +14,7 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 simple_string_scalar!(AccountID, odf::AccountID, from_did_str);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountName
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AccountName(odf::AccountName);
-
-impl From<odf::AccountName> for AccountName {
-    fn from(value: odf::AccountName) -> Self {
-        Self(value)
-    }
-}
-
-impl From<AccountName> for odf::AccountName {
-    fn from(val: AccountName) -> Self {
-        val.0
-    }
-}
-
-impl Deref for AccountName {
-    type Target = odf::AccountName;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for AccountName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for AccountName {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::AccountName::try_from(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
+simple_string_scalar!(AccountName, odf::AccountName);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountDisplayName

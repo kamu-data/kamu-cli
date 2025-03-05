@@ -41,7 +41,7 @@ impl AccountsMut {
     async fn by_name(
         &self,
         ctx: &Context<'_>,
-        account_name: AccountName,
+        account_name: AccountName<'_>,
     ) -> Result<Option<AccountMut>> {
         check_logged_account_name_match(ctx, &account_name)?;
 
