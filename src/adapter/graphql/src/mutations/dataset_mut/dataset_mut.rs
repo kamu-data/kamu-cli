@@ -7,26 +7,29 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use chrono::{DateTime, Utc};
-use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
+use kamu_core::{self as domain, auth, SetWatermarkPlanningError, SetWatermarkUseCase};
 use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
+use tokio::sync::OnceCell;
 
 use crate::mutations::{
-    ensure_account_is_owner_or_admin,
+    DatasetCollaborationMut,
     DatasetEnvVarsMut,
     DatasetFlowsMut,
     DatasetMetadataMut,
 };
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils::{ensure_dataset_env_vars_enabled, from_catalog_n};
+use crate::utils::{ensure_dataset_env_vars_enabled, from_catalog_n, make_dataset_access_error};
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct DatasetMut {
-    dataset_handle: odf::DatasetHandle,
+    dataset_mut_request_state: DatasetMutRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -34,17 +37,25 @@ pub struct DatasetMut {
 impl DatasetMut {
     #[graphql(skip)]
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+        Self {
+            dataset_mut_request_state: DatasetMutRequestState::new(dataset_handle),
+        }
     }
 
     /// Access to the mutable metadata of the dataset
     async fn metadata(&self) -> DatasetMetadataMut {
-        DatasetMetadataMut::new(self.dataset_handle.clone())
+        // TODO: Eliminate cloning
+        //       GQL: Dataset: cache `ResolvedDataset`
+        //       https://github.com/kamu-data/kamu-cli/issues/1114
+        DatasetMetadataMut::new(self.dataset_mut_request_state.dataset_handle.clone())
     }
 
     /// Access to the mutable flow configurations of this dataset
     async fn flows(&self) -> DatasetFlowsMut {
-        DatasetFlowsMut::new(self.dataset_handle.clone())
+        // TODO: Eliminate cloning
+        //       GQL: Dataset: cache `ResolvedDataset`
+        //       https://github.com/kamu-data/kamu-cli/issues/1114
+        DatasetFlowsMut::new(self.dataset_mut_request_state.dataset_handle.clone())
     }
 
     /// Access to the mutable flow configurations of this dataset
@@ -52,7 +63,17 @@ impl DatasetMut {
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
         ensure_dataset_env_vars_enabled(ctx)?;
 
-        Ok(DatasetEnvVarsMut::new(self.dataset_handle.clone()))
+        // TODO: Eliminate cloning
+        //       GQL: Dataset: cache `ResolvedDataset`
+        //       https://github.com/kamu-data/kamu-cli/issues/1114
+        Ok(DatasetEnvVarsMut::new(
+            self.dataset_mut_request_state.dataset_handle.clone(),
+        ))
+    }
+
+    /// Access to collaboration management methods
+    async fn collaboration(&self) -> DatasetCollaborationMut {
+        DatasetCollaborationMut::new(&self.dataset_mut_request_state)
     }
 
     /// Rename the dataset
@@ -63,21 +84,18 @@ impl DatasetMut {
         ctx: &Context<'_>,
         new_name: DatasetName<'static>,
     ) -> Result<RenameResult<'_>> {
-        if self
-            .dataset_handle
-            .alias
-            .dataset_name
-            .as_str()
-            .eq(new_name.as_str())
-        {
+        let dataset_handle = &self.dataset_mut_request_state.dataset_handle;
+
+        if dataset_handle.alias.dataset_name.as_str() == new_name.as_str() {
             return Ok(RenameResult::NoChanges(RenameResultNoChanges {
                 preserved_name: new_name,
             }));
         }
 
-        let rename_dataset = from_catalog_n!(ctx, dyn kamu_datasets::RenameDatasetUseCase);
-        match rename_dataset
-            .execute(&self.dataset_handle.as_local_ref(), &new_name)
+        let rename_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::RenameDatasetUseCase);
+
+        match rename_dataset_use_case
+            .execute(&dataset_handle.as_local_ref(), &new_name)
             .await
         {
             Ok(_) => Ok(RenameResult::Success(RenameResultSuccess {
@@ -89,10 +107,7 @@ impl DatasetMut {
                     colliding_alias: e.alias.into(),
                 }))
             }
-            Err(RenameDatasetError::Access(_)) => Err(GqlError::Gql(
-                Error::new("Dataset access error")
-                    .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
-            )),
+            Err(RenameDatasetError::Access(_)) => Err(make_dataset_access_error(dataset_handle)),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(RenameDatasetError::Internal(e)) => Err(e.into()),
@@ -103,9 +118,12 @@ impl DatasetMut {
     #[graphql(guard = "LoggedInGuard::new()")]
     #[tracing::instrument(level = "info", name = DatasetMut_delete, skip_all)]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
-        let delete_dataset = from_catalog_n!(ctx, dyn kamu_datasets::DeleteDatasetUseCase);
-        match delete_dataset
-            .execute_via_handle(&self.dataset_handle)
+        let delete_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::DeleteDatasetUseCase);
+
+        let dataset_handle = &self.dataset_mut_request_state.dataset_handle;
+
+        match delete_dataset_use_case
+            .execute_via_handle(dataset_handle)
             .await
         {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
@@ -121,10 +139,7 @@ impl DatasetMut {
                         .collect(),
                 },
             )),
-            Err(DeleteDatasetError::Access(_)) => Err(GqlError::Gql(
-                Error::new("Dataset access error")
-                    .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
-            )),
+            Err(DeleteDatasetError::Access(_)) => Err(make_dataset_access_error(dataset_handle)),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
@@ -140,14 +155,13 @@ impl DatasetMut {
         watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult> {
         let set_watermark_use_case = from_catalog_n!(ctx, dyn SetWatermarkUseCase);
+
         match set_watermark_use_case
-            .execute(&self.dataset_handle, watermark)
+            .execute(&self.dataset_mut_request_state.dataset_handle, watermark)
             .await
         {
             Ok(domain::SetWatermarkResult::UpToDate) => {
-                Ok(SetWatermarkResult::UpToDate(SetWatermarkUpToDate {
-                    _dummy: String::new(),
-                }))
+                Ok(SetWatermarkResult::UpToDate(SetWatermarkUpToDate::default()))
             }
             Ok(domain::SetWatermarkResult::Updated { new_head, .. }) => {
                 Ok(SetWatermarkResult::Updated(SetWatermarkUpdated {
@@ -171,7 +185,10 @@ impl DatasetMut {
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
     ) -> Result<SetDatasetVisibilityResult> {
-        ensure_account_is_owner_or_admin(ctx, &self.dataset_handle).await?;
+        // TODO: Private Datasets: extract use case
+        self.dataset_mut_request_state
+            .check_dataset_own_access(ctx)
+            .await?;
 
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 
@@ -189,12 +206,77 @@ impl DatasetMut {
             DatasetPropertyName::allows_anonymous_read(allows_anonymous_read),
         ] {
             rebac_svc
-                .set_dataset_property(&self.dataset_handle.id, name, &value)
+                .set_dataset_property(
+                    &self.dataset_mut_request_state.dataset_handle.id,
+                    name,
+                    &value,
+                )
                 .await
                 .int_err()?;
         }
 
         Ok(SetDatasetVisibilityResultSuccess::default().into())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Private Datasets: extract common with DatasetRequestState parts into
+// helpers/utils
+#[derive(Debug)]
+pub(crate) struct DatasetMutRequestState {
+    dataset_handle: odf::DatasetHandle,
+    allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
+}
+
+impl DatasetMutRequestState {
+    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
+        Self {
+            dataset_handle,
+            allowed_dataset_actions: OnceCell::new(),
+        }
+    }
+
+    pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {
+        self.check_dataset_access(ctx, auth::DatasetAction::Maintain)
+            .await
+    }
+
+    pub async fn check_dataset_own_access(&self, ctx: &Context<'_>) -> Result<()> {
+        self.check_dataset_access(ctx, auth::DatasetAction::Own)
+            .await
+    }
+
+    async fn check_dataset_access(
+        &self,
+        ctx: &Context<'_>,
+        action: auth::DatasetAction,
+    ) -> Result<()> {
+        let allowed_actions = self.allowed_dataset_actions(ctx).await?;
+
+        if allowed_actions.contains(&action) {
+            Ok(())
+        } else {
+            Err(make_dataset_access_error(&self.dataset_handle))
+        }
+    }
+
+    async fn allowed_dataset_actions(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<&HashSet<auth::DatasetAction>> {
+        self.allowed_dataset_actions
+            .get_or_try_init(|| async {
+                let dataset_action_authorizer =
+                    from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
+
+                let allowed_actions = dataset_action_authorizer
+                    .get_allowed_actions(&self.dataset_handle.id)
+                    .await?;
+
+                Ok(allowed_actions)
+            })
+            .await
     }
 }
 
@@ -304,16 +386,16 @@ pub enum SetDatasetVisibilityResult {
     Success(SetDatasetVisibilityResultSuccess),
 }
 
-#[derive(SimpleObject, Debug, Default)]
-#[graphql(complex)]
+#[derive(SimpleObject, Debug)]
 pub struct SetDatasetVisibilityResultSuccess {
-    _dummy: Option<String>,
+    message: String,
 }
 
-#[ComplexObject]
-impl SetDatasetVisibilityResultSuccess {
-    async fn message(&self) -> String {
-        "Success".to_string()
+impl Default for SetDatasetVisibilityResultSuccess {
+    fn default() -> Self {
+        Self {
+            message: "Success".to_string(),
+        }
     }
 }
 
@@ -328,15 +410,15 @@ pub enum SetWatermarkResult<'a> {
 }
 
 #[derive(SimpleObject, Debug)]
-#[graphql(complex)]
 pub struct SetWatermarkUpToDate {
-    pub _dummy: String,
+    message: String,
 }
 
-#[ComplexObject]
-impl SetWatermarkUpToDate {
-    async fn message(&self) -> String {
-        "UpToDate".to_string()
+impl Default for SetWatermarkUpToDate {
+    fn default() -> Self {
+        Self {
+            message: "UpToDate".to_string(),
+        }
     }
 }
 

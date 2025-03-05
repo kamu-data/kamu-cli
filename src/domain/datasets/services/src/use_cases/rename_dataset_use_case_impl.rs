@@ -68,6 +68,7 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             }
         }?;
 
+        // TODO: Private Datasets: use access helper
         // Ensure write permissions
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
