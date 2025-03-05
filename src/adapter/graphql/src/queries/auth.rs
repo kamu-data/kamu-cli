@@ -34,7 +34,7 @@ impl Auth {
     async fn list_access_tokens(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
+        account_id: AccountID<'static>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<AccessTokenConnection> {

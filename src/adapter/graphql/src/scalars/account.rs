@@ -12,64 +12,8 @@ use std::ops::Deref;
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountID
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct AccountID(odf::AccountID);
-
-impl From<odf::AccountID> for AccountID {
-    fn from(value: odf::AccountID) -> Self {
-        AccountID(value)
-    }
-}
-
-impl From<AccountID> for odf::AccountID {
-    fn from(val: AccountID) -> Self {
-        val.0
-    }
-}
-
-impl From<&AccountID> for odf::AccountID {
-    fn from(val: &AccountID) -> Self {
-        val.0.clone()
-    }
-}
-
-impl From<AccountID> for String {
-    fn from(val: AccountID) -> Self {
-        val.0.to_string()
-    }
-}
-
-impl Deref for AccountID {
-    type Target = odf::AccountID;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for AccountID {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for AccountID {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::AccountID::from_did_str(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
+simple_string_scalar!(AccountID, odf::AccountID, from_did_str);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountName

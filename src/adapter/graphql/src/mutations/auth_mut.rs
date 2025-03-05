@@ -53,7 +53,7 @@ impl AuthMut {
     async fn create_access_token(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
+        account_id: AccountID<'static>,
         token_name: String,
     ) -> Result<CreateTokenResult> {
         check_logged_account_id_match(ctx, &account_id)?;
@@ -65,7 +65,7 @@ impl AuthMut {
             .await
         {
             Ok(created_token) => Ok(CreateTokenResult::Success(CreateAccessTokenResultSuccess {
-                token: CreatedAccessToken::new(created_token, &account_id, &token_name),
+                token: CreatedAccessToken::new(created_token, account_id, &token_name),
             })),
             Err(err) => match err {
                 CreateAccessTokenError::Duplicate(_) => Ok(CreateTokenResult::DuplicateName(

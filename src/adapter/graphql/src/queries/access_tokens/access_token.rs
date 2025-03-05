@@ -59,17 +59,17 @@ impl ViewAccessToken {
 #[derive(Debug)]
 pub struct CreatedAccessToken {
     token: KamuAccessToken,
-    account_id: AccountID,
+    account_id: AccountID<'static>,
     token_name: String,
 }
 
 #[Object]
 impl CreatedAccessToken {
     #[graphql(skip)]
-    pub fn new(token: KamuAccessToken, account_id: &AccountID, token_name: &str) -> Self {
+    pub fn new(token: KamuAccessToken, account_id: AccountID<'static>, token_name: &str) -> Self {
         Self {
             token,
-            account_id: account_id.clone(),
+            account_id,
             token_name: token_name.to_string(),
         }
     }

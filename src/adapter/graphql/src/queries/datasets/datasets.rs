@@ -116,7 +116,7 @@ impl Datasets {
     async fn by_account_id(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
+        account_id: AccountID<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
