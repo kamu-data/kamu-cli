@@ -272,7 +272,7 @@ impl Into<odf::metadata::DatasetKind> for DatasetKind {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetSnapshot {
     /// Alias of the dataset.
-    pub name: DatasetAlias,
+    pub name: DatasetAlias<'static>,
     /// Type of the dataset.
     pub kind: DatasetKind,
     /// An array of metadata events that will be used to populate the chain.
@@ -1954,7 +1954,7 @@ pub struct TransformRequest {
     /// Unique identifier of the output dataset.
     pub dataset_id: DatasetID<'static>,
     /// Alias of the output dataset, for logging purposes only.
-    pub dataset_alias: DatasetAlias,
+    pub dataset_alias: DatasetAlias<'static>,
     /// System time to use for new records.
     pub system_time: DateTime<Utc>,
     /// Vocabulary of the output dataset.
@@ -2004,7 +2004,7 @@ pub struct TransformRequestInput {
     /// Unique identifier of the dataset.
     pub dataset_id: DatasetID<'static>,
     /// Alias of the output dataset, for logging purposes only.
-    pub dataset_alias: DatasetAlias,
+    pub dataset_alias: DatasetAlias<'static>,
     /// An alias of this input to be used in queries.
     pub query_alias: String,
     /// Vocabulary of the input dataset.

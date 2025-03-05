@@ -90,7 +90,7 @@ impl Dataset {
 
     /// Returns dataset alias (user + name)
     async fn alias(&self) -> DatasetAlias {
-        self.dataset_handle.alias.clone().into()
+        (&self.dataset_handle.alias).into()
     }
 
     /// Returns the kind of dataset (Root or Derivative)

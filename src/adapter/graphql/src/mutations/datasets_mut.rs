@@ -45,7 +45,7 @@ impl DatasetsMut {
         &self,
         ctx: &Context<'_>,
         dataset_kind: DatasetKind,
-        dataset_alias: DatasetAlias,
+        dataset_alias: DatasetAlias<'_>,
         // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
         //       https://github.com/kamu-data/kamu-cli/issues/780
         dataset_visibility: Option<DatasetVisibility>,

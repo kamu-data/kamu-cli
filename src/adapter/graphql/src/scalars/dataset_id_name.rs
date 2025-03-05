@@ -246,41 +246,47 @@ impl ScalarType for DatasetRef {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetAlias(odf::DatasetAlias);
+pub struct DatasetAlias<'a>(Cow<'a, odf::DatasetAlias>);
 
-impl From<odf::DatasetAlias> for DatasetAlias {
+impl From<odf::DatasetAlias> for DatasetAlias<'_> {
     fn from(value: odf::DatasetAlias) -> Self {
-        DatasetAlias(value)
+        Self(Cow::Owned(value))
     }
 }
 
-impl From<DatasetAlias> for odf::DatasetAlias {
-    fn from(val: DatasetAlias) -> Self {
-        val.0
+impl<'a> From<&'a odf::DatasetAlias> for DatasetAlias<'a> {
+    fn from(value: &'a odf::DatasetAlias) -> Self {
+        Self(Cow::Borrowed(value))
     }
 }
 
-impl From<DatasetAlias> for String {
+impl From<DatasetAlias<'_>> for odf::DatasetAlias {
+    fn from(val: DatasetAlias<'_>) -> Self {
+        val.0.into_owned()
+    }
+}
+
+impl From<DatasetAlias<'_>> for String {
     fn from(val: DatasetAlias) -> Self {
         val.0.to_string()
     }
 }
 
-impl Deref for DatasetAlias {
+impl Deref for DatasetAlias<'_> {
     type Target = odf::DatasetAlias;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl std::fmt::Display for DatasetAlias {
+impl std::fmt::Display for DatasetAlias<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[Scalar]
-impl ScalarType for DatasetAlias {
+impl ScalarType for DatasetAlias<'_> {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
             let val = odf::DatasetAlias::try_from(value.as_str())?;
@@ -304,7 +310,7 @@ pub struct DatasetRefRemote(odf::DatasetRefRemote);
 
 impl From<odf::DatasetRefRemote> for DatasetRefRemote {
     fn from(value: odf::DatasetRefRemote) -> Self {
-        DatasetRefRemote(value)
+        Self(value)
     }
 }
 
