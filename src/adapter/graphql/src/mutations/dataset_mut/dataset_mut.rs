@@ -81,7 +81,7 @@ impl DatasetMut {
             .await
         {
             Ok(_) => Ok(RenameResult::Success(RenameResultSuccess {
-                old_name: self.dataset_handle.alias.dataset_name.clone().into(),
+                old_name: (&self.dataset_handle.alias.dataset_name).into(),
                 new_name,
             })),
             Err(RenameDatasetError::NameCollision(e)) => {
@@ -109,11 +109,11 @@ impl DatasetMut {
             .await
         {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
-                deleted_dataset: self.dataset_handle.alias.clone().into(),
+                deleted_dataset: (&self.dataset_handle.alias).into(),
             })),
             Err(DeleteDatasetError::DanglingReference(e)) => Ok(DeleteResult::DanglingReference(
                 DeleteResultDanglingReference {
-                    not_deleted_dataset: self.dataset_handle.alias.clone().into(),
+                    not_deleted_dataset: (&self.dataset_handle.alias).into(),
                     dangling_child_refs: e
                         .children
                         .iter()
@@ -202,21 +202,21 @@ impl DatasetMut {
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum RenameResult {
-    Success(RenameResultSuccess),
+pub enum RenameResult<'a> {
+    Success(RenameResultSuccess<'a>),
     NoChanges(RenameResultNoChanges),
     NameCollision(RenameResultNameCollision),
 }
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct RenameResultSuccess {
-    pub old_name: DatasetName<'static>,
+pub struct RenameResultSuccess<'a> {
+    pub old_name: DatasetName<'a>,
     pub new_name: DatasetName<'static>,
 }
 
 #[ComplexObject]
-impl RenameResultSuccess {
+impl RenameResultSuccess<'_> {
     async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -252,19 +252,19 @@ impl RenameResultNameCollision {
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum DeleteResult {
-    Success(DeleteResultSuccess),
-    DanglingReference(DeleteResultDanglingReference),
+pub enum DeleteResult<'a> {
+    Success(DeleteResultSuccess<'a>),
+    DanglingReference(DeleteResultDanglingReference<'a>),
 }
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DeleteResultSuccess {
-    pub deleted_dataset: DatasetAlias<'static>,
+pub struct DeleteResultSuccess<'a> {
+    pub deleted_dataset: DatasetAlias<'a>,
 }
 
 #[ComplexObject]
-impl DeleteResultSuccess {
+impl DeleteResultSuccess<'_> {
     async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -272,13 +272,13 @@ impl DeleteResultSuccess {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DeleteResultDanglingReference {
-    pub not_deleted_dataset: DatasetAlias<'static>,
+pub struct DeleteResultDanglingReference<'a> {
+    pub not_deleted_dataset: DatasetAlias<'a>,
     pub dangling_child_refs: Vec<DatasetRef<'static>>,
 }
 
 #[ComplexObject]
-impl DeleteResultDanglingReference {
+impl DeleteResultDanglingReference<'_> {
     async fn message(&self) -> String {
         format!(
             "Dataset '{}' has {} dangling reference(s)",
