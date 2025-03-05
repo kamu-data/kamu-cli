@@ -291,12 +291,12 @@ impl DatasetMetadata {
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-enum DependencyDatasetResult {
+enum DependencyDatasetResult<'a> {
     Accessible(DependencyDatasetResultAccessible),
-    NotAccessible(DependencyDatasetResultNotAccessible),
+    NotAccessible(DependencyDatasetResultNotAccessible<'a>),
 }
 
-impl DependencyDatasetResult {
+impl DependencyDatasetResult<'_> {
     pub fn accessible(dataset: Dataset) -> Self {
         Self::Accessible(DependencyDatasetResultAccessible { dataset })
     }
@@ -323,12 +323,12 @@ impl DependencyDatasetResultAccessible {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct DependencyDatasetResultNotAccessible {
-    pub id: DatasetID<'static>,
+pub struct DependencyDatasetResultNotAccessible<'a> {
+    pub id: DatasetID<'a>,
 }
 
 #[ComplexObject]
-impl DependencyDatasetResultNotAccessible {
+impl DependencyDatasetResultNotAccessible<'_> {
     async fn message(&self) -> String {
         "Not Accessible".to_string()
     }

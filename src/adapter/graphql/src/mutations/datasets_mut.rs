@@ -175,16 +175,16 @@ impl DatasetsMut {
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CreateDatasetResult {
+pub enum CreateDatasetResult<'a> {
     Success(CreateDatasetResultSuccess),
-    NameCollision(CreateDatasetResultNameCollision),
+    NameCollision(CreateDatasetResultNameCollision<'a>),
 }
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CreateDatasetFromSnapshotResult {
+pub enum CreateDatasetFromSnapshotResult<'a> {
     Success(CreateDatasetResultSuccess),
-    NameCollision(CreateDatasetResultNameCollision),
+    NameCollision(CreateDatasetResultNameCollision<'a>),
     Malformed(MetadataManifestMalformed),
     UnsupportedVersion(MetadataManifestUnsupportedVersion),
     InvalidSnapshot(CreateDatasetResultInvalidSnapshot),
@@ -212,13 +212,13 @@ impl CreateDatasetResultSuccess {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct CreateDatasetResultNameCollision {
-    pub account_name: Option<AccountName<'static>>,
-    pub dataset_name: DatasetName<'static>,
+pub struct CreateDatasetResultNameCollision<'a> {
+    pub account_name: Option<AccountName<'a>>,
+    pub dataset_name: DatasetName<'a>,
 }
 
 #[ComplexObject]
-impl CreateDatasetResultNameCollision {
+impl CreateDatasetResultNameCollision<'_> {
     async fn message(&self) -> String {
         format!("Dataset with name '{}' already exists", self.dataset_name)
     }

@@ -164,19 +164,19 @@ impl From<kamu_accounts::LoginResponse> for LoginResponse {
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum RevokeResult {
-    Success(RevokeResultSuccess),
-    AlreadyRevoked(RevokeResultAlreadyRevoked),
+pub enum RevokeResult<'a> {
+    Success(RevokeResultSuccess<'a>),
+    AlreadyRevoked(RevokeResultAlreadyRevoked<'a>),
 }
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct RevokeResultSuccess {
-    pub token_id: AccessTokenID<'static>,
+pub struct RevokeResultSuccess<'a> {
+    pub token_id: AccessTokenID<'a>,
 }
 
 #[ComplexObject]
-impl RevokeResultSuccess {
+impl RevokeResultSuccess<'_> {
     async fn message(&self) -> String {
         "Access token revoked successfully".to_string()
     }
@@ -184,12 +184,12 @@ impl RevokeResultSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct RevokeResultAlreadyRevoked {
-    pub token_id: AccessTokenID<'static>,
+pub struct RevokeResultAlreadyRevoked<'a> {
+    pub token_id: AccessTokenID<'a>,
 }
 
 #[ComplexObject]
-impl RevokeResultAlreadyRevoked {
+impl RevokeResultAlreadyRevoked<'_> {
     async fn message(&self) -> String {
         format!("Access token with id {} already revoked", self.token_id)
     }
@@ -199,8 +199,8 @@ impl RevokeResultAlreadyRevoked {
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CreateTokenResult {
-    Success(CreateAccessTokenResultSuccess),
+pub enum CreateTokenResult<'a> {
+    Success(CreateAccessTokenResultSuccess<'a>),
     DuplicateName(CreateAccessTokenResultDuplicate),
 }
 

@@ -57,16 +57,16 @@ impl ViewAccessToken {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct CreatedAccessToken {
+pub struct CreatedAccessToken<'a> {
     token: KamuAccessToken,
-    account_id: AccountID<'static>,
+    account_id: AccountID<'a>,
     token_name: String,
 }
 
 #[Object]
-impl CreatedAccessToken {
+impl<'a> CreatedAccessToken<'a> {
     #[graphql(skip)]
-    pub fn new(token: KamuAccessToken, account_id: AccountID<'static>, token_name: &str) -> Self {
+    pub fn new(token: KamuAccessToken, account_id: AccountID<'a>, token_name: &str) -> Self {
         Self {
             token,
             account_id,
@@ -99,13 +99,15 @@ impl CreatedAccessToken {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct CreateAccessTokenResultSuccess {
-    pub token: CreatedAccessToken,
+pub struct CreateAccessTokenResultSuccess<'a> {
+    pub token: CreatedAccessToken<'a>,
 }
 
 #[ComplexObject]
-impl CreateAccessTokenResultSuccess {
+impl CreateAccessTokenResultSuccess<'_> {
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

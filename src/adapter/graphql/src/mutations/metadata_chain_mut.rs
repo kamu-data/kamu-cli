@@ -92,8 +92,8 @@ impl MetadataChainMut {
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CommitResult {
-    Success(CommitResultSuccess),
+pub enum CommitResult<'a> {
+    Success(CommitResultSuccess<'a>),
     NoChanges(NoChanges),
     Malformed(MetadataManifestMalformed),
     UnsupportedVersion(MetadataManifestUnsupportedVersion),
@@ -104,13 +104,13 @@ pub enum CommitResult {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct CommitResultSuccess {
-    pub old_head: Option<Multihash<'static>>,
-    pub new_head: Multihash<'static>,
+pub struct CommitResultSuccess<'a> {
+    pub old_head: Option<Multihash<'a>>,
+    pub new_head: Multihash<'a>,
 }
 
 #[ComplexObject]
-impl CommitResultSuccess {
+impl CommitResultSuccess<'_> {
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
