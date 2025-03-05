@@ -17,7 +17,7 @@ use crate::queries::Account;
 // MetadataBlockExtended
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, SimpleObject, Clone, PartialEq, Eq)]
+#[derive(Debug, SimpleObject, PartialEq, Eq)]
 pub struct MetadataBlockExtended {
     pub block_hash: Multihash,
     pub prev_block_hash: Option<Multihash>,
@@ -61,14 +61,14 @@ pub enum MetadataManifestFormat {
 // MetadataFormat serde errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct MetadataManifestMalformed {
     pub message: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MetadataManifestUnsupportedVersion {
     pub manifest_version: i32,
     pub supported_version_from: i32,

@@ -136,7 +136,7 @@ impl DatasetMetadataMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum UpdateReadmeResult {
     Success(CommitResultSuccess),

@@ -90,7 +90,7 @@ impl MetadataChainMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CommitResult {
     Success(CommitResultSuccess),
@@ -102,7 +102,7 @@ pub enum CommitResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CommitResultSuccess {
     pub old_head: Option<Multihash>,
@@ -118,7 +118,7 @@ impl CommitResultSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NoChanges;
 
 #[Object]
@@ -130,7 +130,7 @@ impl NoChanges {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct CommitResultAppendError {
     pub message: String,
 }
