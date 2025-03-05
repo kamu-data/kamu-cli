@@ -5862,6 +5862,7 @@ dependencies = [
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "messaging-outbox",
+ "oop",
  "opendatafabric",
  "pretty_assertions",
  "secrecy",

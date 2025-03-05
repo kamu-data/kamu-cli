@@ -11,19 +11,14 @@ use std::sync::Arc;
 
 use async_graphql::*;
 use chrono::Utc;
-use dill::Component;
 use indoc::indoc;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
-use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
 
-use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
+use crate::utils::{authentication_catalogs, expect_anonymous_access_error, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -603,57 +598,22 @@ async fn test_metadata_chain_set_transform_event() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GraphQLMetadataChainHarness {
-    _tempdir: tempfile::TempDir,
-    catalog_authorized: dill::Catalog,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_anonymous: dill::Catalog,
+    catalog_authorized: dill::Catalog,
     did_generator: Arc<dyn DidGenerator>,
 }
 
 impl GraphQLMetadataChainHarness {
     async fn new(tenancy_config: TenancyConfig) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_gql_harness = BaseGQLDatasetHarness::new(tenancy_config);
 
         let base_catalog = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
-            b.add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<DidGeneratorDefault>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .add::<CreateDatasetUseCaseHelper>()
-            .add::<CommitDatasetEventUseCaseImpl>()
-            .add::<ViewDatasetUseCaseImpl>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add_value(tenancy_config)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
-            .add::<DatasetReferenceServiceImpl>()
-            .add::<InMemoryDatasetReferenceRepository>();
-
-            database_common::NoOpDatabasePlugin::init_database_components(&mut b);
-
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-            );
-
-            register_message_dispatcher::<DatasetReferenceMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-            );
+            b.add::<CommitDatasetEventUseCaseImpl>();
 
             b.build()
         };
@@ -663,7 +623,7 @@ impl GraphQLMetadataChainHarness {
         let did_generator = base_catalog.get_one::<dyn DidGenerator>().unwrap();
 
         Self {
-            _tempdir: tempdir,
+            base_gql_harness,
             catalog_anonymous,
             catalog_authorized,
             did_generator,
