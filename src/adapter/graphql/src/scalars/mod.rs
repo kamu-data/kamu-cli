@@ -173,9 +173,9 @@ macro_rules! __simple_string_scalar_general {
 macro_rules! __simple_string_scalar_scalar_type {
     ($name: ident, $source_type: ty, $source_parse_method: ident) => {
         #[async_graphql::Scalar]
-        impl ScalarType for $name<'_> {
+        impl async_graphql::ScalarType for $name<'_> {
             fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-                if let Value::String(value) = &value {
+                if let async_graphql::Value::String(value) = &value {
                     let val = <$source_type>::$source_parse_method(value.as_str())?;
                     Ok(val.into())
                 } else {

@@ -21,7 +21,7 @@ use crate::scalars::DatasetRefRemote;
 
 #[derive(SimpleObject, Debug)]
 pub struct DatasetPushStatus {
-    pub remote: DatasetRefRemote,
+    pub remote: DatasetRefRemote<'static>,
     pub result: CompareChainsResult,
 }
 
