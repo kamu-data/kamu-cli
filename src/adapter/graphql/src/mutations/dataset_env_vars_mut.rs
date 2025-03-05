@@ -81,7 +81,7 @@ impl DatasetEnvVarsMut {
     async fn delete_env_variable(
         &self,
         ctx: &Context<'_>,
-        id: DatasetEnvVarID,
+        id: DatasetEnvVarID<'static>,
     ) -> Result<DeleteDatasetEnvVarResult> {
         utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
@@ -178,7 +178,7 @@ pub enum DeleteDatasetEnvVarResult {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DeleteDatasetEnvVarResultSuccess {
-    pub env_var_id: DatasetEnvVarID,
+    pub env_var_id: DatasetEnvVarID<'static>,
 }
 
 #[ComplexObject]
@@ -191,7 +191,7 @@ impl DeleteDatasetEnvVarResultSuccess {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DeleteDatasetEnvVarResultNotFound {
-    pub env_var_id: DatasetEnvVarID,
+    pub env_var_id: DatasetEnvVarID<'static>,
 }
 
 #[ComplexObject]
@@ -213,7 +213,7 @@ pub enum ModifyDatasetEnvVarResult {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ModifyDatasetEnvVarResultSuccess {
-    pub env_var_id: DatasetEnvVarID,
+    pub env_var_id: DatasetEnvVarID<'static>,
 }
 
 #[ComplexObject]
@@ -226,7 +226,7 @@ impl ModifyDatasetEnvVarResultSuccess {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ModifyDatasetEnvVarResultNotFound {
-    pub env_var_id: DatasetEnvVarID,
+    pub env_var_id: DatasetEnvVarID<'static>,
 }
 
 #[ComplexObject]

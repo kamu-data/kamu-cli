@@ -33,7 +33,7 @@ impl DatasetEnvVars {
     async fn exposed_value(
         &self,
         ctx: &Context<'_>,
-        dataset_env_var_id: DatasetEnvVarID,
+        dataset_env_var_id: DatasetEnvVarID<'_>,
     ) -> Result<String> {
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
         let dataset_env_var = dataset_env_var_service
