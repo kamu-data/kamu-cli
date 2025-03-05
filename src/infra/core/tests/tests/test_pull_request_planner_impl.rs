@@ -31,7 +31,6 @@ use kamu_datasets_services::{
 };
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
-use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,6 +156,7 @@ async fn create_graph_remote(
 
     let tmp_storage_unit = Arc::new(odf::dataset::DatasetStorageUnitLocalFs::new(
         tmp_registry_dir.path().to_owned(),
+        Arc::new(odf::dataset::DatasetDefaultLfsBuilderImpl {}),
     ));
 
     let tmp_dataset_registry = DatasetRegistrySoloUnitBridge::new(
@@ -842,7 +842,7 @@ impl PullTestHarness {
             .add::<SyncServiceImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<SyncRequestBuilder>()
-            .add::<DatasetFactoryImpl>()
+            .add::<odf::dataset::DatasetFactoryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
@@ -851,7 +851,7 @@ impl PullTestHarness {
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(IpfsClient::default())
-            .add_value(IpfsGateway::default())
+            .add_value(odf::dataset::IpfsGateway::default())
             .add_value(mock_dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()

@@ -9,6 +9,10 @@
 
 mod dataset_factory;
 mod dataset_handle_resolver;
+#[cfg(feature = "lfs")]
+mod dataset_lfs_builder;
+#[cfg(feature = "s3")]
+mod dataset_s3_builder;
 mod dataset_storage_unit_writer;
 mod metadata_chain_visitor;
 mod metadata_chain_visitors;
@@ -17,6 +21,10 @@ mod odf_server_access_token_resolver;
 
 pub use dataset_factory::*;
 pub use dataset_handle_resolver::*;
+#[cfg(feature = "lfs")]
+pub use dataset_lfs_builder::*;
+#[cfg(feature = "s3")]
+pub use dataset_s3_builder::*;
 pub use dataset_storage_unit_writer::*;
 pub use metadata_chain_visitor::*;
 pub use metadata_chain_visitors::*;

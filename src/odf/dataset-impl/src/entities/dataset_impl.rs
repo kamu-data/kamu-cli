@@ -93,6 +93,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn update_summary(
         &self,
         prev: Option<DatasetSummary>,

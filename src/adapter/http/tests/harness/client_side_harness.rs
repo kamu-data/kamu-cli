@@ -126,7 +126,9 @@ impl ClientSideHarness {
 
         b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>();
+            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<odf::dataset::DatasetDefaultLfsBuilderImpl>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilderImpl>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
