@@ -17,60 +17,7 @@ use crate::prelude::*;
 simple_string_scalar!(DatasetID, odf::DatasetID, from_did_str);
 simple_string_scalar!(DatasetName, odf::DatasetName);
 simple_string_scalar!(DatasetAlias, odf::DatasetAlias);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetRefAny
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetRefAny(odf::DatasetRefAny);
-
-impl From<odf::DatasetRefAny> for DatasetRefAny {
-    fn from(value: odf::DatasetRefAny) -> Self {
-        DatasetRefAny(value)
-    }
-}
-
-impl From<DatasetRefAny> for odf::DatasetRefAny {
-    fn from(val: DatasetRefAny) -> Self {
-        val.0
-    }
-}
-
-impl From<DatasetRefAny> for String {
-    fn from(val: DatasetRefAny) -> Self {
-        val.0.to_string()
-    }
-}
-
-impl Deref for DatasetRefAny {
-    type Target = odf::DatasetRefAny;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for DatasetRefAny {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for DatasetRefAny {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::DatasetRefAny::try_from(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
+simple_string_scalar!(DatasetRefAny, odf::DatasetRefAny);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetRef
