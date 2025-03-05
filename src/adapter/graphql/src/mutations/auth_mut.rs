@@ -82,7 +82,7 @@ impl AuthMut {
     async fn revoke_access_token(
         &self,
         ctx: &Context<'_>,
-        token_id: AccessTokenID,
+        token_id: AccessTokenID<'static>,
     ) -> Result<RevokeResult> {
         check_access_token_valid(ctx, &token_id).await?;
 
@@ -172,7 +172,7 @@ pub enum RevokeResult {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct RevokeResultSuccess {
-    pub token_id: AccessTokenID,
+    pub token_id: AccessTokenID<'static>,
 }
 
 #[ComplexObject]
@@ -185,7 +185,7 @@ impl RevokeResultSuccess {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct RevokeResultAlreadyRevoked {
-    pub token_id: AccessTokenID,
+    pub token_id: AccessTokenID<'static>,
 }
 
 #[ComplexObject]

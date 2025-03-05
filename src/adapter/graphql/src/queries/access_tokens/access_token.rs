@@ -28,12 +28,12 @@ impl ViewAccessToken {
 
     /// Unique identifier of the access token
     async fn id(&self) -> AccessTokenID {
-        self.token.id.into()
+        (&self.token.id).into()
     }
 
     /// Name of the access token
-    async fn name(&self) -> String {
-        self.token.token_name.clone()
+    async fn name(&self) -> &String {
+        &self.token.token_name
     }
 
     /// Date of token creation

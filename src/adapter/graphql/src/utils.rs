@@ -194,7 +194,7 @@ pub(crate) fn check_logged_account_id_match(
 
 pub(crate) async fn check_access_token_valid(
     ctx: &Context<'_>,
-    token_id: &AccessTokenID,
+    token_id: &AccessTokenID<'_>,
 ) -> Result<(), GqlError> {
     let (current_account_subject, access_token_service) = from_catalog_n!(
         ctx,
