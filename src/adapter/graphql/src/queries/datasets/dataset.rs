@@ -80,7 +80,7 @@ impl Dataset {
     /// Name can change over the dataset's lifetime. For unique identifier use
     /// `id()`.
     async fn name(&self) -> DatasetName {
-        self.dataset_handle.alias.dataset_name.clone().into()
+        (&self.dataset_handle.alias.dataset_name).into()
     }
 
     /// Returns the user or organization that owns this dataset

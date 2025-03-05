@@ -60,7 +60,7 @@ impl Datasets {
         &self,
         ctx: &Context<'_>,
         account_name: AccountName,
-        dataset_name: DatasetName,
+        dataset_name: DatasetName<'_>,
     ) -> Result<Option<Dataset>> {
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 

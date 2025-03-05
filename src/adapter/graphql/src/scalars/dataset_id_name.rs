@@ -78,41 +78,47 @@ impl ScalarType for DatasetID<'_> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetName(odf::DatasetName);
+pub struct DatasetName<'a>(Cow<'a, odf::DatasetName>);
 
-impl From<odf::DatasetName> for DatasetName {
+impl From<odf::DatasetName> for DatasetName<'_> {
     fn from(value: odf::DatasetName) -> Self {
-        DatasetName(value)
+        Self(Cow::Owned(value))
     }
 }
 
-impl From<DatasetName> for odf::DatasetName {
-    fn from(val: DatasetName) -> Self {
-        val.0
+impl<'a> From<&'a odf::DatasetName> for DatasetName<'a> {
+    fn from(value: &'a odf::DatasetName) -> Self {
+        Self(Cow::Borrowed(value))
     }
 }
 
-impl From<DatasetName> for String {
-    fn from(val: DatasetName) -> Self {
-        val.0.into()
+impl From<DatasetName<'_>> for odf::DatasetName {
+    fn from(val: DatasetName<'_>) -> Self {
+        val.0.into_owned()
     }
 }
 
-impl Deref for DatasetName {
+impl From<DatasetName<'_>> for String {
+    fn from(val: DatasetName<'_>) -> Self {
+        val.0.to_string()
+    }
+}
+
+impl Deref for DatasetName<'_> {
     type Target = odf::DatasetName;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl std::fmt::Display for DatasetName {
+impl std::fmt::Display for DatasetName<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[Scalar]
-impl ScalarType for DatasetName {
+impl ScalarType for DatasetName<'_> {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
             let val = odf::DatasetName::try_from(value.as_str())?;
@@ -190,7 +196,7 @@ pub struct DatasetRef(odf::DatasetRef);
 
 impl From<odf::DatasetRef> for DatasetRef {
     fn from(value: odf::DatasetRef) -> Self {
-        DatasetRef(value)
+        Self(value)
     }
 }
 

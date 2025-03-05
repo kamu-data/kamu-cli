@@ -58,7 +58,11 @@ impl DatasetMut {
     /// Rename the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
     #[tracing::instrument(level = "info", name = DatasetMut_rename, skip_all)]
-    async fn rename(&self, ctx: &Context<'_>, new_name: DatasetName) -> Result<RenameResult> {
+    async fn rename(
+        &self,
+        ctx: &Context<'_>,
+        new_name: DatasetName<'static>,
+    ) -> Result<RenameResult> {
         if self
             .dataset_handle
             .alias
@@ -207,8 +211,8 @@ pub enum RenameResult {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct RenameResultSuccess {
-    pub old_name: DatasetName,
-    pub new_name: DatasetName,
+    pub old_name: DatasetName<'static>,
+    pub new_name: DatasetName<'static>,
 }
 
 #[ComplexObject]
@@ -221,7 +225,7 @@ impl RenameResultSuccess {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct RenameResultNoChanges {
-    pub preserved_name: DatasetName,
+    pub preserved_name: DatasetName<'static>,
 }
 
 #[ComplexObject]
@@ -234,7 +238,7 @@ impl RenameResultNoChanges {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct RenameResultNameCollision {
-    pub colliding_alias: DatasetAlias,
+    pub colliding_alias: DatasetAlias<'static>,
 }
 
 #[ComplexObject]
@@ -256,7 +260,7 @@ pub enum DeleteResult {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DeleteResultSuccess {
-    pub deleted_dataset: DatasetAlias,
+    pub deleted_dataset: DatasetAlias<'static>,
 }
 
 #[ComplexObject]
@@ -269,7 +273,7 @@ impl DeleteResultSuccess {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DeleteResultDanglingReference {
-    pub not_deleted_dataset: DatasetAlias,
+    pub not_deleted_dataset: DatasetAlias<'static>,
     pub dangling_child_refs: Vec<DatasetRef>,
 }
 

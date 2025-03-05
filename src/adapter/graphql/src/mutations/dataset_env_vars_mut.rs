@@ -153,7 +153,7 @@ impl UpsertDatasetEnvVarResultUpdated {
 #[graphql(complex)]
 pub struct SaveDatasetEnvVarResultDuplicate {
     pub dataset_env_var_key: String,
-    pub dataset_name: DatasetName,
+    pub dataset_name: DatasetName<'static>,
 }
 
 #[ComplexObject]
