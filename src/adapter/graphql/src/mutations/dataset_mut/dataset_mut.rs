@@ -274,7 +274,7 @@ impl DeleteResultSuccess {
 #[graphql(complex)]
 pub struct DeleteResultDanglingReference {
     pub not_deleted_dataset: DatasetAlias<'static>,
-    pub dangling_child_refs: Vec<DatasetRef>,
+    pub dangling_child_refs: Vec<DatasetRef<'static>>,
 }
 
 #[ComplexObject]

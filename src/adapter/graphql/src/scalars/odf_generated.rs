@@ -1910,7 +1910,7 @@ impl TransformInputDatasetAccessible {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct TransformInputDatasetNotAccessible {
-    pub dataset_ref: DatasetRef,
+    pub dataset_ref: DatasetRef<'static>,
 }
 
 #[ComplexObject]
@@ -1923,7 +1923,7 @@ impl TransformInputDatasetNotAccessible {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 #[graphql(complex)]
 pub struct TransformInput {
-    pub dataset_ref: DatasetRef,
+    pub dataset_ref: DatasetRef<'static>,
     pub alias: String,
 }
 

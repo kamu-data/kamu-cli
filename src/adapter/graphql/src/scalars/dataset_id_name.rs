@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::TryFrom;
-use std::ops::Deref;
 
 use crate::prelude::*;
 
@@ -18,60 +17,7 @@ simple_string_scalar!(DatasetID, odf::DatasetID, from_did_str);
 simple_string_scalar!(DatasetName, odf::DatasetName);
 simple_string_scalar!(DatasetAlias, odf::DatasetAlias);
 simple_string_scalar!(DatasetRefAny, odf::DatasetRefAny);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetRef
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetRef(odf::DatasetRef);
-
-impl From<odf::DatasetRef> for DatasetRef {
-    fn from(value: odf::DatasetRef) -> Self {
-        Self(value)
-    }
-}
-
-impl From<DatasetRef> for odf::DatasetRef {
-    fn from(val: DatasetRef) -> Self {
-        val.0
-    }
-}
-
-impl From<DatasetRef> for String {
-    fn from(val: DatasetRef) -> Self {
-        val.0.to_string()
-    }
-}
-
-impl Deref for DatasetRef {
-    type Target = odf::DatasetRef;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl std::fmt::Display for DatasetRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for DatasetRef {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::DatasetRef::try_from(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
+simple_string_scalar!(DatasetRef, odf::DatasetRef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetRefRemote
