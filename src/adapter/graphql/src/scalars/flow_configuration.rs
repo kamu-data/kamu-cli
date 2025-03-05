@@ -93,7 +93,7 @@ pub struct SnapshotConfigurationResetCustom {
 
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct SnapshotConfigurationResetToSeedDummy {
-    pub dummy: String,
+    dummy: String,
 }
 
 impl From<ResetRule> for FlowConfigurationReset {
