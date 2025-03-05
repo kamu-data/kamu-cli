@@ -64,16 +64,13 @@ macro_rules! page_based_connection {
             }
 
             async fn edges(&self) -> Vec<$edge_type> {
-                self.nodes
-                    .iter()
-                    .map(|node| $edge_type { node: node.clone() })
-                    .collect()
+                self.nodes.iter().map(|node| $edge_type { node }).collect()
             }
         }
 
         #[derive(SimpleObject)]
-        pub struct $edge_type {
-            pub node: $node_type,
+        pub struct $edge_type<'a> {
+            pub node: &'a $node_type,
         }
     };
 }
