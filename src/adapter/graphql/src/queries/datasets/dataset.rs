@@ -73,7 +73,7 @@ impl Dataset {
 
     /// Unique identifier of the dataset
     async fn id(&self) -> DatasetID {
-        self.dataset_handle.id.clone().into()
+        (&self.dataset_handle.id).into()
     }
 
     /// Symbolic name of the dataset.

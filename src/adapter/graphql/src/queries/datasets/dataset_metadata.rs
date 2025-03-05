@@ -324,7 +324,7 @@ impl DependencyDatasetResultAccessible {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DependencyDatasetResultNotAccessible {
-    pub id: DatasetID,
+    pub id: DatasetID<'static>,
 }
 
 #[ComplexObject]

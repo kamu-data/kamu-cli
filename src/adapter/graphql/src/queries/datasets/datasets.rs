@@ -48,7 +48,7 @@ impl Datasets {
 
     /// Returns dataset by its ID
     #[tracing::instrument(level = "info", name = Datasets_by_id, skip_all, fields(%dataset_id))]
-    async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
+    async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID<'_>) -> Result<Option<Dataset>> {
         let dataset_id: odf::DatasetID = dataset_id.into();
 
         self.by_dataset_ref(ctx, &dataset_id.into_local_ref()).await

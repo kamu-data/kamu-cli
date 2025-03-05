@@ -53,13 +53,13 @@ pub(crate) enum FlowDescriptionDataset {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPollingIngest {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     ingest_result: Option<FlowDescriptionUpdateResult>,
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPushIngest {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     source_name: Option<String>,
     input_records_count: u64,
     ingest_result: Option<FlowDescriptionUpdateResult>,
@@ -67,19 +67,19 @@ pub(crate) struct FlowDescriptionDatasetPushIngest {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetExecuteTransform {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     transform_result: Option<FlowDescriptionUpdateResult>,
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetHardCompaction {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     compaction_result: Option<FlowDescriptionDatasetHardCompactionResult>,
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetReset {
-    dataset_id: DatasetID,
+    dataset_id: DatasetID<'static>,
     reset_result: Option<FlowDescriptionResetResult>,
 }
 

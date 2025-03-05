@@ -26,7 +26,11 @@ pub struct DatasetsMut;
 impl DatasetsMut {
     /// Returns a mutable dataset by its ID
     #[tracing::instrument(level = "info", name = DatasetsMut_by_id, skip_all, fields(%dataset_id))]
-    async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<DatasetMut>> {
+    async fn by_id(
+        &self,
+        ctx: &Context<'_>,
+        dataset_id: DatasetID<'_>,
+    ) -> Result<Option<DatasetMut>> {
         let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
         let hdl = dataset_registry
             .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())

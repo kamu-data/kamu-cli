@@ -511,7 +511,7 @@ impl From<odf::metadata::ExecuteTransform> for ExecuteTransform {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteTransformInput {
     /// Input dataset identifier.
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     /// Last block of the input dataset that was previously incorporated into
     /// the derivative transformation, if any. Must be equal to the last
     /// non-empty `newBlockHash`. Together with `newBlockHash` defines a
@@ -1497,7 +1497,7 @@ impl From<odf::metadata::RequestHeader> for RequestHeader {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Seed {
     /// Unique identity of the dataset.
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     /// Type of the dataset.
     pub dataset_kind: DatasetKind,
 }
@@ -1952,7 +1952,7 @@ impl From<odf::metadata::TransformInput> for TransformInput {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequest {
     /// Unique identifier of the output dataset.
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     /// Alias of the output dataset, for logging purposes only.
     pub dataset_alias: DatasetAlias,
     /// System time to use for new records.
@@ -2002,7 +2002,7 @@ impl From<odf::metadata::TransformRequest> for TransformRequest {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequestInput {
     /// Unique identifier of the dataset.
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     /// Alias of the output dataset, for logging purposes only.
     pub dataset_alias: DatasetAlias,
     /// An alias of this input to be used in queries.

@@ -35,7 +35,7 @@ impl From<fs::FlowKey> for FlowKey {
 
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowKeyDataset {
-    pub dataset_id: DatasetID,
+    pub dataset_id: DatasetID<'static>,
     pub flow_type: DatasetFlowType,
 }
 

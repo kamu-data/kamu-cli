@@ -144,7 +144,7 @@ pub struct AccountFlowFilters {
     by_flow_type: Option<DatasetFlowType>,
     by_status: Option<FlowStatus>,
     by_initiator: Option<InitiatorFilterInput>,
-    by_dataset_ids: Vec<DatasetID>,
+    by_dataset_ids: Vec<DatasetID<'static>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

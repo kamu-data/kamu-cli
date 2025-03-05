@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::ops::Deref;
 
@@ -17,41 +18,47 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetID(odf::DatasetID);
+pub struct DatasetID<'a>(Cow<'a, odf::DatasetID>);
 
-impl From<odf::DatasetID> for DatasetID {
+impl From<odf::DatasetID> for DatasetID<'_> {
     fn from(value: odf::DatasetID) -> Self {
-        DatasetID(value)
+        Self(Cow::Owned(value))
     }
 }
 
-impl From<DatasetID> for odf::DatasetID {
-    fn from(val: DatasetID) -> Self {
-        val.0
+impl<'a> From<&'a odf::DatasetID> for DatasetID<'a> {
+    fn from(value: &'a odf::DatasetID) -> Self {
+        Self(Cow::Borrowed(value))
     }
 }
 
-impl From<DatasetID> for String {
+impl From<DatasetID<'_>> for odf::DatasetID {
     fn from(val: DatasetID) -> Self {
+        val.0.into_owned()
+    }
+}
+
+impl From<DatasetID<'_>> for String {
+    fn from(val: DatasetID<'_>) -> Self {
         val.0.to_string()
     }
 }
 
-impl Deref for DatasetID {
+impl Deref for DatasetID<'_> {
     type Target = odf::DatasetID;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl std::fmt::Display for DatasetID {
+impl std::fmt::Display for DatasetID<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[Scalar]
-impl ScalarType for DatasetID {
+impl ScalarType for DatasetID<'_> {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
             let val = odf::DatasetID::from_did_str(value.as_str())?;
