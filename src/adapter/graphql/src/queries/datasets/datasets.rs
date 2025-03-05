@@ -90,7 +90,7 @@ impl Datasets {
         use futures::TryStreamExt;
 
         let account_owned_datasets_stream =
-            dataset_registry.all_dataset_handles_by_owner(&account_name.clone().into());
+            dataset_registry.all_dataset_handles_by_owner(account_name);
         let readable_dataset_handles_stream = dataset_action_authorizer
             .filtered_datasets_stream(account_owned_datasets_stream, DatasetAction::Read);
         let mut accessible_datasets_handles = readable_dataset_handles_stream

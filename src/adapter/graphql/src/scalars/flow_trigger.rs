@@ -14,7 +14,7 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTrigger {
     pub paused: bool,
     pub schedule: Option<FlowTriggerScheduleRule>,
@@ -30,13 +30,13 @@ impl From<Schedule> for FlowTriggerScheduleRule {
     }
 }
 
-#[derive(Union, Clone, PartialEq, Eq)]
+#[derive(Union, PartialEq, Eq)]
 pub enum FlowTriggerScheduleRule {
     TimeDelta(TimeDelta),
     Cron(Cron5ComponentExpression),
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTriggerBatchingRule {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDelta,
@@ -71,26 +71,26 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject, Clone)]
+#[derive(OneofObject)]
 pub enum FlowTriggerInput {
     Schedule(ScheduleInput),
     Batching(BatchingInput),
 }
 
-#[derive(OneofObject, Clone)]
+#[derive(OneofObject)]
 pub enum ScheduleInput {
     TimeDelta(TimeDeltaInput),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
     Cron5ComponentExpression(String),
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct BatchingInput {
     pub min_records_to_await: u64,
     pub max_batching_interval: TimeDeltaInput,
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct TimeDeltaInput {
     pub every: u32,
     pub unit: TimeUnit,
@@ -122,7 +122,7 @@ impl From<&TimeDeltaInput> for chrono::Duration {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct Cron5ComponentExpression {
     pub cron_5component_expression: String,
 }
@@ -137,7 +137,7 @@ impl From<ScheduleCron> for Cron5ComponentExpression {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct TimeDelta {
     pub every: i64,
     pub unit: TimeUnit,

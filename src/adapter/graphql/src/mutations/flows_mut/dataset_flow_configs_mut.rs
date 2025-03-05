@@ -121,7 +121,7 @@ impl SetFlowConfigSuccess {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct FlowTypeIsNotSupported;
 
 #[Object]
@@ -131,7 +131,7 @@ impl FlowTypeIsNotSupported {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct FlowInvalidConfigInputError {
     reason: String,

@@ -22,7 +22,7 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfiguration {
     pub ingest: Option<FlowConfigurationIngest>,
     pub compaction: Option<FlowConfigurationCompaction>,
@@ -59,7 +59,7 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     }
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfigurationIngest {
     pub fetch_uncacheable: bool,
 }
@@ -74,25 +74,25 @@ impl From<IngestRule> for FlowConfigurationIngest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfigurationReset {
     pub mode: SnapshotPropagationMode,
     pub old_head_hash: Option<Multihash>,
     pub recursive: bool,
 }
 
-#[derive(Union, Clone, PartialEq, Eq)]
+#[derive(Union, PartialEq, Eq)]
 pub enum SnapshotPropagationMode {
     Custom(SnapshotConfigurationResetCustom),
     ToSeed(SnapshotConfigurationResetToSeedDummy),
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct SnapshotConfigurationResetCustom {
     pub new_head_hash: Multihash,
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct SnapshotConfigurationResetToSeedDummy {
     pub dummy: String,
 }
@@ -118,13 +118,13 @@ impl From<ResetRule> for FlowConfigurationReset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Clone, PartialEq, Eq)]
+#[derive(Union, PartialEq, Eq)]
 pub enum FlowConfigurationCompaction {
     Full(CompactionFull),
     MetadataOnly(CompactionMetadataOnly),
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct CompactionFull {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
@@ -141,7 +141,7 @@ impl From<CompactionRuleFull> for CompactionFull {
     }
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct CompactionMetadataOnly {
     pub recursive: bool,
 }
@@ -163,23 +163,23 @@ pub enum FlowRunConfiguration {
     Reset(ResetConditionInput),
 }
 
-#[derive(OneofObject, Clone)]
+#[derive(OneofObject)]
 pub enum PropagationMode {
     Custom(FlowConfigurationResetCustom),
     ToSeed(FlowConfigurationResetToSeedDummy),
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct FlowConfigurationResetCustom {
     pub new_head_hash: Multihash,
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct FlowConfigurationResetToSeedDummy {
     dummy: String,
 }
 
-#[derive(InputObject, Clone)]
+#[derive(InputObject)]
 pub struct ResetConditionInput {
     pub mode: PropagationMode,
     pub old_head_hash: Option<Multihash>,

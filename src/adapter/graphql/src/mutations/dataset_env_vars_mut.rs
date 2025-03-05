@@ -87,20 +87,13 @@ impl DatasetEnvVarsMut {
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
-        match dataset_env_var_service
-            .delete_dataset_env_var(&id.clone().into())
-            .await
-        {
+        match dataset_env_var_service.delete_dataset_env_var(&id).await {
             Ok(_) => Ok(DeleteDatasetEnvVarResult::Success(
-                DeleteDatasetEnvVarResultSuccess {
-                    env_var_id: id.clone(),
-                },
+                DeleteDatasetEnvVarResultSuccess { env_var_id: id },
             )),
             Err(err) => match err {
                 DeleteDatasetEnvVarError::NotFound(_) => Ok(DeleteDatasetEnvVarResult::NotFound(
-                    DeleteDatasetEnvVarResultNotFound {
-                        env_var_id: id.clone(),
-                    },
+                    DeleteDatasetEnvVarResultNotFound { env_var_id: id },
                 )),
                 DeleteDatasetEnvVarError::Internal(internal_err) => {
                     Err(GqlError::Internal(internal_err))

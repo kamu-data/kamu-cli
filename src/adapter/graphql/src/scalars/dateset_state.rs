@@ -11,7 +11,7 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetState {
     /// Globally unique identity of the dataset
     pub id: DatasetID,

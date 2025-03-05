@@ -18,7 +18,7 @@ simple_scalar!(FlowID, fs::FlowID);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Clone, Eq, PartialEq)]
+#[derive(Union, Eq, PartialEq)]
 pub enum FlowKey {
     Dataset(FlowKeyDataset),
     System(FlowKeySystem),
@@ -33,7 +33,7 @@ impl From<fs::FlowKey> for FlowKey {
     }
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowKeyDataset {
     pub dataset_id: DatasetID,
     pub flow_type: DatasetFlowType,
@@ -48,7 +48,7 @@ impl From<fs::FlowKeyDataset> for FlowKeyDataset {
     }
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowKeySystem {
     pub flow_type: SystemFlowType,
 }
@@ -63,7 +63,7 @@ impl From<fs::FlowKeySystem> for FlowKeySystem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct FlowTimingRecords {
     /// Recorded time of last task scheduling
     awaiting_executor_since: Option<DateTime<Utc>>,

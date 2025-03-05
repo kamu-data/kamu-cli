@@ -154,7 +154,7 @@ impl SetFlowTriggerSuccess {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct FlowInvalidTriggerInputError {
     pub reason: String,

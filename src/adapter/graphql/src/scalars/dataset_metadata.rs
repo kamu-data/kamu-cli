@@ -19,13 +19,13 @@ use crate::scalars::DatasetRefRemote;
 // DatasetPushStatuses
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Clone, Debug)]
+#[derive(SimpleObject, Debug)]
 pub struct DatasetPushStatus {
     pub remote: DatasetRefRemote,
     pub result: CompareChainsResult,
 }
 
-#[derive(SimpleObject, Clone, Debug)]
+#[derive(SimpleObject, Debug)]
 pub struct DatasetPushStatuses {
     pub statuses: Vec<DatasetPushStatus>,
 }
@@ -53,17 +53,17 @@ impl From<kamu_core::DatasetPushStatuses> for DatasetPushStatuses {
 // CompareChainsResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct CompareChainsResultReason {
     pub message: String,
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct CompareChainsResultError {
     pub reason: CompareChainsResultReason,
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub struct CompareChainsResultStatus {
     pub message: CompareChainsStatus,
 }
@@ -76,7 +76,7 @@ pub enum CompareChainsStatus {
     Diverged,
 }
 
-#[derive(Union, Debug, Clone)]
+#[derive(Union, Debug)]
 pub enum CompareChainsResult {
     Status(CompareChainsResultStatus),
     Error(CompareChainsResultError),
