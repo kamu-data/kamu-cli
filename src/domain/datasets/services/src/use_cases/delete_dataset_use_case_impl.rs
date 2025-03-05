@@ -133,6 +133,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<(), DeleteDatasetError> {
+        // TODO: Private Datasets: use access helper
         // Permission check
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
