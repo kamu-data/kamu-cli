@@ -145,7 +145,7 @@ impl From<kamu_accounts::GetAccountInfoError> for GqlError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 pub(crate) struct LoginResponse {
     access_token: String,
     account: Account,
@@ -197,14 +197,14 @@ impl RevokeResultAlreadyRevoked {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateTokenResult {
     Success(CreateAccessTokenResultSuccess),
     DuplicateName(CreateAccessTokenResultDuplicate),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateAccessTokenResultDuplicate {
     pub token_name: String,
@@ -216,3 +216,5 @@ impl CreateAccessTokenResultDuplicate {
         format!("Access token with {} name already exists", self.token_name)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

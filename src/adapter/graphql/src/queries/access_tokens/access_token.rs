@@ -15,7 +15,6 @@ use crate::queries::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
 pub struct ViewAccessToken {
     token: ViewKamuAccessToken,
 }
@@ -57,7 +56,7 @@ impl ViewAccessToken {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct CreatedAccessToken {
     token: KamuAccessToken,
     account_id: AccountID,
@@ -98,7 +97,7 @@ impl CreatedAccessToken {
     }
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateAccessTokenResultSuccess {
     pub token: CreatedAccessToken,
