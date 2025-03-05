@@ -49,7 +49,7 @@ impl DatasetFlowConfigsMut {
         dataset_flow_type: DatasetFlowType,
         config_input: FlowConfigurationInput,
     ) -> Result<SetFlowConfigResult> {
-        let flow_run_config: FlowRunConfiguration = config_input.clone().into();
+        let flow_run_config: FlowRunConfiguration = config_input.into();
         if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowConfigResult::TypeIsNotSupported(err));
         };
