@@ -160,7 +160,7 @@ enum FlowDescriptionDatasetHardCompactionResult {
 struct FlowDescriptionHardCompactionSuccess {
     original_blocks_count: u64,
     resulting_blocks_count: u64,
-    new_head: Multihash,
+    new_head: Multihash<'static>,
 }
 
 #[derive(SimpleObject, Debug)]
@@ -207,7 +207,7 @@ impl FlowDescriptionDatasetHardCompactionResult {
 
 #[derive(SimpleObject)]
 struct FlowDescriptionResetResult {
-    new_head: Multihash,
+    new_head: Multihash<'static>,
 }
 
 impl FlowDescriptionResetResult {

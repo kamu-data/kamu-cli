@@ -19,8 +19,8 @@ use crate::queries::Account;
 
 #[derive(Debug, SimpleObject, PartialEq, Eq)]
 pub struct MetadataBlockExtended {
-    pub block_hash: Multihash,
-    pub prev_block_hash: Option<Multihash>,
+    pub block_hash: Multihash<'static>,
+    pub prev_block_hash: Option<Multihash<'static>>,
     pub system_time: DateTime<Utc>,
     pub author: Account,
     pub event: MetadataEvent,
@@ -28,9 +28,9 @@ pub struct MetadataBlockExtended {
 }
 
 impl MetadataBlockExtended {
-    pub async fn new<H: Into<Multihash>>(
+    pub async fn new(
         ctx: &Context<'_>,
-        block_hash: H,
+        block_hash: impl Into<Multihash<'static>>,
         block: odf::metadata::MetadataBlock,
         author: Account,
     ) -> Result<Self, InternalError> {

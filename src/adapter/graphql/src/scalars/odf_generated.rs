@@ -29,7 +29,7 @@ use crate::queries::Dataset;
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
-    pub prev_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<Multihash<'static>>,
     /// Last offset of the previous data slice, if any. Must be equal to the
     /// last non-empty `newData.offsetInterval.end`.
     pub prev_offset: Option<u64>,
@@ -162,7 +162,7 @@ impl From<odf::metadata::AttachmentsEmbedded> for AttachmentsEmbedded {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Checkpoint {
     /// Hash sum of the checkpoint file.
-    pub physical_hash: Multihash,
+    pub physical_hash: Multihash<'static>,
     /// Size of checkpoint file in bytes.
     pub size: u64,
 }
@@ -213,9 +213,9 @@ impl Into<odf::metadata::CompressionFormat> for CompressionFormat {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DataSlice {
     /// Logical hash sum of the data in this slice.
-    pub logical_hash: Multihash,
+    pub logical_hash: Multihash<'static>,
     /// Hash sum of the data part file.
-    pub physical_hash: Multihash,
+    pub physical_hash: Multihash<'static>,
     /// Data slice produced by the transaction.
     pub offset_interval: OffsetInterval,
     /// Size of data file in bytes.
@@ -472,7 +472,7 @@ pub struct ExecuteTransform {
     pub query_inputs: Vec<ExecuteTransformInput>,
     /// Hash of the checkpoint file used to restore transformation state, if
     /// any.
-    pub prev_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<Multihash<'static>>,
     /// Last offset of the previous data slice, if any. Must be equal to the
     /// last non-empty `newData.offsetInterval.end`.
     pub prev_offset: Option<u64>,
@@ -517,12 +517,12 @@ pub struct ExecuteTransformInput {
     /// non-empty `newBlockHash`. Together with `newBlockHash` defines a
     /// half-open `(prevBlockHash, newBlockHash]` interval of blocks that will
     /// be considered in this transaction.
-    pub prev_block_hash: Option<Multihash>,
+    pub prev_block_hash: Option<Multihash<'static>>,
     /// Hash of the last block that will be incorporated into the derivative
     /// transformation. When present, defines a half-open `(prevBlockHash,
     /// newBlockHash]` interval of blocks that will be considered in this
     /// transaction.
-    pub new_block_hash: Option<Multihash>,
+    pub new_block_hash: Option<Multihash<'static>>,
     /// Last data record offset in the input dataset that was previously
     /// incorporated into the derivative transformation, if any. Must be equal
     /// to the last non-empty `newOffset`. Together with `newOffset` defines a
@@ -860,7 +860,7 @@ pub struct MetadataBlock {
     /// System time when this block was written.
     pub system_time: DateTime<Utc>,
     /// Hash sum of the preceding block.
-    pub prev_block_hash: Option<Multihash>,
+    pub prev_block_hash: Option<Multihash<'static>>,
     /// Block sequence number, starting from zero at the seed block.
     pub sequence_number: u64,
     /// Event data.

@@ -21,7 +21,7 @@ pub struct DatasetState {
 
     /// Last block hash of the input datasets that was or should be considered
     /// during the query planning
-    pub block_hash: Option<Multihash>,
+    pub block_hash: Option<Multihash<'static>>,
 }
 
 impl DatasetState {

@@ -105,8 +105,8 @@ pub enum CommitResult {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CommitResultSuccess {
-    pub old_head: Option<Multihash>,
-    pub new_head: Multihash,
+    pub old_head: Option<Multihash<'static>>,
+    pub new_head: Multihash<'static>,
 }
 
 #[ComplexObject]

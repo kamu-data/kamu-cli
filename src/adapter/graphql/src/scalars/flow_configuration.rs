@@ -77,7 +77,7 @@ impl From<IngestRule> for FlowConfigurationIngest {
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfigurationReset {
     pub mode: SnapshotPropagationMode,
-    pub old_head_hash: Option<Multihash>,
+    pub old_head_hash: Option<Multihash<'static>>,
     pub recursive: bool,
 }
 
@@ -89,7 +89,7 @@ pub enum SnapshotPropagationMode {
 
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct SnapshotConfigurationResetCustom {
-    pub new_head_hash: Multihash,
+    pub new_head_hash: Multihash<'static>,
 }
 
 #[derive(SimpleObject, PartialEq, Eq)]
@@ -171,7 +171,7 @@ pub enum PropagationMode {
 
 #[derive(InputObject)]
 pub struct FlowConfigurationResetCustom {
-    pub new_head_hash: Multihash,
+    pub new_head_hash: Multihash<'static>,
 }
 
 #[derive(InputObject)]
@@ -182,7 +182,7 @@ pub struct FlowConfigurationResetToSeedDummy {
 #[derive(InputObject)]
 pub struct ResetConditionInput {
     pub mode: PropagationMode,
-    pub old_head_hash: Option<Multihash>,
+    pub old_head_hash: Option<Multihash<'static>>,
     pub recursive: bool,
 }
 

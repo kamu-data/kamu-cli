@@ -343,7 +343,7 @@ impl SetWatermarkUpToDate {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct SetWatermarkUpdated {
-    pub new_head: Multihash,
+    pub new_head: Multihash<'static>,
 }
 
 #[ComplexObject]

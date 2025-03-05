@@ -21,7 +21,7 @@ use crate::utils::get_dataset;
 #[derive(SimpleObject)]
 pub struct BlockRef {
     name: String,
-    block_hash: Multihash,
+    block_hash: Multihash<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +62,7 @@ impl MetadataChain {
     async fn block_by_hash(
         &self,
         ctx: &Context<'_>,
-        hash: Multihash,
+        hash: Multihash<'static>,
     ) -> Result<Option<MetadataBlockExtended>> {
         let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
         let block_maybe = resolved_dataset
@@ -85,7 +85,7 @@ impl MetadataChain {
     async fn block_by_hash_encoded(
         &self,
         ctx: &Context<'_>,
-        hash: Multihash,
+        hash: Multihash<'_>,
         format: MetadataManifestFormat,
     ) -> Result<Option<String>> {
         use odf::metadata::serde::MetadataBlockSerializer;
