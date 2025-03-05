@@ -30,6 +30,7 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct StoreDatasetResult {
     pub dataset_id: DatasetID,
     pub dataset: Arc<dyn Dataset>,

@@ -402,6 +402,8 @@ pub fn configure_base_catalog(
     );
     b.bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>();
     b.bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>();
+    b.add::<odf::dataset::DatasetDefaultLfsBuilderImpl>();
+    b.bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilderImpl>();
 
     b.add::<odf::dataset::DatasetFactoryImpl>();
 

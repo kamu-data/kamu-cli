@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_impl;
-mod dataset_layout;
 #[cfg(feature = "lfs")]
 mod dataset_storage_unit_local_fs;
 #[cfg(feature = "s3")]
@@ -17,7 +16,6 @@ mod metadata_chain_impl;
 mod metadata_chain_validators;
 
 pub use dataset_impl::*;
-pub use dataset_layout::*;
 #[cfg(feature = "lfs")]
 pub use dataset_storage_unit_local_fs::*;
 #[cfg(feature = "s3")]

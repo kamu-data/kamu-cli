@@ -114,6 +114,8 @@ impl ServerSideS3Harness {
                 )
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
+                .add::<odf::dataset::DatasetDefaultS3BuilderImpl>()
+                .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3BuilderImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()

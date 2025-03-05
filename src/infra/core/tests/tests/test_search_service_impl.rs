@@ -46,6 +46,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add::<odf::dataset::DatasetDefaultLfsBuilderImpl>()
+        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilderImpl>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap())

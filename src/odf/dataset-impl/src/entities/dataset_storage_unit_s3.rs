@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -18,21 +17,17 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use odf_dataset::*;
 use odf_metadata::*;
 use odf_storage::*;
-use odf_storage_lfs::ObjectRepositoryCachingLocalFs;
-use odf_storage_s3::{NamedObjectRepositoryS3, ObjectRepositoryS3Sha3};
 use s3_utils::S3Context;
 use time_source::SystemTimeSource;
 use tokio::sync::Mutex;
-
-use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetStorageUnitS3 {
     s3_context: S3Context,
     registry_cache: Option<Arc<S3RegistryCache>>,
-    metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     system_time_source: Arc<dyn SystemTimeSource>,
+    dataset_s3_builder: Arc<dyn DatasetS3Builder>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,21 +39,17 @@ impl DatasetStorageUnitS3 {
     /// * `registry_cache` - when present in the catalog enables in-memory cache
     ///   of the dataset IDs present in the repository, allowing to avoid
     ///   expensive bucket scanning
-    ///
-    /// * `metadata_cache_local_fs_path` - when specified enables the local FS
-    ///   cache of metadata blocks, allowing to dramatically reduce the number
-    ///   of requests to S3
     pub fn new(
         s3_context: S3Context,
         registry_cache: Option<Arc<S3RegistryCache>>,
-        metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
         system_time_source: Arc<dyn SystemTimeSource>,
+        dataset_s3_builder: Arc<dyn DatasetS3Builder>,
     ) -> Self {
         Self {
             s3_context,
             registry_cache,
-            metadata_cache_local_fs_path,
             system_time_source,
+            dataset_s3_builder,
         }
     }
 
@@ -67,44 +58,7 @@ impl DatasetStorageUnitS3 {
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
-        let s3_context_url = s3_context.url().clone();
-
-        // TODO: Consider switching DatasetImpl to dynamic dispatch to simplify
-        // configurability
-        if let Some(metadata_cache_local_fs_path) = &self.metadata_cache_local_fs_path {
-            Arc::new(DatasetImpl::new(
-                MetadataChainImpl::new(
-                    MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                        ObjectRepositoryCachingLocalFs::new(
-                            ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
-                            metadata_cache_local_fs_path.clone(),
-                        ),
-                    )),
-                    ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
-                        s3_context.sub_context("refs/"),
-                    )),
-                ),
-                ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
-                ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
-                NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
-                s3_context_url,
-            ))
-        } else {
-            Arc::new(DatasetImpl::new(
-                MetadataChainImpl::new(
-                    MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                        ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
-                    )),
-                    ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
-                        s3_context.sub_context("refs/"),
-                    )),
-                ),
-                ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
-                ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
-                NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
-                s3_context_url,
-            ))
-        }
+        self.dataset_s3_builder.build_s3_dataset(s3_context)
     }
 
     async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {

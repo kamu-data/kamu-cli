@@ -31,8 +31,6 @@ use odf_storage_s3::*;
 use s3_utils::{S3Context, S3Metrics};
 use url::Url;
 
-#[cfg(feature = "lfs")]
-use crate::DatasetLayout;
 #[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
 use crate::{DatasetImpl, MetadataChainImpl};
 

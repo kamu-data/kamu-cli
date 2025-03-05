@@ -252,6 +252,8 @@ impl ServerHarness {
                 )
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+                .add::<odf::dataset::DatasetDefaultLfsBuilderImpl>()
+                .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilderImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetReferenceServiceImpl>()

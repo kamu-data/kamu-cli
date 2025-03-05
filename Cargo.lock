@@ -7860,6 +7860,7 @@ dependencies = [
  "opendatafabric-metadata",
  "opendatafabric-storage",
  "pin-project",
+ "s3-utils",
  "serde",
  "serde_with",
  "strum",
