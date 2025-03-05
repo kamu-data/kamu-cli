@@ -80,13 +80,13 @@ impl CreatedAccessToken {
     }
 
     /// Name of the access token
-    async fn name(&self) -> String {
-        self.token_name.clone()
+    async fn name(&self) -> &String {
+        &self.token_name
     }
 
     /// Composed original token
-    async fn composed(&self) -> String {
-        self.token.composed_token.to_string()
+    async fn composed(&self) -> &String {
+        &self.token.composed_token
     }
 
     /// Access token account owner

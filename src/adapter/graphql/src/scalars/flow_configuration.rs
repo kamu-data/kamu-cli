@@ -98,9 +98,9 @@ pub struct SnapshotConfigurationResetToSeedDummy {
 
 impl From<ResetRule> for FlowConfigurationReset {
     fn from(value: ResetRule) -> Self {
-        let propagation_mode = if let Some(new_head_hash) = &value.new_head_hash {
+        let propagation_mode = if let Some(new_head_hash) = value.new_head_hash {
             SnapshotPropagationMode::Custom(SnapshotConfigurationResetCustom {
-                new_head_hash: new_head_hash.clone().into(),
+                new_head_hash: new_head_hash.into(),
             })
         } else {
             SnapshotPropagationMode::ToSeed(SnapshotConfigurationResetToSeedDummy {

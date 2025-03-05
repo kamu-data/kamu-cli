@@ -25,7 +25,7 @@ impl From<Schedule> for FlowTriggerScheduleRule {
     fn from(value: Schedule) -> Self {
         match value {
             Schedule::TimeDelta(time_delta) => Self::TimeDelta(time_delta.every.into()),
-            Schedule::Cron(cron) => Self::Cron(cron.clone().into()),
+            Schedule::Cron(cron) => Self::Cron(cron.into()),
         }
     }
 }
@@ -55,13 +55,13 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
     fn from(value: kamu_flow_system::FlowTriggerState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let FlowTriggerRule::Batching(condition) = &value.rule {
-                Some((*condition).into())
+            batching: if let FlowTriggerRule::Batching(condition) = value.rule {
+                Some(condition.into())
             } else {
                 None
             },
-            schedule: if let FlowTriggerRule::Schedule(schedule_rule) = &value.rule {
-                Some(schedule_rule.clone().into())
+            schedule: if let FlowTriggerRule::Schedule(schedule_rule) = value.rule {
+                Some(schedule_rule.into())
             } else {
                 None
             },

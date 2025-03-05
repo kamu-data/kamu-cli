@@ -233,7 +233,7 @@ pub(crate) fn check_logged_account_name_match(
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_name == odf::AccountName::from(account_name.clone()) {
+        if logged_account.account_name == **account_name {
             return Ok(());
         }
     };
