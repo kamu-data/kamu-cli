@@ -1315,6 +1315,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-openai"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36c566b15aa847e60a9e6c9b9b4b9d4be94bbf776804624279afa69559fea7e1"
+dependencies = [
+ "async-openai-macros",
+ "backoff",
+ "base64 0.22.1",
+ "bytes",
+ "derive_builder",
+ "eventsource-stream",
+ "futures",
+ "rand",
+ "reqwest",
+ "reqwest-eventsource",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.11",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "async-openai-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0289cba6d5143bfe8251d57b4a8cac036adf158525a76533a7082ba65ec76398"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "async-recursion"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1933,6 +1970,20 @@ dependencies = [
  "tower 0.5.2",
  "tower-layer",
  "tower-service",
+]
+
+[[package]]
+name = "backoff"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b62ddb9cb1ec0a098ad4bbf9344d0713fa193ae1a80af55febcff2627b6a00c1"
+dependencies = [
+ "futures-core",
+ "getrandom",
+ "instant",
+ "pin-project-lite",
+ "rand",
+ "tokio",
 ]
 
 [[package]]
@@ -3646,6 +3697,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_builder"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "507dfb09ea8b7fa618fcf76e953f4f5e192547945816d5358edffe39f6f94947"
+dependencies = [
+ "derive_builder_macro",
+]
+
+[[package]]
+name = "derive_builder_core"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d5bcf7b024d6835cfb3d473887cd966994907effbe9227e8c8219824d06c4e8"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
+name = "derive_builder_macro"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab63b0e2bf4d5928aff72e83a7dace85d7bba5fe12dcc3c5a572d78caffd3f3c"
+dependencies = [
+ "derive_builder_core",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "derive_more"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4077,6 +4159,17 @@ version = "0.226.5"
 dependencies = [
  "quote",
  "syn 2.0.96",
+]
+
+[[package]]
+name = "eventsource-stream"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74fef4569247a5f429d9156b9d0a2599914385dd189c539334c625d8099d90ab"
+dependencies = [
+ "futures-core",
+ "nom",
+ "pin-project-lite",
 ]
 
 [[package]]
@@ -5251,6 +5344,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "instant"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
 name = "integer-encoding"
 version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5755,6 +5857,7 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-search",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
@@ -6065,6 +6168,10 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-search",
+ "kamu-search-openai",
+ "kamu-search-qdrant",
+ "kamu-search-services",
  "kamu-task-system-inmem",
  "kamu-task-system-postgres",
  "kamu-task-system-services",
@@ -6710,6 +6817,72 @@ dependencies = [
  "semver 1.0.25",
  "serde",
  "toml",
+]
+
+[[package]]
+name = "kamu-search"
+version = "0.226.5"
+dependencies = [
+ "async-trait",
+ "futures",
+ "internal-error",
+ "opendatafabric",
+ "serde_json",
+ "thiserror 2.0.11",
+]
+
+[[package]]
+name = "kamu-search-openai"
+version = "0.226.5"
+dependencies = [
+ "async-openai",
+ "async-trait",
+ "dill",
+ "futures",
+ "internal-error",
+ "kamu-search",
+ "opendatafabric",
+ "secrecy",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "kamu-search-qdrant"
+version = "0.226.5"
+dependencies = [
+ "async-trait",
+ "dill",
+ "futures",
+ "internal-error",
+ "kamu-search",
+ "opendatafabric",
+ "qdrant-client",
+ "rand",
+ "serde_json",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
+name = "kamu-search-services"
+version = "0.226.5"
+dependencies = [
+ "async-trait",
+ "dill",
+ "futures",
+ "init-on-startup",
+ "internal-error",
+ "itertools 0.14.0",
+ "kamu-core",
+ "kamu-search",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "thiserror 2.0.11",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -8941,6 +9114,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "qdrant-client"
+version = "1.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b585625d1ef06478e97fe8d7170a3f32a1cba5dbf986ff136095a85a0ec3d91"
+dependencies = [
+ "anyhow",
+ "derive_builder",
+ "futures",
+ "prost",
+ "prost-types",
+ "semver 1.0.25",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9258,6 +9450,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "reqwest-eventsource"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "632c55746dbb44275691640e7b40c907c16a2dc1a5842aa98aaec90da6ec6bde"
+dependencies = [
+ "eventsource-stream",
+ "futures-core",
+ "futures-timer",
+ "mime",
+ "nom",
+ "pin-project-lite",
+ "reqwest",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "resolv-conf"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9523,6 +9731,7 @@ version = "0.23.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f287924602bf649d949c63dc8ac8b235fa5387d394020705b80c4eb597ce5b8"
 dependencies = [
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
@@ -9761,6 +9970,7 @@ version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
 dependencies = [
+ "serde",
  "zeroize",
 ]
 
@@ -10141,7 +10351,7 @@ version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03c3c6b7927ffe7ecaa769ee0e3994da3b8cafc8f444578982c83ecb161af917"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.96",
@@ -11026,6 +11236,7 @@ dependencies = [
  "axum 0.7.9",
  "base64 0.22.1",
  "bytes",
+ "flate2",
  "h2 0.4.7",
  "http 1.2.0",
  "http-body 1.0.1",
@@ -11036,8 +11247,11 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost",
+ "rustls-native-certs 0.8.1",
+ "rustls-pemfile 2.2.0",
  "socket2",
  "tokio",
+ "tokio-rustls 0.26.1",
  "tokio-stream",
  "tower 0.4.13",
  "tower-layer",

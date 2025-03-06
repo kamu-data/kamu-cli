@@ -12,11 +12,9 @@ mod remote_aliases_registry_impl;
 mod remote_repository_registry_impl;
 mod remote_status_service_impl;
 mod resource_loader_impl;
-mod search_service_impl;
 
 pub use remote_alias_resolver_impl::*;
 pub use remote_aliases_registry_impl::*;
 pub use remote_repository_registry_impl::*;
 pub use remote_status_service_impl::*;
 pub use resource_loader_impl::*;
-pub use search_service_impl::*;

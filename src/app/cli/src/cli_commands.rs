@@ -371,9 +371,13 @@ pub fn get_command(
         )),
         cli::Command::Search(c) => Box::new(SearchCommand::new(
             cli_catalog.get_one()?,
+            cli_catalog
+                .get::<dill::specs::Maybe<dill::specs::OneOf<dyn kamu_search::SearchServiceLocal>>>(
+                )?,
             cli_catalog.get_one()?,
             c.query,
             c.repo.unwrap_or_default(),
+            c.local,
         )),
         cli::Command::Sql(c) => match c.subcommand {
             None => Box::new(SqlShellCommand::new(

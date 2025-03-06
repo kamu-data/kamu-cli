@@ -60,7 +60,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
-        .add::<SearchServiceImpl>()
+        .add::<SearchServiceRemoteImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>()
@@ -76,7 +76,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder = catalog.get_one::<SyncRequestBuilder>().unwrap();
-    let search_svc = catalog.get_one::<dyn SearchService>().unwrap();
+    let search_svc = catalog.get_one::<dyn SearchServiceRemote>().unwrap();
 
     // Add repository
     remote_repo_reg
@@ -117,11 +117,11 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     // Search!
     assert_eq!(
         search_svc
-            .search(None, SearchOptions::default())
+            .search(None, SearchRemoteOpts::default())
             .await
             .unwrap(),
-        SearchResult {
-            datasets: vec![SearchResultDataset {
+        SearchRemoteResult {
+            datasets: vec![SearchRemoteResultDataset {
                 id: None,
                 alias: dataset_remote_alias.clone(),
                 kind: None,
@@ -134,11 +134,11 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     assert_eq!(
         search_svc
-            .search(Some("bar"), SearchOptions::default())
+            .search(Some("bar"), SearchRemoteOpts::default())
             .await
             .unwrap(),
-        SearchResult {
-            datasets: vec![SearchResultDataset {
+        SearchRemoteResult {
+            datasets: vec![SearchRemoteResultDataset {
                 id: None,
                 alias: dataset_remote_alias.clone(),
                 kind: None,
@@ -151,10 +151,10 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     assert_eq!(
         search_svc
-            .search(Some("foo"), SearchOptions::default())
+            .search(Some("foo"), SearchRemoteOpts::default())
             .await
             .unwrap(),
-        SearchResult { datasets: vec![] }
+        SearchRemoteResult { datasets: vec![] }
     );
 }
 

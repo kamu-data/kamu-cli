@@ -18,14 +18,14 @@ use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchServiceImpl {
+pub struct SearchServiceRemoteImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     maybe_s3_metrics: Option<Arc<S3Metrics>>,
 }
 
 #[component(pub)]
-#[interface(dyn SearchService)]
-impl SearchServiceImpl {
+#[interface(dyn SearchServiceRemote)]
+impl SearchServiceRemoteImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         maybe_s3_metrics: Option<Arc<S3Metrics>>,
@@ -41,7 +41,7 @@ impl SearchServiceImpl {
         url: &Url,
         query: Option<&str>,
         repo_name: &odf::RepoName,
-    ) -> Result<Vec<SearchResultDataset>, SearchError> {
+    ) -> Result<Vec<SearchRemoteResultDataset>, SearchRemoteError> {
         let mut datasets = Vec::new();
 
         let path = url
@@ -52,7 +52,7 @@ impl SearchServiceImpl {
         for entry in std::fs::read_dir(path).int_err()? {
             if let Some(file_name) = entry.int_err()?.file_name().to_str() {
                 if query.is_empty() || file_name.contains(query) {
-                    datasets.push(SearchResultDataset {
+                    datasets.push(SearchRemoteResultDataset {
                         id: None,
                         alias: odf::DatasetAliasRemote::new(
                             repo_name.clone(),
@@ -76,7 +76,7 @@ impl SearchServiceImpl {
         url: &Url,
         query: Option<&str>,
         repo_name: &odf::RepoName,
-    ) -> Result<Vec<SearchResultDataset>, SearchError> {
+    ) -> Result<Vec<SearchRemoteResultDataset>, SearchRemoteError> {
         let mut datasets = Vec::new();
 
         let mut s3_context = S3Context::from_url(url).await;
@@ -97,7 +97,7 @@ impl SearchServiceImpl {
             let name = odf::DatasetName::try_from(prefix).int_err()?;
 
             if query.is_empty() || name.contains(query) {
-                datasets.push(SearchResultDataset {
+                datasets.push(SearchRemoteResultDataset {
                     id: None,
                     alias: odf::DatasetAliasRemote::new(repo_name.clone(), None, name),
                     kind: None,
@@ -117,7 +117,7 @@ impl SearchServiceImpl {
         url: &Url,
         query: Option<&str>,
         repo_name: &odf::RepoName,
-    ) -> Result<Vec<SearchResultDataset>, SearchError> {
+    ) -> Result<Vec<SearchRemoteResultDataset>, SearchRemoteError> {
         let gql_query = r#"
             {
               search {
@@ -166,7 +166,7 @@ impl SearchServiceImpl {
         let gql_response: serde_json::Value = response.json().await.int_err()?;
 
         let invalid_response = || {
-            SearchError::Internal(
+            SearchRemoteError::Internal(
                 format!("GQL endpoint returned invalid response:\n{gql_response}").int_err(),
             )
         };
@@ -179,7 +179,7 @@ impl SearchServiceImpl {
 
         for node in nodes {
             let ds: GqlDataset = serde_json::from_value(node.clone()).int_err()?;
-            datasets.push(SearchResultDataset {
+            datasets.push(SearchRemoteResultDataset {
                 id: Some(ds.id),
                 alias: odf::DatasetAliasRemote::new(
                     repo_name.clone(),
@@ -203,7 +203,7 @@ impl SearchServiceImpl {
         url: &Url,
         query: Option<&str>,
         repo_name: &odf::RepoName,
-    ) -> Result<Vec<SearchResultDataset>, SearchError> {
+    ) -> Result<Vec<SearchRemoteResultDataset>, SearchRemoteError> {
         match url.scheme() {
             "file" => self.search_in_repo_localfs(url, query, repo_name),
             "s3" | "s3+http" | "s3+https" => self.search_in_repo_s3(url, query, repo_name).await,
@@ -220,31 +220,31 @@ impl SearchServiceImpl {
         &self,
         query: Option<&str>,
         repo_name: &odf::RepoName,
-    ) -> Result<SearchResult, SearchError> {
+    ) -> Result<SearchRemoteResult, SearchRemoteError> {
         let repo = self.remote_repo_reg.get_repository(repo_name)?;
 
         tracing::info!(repo_id = repo_name.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
 
         let datasets = self.search_in_resource(&repo.url, query, repo_name).await?;
 
-        Ok(SearchResult { datasets })
+        Ok(SearchRemoteResult { datasets })
     }
 }
 
 #[async_trait::async_trait]
-impl SearchService for SearchServiceImpl {
+impl SearchServiceRemote for SearchServiceRemoteImpl {
     async fn search(
         &self,
         query: Option<&str>,
-        options: SearchOptions,
-    ) -> Result<SearchResult, SearchError> {
+        options: SearchRemoteOpts,
+    ) -> Result<SearchRemoteResult, SearchRemoteError> {
         let repo_names = if !options.repository_names.is_empty() {
             options.repository_names
         } else {
             self.remote_repo_reg.get_all_repositories().collect()
         };
 
-        let mut result = SearchResult::default();
+        let mut result = SearchRemoteResult::default();
         for repo in &repo_names {
             let mut repo_result = self.search_in_repo(query, repo).await?;
             result.datasets.append(&mut repo_result.datasets);

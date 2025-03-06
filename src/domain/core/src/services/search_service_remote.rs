@@ -13,30 +13,30 @@ use thiserror::Error;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Service
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Provides search functionality for datasets that reside in external
+/// repositories
 #[async_trait::async_trait]
-pub trait SearchService: Send + Sync {
+pub trait SearchServiceRemote: Send + Sync {
     async fn search(
         &self,
         query: Option<&str>,
-        options: SearchOptions,
-    ) -> Result<SearchResult, SearchError>;
+        options: SearchRemoteOpts,
+    ) -> Result<SearchRemoteResult, SearchRemoteError>;
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct SearchOptions {
+pub struct SearchRemoteOpts {
     pub repository_names: Vec<odf::RepoName>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SearchResult {
-    pub datasets: Vec<SearchResultDataset>,
+pub struct SearchRemoteResult {
+    pub datasets: Vec<SearchRemoteResultDataset>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SearchResultDataset {
+pub struct SearchRemoteResultDataset {
     pub id: Option<odf::DatasetID>,
     pub alias: odf::DatasetAliasRemote,
     pub kind: Option<odf::DatasetKind>,
@@ -50,7 +50,7 @@ pub struct SearchResultDataset {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum SearchError {
+pub enum SearchRemoteError {
     #[error(transparent)]
     RepositoryNotFound(
         #[from]
@@ -83,7 +83,7 @@ pub enum SearchError {
     ),
 }
 
-impl From<GetRepoError> for SearchError {
+impl From<GetRepoError> for SearchRemoteError {
     fn from(v: GetRepoError) -> Self {
         match v {
             GetRepoError::NotFound(e) => Self::RepositoryNotFound(e),

@@ -26,7 +26,9 @@ pub struct Search;
 impl Search {
     const DEFAULT_RESULTS_PER_PAGE: usize = 15;
 
-    /// Perform search across all resources
+    /// This endpoint uses heuristics to infer whether the query string is a DSL
+    /// or a natural language query and is suitable to present the most
+    /// versatile interface to the user consisting of just one input field.
     #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(?page, ?per_page))]
     async fn query(
         &self,
@@ -92,6 +94,68 @@ impl Search {
             total_count,
         ))
     }
+
+    /// Searches for datasets and other objects managed by the
+    /// current node using a prompt in natural language
+    #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(?page, ?per_page))]
+    async fn query_natural_language(
+        &self,
+        ctx: &Context<'_>,
+        prompt: String,
+        page: Option<usize>,
+        per_page: Option<usize>,
+        min_score: f32,
+    ) -> Result<SearchResultExConnection> {
+        let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchServiceLocal);
+
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(10);
+
+        let skip = per_page * page;
+        let limit = per_page;
+
+        let res = search_service
+            .search_natural_language(
+                &prompt,
+                kamu_search::SearchNatLangOpts {
+                    skip: Some(skip),
+                    limit: Some(limit),
+                    min_score,
+                },
+            )
+            .await
+            .int_err()?;
+
+        // We don't know the total count, so unless we get less results than asked for -
+        // we assume there's more
+        let mut total_count = skip + res.datasets.len();
+        if res.datasets.len() == limit {
+            total_count += 1;
+        }
+
+        let mut nodes: Vec<SearchResultEx> = Vec::new();
+        for hit in res.datasets {
+            let Some(account) = Account::from_dataset_alias(ctx, &hit.handle.alias).await? else {
+                tracing::warn!(
+                    "Skipped dataset '{}' with unresolved account",
+                    hit.handle.alias
+                );
+                continue;
+            };
+
+            nodes.push(SearchResultEx {
+                item: SearchResult::Dataset(Dataset::new(account, hit.handle)),
+                score: hit.score,
+            });
+        }
+
+        Ok(SearchResultExConnection::new(
+            nodes,
+            page,
+            per_page,
+            total_count,
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,8 +168,16 @@ pub enum SearchResult {
     // Issue,
 }
 
+page_based_connection!(SearchResult, SearchResultConnection, SearchResultEdge);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-page_based_connection!(SearchResult, SearchResultConnection, SearchResultEdge);
+#[derive(SimpleObject, Debug)]
+pub struct SearchResultEx {
+    pub item: SearchResult,
+    pub score: f32,
+}
+
+page_based_connection!(SearchResultEx, SearchResultExConnection, SearchResultExEdge);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

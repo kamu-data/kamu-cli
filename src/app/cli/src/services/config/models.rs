@@ -68,6 +68,10 @@ pub struct CLIConfig {
     /// Uploads configuration
     #[merge(strategy = merge_recursive)]
     pub uploads: Option<UploadsConfig>,
+
+    /// Seach configuration
+    #[merge(strategy = merge_recursive)]
+    pub search: Option<SearchConfig>,
 }
 
 impl CLIConfig {
@@ -84,6 +88,7 @@ impl CLIConfig {
             users: None,
             uploads: None,
             flow_system: None,
+            search: None,
         }
     }
 
@@ -104,6 +109,7 @@ impl CLIConfig {
             users: Some(PredefinedAccountsConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
             flow_system: Some(FlowSystemConfig::sample()),
+            search: Some(SearchConfig::sample()),
         }
     }
 }
@@ -122,6 +128,7 @@ impl Default for CLIConfig {
             users: Some(PredefinedAccountsConfig::default()),
             uploads: Some(UploadsConfig::default()),
             flow_system: Some(FlowSystemConfig::default()),
+            search: Some(SearchConfig::default()),
         }
     }
 }
@@ -834,6 +841,87 @@ impl IdentityConfig {
             .clone()
             .map(|private_key| kamu_adapter_http::data::query_types::IdentityConfig { private_key })
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Search
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchConfig {
+    pub embeddings_encoder: Option<EmbeddingsEncoderConfig>,
+    pub vector_repo: Option<VectorRepoConfig>,
+}
+
+impl SearchConfig {
+    pub const DEFAULT_MODEL: &str = "text-embedding-ada-002";
+    pub const DEFAULT_DIMENSIONS: usize = 1536;
+
+    pub fn sample() -> Self {
+        Self {
+            embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
+                EmbeddingsEncoderConfigOpenAi {
+                    url: Some("https://api.openai.com/v1".to_string()),
+                    api_key: Some("<key>".to_string()),
+                    model_name: Some(Self::DEFAULT_MODEL.to_string()),
+                    dimensions: Some(Self::DEFAULT_DIMENSIONS),
+                },
+            )),
+            vector_repo: Some(VectorRepoConfig::Qdrant(VectorRepoConfigQdrant {
+                url: "http://localhost:6333".to_string(),
+                api_key: None,
+                collection_name: Some("kamu-datasets".to_string()),
+                dimensions: Some(Self::DEFAULT_DIMENSIONS),
+            })),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum EmbeddingsEncoderConfig {
+    OpenAi(EmbeddingsEncoderConfigOpenAi),
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddingsEncoderConfigOpenAi {
+    pub url: Option<String>,
+    pub api_key: Option<String>,
+    pub model_name: Option<String>,
+    pub dimensions: Option<usize>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum VectorRepoConfig {
+    Qdrant(VectorRepoConfigQdrant),
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct VectorRepoConfigQdrant {
+    pub url: String,
+    pub api_key: Option<String>,
+    pub collection_name: Option<String>,
+    pub dimensions: Option<usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

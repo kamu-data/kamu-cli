@@ -433,7 +433,7 @@ pub fn configure_base_catalog(
     b.add::<CompactionPlannerImpl>();
     b.add::<CompactionExecutorImpl>();
 
-    b.add::<SearchServiceImpl>();
+    b.add::<SearchServiceRemoteImpl>();
 
     b.add::<SyncServiceImpl>();
     b.add::<SyncRequestBuilder>();
@@ -888,6 +888,50 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
         Duration::seconds(task_agent_config.task_checking_interval_secs.unwrap()),
     ));
+    //
+
+    // Search configuration
+    if let Some(crate::config::SearchConfig {
+        embeddings_encoder: Some(embeddings_encoder),
+        vector_repo: Some(vector_repo),
+    }) = &config.search
+    {
+        catalog_builder.add::<kamu_search_services::SearchServiceLocalImpl>();
+        catalog_builder.add::<kamu_search_services::SearchServiceLocalIndexer>();
+
+        match embeddings_encoder {
+            config::EmbeddingsEncoderConfig::OpenAi(cfg) => {
+                catalog_builder.add::<kamu_search_openai::EmbeddingsEncoderOpenAi>();
+                catalog_builder.add_value(kamu_search_openai::EmbeddingsEncoderConfigOpenAI {
+                    url: cfg.url.clone(),
+                    api_key: cfg.api_key.clone().map(Into::into),
+                    model_name: cfg
+                        .model_name
+                        .clone()
+                        .unwrap_or(config::SearchConfig::DEFAULT_MODEL.to_string()),
+                    dimensions: cfg
+                        .dimensions
+                        .unwrap_or(config::SearchConfig::DEFAULT_DIMENSIONS),
+                });
+            }
+        }
+
+        match vector_repo {
+            config::VectorRepoConfig::Qdrant(cfg) => {
+                catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrant>();
+                catalog_builder.add_value(kamu_search_qdrant::VectorRepositoryConfigQdrant {
+                    url: cfg.url.clone(),
+                    collection_name: cfg
+                        .collection_name
+                        .clone()
+                        .unwrap_or("kamu-datasets".to_string()),
+                    dimensions: cfg
+                        .dimensions
+                        .unwrap_or(config::SearchConfig::DEFAULT_DIMENSIONS),
+                });
+            }
+        }
+    }
     //
 }
 

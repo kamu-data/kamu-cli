@@ -29,7 +29,7 @@ use crate::output::OutputConfig;
 pub struct PullCommand {
     pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    search_svc: Arc<dyn SearchService>,
+    search_svc: Arc<dyn SearchServiceRemote>,
     output_config: Arc<OutputConfig>,
     tenancy_config: TenancyConfig,
     refs: Vec<odf::DatasetRefAnyPattern>,
@@ -48,7 +48,7 @@ impl PullCommand {
     pub fn new<I>(
         pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
         dataset_registry: Arc<dyn DatasetRegistry>,
-        search_svc: Arc<dyn SearchService>,
+        search_svc: Arc<dyn SearchServiceRemote>,
         output_config: Arc<OutputConfig>,
         tenancy_config: TenancyConfig,
         refs: I,

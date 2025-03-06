@@ -42,12 +42,14 @@ members = [
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
+    "src/domain/search/domain",
     "src/domain/task-system/domain",
     # Domain service layer
     "src/domain/accounts/services",
     "src/domain/auth-rebac/services",
     "src/domain/datasets/services",
     "src/domain/flow-system/services",
+    "src/domain/search/services",
     "src/domain/task-system/services",
     # Infra
     "src/infra/core",
@@ -67,6 +69,9 @@ members = [
     "src/infra/datasets/inmem",
     "src/infra/datasets/postgres",
     "src/infra/datasets/sqlite",
+    ## Search
+    "src/infra/search/openai",
+    "src/infra/search/qdrant",
     ## Task System
     "src/infra/task-system/repo-tests",
     "src/infra/task-system/inmem",
@@ -139,6 +144,7 @@ kamu-auth-rebac = { version = "0.226.5", path = "src/domain/auth-rebac/domain", 
 kamu-core = { version = "0.226.5", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.226.5", path = "src/domain/datasets/domain", default-features = false }
 kamu-flow-system = { version = "0.226.5", path = "src/domain/flow-system/domain", default-features = false }
+kamu-search = { version = "0.226.5", path = "src/domain/search/domain", default-features = false }
 kamu-task-system = { version = "0.226.5", path = "src/domain/task-system/domain", default-features = false }
 
 ## Open Data Fabric
@@ -158,6 +164,7 @@ kamu-accounts-services = { version = "0.226.5", path = "src/domain/accounts/serv
 kamu-auth-rebac-services = { version = "0.226.5", path = "src/domain/auth-rebac/services", default-features = false }
 kamu-datasets-services = { version = "0.226.5", path = "src/domain/datasets/services", default-features = false }
 kamu-flow-system-services = { version = "0.226.5", path = "src/domain/flow-system/services", default-features = false }
+kamu-search-services = { version = "0.226.5", path = "src/domain/search/services", default-features = false }
 kamu-task-system-services = { version = "0.226.5", path = "src/domain/task-system/services", default-features = false }
 
 # Infra
@@ -179,6 +186,9 @@ kamu-datasets-inmem = { version = "0.226.5", path = "src/infra/datasets/inmem", 
 kamu-datasets-postgres = { version = "0.226.5", path = "src/infra/datasets/postgres", default-features = false }
 kamu-datasets-sqlite = { version = "0.226.5", path = "src/infra/datasets/sqlite", default-features = false }
 kamu-datasets-repo-tests = { version = "0.226.5", path = "src/infra/datasets/repo-tests", default-features = false }
+## Search
+kamu-search-openai = { version = "0.226.5", path = "src/infra/search/openai", default-features = false }
+kamu-search-qdrant = { version = "0.226.5", path = "src/infra/search/qdrant", default-features = false }
 ## Task System
 kamu-task-system-inmem = { version = "0.226.5", path = "src/infra/task-system/inmem", default-features = false }
 kamu-task-system-postgres = { version = "0.226.5", path = "src/infra/task-system/postgres", default-features = false }
