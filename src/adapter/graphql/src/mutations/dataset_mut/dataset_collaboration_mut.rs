@@ -33,7 +33,7 @@ impl<'a> DatasetCollaborationMut<'a> {
     async fn set_role(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
+        account_id: AccountID<'_>,
         role: DatasetAccessRole,
     ) -> Result<SetRoleResult> {
         self.dataset_mut_request_state
@@ -50,7 +50,7 @@ impl<'a> DatasetCollaborationMut<'a> {
     async fn unset_roles(
         &self,
         ctx: &Context<'_>,
-        account_id: Vec<AccountID>,
+        account_id: Vec<AccountID<'_>>,
     ) -> Result<UnsetRoleResult> {
         self.dataset_mut_request_state
             .check_dataset_maintain_access(ctx)

@@ -99,7 +99,7 @@ impl DatasetMut {
             .await
         {
             Ok(_) => Ok(RenameResult::Success(RenameResultSuccess {
-                old_name: (&self.dataset_handle.alias.dataset_name).into(),
+                old_name: (&dataset_handle.alias.dataset_name).into(),
                 new_name,
             })),
             Err(RenameDatasetError::NameCollision(e)) => {
@@ -127,11 +127,11 @@ impl DatasetMut {
             .await
         {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
-                deleted_dataset: (&self.dataset_handle.alias).into(),
+                deleted_dataset: (&dataset_handle.alias).into(),
             })),
             Err(DeleteDatasetError::DanglingReference(e)) => Ok(DeleteResult::DanglingReference(
                 DeleteResultDanglingReference {
-                    not_deleted_dataset: (&self.dataset_handle.alias).into(),
+                    not_deleted_dataset: (&dataset_handle.alias).into(),
                     dangling_child_refs: e
                         .children
                         .iter()
