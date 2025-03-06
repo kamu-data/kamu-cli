@@ -21,13 +21,15 @@ use crate::utils::from_catalog_n;
 
 pub struct Search;
 
+// TODO: Private Datasets: remove (unused_variables)
+#[expect(unused_variables)]
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Search {
     const DEFAULT_RESULTS_PER_PAGE: usize = 15;
 
     /// Perform search across all resources
-    #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(?page, ?per_page))]
+    #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(%query, ?page, ?per_page))]
     async fn query(
         &self,
         ctx: &Context<'_>,
@@ -92,6 +94,26 @@ impl Search {
             total_count,
         ))
     }
+
+    // TODO: Private Datasets: tests
+    /// Perform lightweight search among resource names.
+    /// Useful for autocomplete.
+    #[tracing::instrument(level = "info", name = Search_name_lookup, skip_all, fields(%query, ?page, ?per_page))]
+    async fn name_lookup(
+        &self,
+        ctx: &Context<'_>,
+        query: String,
+        filters: LookupFilters,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<NameLookupResultConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+
+        // TODO: Private Datasets: implementation
+
+        Ok(NameLookupResultConnection::new(vec![], page, per_page, 0))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,8 +126,31 @@ pub enum SearchResult {
     // Issue,
 }
 
+#[derive(Union, Debug)]
+pub enum NameLookupResult {
+    Account(Account),
+    // Dataset
+    // Organization,
+    // Issue,
+}
+
+#[derive(InputObject, Debug)]
+pub struct LookupFilters {
+    by_account: Option<AccountLookupFilter>,
+}
+
+#[derive(InputObject, Debug)]
+pub struct AccountLookupFilter {
+    _dummy: Option<String>,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(SearchResult, SearchResultConnection, SearchResultEdge);
+page_based_connection!(
+    NameLookupResult,
+    NameLookupResultConnection,
+    NameLookupResultEdge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
