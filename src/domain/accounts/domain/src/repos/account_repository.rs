@@ -53,10 +53,12 @@ pub trait AccountRepository: Send + Sync {
     ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError>;
 
     // TODO: Private Datasets: tests
-    async fn search_accounts_by_name_pattern(
-        &self,
-        name_pattern: &str,
-    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError>;
+    fn search_accounts_by_name_pattern<'a>(
+        &'a self,
+        name_pattern: &'a str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream<'a>;
 
     async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError>;
 
@@ -112,6 +114,13 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type AccountPageStream<'a> = EntityPageStream<'a, Account>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct SearchAccountsByNamePatternFilters {
+    pub exclude_accounts_by_ids: Option<Vec<odf::AccountID>>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
@@ -225,13 +234,6 @@ pub enum FindAccountIdByEmailError {
 
 #[derive(Error, Debug)]
 pub enum FindAccountIdByNameError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum SearchAccountsByNamePatternError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

@@ -379,10 +379,12 @@ impl AccountRepository for PostgresAccountRepository {
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
 
-    async fn search_accounts_by_name_pattern(
+    fn search_accounts_by_name_pattern(
         &self,
         _name_pattern: &str,
-    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError> {
+        _filters: SearchAccountsByNamePatternFilters,
+        _pagination: PaginationOpts,
+    ) -> AccountPageStream {
         todo!("TODO: Private Datasets: implementation")
     }
 }
