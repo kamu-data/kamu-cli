@@ -52,6 +52,12 @@ pub trait AccountRepository: Send + Sync {
         account_name: &odf::AccountName,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError>;
 
+    // TODO: Private Datasets: tests
+    async fn search_accounts_by_name_pattern(
+        &self,
+        name_pattern: &str,
+    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError>;
+
     async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError>;
 
     async fn update_account_email(
@@ -219,6 +225,13 @@ pub enum FindAccountIdByEmailError {
 
 #[derive(Error, Debug)]
 pub enum FindAccountIdByNameError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum SearchAccountsByNamePatternError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

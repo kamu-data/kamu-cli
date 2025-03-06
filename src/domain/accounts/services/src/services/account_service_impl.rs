@@ -20,6 +20,7 @@ use kamu_accounts::{
     GetAccountByIdError,
     GetAccountByNameError,
     GetAccountMapError,
+    SearchAccountsByNamePatternError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +120,15 @@ impl AccountService for AccountServiceImpl {
             Err(GetAccountByIdError::NotFound(_)) => Ok(None),
             Err(GetAccountByIdError::Internal(e)) => Err(e),
         }
+    }
+
+    async fn search_accounts_by_name_pattern(
+        &self,
+        name_pattern: &str,
+    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError> {
+        self.account_repo
+            .search_accounts_by_name_pattern(name_pattern)
+            .await
     }
 }
 
