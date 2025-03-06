@@ -55,6 +55,7 @@ pub enum DatasetAction {
     Read,
     Write,
     Maintain,
+    Own,
 }
 
 #[cfg(feature = "oso")]
