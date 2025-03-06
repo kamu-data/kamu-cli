@@ -20,6 +20,7 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - API server correctly logs unknown routes
 - GQL: `Search::query()`: fix regression resulting in unstable ordering of search results
+- Fix JSON encoding of `BinaryView` and `Utf8View` data (#1127)
 
 ## [0.226.3] - 2025-02-27
 ### Changed
