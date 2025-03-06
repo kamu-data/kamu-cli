@@ -110,6 +110,12 @@ impl Search {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
+        {
+            //
+            let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+            //
+        }
+
         // TODO: Private Datasets: implementation
 
         Ok(NameLookupResultConnection::new(vec![], page, per_page, 0))
@@ -141,7 +147,7 @@ pub struct LookupFilters {
 
 #[derive(InputObject, Debug)]
 pub struct AccountLookupFilter {
-    _dummy: Option<String>,
+    exclude_accounts_by_ids: Option<Vec<AccountID<'static>>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
