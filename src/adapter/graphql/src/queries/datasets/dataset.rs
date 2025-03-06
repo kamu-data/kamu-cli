@@ -81,12 +81,7 @@ impl Dataset {
     /// Name can change over the dataset's lifetime. For unique identifier use
     /// `id()`.
     async fn name(&self) -> DatasetName {
-        (&self.dataset_request_state
-            .dataset_handle
-            .alias
-            .dataset_name
-            )
-            .into()
+        (&self.dataset_request_state.dataset_handle.alias.dataset_name).into()
     }
 
     /// Returns the user or organization that owns this dataset
@@ -96,11 +91,7 @@ impl Dataset {
 
     /// Returns dataset alias (user + name)
     async fn alias(&self) -> DatasetAlias {
-        (&self.dataset_request_state
-            .dataset_handle
-            .alias
-            )
-            .into()
+        (&self.dataset_request_state.dataset_handle.alias).into()
     }
 
     /// Returns the kind of dataset (Root or Derivative)
@@ -395,32 +386,32 @@ pub struct DatasetPermissions {
     metadata: DatasetMetadataPermissions,
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetCollaborationPermissions {
     can_view: bool,
     can_update: bool,
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetEnvVarsPermissions {
     can_view: bool,
     can_update: bool,
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetFlowsPermissions {
     can_view: bool,
     can_run: bool,
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetGeneralPermissions {
     can_rename: bool,
     can_set_visibility: bool,
     can_delete: bool,
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetMetadataPermissions {
     can_commit: bool,
 }
