@@ -9,10 +9,10 @@
 
 mod access_token;
 mod account;
-mod collaboration;
 mod data_batch;
 mod data_query;
 mod data_schema;
+mod dataset_collaboration;
 mod dataset_endpoints;
 mod dataset_env_var;
 mod dataset_id_name;
@@ -34,10 +34,10 @@ mod task_status_outcome;
 
 pub(crate) use access_token::*;
 pub(crate) use account::*;
-pub(crate) use collaboration::*;
 pub(crate) use data_batch::*;
 pub(crate) use data_query::*;
 pub(crate) use data_schema::*;
+pub(crate) use dataset_collaboration::*;
 pub(crate) use dataset_endpoints::*;
 pub(crate) use dataset_env_var::*;
 pub(crate) use dataset_id_name::*;
