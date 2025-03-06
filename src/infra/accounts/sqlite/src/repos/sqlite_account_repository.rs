@@ -7,11 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{
+    sqlite_generate_placeholders_list,
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
+use sqlx::sqlite::SqliteRow;
 use sqlx::Row;
 
 use crate::domain::*;
@@ -54,6 +60,23 @@ impl SqliteAccountRepository {
         };
 
         AccountErrorDuplicate { account_field }
+    }
+
+    fn map_account_row(account_row: SqliteRow) -> Account {
+        Account {
+            id: account_row.get_unchecked("id"),
+            account_name: odf::AccountName::new_unchecked(
+                &account_row.get::<String, &str>("account_name"),
+            ),
+            email: Email::parse(account_row.get("email")).unwrap(),
+            display_name: account_row.get("display_name"),
+            account_type: account_row.get_unchecked("account_type"),
+            avatar_url: account_row.get("avatar_url"),
+            registered_at: account_row.get("registered_at"),
+            is_admin: account_row.get::<bool, &str>("is_admin"),
+            provider: account_row.get("provider"),
+            provider_identity_key: account_row.get("provider_identity_key"),
+        }
     }
 }
 
@@ -268,6 +291,7 @@ impl AccountRepository for SqliteAccountRepository {
             .await
             .map_err(GetAccountByIdError::Internal)?;
 
+        // todo extract this common part
         let placeholders = account_ids
             .iter()
             .map(|_| "?")
@@ -307,20 +331,7 @@ impl AccountRepository for SqliteAccountRepository {
 
         Ok(account_rows
             .into_iter()
-            .map(|account_row| Account {
-                id: account_row.get_unchecked("id"),
-                account_name: odf::AccountName::new_unchecked(
-                    &account_row.get::<String, &str>("account_name"),
-                ),
-                email: Email::parse(account_row.get("email")).unwrap(),
-                display_name: account_row.get("display_name"),
-                account_type: account_row.get_unchecked("account_type"),
-                avatar_url: account_row.get("avatar_url"),
-                registered_at: account_row.get("registered_at"),
-                is_admin: account_row.get::<bool, &str>("is_admin"),
-                provider: account_row.get("provider"),
-                provider_identity_key: account_row.get("provider_identity_key"),
-            })
+            .map(Self::map_account_row)
             .collect())
     }
 
@@ -454,45 +465,75 @@ impl AccountRepository for SqliteAccountRepository {
         .fetch_optional(connection_mut)
         .await
         .int_err()
+        //     todo поудалять этот маппинг
         .map_err(FindAccountIdByNameError::Internal)?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
 
-    async fn search_accounts_by_name_pattern(
-        &self,
-        name_pattern: &str,
-    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError> {
-        let mut tr = self.transaction.lock().await;
+    fn search_accounts_by_name_pattern<'a>(
+        &'a self,
+        name_pattern: &'a str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream<'a> {
+        Box::pin(async_stream::stream! {
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
 
-        let connection_mut = tr.connection_mut().await?;
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
 
-        let account_rows = sqlx::query_as!(
-            AccountRowModel,
-            r#"
-            SELECT id            AS "id: _",
-                   account_name,
-                   email,
-                   display_name,
-                   account_type  AS "account_type: AccountType",
-                   avatar_url,
-                   registered_at AS "registered_at: _",
-                   is_admin      AS "is_admin: _",
-                   provider,
-                   provider_identity_key
-            FROM accounts
-            WHERE account_name LIKE '%'+$1+'%' COLLATE nocase
-               OR email LIKE '%'+$1+'%' COLLATE nocase
-               OR display_name LIKE '%'+$1+'%' COLLATE nocase
-            ORDER BY account_name
-            "#,
-            name_pattern,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
+            let query_str = format!(
+                r#"
+                SELECT id            AS "id: _",
+                       account_name,
+                       email,
+                       display_name,
+                       account_type  AS "account_type: AccountType",
+                       avatar_url,
+                       registered_at AS "registered_at: _",
+                       is_admin      AS "is_admin: _",
+                       provider,
+                       provider_identity_key
+                FROM accounts
+                WHERE (account_name LIKE '%'+$1+'%' COLLATE nocase
+                    OR email LIKE '%'+$1+'%' COLLATE nocase
+                    OR display_name LIKE '%'+$1+'%' COLLATE nocase)
+                  AND id NOT IN ({})
+                ORDER BY account_name
+                LIMIT $2 OFFSET $3
+                "#,
+                filters
+                    .exclude_accounts_by_ids
+                    .as_ref()
+                    .map(|ids| sqlite_generate_placeholders_list(ids.len(), 4))
+                    .unwrap_or_default()
+            );
 
-        Ok(account_rows.into_iter().map(Into::into).collect())
+            // ToDo replace it by macro once sqlx will support it
+            // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+            let mut query = sqlx::query(&query_str)
+                .bind(name_pattern)
+                .bind(limit)
+                .bind(offset);
+
+            if let Some(ids) = filters.exclude_accounts_by_ids {
+                for id in ids {
+                    query = query.bind(id.to_string());
+                }
+            }
+
+            let mut query_stream = query
+                .fetch(connection_mut)
+                .map_err(ErrorIntoInternal::int_err);
+
+            use futures::TryStreamExt;
+
+            while let Some(account_row) = query_stream.try_next().await? {
+                yield Ok(Self::map_account_row(account_row));
+            }
+        })
     }
 }
 

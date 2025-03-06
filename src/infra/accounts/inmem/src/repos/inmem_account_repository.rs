@@ -13,7 +13,6 @@ use std::sync::{Arc, Mutex};
 use database_common::PaginationOpts;
 use dill::*;
 use email_utils::Email;
-use odf::AccountName;
 
 use crate::domain::*;
 
@@ -43,7 +42,10 @@ impl State {
         }
     }
 
-    fn check_unique_name(&self, account_name: &AccountName) -> Result<(), AccountErrorDuplicate> {
+    fn check_unique_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), AccountErrorDuplicate> {
         if self.accounts_by_name.contains_key(account_name) {
             return Err(AccountErrorDuplicate {
                 account_field: AccountDuplicateField::Name,
@@ -305,10 +307,12 @@ impl AccountRepository for InMemoryAccountRepository {
         Ok(maybe_account.map(|a| a.id.clone()))
     }
 
-    async fn search_accounts_by_name_pattern(
+    fn search_accounts_by_name_pattern(
         &self,
         _name_pattern: &str,
-    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError> {
+        _filters: SearchAccountsByNamePatternFilters,
+        _pagination: PaginationOpts,
+    ) -> AccountPageStream {
         todo!("TODO: Private Datasets: implementation")
     }
 }

@@ -10,17 +10,19 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use database_common::PaginationOpts;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
+    AccountPageStream,
     AccountRepository,
     AccountService,
     FindAccountIdByNameError,
     GetAccountByIdError,
     GetAccountByNameError,
     GetAccountMapError,
-    SearchAccountsByNamePatternError,
+    SearchAccountsByNamePatternFilters,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,13 +124,14 @@ impl AccountService for AccountServiceImpl {
         }
     }
 
-    async fn search_accounts_by_name_pattern(
-        &self,
-        name_pattern: &str,
-    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError> {
+    fn search_accounts_by_name_pattern<'a>(
+        &'a self,
+        name_pattern: &'a str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream<'a> {
         self.account_repo
-            .search_accounts_by_name_pattern(name_pattern)
-            .await
+            .search_accounts_by_name_pattern(name_pattern, filters, pagination)
     }
 }
 
