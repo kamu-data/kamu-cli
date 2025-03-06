@@ -91,9 +91,9 @@ pub struct SnapshotConfigurationResetCustom {
     pub new_head_hash: Multihash<'static>,
 }
 
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, PartialEq, Eq, Default)]
 pub struct SnapshotConfigurationResetToSeedDummy {
-    dummy: String,
+    _dummy: Option<String>,
 }
 
 impl From<ResetRule> for FlowConfigurationReset {
@@ -103,9 +103,7 @@ impl From<ResetRule> for FlowConfigurationReset {
                 new_head_hash: new_head_hash.into(),
             })
         } else {
-            SnapshotPropagationMode::ToSeed(SnapshotConfigurationResetToSeedDummy {
-                dummy: String::new(),
-            })
+            SnapshotPropagationMode::ToSeed(SnapshotConfigurationResetToSeedDummy::default())
         };
         Self {
             mode: propagation_mode,
@@ -175,7 +173,7 @@ pub struct FlowConfigurationResetCustom {
 
 #[derive(InputObject)]
 pub struct FlowConfigurationResetToSeedDummy {
-    dummy: String,
+    _dummy: Option<String>,
 }
 
 #[derive(InputObject)]
