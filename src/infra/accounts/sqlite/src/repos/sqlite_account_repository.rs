@@ -458,6 +458,42 @@ impl AccountRepository for SqliteAccountRepository {
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
+
+    async fn search_accounts_by_name_pattern(
+        &self,
+        name_pattern: &str,
+    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_rows = sqlx::query_as!(
+            AccountRowModel,
+            r#"
+            SELECT id            AS "id: _",
+                   account_name,
+                   email,
+                   display_name,
+                   account_type  AS "account_type: AccountType",
+                   avatar_url,
+                   registered_at AS "registered_at: _",
+                   is_admin      AS "is_admin: _",
+                   provider,
+                   provider_identity_key
+            FROM accounts
+            WHERE account_name LIKE '%'+$1+'%' COLLATE nocase
+               OR email LIKE '%'+$1+'%' COLLATE nocase
+               OR display_name LIKE '%'+$1+'%' COLLATE nocase
+            ORDER BY account_name
+            "#,
+            name_pattern,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(account_rows.into_iter().map(Into::into).collect())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

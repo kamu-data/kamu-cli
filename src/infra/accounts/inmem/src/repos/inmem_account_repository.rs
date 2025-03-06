@@ -304,6 +304,13 @@ impl AccountRepository for InMemoryAccountRepository {
         let maybe_account = guard.accounts_by_name.get(account_name);
         Ok(maybe_account.map(|a| a.id.clone()))
     }
+
+    async fn search_accounts_by_name_pattern(
+        &self,
+        _name_pattern: &str,
+    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError> {
+        todo!("TODO: Private Datasets: implementation")
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id            AS \"id: _\",\n                   account_name,\n                   email,\n                   display_name,\n                   account_type  AS \"account_type: AccountType\",\n                   avatar_url,\n                   registered_at AS \"registered_at: _\",\n                   is_admin      AS \"is_admin: _\",\n                   provider,\n                   provider_identity_key\n            FROM accounts\n            WHERE account_name LIKE '%'+$1+'%' COLLATE nocase\n               OR email LIKE '%'+$1+'%' COLLATE nocase\n               OR display_name LIKE '%'+$1+'%' COLLATE nocase\n            ORDER BY account_name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "email",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_type: AccountType",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "avatar_url",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "registered_at: _",
+        "ordinal": 6,
+        "type_info": "Null"
+      },
+      {
+        "name": "is_admin: _",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "provider",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "provider_identity_key",
+        "ordinal": 9,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6f7ed9e1fa1770c1caba27a748015dc2b1f0eddab4e470b13302b42427d7cc91"
+}
