@@ -95,27 +95,10 @@ impl<OffsetSize: OffsetSizeTrait> Encoder for StringEncoder<'_, OffsetSize> {
     }
 }
 
-pub struct StringViewEncoder<'a>(pub &'a arrow::array::StringViewArray);
-impl Encoder for StringViewEncoder<'_> {
-    fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
-        write!(buf, "{}", self.0.value(idx))?;
-        Ok(())
-    }
-}
-
 pub struct BinaryHexEncoder<'a, OffsetSize: OffsetSizeTrait>(
     pub &'a arrow::array::GenericBinaryArray<OffsetSize>,
 );
 impl<OffsetSize: OffsetSizeTrait> Encoder for BinaryHexEncoder<'_, OffsetSize> {
-    fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
-        let hex_str = hex::encode(self.0.value(idx));
-        write!(buf, "{hex_str}")?;
-        Ok(())
-    }
-}
-
-pub struct BinaryViewHexEncoder<'a>(pub &'a arrow::array::BinaryViewArray);
-impl Encoder for BinaryViewHexEncoder<'_> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         let hex_str = hex::encode(self.0.value(idx));
         write!(buf, "{hex_str}")?;
