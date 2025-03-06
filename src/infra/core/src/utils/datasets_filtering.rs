@@ -69,7 +69,7 @@ pub fn filter_datasets_by_any_pattern<'a>(
     let (all_ref_patterns, static_refs): (Vec<_>, Vec<_>) = dataset_ref_any_patterns
         .into_iter()
         .partition(odf::DatasetRefAnyPattern::is_pattern);
-
+w
     let (remote_ref_patterns, local_ref_patterns): (Vec<_>, Vec<_>) =
         all_ref_patterns.into_iter().partition(|pattern| {
             pattern.is_remote_pattern(tenancy_config == TenancyConfig::MultiTenant)

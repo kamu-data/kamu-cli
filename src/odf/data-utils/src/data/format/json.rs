@@ -321,6 +321,10 @@ pub fn encoder_for<'a>(
             c,
             JsonEscapeStringEncoder::new(StringEncoder(c.as_string::<i64>())),
         )),
+        DataType::Utf8View => Box::new(JsonNullableEncoder(
+            c,
+            JsonEscapeStringEncoder::new(StringViewEncoder(c.as_string_view())),
+        )),
         DataType::Timestamp(_, _)
         | DataType::Date32
         | DataType::Date64
@@ -342,6 +346,10 @@ pub fn encoder_for<'a>(
         DataType::LargeBinary => Box::new(JsonNullableEncoder(
             c,
             JsonSafeStringEncoder(BinaryHexEncoder(c.as_binary::<i64>())),
+        )),
+        DataType::BinaryView => Box::new(JsonNullableEncoder(
+            c,
+            JsonSafeStringEncoder(BinaryViewHexEncoder(c.as_binary_view())),
         )),
         DataType::FixedSizeBinary(_) => Box::new(JsonNullableEncoder(
             c,
@@ -374,9 +382,7 @@ pub fn encoder_for<'a>(
                 .collect();
             Box::new(JsonNullableEncoder(c, nested(fields, encoders)))
         }
-        DataType::BinaryView
-        | DataType::Utf8View
-        | DataType::ListView(_)
+        DataType::ListView(_)
         | DataType::LargeListView(_)
         | DataType::Union(_, _)
         | DataType::Dictionary(_, _)
@@ -579,22 +585,30 @@ mod tests {
                 {
                     "bin": "666f6f",
                     "bin_fixed": "0102",
+                    "bin_large": "6c666f6f",
+                    "bin_view": "76666f6f",
                     "decimal": "5789604461865809771178549250434395392663499233282028201972879200395656481996",
                     "nullable": 1,
                     "ts_milli": "2020-01-01T12:00:00Z",
                     "uint64": 100,
                     "utf8": "foo",
                     "utf8_special": "sep,quotes'\",newline\nfin",
+                    "utf8_large": "lfoo",
+                    "utf8_view": "vfoo",
                 },
                 {
                     "bin": "626172",
                     "bin_fixed": "0304",
+                    "bin_large": "6c626172",
+                    "bin_view": "76626172",
                     "decimal": "-5789604461865809771178549250434395392663499233282028201972879200395656481996",
                     "nullable": null,
                     "ts_milli": "2020-01-01T12:01:00Z",
                     "uint64": 200,
                     "utf8": "bar",
                     "utf8_special": null,
+                    "utf8_large": "lbar",
+                    "utf8_view": "vbar",
                 }
             ]),
         );
@@ -664,8 +678,12 @@ mod tests {
                     "5789604461865809771178549250434395392663499233282028201972879200395656481996",
                     "foo",
                     "sep,quotes'\",newline\nfin",
+                    "lfoo",
+                    "vfoo",
                     "666f6f",
                     "0102",
+                    "6c666f6f",
+                    "76666f6f",
                     "2020-01-01T12:00:00Z",
                 ],
                 [
@@ -674,8 +692,12 @@ mod tests {
                     "-5789604461865809771178549250434395392663499233282028201972879200395656481996",
                     "bar",
                     null,
+                    "lbar",
+                    "vbar",
                     "626172",
                     "0304",
+                    "6c626172",
+                    "76626172",
                     "2020-01-01T12:01:00Z",
                 ],
             ]),
@@ -711,12 +733,16 @@ mod tests {
             json!({
                 "bin": [],
                 "bin_fixed": [],
+                "bin_large": [],
+                "bin_view": [],
                 "decimal": [],
                 "nullable": [],
                 "ts_milli": [],
                 "uint64": [],
                 "utf8": [],
                 "utf8_special": [],
+                "utf8_large": [],
+                "utf8_view": [],
             }),
         );
     }
@@ -729,6 +755,8 @@ mod tests {
             json!({
                 "bin": ["666f6f", "626172"],
                 "bin_fixed": ["0102", "0304"],
+                "bin_large": ["6c666f6f", "6c626172"],
+                "bin_view":  ["76666f6f", "76626172"],
                 "decimal": [
                     "5789604461865809771178549250434395392663499233282028201972879200395656481996",
                     "-5789604461865809771178549250434395392663499233282028201972879200395656481996",
@@ -738,6 +766,8 @@ mod tests {
                 "uint64": [100, 200],
                 "utf8": ["foo", "bar"],
                 "utf8_special": ["sep,quotes'\",newline\nfin", null],
+                "utf8_large": ["lfoo", "lbar"],
+                "utf8_view": ["vfoo", "vbar"],
             }),
         );
     }
@@ -782,22 +812,30 @@ mod tests {
                 json!({
                     "bin": "666f6f",
                     "bin_fixed": "0102",
+                    "bin_large": "6c666f6f",
+                    "bin_view": "76666f6f",
                     "decimal": "5789604461865809771178549250434395392663499233282028201972879200395656481996",
                     "nullable": 1,
                     "ts_milli": "2020-01-01T12:00:00Z",
                     "uint64": 100,
                     "utf8": "foo",
                     "utf8_special": "sep,quotes'\",newline\nfin",
+                    "utf8_large": "lfoo",
+                    "utf8_view": "vfoo",
                 }),
                 json!({
                     "bin": "626172",
                     "bin_fixed": "0304",
+                    "bin_large": "6c626172",
+                    "bin_view": "76626172",
                     "decimal": "-5789604461865809771178549250434395392663499233282028201972879200395656481996",
                     "nullable": null,
                     "ts_milli": "2020-01-01T12:01:00Z",
                     "uint64": 200,
                     "utf8": "bar",
                     "utf8_special": null,
+                    "utf8_large": "lbar",
+                    "utf8_view": "vbar",
                 }),
             ],
         );
@@ -810,8 +848,12 @@ mod tests {
             Field::new("decimal", DataType::Decimal256(76, 0), false),
             Field::new("utf8", DataType::Utf8, false),
             Field::new("utf8_special", DataType::Utf8, true),
+            Field::new("utf8_large", DataType::LargeUtf8, false),
+            Field::new("utf8_view", DataType::Utf8View, false),
             Field::new("bin", DataType::Binary, false),
             Field::new("bin_fixed", DataType::FixedSizeBinary(2), false),
+            Field::new("bin_large", DataType::LargeBinary, false),
+            Field::new("bin_view", DataType::BinaryView, false),
             Field::new(
                 "ts_milli",
                 DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
@@ -836,11 +878,15 @@ mod tests {
                     Some("sep,quotes'\",newline\nfin"),
                     None,
                 ])),
+                Arc::new(LargeStringArray::from(vec!["lfoo", "lbar"])),
+                Arc::new(StringViewArray::from(vec!["vfoo", "vbar"])),
                 Arc::new(BinaryArray::from(vec![&b"foo"[..], &b"bar"[..]])),
                 Arc::new({
                     let v = vec![vec![1, 2], vec![3, 4]];
                     FixedSizeBinaryArray::try_from_iter(v.into_iter()).unwrap()
                 }),
+                Arc::new(LargeBinaryArray::from(vec![&b"lfoo"[..], &b"lbar"[..]])),
+                Arc::new(BinaryViewArray::from(vec![&b"vfoo"[..], &b"vbar"[..]])),
                 Arc::new(
                     TimestampMillisecondArray::from(vec![
                         // 2020-01-01T12:00:00Z
