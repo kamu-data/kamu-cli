@@ -6181,7 +6181,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
 ]
 
 [[package]]

@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_collaboration_mut;
-mod dataset_mut;
+mod account;
+mod dataset_access_role;
 
-pub(crate) use dataset_collaboration_mut::*;
-pub(crate) use dataset_mut::*;
+pub(crate) use account::*;
+pub(crate) use dataset_access_role::*;

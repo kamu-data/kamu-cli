@@ -54,6 +54,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         dataset_handle: &odf::DatasetHandle,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
+        // TODO: Private Datasets: use access helper
         // Permission check
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle.id, DatasetAction::Write)

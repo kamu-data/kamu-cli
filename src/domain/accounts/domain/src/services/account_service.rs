@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::Account;
+use crate::{Account, SearchAccountsByNamePatternError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +47,11 @@ pub trait AccountService: Sync + Send {
         &self,
         account_id: &odf::AccountID,
     ) -> Result<Option<odf::AccountName>, InternalError>;
+
+    async fn search_accounts_by_name_pattern(
+        &self,
+        name_pattern: &str,
+    ) -> Result<Vec<Account>, SearchAccountsByNamePatternError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
