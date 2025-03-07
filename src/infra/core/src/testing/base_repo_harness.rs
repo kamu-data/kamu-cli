@@ -69,8 +69,8 @@ impl BaseRepoHarness {
                 .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
                 .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-                .add::<odf::dataset::DatasetDefaultLfsBuilderImpl>()
-                .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilderImpl>()
+                .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+                .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
                 .add::<DatasetRegistrySoloUnitBridge>();
 
             if let Some(current_account_subject) = current_account_subject {

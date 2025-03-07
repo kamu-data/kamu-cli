@@ -18,6 +18,7 @@ use kamu_datasets::{
     DatasetReferenceNotFoundError,
     DatasetReferenceRepository,
     GetDatasetReferenceError,
+    RemoveDatasetReferenceError,
     SetDatasetReferenceError,
 };
 
@@ -50,6 +51,41 @@ impl InMemoryDatasetReferenceRepository {
 
 #[async_trait::async_trait]
 impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
+    async fn get_dataset_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<odf::Multihash, GetDatasetReferenceError> {
+        let guard = self.state.lock().unwrap();
+        if let Some(dataset_references) = guard.references.get(dataset_id) {
+            if let Some(block_hash) = dataset_references.get(block_ref) {
+                return Ok(block_hash.clone());
+            }
+        }
+
+        Err(GetDatasetReferenceError::NotFound(
+            DatasetReferenceNotFoundError {
+                dataset_id: dataset_id.clone(),
+                block_ref: block_ref.clone(),
+            },
+        ))
+    }
+
+    async fn get_all_dataset_references(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<(odf::BlockRef, odf::Multihash)>, InternalError> {
+        let guard = self.state.lock().unwrap();
+        if let Some(dataset_references) = guard.references.get(dataset_id) {
+            Ok(dataset_references
+                .iter()
+                .map(|(block_ref, block_hash)| (block_ref.clone(), block_hash.clone()))
+                .collect())
+        } else {
+            Ok(vec![])
+        }
+    }
+
     async fn set_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,
@@ -117,39 +153,24 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
         Ok(())
     }
 
-    async fn get_dataset_reference(
+    async fn remove_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<odf::Multihash, GetDatasetReferenceError> {
-        let guard = self.state.lock().unwrap();
-        if let Some(dataset_references) = guard.references.get(dataset_id) {
-            if let Some(block_hash) = dataset_references.get(block_ref) {
-                return Ok(block_hash.clone());
+    ) -> Result<(), RemoveDatasetReferenceError> {
+        let mut guard = self.state.lock().unwrap();
+        if let Some(dataset_references) = guard.references.get_mut(dataset_id) {
+            if dataset_references.remove(block_ref).is_some() {
+                return Ok(());
             }
         }
 
-        Err(GetDatasetReferenceError::NotFound(
+        Err(RemoveDatasetReferenceError::NotFound(
             DatasetReferenceNotFoundError {
                 dataset_id: dataset_id.clone(),
                 block_ref: block_ref.clone(),
             },
         ))
-    }
-
-    async fn get_all_dataset_references(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<(odf::BlockRef, odf::Multihash)>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        if let Some(dataset_references) = guard.references.get(dataset_id) {
-            Ok(dataset_references
-                .iter()
-                .map(|(block_ref, block_hash)| (block_ref.clone(), block_hash.clone()))
-                .collect())
-        } else {
-            Ok(vec![])
-        }
     }
 }
 

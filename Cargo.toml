@@ -156,7 +156,7 @@ odf-storage-s3 = { version = "0.226.3", path = "src/odf/storage-s3", default-fea
 # Domain service layer
 kamu-accounts-services = { version = "0.226.3", path = "src/domain/accounts/services", default-features = false }
 kamu-auth-rebac-services = { version = "0.226.3", path = "src/domain/auth-rebac/services", default-features = false }
-kamu-datasets-services = { version = "0.226.3", path = "src/domain/datasets/services", default-features = false }
+kamu-datasets-services = { version = "0.226.3", path = "src/domain/datasets/services", default-features = false, features = ["lfs", "s3"]}
 kamu-flow-system-services = { version = "0.226.3", path = "src/domain/flow-system/services", default-features = false }
 kamu-task-system-services = { version = "0.226.3", path = "src/domain/task-system/services", default-features = false }
 

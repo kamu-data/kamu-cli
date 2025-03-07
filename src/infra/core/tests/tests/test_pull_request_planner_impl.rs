@@ -156,7 +156,7 @@ async fn create_graph_remote(
 
     let tmp_storage_unit = Arc::new(odf::dataset::DatasetStorageUnitLocalFs::new(
         tmp_registry_dir.path().to_owned(),
-        Arc::new(odf::dataset::DatasetDefaultLfsBuilderImpl {}),
+        Arc::new(odf::dataset::DatasetDefaultLfsBuilder {}),
     ));
 
     let tmp_dataset_registry = DatasetRegistrySoloUnitBridge::new(

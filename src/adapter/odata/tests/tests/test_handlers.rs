@@ -392,8 +392,8 @@ impl TestHarness {
                 )
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-                .add::<odf::dataset::DatasetDefaultLfsBuilderImpl>()
-                .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilderImpl>()
+                .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+                .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add_value(SystemTimeSourceStub::new_set(

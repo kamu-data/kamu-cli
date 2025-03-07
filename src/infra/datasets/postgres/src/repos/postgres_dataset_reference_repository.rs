@@ -34,6 +34,74 @@ impl PostgresDatasetReferenceRepository {
 
 #[async_trait::async_trait]
 impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
+    async fn get_dataset_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<odf::Multihash, GetDatasetReferenceError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+
+        let maybe_record = sqlx::query!(
+            r#"
+            SELECT block_hash
+                FROM dataset_references
+                WHERE dataset_id = $1 AND block_ref_name = $2
+            "#,
+            stack_dataset_id.as_str(),
+            block_ref.as_str(),
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        if let Some(record) = maybe_record {
+            Ok(odf::Multihash::from_multibase(&record.block_hash).unwrap())
+        } else {
+            Err(DatasetReferenceNotFoundError {
+                dataset_id: dataset_id.clone(),
+                block_ref: block_ref.clone(),
+            }
+            .into())
+        }
+    }
+
+    async fn get_all_dataset_references(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<(odf::BlockRef, odf::Multihash)>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+
+        let records = sqlx::query!(
+            r#"
+            SELECT block_ref_name, block_hash
+                FROM dataset_references
+                WHERE dataset_id = $1
+            "#,
+            stack_dataset_id.as_str(),
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let mut res = Vec::new();
+        for record in records {
+            res.push((
+                odf::BlockRef::from_str(record.block_ref_name.as_str())?,
+                odf::Multihash::from_multibase(&record.block_hash).int_err()?,
+            ));
+        }
+
+        Ok(res)
+    }
+
     async fn set_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,
@@ -85,72 +153,39 @@ impl DatasetReferenceRepository for PostgresDatasetReferenceRepository {
         }
     }
 
-    async fn get_dataset_reference(
+    async fn remove_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<odf::Multihash, GetDatasetReferenceError> {
-        let mut tr = self.transaction.lock().await;
+    ) -> Result<(), RemoveDatasetReferenceError> {
+        let query_result = {
+            let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr.connection_mut().await?;
+            let connection_mut = tr.connection_mut().await?;
 
-        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
+            sqlx::query!(
+                r#"
+                DELETE FROM dataset_references
+                    WHERE dataset_id = $1 AND block_ref_name = $2
+                "#,
+                dataset_id.to_string(),
+                block_ref.as_str(),
+            )
+            .execute(connection_mut)
+            .await
+            .int_err()?
+        };
 
-        let maybe_record = sqlx::query!(
-            r#"
-            SELECT block_hash
-                FROM dataset_references
-                WHERE dataset_id = $1 AND block_ref_name = $2
-            "#,
-            stack_dataset_id.as_str(),
-            block_ref.as_str()
-        )
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        if let Some(record) = maybe_record {
-            Ok(odf::Multihash::from_multibase(&record.block_hash).unwrap())
+        if query_result.rows_affected() == 0 {
+            Err(RemoveDatasetReferenceError::NotFound(
+                DatasetReferenceNotFoundError {
+                    dataset_id: dataset_id.clone(),
+                    block_ref: block_ref.clone(),
+                },
+            ))
         } else {
-            Err(DatasetReferenceNotFoundError {
-                dataset_id: dataset_id.clone(),
-                block_ref: block_ref.clone(),
-            }
-            .into())
+            Ok(())
         }
-    }
-
-    async fn get_all_dataset_references(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<(odf::BlockRef, odf::Multihash)>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-
-        let records = sqlx::query!(
-            r#"
-            SELECT block_ref_name, block_hash
-                FROM dataset_references
-                WHERE dataset_id = $1
-            "#,
-            stack_dataset_id.as_str(),
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        let mut res = Vec::new();
-        for record in records {
-            res.push((
-                odf::BlockRef::from_str(record.block_ref_name.as_str())?,
-                odf::Multihash::from_multibase(&record.block_hash).int_err()?,
-            ));
-        }
-
-        Ok(res)
     }
 }
 
