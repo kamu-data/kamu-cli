@@ -30,6 +30,8 @@ use s3_utils::{S3Context, S3Metrics};
 use url::Url;
 
 #[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
+use crate::MetadataChainReferenceRepositoryImpl;
+#[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
 use crate::{DatasetImpl, MetadataChainImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +54,7 @@ type DatasetImplLocalFS = DatasetImpl<
         MetadataBlockRepositoryCachingInMem<
             MetadataBlockRepositoryImpl<ObjectRepositoryLocalFSSha3>,
         >,
-        ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>,
+        MetadataChainReferenceRepositoryImpl<ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>>,
     >,
     ObjectRepositoryLocalFSSha3,
     ObjectRepositoryLocalFSSha3,
@@ -109,7 +111,9 @@ impl DatasetFactoryImpl {
         DatasetImpl::new(
             MetadataChainImpl::new(
                 DatasetDefaultLfsBuilder::build_meta_block_repo(layout.blocks_dir),
-                DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
+                MetadataChainReferenceRepositoryImpl::new(
+                    DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
+                ),
             ),
             DatasetDefaultLfsBuilder::build_data_repo(layout.data_dir),
             DatasetDefaultLfsBuilder::build_checkpoint_repo(layout.checkpoints_dir),
@@ -137,10 +141,12 @@ impl DatasetFactoryImpl {
                         header_map.clone(),
                     ),
                 )),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
-                    client.clone(),
-                    base_url.join("refs/").unwrap(),
-                    header_map.clone(),
+                MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
+                    NamedObjectRepositoryHttp::new(
+                        client.clone(),
+                        base_url.join("refs/").unwrap(),
+                        header_map.clone(),
+                    ),
                 )),
             ),
             ObjectRepositoryHttp::new(
@@ -186,7 +192,9 @@ impl DatasetFactoryImpl {
                 DatasetDefaultS3Builder::build_meta_block_repo(
                     DatasetDefaultS3Builder::build_base_block_repo(&s3_context),
                 ),
-                DatasetDefaultS3Builder::build_refs_repo(&s3_context),
+                MetadataChainReferenceRepositoryImpl::new(
+                    DatasetDefaultS3Builder::build_refs_repo(&s3_context),
+                ),
             ),
             DatasetDefaultS3Builder::build_data_repo(&s3_context),
             DatasetDefaultS3Builder::build_checkpoint_repo(&s3_context),
@@ -259,9 +267,11 @@ impl DatasetFactoryImpl {
                         Default::default(),
                     ),
                 )),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryIpfsHttp::new(
-                    client.clone(),
-                    dataset_url.join("refs/").unwrap(),
+                MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
+                    NamedObjectRepositoryIpfsHttp::new(
+                        client.clone(),
+                        dataset_url.join("refs/").unwrap(),
+                    ),
                 )),
             ),
             ObjectRepositoryHttp::new(

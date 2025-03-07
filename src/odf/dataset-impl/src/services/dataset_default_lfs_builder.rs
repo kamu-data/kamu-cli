@@ -16,7 +16,7 @@ use odf_storage::*;
 use odf_storage_lfs::*;
 use url::Url;
 
-use crate::{DatasetImpl, MetadataChainImpl};
+use crate::{DatasetImpl, MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,6 +31,12 @@ impl DatasetDefaultLfsBuilder {
         MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
             ObjectRepositoryLocalFSSha3::new(blocks_dir),
         ))
+    }
+
+    pub fn build_meta_ref_repo<TRefRepo: ReferenceRepository + Send + Sync>(
+        ref_repo: TRefRepo,
+    ) -> MetadataChainReferenceRepositoryImpl<TRefRepo> {
+        MetadataChainReferenceRepositoryImpl::new(ref_repo)
     }
 
     pub fn build_refs_repo(
@@ -53,11 +59,15 @@ impl DatasetDefaultLfsBuilder {
 }
 
 impl DatasetLfsBuilder for DatasetDefaultLfsBuilder {
-    fn build_lfs_dataset(&self, layout: DatasetLayout) -> Arc<dyn Dataset> {
+    fn build_lfs_dataset(
+        &self,
+        _dataset_id: &odf_metadata::DatasetID,
+        layout: DatasetLayout,
+    ) -> Arc<dyn Dataset> {
         Arc::new(DatasetImpl::new(
             MetadataChainImpl::new(
                 Self::build_meta_block_repo(layout.blocks_dir),
-                Self::build_refs_repo(layout.refs_dir),
+                Self::build_meta_ref_repo(Self::build_refs_repo(layout.refs_dir)),
             ),
             Self::build_data_repo(layout.data_dir),
             Self::build_checkpoint_repo(layout.checkpoints_dir),

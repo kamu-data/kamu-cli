@@ -23,7 +23,11 @@ impl DatabaseBackedOdfDatasetS3BuilderImpl {
 }
 
 impl odf::dataset::DatasetS3Builder for DatabaseBackedOdfDatasetS3BuilderImpl {
-    fn build_s3_dataset(&self, _s3_context: S3Context) -> std::sync::Arc<dyn odf::Dataset> {
+    fn build_s3_dataset(
+        &self,
+        _dataset_id: &odf::DatasetID,
+        _s3_context: S3Context,
+    ) -> std::sync::Arc<dyn odf::Dataset> {
         todo!()
     }
 }

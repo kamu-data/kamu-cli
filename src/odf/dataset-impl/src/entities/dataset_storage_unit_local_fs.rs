@@ -68,7 +68,9 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
         dataset_id: &DatasetID,
     ) -> Result<Arc<dyn Dataset>, GetStoredDatasetError> {
         let layout = self.get_dataset_layout(dataset_id)?;
-        let dataset = self.dataset_lfs_builder.build_lfs_dataset(layout);
+        let dataset = self
+            .dataset_lfs_builder
+            .build_lfs_dataset(dataset_id, layout);
         Ok(dataset)
     }
 
@@ -94,7 +96,7 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
 
                 // Head must exist and be properly set
                 let layout = DatasetLayout::create(dataset_dir_entry.path()).int_err()?;
-                let dataset = self.dataset_lfs_builder.build_lfs_dataset(layout);
+                let dataset = self.dataset_lfs_builder.build_lfs_dataset(&dataset_id, layout);
                 let head_res = dataset.as_metadata_chain().resolve_ref(&BlockRef::Head).await;
                 match head_res {
                     // Got head => good dataset
@@ -169,7 +171,9 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         // Create dataset
         let dataset_path = self.get_dataset_path(&dataset_id);
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
-        let dataset = self.dataset_lfs_builder.build_lfs_dataset(layout);
+        let dataset = self
+            .dataset_lfs_builder
+            .build_lfs_dataset(&dataset_id, layout);
 
         // Write seed block, but don't set a head ref
         let seed = match dataset

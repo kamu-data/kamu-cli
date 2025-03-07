@@ -58,7 +58,8 @@ impl DatasetStorageUnitS3 {
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
-        self.dataset_s3_builder.build_s3_dataset(s3_context)
+        self.dataset_s3_builder
+            .build_s3_dataset(dataset_id, s3_context)
     }
 
     async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {

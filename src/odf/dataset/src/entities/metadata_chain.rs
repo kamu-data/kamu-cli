@@ -22,9 +22,6 @@ use crate::*;
 
 #[async_trait]
 pub trait MetadataChain: Send + Sync {
-    /// Resolves reference to the block hash it's pointing to
-    async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
-
     /// Returns true if chain contains block
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;
 
@@ -37,6 +34,16 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
+    /// Appends the block to the chain
+    async fn append<'a>(
+        &'a self,
+        block: MetadataBlock,
+        opts: AppendOpts<'a>,
+    ) -> Result<Multihash, AppendError>;
+
+    /// Resolves reference to the block hash it's pointing to
+    async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
+
     /// Update reference to point at the specified block
     async fn set_ref<'a>(
         &'a self,
@@ -44,13 +51,6 @@ pub trait MetadataChain: Send + Sync {
         hash: &Multihash,
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetChainRefError>;
-
-    /// Appends the block to the chain
-    async fn append<'a>(
-        &'a self,
-        block: MetadataBlock,
-        opts: AppendOpts<'a>,
-    ) -> Result<Multihash, AppendError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
