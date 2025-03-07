@@ -30,9 +30,11 @@ fn init_chain(root: &Path) -> impl MetadataChain {
     let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryLocalFSSha3::new(
         blocks_dir, /* unknown yet */
     ));
-    let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir));
+    let meta_ref_repo = MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
+        NamedObjectRepositoryLocalFS::new(refs_dir),
+    ));
 
-    MetadataChainImpl::new(meta_block_repo, ref_repo)
+    MetadataChainImpl::new(meta_block_repo, meta_ref_repo)
 }
 
 #[tokio::test]

@@ -17,7 +17,7 @@ use odf_storage_lfs::ObjectRepositoryCachingLocalFs;
 use odf_storage_s3::*;
 use s3_utils::S3Context;
 
-use crate::{DatasetImpl, MetadataChainImpl};
+use crate::{DatasetImpl, MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,6 +48,12 @@ impl DatasetDefaultS3Builder {
         ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/"))
     }
 
+    pub fn build_meta_ref_repo<TRefRepo: ReferenceRepository + Send + Sync>(
+        ref_repo: TRefRepo,
+    ) -> MetadataChainReferenceRepositoryImpl<TRefRepo> {
+        MetadataChainReferenceRepositoryImpl::new(ref_repo)
+    }
+
     pub fn build_refs_repo(
         s3_context: &S3Context,
     ) -> ReferenceRepositoryImpl<NamedObjectRepositoryS3> {
@@ -70,7 +76,11 @@ impl DatasetDefaultS3Builder {
 }
 
 impl DatasetS3Builder for DatasetDefaultS3Builder {
-    fn build_s3_dataset(&self, s3_context: S3Context) -> Arc<dyn Dataset> {
+    fn build_s3_dataset(
+        &self,
+        _dataset_id: &odf_metadata::DatasetID,
+        s3_context: S3Context,
+    ) -> Arc<dyn Dataset> {
         let s3_context_url = s3_context.url().clone();
 
         if let Some(metadata_cache_local_fs_path) = &self.metadata_cache_local_fs_path {
@@ -80,7 +90,7 @@ impl DatasetS3Builder for DatasetDefaultS3Builder {
                         Self::build_base_block_repo(&s3_context),
                         metadata_cache_local_fs_path.clone(),
                     )),
-                    Self::build_refs_repo(&s3_context),
+                    Self::build_meta_ref_repo(Self::build_refs_repo(&s3_context)),
                 ),
                 Self::build_data_repo(&s3_context),
                 Self::build_checkpoint_repo(&s3_context),
@@ -91,7 +101,7 @@ impl DatasetS3Builder for DatasetDefaultS3Builder {
             Arc::new(DatasetImpl::new(
                 MetadataChainImpl::new(
                     Self::build_meta_block_repo(Self::build_base_block_repo(&s3_context)),
-                    Self::build_refs_repo(&s3_context),
+                    Self::build_meta_ref_repo(Self::build_refs_repo(&s3_context)),
                 ),
                 Self::build_data_repo(&s3_context),
                 Self::build_checkpoint_repo(&s3_context),

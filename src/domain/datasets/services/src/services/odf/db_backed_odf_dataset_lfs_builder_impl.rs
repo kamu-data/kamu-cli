@@ -25,7 +25,11 @@ impl DatabaseBackedOdfDatasetLfsBuilderImpl {
 }
 
 impl odf::dataset::DatasetLfsBuilder for DatabaseBackedOdfDatasetLfsBuilderImpl {
-    fn build_lfs_dataset(&self, _layout: odf::dataset::DatasetLayout) -> Arc<dyn Dataset> {
+    fn build_lfs_dataset(
+        &self,
+        _dataset_id: &odf::DatasetID,
+        _layout: odf::dataset::DatasetLayout,
+    ) -> Arc<dyn Dataset> {
         todo!()
     }
 }
