@@ -34,68 +34,6 @@ impl SqliteDatasetReferenceRepository {
 
 #[async_trait::async_trait]
 impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
-    async fn set_dataset_reference(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        maybe_prev_block_hash: Option<&odf::Multihash>,
-        block_hash: &odf::Multihash,
-    ) -> Result<(), SetDatasetReferenceError> {
-        let query_result = {
-            let mut tr = self.transaction.lock().await;
-
-            let connection_mut = tr.connection_mut().await?;
-
-            let dataset_id = dataset_id.to_string();
-            let dataset_id_str = dataset_id.as_str();
-
-            let maybe_prev_block_hash = maybe_prev_block_hash.map(ToString::to_string);
-            let maybe_prev_block_hash_str = maybe_prev_block_hash.as_deref();
-
-            let block_hash = block_hash.to_string();
-            let block_hash_str = block_hash.as_str();
-
-            let block_ref_name_str = block_ref.as_str();
-
-            sqlx::query!(
-                r#"
-                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash)
-                    VALUES ($1, $2, $3)
-                    ON CONFLICT(dataset_id, block_ref_name)
-                    DO UPDATE SET block_hash = $3 WHERE dataset_references.block_hash = $4
-                "#,
-                dataset_id_str,
-                block_ref_name_str,
-                block_hash_str,
-                maybe_prev_block_hash_str,
-            )
-            .execute(connection_mut)
-            .await
-            .int_err()?
-        };
-
-        if query_result.rows_affected() == 0 {
-            let maybe_actual_block_hash =
-                match self.get_dataset_reference(dataset_id, block_ref).await {
-                    Ok(actual_block_hash) => Some(actual_block_hash),
-                    Err(GetDatasetReferenceError::NotFound(_)) => None,
-                    Err(GetDatasetReferenceError::Internal(e)) => return Err(e.into()),
-                };
-
-            assert_ne!(maybe_actual_block_hash.as_ref(), maybe_prev_block_hash);
-            Err(SetDatasetReferenceError::CASFailed(
-                DatasetReferenceCASError::new(
-                    dataset_id,
-                    block_ref,
-                    maybe_prev_block_hash,
-                    maybe_actual_block_hash.as_ref(),
-                ),
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
     async fn get_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,
@@ -108,7 +46,7 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
         let stack_dataset_id_str = stack_dataset_id.as_str();
 
-        let block_ref_name_str = block_ref.as_str();
+        let block_ref_str = block_ref.as_str();
 
         let maybe_record = sqlx::query!(
             r#"
@@ -117,7 +55,7 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
                 WHERE dataset_id = $1 AND block_ref_name = $2
             "#,
             stack_dataset_id_str,
-            block_ref_name_str
+            block_ref_str,
         )
         .fetch_optional(connection_mut)
         .await
@@ -166,6 +104,108 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
         }
 
         Ok(res)
+    }
+
+    async fn set_dataset_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        block_hash: &odf::Multihash,
+    ) -> Result<(), SetDatasetReferenceError> {
+        let query_result = {
+            let mut tr = self.transaction.lock().await;
+
+            let connection_mut = tr.connection_mut().await?;
+
+            let dataset_id = dataset_id.to_string();
+            let dataset_id_str = dataset_id.as_str();
+
+            let block_ref_str = block_ref.as_str();
+
+            let maybe_prev_block_hash = maybe_prev_block_hash.map(ToString::to_string);
+            let maybe_prev_block_hash_str = maybe_prev_block_hash.as_deref();
+
+            let block_hash = block_hash.to_string();
+            let block_hash_str = block_hash.as_str();
+
+            sqlx::query!(
+                r#"
+                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT(dataset_id, block_ref_name)
+                    DO UPDATE SET block_hash = $3 WHERE dataset_references.block_hash = $4
+                "#,
+                dataset_id_str,
+                block_ref_str,
+                block_hash_str,
+                maybe_prev_block_hash_str,
+            )
+            .execute(connection_mut)
+            .await
+            .int_err()?
+        };
+
+        if query_result.rows_affected() == 0 {
+            let maybe_actual_block_hash =
+                match self.get_dataset_reference(dataset_id, block_ref).await {
+                    Ok(actual_block_hash) => Some(actual_block_hash),
+                    Err(GetDatasetReferenceError::NotFound(_)) => None,
+                    Err(GetDatasetReferenceError::Internal(e)) => return Err(e.into()),
+                };
+
+            assert_ne!(maybe_actual_block_hash.as_ref(), maybe_prev_block_hash);
+            Err(SetDatasetReferenceError::CASFailed(
+                DatasetReferenceCASError::new(
+                    dataset_id,
+                    block_ref,
+                    maybe_prev_block_hash,
+                    maybe_actual_block_hash.as_ref(),
+                ),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn remove_dataset_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<(), RemoveDatasetReferenceError> {
+        let query_result = {
+            let mut tr = self.transaction.lock().await;
+
+            let connection_mut = tr.connection_mut().await?;
+
+            let dataset_id = dataset_id.to_string();
+            let dataset_id_str = dataset_id.as_str();
+
+            let block_ref_str = block_ref.as_str();
+
+            sqlx::query!(
+                r#"
+                DELETE FROM dataset_references
+                    WHERE dataset_id = $1 AND block_ref_name = $2
+                "#,
+                dataset_id_str,
+                block_ref_str,
+            )
+            .execute(connection_mut)
+            .await
+            .int_err()?
+        };
+
+        if query_result.rows_affected() == 0 {
+            Err(RemoveDatasetReferenceError::NotFound(
+                DatasetReferenceNotFoundError {
+                    dataset_id: dataset_id.clone(),
+                    block_ref: block_ref.clone(),
+                },
+            ))
+        } else {
+            Ok(())
+        }
     }
 }
 

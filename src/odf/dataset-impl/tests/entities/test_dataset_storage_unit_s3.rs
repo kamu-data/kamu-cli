@@ -34,9 +34,8 @@ impl S3StorageUnitHarness {
             .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
             .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
-            .add::<odf::dataset::DatasetDefaultS3BuilderImpl>()
-            .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3BuilderImpl>(
-            );
+            .add::<odf::dataset::DatasetDefaultS3Builder>()
+            .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3Builder>();
 
         if registry_caching {
             b.add::<S3RegistryCache>();

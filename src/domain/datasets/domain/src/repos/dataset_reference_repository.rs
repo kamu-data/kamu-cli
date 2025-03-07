@@ -14,14 +14,6 @@ use thiserror::Error;
 
 #[async_trait::async_trait]
 pub trait DatasetReferenceRepository: Send + Sync {
-    async fn set_dataset_reference(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        maybe_prev_block_hash: Option<&odf::Multihash>,
-        new_block_hash: &odf::Multihash,
-    ) -> Result<(), SetDatasetReferenceError>;
-
     async fn get_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,
@@ -32,6 +24,20 @@ pub trait DatasetReferenceRepository: Send + Sync {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<(odf::BlockRef, odf::Multihash)>, InternalError>;
+
+    async fn set_dataset_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        new_block_hash: &odf::Multihash,
+    ) -> Result<(), SetDatasetReferenceError>;
+
+    async fn remove_dataset_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<(), RemoveDatasetReferenceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +55,17 @@ pub enum SetDatasetReferenceError {
 
 #[derive(Debug, Error)]
 pub enum GetDatasetReferenceError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetReferenceNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum RemoveDatasetReferenceError {
     #[error(transparent)]
     NotFound(#[from] DatasetReferenceNotFoundError),
 

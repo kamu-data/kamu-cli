@@ -6529,6 +6529,7 @@ dependencies = [
  "opendatafabric",
  "petgraph 0.7.1",
  "pretty_assertions",
+ "s3-utils",
  "secrecy",
  "serde_json",
  "tempfile",
