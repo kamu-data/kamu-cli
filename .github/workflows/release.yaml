@@ -1,5 +1,7 @@
 name: release
 on:
+  # Manual trigger
+  workflow_dispatch: { }
   push:
     tags:
       - v[0-9]+.[0-9]+.[0-9]+*
