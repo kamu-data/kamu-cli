@@ -4,7 +4,6 @@ kind: CLIConfig
 content:
   engine:
     runtime: podman
-    networkNs: host
     maxConcurrency: 1
     startTimeout: 60s
   protocol:
