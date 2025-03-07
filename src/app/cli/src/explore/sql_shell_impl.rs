@@ -64,7 +64,6 @@ impl SqlShellImpl {
             let mut container_builder = self
                 .container_runtime
                 .run_attached(&self.image)
-                .init(true)
                 .shell_cmd("sleep 999999")
                 .random_container_name_with_prefix("kamu-spark-")
                 .user("root")
