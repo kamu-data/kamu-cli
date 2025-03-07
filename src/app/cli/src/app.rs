@@ -403,8 +403,7 @@ pub fn configure_base_catalog(
     );
     b.bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>();
     b.bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>();
-    b.add::<odf::dataset::DatasetDefaultLfsBuilder>();
-    b.bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>();
+    b.add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>();
 
     b.add::<odf::dataset::DatasetFactoryImpl>();
 

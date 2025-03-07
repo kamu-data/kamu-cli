@@ -23,6 +23,8 @@ pub trait MetadataChainReferenceRepository: Send + Sync {
         hash: &Multihash,
         check_ref_is: Option<Option<&'a Multihash>>,
     ) -> Result<(), SetChainRefError>;
+
+    fn as_raw_ref_repo(&self) -> &dyn ReferenceRepository;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,6 +81,10 @@ where
         self.ref_repo.set(r.as_str(), hash).await?;
 
         Ok(())
+    }
+
+    fn as_raw_ref_repo(&self) -> &dyn ReferenceRepository {
+        &self.ref_repo
     }
 }
 

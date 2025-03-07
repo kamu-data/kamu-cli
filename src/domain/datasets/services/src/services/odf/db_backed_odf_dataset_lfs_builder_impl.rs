@@ -9,28 +9,48 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface};
+use dill::{component, interface, Catalog};
 use odf::Dataset;
+use url::Url;
+
+use crate::DatabaseBackedOdfMetadataChainRefRepositoryImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatabaseBackedOdfDatasetLfsBuilderImpl {}
+pub struct DatabaseBackedOdfDatasetLfsBuilderImpl {
+    catalog: Catalog,
+}
 
 #[component(pub)]
 #[interface(dyn odf::dataset::DatasetLfsBuilder)]
 impl DatabaseBackedOdfDatasetLfsBuilderImpl {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(catalog: Catalog) -> Self {
+        Self { catalog }
     }
 }
 
 impl odf::dataset::DatasetLfsBuilder for DatabaseBackedOdfDatasetLfsBuilderImpl {
     fn build_lfs_dataset(
         &self,
-        _dataset_id: &odf::DatasetID,
-        _layout: odf::dataset::DatasetLayout,
+        dataset_id: &odf::DatasetID,
+        layout: odf::dataset::DatasetLayout,
     ) -> Arc<dyn Dataset> {
-        todo!()
+        use odf::dataset::*;
+
+        Arc::new(DatasetImpl::new(
+            MetadataChainImpl::new(
+                DatasetDefaultLfsBuilder::build_meta_block_repo(layout.blocks_dir),
+                DatabaseBackedOdfMetadataChainRefRepositoryImpl::new(
+                    self.catalog.get_one().unwrap(),
+                    DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
+                    dataset_id.clone(),
+                ),
+            ),
+            DatasetDefaultLfsBuilder::build_data_repo(layout.data_dir),
+            DatasetDefaultLfsBuilder::build_checkpoint_repo(layout.checkpoints_dir),
+            DatasetDefaultLfsBuilder::build_info_repo(layout.info_dir),
+            Url::from_directory_path(&layout.root_dir).unwrap(),
+        ))
     }
 }
 
