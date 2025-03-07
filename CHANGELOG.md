@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.226.4] - 2025-03-07
 ### Changed
 - Simple Transfer Protocol & Smart Transfer Protocol use `AppendDatasetMetadataBatchUseCase`
 - SQLite: protection against database locking, in case of parallel execution of `kamu` commands.
