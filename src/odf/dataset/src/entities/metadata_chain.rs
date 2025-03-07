@@ -51,6 +51,8 @@ pub trait MetadataChain: Send + Sync {
         hash: &Multihash,
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetChainRefError>;
+
+    fn as_raw_ref_repo(&self) -> &dyn ReferenceRepository;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

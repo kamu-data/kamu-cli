@@ -16,6 +16,7 @@ use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetReferenceRepository,
     DatasetReferenceService,
+    GetDatasetReferenceError,
     SetDatasetReferenceError,
     MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
@@ -63,6 +64,16 @@ impl DatasetReferenceServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetReferenceService for DatasetReferenceServiceImpl {
+    async fn get_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<odf::Multihash, GetDatasetReferenceError> {
+        self.dataset_reference_repo
+            .get_dataset_reference(dataset_id, block_ref)
+            .await
+    }
+
     async fn set_reference(
         &self,
         dataset_id: &odf::DatasetID,
@@ -129,11 +140,8 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
                 // Update reference at storage level
                 dataset
                     .as_metadata_chain()
-                    .set_ref(
-                        &message.block_ref,
-                        &message.new_block_hash,
-                        odf::dataset::SetRefOpts::default(),
-                    )
+                    .as_raw_ref_repo() // Access storage level directly!
+                    .set(&message.block_ref.as_str(), &message.new_block_hash)
                     .await
                     .int_err()?;
             }
