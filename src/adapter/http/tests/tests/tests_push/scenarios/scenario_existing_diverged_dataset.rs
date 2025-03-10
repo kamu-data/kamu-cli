@@ -102,6 +102,17 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
             .await
             .unwrap();
 
+        server_harness
+            .cli_dataset_reference_service()
+            .set_reference(
+                &client_create_result.dataset_handle.id,
+                &odf::BlockRef::Head,
+                None,
+                &commit_result.as_ref().unwrap().new_head,
+            )
+            .await
+            .unwrap();
+
         let client_dataset = client_harness
             .dataset_registry()
             .get_dataset_by_handle(&client_create_result.dataset_handle)
