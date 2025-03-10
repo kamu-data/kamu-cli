@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_auth_rebac::RebacService;
+
 use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
 
@@ -16,6 +18,7 @@ pub struct DatasetCollaborationMut<'a> {
     dataset_mut_request_state: &'a DatasetMutRequestState,
 }
 
+// TODO: Private Datasets: tests
 // TODO: Private Datasets: remove (unused_variables)
 #[expect(unused_variables)]
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -40,7 +43,16 @@ impl<'a> DatasetCollaborationMut<'a> {
             .check_dataset_maintain_access(ctx)
             .await?;
 
-        // TODO: Private Datasets: implementation
+        let rebac_service = from_catalog_n!(ctx, dyn RebacService);
+
+        rebac_service
+            .set_account_dataset_relation(
+                &account_id,
+                role.into(),
+                &self.dataset_mut_request_state.dataset_handle.id,
+            )
+            .await
+            .int_err()?;
 
         Ok(SetRoleResultSuccess::default().into())
     }

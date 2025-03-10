@@ -225,7 +225,7 @@ impl DatasetMut {
 // helpers/utils
 #[derive(Debug)]
 pub(crate) struct DatasetMutRequestState {
-    dataset_handle: odf::DatasetHandle,
+    pub dataset_handle: odf::DatasetHandle,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
 }
 

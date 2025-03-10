@@ -22,12 +22,10 @@ use kamu_auth_rebac::{
     DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     DeletePropertiesError,
-    DeleteRelationError,
     Entity,
     EntityWithRelation,
     GetPropertiesError,
     InsertEntitiesRelationError,
-    InsertRelationError,
     PropertiesCountError,
     PropertyName,
     PropertyValue,
@@ -35,8 +33,10 @@ use kamu_auth_rebac::{
     RebacService,
     Relation,
     SetEntityPropertyError,
+    SetRelationError,
     SubjectEntityRelationsError,
     UnsetEntityPropertyError,
+    UnsetRelationError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -254,12 +254,12 @@ impl RebacService for RebacServiceImpl {
         Ok(dataset_properties_map)
     }
 
-    async fn insert_account_dataset_relation(
+    async fn set_account_dataset_relation(
         &self,
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), InsertRelationError> {
+    ) -> Result<(), SetRelationError> {
         use futures::FutureExt;
 
         let account_id = account_id.as_did_str().to_stack_string();
@@ -278,20 +278,18 @@ impl RebacService for RebacServiceImpl {
                 Ok(_) => Ok(()),
                 Err(err) => match err {
                     InsertEntitiesRelationError::Duplicate(_) => Ok(()),
-                    InsertEntitiesRelationError::Internal(e) => {
-                        Err(InsertRelationError::Internal(e))
-                    }
+                    InsertEntitiesRelationError::Internal(e) => Err(SetRelationError::Internal(e)),
                 },
             })
             .await
     }
 
-    async fn delete_account_dataset_relation(
+    async fn unset_account_dataset_relation(
         &self,
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeleteRelationError> {
+    ) -> Result<(), UnsetRelationError> {
         let account_id = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
@@ -310,7 +308,7 @@ impl RebacService for RebacServiceImpl {
             Ok(_) => Ok(()),
             Err(err) => match err {
                 DeleteEntitiesRelationError::NotFound(_) => Ok(()),
-                DeleteEntitiesRelationError::Internal(e) => Err(DeleteRelationError::Internal(e)),
+                DeleteEntitiesRelationError::Internal(e) => Err(UnsetRelationError::Internal(e)),
             },
         }
     }

@@ -62,7 +62,7 @@ impl SqliteAccountRepository {
         AccountErrorDuplicate { account_field }
     }
 
-    fn map_account_row(account_row: SqliteRow) -> Account {
+    fn map_account_row(account_row: &SqliteRow) -> Account {
         Account {
             id: account_row.get_unchecked("id"),
             account_name: odf::AccountName::new_unchecked(
@@ -329,10 +329,7 @@ impl AccountRepository for SqliteAccountRepository {
             .int_err()
             .map_err(GetAccountByIdError::Internal)?;
 
-        Ok(account_rows
-            .into_iter()
-            .map(Self::map_account_row)
-            .collect())
+        Ok(account_rows.iter().map(Self::map_account_row).collect())
     }
 
     async fn get_account_by_name(
@@ -531,7 +528,7 @@ impl AccountRepository for SqliteAccountRepository {
             use futures::TryStreamExt;
 
             while let Some(account_row) = query_stream.try_next().await? {
-                yield Ok(Self::map_account_row(account_row));
+                yield Ok(Self::map_account_row(&account_row));
             }
         })
     }

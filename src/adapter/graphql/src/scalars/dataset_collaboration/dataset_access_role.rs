@@ -21,4 +21,24 @@ pub enum DatasetAccessRole {
     Maintainer,
 }
 
+impl From<DatasetAccessRole> for AccountToDatasetRelation {
+    fn from(role: DatasetAccessRole) -> Self {
+        match role {
+            DatasetAccessRole::Reader => Self::Reader,
+            DatasetAccessRole::Editor => Self::Editor,
+            DatasetAccessRole::Maintainer => Self::Maintainer,
+        }
+    }
+}
+
+impl From<AccountToDatasetRelation> for DatasetAccessRole {
+    fn from(relation: AccountToDatasetRelation) -> Self {
+        match relation {
+            AccountToDatasetRelation::Reader => Self::Reader,
+            AccountToDatasetRelation::Editor => Self::Editor,
+            AccountToDatasetRelation::Maintainer => Self::Maintainer,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

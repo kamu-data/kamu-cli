@@ -80,19 +80,19 @@ pub trait RebacService: Send + Sync {
     ) -> Result<HashMap<odf::DatasetID, DatasetProperties>, GetPropertiesError>;
 
     // Relations
-    async fn insert_account_dataset_relation(
+    async fn set_account_dataset_relation(
         &self,
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), InsertRelationError>;
+    ) -> Result<(), SetRelationError>;
 
-    async fn delete_account_dataset_relation(
+    async fn unset_account_dataset_relation(
         &self,
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeleteRelationError>;
+    ) -> Result<(), UnsetRelationError>;
 
     async fn get_account_dataset_relations(
         &self,
@@ -170,7 +170,7 @@ pub enum GetPropertiesError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum InsertRelationError {
+pub enum SetRelationError {
     #[error(transparent)]
     Internal(InternalError),
 }
@@ -178,7 +178,7 @@ pub enum InsertRelationError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum DeleteRelationError {
+pub enum UnsetRelationError {
     #[error(transparent)]
     Internal(InternalError),
 }
