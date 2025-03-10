@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-# Unreleased
+## [0.226.5] - 2025-03-10
 ### Fixed
 - Prometheus metrics, S3: fixed `storage_url` label values
 

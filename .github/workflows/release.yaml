@@ -8,7 +8,7 @@ on:
 env:
   PACKAGE_NAME: kamu-cli
   BINARY_NAME: kamu
-  KAMU_WEB_UI_VERSION: "0.41.0"
+  KAMU_WEB_UI_VERSION: "0.41.1"
 jobs:
   build:
     strategy:
