@@ -350,6 +350,13 @@ impl RebacRepository for PostgresRebacRepository {
             .map_err(SubjectEntityRelationsError::Internal)
     }
 
+    async fn get_object_entity_relations(
+        &self,
+        _object_entity: &Entity,
+    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError> {
+        todo!("TODO: Private Datasets: implementation")
+    }
+
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,

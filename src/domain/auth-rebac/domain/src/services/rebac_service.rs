@@ -18,6 +18,7 @@ use crate::{
     DatasetPropertyName,
     EntityNotFoundError,
     EntityWithRelation,
+    ObjectEntityRelationsError,
     PropertiesCountError,
     PropertyValue,
     SetEntityPropertyError,
@@ -97,6 +98,11 @@ pub trait RebacService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError>;
+
+    async fn get_accounts_dataset_relations(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

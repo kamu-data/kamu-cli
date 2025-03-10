@@ -68,6 +68,12 @@ pub trait RebacRepository: Send + Sync {
         subject_entity: &Entity,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError>;
 
+    // TODO: Private Datasets: tests
+    async fn get_object_entity_relations(
+        &self,
+        object_entity: &Entity,
+    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError>;
+
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,
@@ -241,6 +247,14 @@ pub struct EntitiesRelationNotFoundError {
 
 #[derive(Error, Debug)]
 pub enum SubjectEntityRelationsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum ObjectEntityRelationsError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

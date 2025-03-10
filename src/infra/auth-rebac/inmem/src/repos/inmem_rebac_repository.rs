@@ -23,6 +23,7 @@ use kamu_auth_rebac::{
     GetEntityPropertiesError,
     GetRelationsBetweenEntitiesError,
     InsertEntitiesRelationError,
+    ObjectEntityRelationsError,
     PropertiesCountError,
     PropertyName,
     PropertyValue,
@@ -262,6 +263,13 @@ impl RebacRepository for InMemoryRebacRepository {
             .await;
 
         Ok(res)
+    }
+
+    async fn get_object_entity_relations(
+        &self,
+        _object_entity: &Entity,
+    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError> {
+        todo!("TODO: Private Datasets: implementation")
     }
 
     async fn get_subject_entity_relations_by_object_type(
