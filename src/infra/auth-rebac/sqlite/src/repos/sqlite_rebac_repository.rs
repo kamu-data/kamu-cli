@@ -9,7 +9,7 @@
 
 use std::borrow::Cow;
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{sqlite_generate_placeholders_tuple_list_2, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::*;
@@ -441,6 +441,50 @@ impl RebacRepository for SqliteRebacRepository {
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
             .map_err(GetRelationsBetweenEntitiesError::Internal)
+    }
+
+    async fn delete_subject_entities_object_entity_relations(
+        &self,
+        subject_entities: Vec<Entity<'static>>,
+        object_entity: &Entity,
+    ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let placeholder_list = sqlite_generate_placeholders_tuple_list_2(subject_entities.len(), 3);
+
+        // TODO: replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let query_str = format!(
+            r#"
+            DELETE
+            FROM auth_rebac_relations
+            WHERE object_entity_type = $1
+              AND object_entity_id = $2
+              AND (subject_entity_type, subject_entity_id) in ({placeholder_list})
+            "#,
+        );
+
+        let mut query = sqlx::query(&query_str)
+            .bind(object_entity.entity_type)
+            .bind(object_entity.entity_id.as_ref());
+        for subject_entity in &subject_entities {
+            query = query.bind(subject_entity.entity_type);
+            // todo если сработает, убрать строки в биндах
+            query = query.bind(subject_entity.entity_id.as_ref());
+        }
+
+        let delete_result = query.execute(&mut *connection_mut).await.int_err()?;
+
+        if delete_result.rows_affected() == 0 {
+            return Err(DeleteSubjectEntitiesObjectEntityRelationsError::not_found(
+                subject_entities,
+                object_entity,
+            ));
+        }
+
+        Ok(())
     }
 }
 

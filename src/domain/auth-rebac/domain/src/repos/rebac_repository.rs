@@ -79,6 +79,12 @@ pub trait RebacRepository: Send + Sync {
         subject_entity: &Entity,
         object_entity: &Entity,
     ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError>;
+
+    async fn delete_subject_entities_object_entity_relations(
+        &self,
+        subject_entities: Vec<Entity<'static>>,
+        object_entity: &Entity,
+    ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -253,6 +259,36 @@ pub enum SubjectEntityRelationsByObjectTypeError {
 pub enum GetRelationsBetweenEntitiesError {
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteSubjectEntitiesObjectEntityRelationsError {
+    #[error(transparent)]
+    NotFound(#[from] SubjectEntitiesObjectEntityRelationsNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl DeleteSubjectEntitiesObjectEntityRelationsError {
+    pub fn not_found(subject_entities: Vec<Entity<'static>>, object_entity: &Entity) -> Self {
+        Self::NotFound(SubjectEntitiesObjectEntityRelationsNotFoundError {
+            subject_entities,
+            object_entity: object_entity.clone().into_owned(),
+        })
+    }
+}
+
+#[derive(Error, Debug)]
+#[error(
+    "Entities relations not found: subject_entities='{subject_entities:?}', \
+     object_entity='{object_entity:?}'"
+)]
+pub struct SubjectEntitiesObjectEntityRelationsNotFoundError {
+    pub subject_entities: Vec<Entity<'static>>,
+    pub object_entity: Entity<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,6 +16,7 @@ use kamu_auth_rebac::{
     DeleteEntitiesRelationError,
     DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
+    DeleteSubjectEntitiesObjectEntityRelationsError,
     Entity,
     EntityType,
     EntityWithRelation,
@@ -302,6 +303,14 @@ impl RebacRepository for InMemoryRebacRepository {
             .await;
 
         Ok(res)
+    }
+
+    async fn delete_subject_entities_object_entity_relations(
+        &self,
+        _subject_entities: Vec<Entity<'static>>,
+        _object_entity: &Entity,
+    ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError> {
+        todo!("TODO: Private Datasets: implementation")
     }
 }
 

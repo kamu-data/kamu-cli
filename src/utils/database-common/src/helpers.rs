@@ -29,10 +29,46 @@ pub fn sqlite_generate_placeholders_list(arguments_count: usize, index_offset: u
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub fn sqlite_generate_placeholders_tuple_list_2(
+    tuples_count: usize,
+    index_offset: usize,
+) -> String {
+    (0..tuples_count)
+        .map(|i| {
+            // i | idxs
+            // 1 | 1, 2
+            // 2 | 3, 4
+            // 3 | 5, 6
+            // ...
+            let first_idx = i * 2 + index_offset;
+            let second_idx = i * 2 + 1 + index_offset;
+
+            format!("(${first_idx},${second_idx})")
+        })
+        .intersperse(",".to_string())
+        .collect()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_sqlite_generate_placeholders_list() {
     pretty_assertions::assert_eq!("$0,$1,$2", sqlite_generate_placeholders_list(3, 0));
     pretty_assertions::assert_eq!("$3,$4", sqlite_generate_placeholders_list(2, 3));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_sqlite_generate_placeholders_tuple_list_2() {
+    pretty_assertions::assert_eq!(
+        "($0,$1),($2,$3),($4,$5)",
+        sqlite_generate_placeholders_tuple_list_2(3, 0)
+    );
+    pretty_assertions::assert_eq!(
+        "($3,$4),($5,$6)",
+        sqlite_generate_placeholders_tuple_list_2(2, 3)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
