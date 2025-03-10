@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.226.6] - 2025-03-10
 ### Fixed
 - `kamu sql server`: correctly works inside containers(jupyter)
 

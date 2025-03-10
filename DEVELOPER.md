@@ -363,7 +363,7 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
    2. Run `cargo upgrade --dry-run --incompatible` and see which packages have major upgrades - either perform them or ticket them up
    3. Run `cargo deny check` to audit updated dependencies for licenses, security advisories etc.
 3. Bump the version using: `make release-patch / make release-minor / make release-major`
-4. Create a dated `CHANGELOG` entry for the new version
+4. Double check if the entry with new version was added in `CHANGELOG`
 5. Create PR, wait for tests, then merge as normal feature branch
 6. On `master` tag the latest commit with a new version: `git tag vX.Y.Z`.
 7. Push the tag to the repo: `git push origin tag vX.Y.Z`
