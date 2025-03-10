@@ -127,9 +127,7 @@ impl ClientSideHarness {
         b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>();
-        //.add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>();
+            .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -257,6 +255,10 @@ impl ClientSideHarness {
     }
 
     pub fn dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService> {
         self.catalog.get_one().unwrap()
     }
 

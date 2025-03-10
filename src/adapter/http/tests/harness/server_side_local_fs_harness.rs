@@ -129,10 +129,9 @@ impl ServerSideLocalFsHarness {
                     odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
                 )
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-                .add::<odf::dataset::DatasetDefaultLfsBuilder>()
-                .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
-                // .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
+                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
+                )
+                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()
@@ -261,6 +260,11 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     }
 
     fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
+    }
+
+    fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog.get_one().unwrap()
     }

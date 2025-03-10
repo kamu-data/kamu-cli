@@ -114,9 +114,7 @@ impl ServerSideS3Harness {
                 )
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
-                .add::<odf::dataset::DatasetDefaultS3Builder>()
-                .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3Builder>()
-                // .add::<kamu_datasets_services::DatabaseBackedOdfDatasetS3BuilderImpl>()
+                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetS3BuilderImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()
@@ -239,6 +237,11 @@ impl ServerSideHarness for ServerSideS3Harness {
     }
 
     fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
+    }
+
+    fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog.get_one().unwrap()
     }

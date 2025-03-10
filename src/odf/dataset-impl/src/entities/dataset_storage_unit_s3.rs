@@ -139,7 +139,7 @@ impl DatasetStorageUnit for DatasetStorageUnitS3 {
             for dataset_id in self.list_dataset_ids_maybe_cached().await? {
                 // Head must exist, otherwise it's a garbage
                 let dataset = self.get_dataset_impl(&dataset_id);
-                let head_res = dataset.as_metadata_chain().resolve_ref(&BlockRef::Head).await;
+                let head_res = dataset.as_metadata_chain().as_raw_ref_repo().get(BlockRef::Head.as_str()).await;
                 match head_res {
                     // Got head => good dataset
                     Ok(_) => { yield dataset_id; Ok(()) }
@@ -183,7 +183,8 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()
-                .resolve_ref(&BlockRef::Head)
+                .as_raw_ref_repo()
+                .get(BlockRef::Head.as_str())
                 .await
             {
                 // Existing head
