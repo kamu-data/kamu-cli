@@ -1,7 +1,15 @@
 name: release
 on:
-  # Manual trigger
-  workflow_dispatch: { }
+  # Situation: CI error during build release,
+  #            and you want to reanimate it by restarting manually.
+  #
+  # If so, please prefer a different strategy:
+  # 1) Fix the build error (via PR)
+  # 2) Remove the version tag from the revision causing the breakage
+  # 3) Put the version tag on the corrected revision
+  #
+  #  # Manual trigger
+  #  workflow_dispatch: { }
   push:
     tags:
       - v[0-9]+.[0-9]+.[0-9]+*
