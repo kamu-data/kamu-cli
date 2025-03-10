@@ -486,20 +486,20 @@ impl AccountRepository for SqliteAccountRepository {
 
             let query_str = format!(
                 r#"
-                SELECT id            AS "id: _",
+                SELECT id,
                        account_name,
                        email,
                        display_name,
-                       account_type  AS "account_type: AccountType",
+                       account_type,
                        avatar_url,
-                       registered_at AS "registered_at: _",
-                       is_admin      AS "is_admin: _",
+                       registered_at,
+                       is_admin,
                        provider,
                        provider_identity_key
                 FROM accounts
-                WHERE (account_name LIKE '%'+$1+'%' COLLATE nocase
-                    OR email LIKE '%'+$1+'%' COLLATE nocase
-                    OR display_name LIKE '%'+$1+'%' COLLATE nocase)
+                WHERE (account_name LIKE '%'||$1||'%' COLLATE nocase
+                    OR email LIKE '%'||$1||'%' COLLATE nocase
+                    OR display_name LIKE '%'||$1||'%' COLLATE nocase)
                   AND id NOT IN ({})
                 ORDER BY account_name
                 LIMIT $2 OFFSET $3
