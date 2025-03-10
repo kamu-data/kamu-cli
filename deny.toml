@@ -99,4 +99,7 @@ ignore = [
     # Unmaintained (proc-macro-error)
     # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
     "RUSTSEC-2024-0370",
+    # Unmaintained (paste)
+    # https://rustsec.org/advisories/RUSTSEC-2024-0436
+    "RUSTSEC-2024-0436",
 ]
