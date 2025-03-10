@@ -19,8 +19,6 @@ pub struct DatasetCollaborationMut<'a> {
 }
 
 // TODO: Private Datasets: tests
-// TODO: Private Datasets: remove (unused_variables)
-#[expect(unused_variables)]
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl<'a> DatasetCollaborationMut<'a> {
@@ -62,13 +60,27 @@ impl<'a> DatasetCollaborationMut<'a> {
     async fn unset_roles(
         &self,
         ctx: &Context<'_>,
-        account_id: Vec<AccountID<'_>>,
+        account_ids: Vec<AccountID<'_>>,
     ) -> Result<UnsetRoleResult> {
         self.dataset_mut_request_state
             .check_dataset_maintain_access(ctx)
             .await?;
 
-        // TODO: Private Datasets: implementation
+        let rebac_service = from_catalog_n!(ctx, dyn RebacService);
+
+        let odf_account_ids = account_ids
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<odf::AccountID>>();
+        let odf_account_ids_refs = odf_account_ids.iter().collect::<Vec<_>>();
+
+        rebac_service
+            .unset_accounts_dataset_relations(
+                &odf_account_ids_refs[..],
+                &self.dataset_mut_request_state.dataset_handle.id,
+            )
+            .await
+            .int_err()?;
 
         Ok(UnsetRoleResultSuccess::default().into())
     }

@@ -18,10 +18,10 @@ use kamu_auth_rebac::{
     AccountToDatasetRelation,
     DatasetProperties,
     DatasetPropertyName,
-    DeleteEntitiesRelationError,
     DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     DeletePropertiesError,
+    DeleteSubjectEntitiesObjectEntityRelationsError,
     Entity,
     EntityWithRelation,
     GetPropertiesError,
@@ -175,9 +175,9 @@ impl RebacService for RebacServiceImpl {
             .await
         {
             Ok(_) => Ok(()),
-            Err(err) => match err {
+            Err(e) => match e {
                 DeleteEntityPropertiesError::NotFound(_) => Ok(()),
-                DeleteEntityPropertiesError::Internal(e) => Err(DeletePropertiesError::Internal(e)),
+                e @ DeleteEntityPropertiesError::Internal(_) => Err(e.int_err().into()),
             },
         }
     }
@@ -262,12 +262,18 @@ impl RebacService for RebacServiceImpl {
     ) -> Result<(), SetRelationError> {
         use futures::FutureExt;
 
-        let account_id = account_id.as_did_str().to_stack_string();
-        let account_entity = Entity::new_account(account_id.as_str());
+        let account_id_stack = account_id.as_did_str().to_stack_string();
+        let account_entity = Entity::new_account(account_id_stack.as_str());
 
-        let dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_entity = Entity::new_dataset(dataset_id.as_str());
+        let dataset_id_stack = dataset_id.as_did_str().to_stack_string();
+        let dataset_entity = Entity::new_dataset(dataset_id_stack.as_str());
 
+        // Removes an existing role (if any), ...
+        self.unset_accounts_dataset_relations(&[account_id], dataset_id)
+            .await
+            .int_err()?;
+
+        // ... before setting up a new one.
         self.rebac_repo
             .insert_entities_relation(
                 &account_entity,
@@ -276,39 +282,38 @@ impl RebacService for RebacServiceImpl {
             )
             .map(|res| match res {
                 Ok(_) => Ok(()),
-                Err(err) => match err {
+                Err(e) => match e {
                     InsertEntitiesRelationError::Duplicate(_) => Ok(()),
-                    InsertEntitiesRelationError::Internal(e) => Err(SetRelationError::Internal(e)),
+                    e @ InsertEntitiesRelationError::Internal(_) => Err(e.int_err().into()),
                 },
             })
             .await
     }
 
-    async fn unset_account_dataset_relation(
+    async fn unset_accounts_dataset_relations(
         &self,
-        account_id: &odf::AccountID,
-        relationship: AccountToDatasetRelation,
+        account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
     ) -> Result<(), UnsetRelationError> {
-        let account_id = account_id.as_did_str().to_stack_string();
-        let account_entity = Entity::new_account(account_id.as_str());
+        let account_entities = account_ids
+            .iter()
+            .map(|id| Entity::new_account(id.to_string()))
+            .collect::<Vec<_>>();
 
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
         match self
             .rebac_repo
-            .delete_entities_relation(
-                &account_entity,
-                Relation::AccountToDataset(relationship),
-                &dataset_entity,
-            )
+            .delete_subject_entities_object_entity_relations(account_entities, &dataset_entity)
             .await
         {
             Ok(_) => Ok(()),
-            Err(err) => match err {
-                DeleteEntitiesRelationError::NotFound(_) => Ok(()),
-                DeleteEntitiesRelationError::Internal(e) => Err(UnsetRelationError::Internal(e)),
+            Err(e) => match e {
+                DeleteSubjectEntitiesObjectEntityRelationsError::NotFound(_) => Ok(()),
+                e @ DeleteSubjectEntitiesObjectEntityRelationsError::Internal(_) => {
+                    Err(e.int_err().into())
+                }
             },
         }
     }
@@ -338,9 +343,9 @@ fn map_delete_entity_property_result(
 ) -> Result<(), UnsetEntityPropertyError> {
     match res {
         Ok(_) => Ok(()),
-        Err(err) => match err {
+        Err(e) => match e {
             DeleteEntityPropertyError::NotFound(_) => Ok(()),
-            DeleteEntityPropertyError::Internal(e) => Err(UnsetEntityPropertyError::Internal(e)),
+            e @ DeleteEntityPropertyError::Internal(_) => Err(e.int_err().into()),
         },
     }
 }

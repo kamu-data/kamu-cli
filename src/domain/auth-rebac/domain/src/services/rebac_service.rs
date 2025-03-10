@@ -87,10 +87,9 @@ pub trait RebacService: Send + Sync {
         dataset_id: &odf::DatasetID,
     ) -> Result<(), SetRelationError>;
 
-    async fn unset_account_dataset_relation(
+    async fn unset_accounts_dataset_relations(
         &self,
-        account_id: &odf::AccountID,
-        relationship: AccountToDatasetRelation,
+        account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
     ) -> Result<(), UnsetRelationError>;
 
@@ -148,7 +147,7 @@ pub enum UnsetEntityPropertyError {
     NotFound(EntityNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +155,7 @@ pub enum UnsetEntityPropertyError {
 #[derive(Error, Debug)]
 pub enum DeletePropertiesError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,7 +171,7 @@ pub enum GetPropertiesError {
 #[derive(Error, Debug)]
 pub enum SetRelationError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +179,7 @@ pub enum SetRelationError {
 #[derive(Error, Debug)]
 pub enum UnsetRelationError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
