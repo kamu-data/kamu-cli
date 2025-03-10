@@ -23,18 +23,9 @@ use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::CreateDatasetUseCase;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetReferenceRepository,
-};
+use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
-use kamu_datasets_services::{
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DatasetReferenceServiceImpl,
-    DependencyGraphServiceImpl,
-};
+use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
 use odf::metadata::testing::MetadataFactory;

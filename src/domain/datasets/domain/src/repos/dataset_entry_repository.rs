@@ -228,16 +228,6 @@ pub enum DeleteEntryDatasetError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetEntryCreatedListener: Send + Sync {
-    async fn on_dataset_entry_created(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<(), InternalError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
 pub trait DatasetEntryRemovalListener: Send + Sync {
     async fn on_dataset_entry_removed(
         &self,

@@ -29,9 +29,7 @@ use kamu_datasets_services::{
     CreateDatasetFromSnapshotUseCaseImpl,
     DatasetEntryWriter,
     DatasetReferenceServiceImpl,
-    DependencyGraphWriter,
     MockDatasetEntryWriter,
-    MockDependencyGraphWriter,
 };
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use mockall::predicate::{always, eq};
@@ -52,11 +50,8 @@ async fn test_create_root_dataset_from_snapshot() {
         .once()
         .returning(|_, _, _| Ok(()));
 
-    let harness = CreateFromSnapshotUseCaseHarness::new(
-        mock_dataset_entry_writer,
-        MockDependencyGraphWriter::new(),
-        vec![predefined_foo_id],
-    );
+    let harness =
+        CreateFromSnapshotUseCaseHarness::new(mock_dataset_entry_writer, vec![predefined_foo_id]);
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -124,15 +119,8 @@ async fn test_create_derived_dataset_from_snapshot() {
         .once()
         .returning(|_, _, _| Ok(()));
 
-    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer
-        .expect_update_dataset_node_dependencies()
-        .times(1)
-        .returning(|_, _, _| Ok(()));
-
     let harness = CreateFromSnapshotUseCaseHarness::new(
         mock_dataset_entry_writer,
-        mock_dependency_graph_writer,
         vec![predefined_foo_id.clone(), predefined_bar_id.clone()],
     );
 
@@ -231,7 +219,6 @@ struct CreateFromSnapshotUseCaseHarness {
 impl CreateFromSnapshotUseCaseHarness {
     fn new(
         mock_dataset_entry_writer: MockDatasetEntryWriter,
-        mock_dependency_graph_writer: MockDependencyGraphWriter,
         predefined_dataset_ids: Vec<odf::DatasetID>,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
@@ -255,8 +242,6 @@ impl CreateFromSnapshotUseCaseHarness {
         .add::<CreateDatasetUseCaseHelper>()
         .add_value(mock_dataset_entry_writer)
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add_value(mock_dependency_graph_writer)
-        .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>()
         .add::<TestDatasetOutboxListener>();

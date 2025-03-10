@@ -94,7 +94,7 @@ impl DatasetReferenceService for DatasetReferenceServiceImpl {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-                DatasetReferenceMessage::updated(
+                DatasetReferenceMessage::new(
                     dataset_id.clone(),
                     block_ref.clone(),
                     maybe_prev_block_hash.cloned(),
@@ -129,23 +129,19 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
             .get_one::<dyn DatasetRegistry>()
             .unwrap();
 
-        match message {
-            DatasetReferenceMessage::Updated(message) => {
-                // Resolve dataset
-                let dataset = dataset_registry
-                    .get_dataset_by_id(&message.dataset_id)
-                    .await
-                    .int_err()?;
+        // Resolve dataset
+        let dataset = dataset_registry
+            .get_dataset_by_id(&message.dataset_id)
+            .await
+            .int_err()?;
 
-                // Update reference at storage level
-                dataset
-                    .as_metadata_chain()
-                    .as_raw_ref_repo() // Access storage level directly!
-                    .set(message.block_ref.as_str(), &message.new_block_hash)
-                    .await
-                    .int_err()?;
-            }
-        }
+        // Update reference at storage level
+        dataset
+            .as_metadata_chain()
+            .as_raw_ref_repo() // Access storage level directly!
+            .set(message.block_ref.as_str(), &message.new_block_hash)
+            .await
+            .int_err()?;
 
         Ok(())
     }

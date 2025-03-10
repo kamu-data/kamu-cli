@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::Catalog;
+use dill::Component;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
 use kamu_accounts::{AccountConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_NAME_STR};
@@ -21,10 +21,23 @@ use kamu_accounts_services::{
 };
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
-use kamu_datasets::{DatasetEntry, DatasetEntryCreatedListener};
+use kamu_datasets::{
+    DatasetDependenciesMessage,
+    DatasetEntry,
+    DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
-use kamu_datasets_services::{DependencyGraphServiceImpl, DependencyGraphWriter};
+use kamu_datasets_services::DependencyGraphServiceImpl;
+use messaging_outbox::{
+    register_message_dispatcher,
+    ConsumerFilter,
+    Outbox,
+    OutboxExt,
+    OutboxImmediateImpl,
+};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -260,10 +273,9 @@ async fn test_inaccessible_upstream_dependencies_present() {
 struct GetDatasetUpstreamDependenciesUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn GetDatasetUpstreamDependenciesUseCase>,
-    dependency_graph_service: Arc<DependencyGraphServiceImpl>,
+    outbox: Arc<dyn Outbox>,
     fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
     system_time_source: Arc<dyn SystemTimeSource>,
-    catalog: Catalog,
 }
 
 impl GetDatasetUpstreamDependenciesUseCaseHarness {
@@ -274,25 +286,41 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_tenancy_config(TenancyConfig::MultiTenant)
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer)),
+                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .without_outbox(),
         );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
-            .add::<GetDatasetUpstreamDependenciesUseCaseImpl>()
-            .add::<PredefinedAccountsRegistrator>()
-            .add_value(PredefinedAccountsConfig {
-                predefined: predefined_account
-                    .into_iter()
-                    .map(AccountConfig::test_config_from_name)
-                    .collect(),
-            })
-            .add::<LoginPasswordAuthProvider>()
-            .add::<FakeDatasetEntryService>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add::<AccountServiceImpl>()
-            .add::<InMemoryAccountRepository>()
-            .build();
+        let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        b.add_builder(
+            OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
+        )
+        .bind::<dyn Outbox, OutboxImmediateImpl>()
+        .add::<GetDatasetUpstreamDependenciesUseCaseImpl>()
+        .add::<PredefinedAccountsRegistrator>()
+        .add_value(PredefinedAccountsConfig {
+            predefined: predefined_account
+                .into_iter()
+                .map(AccountConfig::test_config_from_name)
+                .collect(),
+        })
+        .add::<LoginPasswordAuthProvider>()
+        .add::<FakeDatasetEntryService>()
+        .add::<DependencyGraphServiceImpl>()
+        .add::<InMemoryDatasetDependencyRepository>()
+        .add::<AccountServiceImpl>()
+        .add::<InMemoryAccountRepository>();
+
+        register_message_dispatcher::<DatasetLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        );
+
+        register_message_dispatcher::<DatasetDependenciesMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+        );
+
+        let catalog = b.build();
 
         {
             use init_on_startup::InitOnStartup;
@@ -307,10 +335,9 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
         Self {
             base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
-            dependency_graph_service: catalog.get_one().unwrap(),
+            outbox: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
             system_time_source: catalog.get_one().unwrap(),
-            catalog,
         }
     }
 
@@ -326,12 +353,20 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.system_time_source.now(),
             id: dataset_handle.id.clone(),
-            owner_id,
+            owner_id: owner_id.clone(),
             name: dataset_handle.alias.dataset_name.clone(),
         });
 
-        self.dependency_graph_service
-            .on_dataset_entry_created(&dataset_handle.id)
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::created(
+                    dataset_handle.id.clone(),
+                    owner_id,
+                    odf::DatasetVisibility::Public,
+                    dataset_handle.alias.dataset_name.clone(),
+                ),
+            )
             .await
             .unwrap();
 
@@ -351,16 +386,32 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.system_time_source.now(),
             id: dataset_handle.id.clone(),
-            owner_id,
+            owner_id: owner_id.clone(),
             name: dataset_handle.alias.dataset_name.clone(),
         });
 
-        self.dependency_graph_service
-            .on_dataset_entry_created(&dataset_handle.id)
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::created(
+                    dataset_handle.id.clone(),
+                    owner_id,
+                    odf::DatasetVisibility::Public,
+                    dataset_handle.alias.dataset_name.clone(),
+                ),
+            )
             .await
             .unwrap();
-        self.dependency_graph_service
-            .update_dataset_node_dependencies(&self.catalog, &dataset_handle.id, input_ids)
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+                DatasetDependenciesMessage {
+                    dataset_id: dataset_handle.id.clone(),
+                    obsolete_upstream_ids: vec![],
+                    added_upstream_ids: input_ids,
+                },
+            )
             .await
             .unwrap();
 

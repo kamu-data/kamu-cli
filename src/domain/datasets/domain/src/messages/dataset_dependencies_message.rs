@@ -12,37 +12,20 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const DATASET_REFERENCE_OUTBOX_VERSION: u32 = 1;
+const DATASET_DEPENDENCIES_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetReferenceMessage {
+pub struct DatasetDependenciesMessage {
     pub dataset_id: odf::DatasetID,
-    pub block_ref: odf::BlockRef,
-    pub maybe_prev_block_hash: Option<odf::Multihash>,
-    pub new_block_hash: odf::Multihash,
+    pub obsolete_upstream_ids: Vec<odf::DatasetID>,
+    pub added_upstream_ids: Vec<odf::DatasetID>,
 }
 
-impl DatasetReferenceMessage {
-    pub fn new(
-        dataset_id: odf::DatasetID,
-        block_ref: odf::BlockRef,
-        maybe_prev_block_hash: Option<odf::Multihash>,
-        new_block_hash: odf::Multihash,
-    ) -> Self {
-        Self {
-            dataset_id,
-            block_ref,
-            maybe_prev_block_hash,
-            new_block_hash,
-        }
-    }
-}
-
-impl Message for DatasetReferenceMessage {
+impl Message for DatasetDependenciesMessage {
     fn version() -> u32 {
-        DATASET_REFERENCE_OUTBOX_VERSION
+        DATASET_DEPENDENCIES_OUTBOX_VERSION
     }
 }
 
