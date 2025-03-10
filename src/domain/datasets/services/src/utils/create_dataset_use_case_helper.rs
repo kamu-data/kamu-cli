@@ -112,7 +112,10 @@ impl CreateDatasetUseCaseHelper {
     ) -> Result<odf::dataset::StoreDatasetResult, CreateDatasetError> {
         let store_result = self
             .dataset_storage_unit_writer
-            .store_dataset(seed_block)
+            .store_dataset(
+                seed_block,
+                odf::dataset::StoreDatasetOpts { set_head: false },
+            )
             .await
             .map_err(|e| match e {
                 odf::dataset::StoreDatasetError::RefCollision(e) => {

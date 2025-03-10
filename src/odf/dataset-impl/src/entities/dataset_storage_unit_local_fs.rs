@@ -124,6 +124,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
+        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
         use DatasetStorageUnit;
@@ -176,7 +177,8 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             .dataset_lfs_builder
             .build_lfs_dataset(&dataset_id, layout);
 
-        // Write seed block, but don't set a head ref
+        // Write seed block
+        // Only set reference, if specified in the options
         let seed = match dataset
             .as_metadata_chain()
             .append(
@@ -185,7 +187,11 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
-                    update_ref: None,
+                    update_ref: if opts.set_head {
+                        Some(&BlockRef::Head)
+                    } else {
+                        None
+                    },
                     ..AppendOpts::default()
                 },
             )

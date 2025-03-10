@@ -13,7 +13,6 @@ use std::sync::Arc;
 use kamu::domain::*;
 use kamu::testing::BaseRepoHarness;
 use kamu::*;
-use odf::dataset::SetRefOpts;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,20 +206,9 @@ impl ResetTestHarness {
 
         let stored = self
             .dataset_storage_unit_writer()
-            .store_dataset(seed_block)
-            .await
-            .unwrap();
-
-        stored
-            .dataset
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                &stored.seed,
-                SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(None),
-                },
+            .store_dataset(
+                seed_block,
+                odf::dataset::StoreDatasetOpts { set_head: true },
             )
             .await
             .unwrap();

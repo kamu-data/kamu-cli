@@ -17,7 +17,6 @@ use indoc::indoc;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
-use odf::dataset::SetRefOpts;
 use odf::metadata::testing::MetadataFactory;
 use odf::utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
 use serde_json::json;
@@ -1241,17 +1240,7 @@ impl Harness {
                 )
                 .system_time(system_time)
                 .build_typed(),
-            )
-            .await
-            .unwrap();
-
-        foo_stored
-            .dataset
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                &foo_stored.seed,
-                SetRefOpts::default(),
+                odf::dataset::StoreDatasetOpts { set_head: true },
             )
             .await
             .unwrap();

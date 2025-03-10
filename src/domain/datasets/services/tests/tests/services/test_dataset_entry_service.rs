@@ -27,7 +27,6 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use odf::dataset::SetRefOpts;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
@@ -81,24 +80,11 @@ async fn test_indexes_datasets_correctly() {
                         .build(),
                 )
                 .build_typed(),
+                odf::dataset::StoreDatasetOpts { set_head: true },
             )
             .await
             .unwrap();
 
-        // Set a head, or datasets won't iterate
-        stored
-            .dataset
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                &stored.seed,
-                SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: None,
-                },
-            )
-            .await
-            .unwrap();
         stored_by_id.insert(dataset_id.clone(), stored);
     }
 
