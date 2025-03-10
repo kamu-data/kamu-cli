@@ -143,7 +143,6 @@ impl ServerSideLocalFsHarness {
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
-                .add::<EditDatasetUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
