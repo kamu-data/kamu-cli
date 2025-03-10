@@ -527,6 +527,7 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
     b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();
+    b.add::<kamu_datasets_services::DependencyGraphImmediateListener>();
     b.add::<kamu_datasets_services::DatasetReferenceServiceImpl>();
     b.add::<kamu_datasets_services::utils::CreateDatasetUseCaseHelper>();
 
@@ -552,6 +553,11 @@ pub fn configure_base_catalog(
     register_message_dispatcher::<kamu_datasets::DatasetReferenceMessage>(
         &mut b,
         kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    );
+
+    register_message_dispatcher::<kamu_datasets::DatasetDependenciesMessage>(
+        &mut b,
+        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     );
 
     b

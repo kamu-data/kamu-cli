@@ -38,7 +38,6 @@ impl State {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetEntryRepository {
-    created_listeners: Vec<Arc<dyn DatasetEntryCreatedListener>>,
     removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
     state: Arc<RwLock<State>>,
 }
@@ -47,12 +46,8 @@ pub struct InMemoryDatasetEntryRepository {
 #[interface(dyn DatasetEntryRepository)]
 #[scope(Singleton)]
 impl InMemoryDatasetEntryRepository {
-    pub fn new(
-        created_listeners: Vec<Arc<dyn DatasetEntryCreatedListener>>,
-        removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-    ) -> Self {
+    pub fn new(removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>) -> Self {
         Self {
-            created_listeners,
             removal_listeners,
             state: Arc::new(RwLock::new(State::new())),
         }
@@ -235,13 +230,6 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
                 owner_dataset_ids.insert(dataset_entry.id.clone());
             })
             .or_insert_with(|| BTreeSet::from_iter([dataset_entry.id.clone()]));
-
-        for listener in &self.created_listeners {
-            listener
-                .on_dataset_entry_created(&dataset_entry.id)
-                .await
-                .int_err()?;
-        }
 
         Ok(())
     }

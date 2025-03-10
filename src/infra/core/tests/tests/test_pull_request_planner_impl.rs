@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::Utc;
+use dill::Component;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::testing::{BaseRepoHarness, *};
@@ -20,6 +21,7 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets::{DatasetReferenceMessage, MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE};
 use kamu_datasets_inmem::InMemoryDatasetReferenceRepository;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
@@ -29,7 +31,7 @@ use kamu_datasets_services::{
     DatasetReferenceServiceImpl,
     MockDatasetEntryWriter,
 };
-use messaging_outbox::DummyOutboxImpl;
+use messaging_outbox::{register_message_dispatcher, ConsumerFilter, Outbox, OutboxImmediateImpl};
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 
@@ -832,8 +834,8 @@ impl PullTestHarness {
         let repos_dir = base_repo_harness.temp_dir_path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
-            .add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
+        let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
+        b.add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<PullRequestPlannerImpl>()
@@ -849,14 +851,23 @@ impl PullTestHarness {
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add::<DummyOutboxImpl>()
+            .add_builder(
+                OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
+            )
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add_value(IpfsClient::default())
             .add_value(odf::dataset::IpfsGateway::default())
             .add_value(mock_dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()
-            .add::<InMemoryDatasetReferenceRepository>()
-            .build();
+            .add::<InMemoryDatasetReferenceRepository>();
+
+        register_message_dispatcher::<DatasetReferenceMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+        );
+
+        let catalog = b.build();
 
         Self {
             base_repo_harness,

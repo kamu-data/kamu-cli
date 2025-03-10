@@ -16,15 +16,15 @@ use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_core::*;
 use kamu_datasets::{
+    DatasetDependenciesMessage,
     DatasetEntry,
-    DatasetEntryCreatedListener,
-    DatasetEntryRemovalListener,
     DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
-use kamu_datasets_services::{DependencyGraphServiceImpl, DependencyGraphWriter};
+use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -55,7 +55,6 @@ pub(crate) const SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS: i64 = SCHEDULING_ALI
 pub(crate) struct FlowHarness {
     pub catalog: Catalog,
     pub outbox: Arc<dyn Outbox>,
-    pub dependency_graph_service: Arc<DependencyGraphServiceImpl>,
     pub fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
     pub fake_system_time_source: FakeSystemTimeSource,
 
@@ -131,6 +130,10 @@ impl FlowHarness {
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
             );
+            register_message_dispatcher::<DatasetDependenciesMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+            );
             register_message_dispatcher::<TaskProgressMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_TASK_AGENT,
@@ -157,7 +160,6 @@ impl FlowHarness {
 
         Self {
             outbox: catalog.get_one().unwrap(),
-            dependency_graph_service: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
 
             flow_agent: catalog.get_one().unwrap(),
@@ -181,12 +183,20 @@ impl FlowHarness {
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.fake_system_time_source.now(),
             id: dataset_id.clone(),
-            owner_id,
-            name: dataset_alias.dataset_name,
+            owner_id: owner_id.clone(),
+            name: dataset_alias.dataset_name.clone(),
         });
 
-        self.dependency_graph_service
-            .on_dataset_entry_created(&dataset_id)
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::created(
+                    dataset_id.clone(),
+                    owner_id,
+                    odf::DatasetVisibility::Public,
+                    dataset_alias.dataset_name,
+                ),
+            )
             .await
             .unwrap();
 
@@ -207,16 +217,32 @@ impl FlowHarness {
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.fake_system_time_source.now(),
             id: dataset_id.clone(),
-            owner_id,
-            name: dataset_alias.dataset_name,
+            owner_id: owner_id.clone(),
+            name: dataset_alias.dataset_name.clone(),
         });
 
-        self.dependency_graph_service
-            .on_dataset_entry_created(&dataset_id)
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::created(
+                    dataset_id.clone(),
+                    owner_id,
+                    odf::DatasetVisibility::Public,
+                    dataset_alias.dataset_name,
+                ),
+            )
             .await
             .unwrap();
-        self.dependency_graph_service
-            .update_dataset_node_dependencies(&self.catalog, &dataset_id, input_ids)
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+                DatasetDependenciesMessage {
+                    dataset_id: dataset_id.clone(),
+                    obsolete_upstream_ids: vec![],
+                    added_upstream_ids: input_ids,
+                },
+            )
             .await
             .unwrap();
 
@@ -230,11 +256,6 @@ impl FlowHarness {
     }
 
     pub async fn issue_dataset_deleted(&self, dataset_id: &odf::DatasetID) {
-        self.dependency_graph_service
-            .on_dataset_entry_removed(dataset_id)
-            .await
-            .unwrap();
-
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,

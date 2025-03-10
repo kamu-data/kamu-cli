@@ -11,28 +11,21 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::InternalError;
-use kamu_datasets::{DatasetEntryCreatedListener, DatasetEntryRemovalListener};
+use kamu_datasets::DatasetEntryRemovalListener;
 
 use crate::{CreateDatasetEntryError, DatasetEntryWriter, RenameDatasetEntryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FakeConnectingDatasetEntryWriter {
-    created_listeners: Vec<Arc<dyn DatasetEntryCreatedListener>>,
     removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetEntryWriter)]
 impl FakeConnectingDatasetEntryWriter {
-    pub fn new(
-        created_listeners: Vec<Arc<dyn DatasetEntryCreatedListener>>,
-        removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-    ) -> Self {
-        Self {
-            created_listeners,
-            removal_listeners,
-        }
+    pub fn new(removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>) -> Self {
+        Self { removal_listeners }
     }
 }
 
@@ -40,14 +33,10 @@ impl FakeConnectingDatasetEntryWriter {
 impl DatasetEntryWriter for FakeConnectingDatasetEntryWriter {
     async fn create_entry(
         &self,
-        dataset_id: &odf::DatasetID,
+        _dataset_id: &odf::DatasetID,
         _owner_account_id: &odf::AccountID,
         _dataset_name: &odf::DatasetName,
     ) -> Result<(), CreateDatasetEntryError> {
-        for listener in &self.created_listeners {
-            listener.on_dataset_entry_created(dataset_id).await.unwrap();
-        }
-
         Ok(())
     }
 

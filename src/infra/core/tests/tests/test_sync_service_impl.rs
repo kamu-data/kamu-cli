@@ -102,8 +102,6 @@ async fn do_test_sync(
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add_value(MockDatasetEntryWriter::new())
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add_value(MockDependencyGraphWriter::new())
-        .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>();
@@ -160,8 +158,6 @@ async fn do_test_sync(
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add_value(mock_dataset_entry_writer_bar)
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add_value(MockDependencyGraphWriter::new())
-        .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>();
 

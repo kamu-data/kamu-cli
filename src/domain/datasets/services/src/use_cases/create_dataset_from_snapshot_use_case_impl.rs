@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface, Catalog};
+use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DatasetRegistry, DidGenerator};
@@ -22,39 +22,32 @@ use kamu_datasets::{
 use time_source::SystemTimeSource;
 
 use crate::utils::CreateDatasetUseCaseHelper;
-use crate::DependencyGraphWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
-    catalog: Catalog,
     current_account_subject: Arc<CurrentAccountSubject>,
     system_time_source: Arc<dyn SystemTimeSource>,
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
 impl CreateDatasetFromSnapshotUseCaseImpl {
     pub fn new(
-        catalog: Catalog,
         current_account_subject: Arc<CurrentAccountSubject>,
         system_time_source: Arc<dyn SystemTimeSource>,
         did_generator: Arc<dyn DidGenerator>,
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
         create_helper: Arc<CreateDatasetUseCaseHelper>,
     ) -> Self {
         Self {
-            catalog,
             current_account_subject,
             system_time_source,
             did_generator,
             dataset_registry,
-            dependency_graph_writer,
             create_helper,
         }
     }
@@ -109,24 +102,6 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .store_dataset(&canonical_alias, seed_block)
             .await?;
 
-        // Analyze dependencies
-        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
-        for event in &snapshot.metadata {
-            if let odf::MetadataEvent::SetTransform(set_transform) = event {
-                // Collect only the latest upstream dataset IDs
-                new_upstream_ids.clear();
-                for new_input in &set_transform.inputs {
-                    if let Some(id) = new_input.dataset_ref.id() {
-                        new_upstream_ids.push(id.clone());
-                    } else {
-                        // Input references must be resolved to IDs here, but we
-                        // ignore the errors and let the metadata chain reject
-                        // this event
-                    }
-                }
-            }
-        }
-
         // Append snapshot metadata
         let append_result = odf::dataset::append_snapshot_metadata_to_dataset(
             snapshot.metadata,
@@ -137,23 +112,6 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .await
         .int_err()?;
 
-        // Set initial dataset HEAD
-        self.create_helper
-            .set_created_head(&store_result.dataset_id, &append_result.proposed_head)
-            .await?;
-
-        // Note: modify dependencies only after `set_ref` succeeds.
-        // TODO: the dependencies should be updated as a part of HEAD change
-        if !new_upstream_ids.is_empty() {
-            self.dependency_graph_writer
-                .update_dataset_node_dependencies(
-                    &self.catalog,
-                    &store_result.dataset_id,
-                    new_upstream_ids,
-                )
-                .await?;
-        }
-
         // Notify interested parties the dataset was created
         self.create_helper
             .notify_dataset_created(
@@ -162,6 +120,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 &logged_account_id,
                 options.dataset_visibility,
             )
+            .await?;
+
+        // Set initial dataset HEAD
+        self.create_helper
+            .set_created_head(&store_result.dataset_id, &append_result.proposed_head)
             .await?;
 
         Ok(CreateDatasetResult {

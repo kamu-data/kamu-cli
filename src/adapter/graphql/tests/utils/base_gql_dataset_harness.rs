@@ -61,6 +61,7 @@ impl BaseGQLDatasetHarness {
             .add::<InMemoryDatasetReferenceRepository>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
+            .add::<DependencyGraphImmediateListener>()
             .add::<DatasetEntryServiceImpl>()
             .add::<InMemoryDatasetEntryRepository>()
             .add_value(RunInfoDir::new(run_info_dir));
@@ -75,6 +76,11 @@ impl BaseGQLDatasetHarness {
             register_message_dispatcher::<DatasetReferenceMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+            );
+
+            register_message_dispatcher::<DatasetDependenciesMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
             );
 
             b.build()
