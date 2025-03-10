@@ -65,7 +65,8 @@ pub struct PhysicalHashFromPath {
     )
 )]
 pub async fn dataset_refs_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
+    axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
     axum::extract::Path(ref_param): axum::extract::Path<RefFromPath>,
 ) -> Result<String, ApiError> {
     let block_ref = match odf::BlockRef::from_str(ref_param.reference.as_str()) {
@@ -73,7 +74,14 @@ pub async fn dataset_refs_handler(
         Err(e) => Err(ApiError::not_found(e)),
     }?;
 
-    match dataset.as_metadata_chain().resolve_ref(&block_ref).await {
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+
+    match target_dataset
+        .as_metadata_chain()
+        .resolve_ref(&block_ref)
+        .await
+    {
         Ok(hash) => Ok(hash.to_string()),
         Err(e @ odf::GetRefError::NotFound(_)) => Err(ApiError::not_found(e)),
         Err(e) => Err(e.api_err()),
@@ -95,10 +103,14 @@ pub async fn dataset_refs_handler(
     )
 )]
 pub async fn dataset_blocks_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
+    axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
     axum::extract::Path(hash_param): axum::extract::Path<BlockHashFromPath>,
 ) -> Result<Vec<u8>, ApiError> {
-    let block: odf::MetadataBlock = match dataset
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+
+    let block: odf::MetadataBlock = match target_dataset
         .as_metadata_chain()
         .get_block(&hash_param.block_hash)
         .await
@@ -131,10 +143,14 @@ pub async fn dataset_blocks_handler(
     )
 )]
 pub async fn dataset_data_get_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
+    axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<impl IntoResponse, ApiError> {
-    dataset_get_object_common(dataset.as_data_repo(), &hash_param.physical_hash).await
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+
+    dataset_get_object_common(target_dataset.as_data_repo(), &hash_param.physical_hash).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -152,10 +168,18 @@ pub async fn dataset_data_get_handler(
     )
 )]
 pub async fn dataset_checkpoints_get_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
+    axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<impl IntoResponse, ApiError> {
-    dataset_get_object_common(dataset.as_checkpoint_repo(), &hash_param.physical_hash).await
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+
+    dataset_get_object_common(
+        target_dataset.as_checkpoint_repo(),
+        &hash_param.physical_hash,
+    )
+    .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -191,13 +215,17 @@ async fn dataset_get_object_common(
     )
 )]
 pub async fn dataset_data_put_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
+    axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
     TypedHeader(content_length): TypedHeader<headers::ContentLength>,
     body: axum::body::Body,
 ) -> Result<(), ApiError> {
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+
     dataset_put_object_common(
-        dataset.as_data_repo(),
+        target_dataset.as_data_repo(),
         hash_param.physical_hash,
         content_length.0,
         body,
@@ -221,13 +249,17 @@ pub async fn dataset_data_put_handler(
     )
 )]
 pub async fn dataset_checkpoints_put_handler(
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
+    axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
     TypedHeader(content_length): TypedHeader<headers::ContentLength>,
     body: axum::body::Body,
 ) -> Result<(), ApiError> {
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+
     dataset_put_object_common(
-        dataset.as_checkpoint_repo(),
+        target_dataset.as_checkpoint_repo(),
         hash_param.physical_hash,
         content_length.0,
         body,
@@ -346,8 +378,8 @@ pub async fn dataset_push_ws_upgrade_handler(
 )]
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn odf::Dataset>>,
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
     uri: axum::extract::OriginalUri,
     TypedHeader(OdfSmtpVersion(version_header)): OdfSmtpVersionTyped,
     maybe_bearer_header: Option<BearerHeader>,
@@ -357,9 +389,17 @@ pub async fn dataset_pull_ws_upgrade_handler(
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
     let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
 
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+
     Ok(ws.on_upgrade(move |socket| {
-        AxumServerPullProtocolInstance::new(socket, dataset, dataset_url, maybe_bearer_header)
-            .serve()
+        AxumServerPullProtocolInstance::new(
+            socket,
+            (*target_dataset).clone(),
+            dataset_url,
+            maybe_bearer_header,
+        )
+        .serve()
     }))
 }
 
