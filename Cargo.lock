@@ -5599,10 +5599,12 @@ dependencies = [
  "database-common",
  "dill",
  "email-utils",
+ "futures",
  "kamu-accounts",
  "kamu-adapter-oauth",
  "opendatafabric",
  "password-hash",
+ "pretty_assertions",
  "rand",
  "uuid",
 ]
