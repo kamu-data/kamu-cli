@@ -40,11 +40,12 @@ impl EditDatasetUseCaseImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl EditDatasetUseCase for EditDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "EditDatasetUseCase::execute",
+        name = EditDatasetUseCaseImpl_execute,
         skip_all,
         fields(dataset_ref)
     )]
@@ -63,7 +64,7 @@ impl EditDatasetUseCase for EditDatasetUseCaseImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = "EditDatasetUseCase::execute_multi",
+        name = EditDatasetUseCaseImpl_execute_multi,
         skip_all,
         fields(dataset_refs)
     )]

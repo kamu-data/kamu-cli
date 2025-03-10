@@ -275,6 +275,7 @@ impl AccountRepository for MySqlAccountRepository {
 
         Ok(account_rows
             .into_iter()
+            // todo extract
             .map(|account_row| Account {
                 id: account_row.get_unchecked("id"),
                 account_name: odf::AccountName::new_unchecked(
@@ -404,6 +405,15 @@ impl AccountRepository for MySqlAccountRepository {
         .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
+    }
+
+    fn search_accounts_by_name_pattern(
+        &self,
+        _name_pattern: &str,
+        _filters: SearchAccountsByNamePatternFilters,
+        _pagination: PaginationOpts,
+    ) -> AccountPageStream {
+        todo!("TODO: Private Datasets: implementation")
     }
 }
 

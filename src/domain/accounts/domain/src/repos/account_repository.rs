@@ -52,6 +52,14 @@ pub trait AccountRepository: Send + Sync {
         account_name: &odf::AccountName,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError>;
 
+    // TODO: Private Datasets: tests
+    fn search_accounts_by_name_pattern<'a>(
+        &'a self,
+        name_pattern: &'a str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream<'a>;
+
     async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError>;
 
     async fn update_account_email(
@@ -106,6 +114,13 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type AccountPageStream<'a> = EntityPageStream<'a, Account>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct SearchAccountsByNamePatternFilters {
+    pub exclude_accounts_by_ids: Option<Vec<odf::AccountID>>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors

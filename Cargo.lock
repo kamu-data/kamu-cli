@@ -5599,10 +5599,12 @@ dependencies = [
  "database-common",
  "dill",
  "email-utils",
+ "futures",
  "kamu-accounts",
  "kamu-adapter-oauth",
  "opendatafabric",
  "password-hash",
+ "pretty_assertions",
  "rand",
  "uuid",
 ]
@@ -6181,7 +6183,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
 ]
 
 [[package]]

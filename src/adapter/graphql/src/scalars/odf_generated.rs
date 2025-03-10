@@ -1872,6 +1872,7 @@ impl From<odf::metadata::TransformSql> for TransformSql {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: update codegen scripts
 /// Describes a derivative transformation input
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
