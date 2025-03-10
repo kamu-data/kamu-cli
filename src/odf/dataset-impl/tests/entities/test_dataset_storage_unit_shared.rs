@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use odf::DatasetID;
-use odf_dataset::SetRefOpts;
+use odf_dataset::{SetRefOpts, StoreDatasetOpts};
 use odf_metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +36,7 @@ pub async fn test_store_dataset<
     );
 
     let store_result = storage_unit
-        .store_dataset(seed_block.clone())
+        .store_dataset(seed_block.clone(), StoreDatasetOpts::default())
         .await
         .unwrap();
 
@@ -64,7 +64,9 @@ pub async fn test_store_dataset<
         .unwrap();
 
     // Now test ID collision
-    let store_result = storage_unit.store_dataset(seed_block).await;
+    let store_result = storage_unit
+        .store_dataset(seed_block, StoreDatasetOpts::default())
+        .await;
 
     assert_matches!(
         store_result.err(),
@@ -87,22 +89,7 @@ pub async fn test_delete_dataset<
     )
     .build_typed();
     let store_result = storage_unit
-        .store_dataset(seed_block.clone())
-        .await
-        .unwrap();
-
-    // Set head ref
-    store_result
-        .dataset
-        .as_metadata_chain()
-        .set_ref(
-            &odf::BlockRef::Head,
-            &store_result.seed,
-            SetRefOpts {
-                validate_block_present: true,
-                check_ref_is: Some(None),
-            },
-        )
+        .store_dataset(seed_block.clone(), StoreDatasetOpts { set_head: true })
         .await
         .unwrap();
 
@@ -151,41 +138,11 @@ pub async fn test_iterate_datasets<
     .build_typed();
 
     let store_result_1 = storage_unit
-        .store_dataset(seed_block_1.clone())
+        .store_dataset(seed_block_1.clone(), StoreDatasetOpts { set_head: true })
         .await
         .unwrap();
     let store_result_2 = storage_unit
-        .store_dataset(seed_block_2.clone())
-        .await
-        .unwrap();
-
-    // Set head refs
-    store_result_1
-        .dataset
-        .as_metadata_chain()
-        .set_ref(
-            &odf::BlockRef::Head,
-            &store_result_1.seed,
-            SetRefOpts {
-                validate_block_present: true,
-                check_ref_is: Some(None),
-            },
-        )
-        .await
-        .unwrap();
-
-    // Set head ref
-    store_result_2
-        .dataset
-        .as_metadata_chain()
-        .set_ref(
-            &odf::BlockRef::Head,
-            &store_result_2.seed,
-            SetRefOpts {
-                validate_block_present: true,
-                check_ref_is: Some(None),
-            },
-        )
+        .store_dataset(seed_block_2.clone(), StoreDatasetOpts { set_head: true })
         .await
         .unwrap();
 
