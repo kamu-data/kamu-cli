@@ -60,7 +60,14 @@ impl Search {
             .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))
             .try_collect::<Vec<_>>()
             .await?;
-        readable_dataset_handles.sort_by(|a, b| a.alias.dataset_name.cmp(&b.alias.dataset_name));
+        // Sort first by dataset name and for stability after by account name
+        readable_dataset_handles.sort_by(|a, b| {
+            let dataset_name_cmp = a.alias.dataset_name.cmp(&b.alias.dataset_name);
+            if dataset_name_cmp != std::cmp::Ordering::Equal {
+                return dataset_name_cmp;
+            }
+            a.alias.account_name.cmp(&b.alias.account_name)
+        });
 
         let total_count = readable_dataset_handles.len();
 
