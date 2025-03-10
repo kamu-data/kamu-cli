@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.226.5] - 2025-03-10
+### Fixed
+- Prometheus metrics, S3: fixed `storage_url` label values
+
 ## [0.226.4] - 2025-03-07
 ### Changed
 - Simple Transfer Protocol & Smart Transfer Protocol use `AppendDatasetMetadataBatchUseCase`

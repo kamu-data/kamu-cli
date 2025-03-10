@@ -23,13 +23,13 @@ pub struct S3Metrics {
 #[interface(dyn MetricsProvider)]
 #[scope(Singleton)]
 impl S3Metrics {
-    pub fn new(application: &str) -> Self {
+    pub fn new() -> Self {
         use prometheus::*;
 
         Self {
             s3_api_call_count_successful_num_total: IntCounterVec::new(
                 Opts::new(
-                    format!("{application}_s3_api_call_count_successful_num_total"),
+                    "s3_api_call_count_successful_num_total",
                     "Number of successful AWS SDK S3 calls by storage URL and SDK method",
                 ),
                 &["storage_url", "sdk_method"],
@@ -37,7 +37,7 @@ impl S3Metrics {
             .unwrap(),
             s3_api_call_count_failed_num_total: IntCounterVec::new(
                 Opts::new(
-                    format!("{application}_s3_api_call_count_failed_num_total"),
+                    "s3_api_call_count_failed_num_total",
                     "Number of failed AWS SDK S3 calls by storage URL and SDK method",
                 ),
                 &["storage_url", "sdk_method"],
@@ -45,7 +45,7 @@ impl S3Metrics {
             .unwrap(),
             s3_api_request_time_s_hist: HistogramVec::new(
                 HistogramOpts::new(
-                    format!("{application}_s3_api_request_time_s_hist"),
+                    "s3_api_request_time_s_hist",
                     "Histogram of AWS SDK S3 API request latencies (in seconds) by storage URL \
                      and SDK method",
                 ),

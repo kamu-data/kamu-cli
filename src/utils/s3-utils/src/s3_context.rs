@@ -32,6 +32,27 @@ struct S3ContextSharedState {
     endpoint: Option<String>,
     bucket: String,
     sdk_config: SdkConfig,
+    bucket_url: String,
+}
+
+impl S3ContextSharedState {
+    fn new(endpoint: Option<String>, bucket: String, sdk_config: SdkConfig) -> Self {
+        let bucket_url = match &endpoint {
+            Some(endpoint) => {
+                format!("s3+{endpoint}/{bucket}")
+            }
+            None => {
+                format!("s3://{bucket}")
+            }
+        };
+
+        Self {
+            endpoint,
+            bucket,
+            sdk_config,
+            bucket_url,
+        }
+    }
 }
 
 struct S3ContextState {
@@ -103,11 +124,7 @@ impl S3Context {
 
         Self {
             client,
-            shared_state: Arc::new(S3ContextSharedState {
-                endpoint,
-                bucket,
-                sdk_config,
-            }),
+            shared_state: Arc::new(S3ContextSharedState::new(endpoint, bucket, sdk_config)),
             state: Arc::new(S3ContextState { key_prefix, url }),
             maybe_metrics: None,
         }
@@ -242,7 +259,7 @@ impl S3Context {
             let api_call_result = f().await;
             let elapsed = start.elapsed();
 
-            let metric_labels = [self.state.url.as_str(), sdk_method];
+            let metric_labels = [self.shared_state.bucket_url.as_str(), sdk_method];
 
             metrics
                 .s3_api_request_time_s_hist
