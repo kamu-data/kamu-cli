@@ -188,29 +188,15 @@ impl RebacRepository for SqliteRebacRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let placeholder_list = (1..=entities.len())
-            .map(|i| {
-                // i | idxs
-                // 1 | 1, 2
-                // 2 | 3, 4
-                // 3 | 5, 6
-                // ...
-                let entity_type_idx = i * 2 - 1;
-                let entity_id_idx = i * 2;
-
-                format!("(${entity_type_idx},${entity_id_idx})")
-            })
-            .intersperse(",".to_string())
-            .collect::<String>();
-
         // TODO: replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
         let query_str = format!(
             r#"
             SELECT entity_type, entity_id, property_name, property_value
             FROM auth_rebac_properties
-            WHERE (entity_type, entity_id) IN ({placeholder_list})
+            WHERE (entity_type, entity_id) IN ({})
             "#,
+            sqlite_generate_placeholders_tuple_list_2(entities.len(), 0)
         );
 
         let mut query = sqlx::query(&query_str);
@@ -266,16 +252,16 @@ impl RebacRepository for SqliteRebacRepository {
         )
         .execute(connection_mut)
         .await
-            .map_err(|e| match e {
-                sqlx::Error::Database(e) if e.is_unique_violation() => {
-                    InsertEntitiesRelationError::duplicate(
-                        subject_entity,
-                        relationship,
-                        object_entity,
-                    )
-                }
-                _ => InsertEntitiesRelationError::Internal(e.int_err()),
-            })?;
+        .map_err(|e| match e {
+            sqlx::Error::Database(e) if e.is_unique_violation() => {
+                InsertEntitiesRelationError::duplicate(
+                    subject_entity,
+                    relationship,
+                    object_entity,
+                )
+            }
+            _ => InsertEntitiesRelationError::Internal(e.int_err()),
+        })?;
 
         Ok(())
     }
@@ -399,8 +385,6 @@ impl RebacRepository for SqliteRebacRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let placeholder_list = sqlite_generate_placeholders_tuple_list_2(object_entities.len(), 0);
-
         // TODO: replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
         let query_str = format!(
@@ -411,9 +395,10 @@ impl RebacRepository for SqliteRebacRepository {
                    object_entity_type,
                    object_entity_id
             FROM auth_rebac_relations
-            WHERE (object_entity_type, object_entity_id) IN ({placeholder_list})
+            WHERE (object_entity_type, object_entity_id) IN ({})
             ORDER BY entity_id
             "#,
+            sqlite_generate_placeholders_tuple_list_2(object_entities.len(), 0)
         );
 
         let mut query = sqlx::query(&query_str);
@@ -522,8 +507,6 @@ impl RebacRepository for SqliteRebacRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let placeholder_list = sqlite_generate_placeholders_tuple_list_2(subject_entities.len(), 3);
-
         // TODO: replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
         let query_str = format!(
@@ -532,8 +515,9 @@ impl RebacRepository for SqliteRebacRepository {
             FROM auth_rebac_relations
             WHERE object_entity_type = $1
               AND object_entity_id = $2
-              AND (subject_entity_type, subject_entity_id) in ({placeholder_list})
+              AND (subject_entity_type, subject_entity_id) in ({})
             "#,
+            sqlite_generate_placeholders_tuple_list_2(subject_entities.len(), 3)
         );
 
         let mut query = sqlx::query(&query_str)
