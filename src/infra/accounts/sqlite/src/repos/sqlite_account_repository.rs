@@ -495,7 +495,6 @@ impl AccountRepository for SqliteAccountRepository {
                        provider_identity_key
                 FROM accounts
                 WHERE (account_name LIKE '%'||$1||'%' COLLATE nocase
-                    OR email LIKE '%'||$1||'%' COLLATE nocase
                     OR display_name LIKE '%'||$1||'%' COLLATE nocase)
                   AND id NOT IN ({})
                 ORDER BY account_name
