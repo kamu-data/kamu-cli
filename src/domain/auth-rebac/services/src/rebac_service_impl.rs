@@ -339,7 +339,7 @@ impl RebacService for RebacServiceImpl {
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<(odf::AccountID, AccountToDatasetRelation)>, ObjectEntityRelationsError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_entity = Entity::new_account(dataset_id.as_str());
+        let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
         let object_entities = self
             .rebac_repo
