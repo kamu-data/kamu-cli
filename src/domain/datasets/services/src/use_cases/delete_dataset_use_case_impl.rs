@@ -70,21 +70,36 @@ impl DeleteDatasetUseCaseImpl {
             .await;
 
         if !downstream_dataset_ids.is_empty() {
-            let mut children = Vec::with_capacity(downstream_dataset_ids.len());
+            let mut dangling_children = Vec::with_capacity(downstream_dataset_ids.len());
             for downstream_dataset_id in downstream_dataset_ids {
-                let hdl = self
+                match self
                     .dataset_registry
                     .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
                     .await
-                    .int_err()?;
-                children.push(hdl);
+                {
+                    Ok(hdl) => dangling_children.push(hdl),
+                    Err(odf::dataset::DatasetRefUnresolvedError::NotFound(_)) => {
+                        tracing::warn!(
+                            "Skipped unresolved downstream reference: {downstream_dataset_id}"
+                        );
+                        // Skip this not found error, as the dependency graph
+                        // in-memory is only updated at the end of the current
+                        // transaction, and in case of recursive or all delete
+                        // modes, we might have already deleted this dataset
+                    }
+                    Err(odf::dataset::DatasetRefUnresolvedError::Internal(e)) => {
+                        return Err(e.into())
+                    }
+                };
             }
 
-            return Err(DanglingReferenceError {
-                dataset_handle: dataset_handle.clone(),
-                children,
+            if !dangling_children.is_empty() {
+                return Err(DanglingReferenceError {
+                    dataset_handle: dataset_handle.clone(),
+                    children: dangling_children,
+                }
+                .into());
             }
-            .into());
         }
 
         Ok(())
