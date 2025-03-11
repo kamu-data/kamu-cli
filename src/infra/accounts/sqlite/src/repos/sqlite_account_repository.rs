@@ -291,13 +291,6 @@ impl AccountRepository for SqliteAccountRepository {
             .await
             .map_err(GetAccountByIdError::Internal)?;
 
-        // todo extract this common part
-        let placeholders = account_ids
-            .iter()
-            .map(|_| "?")
-            .collect::<Vec<_>>()
-            .join(", ");
-
         let query_str = format!(
             r#"
                 SELECT
@@ -312,8 +305,9 @@ impl AccountRepository for SqliteAccountRepository {
                     provider,
                     provider_identity_key
                 FROM accounts
-                WHERE id IN ({placeholders})
+                WHERE id IN ({})
                 "#,
+            sqlite_generate_placeholders_list(account_ids.len(), 1)
         );
 
         // ToDo replace it by macro once sqlx will support it

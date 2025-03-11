@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -155,20 +155,14 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let placeholders = obsolete_upstream_dataset_ids
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("${}", i + 2))
-            .collect::<Vec<_>>()
-            .join(", ");
-
         let query_str = format!(
             r#"
             DELETE FROM dataset_dependencies
             WHERE
                 downstream_dataset_id = $1 AND
-                upstream_dataset_id IN ({placeholders})
+                upstream_dataset_id IN ({})
             "#,
+            sqlite_generate_placeholders_list(obsolete_upstream_dataset_ids.len(), 2)
         );
 
         // ToDo replace it by macro once sqlx will support it

@@ -10,7 +10,12 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{
+    sqlite_generate_placeholders_list,
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -163,13 +168,6 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        //
-        let placeholders = dataset_ids
-            .iter()
-            .map(|_| "?")
-            .collect::<Vec<_>>()
-            .join(", ");
-
         let query_str = format!(
             r#"
             SELECT dataset_id as id,
@@ -177,9 +175,10 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                    dataset_name as name,
                    created_at
             FROM dataset_entries
-            WHERE dataset_id IN ({placeholders})
+            WHERE dataset_id IN ({})
             ORDER BY created_at
             "#,
+            sqlite_generate_placeholders_list(dataset_ids.len(), 1)
         );
 
         // ToDo replace it by macro once sqlx will support it
