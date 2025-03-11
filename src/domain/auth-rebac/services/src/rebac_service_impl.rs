@@ -363,7 +363,7 @@ impl RebacService for RebacServiceImpl {
 
     async fn get_accounts_dataset_relations_by_ids(
         &self,
-        dataset_ids: &[&odf::DatasetID],
+        dataset_ids: &[odf::DatasetID],
     ) -> Result<
         HashMap<odf::DatasetID, Vec<(odf::AccountID, AccountToDatasetRelation)>>,
         ObjectEntityRelationsError,
