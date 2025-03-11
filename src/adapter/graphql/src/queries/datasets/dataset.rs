@@ -251,7 +251,7 @@ impl Dataset {
 #[derive(Debug)]
 pub(crate) struct DatasetRequestState {
     owner: Account,
-    dataset_handle: odf::DatasetHandle,
+    pub dataset_handle: odf::DatasetHandle,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
     resolved_dataset: OnceCell<ResolvedDataset>,
     dataset_summary: OnceCell<odf::DatasetSummary>,

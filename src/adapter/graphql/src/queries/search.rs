@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
+use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
 use odf::dataset::TryStreamExtExt as _;
 
@@ -21,8 +23,6 @@ use crate::utils::from_catalog_n;
 
 pub struct Search;
 
-// TODO: Private Datasets: remove (unused_variables)
-#[expect(unused_variables)]
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Search {
@@ -110,15 +110,40 @@ impl Search {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        {
-            //
-            let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
-            //
-        }
+        let account_nodes = if let Some(filters) = filters.by_account {
+            use futures::TryStreamExt;
 
-        // TODO: Private Datasets: implementation
+            let account_service = from_catalog_n!(ctx, dyn AccountService);
 
-        Ok(NameLookupResultConnection::new(vec![], page, per_page, 0))
+            let exclude_accounts_by_ids = filters
+                .exclude_accounts_by_ids
+                .map(|ids| ids.into_iter().map(Into::into).collect::<Vec<_>>());
+            let accounts = account_service
+                .search_accounts_by_name_pattern(
+                    &query,
+                    SearchAccountsByNamePatternFilters {
+                        exclude_accounts_by_ids,
+                    },
+                    PaginationOpts::from_page(page, per_page),
+                )
+                .try_collect::<Vec<_>>()
+                .await?;
+
+            accounts
+                .into_iter()
+                .map(Account::from_account)
+                .map(NameLookupResult::Account)
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let nodes = account_nodes;
+        let total = nodes.len();
+
+        Ok(NameLookupResultConnection::new(
+            nodes, page, per_page, total,
+        ))
     }
 }
 

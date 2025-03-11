@@ -22,6 +22,13 @@ pub struct PaginationOpts {
 }
 
 impl PaginationOpts {
+    pub fn from_page(page: usize, per_page: usize) -> Self {
+        Self {
+            offset: page * per_page,
+            limit: per_page,
+        }
+    }
+
     pub fn safe_limit(&self, total: usize) -> usize {
         let rest = total.saturating_sub(self.offset);
 
