@@ -97,9 +97,7 @@ impl DatasetFlowRunsMut {
                 flow_run_snapshot,
             )
             .await
-            .map_err(|e| match e {
-                fs::RequestFlowError::Internal(e) => GqlError::Internal(e),
-            })?;
+            .int_err()?;
 
         Ok(TriggerFlowResult::Success(TriggerFlowSuccess {
             flow: Flow::build_batch(vec![flow_state], ctx)

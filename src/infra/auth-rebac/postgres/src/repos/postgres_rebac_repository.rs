@@ -169,7 +169,7 @@ impl RebacRepository for PostgresRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(GetEntityPropertiesError::Internal)
+            .map_err(Into::into)
     }
 
     async fn get_entities_properties(
@@ -348,7 +348,7 @@ impl RebacRepository for PostgresRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(SubjectEntityRelationsError::Internal)
+            .map_err(Into::into)
     }
 
     async fn get_object_entity_relations(
@@ -372,10 +372,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsByObjectTypeError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(SubjectEntityRelationsByObjectTypeError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let row_models = sqlx::query_as!(
             EntityWithRelationRowModel,
@@ -400,7 +397,7 @@ impl RebacRepository for PostgresRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(SubjectEntityRelationsByObjectTypeError::Internal)
+            .map_err(Into::into)
     }
 
     async fn get_relations_between_entities(
@@ -410,10 +407,7 @@ impl RebacRepository for PostgresRebacRepository {
     ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetRelationsBetweenEntitiesError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let row_models = sqlx::query_as!(
             RelationRowModel,
@@ -438,7 +432,7 @@ impl RebacRepository for PostgresRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(GetRelationsBetweenEntitiesError::Internal)
+            .map_err(Into::into)
     }
 
     async fn delete_subject_entities_object_entity_relations(

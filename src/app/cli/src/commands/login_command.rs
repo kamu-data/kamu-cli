@@ -96,7 +96,7 @@ impl LoginCommand {
             backend_url.as_odf_protocol().map_err(CLIError::failure)?,
         ) {
             Ok(_) => Ok(()),
-            Err(_err @ AddRepoError::AlreadyExists(_)) => Ok(()),
+            Err(AddRepoError::AlreadyExists(_)) => Ok(()),
             Err(e) => Err(CLIError::failure(e)),
         }
     }

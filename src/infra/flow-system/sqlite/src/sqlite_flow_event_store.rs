@@ -79,7 +79,7 @@ impl SqliteFlowEventStore {
             )
                 .execute(connection_mut)
                 .await
-                .map_err(ErrorIntoInternal::int_err)?;
+                .int_err()?;
             }
             FlowKey::System(fk_system) => {
                 let system_flow_type = fk_system.flow_type;
@@ -95,7 +95,7 @@ impl SqliteFlowEventStore {
                 )
                 .execute(connection_mut)
                 .await
-                .map_err(ErrorIntoInternal::int_err)?;
+                .int_err()?;
             }
         }
 
@@ -143,7 +143,7 @@ impl SqliteFlowEventStore {
             )
             .fetch_one(connection_mut)
             .await
-            .map_err(|e| SaveEventsError::Internal(e.int_err()))?
+            .int_err()?
             .flow_status
         };
 
@@ -166,7 +166,7 @@ impl SqliteFlowEventStore {
         )
         .fetch_all(connection_mut)
         .await
-        .map_err(|e| SaveEventsError::Internal(e.int_err()))?;
+        .int_err()?;
 
         // If a previously stored event id does not match the expected,
         // this means we've just detected a concurrent modification (version conflict)
@@ -414,9 +414,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
             }
 
             // Make registration
-            self.register_flow(&mut tr, e)
-                .await
-                .map_err(SaveEventsError::Internal)?;
+            self.register_flow(&mut tr, e).await?;
         }
 
         // Save events one by one

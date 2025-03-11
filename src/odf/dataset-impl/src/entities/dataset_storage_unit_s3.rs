@@ -310,9 +310,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
             .map_err(|e| e.into_service_error().int_err())?;
 
         // Remove all objects under the key
-        self.delete_dataset_s3_objects(dataset_id)
-            .await
-            .map_err(DeleteStoredDatasetError::Internal)?;
+        self.delete_dataset_s3_objects(dataset_id).await?;
 
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {

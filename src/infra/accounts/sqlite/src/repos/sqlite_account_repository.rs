@@ -85,10 +85,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(CreateAccountError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let account_id = account.id.to_string();
         let account_name = account.account_name.to_ascii_lowercase();
@@ -131,10 +128,7 @@ impl AccountRepository for SqliteAccountRepository {
     async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(UpdateAccountError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let account_id = updated_account.id.to_string();
         let account_name = updated_account.account_name.to_ascii_lowercase();
@@ -240,10 +234,7 @@ impl AccountRepository for SqliteAccountRepository {
     ) -> Result<Account, GetAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccountByIdError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let account_id_str = account_id.to_string();
 
@@ -268,8 +259,7 @@ impl AccountRepository for SqliteAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccountByIdError::Internal)?;
+        .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
             Ok(account_row.into())
@@ -286,10 +276,7 @@ impl AccountRepository for SqliteAccountRepository {
     ) -> Result<Vec<Account>, GetAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccountByIdError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let query_str = format!(
             r#"
@@ -317,11 +304,7 @@ impl AccountRepository for SqliteAccountRepository {
             query = query.bind(account_id.to_string());
         }
 
-        let account_rows = query
-            .fetch_all(connection_mut)
-            .await
-            .int_err()
-            .map_err(GetAccountByIdError::Internal)?;
+        let account_rows = query.fetch_all(connection_mut).await.int_err()?;
 
         Ok(account_rows.iter().map(Self::map_account_row).collect())
     }
@@ -332,10 +315,7 @@ impl AccountRepository for SqliteAccountRepository {
     ) -> Result<Account, GetAccountByNameError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(GetAccountByNameError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let account_name_str = account_name.to_string();
 
@@ -360,8 +340,7 @@ impl AccountRepository for SqliteAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(GetAccountByNameError::Internal)?;
+        .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
             Ok(account_row.into())
@@ -380,10 +359,7 @@ impl AccountRepository for SqliteAccountRepository {
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindAccountIdByProviderIdentityKeyError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         use odf::AccountID;
         let maybe_account_row = sqlx::query!(
@@ -396,8 +372,7 @@ impl AccountRepository for SqliteAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindAccountIdByProviderIdentityKeyError::Internal)?;
+        .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
@@ -408,10 +383,7 @@ impl AccountRepository for SqliteAccountRepository {
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindAccountIdByEmailError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let email_str = email.as_ref();
 
@@ -426,8 +398,7 @@ impl AccountRepository for SqliteAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindAccountIdByEmailError::Internal)?;
+        .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
@@ -438,10 +409,7 @@ impl AccountRepository for SqliteAccountRepository {
     ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindAccountIdByNameError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         use odf::AccountID;
         let account_name_str = account_name.to_string();
@@ -455,9 +423,7 @@ impl AccountRepository for SqliteAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        //     todo поудалять этот маппинг
-        .map_err(FindAccountIdByNameError::Internal)?;
+        .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
@@ -600,10 +566,7 @@ impl PasswordHashRepository for SqliteAccountRepository {
     ) -> Result<(), SavePasswordHashError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(SavePasswordHashError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         // TODO: duplicates are prevented with unique indices, but handle error
 
@@ -618,8 +581,7 @@ impl PasswordHashRepository for SqliteAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .int_err()
-        .map_err(SavePasswordHashError::Internal)?;
+        .int_err()?;
 
         Ok(())
     }
@@ -630,10 +592,7 @@ impl PasswordHashRepository for SqliteAccountRepository {
     ) -> Result<Option<String>, FindPasswordHashError> {
         let mut tr = self.transaction.lock().await;
 
-        let connection_mut = tr
-            .connection_mut()
-            .await
-            .map_err(FindPasswordHashError::Internal)?;
+        let connection_mut = tr.connection_mut().await?;
 
         let account_name = account_name.to_string();
         let maybe_password_row = sqlx::query!(
@@ -646,8 +605,7 @@ impl PasswordHashRepository for SqliteAccountRepository {
         )
         .fetch_optional(connection_mut)
         .await
-        .int_err()
-        .map_err(FindPasswordHashError::Internal)?;
+        .int_err()?;
 
         Ok(maybe_password_row.map(|password_row| password_row.password_hash))
     }

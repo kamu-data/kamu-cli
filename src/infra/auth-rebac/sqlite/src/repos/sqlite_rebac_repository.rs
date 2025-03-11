@@ -460,7 +460,7 @@ impl RebacRepository for SqliteRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(SubjectEntityRelationsByObjectTypeError::Internal)
+            .map_err(Into::into)
     }
 
     async fn get_relations_between_entities(
@@ -495,7 +495,7 @@ impl RebacRepository for SqliteRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(GetRelationsBetweenEntitiesError::Internal)
+            .map_err(Into::into)
     }
 
     async fn delete_subject_entities_object_entity_relations(

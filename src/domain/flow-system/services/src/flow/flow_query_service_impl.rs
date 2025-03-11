@@ -263,7 +263,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
                 config_snapshot_maybe,
             )
             .await
-            .map_err(RequestFlowError::Internal)
+            .map_err(Into::into)
     }
 
     /// Attempts to cancel the tasks already scheduled for the given flow
@@ -278,10 +278,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     ) -> Result<FlowState, CancelScheduledTasksError> {
         // Abort current flow and it's scheduled tasks
         let abort_helper = self.catalog.get_one::<FlowAbortHelper>().unwrap();
-        abort_helper
-            .abort_flow(flow_id)
-            .await
-            .map_err(CancelScheduledTasksError::Internal)
+        abort_helper.abort_flow(flow_id).await.map_err(Into::into)
     }
 }
 

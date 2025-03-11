@@ -188,11 +188,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             query = query.bind(dataset_id.to_string());
         }
 
-        let dataset_rows = query
-            .fetch_all(connection_mut)
-            .await
-            .int_err()
-            .map_err(GetMultipleDatasetEntriesError::Internal)?;
+        let dataset_rows = query.fetch_all(connection_mut).await.int_err()?;
 
         let resolved_entries: Vec<_> = dataset_rows
             .into_iter()
@@ -390,10 +386,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         {
             let mut tr = self.transaction.lock().await;
 
-            let connection_mut = tr
-                .connection_mut()
-                .await
-                .map_err(DeleteEntryDatasetError::Internal)?;
+            let connection_mut = tr.connection_mut().await?;
 
             let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
             let dataset_id_as_str = stack_dataset_id.as_str();

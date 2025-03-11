@@ -504,8 +504,7 @@ impl PasswordHashRepository for MySqlAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .int_err()
-        .map_err(SavePasswordHashError::Internal)?;
+        .int_err()?;
 
         Ok(())
     }

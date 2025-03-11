@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_flow_system::{FlowKeyDataset, FlowTriggerRule, FlowTriggerService, SetFlowTriggerError};
+use kamu_flow_system::{FlowKeyDataset, FlowTriggerRule, FlowTriggerService};
 
 use super::{
     ensure_expected_dataset_kind,
@@ -77,9 +77,7 @@ impl DatasetFlowTriggersMut {
                 trigger_rule,
             )
             .await
-            .map_err(|e| match e {
-                SetFlowTriggerError::Internal(e) => GqlError::Internal(e),
-            })?;
+            .int_err()?;
 
         Ok(SetFlowTriggerResult::Success(SetFlowTriggerSuccess {
             trigger: res.into(),

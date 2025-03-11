@@ -69,7 +69,7 @@ pub enum GetIncrementError {
     Access(odf::AccessError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

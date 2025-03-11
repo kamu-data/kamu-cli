@@ -58,8 +58,7 @@ impl DatasetEnvVarsMut {
                 &dataset_env_var_value,
                 &self.dataset_handle.id,
             )
-            .await
-            .map_err(GqlError::Internal)?;
+            .await?;
 
         Ok(match upsert_result.status {
             UpsertDatasetEnvVarStatus::Created => {

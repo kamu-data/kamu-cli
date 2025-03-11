@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{
     DatasetChangesService,
     DatasetIntervalIncrement,
@@ -201,8 +201,7 @@ impl DatasetChangesService for DatasetChangesServiceImpl {
 
         let increment = self
             .make_increment_from_interval(&resolved_dataset, old_head, new_head)
-            .await
-            .map_err(GetIncrementError::Internal)?;
+            .await?;
 
         Ok(increment)
     }
@@ -217,8 +216,7 @@ impl DatasetChangesService for DatasetChangesServiceImpl {
 
         let increment = self
             .make_increment_from_interval(&resolved_dataset, old_head, &current_head)
-            .await
-            .map_err(GetIncrementError::Internal)?;
+            .await?;
 
         Ok(increment)
     }

@@ -147,7 +147,7 @@ impl OutboxMessageRepository for PostgresOutboxMessageRepository {
         )
         .fetch_all(connection_mut)
         .await
-        .map_err(ErrorIntoInternal::int_err)?;
+        .int_err()?;
 
         Ok(records
             .into_iter()

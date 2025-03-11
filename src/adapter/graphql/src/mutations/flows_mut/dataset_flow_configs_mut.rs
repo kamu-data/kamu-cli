@@ -14,7 +14,6 @@ use kamu_flow_system::{
     FlowConfigurationService,
     FlowKeyDataset,
     IngestRule,
-    SetFlowConfigurationError,
 };
 
 use super::{
@@ -86,9 +85,7 @@ impl DatasetFlowConfigsMut {
                 configuration_rule,
             )
             .await
-            .map_err(|e| match e {
-                SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
-            })?;
+            .int_err()?;
 
         Ok(SetFlowConfigResult::Success(SetFlowConfigSuccess {
             config: res.into(),
