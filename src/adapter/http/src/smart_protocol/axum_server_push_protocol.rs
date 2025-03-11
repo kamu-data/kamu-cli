@@ -13,8 +13,8 @@ use std::time::Duration;
 
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
-use internal_error::ErrorIntoInternal;
-use kamu_core::CorruptedSourceError;
+use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_core::{CorruptedSourceError, DatasetRegistry};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseOptions,
@@ -45,7 +45,7 @@ pub struct AxumServerPushProtocolInstance {
     socket: axum::extract::ws::WebSocket,
     catalog: Catalog,
     dataset_ref: odf::DatasetRef,
-    maybe_dataset: Option<Arc<dyn odf::Dataset>>,
+    maybe_dataset_handle: Option<odf::DatasetHandle>,
     dataset_url: Url,
     maybe_bearer_header: Option<BearerHeader>,
 }
@@ -55,7 +55,7 @@ impl AxumServerPushProtocolInstance {
         socket: axum::extract::ws::WebSocket,
         catalog: Catalog,
         dataset_ref: odf::DatasetRef,
-        maybe_dataset: Option<Arc<dyn odf::Dataset>>,
+        maybe_dataset_handle: Option<odf::DatasetHandle>,
         dataset_url: Url,
         maybe_bearer_header: Option<BearerHeader>,
     ) -> Self {
@@ -63,7 +63,7 @@ impl AxumServerPushProtocolInstance {
             socket,
             catalog,
             dataset_ref,
-            maybe_dataset,
+            maybe_dataset_handle,
             dataset_url,
             maybe_bearer_header,
         }
@@ -192,7 +192,7 @@ impl AxumServerPushProtocolInstance {
 
         let mut new_blocks = self.try_handle_push_metadata_request(push_request).await?;
         if !new_blocks.is_empty() {
-            if self.maybe_dataset.is_none() {
+            if self.maybe_dataset_handle.is_none() {
                 tracing::info!("Dataset does not exist, trying to create from Seed block");
 
                 let dataset_alias = self
@@ -221,21 +221,25 @@ impl AxumServerPushProtocolInstance {
                 let create_options = CreateDatasetUseCaseOptions {
                     dataset_visibility: visibility_for_created_dataset,
                 };
-                let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
-                    .transactional_with(
-                        |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
-                            create_dataset_use_case
-                                .execute(dataset_alias, seed_block, create_options)
-                                .await
-                        },
-                    )
-                    .instrument(tracing::debug_span!(
-                        "AxumServerPushProtocolInstance::create_dataset",
-                    ))
-                    .await;
-                match create_result {
-                    Ok(create_result) => {
-                        self.maybe_dataset = Some(create_result.dataset);
+                let created_dataset_handle_result =
+                    DatabaseTransactionRunner::new(self.catalog.clone())
+                        .transactional_with(
+                            |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
+                                create_dataset_use_case
+                                    .execute(dataset_alias, seed_block, create_options)
+                                    .await
+                                    .map(|create_dataset_result| {
+                                        create_dataset_result.dataset_handle
+                                    })
+                            },
+                        )
+                        .instrument(tracing::debug_span!(
+                            "AxumServerPushProtocolInstance::create_dataset",
+                        ))
+                        .await;
+                match created_dataset_handle_result {
+                    Ok(created_dataset_handle) => {
+                        self.maybe_dataset_handle = Some(created_dataset_handle);
                     }
                     Err(CreateDatasetError::RefCollision(err)) => {
                         return Err(PushServerError::RefCollision(
@@ -255,10 +259,7 @@ impl AxumServerPushProtocolInstance {
             }
 
             loop {
-                let should_continue = self
-                    .try_handle_push_objects_request(self.maybe_dataset.as_ref().unwrap().clone())
-                    .await?;
-
+                let should_continue = self.try_handle_push_objects_request().await?;
                 if !should_continue {
                     break;
                 }
@@ -292,23 +293,30 @@ impl AxumServerPushProtocolInstance {
 
         // TODO: consider size estimate and maybe cancel too large pushes
 
-        let actual_head = if let Some(dataset) = self.maybe_dataset.as_ref() {
-            match dataset
-                .as_metadata_chain()
-                .resolve_ref(&odf::BlockRef::Head)
+        let actual_head = if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref() {
+            DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                    let resolved_dataset =
+                        dataset_registry.get_dataset_by_handle(dataset_handle).await;
+
+                    match resolved_dataset
+                        .as_metadata_chain()
+                        .resolve_ref(&odf::BlockRef::Head)
+                        .await
+                    {
+                        Ok(head) => Ok(Some(head)),
+                        Err(odf::GetRefError::NotFound(_)) => Ok(None),
+                        Err(e) => Err(e),
+                    }
+                })
+                .instrument(tracing::debug_span!(
+                    "AxumServerPushProtocolInstance::handle_push_request_initiation"
+                ))
                 .await
-            {
-                Ok(head) => Some(head),
-                Err(odf::GetRefError::NotFound(_)) => None,
-                Err(e) => {
-                    return Err(PushServerError::Internal(
-                        e.protocol_int_err(PushPhase::InitialRequest),
-                    ))
-                }
-            }
         } else {
-            None
-        };
+            Ok(None)
+        }
+        .protocol_int_err(PushPhase::InitialRequest)?;
 
         let response = if push_request.current_head == actual_head {
             Ok(DatasetPushRequestAccepted {})
@@ -371,10 +379,7 @@ impl AxumServerPushProtocolInstance {
         Ok(new_blocks)
     }
 
-    async fn try_handle_push_objects_request(
-        &mut self,
-        dataset: Arc<dyn odf::Dataset>,
-    ) -> Result<bool, PushServerError> {
+    async fn try_handle_push_objects_request(&mut self) -> Result<bool, PushServerError> {
         let request = axum_read_payload::<DatasetPushObjectsTransferRequest>(&mut self.socket)
             .await
             .map_err(|e| {
@@ -388,19 +393,36 @@ impl AxumServerPushProtocolInstance {
             "Push client sent a push objects request",
         );
 
-        let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();
-        for r in request.object_files {
-            let transfer_strategy = prepare_push_object_transfer_strategy(
-                dataset.as_ref(),
-                &r,
-                &self.dataset_url,
-                self.maybe_bearer_header.as_ref(),
-            )
-            .await
-            .protocol_int_err(PushPhase::MetadataRequest)?;
+        let dataset_url = self.dataset_url.clone();
+        let dataset_handle = self.maybe_dataset_handle.clone().unwrap();
+        let maybe_bearer_header = self.maybe_bearer_header.clone();
 
-            object_transfer_strategies.push(transfer_strategy);
-        }
+        let object_transfer_strategies = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                let resolved_dataset = dataset_registry
+                    .get_dataset_by_handle(&dataset_handle)
+                    .await;
+
+                let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();
+                for r in request.object_files {
+                    let transfer_strategy = prepare_push_object_transfer_strategy(
+                        resolved_dataset.as_ref(),
+                        &r,
+                        &dataset_url,
+                        maybe_bearer_header.as_ref(),
+                    )
+                    .await?;
+
+                    object_transfer_strategies.push(transfer_strategy);
+                }
+
+                Ok::<_, InternalError>(object_transfer_strategies)
+            })
+            .instrument(tracing::debug_span!(
+                "AxumServerPushProtocolInstance::try_handle_push_objects_request",
+            ))
+            .await
+            .protocol_int_err(PushPhase::ObjectsRequest)?;
 
         tracing::debug!("Object transfer strategies defined");
 
@@ -468,12 +490,13 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Push client sent a complete request. Committing the dataset");
 
-        let dataset = self.maybe_dataset.clone().unwrap();
+        let dataset_handle = self.maybe_dataset_handle.clone().unwrap();
         DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                |append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
+            .transactional_with2(
+                |dataset_registry: Arc<dyn DatasetRegistry>, append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
+                    let resolved_dataset = dataset_registry.get_dataset_by_handle(&dataset_handle).await;
                     append_dataset_metadata_batch
-                        .execute(dataset.as_ref(), Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
+                        .execute(resolved_dataset.as_ref(), Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
                             set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged)),
                             ..Default::default()
                         })

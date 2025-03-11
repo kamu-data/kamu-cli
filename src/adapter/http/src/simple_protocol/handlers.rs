@@ -13,6 +13,7 @@ use std::sync::Arc;
 use axum::response::IntoResponse;
 use axum_extra::typed_header::TypedHeader;
 use database_common::DatabaseTransactionRunner;
+use database_common_macros::transactional_handler;
 use http_common::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
@@ -64,6 +65,7 @@ pub struct PhysicalHashFromPath {
         ("api_key" = [])
     )
 )]
+#[transactional_handler]
 pub async fn dataset_refs_handler(
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
@@ -102,6 +104,7 @@ pub async fn dataset_refs_handler(
         ("api_key" = [])
     )
 )]
+#[transactional_handler]
 pub async fn dataset_blocks_handler(
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
@@ -142,6 +145,7 @@ pub async fn dataset_blocks_handler(
         ("api_key" = [])
     )
 )]
+#[transactional_handler]
 pub async fn dataset_data_get_handler(
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
@@ -167,6 +171,7 @@ pub async fn dataset_data_get_handler(
         ("api_key" = [])
     )
 )]
+#[transactional_handler]
 pub async fn dataset_checkpoints_get_handler(
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
@@ -214,6 +219,7 @@ async fn dataset_get_object_common(
         ("api_key" = [])
     )
 )]
+#[transactional_handler]
 pub async fn dataset_data_put_handler(
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
@@ -248,6 +254,7 @@ pub async fn dataset_data_put_handler(
         ("api_key" = [])
     )
 )]
+#[transactional_handler]
 pub async fn dataset_checkpoints_put_handler(
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
@@ -324,12 +331,15 @@ pub async fn dataset_push_ws_upgrade_handler(
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
     let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
 
-    let maybe_dataset = {
+    let maybe_dataset_handle = {
         let dataset_ref = dataset_ref.clone();
         DatabaseTransactionRunner::new(catalog.clone())
             .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
-                    Ok(resolved_dataset) => Ok(Some((*resolved_dataset).clone())),
+                match dataset_registry
+                    .resolve_dataset_handle_by_ref(&dataset_ref)
+                    .await
+                {
+                    Ok(dataset_handle) => Ok(Some(dataset_handle)),
                     Err(odf::DatasetRefUnresolvedError::NotFound(_)) => {
                         // Make sure account in dataset ref being created and token account match
                         let CurrentAccountSubject::Logged(acc) = current_account_subject.as_ref()
@@ -354,7 +364,7 @@ pub async fn dataset_push_ws_upgrade_handler(
             socket,
             catalog,
             dataset_ref,
-            maybe_dataset,
+            maybe_dataset_handle,
             dataset_url,
             maybe_bearer_header,
         )
@@ -389,17 +399,9 @@ pub async fn dataset_pull_ws_upgrade_handler(
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
     let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
 
-    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
-
     Ok(ws.on_upgrade(move |socket| {
-        AxumServerPullProtocolInstance::new(
-            socket,
-            (*target_dataset).clone(),
-            dataset_url,
-            maybe_bearer_header,
-        )
-        .serve()
+        AxumServerPullProtocolInstance::new(socket, catalog, hdl, dataset_url, maybe_bearer_header)
+            .serve()
     }))
 }
 
