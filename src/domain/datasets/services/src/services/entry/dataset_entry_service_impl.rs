@@ -16,6 +16,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountNotFoundByNameError,
     AccountService,
+    AccountServiceExt,
     CurrentAccountSubject,
     GetAccountByNameError,
 };

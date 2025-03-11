@@ -13,16 +13,16 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Account, AccountPageStream, SearchAccountsByNamePatternFilters};
+use crate::{Account, AccountPageStream, GetAccountByIdError, SearchAccountsByNamePatternFilters};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait AccountService: Sync + Send {
-    async fn account_by_id(
+    async fn get_account_by_id(
         &self,
         account_id: &odf::AccountID,
-    ) -> Result<Option<Account>, InternalError>;
+    ) -> Result<Account, GetAccountByIdError>;
 
     async fn accounts_by_ids(
         &self,
@@ -55,6 +55,30 @@ pub trait AccountService: Sync + Send {
         filters: SearchAccountsByNamePatternFilters,
         pagination: PaginationOpts,
     ) -> AccountPageStream<'a>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait AccountServiceExt {
+    async fn account_by_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<Account>, InternalError>;
+}
+
+#[async_trait::async_trait]
+impl<T: AccountService + ?Sized> AccountServiceExt for T {
+    async fn account_by_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<Account>, InternalError> {
+        match self.get_account_by_id(account_id).await {
+            Ok(account) => Ok(Some(account)),
+            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
+            Err(GetAccountByIdError::Internal(e)) => Err(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
