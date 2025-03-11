@@ -64,18 +64,16 @@ impl SqliteAccountRepository {
 
     fn map_account_row(account_row: &SqliteRow) -> Account {
         Account {
-            id: account_row.get_unchecked("id"),
-            account_name: odf::AccountName::new_unchecked(
-                &account_row.get::<String, &str>("account_name"),
-            ),
-            email: Email::parse(account_row.get("email")).unwrap(),
-            display_name: account_row.get("display_name"),
-            account_type: account_row.get_unchecked("account_type"),
-            avatar_url: account_row.get("avatar_url"),
-            registered_at: account_row.get("registered_at"),
-            is_admin: account_row.get::<bool, &str>("is_admin"),
-            provider: account_row.get("provider"),
-            provider_identity_key: account_row.get("provider_identity_key"),
+            id: account_row.get(0),
+            account_name: odf::AccountName::new_unchecked(account_row.get::<&str, _>(1)),
+            email: Email::parse(account_row.get(2)).unwrap(),
+            display_name: account_row.get(3),
+            account_type: account_row.get(4),
+            avatar_url: account_row.get(5),
+            registered_at: account_row.get(6),
+            is_admin: account_row.get(7),
+            provider: account_row.get(8),
+            provider_identity_key: account_row.get(9),
         }
     }
 }
