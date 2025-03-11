@@ -219,13 +219,13 @@ impl RebacRepository for PostgresRebacRepository {
         }
 
         let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
-        let entity_properties: Vec<_> = raw_rows
+        let entity_properties = raw_rows
             .into_iter()
             .map(|row| {
-                let entity_type = row.get_unchecked("entity_type");
-                let entity_id = row.get_unchecked::<String, _>("entity_id");
-                let property_name = row.get_unchecked::<String, _>("property_name").parse()?;
-                let property_value = Cow::Owned(row.get_unchecked("property_value"));
+                let entity_type = row.get(0);
+                let entity_id = row.get::<&str, _>(1);
+                let property_name = row.get::<&str, _>(2).parse()?;
+                let property_value = Cow::Owned(row.get(3));
 
                 Ok((
                     Entity::new(entity_type, entity_id),

@@ -194,10 +194,10 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             .into_iter()
             .map(|row| {
                 DatasetEntry::new(
-                    row.get_unchecked("id"),
-                    row.get_unchecked("owner_id"),
-                    odf::DatasetName::new_unchecked(&row.get::<String, &str>("name")),
-                    row.get_unchecked("created_at"),
+                    row.get(0),
+                    row.get(1),
+                    odf::DatasetName::new_unchecked(row.get::<&str, _>(2)),
+                    row.get(3),
                 )
             })
             .collect();
