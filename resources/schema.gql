@@ -675,7 +675,7 @@ type DatasetCollaborationMut {
 	"""
 	Revoking account accesses for the dataset
 	"""
-	unsetRoles(accountId: [AccountID!]!): UnsetRoleResult!
+	unsetRoles(accountIds: [AccountID!]!): UnsetRoleResult!
 }
 
 type DatasetCollaborationPermissions {
