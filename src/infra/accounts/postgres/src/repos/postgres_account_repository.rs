@@ -228,7 +228,7 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 

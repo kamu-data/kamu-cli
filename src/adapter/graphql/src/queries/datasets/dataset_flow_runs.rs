@@ -137,7 +137,7 @@ impl DatasetFlowRuns {
         let account_service = from_catalog_n!(ctx, dyn AccountService);
 
         let matched_flow_initiators: Vec<_> = account_service
-            .accounts_by_ids(flow_initiator_ids)
+            .accounts_by_ids(&flow_initiator_ids)
             .await?
             .into_iter()
             .map(Account::from_account)

@@ -52,7 +52,7 @@ impl AccountService for AccountServiceImpl {
 
     async fn accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, InternalError> {
         self.account_repo
             .get_accounts_by_ids(account_ids)
@@ -62,7 +62,7 @@ impl AccountService for AccountServiceImpl {
 
     async fn get_account_map(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<HashMap<odf::AccountID, Account>, GetAccountMapError> {
         let account_map = match self.account_repo.get_accounts_by_ids(account_ids).await {
             Ok(accounts) => {

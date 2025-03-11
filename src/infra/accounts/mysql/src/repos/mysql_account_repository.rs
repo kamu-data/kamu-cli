@@ -232,7 +232,7 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError> {
         let mut tr = self.transaction.lock().await;
 
@@ -267,7 +267,7 @@ impl AccountRepository for MySqlAccountRepository {
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
         let mut query = sqlx::query(&query_str);
-        for account_id in &account_ids {
+        for account_id in account_ids {
             query = query.bind(account_id.to_string());
         }
 

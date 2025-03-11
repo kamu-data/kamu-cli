@@ -58,7 +58,7 @@ impl<'a> DatasetCollaboration<'a> {
             .map(|t| t.0.clone())
             .collect::<Vec<_>>();
         let mut account_map = account_service
-            .get_account_map(account_ids)
+            .get_account_map(&account_ids)
             .await
             .int_err()?;
 

@@ -95,7 +95,10 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
             .await
             .int_err()?;
 
-        let owner_ids = dataset_entries_resolution.resolved_entries_owner_ids();
+        let owner_ids = dataset_entries_resolution
+            .resolved_entries_owner_ids()
+            .into_iter()
+            .collect::<Vec<_>>();
 
         upstream_dependencies.extend(
             dataset_entries_resolution
@@ -106,7 +109,7 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
 
         let account_map = self
             .account_service
-            .get_account_map(owner_ids.into_iter().collect())
+            .get_account_map(&owner_ids)
             .await
             .int_err()?;
 

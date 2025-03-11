@@ -26,12 +26,12 @@ pub trait AccountService: Sync + Send {
 
     async fn accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, InternalError>;
 
     async fn get_account_map(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<HashMap<odf::AccountID, Account>, GetAccountMapError>;
 
     async fn account_by_name(
