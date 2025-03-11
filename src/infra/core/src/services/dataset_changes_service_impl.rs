@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
     DatasetChangesService,
     DatasetIntervalIncrement,

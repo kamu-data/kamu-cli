@@ -234,6 +234,10 @@ impl AccountRepository for MySqlAccountRepository {
         &self,
         account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError> {
+        if account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
