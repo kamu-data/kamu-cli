@@ -522,7 +522,7 @@ impl RebacRepository for SqliteRebacRepository {
 
         let mut query = sqlx::query(&query_str)
             .bind(object_entity.entity_type)
-            .bind(object_entity.entity_id.as_ref());
+            .bind(&object_entity.entity_id);
         for subject_entity in &subject_entities {
             query = query.bind(subject_entity.entity_type);
             query = query.bind(&subject_entity.entity_id);

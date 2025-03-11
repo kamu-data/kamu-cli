@@ -215,7 +215,7 @@ impl RebacRepository for PostgresRebacRepository {
         let mut query = sqlx::query(&query_str);
         for entity in entities {
             query = query.bind(entity.entity_type);
-            query = query.bind(entity.entity_id.to_string());
+            query = query.bind(&entity.entity_id);
         }
 
         let raw_rows = query.fetch_all(connection_mut).await.int_err()?;

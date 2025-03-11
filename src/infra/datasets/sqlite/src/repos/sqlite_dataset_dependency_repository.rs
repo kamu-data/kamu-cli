@@ -168,7 +168,10 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
         let mut query = sqlx::query(&query_str);
-        query = query.bind(downstream_dataset_id.to_string());
+
+        let stack_downstream_dataset_id = downstream_dataset_id.as_did_str().to_stack_string();
+        query = query.bind(stack_downstream_dataset_id.as_str());
+
         for upstream_dataset_id in obsolete_upstream_dataset_ids {
             query = query.bind(upstream_dataset_id.to_string());
         }

@@ -629,7 +629,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
-        let dataset_id = dataset_id.to_string();
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
 
         let maybe_initiators = filters
             .by_initiator
@@ -660,7 +660,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             );
 
             let mut query = sqlx::query(&query_str)
-                .bind(dataset_id)
+                .bind(dataset_id.as_str())
                 .bind(maybe_by_flow_type)
                 .bind(maybe_by_flow_status)
                 .bind(i32::from(maybe_initiators.is_some()))
@@ -696,7 +696,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let dataset_id = dataset_id.to_string();
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
         let maybe_filters_by_flow_type = filters.by_flow_type;
         let maybe_filters_by_flow_status = filters.by_flow_status;
 
@@ -716,7 +716,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         );
 
         let mut query = sqlx::query(&query_str)
-            .bind(dataset_id)
+            .bind(dataset_id.as_str())
             .bind(maybe_filters_by_flow_type)
             .bind(maybe_filters_by_flow_status)
             .bind(i32::from(maybe_initiators.is_some()));
