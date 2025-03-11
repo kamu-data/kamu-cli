@@ -143,7 +143,7 @@ impl OsoResourceServiceImpl {
             .int_err()?;
         let authorized_accounts = self
             .rebac_service
-            .get_accounts_dataset_relations(dataset_id)
+            .get_authorized_accounts(dataset_id)
             .await
             .int_err()?;
 
@@ -200,7 +200,7 @@ impl OsoResourceServiceImpl {
                         .int_err()?;
                     let mut dataset_accounts_relation_map = self
                         .rebac_service
-                        .get_accounts_dataset_relations_by_ids(&dataset_ids)
+                        .get_authorized_accounts_by_ids(&dataset_ids)
                         .await
                         .int_err()?;
 
