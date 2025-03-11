@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SQLite
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Utility to generate the placeholder list. Helpful when using dynamic SQL
 /// generation.
@@ -53,22 +55,48 @@ pub fn sqlite_generate_placeholders_tuple_list_2(
 
 #[test]
 fn test_sqlite_generate_placeholders_list() {
-    pretty_assertions::assert_eq!("$0,$1,$2", sqlite_generate_placeholders_list(3, 0));
-    pretty_assertions::assert_eq!("$3,$4", sqlite_generate_placeholders_list(2, 3));
+    use sqlite_generate_placeholders_list as f;
+
+    pretty_assertions::assert_eq!("", f(0, 0));
+    pretty_assertions::assert_eq!("$0", f(1, 0));
+    pretty_assertions::assert_eq!("$0,$1,$2", f(3, 0));
+    pretty_assertions::assert_eq!("$3,$4", f(2, 3));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_sqlite_generate_placeholders_tuple_list_2() {
-    pretty_assertions::assert_eq!(
-        "($0,$1),($2,$3),($4,$5)",
-        sqlite_generate_placeholders_tuple_list_2(3, 0)
-    );
-    pretty_assertions::assert_eq!(
-        "($3,$4),($5,$6)",
-        sqlite_generate_placeholders_tuple_list_2(2, 3)
-    );
+    use sqlite_generate_placeholders_tuple_list_2 as f;
+
+    pretty_assertions::assert_eq!("", f(0, 0));
+    pretty_assertions::assert_eq!("($0,$1)", f(1, 0));
+    pretty_assertions::assert_eq!("($0,$1),($2,$3),($4,$5)", f(3, 0));
+    pretty_assertions::assert_eq!("($3,$4),($5,$6)", f(2, 3));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MySQL
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn mysql_generate_placeholders_list(arguments_count: usize) -> String {
+    if arguments_count == 0 {
+        // MySQL does not consider the "in ()" syntax correct, so we add NULL
+        return "NULL".to_string();
+    }
+
+    (0..arguments_count).map(|_| "?").intersperse(",").collect()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_mysql_generate_placeholders_list() {
+    use mysql_generate_placeholders_list as f;
+
+    pretty_assertions::assert_eq!("NULL", f(0));
+    pretty_assertions::assert_eq!("?", f(1));
+    pretty_assertions::assert_eq!("?,?", f(2));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

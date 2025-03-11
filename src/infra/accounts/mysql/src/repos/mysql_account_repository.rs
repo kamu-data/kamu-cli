@@ -7,7 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{
+    mysql_generate_placeholders_list,
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -242,14 +247,6 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let placeholders = account_ids.iter().map(|_| "?").collect::<Vec<_>>();
-        let placeholders_str = if placeholders.is_empty() {
-            // MySQL does not consider the “in ()” syntax correct, so we add NULL
-            "NULL".to_string()
-        } else {
-            placeholders.join(", ")
-        };
-
         let query_str = format!(
             r#"
                 SELECT
@@ -264,8 +261,9 @@ impl AccountRepository for MySqlAccountRepository {
                     provider,
                     provider_identity_key
                 FROM accounts
-                WHERE id IN ({placeholders_str})
+                WHERE id IN ({})
                 "#,
+            mysql_generate_placeholders_list(account_ids.len())
         );
 
         // ToDo replace it by macro once sqlx will support it
@@ -279,7 +277,6 @@ impl AccountRepository for MySqlAccountRepository {
 
         Ok(account_rows
             .into_iter()
-            // todo extract
             .map(|account_row| Account {
                 id: account_row.get_unchecked("id"),
                 account_name: odf::AccountName::new_unchecked(
