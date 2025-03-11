@@ -10,7 +10,15 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Entity, EntityType, EntityWithRelation, PropertyName, PropertyValue, Relation};
+use crate::{
+    EntitiesWithRelation,
+    Entity,
+    EntityType,
+    EntityWithRelation,
+    PropertyName,
+    PropertyValue,
+    Relation,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -73,6 +81,12 @@ pub trait RebacRepository: Send + Sync {
         &self,
         object_entity: &Entity,
     ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError>;
+
+    // TODO: Private Datasets: tests
+    async fn get_object_entities_relations(
+        &self,
+        object_entities: &[Entity],
+    ) -> Result<Vec<EntitiesWithRelation>, ObjectEntityRelationsError>;
 
     async fn get_subject_entity_relations_by_object_type(
         &self,

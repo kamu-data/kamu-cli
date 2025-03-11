@@ -88,6 +88,15 @@ impl<'a> EntityWithRelation<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct EntitiesWithRelation<'a> {
+    pub subject_entity: Entity<'a>,
+    pub relation: Relation,
+    pub object_entity: Entity<'a>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct EntityWithRelationRowModel {
@@ -104,7 +113,37 @@ impl TryFrom<EntityWithRelationRowModel> for EntityWithRelation<'static> {
         let relationship = row_model.relationship.parse()?;
         let entity = Entity::new(row_model.entity_type, row_model.entity_id);
 
-        Ok(EntityWithRelation::new(entity, relationship))
+        Ok(Self::new(entity, relationship))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "sqlx")]
+#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
+pub struct EntitiesWithRelationRowModel {
+    pub subject_entity_type: EntityType,
+    pub subject_entity_id: String,
+    pub relationship: String,
+    pub object_entity_type: EntityType,
+    pub object_entity_id: String,
+}
+
+#[cfg(feature = "sqlx")]
+impl TryFrom<EntitiesWithRelationRowModel> for EntitiesWithRelation<'static> {
+    type Error = internal_error::InternalError;
+
+    fn try_from(row_model: EntitiesWithRelationRowModel) -> Result<Self, Self::Error> {
+        let relation = row_model.relationship.parse()?;
+        let subject_entity =
+            Entity::new(row_model.subject_entity_type, row_model.subject_entity_id);
+        let object_entity = Entity::new(row_model.object_entity_type, row_model.object_entity_id);
+
+        Ok(Self {
+            subject_entity,
+            relation,
+            object_entity,
+        })
     }
 }
 

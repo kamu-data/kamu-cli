@@ -22,6 +22,7 @@ use kamu_auth_rebac::{
     DeleteEntityPropertyError,
     DeletePropertiesError,
     DeleteSubjectEntitiesObjectEntityRelationsError,
+    EntitiesWithRelation,
     Entity,
     EntityWithRelation,
     GetPropertiesError,
@@ -351,13 +352,57 @@ impl RebacService for RebacServiceImpl {
             let account_id = odf::AccountID::from_did_str(&entity.entity_id).int_err()?;
 
             match relation {
-                Relation::AccountToDataset(relationship) => {
-                    account_id_relation_tuples.push((account_id, relationship));
+                Relation::AccountToDataset(relation) => {
+                    account_id_relation_tuples.push((account_id, relation));
                 }
             }
         }
 
         Ok(account_id_relation_tuples)
+    }
+
+    async fn get_accounts_dataset_relations_by_ids(
+        &self,
+        dataset_ids: &[&odf::DatasetID],
+    ) -> Result<
+        HashMap<odf::DatasetID, Vec<(odf::AccountID, AccountToDatasetRelation)>>,
+        ObjectEntityRelationsError,
+    > {
+        let dataset_entities = dataset_ids
+            .iter()
+            .map(|id| Entity::new_dataset(id.to_string()))
+            .collect::<Vec<_>>();
+
+        let entities_with_relations = self
+            .rebac_repo
+            .get_object_entities_relations(&dataset_entities[..])
+            .await
+            .int_err()?;
+
+        let mut dataset_accounts_relation_map = HashMap::new();
+
+        for entities_with_relation in entities_with_relations {
+            let EntitiesWithRelation {
+                subject_entity,
+                relation,
+                object_entity,
+            } = entities_with_relation;
+
+            let account_id = odf::AccountID::from_did_str(&subject_entity.entity_id).int_err()?;
+            let dataset_id = odf::DatasetID::from_did_str(&object_entity.entity_id).int_err()?;
+
+            match relation {
+                Relation::AccountToDataset(relation) => {
+                    let authorized_accounts = dataset_accounts_relation_map
+                        .entry(dataset_id)
+                        .or_insert_with(|| vec![]);
+
+                    authorized_accounts.push((account_id, relation))
+                }
+            }
+        }
+
+        Ok(dataset_accounts_relation_map)
     }
 }
 

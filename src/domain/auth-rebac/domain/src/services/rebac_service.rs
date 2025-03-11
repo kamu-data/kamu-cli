@@ -28,6 +28,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait RebacService: Send + Sync {
     async fn properties_count(&self) -> Result<usize, PropertiesCountError>;
@@ -103,6 +104,14 @@ pub trait RebacService: Send + Sync {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<(odf::AccountID, AccountToDatasetRelation)>, ObjectEntityRelationsError>;
+
+    async fn get_accounts_dataset_relations_by_ids(
+        &self,
+        dataset_ids: &[&odf::DatasetID],
+    ) -> Result<
+        HashMap<odf::DatasetID, Vec<(odf::AccountID, AccountToDatasetRelation)>>,
+        ObjectEntityRelationsError,
+    >;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

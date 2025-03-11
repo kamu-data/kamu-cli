@@ -387,6 +387,62 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(ObjectEntityRelationsError::Internal)
     }
 
+    async fn get_object_entities_relations(
+        &self,
+        object_entities: &[Entity],
+    ) -> Result<Vec<EntitiesWithRelation>, ObjectEntityRelationsError> {
+        if object_entities.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let placeholder_list = sqlite_generate_placeholders_tuple_list_2(object_entities.len(), 0);
+
+        // TODO: replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let query_str = format!(
+            r#"
+            SELECT subject_entity_type,
+                   subject_entity_id,
+                   relationship,
+                   object_entity_type,
+                   object_entity_id
+            FROM auth_rebac_relations
+            WHERE (object_entity_type, object_entity_id) IN ({placeholder_list})
+            ORDER BY entity_id
+            "#,
+        );
+
+        let mut query = sqlx::query(&query_str);
+        for entity in object_entities {
+            query = query.bind(entity.entity_type);
+            query = query.bind(&entity.entity_id);
+        }
+
+        let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
+        let subject_entity_with_relation_tuples = raw_rows
+            .into_iter()
+            .map(|row| {
+                let raw_entity = EntitiesWithRelationRowModel {
+                    subject_entity_type: row.get(0),
+                    subject_entity_id: row.get(1),
+                    relationship: row.get(2),
+                    object_entity_type: row.get(3),
+                    object_entity_id: row.get(4),
+                };
+                let entity = raw_entity.try_into()?;
+
+                Ok(entity)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(ObjectEntityRelationsError::Internal)?;
+
+        Ok(subject_entity_with_relation_tuples)
+    }
+
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,
