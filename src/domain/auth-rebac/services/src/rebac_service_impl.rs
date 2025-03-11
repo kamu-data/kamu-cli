@@ -396,10 +396,10 @@ impl RebacService for RebacServiceImpl {
                 Relation::AccountToDataset(role) => {
                     let authorized_accounts = dataset_accounts_relation_map
                         .entry(dataset_id)
-                        .or_insert_with(|| vec![]);
+                        .or_insert_with(Vec::new);
                     let authorized_account = AuthorizedAccount { account_id, role };
 
-                    authorized_accounts.push(authorized_account)
+                    authorized_accounts.push(authorized_account);
                 }
             }
         }

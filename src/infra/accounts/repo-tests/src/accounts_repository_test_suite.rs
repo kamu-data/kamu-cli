@@ -185,7 +185,7 @@ pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
         .unwrap();
 
     let mut db_accounts = account_repo
-        .get_accounts_by_ids(vec![account_id_wasya, account_id_petya])
+        .get_accounts_by_ids(&[account_id_wasya, account_id_petya])
         .await
         .unwrap();
 

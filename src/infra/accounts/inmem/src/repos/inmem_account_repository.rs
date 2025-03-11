@@ -251,7 +251,7 @@ impl AccountRepository for InMemoryAccountRepository {
         let guard = self.state.lock().unwrap();
 
         let accounts: Vec<Account> = account_ids
-            .into_iter()
+            .iter()
             .filter_map(|account_id| guard.accounts_by_id.get(account_id).cloned())
             .collect();
 

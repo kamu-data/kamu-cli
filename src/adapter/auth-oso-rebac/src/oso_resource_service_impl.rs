@@ -271,7 +271,7 @@ impl From<GetAccountByIdError> for GetUserActorError {
     fn from(err: GetAccountByIdError) -> Self {
         match err {
             GetAccountByIdError::NotFound(e) => Self::NotFound(e),
-            e @ GetAccountByIdError::Internal(_) => Self::Internal(e.int_err().into()),
+            e @ GetAccountByIdError::Internal(_) => Self::Internal(e.int_err()),
         }
     }
 }

@@ -210,8 +210,8 @@ impl RebacRepository for SqliteRebacRepository {
             .into_iter()
             .map(|row| {
                 let entity_type = row.get(0);
-                let entity_id = row.get::<&str, _>(1);
-                let property_name = row.get::<&str, _>(2).parse()?;
+                let entity_id = row.get::<String, _>(1);
+                let property_name = row.get::<String, _>(2).parse()?;
                 let property_value = Cow::Owned(row.get(3));
 
                 Ok((
