@@ -80,13 +80,13 @@ pub trait RebacRepository: Send + Sync {
     async fn get_object_entity_relations(
         &self,
         object_entity: &Entity,
-    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError>;
+    ) -> Result<Vec<EntityWithRelation>, GetObjectEntityRelationsError>;
 
     // TODO: Private Datasets: tests
     async fn get_object_entities_relations(
         &self,
         object_entities: &[Entity],
-    ) -> Result<Vec<EntitiesWithRelation>, ObjectEntityRelationsError>;
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError>;
 
     async fn get_subject_entity_relations_by_object_type(
         &self,
@@ -268,7 +268,7 @@ pub enum SubjectEntityRelationsError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum ObjectEntityRelationsError {
+pub enum GetObjectEntityRelationsError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

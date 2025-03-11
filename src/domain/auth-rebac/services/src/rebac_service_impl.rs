@@ -25,9 +25,9 @@ use kamu_auth_rebac::{
     EntitiesWithRelation,
     Entity,
     EntityWithRelation,
+    GetObjectEntityRelationsError,
     GetPropertiesError,
     InsertEntitiesRelationError,
-    ObjectEntityRelationsError,
     PropertiesCountError,
     PropertyName,
     PropertyValue,
@@ -338,7 +338,8 @@ impl RebacService for RebacServiceImpl {
     async fn get_accounts_dataset_relations(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<(odf::AccountID, AccountToDatasetRelation)>, ObjectEntityRelationsError> {
+    ) -> Result<Vec<(odf::AccountID, AccountToDatasetRelation)>, GetObjectEntityRelationsError>
+    {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
@@ -366,7 +367,7 @@ impl RebacService for RebacServiceImpl {
         dataset_ids: &[odf::DatasetID],
     ) -> Result<
         HashMap<odf::DatasetID, Vec<(odf::AccountID, AccountToDatasetRelation)>>,
-        ObjectEntityRelationsError,
+        GetObjectEntityRelationsError,
     > {
         let dataset_entities = dataset_ids
             .iter()

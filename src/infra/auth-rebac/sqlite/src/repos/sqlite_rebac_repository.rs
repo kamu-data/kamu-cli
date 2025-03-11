@@ -344,7 +344,7 @@ impl RebacRepository for SqliteRebacRepository {
     async fn get_object_entity_relations(
         &self,
         object_entity: &Entity,
-    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError> {
+    ) -> Result<Vec<EntityWithRelation>, GetObjectEntityRelationsError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -370,13 +370,13 @@ impl RebacRepository for SqliteRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(ObjectEntityRelationsError::Internal)
+            .map_err(GetObjectEntityRelationsError::Internal)
     }
 
     async fn get_object_entities_relations(
         &self,
         object_entities: &[Entity],
-    ) -> Result<Vec<EntitiesWithRelation>, ObjectEntityRelationsError> {
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError> {
         if object_entities.is_empty() {
             return Ok(vec![]);
         }
@@ -423,7 +423,7 @@ impl RebacRepository for SqliteRebacRepository {
                 Ok(entity)
             })
             .collect::<Result<Vec<_>, _>>()
-            .map_err(ObjectEntityRelationsError::Internal)?;
+            .map_err(GetObjectEntityRelationsError::Internal)?;
 
         Ok(subject_entity_with_relation_tuples)
     }

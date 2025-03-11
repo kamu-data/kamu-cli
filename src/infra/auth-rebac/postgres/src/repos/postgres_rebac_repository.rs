@@ -353,14 +353,14 @@ impl RebacRepository for PostgresRebacRepository {
     async fn get_object_entity_relations(
         &self,
         _object_entity: &Entity,
-    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError> {
+    ) -> Result<Vec<EntityWithRelation>, GetObjectEntityRelationsError> {
         todo!("TODO: Private Datasets: implementation")
     }
 
     async fn get_object_entities_relations(
         &self,
         _object_entities: &[Entity],
-    ) -> Result<Vec<EntitiesWithRelation>, ObjectEntityRelationsError> {
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError> {
         todo!("TODO: Private Datasets: implementation")
     }
 
