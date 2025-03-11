@@ -326,6 +326,7 @@ impl RebacRepository for SqliteRebacRepository {
             FROM auth_rebac_relations
             WHERE subject_entity_type = $1
               AND subject_entity_id = $2
+            ORDER BY entity_id
             "#,
             subject_entity.entity_type,
             subject_entity.entity_id,
@@ -338,7 +339,7 @@ impl RebacRepository for SqliteRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(SubjectEntityRelationsError::Internal)
+            .map_err(Into::into)
     }
 
     async fn get_object_entity_relations(
@@ -358,6 +359,7 @@ impl RebacRepository for SqliteRebacRepository {
             FROM auth_rebac_relations
             WHERE object_entity_type = $1
               AND object_entity_id = $2
+            ORDER BY entity_id
             "#,
             object_entity.entity_type,
             object_entity.entity_id,
@@ -370,7 +372,7 @@ impl RebacRepository for SqliteRebacRepository {
             .into_iter()
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(GetObjectEntityRelationsError::Internal)
+            .map_err(Into::into)
     }
 
     async fn get_object_entities_relations(
@@ -447,6 +449,7 @@ impl RebacRepository for SqliteRebacRepository {
             WHERE subject_entity_type = $1
               AND subject_entity_id = $2
               AND object_entity_type = $3
+            ORDER BY entity_id
             "#,
             subject_entity.entity_type,
             subject_entity.entity_id,
@@ -481,6 +484,7 @@ impl RebacRepository for SqliteRebacRepository {
               AND subject_entity_id = $2
               AND object_entity_type = $3
               AND object_entity_id = $4
+            ORDER BY relationship
             "#,
             subject_entity.entity_type,
             subject_entity.entity_id,
@@ -503,6 +507,10 @@ impl RebacRepository for SqliteRebacRepository {
         subject_entities: Vec<Entity<'static>>,
         object_entity: &Entity,
     ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError> {
+        if subject_entities.is_empty() {
+            return Ok(());
+        }
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;

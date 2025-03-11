@@ -336,6 +336,7 @@ impl RebacRepository for PostgresRebacRepository {
             FROM auth_rebac_relations
             WHERE subject_entity_type = $1
               AND subject_entity_id = $2
+            ORDER BY entity_id
             "#,
             subject_entity.entity_type as EntityType,
             subject_entity.entity_id.as_ref(),
@@ -384,6 +385,7 @@ impl RebacRepository for PostgresRebacRepository {
             WHERE subject_entity_type = $1
               AND subject_entity_id = $2
               AND object_entity_type = $3
+            ORDER BY entity_id
             "#,
             subject_entity.entity_type as EntityType,
             subject_entity.entity_id.as_ref(),
@@ -418,11 +420,12 @@ impl RebacRepository for PostgresRebacRepository {
               AND subject_entity_id = $2
               AND object_entity_type = $3
               AND object_entity_id = $4
+            ORDER BY relationship
             "#,
             subject_entity.entity_type as EntityType,
-            subject_entity.entity_id.as_ref(),
+            &subject_entity.entity_id,
             object_entity.entity_type as EntityType,
-            object_entity.entity_id.as_ref(),
+            &object_entity.entity_id,
         )
         .fetch_all(connection_mut)
         .await
