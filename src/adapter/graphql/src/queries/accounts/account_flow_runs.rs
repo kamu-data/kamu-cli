@@ -82,10 +82,7 @@ impl AccountFlowRuns {
             .list_all_flows_by_account(
                 &self.account.id,
                 filters.unwrap_or_default(),
-                PaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                },
+                PaginationOpts::from_page(page, per_page),
             )
             .await
             .int_err()?;

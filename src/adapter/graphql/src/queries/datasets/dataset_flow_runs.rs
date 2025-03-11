@@ -102,10 +102,7 @@ impl DatasetFlowRuns {
             .list_all_flows_by_dataset(
                 &self.dataset_handle.id,
                 filters,
-                PaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                },
+                PaginationOpts::from_page(page, per_page),
             )
             .await
             .int_err()?;
