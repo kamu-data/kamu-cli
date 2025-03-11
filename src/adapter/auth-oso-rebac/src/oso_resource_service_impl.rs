@@ -14,7 +14,7 @@ use database_common::{EntityPageListing, EntityPageStreamer};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountNotFoundByIdError, AccountService, GetAccountByIdError};
-use kamu_auth_rebac::RebacService;
+use kamu_auth_rebac::{AuthorizedAccount, RebacService};
 use kamu_datasets::{
     DatasetEntriesResolution,
     DatasetEntryNotFoundError,
@@ -141,7 +141,7 @@ impl OsoResourceServiceImpl {
             .get_dataset_properties(&dataset_entry.id)
             .await
             .int_err()?;
-        let account_id_role_tuples = self
+        let authorized_accounts = self
             .rebac_service
             .get_accounts_dataset_relations(dataset_id)
             .await
@@ -151,7 +151,7 @@ impl OsoResourceServiceImpl {
             &dataset_entry.owner_id,
             dataset_properties.allows_public_read,
         );
-        for (account_id, role) in account_id_role_tuples {
+        for AuthorizedAccount { account_id, role } in authorized_accounts {
             dataset_resource.authorize_account(&account_id, role);
         }
 
@@ -221,7 +221,7 @@ impl OsoResourceServiceImpl {
                         if let Some(authorized_accounts) =
                             dataset_accounts_relation_map.remove(&dataset_id)
                         {
-                            for (account_id, role) in authorized_accounts {
+                            for AuthorizedAccount { account_id, role } in authorized_accounts {
                                 dataset_resource.authorize_account(&account_id, role);
                             }
                         }

@@ -16,6 +16,7 @@ use kamu_auth_rebac::{
     AccountProperties,
     AccountPropertyName,
     AccountToDatasetRelation,
+    AuthorizedAccount,
     DatasetProperties,
     DatasetPropertyName,
     DeleteEntityPropertiesError,
@@ -338,8 +339,7 @@ impl RebacService for RebacServiceImpl {
     async fn get_accounts_dataset_relations(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<(odf::AccountID, AccountToDatasetRelation)>, GetObjectEntityRelationsError>
-    {
+    ) -> Result<Vec<AuthorizedAccount>, GetObjectEntityRelationsError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
@@ -348,27 +348,27 @@ impl RebacService for RebacServiceImpl {
             .get_object_entity_relations(&dataset_entity)
             .await?;
 
-        let mut account_id_relation_tuples = Vec::with_capacity(object_entities.len());
+        let mut authorized_accounts = Vec::with_capacity(object_entities.len());
         for EntityWithRelation { entity, relation } in object_entities {
             let account_id = odf::AccountID::from_did_str(&entity.entity_id).int_err()?;
 
             match relation {
-                Relation::AccountToDataset(relation) => {
-                    account_id_relation_tuples.push((account_id, relation));
+                Relation::AccountToDataset(role) => {
+                    let authorized_account = AuthorizedAccount { account_id, role };
+
+                    authorized_accounts.push(authorized_account);
                 }
             }
         }
 
-        Ok(account_id_relation_tuples)
+        Ok(authorized_accounts)
     }
 
     async fn get_accounts_dataset_relations_by_ids(
         &self,
         dataset_ids: &[odf::DatasetID],
-    ) -> Result<
-        HashMap<odf::DatasetID, Vec<(odf::AccountID, AccountToDatasetRelation)>>,
-        GetObjectEntityRelationsError,
-    > {
+    ) -> Result<HashMap<odf::DatasetID, Vec<AuthorizedAccount>>, GetObjectEntityRelationsError>
+    {
         let dataset_entities = dataset_ids
             .iter()
             .map(|id| Entity::new_dataset(id.to_string()))
@@ -393,12 +393,13 @@ impl RebacService for RebacServiceImpl {
             let dataset_id = odf::DatasetID::from_did_str(&object_entity.entity_id).int_err()?;
 
             match relation {
-                Relation::AccountToDataset(relation) => {
+                Relation::AccountToDataset(role) => {
                     let authorized_accounts = dataset_accounts_relation_map
                         .entry(dataset_id)
                         .or_insert_with(|| vec![]);
+                    let authorized_account = AuthorizedAccount { account_id, role };
 
-                    authorized_accounts.push((account_id, relation))
+                    authorized_accounts.push(authorized_account)
                 }
             }
         }

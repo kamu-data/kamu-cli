@@ -49,28 +49,30 @@ impl<'a> DatasetCollaboration<'a> {
         let (rebac_service, account_service) =
             from_catalog_n!(ctx, dyn RebacService, dyn AccountService);
 
-        let account_id_relation_tuples = rebac_service
+        let authorized_accounts = rebac_service
             .get_accounts_dataset_relations(&self.dataset_request_state.dataset_handle.id)
             .await
             .int_err()?;
-        let account_ids = account_id_relation_tuples
+        let authorized_account_ids = authorized_accounts
             .iter()
-            .map(|t| t.0.clone())
+            .map(|a| a.account_id.clone())
             .collect::<Vec<_>>();
-        let mut account_map = account_service
-            .get_account_map(&account_ids)
+        let mut authorized_account_map = account_service
+            .get_account_map(&authorized_account_ids)
             .await
             .int_err()?;
 
-        let nodes = account_id_relation_tuples
+        let nodes = authorized_accounts
             .into_iter()
-            .map(|(account_id, role)| {
+            .map(|authorized_account| {
                 // Safety: The map guarantees the pair presence
-                let account_model = account_map.remove(&account_id).unwrap();
+                let account_model = authorized_account_map
+                    .remove(&authorized_account.account_id)
+                    .unwrap();
 
                 AccountWithRole {
                     account: Account::from_account(account_model),
-                    role: role.into(),
+                    role: authorized_account.role.into(),
                 }
             })
             .collect::<Vec<_>>();
