@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::AccountService;
 use kamu_auth_rebac::RebacService;
 
 use crate::prelude::*;
-use crate::queries::DatasetRequestState;
+use crate::queries::{Account, DatasetRequestState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,9 +46,37 @@ impl<'a> DatasetCollaboration<'a> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        // TODO: Private Datasets: implementation
+        let (rebac_service, account_service) =
+            from_catalog_n!(ctx, dyn RebacService, dyn AccountService);
 
-        Ok(AccountWithRoleConnection::new(vec![], page, per_page, 0))
+        let account_id_relation_tuples = rebac_service
+            .get_accounts_dataset_relations(&self.dataset_request_state.dataset_handle.id)
+            .await
+            .int_err()?;
+        let account_ids = account_id_relation_tuples
+            .iter()
+            .map(|t| t.0.clone())
+            .collect::<Vec<_>>();
+        let mut account_map = account_service
+            .get_account_map(account_ids)
+            .await
+            .int_err()?;
+
+        let nodes = account_id_relation_tuples
+            .into_iter()
+            .map(|(account_id, role)| {
+                // Safety: The map guarantees the pair presence
+                let account_model = account_map.remove(&account_id).unwrap();
+
+                AccountWithRole {
+                    account: Account::from_account(account_model),
+                    role: role.into(),
+                }
+            })
+            .collect::<Vec<_>>();
+        let total = nodes.len();
+
+        Ok(AccountWithRoleConnection::new(nodes, page, per_page, total))
     }
 }
 

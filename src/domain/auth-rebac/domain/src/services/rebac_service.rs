@@ -102,7 +102,7 @@ pub trait RebacService: Send + Sync {
     async fn get_accounts_dataset_relations(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError>;
+    ) -> Result<Vec<(odf::AccountID, AccountToDatasetRelation)>, ObjectEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

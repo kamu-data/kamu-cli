@@ -337,7 +337,7 @@ impl RebacService for RebacServiceImpl {
     async fn get_accounts_dataset_relations(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<EntityWithRelation>, ObjectEntityRelationsError> {
+    ) -> Result<Vec<(odf::AccountID, AccountToDatasetRelation)>, ObjectEntityRelationsError> {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_account(dataset_id.as_str());
 
@@ -346,7 +346,18 @@ impl RebacService for RebacServiceImpl {
             .get_object_entity_relations(&dataset_entity)
             .await?;
 
-        Ok(object_entities)
+        let mut account_id_relation_tuples = Vec::with_capacity(object_entities.len());
+        for EntityWithRelation { entity, relation } in object_entities {
+            let account_id = odf::AccountID::from_did_str(&entity.entity_id).int_err()?;
+
+            match relation {
+                Relation::AccountToDataset(relationship) => {
+                    account_id_relation_tuples.push((account_id, relationship));
+                }
+            }
+        }
+
+        Ok(account_id_relation_tuples)
     }
 }
 
