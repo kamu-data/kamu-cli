@@ -78,7 +78,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
       - uses: cargo-bins/cargo-binstall@main
       - run: cargo binstall cargo-deny -y
-      - run: cargo deny check
+      - run: cargo deny check --hide-inclusion-graph
       - run: cargo binstall cargo-udeps -y
       - run: cargo udeps --all-targets
 
