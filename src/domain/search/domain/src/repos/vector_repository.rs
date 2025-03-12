@@ -14,10 +14,18 @@ use internal_error::InternalError;
 /// Stores embedding vectors and allows to search for nearest points efficiently
 #[async_trait::async_trait]
 pub trait VectorRepository: Send + Sync {
+    /// Returns number of points stored. May be approximate number on large
+    /// quantities.
     async fn num_points(&self) -> Result<usize, InternalError>;
 
-    async fn upsert(&self, points: Vec<NewPoint>) -> Result<(), UpsertError>;
+    /// Insert new points
+    async fn insert(&self, points: Vec<NewPoint>) -> Result<(), InsertError>;
 
+    /// Searches for nearest neighbouring points to the specified vector.
+    ///
+    /// Note that multiple points can correspond to a single entity and its the
+    /// caller's responsibility to deduplicate, re-rank, and check for
+    /// authorization.
     async fn search_points(
         &self,
         vec: Vec<f32>,
@@ -27,8 +35,12 @@ pub trait VectorRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Note that skip+limit style of pagination works on repository level because
+// all post-filtering, authorization checks, and deduplication happens on a
+// higher level
 #[derive(Debug, Default)]
 pub struct SearchPointsOpts {
+    pub skip: usize,
     pub limit: usize,
 }
 
@@ -45,7 +57,7 @@ pub struct FoundPoint {
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
-pub enum UpsertError {
+pub enum InsertError {
     Internal(#[from] InternalError),
 }
 

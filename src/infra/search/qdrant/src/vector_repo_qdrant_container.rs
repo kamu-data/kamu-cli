@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::*;
-use kamu_search::{FoundPoint, NewPoint, SearchPointsOpts, UpsertError, VectorRepository};
+use kamu_search::{FoundPoint, InsertError, NewPoint, SearchPointsOpts, VectorRepository};
 
 use crate::*;
 
@@ -98,8 +98,8 @@ impl VectorRepository for VectorRepositoryQdrantContainer {
         self.inner().await?.num_points().await
     }
 
-    async fn upsert(&self, points: Vec<NewPoint>) -> Result<(), UpsertError> {
-        self.inner().await?.upsert(points).await
+    async fn insert(&self, points: Vec<NewPoint>) -> Result<(), InsertError> {
+        self.inner().await?.insert(points).await
     }
 
     async fn search_points(

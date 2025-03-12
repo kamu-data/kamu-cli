@@ -2403,7 +2403,7 @@ type Search {
 	Searches for datasets and other objects managed by the
 	current node using a prompt in natural language
 	"""
-	queryNaturalLanguage(prompt: String!, page: Int, perPage: Int): SearchResultExConnection!
+	queryNaturalLanguage(prompt: String!, perPage: Int): SearchResultExConnection!
 }
 
 union SearchResult = Dataset

@@ -148,7 +148,7 @@ impl InitOnStartup for SearchServiceLocalIndexer {
             .map(|(vector, payload)| NewPoint { vector, payload })
             .collect();
 
-        self.vector_repo.upsert(points).await.int_err()?;
+        self.vector_repo.insert(points).await.int_err()?;
 
         Ok(())
     }

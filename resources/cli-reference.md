@@ -1036,7 +1036,7 @@ Searches for datasets in the registered repositories
 **Options:**
 
 * `-l`, `--local` — Search local datasets instead of searching in remote repositories
-* `-n`, `--max-results <MAX_RESULTS>` — Search local datasets instead of searching in remote repositories
+* `-n`, `--max-results <MAX_RESULTS>` — Maximum results to fetch
 
   Default value: `10`
 * `-o`, `--output-format <FMT>` — Format to display the results in

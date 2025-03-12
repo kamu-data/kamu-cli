@@ -20,7 +20,7 @@ use crate::output::*;
 
 pub struct SearchCommand {
     search_svc: Arc<dyn SearchServiceRemote>,
-    search_local_svc: Option<Arc<dyn SearchServiceLocal>>,
+    search_local_svc: Arc<dyn SearchServiceLocal>,
     output_config: Arc<OutputConfig>,
     query: Option<String>,
     repository_names: Vec<odf::RepoName>,
@@ -31,7 +31,7 @@ pub struct SearchCommand {
 impl SearchCommand {
     pub fn new<S, I>(
         search_svc: Arc<dyn SearchServiceRemote>,
-        search_local_svc: Option<Arc<dyn SearchServiceLocal>>,
+        search_local_svc: Arc<dyn SearchServiceLocal>,
         output_config: Arc<OutputConfig>,
         query: Option<S>,
         repository_names: I,
@@ -70,21 +70,17 @@ impl SearchCommand {
     }
 
     async fn search_local(&mut self) -> Result<(), CLIError> {
-        let Some(search_svc_local) = self.search_local_svc.as_deref() else {
-            return Err(CLIError::usage_error("Local search is not configured"));
-        };
-
         let prompt = self.query.clone().unwrap_or_default();
         if prompt.is_empty() {
             return Err(CLIError::usage_error("Please provide a search prompt"));
         }
 
-        let res = search_svc_local
+        let res = self
+            .search_local_svc
             .search_natural_language(
                 &prompt,
                 SearchNatLangOpts {
                     limit: self.max_results,
-                    ..Default::default()
                 },
             )
             .await

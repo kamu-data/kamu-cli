@@ -15,7 +15,10 @@ use internal_error::InternalError;
 /// current node
 #[async_trait::async_trait]
 pub trait SearchServiceLocal: Send + Sync {
-    /// Search for datasets using a natural language prompt
+    /// Search for datasets using a natural language prompt.
+    ///
+    /// Note that currently this API does NOT perform deduplication and
+    /// re-ranking, so multiple search hits can refer to the same dataset.
     async fn search_natural_language(
         &self,
         prompt: &str,
@@ -27,16 +30,16 @@ pub trait SearchServiceLocal: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SearchNatLangOpts {
-    pub skip: usize,
     pub limit: usize,
 }
 
 impl Default for SearchNatLangOpts {
     fn default() -> Self {
-        Self { skip: 0, limit: 10 }
+        Self { limit: 10 }
     }
 }
 
+// TODO: Support next page token for paginating through results
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SearchLocalNatLangResult {
     pub datasets: Vec<SearchLocalResultDataset>,

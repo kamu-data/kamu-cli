@@ -1205,7 +1205,7 @@ pub struct Search {
     #[arg(long, short = 'l')]
     pub local: bool,
 
-    /// Search local datasets instead of searching in remote repositories
+    /// Maximum results to fetch
     #[arg(long, short = 'n', default_value_t = 10)]
     pub max_results: usize,
 

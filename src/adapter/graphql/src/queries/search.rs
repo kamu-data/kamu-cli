@@ -97,33 +97,28 @@ impl Search {
 
     /// Searches for datasets and other objects managed by the
     /// current node using a prompt in natural language
-    #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(?page, ?per_page))]
+    #[tracing::instrument(level = "info", name = Search_query, skip_all, fields(?per_page))]
     async fn query_natural_language(
         &self,
         ctx: &Context<'_>,
         prompt: String,
-        page: Option<usize>,
+        // page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultExConnection> {
         let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchServiceLocal);
 
-        let page = page.unwrap_or(0);
+        // TODO: Support "next page token" style pagination
+        let page = 0;
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let skip = per_page * page;
         let limit = per_page;
 
         let res = search_service
-            .search_natural_language(&prompt, kamu_search::SearchNatLangOpts { skip, limit })
+            .search_natural_language(&prompt, kamu_search::SearchNatLangOpts { limit })
             .await
             .int_err()?;
 
-        // We don't know the total count, so unless we get less results than asked for -
-        // we assume there's more
-        let mut total_count = skip + res.datasets.len();
-        if res.datasets.len() == limit {
-            total_count += 1;
-        }
+        let total_count = res.datasets.len();
 
         let mut nodes: Vec<SearchResultEx> = Vec::new();
         for hit in res.datasets {

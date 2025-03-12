@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::*;
-use kamu_search::{FoundPoint, NewPoint, SearchPointsOpts, UpsertError, VectorRepository};
+use kamu_search::{FoundPoint, InsertError, NewPoint, SearchPointsOpts, VectorRepository};
 use rand::RngCore;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,7 +91,7 @@ impl VectorRepository for VectorRepositoryQdrant {
         Ok(usize::try_from(res.result.unwrap().points_count.unwrap()).unwrap())
     }
 
-    async fn upsert(&self, points: Vec<NewPoint>) -> Result<(), UpsertError> {
+    async fn insert(&self, points: Vec<NewPoint>) -> Result<(), InsertError> {
         let points: Vec<_> = {
             let mut rng = rand::thread_rng();
 
@@ -134,7 +134,8 @@ impl VectorRepository for VectorRepositoryQdrant {
             .await?
             .search_points(
                 SearchPointsBuilder::new(&self.config.collection_name, vec, opts.limit as u64)
-                    .with_payload(true),
+                    .with_payload(true)
+                    .offset(opts.skip as u64),
             )
             .await
             .int_err()?;
