@@ -185,7 +185,6 @@ impl DatasetMut {
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
     ) -> Result<SetDatasetVisibilityResult> {
-        // TODO: Private Datasets: extract use case
         self.dataset_mut_request_state
             .check_dataset_own_access(ctx)
             .await?;

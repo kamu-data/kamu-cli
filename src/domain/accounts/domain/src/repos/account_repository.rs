@@ -52,7 +52,6 @@ pub trait AccountRepository: Send + Sync {
         account_name: &odf::AccountName,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError>;
 
-    // TODO: Private Datasets: tests
     fn search_accounts_by_name_pattern<'a>(
         &'a self,
         name_pattern: &'a str,
