@@ -68,7 +68,7 @@ impl SqliteAccountRepository {
             account_name: odf::AccountName::new_unchecked(account_row.get::<&str, _>(1)),
             email: Email::parse(account_row.get(2)).unwrap(),
             display_name: account_row.get(3),
-            account_type: account_row.get(4),
+            account_type: account_row.get_unchecked(4),
             avatar_url: account_row.get(5),
             registered_at: account_row.get(6),
             is_admin: account_row.get(7),

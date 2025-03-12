@@ -461,11 +461,11 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     // Search by account name
     pretty_assertions::assert_eq!(
         [name(&"user1"), name(&"user2"), name(&"user3")],
-        *search(&account_repo, "us", Filters::default()).await
+        *search(&account_repo, "uS", Filters::default()).await
     );
     pretty_assertions::assert_eq!(
         [name(&"user1"), name(&"user2"), name(&"user3")],
-        *search(&account_repo, "se", Filters::default()).await
+        *search(&account_repo, "sE", Filters::default()).await
     );
     pretty_assertions::assert_eq!(
         [name(&"user1")],

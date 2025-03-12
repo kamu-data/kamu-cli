@@ -81,8 +81,21 @@ fn test_sqlite_generate_placeholders_tuple_list_2() {
 
 pub fn mysql_generate_placeholders_list(arguments_count: usize) -> String {
     if arguments_count == 0 {
-        // MySQL does not consider the "in ()" syntax correct, so we add NULL
-        return "NULL".to_string();
+        // MySQL does not consider the "IN ()" syntax correct,
+        // so we add a subquery that has nothing rows in the result:
+        //
+        // ```sql
+        // SELECT *
+        // FROM table
+        // WHERE id IN (SELECT NULL WHERE FALSE);
+        // -- output: empty (nothing included)
+        //
+        // SELECT *
+        // FROM table
+        // WHERE id NOT IN (SELECT NULL WHERE FALSE);
+        // -- output: all rows (nothing excluded)
+        // ```
+        return "(SELECT NULL WHERE FALSE)".to_string();
     }
 
     (0..arguments_count).map(|_| "?").intersperse(",").collect()

@@ -325,19 +325,19 @@ impl AccountRepository for InMemoryAccountRepository {
             let mut found_accounts_without_pagination = readable_state
                 .accounts_by_id
                 .values()
-                .filter_map(|account| {
+                .filter(|account| {
                     if let Some(exclude_accounts_by_ids) = &exclude_accounts_by_ids_set
                         && exclude_accounts_by_ids.contains(&account.id)
                     {
-                        return None;
+                        return false;
                     }
                     if !account.account_name.contains(name_pattern)
                         && !account.display_name.contains(name_pattern)
                     {
-                        return None;
+                        return false;
                     }
 
-                    Some(account)
+                    true
                 })
                 .collect::<Vec<_>>();
 
