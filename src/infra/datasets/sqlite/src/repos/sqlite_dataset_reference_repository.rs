@@ -34,6 +34,23 @@ impl SqliteDatasetReferenceRepository {
 
 #[async_trait::async_trait]
 impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
+    async fn has_any_references(&self) -> Result<bool, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_row = sqlx::query!(
+            r#"
+            SELECT 1 as count FROM dataset_references LIMIT 1
+            "#,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_row.is_some())
+    }
+
     async fn get_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,

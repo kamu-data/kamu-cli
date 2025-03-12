@@ -14,6 +14,8 @@ use thiserror::Error;
 
 #[async_trait::async_trait]
 pub trait DatasetReferenceRepository: Send + Sync {
+    async fn has_any_references(&self) -> Result<bool, InternalError>;
+
     async fn get_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,

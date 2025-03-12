@@ -51,6 +51,11 @@ impl InMemoryDatasetReferenceRepository {
 
 #[async_trait::async_trait]
 impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
+    async fn has_any_references(&self) -> Result<bool, InternalError> {
+        let guard = self.state.lock().unwrap();
+        Ok(!guard.references.is_empty())
+    }
+
     async fn get_dataset_reference(
         &self,
         dataset_id: &odf::DatasetID,

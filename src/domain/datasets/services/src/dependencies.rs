@@ -17,6 +17,7 @@ use crate::*;
 pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     if needs_indexing {
         b.add::<DatasetEntryIndexer>();
+        b.add::<DatasetReferenceIndexer>();
         b.add::<DependencyGraphIndexer>();
     }
 
