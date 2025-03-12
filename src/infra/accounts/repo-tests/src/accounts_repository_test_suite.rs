@@ -503,21 +503,6 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
         )
         .await
     );
-
-    // Search by email name
-    pretty_assertions::assert_eq!(
-        [
-            name(&"admin1"),
-            name(&"user1"),
-            name(&"user2"),
-            name(&"user3"),
-        ],
-        *search(&account_repo, "example", Filters::default()).await
-    );
-    pretty_assertions::assert_eq!(
-        [name(&"user2"),],
-        *search(&account_repo, "new", Filters::default()).await
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

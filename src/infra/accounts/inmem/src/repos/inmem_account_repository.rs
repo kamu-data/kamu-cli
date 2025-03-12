@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
@@ -309,11 +309,50 @@ impl AccountRepository for InMemoryAccountRepository {
 
     fn search_accounts_by_name_pattern(
         &self,
-        _name_pattern: &str,
-        _filters: SearchAccountsByNamePatternFilters,
-        _pagination: PaginationOpts,
+        name_pattern: &str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
     ) -> AccountPageStream {
-        todo!("TODO: Private Datasets: implementation")
+        let exclude_accounts_by_ids_set = filters.exclude_accounts_by_ids.map(|ids| {
+            let mut set = HashSet::new();
+            set.extend(ids);
+            set
+        });
+
+        let found_accounts = {
+            let readable_state = self.state.lock().unwrap();
+
+            let mut found_accounts_without_pagination = readable_state
+                .accounts_by_id
+                .values()
+                .filter_map(|account| {
+                    if let Some(exclude_accounts_by_ids) = &exclude_accounts_by_ids_set
+                        && exclude_accounts_by_ids.contains(&account.id)
+                    {
+                        return None;
+                    }
+                    if !account.account_name.contains(name_pattern)
+                        && !account.display_name.contains(name_pattern)
+                    {
+                        return None;
+                    }
+
+                    Some(account)
+                })
+                .collect::<Vec<_>>();
+
+            found_accounts_without_pagination.sort_by(|a, b| a.account_name.cmp(&b.account_name));
+
+            found_accounts_without_pagination
+                .into_iter()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .cloned()
+                .map(Ok)
+                .collect::<Vec<_>>()
+        };
+
+        Box::pin(futures::stream::iter(found_accounts))
     }
 }
 
