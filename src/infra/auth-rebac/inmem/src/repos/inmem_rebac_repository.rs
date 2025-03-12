@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 use std::sync::Arc;
 
 use dill::{component, interface, scope, Singleton};
@@ -46,7 +45,7 @@ type EntitiesPropertiesMap = HashMap<Entity<'static>, EntityProperties>;
 #[derive(Default)]
 struct State {
     entities_properties_map: EntitiesPropertiesMap,
-    entities_relations_rows: HashSet<EntitiesRelationsRow>,
+    entities_relations_rows: HashSet<EntitiesWithRelation<'static>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,7 +66,7 @@ impl InMemoryRebacRepository {
 
     async fn get_rows<F, R>(&self, filter_map_predicate: F) -> Vec<R>
     where
-        F: Fn(&EntitiesRelationsRow) -> Option<R>,
+        F: Fn(&EntitiesWithRelation) -> Option<R>,
     {
         let readable_state = self.state.read().await;
 
@@ -203,18 +202,22 @@ impl RebacRepository for InMemoryRebacRepository {
     async fn insert_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: Relation,
+        relation: Relation,
         object_entity: &Entity,
     ) -> Result<(), InsertEntitiesRelationError> {
         let mut writable_state = self.state.write().await;
 
-        let row = EntitiesRelationsRow::new(subject_entity, relationship, object_entity);
+        let row = EntitiesWithRelation {
+            subject_entity: subject_entity.clone().into_owned(),
+            relation,
+            object_entity: object_entity.clone().into_owned(),
+        };
         let is_duplicate = writable_state.entities_relations_rows.contains(&row);
 
         if is_duplicate {
             return Err(InsertEntitiesRelationError::duplicate(
                 subject_entity,
-                relationship,
+                relation,
                 object_entity,
             ));
         }
@@ -227,18 +230,22 @@ impl RebacRepository for InMemoryRebacRepository {
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: Relation,
+        relation: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError> {
         let mut writable_state = self.state.write().await;
 
-        let row = EntitiesRelationsRow::new(subject_entity, relationship, object_entity);
+        let row = EntitiesWithRelation {
+            subject_entity: subject_entity.clone().into_owned(),
+            relation,
+            object_entity: object_entity.clone().into_owned(),
+        };
         let not_found = !writable_state.entities_relations_rows.remove(&row);
 
         if not_found {
             return Err(DeleteEntitiesRelationError::not_found(
                 subject_entity,
-                relationship,
+                relation,
                 object_entity,
             ));
         }
@@ -254,8 +261,8 @@ impl RebacRepository for InMemoryRebacRepository {
             .get_rows(|row| {
                 if row.subject_entity == *subject_entity {
                     Some(EntityWithRelation::new(
-                        row.object_entity.clone(),
-                        row.relationship,
+                        row.object_entity.clone().into_owned(),
+                        row.relation,
                     ))
                 } else {
                     None
@@ -268,16 +275,41 @@ impl RebacRepository for InMemoryRebacRepository {
 
     async fn get_object_entity_relations(
         &self,
-        _object_entity: &Entity,
+        object_entity: &Entity,
     ) -> Result<Vec<EntityWithRelation>, GetObjectEntityRelationsError> {
-        todo!("TODO: Private Datasets: implementation")
+        let res = self
+            .get_rows(|row| {
+                if row.object_entity == *object_entity {
+                    Some(EntityWithRelation::new(
+                        row.subject_entity.clone().into_owned(),
+                        row.relation,
+                    ))
+                } else {
+                    None
+                }
+            })
+            .await;
+
+        Ok(res)
     }
 
     async fn get_object_entities_relations(
         &self,
-        _object_entities: &[Entity],
+        object_entities: &[Entity],
     ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError> {
-        todo!("TODO: Private Datasets: implementation")
+        let object_entities_set = object_entities.iter().collect::<HashSet<_>>();
+
+        let res = self
+            .get_rows(|row| {
+                if object_entities_set.contains(&row.object_entity) {
+                    Some(row.clone_owned())
+                } else {
+                    None
+                }
+            })
+            .await;
+
+        Ok(res)
     }
 
     async fn get_subject_entity_relations_by_object_type(
@@ -291,8 +323,8 @@ impl RebacRepository for InMemoryRebacRepository {
                     && row.object_entity.entity_type == object_entity_type
                 {
                     Some(EntityWithRelation::new(
-                        row.object_entity.clone(),
-                        row.relationship,
+                        row.object_entity.clone().into_owned(),
+                        row.relation,
                     ))
                 } else {
                     None
@@ -311,7 +343,7 @@ impl RebacRepository for InMemoryRebacRepository {
         let res = self
             .get_rows(|row| {
                 if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
-                    Some(row.relationship)
+                    Some(row.relation)
                 } else {
                     None
                 }
@@ -327,29 +359,6 @@ impl RebacRepository for InMemoryRebacRepository {
         _object_entity: &Entity,
     ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError> {
         todo!("TODO: Private Datasets: implementation")
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct EntitiesRelationsRow {
-    subject_entity: Entity<'static>,
-    relationship: Relation,
-    object_entity: Entity<'static>,
-}
-
-impl EntitiesRelationsRow {
-    pub fn new(
-        subject_entity: &Entity<'_>,
-        relationship: Relation,
-        object_entity: &Entity<'_>,
-    ) -> Self {
-        Self {
-            subject_entity: subject_entity.clone().into_owned(),
-            relationship,
-            object_entity: object_entity.clone().into_owned(),
-        }
     }
 }
 

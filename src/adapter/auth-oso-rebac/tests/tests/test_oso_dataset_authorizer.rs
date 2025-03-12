@@ -74,6 +74,8 @@ macro_rules! assert_single_dataset {
     };
 }
 
+// TODO: Private Datasets: cover new paths
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,7 +98,12 @@ async fn test_owner_can_read_and_write_owned_private_dataset() {
             read_result = Ok(()),
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
     );
 }
 
@@ -120,7 +127,12 @@ async fn test_owner_can_read_and_write_owned_public_dataset() {
             read_result = Ok(()),
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
     );
 }
 
@@ -244,7 +256,12 @@ async fn test_admin_can_read_and_write_not_owned_public_dataset() {
             read_result = Ok(()),
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
     );
 }
 
@@ -270,7 +287,12 @@ async fn test_admin_can_read_and_write_not_owned_private_dataset() {
             read_result = Ok(()),
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
     );
 }
 

@@ -88,11 +88,21 @@ impl<'a> EntityWithRelation<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EntitiesWithRelation<'a> {
     pub subject_entity: Entity<'a>,
     pub relation: Relation,
     pub object_entity: Entity<'a>,
+}
+
+impl EntitiesWithRelation<'_> {
+    pub fn clone_owned(&self) -> EntitiesWithRelation<'static> {
+        EntitiesWithRelation {
+            subject_entity: self.subject_entity.clone().into_owned(),
+            relation: self.relation,
+            object_entity: self.object_entity.clone().into_owned(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

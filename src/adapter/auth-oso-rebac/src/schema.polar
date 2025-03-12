@@ -63,7 +63,6 @@ has_permission(user: UserActor, "own", dataset: DatasetResource) if
 user_owns_dataset(user: UserActor, dataset: DatasetResource) if
     dataset.owner_account_id == user.account_id;
 
-
 user_authorized_for_dataset(user: UserActor, dataset: DatasetResource, allowed_roles: List) if
     user_id = user.account_id and
     dataset.authorized_users.(user_id) in allowed_roles;
