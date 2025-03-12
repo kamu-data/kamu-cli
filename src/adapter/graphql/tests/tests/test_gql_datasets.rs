@@ -681,6 +681,7 @@ async fn test_dataset_delete_dangling_ref() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: check other variants
 #[test_log::test(tokio::test)]
 async fn test_dataset_view_permissions() {
     let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
@@ -695,11 +696,26 @@ async fn test_dataset_view_permissions() {
             datasets {
                 byId (datasetId: "<id>") {
                     permissions {
-                        canView
-                        canDelete
-                        canRename
-                        canCommit
-                        canSchedule
+                        collaboration {
+                            canView
+                            canUpdate
+                        }
+                        envVars {
+                            canView
+                            canUpdate
+                        }
+                        flows {
+                            canView
+                            canRun
+                        }
+                        general {
+                            canRename
+                            canSetVisibility
+                            canDelete
+                        }
+                        metadata {
+                            canCommit
+                        }
                     }
                 }
             }
@@ -716,11 +732,26 @@ async fn test_dataset_view_permissions() {
             "datasets": {
                 "byId": {
                     "permissions": {
-                        "canView": true,
-                        "canDelete": true,
-                        "canRename": true,
-                        "canCommit": true,
-                        "canSchedule": true,
+                        "collaboration": {
+                            "canView": true,
+                            "canUpdate": true,
+                        },
+                        "envVars": {
+                            "canView": true,
+                            "canUpdate": true,
+                        },
+                        "flows": {
+                            "canView": true,
+                            "canRun": true,
+                        },
+                        "general": {
+                            "canRename": true,
+                            "canSetVisibility": true,
+                            "canDelete": true,
+                        },
+                        "metadata": {
+                            "canCommit": true,
+                        },
                     }
                 }
             }
