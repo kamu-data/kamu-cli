@@ -48,8 +48,13 @@ async fn test_di_server_graph_validates_mt() {
 fn test_di_cli_graph_validates(tenancy_config: TenancyConfig) {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(temp_dir.path());
-    let mut base_catalog_builder =
-        kamu_cli::configure_base_catalog(&workspace_layout, tenancy_config, None, false);
+    let mut base_catalog_builder = kamu_cli::configure_base_catalog(
+        &workspace_layout,
+        WorkspaceStatus::Created(tenancy_config),
+        tenancy_config,
+        None,
+        false,
+    );
     kamu_cli::configure_in_memory_components(&mut base_catalog_builder);
     base_catalog_builder.add_value(OutputConfig::default());
 
@@ -84,8 +89,13 @@ fn test_di_cli_graph_validates(tenancy_config: TenancyConfig) {
 fn test_di_server_graph_validates(tenancy_config: TenancyConfig) {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(temp_dir.path());
-    let mut base_catalog_builder =
-        kamu_cli::configure_base_catalog(&workspace_layout, tenancy_config, None, false);
+    let mut base_catalog_builder = kamu_cli::configure_base_catalog(
+        &workspace_layout,
+        WorkspaceStatus::Created(tenancy_config),
+        tenancy_config,
+        None,
+        false,
+    );
     kamu_cli::configure_in_memory_components(&mut base_catalog_builder);
     base_catalog_builder.add_value(OutputConfig::default());
 
