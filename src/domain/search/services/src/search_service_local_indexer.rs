@@ -27,6 +27,7 @@ use kamu_search::*;
 })]
 pub struct SearchServiceLocalIndexer {
     dataset_registry: Arc<dyn DatasetRegistry>,
+    embeddings_chunker: Arc<dyn EmbeddingsChunker>,
     embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
     vector_repo: Arc<dyn VectorRepository>,
 }
@@ -100,9 +101,7 @@ impl SearchServiceLocalIndexer {
             .unwrap_or_default();
 
         for attachment in embedded_attachments {
-            for paragraph in attachment.content.split("\n\n") {
-                chunks.push(paragraph.to_string());
-            }
+            chunks.push(attachment.content);
         }
 
         chunks.iter_mut().for_each(|i| (*i) = i.trim().to_string());
@@ -130,11 +129,15 @@ impl InitOnStartup for SearchServiceLocalIndexer {
         while let Some(hdl) = datasets.try_next().await? {
             let dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
-            for chunk in self.dataset_to_description(dataset).await? {
+            let description = self.dataset_to_description(dataset).await?;
+
+            for chunk in self.embeddings_chunker.chunk(description).await? {
                 payloads.push(serde_json::json!({"id": hdl.id.to_string()}));
                 chunks.push(chunk);
             }
         }
+
+        tracing::debug!(?chunks, "Encoding chunks to embeddings");
 
         // TODO: Split into batches?
         let vectors = self.embeddings_encoder.encode(chunks).await?;

@@ -378,6 +378,7 @@ pub fn get_command(
             c.query,
             c.repo.unwrap_or_default(),
             c.local,
+            c.max_results,
         )),
         cli::Command::Sql(c) => match c.subcommand {
             None => Box::new(SqlShellCommand::new(

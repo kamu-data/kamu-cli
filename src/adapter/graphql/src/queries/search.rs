@@ -104,25 +104,17 @@ impl Search {
         prompt: String,
         page: Option<usize>,
         per_page: Option<usize>,
-        min_score: f32,
     ) -> Result<SearchResultExConnection> {
         let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchServiceLocal);
 
         let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(10);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
         let skip = per_page * page;
         let limit = per_page;
 
         let res = search_service
-            .search_natural_language(
-                &prompt,
-                kamu_search::SearchNatLangOpts {
-                    skip: Some(skip),
-                    limit: Some(limit),
-                    min_score,
-                },
-            )
+            .search_natural_language(&prompt, kamu_search::SearchNatLangOpts { skip, limit })
             .await
             .int_err()?;
 

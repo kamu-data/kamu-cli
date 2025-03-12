@@ -852,6 +852,7 @@ impl IdentityConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchConfig {
+    pub embeddings_chunker: Option<EmbeddingsChunkerConfig>,
     pub embeddings_encoder: Option<EmbeddingsEncoderConfig>,
     pub vector_repo: Option<VectorRepoConfig>,
 }
@@ -862,6 +863,12 @@ impl SearchConfig {
 
     pub fn sample() -> Self {
         Self {
+            embeddings_chunker: Some(EmbeddingsChunkerConfig::Simple(
+                EmbeddingsChunkerConfigSimple {
+                    split_sections: Some(false),
+                    split_paragraphs: Some(false),
+                },
+            )),
             embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
                 EmbeddingsEncoderConfigOpenAi {
                     url: Some("https://api.openai.com/v1".to_string()),
@@ -876,6 +883,45 @@ impl SearchConfig {
                 collection_name: Some("kamu-datasets".to_string()),
                 dimensions: Some(Self::DEFAULT_DIMENSIONS),
             })),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum EmbeddingsChunkerConfig {
+    Simple(EmbeddingsChunkerConfigSimple),
+}
+
+impl Default for EmbeddingsChunkerConfig {
+    fn default() -> Self {
+        Self::Simple(EmbeddingsChunkerConfigSimple::default())
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddingsChunkerConfigSimple {
+    // Whether to chunk separately major dataset sections like name, schema, readme, or to combine
+    // them all into one chunk
+    pub split_sections: Option<bool>,
+
+    // Whether to split section content by paragraph
+    pub split_paragraphs: Option<bool>,
+}
+
+impl Default for EmbeddingsChunkerConfigSimple {
+    fn default() -> Self {
+        Self {
+            split_sections: Some(false),
+            split_paragraphs: Some(false),
         }
     }
 }

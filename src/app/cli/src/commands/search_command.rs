@@ -25,6 +25,7 @@ pub struct SearchCommand {
     query: Option<String>,
     repository_names: Vec<odf::RepoName>,
     local: bool,
+    max_results: usize,
 }
 
 impl SearchCommand {
@@ -35,6 +36,7 @@ impl SearchCommand {
         query: Option<S>,
         repository_names: I,
         local: bool,
+        max_results: usize,
     ) -> Self
     where
         S: Into<String>,
@@ -47,6 +49,7 @@ impl SearchCommand {
             query: query.map(Into::into),
             repository_names: repository_names.into_iter().collect(),
             local,
+            max_results,
         }
     }
 
@@ -77,7 +80,13 @@ impl SearchCommand {
         }
 
         let res = search_svc_local
-            .search_natural_language(&prompt, SearchNatLangOpts::default())
+            .search_natural_language(
+                &prompt,
+                SearchNatLangOpts {
+                    limit: self.max_results,
+                    ..Default::default()
+                },
+            )
             .await
             .int_err()?;
 

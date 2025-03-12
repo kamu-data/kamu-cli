@@ -25,11 +25,16 @@ pub trait SearchServiceLocal: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SearchNatLangOpts {
-    pub skip: Option<usize>,
-    pub limit: Option<usize>,
-    pub min_score: f32,
+    pub skip: usize,
+    pub limit: usize,
+}
+
+impl Default for SearchNatLangOpts {
+    fn default() -> Self {
+        Self { skip: 0, limit: 10 }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

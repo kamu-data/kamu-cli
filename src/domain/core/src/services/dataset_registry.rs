@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::*;
 use thiserror::Error;
 
 use crate::ResolvedDataset;
@@ -25,7 +25,7 @@ pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
 
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[odf::DatasetID],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError>;
 
     async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;
@@ -41,6 +41,13 @@ pub trait DatasetRegistryExt: DatasetRegistry {
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<odf::DatasetHandle>, InternalError>;
+
+    /// Attempts to resolve datasets by IDs and returns results in the matching
+    /// order (useful for ziping)
+    async fn try_resolve_multiple_dataset_handles_by_ids_stable(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<Vec<Result<odf::DatasetHandle, odf::DatasetNotFoundError>>, InternalError>;
 
     async fn get_dataset_by_ref(
         &self,
@@ -65,6 +72,35 @@ where
             Err(odf::DatasetRefUnresolvedError::NotFound(_)) => Ok(None),
             Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
         }
+    }
+
+    async fn try_resolve_multiple_dataset_handles_by_ids_stable(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<Vec<Result<odf::DatasetHandle, odf::DatasetNotFoundError>>, InternalError> {
+        // TODO: Avoid cloning!
+        let resolution = self
+            .resolve_multiple_dataset_handles_by_ids(dataset_ids)
+            .await
+            .int_err()?;
+
+        let mut handles_by_id: std::collections::BTreeMap<_, _> = resolution
+            .resolved_handles
+            .into_iter()
+            .map(|h| (h.id.clone(), h))
+            .collect();
+
+        let mut res = Vec::new();
+        for id in dataset_ids {
+            match handles_by_id.remove(id) {
+                Some(h) => res.push(Ok(h)),
+                None => res.push(Err(odf::DatasetNotFoundError {
+                    dataset_ref: id.as_local_ref(),
+                })),
+            }
+        }
+
+        Ok(res)
     }
 
     async fn get_dataset_by_ref(

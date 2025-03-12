@@ -9,10 +9,12 @@
 
 #![feature(error_generic_member_access)]
 
+mod embeddings_chunker_simple;
 mod search_service_local_impl;
 mod search_service_local_indexer;
 mod search_service_local_lazy_init;
 
+pub use embeddings_chunker_simple::*;
 pub use search_service_local_impl::*;
 pub use search_service_local_indexer::*;
 pub use search_service_local_lazy_init::*;

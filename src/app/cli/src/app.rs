@@ -892,12 +892,23 @@ pub fn register_config_in_catalog(
 
     // Search configuration
     if let Some(crate::config::SearchConfig {
+        embeddings_chunker,
         embeddings_encoder: Some(embeddings_encoder),
         vector_repo: Some(vector_repo),
     }) = &config.search
     {
         catalog_builder.add::<kamu_search_services::SearchServiceLocalImpl>();
         catalog_builder.add::<kamu_search_services::SearchServiceLocalIndexer>();
+
+        match embeddings_chunker.clone().unwrap_or_default() {
+            config::EmbeddingsChunkerConfig::Simple(cfg) => {
+                catalog_builder.add::<kamu_search_services::EmbeddingsChunkerSimple>();
+                catalog_builder.add_value(kamu_search_services::EmbeddingsChunkerConfigSimple {
+                    split_sections: cfg.split_sections.unwrap_or(false),
+                    split_paragraphs: cfg.split_paragraphs.unwrap_or(false),
+                });
+            }
+        }
 
         match embeddings_encoder {
             config::EmbeddingsEncoderConfig::OpenAi(cfg) => {

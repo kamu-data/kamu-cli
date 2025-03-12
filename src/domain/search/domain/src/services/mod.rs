@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod embeddings_chunker;
 mod embeddings_encoder;
 mod search_service_local;
 
+pub use embeddings_chunker::*;
 pub use embeddings_encoder::*;
 pub use search_service_local::*;

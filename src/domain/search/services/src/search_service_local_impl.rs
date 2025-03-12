@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::*;
+use itertools::Itertools;
 use kamu_core::{DatasetRegistry, DatasetRegistryExt as _};
 use kamu_search::*;
 
@@ -26,8 +27,6 @@ pub struct SearchServiceLocalImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn SearchServiceLocal)]
 impl SearchServiceLocalImpl {
-    pub const DEFAULT_POINTS_LIMIT: usize = 10;
-
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
@@ -50,6 +49,7 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
         prompt: &str,
         options: SearchNatLangOpts,
     ) -> Result<SearchLocalNatLangResult, SearchLocalNatLangError> {
+        // Encode prompt
         let prompt_vec = self
             .embeddings_encoder
             .encode(vec![prompt.to_string()])
@@ -59,46 +59,60 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             .next()
             .unwrap();
 
+        // Search for nearby points
         let points = self
             .vector_repo
             .search_points(
                 prompt_vec,
                 SearchPointsOpts {
-                    limit: options.limit.unwrap_or(Self::DEFAULT_POINTS_LIMIT),
+                    limit: options.limit,
                 },
             )
             .await
             .int_err()?;
 
-        let mut datasets = Vec::new();
-        for p in points {
-            let dataset_id = p.payload["id"].as_str().ok_or_else(|| {
-                InternalError::new(format!(
-                    "Point {} does not have associated dataset ID",
-                    p.point_id
-                ))
-            })?;
+        // Map points to dataset IDs
+        let dataset_ids: Vec<_> = points
+            .iter()
+            .map(|p| {
+                p.payload["id"].as_str().ok_or_else(|| {
+                    InternalError::new(format!(
+                        "Point {} does not have associated dataset ID",
+                        p.point_id
+                    ))
+                })
+            })
+            .map(|r| match r {
+                Ok(sid) => odf::DatasetID::from_did_str(sid).int_err(),
+                Err(e) => Err(e),
+            })
+            .try_collect()?;
 
-            let dataset_id = odf::DatasetID::from_did_str(dataset_id).int_err()?;
+        // Resolve dataset handles
+        let dataset_handles = self
+            .dataset_registry
+            .try_resolve_multiple_dataset_handles_by_ids_stable(&dataset_ids)
+            .await?;
 
-            // TODO: Vectorize
-            let Some(handle) = self
-                .dataset_registry
-                .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
-                .await?
-            else {
-                return Err(InternalError::new(format!(
-                    "Point {} refers to dataset ID {} which is not present in the registry",
-                    p.point_id, dataset_id,
-                ))
-                .into());
-            };
-
-            datasets.push(SearchLocalResultDataset {
-                handle,
-                score: p.score,
-            });
-        }
+        // Combine points and handles
+        let datasets: Vec<_> = dataset_handles
+            .into_iter()
+            .zip(points)
+            .filter_map(|(resolve, point)| match resolve {
+                Ok(handle) => Some(SearchLocalResultDataset {
+                    handle,
+                    score: point.score,
+                }),
+                Err(err) => {
+                    tracing::warn!(
+                        point_id = point.point_id,
+                        dataset_id = %err.dataset_ref,
+                        "Ignoring point that refers to a dataset not present in the registry"
+                    );
+                    None
+                }
+            })
+            .collect();
 
         Ok(SearchLocalNatLangResult { datasets })
     }

@@ -489,11 +489,11 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[odf::DatasetID],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
         let entries_resolution = self
             .dataset_entry_repo
-            .get_multiple_dataset_entries(&dataset_ids)
+            .get_multiple_dataset_entries(dataset_ids)
             .await
             .map_err(|e| match e {
                 GetMultipleDatasetEntriesError::Internal(e) => {
