@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use kamu_datasets::{DatasetReferenceService, GetDatasetReferenceError, SetDatasetReferenceError};
 
@@ -17,9 +17,14 @@ pub struct DatabaseBackedOdfMetadataChainRefRepositoryImpl<TStorageRefRepo>
 where
     TStorageRefRepo: odf::storage::ReferenceRepository + Send + Sync,
 {
-    dataset_ref_service: Arc<dyn DatasetReferenceService>,
+    state: RwLock<State>,
     storage_ref_repo: TStorageRefRepo,
     dataset_id: odf::DatasetID,
+}
+
+struct State {
+    // TODO: add references caching
+    maybe_dataset_ref_service: Option<Arc<dyn DatasetReferenceService>>,
 }
 
 impl<TStorageRefRepo> DatabaseBackedOdfMetadataChainRefRepositoryImpl<TStorageRefRepo>
@@ -32,7 +37,9 @@ where
         dataset_id: odf::DatasetID,
     ) -> Self {
         Self {
-            dataset_ref_service,
+            state: RwLock::new(State {
+                maybe_dataset_ref_service: Some(dataset_ref_service),
+            }),
             storage_ref_repo,
             dataset_id,
         }
@@ -45,21 +52,45 @@ impl<TStorageRefRepo> odf::dataset::MetadataChainReferenceRepository
 where
     TStorageRefRepo: odf::storage::ReferenceRepository + Send + Sync,
 {
+    fn detach_from_transaction(&self) {
+        let mut write_guard = self.state.write().unwrap();
+        write_guard.maybe_dataset_ref_service = None;
+    }
+
+    fn reattach_to_transaction(&self, catalog: &dill::Catalog) {
+        let mut write_guard = self.state.write().unwrap();
+        write_guard.maybe_dataset_ref_service =
+            Some(catalog.get_one::<dyn DatasetReferenceService>().unwrap());
+    }
+
     async fn get_ref(
         &self,
         r: &odf::BlockRef,
     ) -> Result<odf::Multihash, odf::storage::GetRefError> {
-        self.dataset_ref_service
-            .get_reference(&self.dataset_id, r)
-            .await
-            .map_err(|e| match e {
-                GetDatasetReferenceError::NotFound(_) => {
-                    odf::storage::GetRefError::NotFound(odf::storage::RefNotFoundError {
-                        block_ref_name: r.to_string(),
-                    })
-                }
-                GetDatasetReferenceError::Internal(e) => odf::storage::GetRefError::Internal(e),
-            })
+        let maybe_dataset_ref_service = {
+            let guard = self.state.read().unwrap();
+            guard.maybe_dataset_ref_service.clone()
+        };
+
+        // Read from database
+        if let Some(dataset_ref_service) = maybe_dataset_ref_service {
+            let resolved_ref = dataset_ref_service
+                .get_reference(&self.dataset_id, r)
+                .await
+                .map_err(|e| match e {
+                    GetDatasetReferenceError::NotFound(_) => {
+                        odf::storage::GetRefError::NotFound(odf::storage::RefNotFoundError {
+                            block_ref_name: r.to_string(),
+                        })
+                    }
+                    GetDatasetReferenceError::Internal(e) => odf::storage::GetRefError::Internal(e),
+                })?;
+
+            return Ok(resolved_ref);
+        }
+
+        // Fallback: read from storage, if database is inaccessible
+        self.storage_ref_repo.get(r.as_str()).await
     }
 
     async fn set_ref<'a>(
@@ -83,21 +114,32 @@ where
             }
         }?;
 
-        self.dataset_ref_service
-            .set_reference(&self.dataset_id, r, maybe_prev_block_hash.as_ref(), hash)
-            .await
-            .map_err(|e| match e {
-                SetDatasetReferenceError::CASFailed(e) => {
-                    odf::dataset::SetChainRefError::CASFailed(odf::dataset::RefCASError {
-                        reference: e.block_ref,
-                        expected: e.expected_prev_block_hash,
-                        actual: e.actual_prev_block_hash,
-                    })
-                }
-                SetDatasetReferenceError::Internal(e) => {
-                    odf::dataset::SetChainRefError::Internal(e)
-                }
-            })
+        let maybe_dataset_ref_service = {
+            let guard = self.state.read().unwrap();
+            guard.maybe_dataset_ref_service.clone()
+        };
+
+        if let Some(dataset_ref_service) = maybe_dataset_ref_service {
+            dataset_ref_service
+                .set_reference(&self.dataset_id, r, maybe_prev_block_hash.as_ref(), hash)
+                .await
+                .map_err(|e| match e {
+                    SetDatasetReferenceError::CASFailed(e) => {
+                        odf::dataset::SetChainRefError::CASFailed(odf::dataset::RefCASError {
+                            reference: e.block_ref,
+                            expected: e.expected_prev_block_hash,
+                            actual: e.actual_prev_block_hash,
+                        })
+                    }
+                    SetDatasetReferenceError::Internal(e) => {
+                        odf::dataset::SetChainRefError::Internal(e)
+                    }
+                })?;
+
+            return Ok(());
+        }
+
+        panic!("Cannot set dataset reference without attached reference service")
     }
 
     fn as_raw_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {

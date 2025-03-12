@@ -57,6 +57,14 @@ where
     MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     MetaRefRepo: MetadataChainReferenceRepository + Sync + Send,
 {
+    fn detach_from_transaction(&self) {
+        self.meta_ref_repo.detach_from_transaction();
+    }
+
+    fn reattach_to_transaction(&self, catalog: &dill::Catalog) {
+        self.meta_ref_repo.reattach_to_transaction(catalog);
+    }
+
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
         self.meta_block_repo.contains_block(hash).await
     }

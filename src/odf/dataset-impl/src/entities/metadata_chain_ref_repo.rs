@@ -15,6 +15,14 @@ use odf_storage::*;
 
 #[async_trait::async_trait]
 pub trait MetadataChainReferenceRepository: Send + Sync {
+    fn detach_from_transaction(&self) {
+        // Nothing to do by default
+    }
+
+    fn reattach_to_transaction(&self, _catalog: &dill::Catalog) {
+        // Nothing to do by default
+    }
+
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
     async fn set_ref<'a>(

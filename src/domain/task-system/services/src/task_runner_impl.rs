@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common_macros::transactional_method;
 use dill::*;
 use internal_error::InternalError;
 use kamu_core::*;
@@ -17,6 +18,7 @@ use kamu_task_system::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TaskRunnerImpl {
+    catalog: Catalog,
     polling_ingest_service: Arc<dyn PollingIngestService>,
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
@@ -31,6 +33,7 @@ pub struct TaskRunnerImpl {
 #[interface(dyn TaskRunner)]
 impl TaskRunnerImpl {
     pub fn new(
+        catalog: Catalog,
         polling_ingest_service: Arc<dyn PollingIngestService>,
         transform_elaboration_service: Arc<dyn TransformElaborationService>,
         transform_executor: Arc<dyn TransformExecutor>,
@@ -39,6 +42,7 @@ impl TaskRunnerImpl {
         sync_service: Arc<dyn SyncService>,
     ) -> Self {
         Self {
+            catalog,
             polling_ingest_service,
             transform_elaboration_service,
             transform_executor,
@@ -102,11 +106,16 @@ impl TaskRunnerImpl {
         }
     }
 
+    #[transactional_method]
     async fn run_ingest_update(
         &self,
         ingest_item: PullIngestItem,
         ingest_options: PollingIngestOptions,
     ) -> Result<TaskOutcome, InternalError> {
+        ingest_item
+            .target
+            .reattach_to_transaction(&transaction_catalog);
+
         let ingest_response = self
             .polling_ingest_service
             .ingest(
@@ -126,10 +135,19 @@ impl TaskRunnerImpl {
         }
     }
 
+    #[transactional_method]
     async fn run_transform_update(
         &self,
         transform_item: PullTransformItem,
     ) -> Result<TaskOutcome, InternalError> {
+        transform_item
+            .target
+            .reattach_to_transaction(&transaction_catalog);
+        transform_item
+            .plan
+            .datasets_map
+            .reattach_to_transaction(&transaction_catalog);
+
         let transform_elaboration = match self
             .transform_elaboration_service
             .elaborate_transform(
@@ -179,10 +197,16 @@ impl TaskRunnerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?task_reset))]
+    #[transactional_method]
     async fn run_reset(
         &self,
         task_reset: TaskDefinitionReset,
     ) -> Result<TaskOutcome, InternalError> {
+        // Reattach the transaction
+        task_reset
+            .target
+            .reattach_to_transaction(&transaction_catalog);
+
         let reset_result_maybe = self
             .reset_executor
             .execute(task_reset.target, task_reset.reset_plan)
@@ -212,10 +236,15 @@ impl TaskRunnerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?task_compact))]
+    #[transactional_method]
     async fn run_hard_compaction(
         &self,
         task_compact: TaskDefinitionHardCompact,
     ) -> Result<TaskOutcome, InternalError> {
+        task_compact
+            .target
+            .reattach_to_transaction(&transaction_catalog);
+
         let compaction_result = self
             .compaction_executor
             .execute(task_compact.target, task_compact.compaction_plan, None)

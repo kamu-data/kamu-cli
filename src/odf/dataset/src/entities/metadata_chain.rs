@@ -22,6 +22,15 @@ use crate::*;
 
 #[async_trait]
 pub trait MetadataChain: Send + Sync {
+    /// Detaches this metadata chain from any transaction references
+    fn detach_from_transaction(&self) {
+        // Nothing to do by default
+    }
+
+    fn reattach_to_transaction(&self, _catalog: &dill::Catalog) {
+        // Nothing to do by default
+    }
+
     /// Returns true if chain contains block
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;
 

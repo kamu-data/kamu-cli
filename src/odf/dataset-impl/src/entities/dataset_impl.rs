@@ -373,6 +373,16 @@ where
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
+    /// Detaches this metadata chain from any transaction references
+    fn detach_from_transaction(&self) {
+        self.metadata_chain.detach_from_transaction();
+    }
+
+    /// Reattaches this dataset to new transaction catalog
+    fn reattach_to_transaction(&self, catalog: &dill::Catalog) {
+        self.metadata_chain.reattach_to_transaction(catalog);
+    }
+
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.

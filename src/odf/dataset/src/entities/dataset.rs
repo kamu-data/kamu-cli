@@ -23,6 +23,16 @@ use crate::{AppendError, BlockRef, DatasetSummary, MetadataChain};
 
 #[async_trait]
 pub trait Dataset: Send + Sync {
+    /// Detaches this dataset from any transaction references
+    fn detach_from_transaction(&self) {
+        // Nothing to do by default
+    }
+
+    /// Reattaches this dataset to new transaction catalog
+    fn reattach_to_transaction(&self, _catalog: &dill::Catalog) {
+        // Nothing to do by default
+    }
+
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.
