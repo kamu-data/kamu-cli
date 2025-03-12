@@ -198,9 +198,8 @@ impl Dataset {
             .await?;
         let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
-        // TODO: Private Datasets: uncomment when Maintain is integrated
-        // let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
-        let can_maintain = can_write;
+        let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
+        let is_owner = allowed_actions.contains(&auth::DatasetAction::Own);
 
         Ok(DatasetPermissions {
             collaboration: DatasetCollaborationPermissions {
@@ -218,8 +217,7 @@ impl Dataset {
             general: DatasetGeneralPermissions {
                 can_rename: can_maintain,
                 can_set_visibility: can_maintain,
-                // TODO: Private Datasets: replace with is_owner
-                can_delete: can_maintain,
+                can_delete: is_owner,
             },
             metadata: DatasetMetadataPermissions {
                 can_commit: can_write,
