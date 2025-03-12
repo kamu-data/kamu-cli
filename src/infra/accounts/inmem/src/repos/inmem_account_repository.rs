@@ -331,8 +331,14 @@ impl AccountRepository for InMemoryAccountRepository {
                     {
                         return false;
                     }
-                    if !account.account_name.contains(name_pattern)
-                        && !account.display_name.contains(name_pattern)
+                    if !account
+                        .account_name
+                        .to_lowercase()
+                        .contains(&name_pattern.to_lowercase())
+                        && !account
+                            .display_name
+                            .to_lowercase()
+                            .contains(&name_pattern.to_lowercase())
                     {
                         return false;
                     }
