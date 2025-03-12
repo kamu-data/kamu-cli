@@ -343,13 +343,13 @@ impl RebacService for RebacServiceImpl {
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
-        let object_entities = self
+        let subject_entities = self
             .rebac_repo
             .get_object_entity_relations(&dataset_entity)
             .await?;
 
-        let mut authorized_accounts = Vec::with_capacity(object_entities.len());
-        for EntityWithRelation { entity, relation } in object_entities {
+        let mut authorized_accounts = Vec::with_capacity(subject_entities.len());
+        for EntityWithRelation { entity, relation } in subject_entities {
             let account_id = odf::AccountID::from_did_str(&entity.entity_id).int_err()?;
 
             match relation {

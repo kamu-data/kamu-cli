@@ -402,7 +402,7 @@ impl RebacRepository for SqliteRebacRepository {
                    object_entity_id
             FROM auth_rebac_relations
             WHERE (object_entity_type, object_entity_id) IN ({})
-            ORDER BY entity_id
+            ORDER BY subject_entity_id, object_entity_id
             "#,
             sqlite_generate_placeholders_tuple_list_2(
                 object_entities.len(),
@@ -417,7 +417,7 @@ impl RebacRepository for SqliteRebacRepository {
         }
 
         let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
-        let subject_entity_with_relation_tuples = raw_rows
+        let rows = raw_rows
             .into_iter()
             .map(|row| {
                 let raw_entity = EntitiesWithRelationRowModel {
@@ -434,7 +434,7 @@ impl RebacRepository for SqliteRebacRepository {
             .collect::<Result<Vec<_>, _>>()
             .map_err(GetObjectEntityRelationsError::Internal)?;
 
-        Ok(subject_entity_with_relation_tuples)
+        Ok(rows)
     }
 
     async fn get_subject_entity_relations_by_object_type(

@@ -345,16 +345,93 @@ impl RebacRepository for PostgresRebacRepository {
 
     async fn get_object_entity_relations(
         &self,
-        _object_entity: &Entity,
+        object_entity: &Entity,
     ) -> Result<Vec<EntityWithRelation>, GetObjectEntityRelationsError> {
-        todo!("TODO: Private Datasets: implementation")
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let row_models = sqlx::query_as!(
+            EntityWithRelationRowModel,
+            r#"
+            SELECT subject_entity_type as "entity_type: EntityType",
+                   subject_entity_id as entity_id,
+                   relationship
+            FROM auth_rebac_relations
+            WHERE object_entity_type = $1
+              AND object_entity_id = $2
+            ORDER BY entity_id
+            "#,
+            object_entity.entity_type as EntityType,
+            &object_entity.entity_id,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        row_models
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     async fn get_object_entities_relations(
         &self,
-        _object_entities: &[Entity],
+        object_entities: &[Entity],
     ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError> {
-        todo!("TODO: Private Datasets: implementation")
+        if object_entities.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        // TODO: replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let query_str = format!(
+            r#"
+            SELECT subject_entity_type,
+                   subject_entity_id,
+                   relationship,
+                   object_entity_type,
+                   object_entity_id
+            FROM auth_rebac_relations
+            WHERE (object_entity_type, object_entity_id) IN ({})
+            ORDER BY subject_entity_id, object_entity_id
+            "#,
+            postgres_generate_placeholders_tuple_list_2(
+                object_entities.len(),
+                NonZeroUsize::new(1).unwrap()
+            )
+        );
+
+        let mut query = sqlx::query(&query_str);
+        for entity in object_entities {
+            query = query.bind(entity.entity_type);
+            query = query.bind(&entity.entity_id);
+        }
+
+        let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
+        let rows = raw_rows
+            .into_iter()
+            .map(|row| {
+                let raw_entity = EntitiesWithRelationRowModel {
+                    subject_entity_type: row.get(0),
+                    subject_entity_id: row.get(1),
+                    relationship: row.get(2),
+                    object_entity_type: row.get(3),
+                    object_entity_id: row.get(4),
+                };
+                let entity = raw_entity.try_into()?;
+
+                Ok(entity)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(GetObjectEntityRelationsError::Internal)?;
+
+        Ok(rows)
     }
 
     async fn get_subject_entity_relations_by_object_type(
