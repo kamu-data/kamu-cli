@@ -848,7 +848,7 @@ impl IdentityConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Default, Merge, Serialize, Deserialize)]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchConfig {
@@ -883,6 +883,22 @@ impl SearchConfig {
                 collection_name: Some("kamu-datasets".to_string()),
                 dimensions: Some(Self::DEFAULT_DIMENSIONS),
             })),
+        }
+    }
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        Self {
+            embeddings_chunker: Some(EmbeddingsChunkerConfig::Simple(
+                EmbeddingsChunkerConfigSimple::default(),
+            )),
+            embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
+                EmbeddingsEncoderConfigOpenAi::default(),
+            )),
+            vector_repo: Some(VectorRepoConfig::QdrantContainer(
+                VectorRepoConfigQdrantContainer::default(),
+            )),
         }
     }
 }
@@ -937,8 +953,14 @@ pub enum EmbeddingsEncoderConfig {
     OpenAi(EmbeddingsEncoderConfigOpenAi),
 }
 
+impl Default for EmbeddingsEncoderConfig {
+    fn default() -> Self {
+        Self::OpenAi(EmbeddingsEncoderConfigOpenAi::default())
+    }
+}
+
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct EmbeddingsEncoderConfigOpenAi {
@@ -946,6 +968,17 @@ pub struct EmbeddingsEncoderConfigOpenAi {
     pub api_key: Option<String>,
     pub model_name: Option<String>,
     pub dimensions: Option<usize>,
+}
+
+impl Default for EmbeddingsEncoderConfigOpenAi {
+    fn default() -> Self {
+        Self {
+            url: None,
+            api_key: None,
+            model_name: Some(SearchConfig::DEFAULT_MODEL.to_string()),
+            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -957,17 +990,56 @@ pub struct EmbeddingsEncoderConfigOpenAi {
 #[serde(tag = "kind")]
 pub enum VectorRepoConfig {
     Qdrant(VectorRepoConfigQdrant),
+    QdrantContainer(VectorRepoConfigQdrantContainer),
+}
+
+impl Default for VectorRepoConfig {
+    fn default() -> Self {
+        Self::QdrantContainer(VectorRepoConfigQdrantContainer::default())
+    }
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct VectorRepoConfigQdrant {
+    #[merge(skip)]
     pub url: String,
     pub api_key: Option<String>,
     pub collection_name: Option<String>,
     pub dimensions: Option<usize>,
+}
+
+impl Default for VectorRepoConfigQdrant {
+    fn default() -> Self {
+        Self {
+            url: String::new(),
+            api_key: None,
+            collection_name: Some("kamu-datasets".to_string()),
+            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct VectorRepoConfigQdrantContainer {
+    pub image: Option<String>,
+    pub dimensions: Option<usize>,
+    pub start_timeout: Option<DurationString>,
+}
+
+impl Default for VectorRepoConfigQdrantContainer {
+    fn default() -> Self {
+        Self {
+            image: Some(kamu::utils::docker_images::QDRANT.to_string()),
+            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
+            start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

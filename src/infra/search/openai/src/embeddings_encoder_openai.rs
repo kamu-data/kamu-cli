@@ -30,13 +30,49 @@ pub struct EmbeddingsEncoderConfigOpenAI {
 
 pub struct EmbeddingsEncoderOpenAi {
     config: Arc<EmbeddingsEncoderConfigOpenAI>,
+    client: tokio::sync::OnceCell<async_openai::Client<async_openai::config::OpenAIConfig>>,
 }
 
 #[dill::component(pub)]
+#[dill::scope(dill::Singleton)]
 #[dill::interface(dyn EmbeddingsEncoder)]
 impl EmbeddingsEncoderOpenAi {
     pub fn new(config: Arc<EmbeddingsEncoderConfigOpenAI>) -> Self {
-        Self { config }
+        Self {
+            config,
+            client: tokio::sync::OnceCell::new(),
+        }
+    }
+
+    async fn client(
+        &self,
+    ) -> Result<&async_openai::Client<async_openai::config::OpenAIConfig>, InternalError> {
+        self.client
+            .get_or_try_init(async || self.init_client())
+            .await
+    }
+
+    fn init_client(
+        &self,
+    ) -> Result<async_openai::Client<async_openai::config::OpenAIConfig>, InternalError> {
+        let mut config = async_openai::config::OpenAIConfig::default();
+        if let Some(url) = &self.config.url {
+            config = config.with_api_base(url);
+        }
+
+        if let Some(api_key) = &self.config.api_key {
+            config = config.with_api_key(api_key.expose_secret());
+        } else if std::env::var("OPENAI_API_KEY")
+            .ok()
+            .unwrap_or_default()
+            .is_empty()
+        {
+            return Err(InternalError::new(
+                "Configure OpenAI API key in kamu configuration or set OPENAI_API_KEY env var",
+            ));
+        }
+
+        Ok(async_openai::Client::with_config(config))
     }
 }
 
@@ -46,16 +82,6 @@ impl EmbeddingsEncoderOpenAi {
 impl EmbeddingsEncoder for EmbeddingsEncoderOpenAi {
     #[tracing::instrument(level = "info", skip_all)]
     async fn encode(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, InternalError> {
-        let mut config = async_openai::config::OpenAIConfig::default();
-        if let Some(url) = &self.config.url {
-            config = config.with_api_base(url);
-        }
-        if let Some(api_key) = &self.config.api_key {
-            config = config.with_api_key(api_key.expose_secret());
-        }
-
-        let client = async_openai::Client::with_config(config);
-
         // TODO: Handle too many tokens?
         let embedding_request = async_openai::types::CreateEmbeddingRequestArgs::default()
             .model(&self.config.model_name)
@@ -63,7 +89,9 @@ impl EmbeddingsEncoder for EmbeddingsEncoderOpenAi {
             .build()
             .int_err()?;
 
-        let response = client
+        let response = self
+            .client()
+            .await?
             .embeddings()
             .create(embedding_request)
             .await

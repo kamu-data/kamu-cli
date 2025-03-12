@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod vector_repo_qdrant;
+mod vector_repo_qdrant_container;
 
 pub use vector_repo_qdrant::*;
+pub use vector_repo_qdrant_container::*;

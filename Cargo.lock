@@ -6852,6 +6852,7 @@ name = "kamu-search-qdrant"
 version = "0.226.5"
 dependencies = [
  "async-trait",
+ "container-runtime",
  "dill",
  "futures",
  "internal-error",
