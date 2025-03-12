@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use database_common::{
@@ -178,7 +179,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             WHERE dataset_id IN ({})
             ORDER BY created_at
             "#,
-            sqlite_generate_placeholders_list(dataset_ids.len(), 1)
+            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(1).unwrap())
         );
 
         // ToDo replace it by macro once sqlx will support it

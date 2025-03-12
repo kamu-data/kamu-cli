@@ -8,8 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::num::NonZeroUsize;
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{
+    postgres_generate_placeholders_tuple_list_2,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::*;
@@ -70,9 +75,9 @@ impl RebacRepository for PostgresRebacRepository {
                 DO UPDATE SET property_value = excluded.property_value
             "#,
             entity.entity_type as EntityType,
-            entity.entity_id.as_ref(),
+            &entity.entity_id,
             property_name.to_string(),
-            property_value.as_ref(),
+            property_value,
         )
         .execute(connection_mut)
         .await
@@ -99,7 +104,7 @@ impl RebacRepository for PostgresRebacRepository {
               AND property_name = $3
             "#,
             entity.entity_type as EntityType,
-            entity.entity_id.as_ref(),
+            &entity.entity_id,
             property_name.to_string(),
         )
         .execute(&mut *connection_mut)
@@ -129,7 +134,7 @@ impl RebacRepository for PostgresRebacRepository {
               AND entity_id = $2
             "#,
             entity.entity_type as EntityType,
-            entity.entity_id.as_ref(),
+            &entity.entity_id,
         )
         .execute(&mut *connection_mut)
         .await
@@ -159,7 +164,7 @@ impl RebacRepository for PostgresRebacRepository {
               AND entity_id = $2
             "#,
             entity.entity_type as EntityType,
-            entity.entity_id.as_ref(),
+            &entity.entity_id,
         )
         .fetch_all(connection_mut)
         .await
@@ -184,32 +189,18 @@ impl RebacRepository for PostgresRebacRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        //
-        let placeholder_list = {
-            (1..=entities.len())
-                .map(|i| {
-                    // i | idxs
-                    // 1 | 1, 2
-                    // 2 | 3, 4
-                    // 3 | 5, 6
-                    // ...
-                    let entity_type_idx = i * 2 - 1;
-                    let entity_id_idx = i * 2;
-
-                    format!("(${entity_type_idx},${entity_id_idx})")
-                })
-                .intersperse(",".to_string())
-                .collect::<String>()
-        };
-
         // TODO: replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
         let query_str = format!(
             r#"
             SELECT entity_type, entity_id, property_name, property_value
             FROM auth_rebac_properties
-            WHERE (entity_type, entity_id) IN ({placeholder_list})
+            WHERE (entity_type, entity_id) IN ({})
             "#,
+            postgres_generate_placeholders_tuple_list_2(
+                entities.len(),
+                NonZeroUsize::new(1).unwrap()
+            )
         );
 
         let mut query = sqlx::query(&query_str);
@@ -257,10 +248,10 @@ impl RebacRepository for PostgresRebacRepository {
             VALUES ($1, $2, $3, $4, $5)
             "#,
             subject_entity.entity_type as EntityType,
-            subject_entity.entity_id.as_ref(),
+            &subject_entity.entity_id,
             relationship.to_string(),
             object_entity.entity_type as EntityType,
-            object_entity.entity_id.as_ref(),
+            &object_entity.entity_id,
         )
         .execute(connection_mut)
         .await
@@ -299,10 +290,10 @@ impl RebacRepository for PostgresRebacRepository {
               AND object_entity_id = $5
             "#,
             subject_entity.entity_type as EntityType,
-            subject_entity.entity_id.as_ref(),
+            &subject_entity.entity_id,
             relationship.to_string(),
             object_entity.entity_type as EntityType,
-            object_entity.entity_id.as_ref(),
+            &object_entity.entity_id,
         )
         .execute(&mut *connection_mut)
         .await
@@ -339,7 +330,7 @@ impl RebacRepository for PostgresRebacRepository {
             ORDER BY entity_id
             "#,
             subject_entity.entity_type as EntityType,
-            subject_entity.entity_id.as_ref(),
+            &subject_entity.entity_id,
         )
         .fetch_all(connection_mut)
         .await
@@ -388,7 +379,7 @@ impl RebacRepository for PostgresRebacRepository {
             ORDER BY entity_id
             "#,
             subject_entity.entity_type as EntityType,
-            subject_entity.entity_id.as_ref(),
+            &subject_entity.entity_id,
             object_entity_type as EntityType,
         )
         .fetch_all(connection_mut)
@@ -440,10 +431,51 @@ impl RebacRepository for PostgresRebacRepository {
 
     async fn delete_subject_entities_object_entity_relations(
         &self,
-        _subject_entities: Vec<Entity<'static>>,
-        _object_entity: &Entity,
+        subject_entities: Vec<Entity<'static>>,
+        object_entity: &Entity,
     ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError> {
-        todo!("TODO: Private Datasets: implementation")
+        if subject_entities.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        // TODO: replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let query_str = format!(
+            r#"
+            DELETE
+            FROM auth_rebac_relations
+            WHERE object_entity_type = $1
+              AND object_entity_id = $2
+              AND (subject_entity_type, subject_entity_id) in ({})
+            "#,
+            postgres_generate_placeholders_tuple_list_2(
+                subject_entities.len(),
+                NonZeroUsize::new(3).unwrap()
+            )
+        );
+
+        let mut query = sqlx::query(&query_str)
+            .bind(object_entity.entity_type)
+            .bind(&object_entity.entity_id);
+        for subject_entity in &subject_entities {
+            query = query.bind(subject_entity.entity_type);
+            query = query.bind(&subject_entity.entity_id);
+        }
+
+        let delete_result = query.execute(&mut *connection_mut).await.int_err()?;
+
+        if delete_result.rows_affected() == 0 {
+            return Err(DeleteSubjectEntitiesObjectEntityRelationsError::not_found(
+                subject_entities,
+                object_entity,
+            ));
+        }
+
+        Ok(())
     }
 }
 

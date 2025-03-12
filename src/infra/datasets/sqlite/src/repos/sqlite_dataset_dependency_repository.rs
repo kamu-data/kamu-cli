@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
+
 use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -162,7 +164,10 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
                 downstream_dataset_id = $1 AND
                 upstream_dataset_id IN ({})
             "#,
-            sqlite_generate_placeholders_list(obsolete_upstream_dataset_ids.len(), 2)
+            sqlite_generate_placeholders_list(
+                obsolete_upstream_dataset_ids.len(),
+                NonZeroUsize::new(2).unwrap()
+            )
         );
 
         // ToDo replace it by macro once sqlx will support it

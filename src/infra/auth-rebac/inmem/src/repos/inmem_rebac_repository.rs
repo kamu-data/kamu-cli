@@ -355,10 +355,41 @@ impl RebacRepository for InMemoryRebacRepository {
 
     async fn delete_subject_entities_object_entity_relations(
         &self,
-        _subject_entities: Vec<Entity<'static>>,
-        _object_entity: &Entity,
+        subject_entities: Vec<Entity<'static>>,
+        object_entity: &Entity,
     ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError> {
-        todo!("TODO: Private Datasets: implementation")
+        if subject_entities.is_empty() {
+            return Ok(());
+        }
+
+        let subject_entities_ids = subject_entities.iter().collect::<HashSet<_>>();
+
+        let mut writable_state = self.state.write().await;
+
+        let mut count_deleted = 0;
+        let mut rows_after_deletion = HashSet::new();
+
+        for row in writable_state.entities_relations_rows.drain() {
+            if row.object_entity == *object_entity
+                && subject_entities_ids.contains(&row.subject_entity)
+            {
+                count_deleted += 1;
+                continue;
+            }
+
+            rows_after_deletion.insert(row);
+        }
+
+        writable_state.entities_relations_rows = rows_after_deletion;
+
+        if count_deleted == 0 {
+            return Err(DeleteSubjectEntitiesObjectEntityRelationsError::not_found(
+                subject_entities,
+                object_entity,
+            ));
+        }
+
+        Ok(())
     }
 }
 

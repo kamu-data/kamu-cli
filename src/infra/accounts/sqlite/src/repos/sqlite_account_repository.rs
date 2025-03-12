@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
+
 use database_common::{
     sqlite_generate_placeholders_list,
     PaginationOpts,
@@ -296,7 +298,7 @@ impl AccountRepository for SqliteAccountRepository {
                 FROM accounts
                 WHERE id IN ({})
                 "#,
-            sqlite_generate_placeholders_list(account_ids.len(), 1)
+            sqlite_generate_placeholders_list(account_ids.len(), NonZeroUsize::new(1).unwrap())
         );
 
         // ToDo replace it by macro once sqlx will support it
@@ -465,7 +467,9 @@ impl AccountRepository for SqliteAccountRepository {
                 filters
                     .exclude_accounts_by_ids
                     .as_ref()
-                    .map(|ids| sqlite_generate_placeholders_list(ids.len(), 4))
+                    .map(|ids| {
+                        sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(4).unwrap())
+                    })
                     .unwrap_or_default()
             );
 

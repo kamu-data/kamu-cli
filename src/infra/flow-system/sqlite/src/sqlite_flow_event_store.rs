@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
 use database_common::{
@@ -653,7 +654,10 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
                 maybe_initiators
                     .as_ref()
-                    .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 7))
+                    .map(|initiators| sqlite_generate_placeholders_list(
+                        initiators.len(),
+                        NonZeroUsize::new(7).unwrap()
+                    ))
                     .unwrap_or_default(),
             );
 
@@ -709,7 +713,12 @@ impl FlowEventStore for SqliteFlowEventStore {
             "#,
             maybe_initiators
                 .as_ref()
-                .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 5))
+                .map(|initiators| {
+                    sqlite_generate_placeholders_list(
+                        initiators.len(),
+                        NonZeroUsize::new(5).unwrap(),
+                    )
+                })
                 .unwrap_or_default()
         );
 
@@ -762,12 +771,12 @@ impl FlowEventStore for SqliteFlowEventStore {
                 ORDER BY flow_status DESC, last_event_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
-                sqlite_generate_placeholders_list(dataset_ids.len(), 6),
+                sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(6).unwrap()),
                 maybe_initiators
                     .as_ref()
                     .map(|initiators| sqlite_generate_placeholders_list(
                         initiators.len(),
-                        6 + dataset_ids.len()
+                        NonZeroUsize::new(6 + dataset_ids.len()).unwrap()
                     ))
                     .unwrap_or_default()
             );
@@ -860,7 +869,9 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
                 maybe_initiators
                     .as_ref()
-                    .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 6))
+                    .map(|initiators| {
+                        sqlite_generate_placeholders_list(initiators.len(), NonZeroUsize::new(6).unwrap())
+                    })
                     .unwrap_or_default()
             );
 
@@ -913,7 +924,12 @@ impl FlowEventStore for SqliteFlowEventStore {
             "#,
             maybe_initiators
                 .as_ref()
-                .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 4))
+                .map(|initiators| {
+                    sqlite_generate_placeholders_list(
+                        initiators.len(),
+                        NonZeroUsize::new(4).unwrap(),
+                    )
+                })
                 .unwrap_or_default()
         );
 
@@ -962,7 +978,9 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
                 maybe_initiators
                     .as_ref()
-                    .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 5))
+                    .map(|initiators| {
+                        sqlite_generate_placeholders_list(initiators.len(), NonZeroUsize::new(5).unwrap())
+                    })
                     .unwrap_or_default()
             );
 
@@ -1009,7 +1027,12 @@ impl FlowEventStore for SqliteFlowEventStore {
             "#,
             maybe_initiators
                 .as_ref()
-                .map(|initiators| sqlite_generate_placeholders_list(initiators.len(), 3))
+                .map(|initiators| {
+                    sqlite_generate_placeholders_list(
+                        initiators.len(),
+                        NonZeroUsize::new(3).unwrap(),
+                    )
+                })
                 .unwrap_or_default()
         );
 
@@ -1071,12 +1094,12 @@ impl FlowEventStore for SqliteFlowEventStore {
                 AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
                 AND ($3 = 0 OR initiator IN ({}))
             "#,
-            sqlite_generate_placeholders_list(ids.len(), 4),
+            sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(4).unwrap()),
             maybe_initiators
                 .as_ref()
                 .map(|initiators| sqlite_generate_placeholders_list(
                     initiators.len(),
-                    ids.len() + 4
+                    NonZeroUsize::new(ids.len() + 4).unwrap()
                 ))
                 .unwrap_or_default()
         );

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::num::NonZeroUsize;
 
 use database_common::{sqlite_generate_placeholders_tuple_list_2, TransactionRef, TransactionRefT};
 use dill::{component, interface};
@@ -196,7 +197,10 @@ impl RebacRepository for SqliteRebacRepository {
             FROM auth_rebac_properties
             WHERE (entity_type, entity_id) IN ({})
             "#,
-            sqlite_generate_placeholders_tuple_list_2(entities.len(), 0)
+            sqlite_generate_placeholders_tuple_list_2(
+                entities.len(),
+                NonZeroUsize::new(1).unwrap()
+            )
         );
 
         let mut query = sqlx::query(&query_str);
@@ -400,7 +404,10 @@ impl RebacRepository for SqliteRebacRepository {
             WHERE (object_entity_type, object_entity_id) IN ({})
             ORDER BY entity_id
             "#,
-            sqlite_generate_placeholders_tuple_list_2(object_entities.len(), 0)
+            sqlite_generate_placeholders_tuple_list_2(
+                object_entities.len(),
+                NonZeroUsize::new(1).unwrap()
+            )
         );
 
         let mut query = sqlx::query(&query_str);
@@ -525,7 +532,10 @@ impl RebacRepository for SqliteRebacRepository {
               AND object_entity_id = $2
               AND (subject_entity_type, subject_entity_id) in ({})
             "#,
-            sqlite_generate_placeholders_tuple_list_2(subject_entities.len(), 3)
+            sqlite_generate_placeholders_tuple_list_2(
+                subject_entities.len(),
+                NonZeroUsize::new(3).unwrap()
+            )
         );
 
         let mut query = sqlx::query(&query_str)
