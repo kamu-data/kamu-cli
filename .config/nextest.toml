@@ -1,5 +1,7 @@
 [profile.default]
 fail-fast = false
+# NOTE: Terminate tests after 5 minutes of execution
+slow-timeout = { period = "60s", terminate-after = 5, grace-period = "0s" }
 
 [test-groups]
 setup = { max-threads = 1 }  # Serialize the setup steps
