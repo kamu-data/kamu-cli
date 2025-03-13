@@ -52,11 +52,12 @@ impl CompactDatasetUseCaseImpl {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "CompactDatasetUseCase::execute",
+        name = CompactDatasetUseCaseImpl_execute,
         skip_all,
         fields(dataset_handle, ?options)
     )]
@@ -68,7 +69,7 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
     ) -> Result<CompactionResult, CompactionError> {
         // Permission check
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
+            .check_action_allowed(&dataset_handle.id, DatasetAction::Maintain)
             .await?;
 
         // Resolve dataset
