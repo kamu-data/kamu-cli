@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT object_entity_type as \"entity_type: EntityType\",\n                   object_entity_id as entity_id,\n                   relationship\n            FROM auth_rebac_relations\n            WHERE subject_entity_type = $1\n              AND subject_entity_id = $2\n              AND object_entity_type = $3\n            ORDER BY entity_id\n            ",
+  "query": "\n            SELECT subject_entity_type AS \"entity_type: EntityType\",\n                   subject_entity_id AS entity_id,\n                   relationship\n            FROM auth_rebac_relations\n            WHERE object_entity_type = $1\n              AND object_entity_id = $2\n            ORDER BY entity_id\n            ",
   "describe": {
     "columns": [
       {
@@ -42,18 +42,7 @@
             }
           }
         },
-        "Text",
-        {
-          "Custom": {
-            "name": "rebac_entity_type",
-            "kind": {
-              "Enum": [
-                "account",
-                "dataset"
-              ]
-            }
-          }
-        }
+        "Text"
       ]
     },
     "nullable": [
@@ -62,5 +51,5 @@
       false
     ]
   },
-  "hash": "83fba96d76e48d0459038fd0ec5cb21b5a513927098b35c2e273b9e484c12994"
+  "hash": "f9be4bedc03bb364561bbf76b8209b172f9861f48e928256a6cf1c55ee9cdeea"
 }
