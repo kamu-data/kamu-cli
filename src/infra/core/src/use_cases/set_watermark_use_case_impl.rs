@@ -41,11 +41,12 @@ impl SetWatermarkUseCaseImpl {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "SetWatermarkUseCase::execute",
+        name = SetWatermarkUseCaseImpl_execute,
         skip_all,
         fields(dataset_handle, new_watermark)
     )]
@@ -54,7 +55,6 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         dataset_handle: &odf::DatasetHandle,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
-        // TODO: Private Datasets: use access helper
         // Permission check
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
