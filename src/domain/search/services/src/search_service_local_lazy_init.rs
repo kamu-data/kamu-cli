@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use dill::{Component, TypedBuilder};
 use init_on_startup::InitOnStartup;
 use internal_error::*;
@@ -44,9 +42,6 @@ impl SearchServiceLocalImplLazyInit {
 
     async fn init(&self) -> Result<(), InternalError> {
         let indexer = SearchServiceLocalIndexer::builder()
-            .with_config(Arc::new(SearchServiceLocalIndexerConfig {
-                clear_on_start: false,
-            }))
             .get(&self.catalog)
             .int_err()?;
 

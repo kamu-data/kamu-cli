@@ -92,6 +92,10 @@ impl VectorRepository for VectorRepositoryQdrant {
     }
 
     async fn insert(&self, points: Vec<NewPoint>) -> Result<(), InsertError> {
+        if points.is_empty() {
+            return Ok(());
+        }
+
         let points: Vec<_> = {
             let mut rng = rand::thread_rng();
 
@@ -166,6 +170,7 @@ impl VectorRepository for VectorRepositoryQdrant {
             .await?
             .delete_points(
                 DeletePointsBuilder::new(&self.config.collection_name)
+                    .points(Filter::default())
                     .wait(true)
                     .build(),
             )

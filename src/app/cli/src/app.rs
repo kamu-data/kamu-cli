@@ -893,12 +893,16 @@ pub fn register_config_in_catalog(
 
     // Search configuration
     let crate::config::SearchConfig {
+        indexer,
         embeddings_chunker,
         embeddings_encoder,
         vector_repo,
     } = config.search.clone().unwrap();
 
     catalog_builder.add::<kamu_search_services::SearchServiceLocalImplLazyInit>();
+    catalog_builder.add_value(kamu_search_services::SearchServiceLocalIndexerConfig {
+        clear_on_start: indexer.unwrap_or_default().clear_on_start,
+    });
 
     match embeddings_chunker.unwrap_or_default() {
         config::EmbeddingsChunkerConfig::Simple(cfg) => {

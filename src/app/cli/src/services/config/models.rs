@@ -852,6 +852,7 @@ impl IdentityConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchConfig {
+    pub indexer: Option<SearchIndexerConfig>,
     pub embeddings_chunker: Option<EmbeddingsChunkerConfig>,
     pub embeddings_encoder: Option<EmbeddingsEncoderConfig>,
     pub vector_repo: Option<VectorRepoConfig>,
@@ -863,11 +864,9 @@ impl SearchConfig {
 
     pub fn sample() -> Self {
         Self {
+            indexer: Some(SearchIndexerConfig::default()),
             embeddings_chunker: Some(EmbeddingsChunkerConfig::Simple(
-                EmbeddingsChunkerConfigSimple {
-                    split_sections: Some(false),
-                    split_paragraphs: Some(false),
-                },
+                EmbeddingsChunkerConfigSimple::default(),
             )),
             embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
                 EmbeddingsEncoderConfigOpenAi {
@@ -890,6 +889,7 @@ impl SearchConfig {
 impl Default for SearchConfig {
     fn default() -> Self {
         Self {
+            indexer: Some(SearchIndexerConfig::default()),
             embeddings_chunker: Some(EmbeddingsChunkerConfig::Simple(
                 EmbeddingsChunkerConfigSimple::default(),
             )),
@@ -901,6 +901,17 @@ impl Default for SearchConfig {
             )),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchIndexerConfig {
+    // Whether to clear and re-index on start or use existing vectors if any
+    pub clear_on_start: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

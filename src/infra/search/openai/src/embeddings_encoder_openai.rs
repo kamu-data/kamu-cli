@@ -82,6 +82,10 @@ impl EmbeddingsEncoderOpenAi {
 impl EmbeddingsEncoder for EmbeddingsEncoderOpenAi {
     #[tracing::instrument(level = "info", skip_all)]
     async fn encode(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, InternalError> {
+        if input.is_empty() {
+            return Ok(Vec::new());
+        }
+
         // TODO: Handle too many tokens?
         let embedding_request = async_openai::types::CreateEmbeddingRequestArgs::default()
             .model(&self.config.model_name)
