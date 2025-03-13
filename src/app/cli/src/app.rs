@@ -218,125 +218,16 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         )
     };
 
-    // Register metrics
-    let metrics_registry = observability::metrics::register_all(&cli_catalog);
+    let mut command_result: Result<(), CLIError> = Ok(());
 
-    let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
+    // UNCOMMENT ME TO SEE THE BUG!!
+    //
+    // if command_result.is_ok() && cli_commands::command_needs_startup_jobs(&args)
+    // {     command_result = run_startup_initializations(&cli_catalog).await;
+    // }
 
-    if is_in_workspace && !is_workspace_upgrade_needed {
-        // Evict cache
-        cli_catalog.get_one::<GcService>()?.evict_cache()?;
-    }
-
-    // Some extra steps are necessary for commands that require workspace
-    let mut command_result: Result<(), CLIError> = if cli_commands::command_needs_workspace(&args) {
-        if !workspace_svc.is_in_workspace() {
-            Err(CLIError::usage_error_from(NotInWorkspace))
-        } else if is_workspace_upgrade_needed {
-            Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-        } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant {
-            Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-        } else {
-            Ok(())
-        }
-    } else {
-        Ok(())
-    };
-
-    if command_result.is_ok() && cli_commands::command_needs_startup_jobs(&args) {
-        command_result = run_startup_initializations(&cli_catalog).await;
-    }
-
-    if command_result.is_ok() {
-        let is_transactional = maybe_db_connection_settings.is_some()
-            && cli_commands::command_needs_transaction(&args);
-        let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
-
-        command_result = maybe_transactional(
-            is_transactional,
-            cli_catalog.clone(),
-            |maybe_transactional_cli_catalog: Catalog| async move {
-                let mut command = cli_commands::get_command(
-                    work_catalog,
-                    &maybe_transactional_cli_catalog,
-                    args,
-                )?;
-
-                command.validate_args().await?;
-
-                let command_name = command.name();
-
-                command
-                    .run()
-                    .instrument(tracing::info_span!(
-                        "Running command",
-                        %is_transactional,
-                        %command_name,
-                    ))
-                    .await
-            },
-        )
-        .instrument(tracing::debug_span!("app::run_command"))
-        .await;
-
-        command_result = command_result
-            // If successful, then process the Outbox messages while they are present
-            .and_then_async(|_| async {
-                let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
-                outbox_agent
-                    .run_while_has_tasks()
-                    .await
-                    .map_err(CLIError::critical)
-            })
-            .instrument(tracing::debug_span!(
-                "Consume accumulated the Outbox messages"
-            ))
-            .await
-            // If we had a temporary directory, we move the database from it to the expected
-            // location.
-            .and_then_async(|_| async {
-                move_initial_database_to_workspace_if_needed(
-                    &workspace_layout,
-                    maybe_temp_database_path,
-                )
-                .await
-                .map_int_err(CLIError::critical)
-            })
-            .await;
-    }
-
-    match &command_result {
-        Ok(()) => {
-            tracing::info!("Command successful");
-        }
-        Err(err) => {
-            tracing::error!(
-                error_dbg = ?err,
-                error = %err.pretty(true),
-                "Command failed",
-            );
-
-            if output_config.verbosity_level == 0 {
-                eprintln!("{}", err.pretty(false));
-            }
-        }
-    }
-
-    // Flush all logging sinks
-    drop(guards);
-
-    if let Some(metrics_file) = &output_config.metrics_file {
-        if let Ok(mut file) = std::fs::File::create(metrics_file) {
-            use prometheus::Encoder as _;
-            let _ = prometheus::TextEncoder::new().encode(&metrics_registry.gather(), &mut file);
-            eprintln!("Saving metrics to {}", metrics_file.display());
-        }
-    }
-
-    if let Some(trace_file) = &output_config.trace_file {
-        // Run a web server and open the trace in the browser if the environment allows
-        let _ = TraceServer::maybe_serve_in_browser(trace_file).await;
-    }
+    eprintln!("GETTTTTTTTTT");
+    let xx = cli_catalog.get_one::<XX>().unwrap();
 
     command_result
 }
@@ -951,6 +842,8 @@ pub fn register_config_in_catalog(
         }
     }
     //
+
+    catalog_builder.add::<XX>();
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -1149,3 +1042,13 @@ struct Guards {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::scope(dill::Singleton)]
+struct XX {}
+
+impl Drop for XX {
+    fn drop(&mut self) {
+        eprintln!("DROOOOOOOOOOOOP")
+    }
+}
