@@ -11,9 +11,13 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.227.0] - 2025-03-13
+### Added
+- `kamu search` now supports `--local` flag which will use natural language search on datasets in the local workspace (#1136)
+  - To use this feature you'll need to configure the OpenAI key in kamu config or set it via `OPENAI_API_KEY` env var
+  - By default uses [Qdrant](https://qdrant.tech/) vector database spawned per command in a container
 ### Fixed
-- `kamu sql server`: correctly works inside containers(jupyter)
+- `kamu sql server` now works again inside containers (e.g. jupyter)
 
 ## [0.226.5] - 2025-03-10
 ### Fixed

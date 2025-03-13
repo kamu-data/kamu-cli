@@ -1397,7 +1397,7 @@ dependencies = [
 
 [[package]]
 name = "async-utils"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "tokio",
@@ -2577,7 +2577,7 @@ dependencies = [
 
 [[package]]
 name = "common-macros"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "quote",
  "syn 2.0.96",
@@ -2652,7 +2652,7 @@ checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
 name = "container-runtime"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -3090,7 +3090,7 @@ checksum = "0e60eed09d8c01d3cee5b7d30acb059b76614c918fa0f992e0dd6eeb10daad6f"
 
 [[package]]
 name = "database-common"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3117,7 +3117,7 @@ dependencies = [
 
 [[package]]
 name = "database-common-macros"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "quote",
  "syn 2.0.96",
@@ -4011,7 +4011,7 @@ dependencies = [
 
 [[package]]
 name = "email-utils"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "serde",
  "thiserror 2.0.11",
@@ -4071,7 +4071,7 @@ dependencies = [
 
 [[package]]
 name = "enum-variants"
-version = "0.226.5"
+version = "0.227.0"
 
 [[package]]
 name = "env_filter"
@@ -4140,7 +4140,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -4155,7 +4155,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing-macros"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "quote",
  "syn 2.0.96",
@@ -4237,7 +4237,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "file-utils"
-version = "0.226.5"
+version = "0.227.0"
 
 [[package]]
 name = "filetime"
@@ -4900,7 +4900,7 @@ dependencies = [
 
 [[package]]
 name = "http-common"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "axum 0.8.1",
  "http 1.2.0",
@@ -5320,7 +5320,7 @@ checksum = "b248f5224d1d606005e02c97f5aa4e88eeb230488bcc03bc9ca4d7991399f2b5"
 
 [[package]]
 name = "init-on-startup"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -5360,7 +5360,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "thiserror 2.0.11",
 ]
@@ -5519,7 +5519,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "alloy",
  "async-recursion",
@@ -5599,7 +5599,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "base32",
@@ -5627,7 +5627,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-inmem"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5648,7 +5648,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-mysql"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5671,7 +5671,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-postgres"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5694,7 +5694,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-repo-tests"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "argon2",
  "chrono",
@@ -5711,7 +5711,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-services"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "argon2",
  "async-trait",
@@ -5739,7 +5739,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-accounts-sqlite"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5762,7 +5762,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-oso-rebac"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -5794,7 +5794,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flight-sql"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "arrow-flight",
  "async-trait",
@@ -5827,7 +5827,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -5880,7 +5880,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "aws-sdk-s3",
@@ -5951,7 +5951,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-oauth"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "dill",
@@ -5968,7 +5968,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-odata"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "axum 0.8.1",
@@ -6010,7 +6010,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "internal-error",
@@ -6022,7 +6022,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-inmem"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common-macros",
@@ -6036,7 +6036,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-postgres"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -6052,7 +6052,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-repo-tests"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "dill",
  "kamu-auth-rebac",
@@ -6061,7 +6061,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-services"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -6085,7 +6085,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-rebac-sqlite"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -6101,7 +6101,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "arrow-flight",
  "async-graphql",
@@ -6229,7 +6229,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -6259,7 +6259,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-common-macros"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "quote",
  "syn 2.0.96",
@@ -6267,7 +6267,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-inmem"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "indoc 2.0.5",
  "kamu-cli-e2e-common",
@@ -6279,7 +6279,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-mysql"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "database-common",
  "indoc 2.0.5",
@@ -6293,7 +6293,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-postgres"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "database-common",
  "indoc 2.0.5",
@@ -6307,7 +6307,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-repo-tests"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "chrono",
  "database-common",
@@ -6334,7 +6334,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-e2e-sqlite"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "database-common",
  "indoc 2.0.5",
@@ -6348,7 +6348,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli-puppet"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "assert_cmd",
  "async-trait",
@@ -6368,7 +6368,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6400,7 +6400,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datafusion-cli"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "arrow",
  "async-trait",
@@ -6420,7 +6420,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -6444,7 +6444,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-inmem"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -6465,7 +6465,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-postgres"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6486,7 +6486,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-repo-tests"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "chrono",
  "database-common",
@@ -6503,7 +6503,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-services"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6542,7 +6542,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datasets-sqlite"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6563,7 +6563,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6589,7 +6589,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-inmem"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6610,7 +6610,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-postgres"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6632,7 +6632,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-repo-tests"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "chrono",
  "database-common",
@@ -6645,7 +6645,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-services"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6683,7 +6683,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-sqlite"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6705,7 +6705,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-ingest-datafusion"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6737,7 +6737,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-inmem"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common-macros",
@@ -6753,7 +6753,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-postgres"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6771,7 +6771,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-repo-tests"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "chrono",
  "dill",
@@ -6784,7 +6784,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-messaging-outbox-sqlite"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6803,7 +6803,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-repo-tools"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "chrono",
  "clap",
@@ -6821,7 +6821,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -6833,7 +6833,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search-openai"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-openai",
  "async-trait",
@@ -6849,7 +6849,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search-qdrant"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "container-runtime",
@@ -6867,7 +6867,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-search-services"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "dill",
@@ -6888,7 +6888,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6907,7 +6907,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "database-common",
@@ -6924,7 +6924,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-postgres"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -6944,7 +6944,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-repo-tests"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "chrono",
  "database-common",
@@ -6956,7 +6956,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-services"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6988,7 +6988,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-sqlite"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -7434,7 +7434,7 @@ dependencies = [
 
 [[package]]
 name = "messaging-outbox"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -7574,7 +7574,7 @@ dependencies = [
 
 [[package]]
 name = "multiformats"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "base64 0.22.1",
  "bs58",
@@ -7902,7 +7902,7 @@ dependencies = [
 
 [[package]]
 name = "observability"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "axum 0.8.1",
@@ -7980,7 +7980,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "opendatafabric"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "opendatafabric-data-utils",
  "opendatafabric-dataset",
@@ -7995,7 +7995,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-data-utils"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "arrow",
  "arrow-digest",
@@ -8019,7 +8019,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-dataset"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8043,7 +8043,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-dataset-impl"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -8083,7 +8083,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-metadata"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "arrow",
  "base64 0.22.1",
@@ -8114,7 +8114,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -8136,7 +8136,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage-http"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -8159,7 +8159,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage-inmem"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -8175,7 +8175,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage-lfs"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -8195,7 +8195,7 @@ dependencies = [
 
 [[package]]
 name = "opendatafabric-storage-s3"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "async-utils",
@@ -9268,7 +9268,7 @@ dependencies = [
 
 [[package]]
 name = "random-names"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "rand",
 ]
@@ -9874,7 +9874,7 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
 name = "s3-utils"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-utils",
  "aws-config",
@@ -10875,7 +10875,7 @@ dependencies = [
 
 [[package]]
 name = "test-utils"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "axum 0.8.1",
  "container-runtime",
@@ -11010,7 +11010,7 @@ dependencies = [
 
 [[package]]
 name = "time-source"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -11436,7 +11436,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-perfetto"
-version = "0.226.5"
+version = "0.227.0"
 dependencies = [
  "conv",
  "serde",
