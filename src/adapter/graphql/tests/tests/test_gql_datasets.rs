@@ -11,9 +11,11 @@ use bon::bon;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use indoc::indoc;
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -723,11 +725,156 @@ async fn test_dataset_delete_dangling_ref() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: check other variants
 #[test_log::test(tokio::test)]
-async fn test_dataset_view_permissions() {
+async fn test_dataset_view_permissions_for_a_reader() {
+    test_dataset_view_permissions(
+        &[DatasetAction::Read],
+        async_graphql::value!({
+            "collaboration": {
+                "canView": false,
+                "canUpdate": false,
+            },
+            "envVars": {
+                "canView": true,
+                "canUpdate": false,
+            },
+            "flows": {
+                "canView": true,
+                "canRun": false,
+            },
+            "general": {
+                "canRename": false,
+                "canSetVisibility": false,
+                "canDelete": false,
+            },
+            "metadata": {
+                "canCommit": false,
+            },
+        }),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_view_permissions_for_an_editor() {
+    test_dataset_view_permissions(
+        &[DatasetAction::Read, DatasetAction::Write],
+        async_graphql::value!({
+            "collaboration": {
+                "canView": false,
+                "canUpdate": false,
+            },
+            "envVars": {
+                "canView": true,
+                "canUpdate": false,
+            },
+            "flows": {
+                "canView": true,
+                "canRun": false,
+            },
+            "general": {
+                "canRename": false,
+                "canSetVisibility": false,
+                "canDelete": false,
+            },
+            "metadata": {
+                "canCommit": true,
+            },
+        }),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_view_permissions_for_a_maintainer() {
+    test_dataset_view_permissions(
+        &[
+            DatasetAction::Read,
+            DatasetAction::Write,
+            DatasetAction::Maintain,
+        ],
+        async_graphql::value!({
+            "collaboration": {
+                "canView": true,
+                "canUpdate": true,
+            },
+            "envVars": {
+                "canView": true,
+                "canUpdate": true,
+            },
+            "flows": {
+                "canView": true,
+                "canRun": true,
+            },
+            "general": {
+                "canRename": true,
+                "canSetVisibility": true,
+                "canDelete": false,
+            },
+            "metadata": {
+                "canCommit": true,
+            },
+        }),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_view_permissions_for_an_owner() {
+    test_dataset_view_permissions(
+        &[
+            DatasetAction::Read,
+            DatasetAction::Write,
+            DatasetAction::Maintain,
+            DatasetAction::Own,
+        ],
+        async_graphql::value!({
+            "collaboration": {
+                "canView": true,
+                "canUpdate": true,
+            },
+            "envVars": {
+                "canView": true,
+                "canUpdate": true,
+            },
+            "flows": {
+                "canView": true,
+                "canRun": true,
+            },
+            "general": {
+                "canRename": true,
+                "canSetVisibility": true,
+                "canDelete": true,
+            },
+            "metadata": {
+                "canCommit": true,
+            },
+        }),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_dataset_view_permissions(
+    allowed_actions: &[DatasetAction],
+    expected_permission: async_graphql::Value,
+) {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::SingleTenant)
+        .mock_dataset_action_authorizer(
+            MockDatasetActionAuthorizer::new()
+                .expect_check_read_a_dataset(1, true)
+                .make_expect_get_allowed_actions(allowed_actions, 1),
+        )
         .build()
         .await;
 
@@ -776,28 +923,7 @@ async fn test_dataset_view_permissions() {
         async_graphql::value!({
             "datasets": {
                 "byId": {
-                    "permissions": {
-                        "collaboration": {
-                            "canView": true,
-                            "canUpdate": true,
-                        },
-                        "envVars": {
-                            "canView": true,
-                            "canUpdate": true,
-                        },
-                        "flows": {
-                            "canView": true,
-                            "canRun": true,
-                        },
-                        "general": {
-                            "canRename": true,
-                            "canSetVisibility": true,
-                            "canDelete": true,
-                        },
-                        "metadata": {
-                            "canCommit": true,
-                        },
-                    }
+                    "permissions": expected_permission
                 }
             }
         }),
@@ -818,7 +944,10 @@ struct GraphQLDatasetsHarness {
 #[bon]
 impl GraphQLDatasetsHarness {
     #[builder]
-    pub async fn new(tenancy_config: TenancyConfig) -> Self {
+    pub async fn new(
+        tenancy_config: TenancyConfig,
+        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -843,7 +972,6 @@ impl GraphQLDatasetsHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<RebacServiceImpl>()
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
                 .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
@@ -854,6 +982,13 @@ impl GraphQLDatasetsHarness {
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<RebacDatasetLifecycleMessageConsumer>();
+
+            if let Some(mock) = mock_dataset_action_authorizer {
+                b.add_value(mock)
+                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+            } else {
+                b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+            }
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

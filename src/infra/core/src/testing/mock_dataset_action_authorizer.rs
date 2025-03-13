@@ -215,6 +215,18 @@ impl MockDatasetActionAuthorizer {
 
         self
     }
+
+    pub fn make_expect_get_allowed_actions(
+        mut self,
+        allowed_actions: &[DatasetAction],
+        times: usize,
+    ) -> Self {
+        let res = HashSet::from_iter(allowed_actions.iter().copied());
+        self.expect_get_allowed_actions()
+            .times(times)
+            .returning(move |_| Ok(res.clone()));
+        self
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
