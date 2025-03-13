@@ -277,20 +277,24 @@ impl RebacService for RebacServiceImpl {
             .int_err()?;
 
         // ... before setting up a new one.
-        self.rebac_repo
+        let insert_res = self
+            .rebac_repo
             .insert_entities_relation(
                 &account_entity,
                 Relation::AccountToDataset(relationship),
                 &dataset_entity,
             )
-            .map(|res| match res {
-                Ok(_) => Ok(()),
-                Err(e) => match e {
-                    InsertEntitiesRelationError::Duplicate(_) => Ok(()),
-                    e @ InsertEntitiesRelationError::Internal(_) => Err(e.int_err().into()),
-                },
-            })
-            .await
+            .await;
+
+        use InsertEntitiesRelationError::{AnotherRolePresent, Duplicate, Internal};
+
+        match insert_res {
+            Ok(_) => Ok(()),
+            Err(e) => match e {
+                Duplicate(_) => Ok(()),
+                e @ (Internal(_) | AnotherRolePresent(_)) => Err(e.int_err().into()),
+            },
+        }
     }
 
     async fn unset_accounts_dataset_relations(

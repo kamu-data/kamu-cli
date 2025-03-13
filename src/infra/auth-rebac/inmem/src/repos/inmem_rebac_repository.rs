@@ -22,7 +22,7 @@ use kamu_auth_rebac::{
     EntityWithRelation,
     GetEntityPropertiesError,
     GetObjectEntityRelationsError,
-    GetRelationsBetweenEntitiesError,
+    GetRelationBetweenEntitiesError,
     InsertEntitiesRelationError,
     PropertiesCountError,
     PropertyName,
@@ -207,22 +207,32 @@ impl RebacRepository for InMemoryRebacRepository {
     ) -> Result<(), InsertEntitiesRelationError> {
         let mut writable_state = self.state.write().await;
 
-        let row = EntitiesWithRelation {
+        for row in &writable_state.entities_relations_rows {
+            if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
+                let error = if row.relation == relation {
+                    Err(InsertEntitiesRelationError::duplicate(
+                        subject_entity,
+                        relation,
+                        object_entity,
+                    ))
+                } else {
+                    Err(InsertEntitiesRelationError::another_role_present(
+                        subject_entity,
+                        object_entity,
+                    ))
+                };
+
+                return error;
+            }
+        }
+
+        let new_row = EntitiesWithRelation {
             subject_entity: subject_entity.clone().into_owned(),
             relation,
             object_entity: object_entity.clone().into_owned(),
         };
-        let is_duplicate = writable_state.entities_relations_rows.contains(&row);
 
-        if is_duplicate {
-            return Err(InsertEntitiesRelationError::duplicate(
-                subject_entity,
-                relation,
-                object_entity,
-            ));
-        }
-
-        writable_state.entities_relations_rows.insert(row);
+        writable_state.entities_relations_rows.insert(new_row);
 
         Ok(())
     }
@@ -230,27 +240,28 @@ impl RebacRepository for InMemoryRebacRepository {
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
-        relation: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError> {
         let mut writable_state = self.state.write().await;
 
-        let row = EntitiesWithRelation {
-            subject_entity: subject_entity.clone().into_owned(),
-            relation,
-            object_entity: object_entity.clone().into_owned(),
-        };
-        let not_found = !writable_state.entities_relations_rows.remove(&row);
+        let maybe_row = writable_state
+            .entities_relations_rows
+            .iter()
+            .find(|row| {
+                row.subject_entity == *subject_entity && row.object_entity == *object_entity
+            })
+            .cloned();
 
-        if not_found {
-            return Err(DeleteEntitiesRelationError::not_found(
+        if let Some(row) = maybe_row {
+            writable_state.entities_relations_rows.remove(&row);
+
+            Ok(())
+        } else {
+            Err(DeleteEntitiesRelationError::not_found(
                 subject_entity,
-                relation,
                 object_entity,
-            ));
+            ))
         }
-
-        Ok(())
     }
 
     async fn get_subject_entity_relations(
@@ -335,22 +346,29 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(res)
     }
 
-    async fn get_relations_between_entities(
+    async fn get_relation_between_entities(
         &self,
         subject_entity: &Entity,
         object_entity: &Entity,
-    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError> {
-        let res = self
-            .get_rows(|row| {
-                if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
-                    Some(row.relation)
-                } else {
-                    None
-                }
-            })
-            .await;
+    ) -> Result<Relation, GetRelationBetweenEntitiesError> {
+        let readable_state = self.state.read().await;
 
-        Ok(res)
+        let maybe_row = readable_state
+            .entities_relations_rows
+            .iter()
+            .find(|row| {
+                row.subject_entity == *subject_entity && row.object_entity == *object_entity
+            })
+            .cloned();
+
+        if let Some(row) = maybe_row {
+            Ok(row.relation)
+        } else {
+            Err(GetRelationBetweenEntitiesError::not_found(
+                subject_entity,
+                object_entity,
+            ))
+        }
     }
 
     async fn delete_subject_entities_object_entity_relations(

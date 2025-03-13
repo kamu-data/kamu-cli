@@ -25,6 +25,7 @@ use kamu_auth_rebac::{
     InsertEntitiesRelationError,
     PropertyName,
     RebacRepository,
+    RebacRepositoryExt,
     Relation,
 };
 
@@ -347,6 +348,15 @@ pub async fn test_delete_entities_relation(catalog: &Catalog) {
 
     assert_matches!(
         rebac_repo
+            .delete_entities_relation(&account, &dataset)
+            .await,
+        Err(DeleteEntitiesRelationError::NotFound(e))
+            if e.subject_entity == account
+                && e.object_entity == dataset
+    );
+
+    assert_matches!(
+        rebac_repo
             .insert_entities_relation(&account, relationship, &dataset)
             .await,
         Ok(())
@@ -354,17 +364,16 @@ pub async fn test_delete_entities_relation(catalog: &Catalog) {
 
     assert_matches!(
         rebac_repo
-            .delete_entities_relation(&account, relationship, &dataset)
+            .delete_entities_relation(&account, &dataset)
             .await,
         Ok(())
     );
     assert_matches!(
         rebac_repo
-            .delete_entities_relation(&account, relationship, &dataset)
+            .delete_entities_relation(&account, &dataset)
             .await,
         Err(DeleteEntitiesRelationError::NotFound(e))
             if e.subject_entity == account
-                && e.relationship == relationship
                 && e.object_entity == dataset
     );
 }
@@ -384,10 +393,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
                 Relation::account_is_a_dataset_reader(),
                 ["dataset1", "dataset2"].into(),
             ),
-            (
-                Relation::account_is_a_dataset_editor(),
-                ["dataset1", "dataset3"].into(),
-            ),
+            (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
         ]),
     };
 
@@ -410,7 +416,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
     // 2. Validate inserted
 
-    assert_get_relations(&rebac_repo, &state).await;
+    assert_get_relations("2.", &rebac_repo, &state).await;
 
     // 3. Deletions
 
@@ -420,11 +426,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
         assert_matches!(
             rebac_repo
-                .delete_entities_relation(
-                    &account,
-                    Relation::account_is_a_dataset_reader(),
-                    &dataset1
-                )
+                .delete_entities_relation(&account, &dataset1)
                 .await,
             Ok(())
         );
@@ -434,14 +436,11 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
             relation_map: HashMap::from([
                 (Relation::account_is_a_dataset_reader(), ["dataset2"].into()),
-                (
-                    Relation::account_is_a_dataset_editor(),
-                    ["dataset1", "dataset3"].into(),
-                ),
+                (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
             ]),
         };
 
-        assert_get_relations(&rebac_repo, &state).await;
+        assert_get_relations("3.1.", &rebac_repo, &state).await;
     }
     {
         let account = Entity::new_account("account");
@@ -449,11 +448,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
         assert_matches!(
             rebac_repo
-                .delete_entities_relation(
-                    &account,
-                    Relation::account_is_a_dataset_reader(),
-                    &dataset2
-                )
+                .delete_entities_relation(&account, &dataset2)
                 .await,
             Ok(())
         );
@@ -463,14 +458,11 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
             relation_map: HashMap::from([
                 (Relation::account_is_a_dataset_reader(), [].into()),
-                (
-                    Relation::account_is_a_dataset_editor(),
-                    ["dataset1", "dataset3"].into(),
-                ),
+                (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
             ]),
         };
 
-        assert_get_relations(&rebac_repo, &state).await;
+        assert_get_relations("3.2.", &rebac_repo, &state).await;
     }
     {
         let account = Entity::new_account("account");
@@ -478,37 +470,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
         assert_matches!(
             rebac_repo
-                .delete_entities_relation(
-                    &account,
-                    Relation::account_is_a_dataset_editor(),
-                    &dataset3
-                )
-                .await,
-            Ok(())
-        );
-
-        let state = CrossoverTestState {
-            account_id: "account",
-            dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
-            relation_map: HashMap::from([
-                (Relation::account_is_a_dataset_reader(), [].into()),
-                (Relation::account_is_a_dataset_editor(), ["dataset1"].into()),
-            ]),
-        };
-
-        assert_get_relations(&rebac_repo, &state).await;
-    }
-    {
-        let account = Entity::new_account("account");
-        let dataset1 = Entity::new_dataset("dataset1");
-
-        assert_matches!(
-            rebac_repo
-                .delete_entities_relation(
-                    &account,
-                    Relation::account_is_a_dataset_editor(),
-                    &dataset1
-                )
+                .delete_entities_relation(&account, &dataset3)
                 .await,
             Ok(())
         );
@@ -522,7 +484,7 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
             ]),
         };
 
-        assert_get_relations(&rebac_repo, &state).await;
+        assert_get_relations("3.3.", &rebac_repo, &state).await;
     }
 }
 
@@ -597,7 +559,7 @@ pub async fn test_delete_subject_entities_object_entity_relations(catalog: &Cata
     ];
 
     for expected_state in &expected_states {
-        assert_get_relations(&rebac_repo, expected_state).await;
+        assert_get_relations("before", &rebac_repo, expected_state).await;
     }
 
     assert_matches!(
@@ -613,13 +575,19 @@ pub async fn test_delete_subject_entities_object_entity_relations(catalog: &Cata
     );
 
     for expected_state in &expected_states {
-        assert_get_relations(&rebac_repo, expected_state).await;
+        assert_get_relations("after", &rebac_repo, expected_state).await;
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &CrossoverTestState) {
+async fn assert_get_relations(
+    tag: &'static str,
+    rebac_repo: &Arc<dyn RebacRepository>,
+    state: &CrossoverTestState,
+) {
     let account = Entity::new_account(state.account_id);
     let mut object_entities = state.get_object_entities_with_relation();
 
@@ -633,7 +601,8 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
                 pretty_assertions::assert_eq!(
                     object_entities,
                     actual_res,
-                    "AccountID: {}",
+                    "[{}] AccountID: {}",
+                    tag,
                     state.account_id
                 );
             }
@@ -656,7 +625,8 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
                     pretty_assertions::assert_eq!(
                         object_entities,
                         actual_res,
-                        "AccountID: {}",
+                        "[{}] AccountID: {}",
+                        tag,
                         state.account_id
                     );
                 }
@@ -677,7 +647,7 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
         }
     }
 
-    // Check RebacRepository::get_relations_between_entities()
+    // Check RebacRepository::try_get_relation_between_entities()
     {
         let relation_map = state.get_object_entity_relation_map();
 
@@ -685,18 +655,17 @@ async fn assert_get_relations(rebac_repo: &Arc<dyn RebacRepository>, state: &Cro
             let dataset = Entity::new_dataset(*dataset_id);
 
             match rebac_repo
-                .get_relations_between_entities(&account, &dataset)
+                .try_get_relation_between_entities(&account, &dataset)
                 .await
             {
-                Ok(mut actual_relations) => {
-                    actual_relations.sort();
-
-                    let expected_relations = relation_map.get(dataset_id).unwrap();
+                Ok(actual_relation) => {
+                    let expected_relation = relation_map.get(dataset_id).unwrap();
 
                     pretty_assertions::assert_eq!(
-                        expected_relations,
-                        &actual_relations,
-                        "AccountID: {}",
+                        expected_relation,
+                        &actual_relation,
+                        "[{}] AccountID: {}",
+                        tag,
                         state.account_id
                     );
                 }
@@ -734,11 +703,11 @@ impl CrossoverTestState {
             })
     }
 
-    pub fn get_object_entity_relation_map(&self) -> HashMap<DatasetId, Vec<Relation>> {
+    pub fn get_object_entity_relation_map(&self) -> HashMap<DatasetId, Option<Relation>> {
         self.dataset_ids_for_check
             .iter()
             .fold(HashMap::new(), |mut acc, dataset_id| {
-                let relations = [
+                let mut relations = [
                     Relation::account_is_a_dataset_reader(),
                     Relation::account_is_a_dataset_editor(),
                 ]
@@ -753,7 +722,18 @@ impl CrossoverTestState {
                     acc
                 });
 
-                acc.insert(*dataset_id, relations);
+                let maybe_relation = match relations.len() {
+                    0 => None,
+                    1 => Some(relations.remove(0)),
+                    _ => {
+                        panic!(
+                            "[CrossoverTestState::relation_map]: More than one relation found for \
+                             dataset: {dataset_id}",
+                        );
+                    }
+                };
+
+                acc.insert(*dataset_id, maybe_relation);
 
                 acc
             })

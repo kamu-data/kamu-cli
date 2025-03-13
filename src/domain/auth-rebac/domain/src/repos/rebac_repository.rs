@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
 use crate::{
@@ -67,7 +67,6 @@ pub trait RebacRepository: Send + Sync {
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError>;
 
@@ -94,17 +93,50 @@ pub trait RebacRepository: Send + Sync {
         object_entity_type: EntityType,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsByObjectTypeError>;
 
-    async fn get_relations_between_entities(
+    async fn get_relation_between_entities(
         &self,
         subject_entity: &Entity,
         object_entity: &Entity,
-    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError>;
+    ) -> Result<Relation, GetRelationBetweenEntitiesError>;
 
     async fn delete_subject_entities_object_entity_relations(
         &self,
         subject_entities: Vec<Entity<'static>>,
         object_entity: &Entity,
     ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait RebacRepositoryExt: RebacRepository {
+    async fn try_get_relation_between_entities(
+        &self,
+        subject_entity: &Entity,
+        object_entity: &Entity,
+    ) -> Result<Option<Relation>, InternalError>;
+}
+
+#[async_trait::async_trait]
+impl<T> RebacRepositoryExt for T
+where
+    T: RebacRepository,
+    T: ?Sized,
+{
+    async fn try_get_relation_between_entities(
+        &self,
+        subject_entity: &Entity,
+        object_entity: &Entity,
+    ) -> Result<Option<Relation>, InternalError> {
+        match self
+            .get_relation_between_entities(subject_entity, object_entity)
+            .await
+        {
+            Ok(relation) => Ok(Some(relation)),
+            Err(GetRelationBetweenEntitiesError::NotFound(_)) => Ok(None),
+            Err(e) => Err(e.int_err()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -193,6 +225,9 @@ pub enum InsertEntitiesRelationError {
     Duplicate(InsertEntitiesRelationDuplicateError),
 
     #[error(transparent)]
+    AnotherRolePresent(InsertEntitiesRelationAnotherRolePresentError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -205,6 +240,13 @@ impl InsertEntitiesRelationError {
         Self::Duplicate(InsertEntitiesRelationDuplicateError {
             subject_entity: subject_entity.clone().into_owned(),
             relationship,
+            object_entity: object_entity.clone().into_owned(),
+        })
+    }
+
+    pub fn another_role_present(subject_entity: &Entity, object_entity: &Entity) -> Self {
+        Self::AnotherRolePresent(InsertEntitiesRelationAnotherRolePresentError {
+            subject_entity: subject_entity.clone().into_owned(),
             object_entity: object_entity.clone().into_owned(),
         })
     }
@@ -221,6 +263,16 @@ pub struct InsertEntitiesRelationDuplicateError {
     pub object_entity: Entity<'static>,
 }
 
+#[derive(Error, Debug)]
+#[error(
+    "Another role is present: subject_entity='{subject_entity:?}', \
+     object_entity='{object_entity:?}'"
+)]
+pub struct InsertEntitiesRelationAnotherRolePresentError {
+    pub subject_entity: Entity<'static>,
+    pub object_entity: Entity<'static>,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -233,14 +285,9 @@ pub enum DeleteEntitiesRelationError {
 }
 
 impl DeleteEntitiesRelationError {
-    pub fn not_found(
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Self {
+    pub fn not_found(subject_entity: &Entity, object_entity: &Entity) -> Self {
         Self::NotFound(EntitiesRelationNotFoundError {
             subject_entity: subject_entity.clone().into_owned(),
-            relationship,
             object_entity: object_entity.clone().into_owned(),
         })
     }
@@ -249,11 +296,10 @@ impl DeleteEntitiesRelationError {
 #[derive(Error, Debug)]
 #[error(
     "Entities relation not found: subject_entity='{subject_entity:?}', \
-     relationship='{relationship:?}', object_entity='{object_entity:?}'"
+     object_entity='{object_entity:?}'"
 )]
 pub struct EntitiesRelationNotFoundError {
     pub subject_entity: Entity<'static>,
-    pub relationship: Relation,
     pub object_entity: Entity<'static>,
 }
 
@@ -284,9 +330,21 @@ pub enum SubjectEntityRelationsByObjectTypeError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetRelationsBetweenEntitiesError {
+pub enum GetRelationBetweenEntitiesError {
+    #[error(transparent)]
+    NotFound(EntitiesRelationNotFoundError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl GetRelationBetweenEntitiesError {
+    pub fn not_found(subject_entity: &Entity, object_entity: &Entity) -> Self {
+        Self::NotFound(EntitiesRelationNotFoundError {
+            subject_entity: subject_entity.clone().into_owned(),
+            object_entity: object_entity.clone().into_owned(),
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

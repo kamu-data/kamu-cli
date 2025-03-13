@@ -273,14 +273,11 @@ impl RebacRepository for SqliteRebacRepository {
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-
-        let relation_as_str = relationship.to_string();
 
         let delete_result = sqlx::query!(
             r#"
@@ -288,13 +285,11 @@ impl RebacRepository for SqliteRebacRepository {
             FROM auth_rebac_relations
             WHERE subject_entity_type = $1
               AND subject_entity_id = $2
-              AND relationship = $3
-              AND object_entity_type = $4
-              AND object_entity_id = $5
+              AND object_entity_type = $3
+              AND object_entity_id = $4
             "#,
             subject_entity.entity_type,
             subject_entity.entity_id,
-            relation_as_str,
             object_entity.entity_type,
             object_entity.entity_id,
         )
@@ -305,7 +300,6 @@ impl RebacRepository for SqliteRebacRepository {
         if delete_result.rows_affected() == 0 {
             return Err(DeleteEntitiesRelationError::not_found(
                 subject_entity,
-                relationship,
                 object_entity,
             ));
         }
@@ -473,16 +467,16 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(Into::into)
     }
 
-    async fn get_relations_between_entities(
+    async fn get_relation_between_entities(
         &self,
         subject_entity: &Entity,
         object_entity: &Entity,
-    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError> {
+    ) -> Result<Relation, GetRelationBetweenEntitiesError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let row_models = sqlx::query_as!(
+        let maybe_row_model = sqlx::query_as!(
             RelationRowModel,
             r#"
             SELECT relationship
@@ -498,15 +492,19 @@ impl RebacRepository for SqliteRebacRepository {
             object_entity.entity_type,
             object_entity.entity_id,
         )
-        .fetch_all(connection_mut)
+        .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
-        row_models
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(Into::into)
+        if let Some(row_model) = maybe_row_model {
+            let relation = row_model.try_into()?;
+            Ok(relation)
+        } else {
+            Err(GetRelationBetweenEntitiesError::not_found(
+                subject_entity,
+                object_entity,
+            ))
+        }
     }
 
     async fn delete_subject_entities_object_entity_relations(
