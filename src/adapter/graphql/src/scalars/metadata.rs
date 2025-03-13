@@ -109,7 +109,7 @@ impl SetTransform {
             .collect();
         let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
         let dataset_infos = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&input_ids_list)
+            .resolve_multiple_dataset_handles_by_ids(input_ids_list)
             .await
             .int_err()?;
 

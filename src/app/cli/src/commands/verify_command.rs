@@ -102,7 +102,7 @@ impl VerifyCommand {
         let dataset_handles: Vec<_> = if self.recursive {
             let input_dataset_ids = dataset_handles.into_iter().map(|hdl| hdl.id).collect();
 
-            let all_dataset_ids: Vec<_> = self
+            let all_dataset_ids = self
                 .dependency_graph_service
                 .get_recursive_upstream_dependencies(input_dataset_ids)
                 .await
@@ -112,7 +112,7 @@ impl VerifyCommand {
 
             let resolution_results = self
                 .dataset_registry
-                .resolve_multiple_dataset_handles_by_ids(&all_dataset_ids)
+                .resolve_multiple_dataset_handles_by_ids(all_dataset_ids)
                 .await
                 .int_err()?;
 

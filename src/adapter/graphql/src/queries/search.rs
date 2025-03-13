@@ -9,6 +9,7 @@
 
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
+use kamu_search::SearchLocalNatLangError;
 use odf::dataset::TryStreamExtExt as _;
 
 use crate::prelude::*;
@@ -105,11 +106,7 @@ impl Search {
         // page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultExConnection> {
-        let Some(search_service) =
-            from_catalog_n!(ctx, Option<dyn kamu_search::SearchServiceLocal>)
-        else {
-            return Err(async_graphql::Error::new("Semantic search is not enabled").into());
-        };
+        let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchServiceLocal);
 
         // TODO: Support "next page token" style pagination
         let page = 0;
@@ -120,7 +117,10 @@ impl Search {
         let res = search_service
             .search_natural_language(&prompt, kamu_search::SearchNatLangOpts { limit })
             .await
-            .int_err()?;
+            .map_err(|e| match e {
+                SearchLocalNatLangError::NotEnabled(e) => GqlError::Gql(e.into()),
+                SearchLocalNatLangError::Internal(e) => GqlError::Internal(e),
+            })?;
 
         let total_count = res.datasets.len();
 

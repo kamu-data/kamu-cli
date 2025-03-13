@@ -58,5 +58,11 @@ pub struct SearchLocalResultDataset {
 #[derive(Debug, thiserror::Error)]
 pub enum SearchLocalNatLangError {
     #[error(transparent)]
+    NotEnabled(#[from] NatLangSearchNotEnabled),
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("Natural language search is not enabled")]
+pub struct NatLangSearchNotEnabled;

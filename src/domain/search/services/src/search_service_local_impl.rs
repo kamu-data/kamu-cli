@@ -19,9 +19,9 @@ use kamu_search::*;
 
 pub struct SearchServiceLocalImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
-    vector_repo: Arc<dyn VectorRepository>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
+    vector_repo: Option<Arc<dyn VectorRepository>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,15 +38,15 @@ impl SearchServiceLocalImpl {
 
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
-        embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
-        vector_repo: Arc<dyn VectorRepository>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
+        vector_repo: Option<Arc<dyn VectorRepository>>,
     ) -> Self {
         Self {
             dataset_registry,
+            dataset_action_authorizer,
             embeddings_encoder,
             vector_repo,
-            dataset_action_authorizer,
         }
     }
 }
@@ -60,9 +60,15 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
         prompt: &str,
         options: SearchNatLangOpts,
     ) -> Result<SearchLocalNatLangResult, SearchLocalNatLangError> {
+        let (Some(embeddings_encoder), Some(vector_repo)) = (
+            self.embeddings_encoder.as_deref(),
+            self.vector_repo.as_deref(),
+        ) else {
+            return Err(NatLangSearchNotEnabled.into());
+        };
+
         // Encode prompt
-        let prompt_vec = self
-            .embeddings_encoder
+        let prompt_vec = embeddings_encoder
             .encode(vec![prompt.to_string()])
             .await
             .int_err()?
@@ -71,8 +77,7 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             .unwrap();
 
         // Search for nearby points
-        let points = self
-            .vector_repo
+        let points = vector_repo
             .search_points(
                 prompt_vec,
                 SearchPointsOpts {
@@ -98,14 +103,14 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             .try_collect()?;
 
         // Resolve dataset handles
-        let dataset_ids: Vec<odf::DatasetID> = points_with_dataset_ids
-            .iter()
-            .map(|(_pooint, id)| id.clone())
-            .collect();
-
         let dataset_handles_res = self
             .dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&dataset_ids)
+            .resolve_multiple_dataset_handles_by_ids(
+                points_with_dataset_ids
+                    .iter()
+                    .map(|(_pooint, id)| id.clone())
+                    .collect(),
+            )
             .await
             .int_err()?;
 
