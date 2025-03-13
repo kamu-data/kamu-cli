@@ -241,7 +241,14 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
         &self,
         _dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError> {
-        Ok(HashSet::from([DatasetAction::Read, DatasetAction::Write]))
+        let all_actions = [
+            DatasetAction::Read,
+            DatasetAction::Write,
+            DatasetAction::Maintain,
+            DatasetAction::Own,
+        ];
+
+        Ok(all_actions.into())
     }
 
     async fn filter_datasets_allowing(

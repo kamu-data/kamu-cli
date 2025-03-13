@@ -79,7 +79,12 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
         dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError> {
         let allowed_actions = if self.owns_dataset_by_id(dataset_id).await? {
-            HashSet::from([DatasetAction::Read, DatasetAction::Write])
+            HashSet::from([
+                DatasetAction::Read,
+                DatasetAction::Write,
+                DatasetAction::Maintain,
+                DatasetAction::Own,
+            ])
         } else {
             HashSet::new()
         };
