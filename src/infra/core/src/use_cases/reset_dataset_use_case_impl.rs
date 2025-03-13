@@ -47,11 +47,12 @@ impl ResetDatasetUseCaseImpl {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "ResetDatasetUseCase::execute",
+        name = ResetDatasetUseCaseImpl_execute,
         skip_all,
         fields(dataset_handle, ?maybe_new_head, ?maybe_old_head)
     )]
@@ -63,7 +64,7 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
     ) -> Result<ResetResult, ResetError> {
         // Permission check
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
+            .check_action_allowed(&dataset_handle.id, DatasetAction::Maintain)
             .await?;
 
         // Resolve dataset
