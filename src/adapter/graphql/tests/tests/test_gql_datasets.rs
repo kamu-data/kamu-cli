@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use bon::bon;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use indoc::indoc;
@@ -37,7 +38,10 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 macro_rules! test_dataset_create_empty_without_visibility {
     ($tenancy_config:expr) => {
-        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
+        let harness = GraphQLDatasetsHarness::builder()
+            .tenancy_config($tenancy_config)
+            .build()
+            .await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -79,7 +83,10 @@ macro_rules! test_dataset_create_empty_without_visibility {
 
 macro_rules! test_dataset_create_empty_public {
     ($tenancy_config:expr) => {
-        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
+        let harness = GraphQLDatasetsHarness::builder()
+            .tenancy_config($tenancy_config)
+            .build()
+            .await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -123,7 +130,11 @@ macro_rules! test_dataset_create_empty_public {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_id_does_not_exist() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
     let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
@@ -152,7 +163,10 @@ async fn test_dataset_by_id_does_not_exist() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_id() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -195,9 +209,12 @@ async fn test_dataset_by_id() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_account_and_name_case_insensitive() {
-    let account_name = odf::AccountName::new_unchecked("KaMu");
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
 
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
+    let account_name = odf::AccountName::new_unchecked("KaMu");
 
     harness
         .create_root_dataset(
@@ -244,7 +261,11 @@ async fn test_dataset_by_account_and_name_case_insensitive() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_account_id() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
     harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("Foo"))
         .await;
@@ -322,7 +343,10 @@ async fn test_dataset_create_empty_public_mt() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_from_snapshot() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
@@ -382,7 +406,10 @@ async fn test_dataset_create_from_snapshot() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_from_snapshot_malformed() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let res = harness
         .execute_authorized_query(indoc!(
@@ -417,7 +444,10 @@ async fn test_dataset_create_from_snapshot_malformed() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_rename_success() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -470,7 +500,10 @@ async fn test_dataset_rename_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_rename_no_changes() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -521,7 +554,10 @@ async fn test_dataset_rename_no_changes() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_rename_name_collision() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -575,7 +611,10 @@ async fn test_dataset_rename_name_collision() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_delete_success() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -625,7 +664,10 @@ async fn test_dataset_delete_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_delete_dangling_ref() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -684,7 +726,10 @@ async fn test_dataset_delete_dangling_ref() {
 // TODO: Private Datasets: check other variants
 #[test_log::test(tokio::test)]
 async fn test_dataset_view_permissions() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -770,7 +815,9 @@ struct GraphQLDatasetsHarness {
     catalog_anonymous: dill::Catalog,
 }
 
+#[bon]
 impl GraphQLDatasetsHarness {
+    #[builder]
     pub async fn new(tenancy_config: TenancyConfig) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");

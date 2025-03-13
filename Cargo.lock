@@ -5731,6 +5731,7 @@ version = "0.226.5"
 dependencies = [
  "async-graphql",
  "async-trait",
+ "bon",
  "chrono",
  "common-macros",
  "database-common",
