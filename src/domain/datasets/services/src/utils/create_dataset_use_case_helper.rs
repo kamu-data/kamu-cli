@@ -12,13 +12,12 @@ use std::sync::Arc;
 use dill::component;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::TenancyConfig;
+use kamu_core::{ResolvedDataset, TenancyConfig};
 use kamu_datasets::{
     CreateDatasetError,
     DatasetLifecycleMessage,
-    DatasetReferenceService,
+    DatasetReferenceCASError,
     NameCollisionError,
-    SetDatasetReferenceError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
@@ -32,7 +31,6 @@ pub struct CreateDatasetUseCaseHelper {
     tenancy_config: Arc<TenancyConfig>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    dataset_reference_service: Arc<dyn DatasetReferenceService>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -45,7 +43,6 @@ impl CreateDatasetUseCaseHelper {
         tenancy_config: Arc<TenancyConfig>,
         dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
         dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-        dataset_reference_service: Arc<dyn DatasetReferenceService>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
@@ -53,7 +50,6 @@ impl CreateDatasetUseCaseHelper {
             tenancy_config,
             dataset_entry_writer,
             dataset_storage_unit_writer,
-            dataset_reference_service,
             outbox,
         }
     }
@@ -154,20 +150,32 @@ impl CreateDatasetUseCaseHelper {
 
     pub async fn set_created_head(
         &self,
-        dataset_id: &odf::DatasetID,
+        dataset: ResolvedDataset,
         initial_head: &odf::Multihash,
     ) -> Result<(), CreateDatasetError> {
-        self.dataset_reference_service
-            .set_reference(dataset_id, &odf::BlockRef::Head, None, initial_head)
+        dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                initial_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(None),
+                },
+            )
             .await
             .map_err(|e| match e {
-                SetDatasetReferenceError::CASFailed(e) => {
-                    CreateDatasetError::CASFailed(Box::new(e))
+                odf::dataset::SetChainRefError::CASFailed(e) => {
+                    CreateDatasetError::CASFailed(Box::new(DatasetReferenceCASError {
+                        dataset_id: dataset.get_id().clone(),
+                        block_ref: e.reference,
+                        expected_prev_block_hash: e.expected,
+                        actual_prev_block_hash: e.actual,
+                    }))
                 }
-                SetDatasetReferenceError::Internal(e) => CreateDatasetError::Internal(e),
-            })?;
-
-        Ok(())
+                odf::dataset::SetChainRefError::Internal(e) => CreateDatasetError::Internal(e),
+                _ => CreateDatasetError::Internal(e.int_err()),
+            })
     }
 }
 

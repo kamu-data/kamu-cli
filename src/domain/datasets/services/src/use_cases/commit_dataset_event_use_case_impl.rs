@@ -16,6 +16,7 @@ use kamu_core::DatasetRegistry;
 use kamu_datasets::{CommitDatasetEventUseCase, ViewMultiResponse};
 use odf::dataset::{AppendError, InvalidEventError};
 use odf::metadata::EnumWithVariants;
+use time_source::SystemTimeSource;
 
 use crate::utils::access_dataset_helper::{AccessDatasetHelper, DatasetAccessError};
 
@@ -26,16 +27,19 @@ use crate::utils::access_dataset_helper::{AccessDatasetHelper, DatasetAccessErro
 pub struct CommitDatasetEventUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    system_time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl CommitDatasetEventUseCaseImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             dataset_registry,
             dataset_action_authorizer,
+            system_time_source,
         }
     }
 
@@ -106,8 +110,15 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
             .get_dataset_by_handle(dataset_handle)
             .await;
 
+        use odf::dataset::CommitOpts;
         let commit_result = resolved_dataset
-            .commit_event(event, odf::dataset::CommitOpts::default())
+            .commit_event(
+                event,
+                CommitOpts {
+                    system_time: Some(self.system_time_source.now()),
+                    ..CommitOpts::default()
+                },
+            )
             .await?;
 
         Ok(commit_result)

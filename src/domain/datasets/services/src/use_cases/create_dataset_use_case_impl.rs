@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_accounts::CurrentAccountSubject;
+use kamu_core::ResolvedDataset;
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetResult,
@@ -78,7 +79,10 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
 
         // Set initial dataset HEAD
         self.create_helper
-            .set_created_head(&store_result.dataset_id, &store_result.seed)
+            .set_created_head(
+                ResolvedDataset::from_stored(&store_result, &canonical_alias),
+                &store_result.seed,
+            )
             .await?;
 
         // Notify interested parties the dataset was created

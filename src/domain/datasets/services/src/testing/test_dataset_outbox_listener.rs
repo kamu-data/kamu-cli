@@ -12,8 +12,10 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{
+    DatasetDependenciesMessage,
     DatasetLifecycleMessage,
     DatasetReferenceMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
@@ -31,6 +33,7 @@ pub struct TestDatasetOutboxListener {
 struct State {
     dataset_lifecycle_messages: Vec<DatasetLifecycleMessage>,
     dataset_reference_messages: Vec<DatasetReferenceMessage>,
+    dataset_dependency_messages: Vec<DatasetDependenciesMessage>,
 }
 
 #[component(pub)]
@@ -38,11 +41,13 @@ struct State {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[interface(dyn MessageConsumerT<DatasetReferenceMessage>)]
+#[interface(dyn MessageConsumerT<DatasetDependenciesMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: "TestOutboxDispatcher",
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+        MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
 })]
@@ -51,6 +56,13 @@ impl TestDatasetOutboxListener {
         Self {
             state: Default::default(),
         }
+    }
+
+    pub fn reset(&self) {
+        let mut guard = self.state.lock().unwrap();
+        guard.dataset_lifecycle_messages.clear();
+        guard.dataset_reference_messages.clear();
+        guard.dataset_dependency_messages.clear();
     }
 }
 
@@ -82,47 +94,96 @@ impl MessageConsumerT<DatasetReferenceMessage> for TestDatasetOutboxListener {
     }
 }
 
+#[async_trait::async_trait]
+impl MessageConsumerT<DatasetDependenciesMessage> for TestDatasetOutboxListener {
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &DatasetDependenciesMessage,
+    ) -> Result<(), InternalError> {
+        let mut guard = self.state.lock().unwrap();
+        guard.dataset_dependency_messages.push(message.clone());
+        Ok(())
+    }
+}
+
 impl std::fmt::Display for TestDatasetOutboxListener {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let guard = self.state.lock().unwrap();
 
-        writeln!(
-            f,
-            "Dataset Lifecycle Messages: {}",
-            guard.dataset_lifecycle_messages.len()
-        )?;
+        if !guard.dataset_lifecycle_messages.is_empty() {
+            writeln!(
+                f,
+                "Dataset Lifecycle Messages: {}",
+                guard.dataset_lifecycle_messages.len()
+            )?;
 
-        for msg in &guard.dataset_lifecycle_messages {
-            match msg {
-                DatasetLifecycleMessage::Created(created_msg) => {
-                    writeln!(f, "  Created {{",)?;
-                    writeln!(f, "    Dataset ID: {}", created_msg.dataset_id)?;
-                    writeln!(f, "    Dataset Name: {}", created_msg.dataset_name)?;
-                    writeln!(f, "    Owner: {}", created_msg.owner_account_id)?;
-                    writeln!(f, "    Visibility: {}", created_msg.dataset_visibility)?;
-                    writeln!(f, "  }}")?;
-                }
-                DatasetLifecycleMessage::Deleted(deleted_msg) => {
-                    writeln!(f, "  Deleted {{",)?;
-                    writeln!(f, "    Dataset ID: {}", deleted_msg.dataset_id)?;
-                    writeln!(f, "  }}")?;
+            for msg in &guard.dataset_lifecycle_messages {
+                match msg {
+                    DatasetLifecycleMessage::Created(created_msg) => {
+                        writeln!(f, "  Created {{",)?;
+                        writeln!(f, "    Dataset ID: {}", created_msg.dataset_id)?;
+                        writeln!(f, "    Dataset Name: {}", created_msg.dataset_name)?;
+                        writeln!(f, "    Owner: {}", created_msg.owner_account_id)?;
+                        writeln!(f, "    Visibility: {}", created_msg.dataset_visibility)?;
+                        writeln!(f, "  }}")?;
+                    }
+                    DatasetLifecycleMessage::Deleted(deleted_msg) => {
+                        writeln!(f, "  Deleted {{",)?;
+                        writeln!(f, "    Dataset ID: {}", deleted_msg.dataset_id)?;
+                        writeln!(f, "  }}")?;
+                    }
                 }
             }
         }
 
-        writeln!(
-            f,
-            "Dataset Reference Messages: {}",
-            guard.dataset_reference_messages.len()
-        )?;
+        if !guard.dataset_reference_messages.is_empty() {
+            writeln!(
+                f,
+                "Dataset Reference Messages: {}",
+                guard.dataset_reference_messages.len()
+            )?;
 
-        for msg in &guard.dataset_reference_messages {
-            writeln!(f, "  Ref Updated {{",)?;
-            writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
-            writeln!(f, "    Ref: {}", msg.block_ref)?;
-            writeln!(f, "    Prev Head: {:?}", msg.maybe_prev_block_hash)?;
-            writeln!(f, "    New Head: {:?}", msg.new_block_hash)?;
-            writeln!(f, "  }}")?;
+            for msg in &guard.dataset_reference_messages {
+                writeln!(f, "  Ref Updated {{",)?;
+                writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
+                writeln!(f, "    Ref: {}", msg.block_ref)?;
+                writeln!(f, "    Prev Head: {:?}", msg.maybe_prev_block_hash)?;
+                writeln!(f, "    New Head: {:?}", msg.new_block_hash)?;
+                writeln!(f, "  }}")?;
+            }
+        }
+
+        if !guard.dataset_dependency_messages.is_empty() {
+            writeln!(
+                f,
+                "Dataset Dependency Messages: {}",
+                guard.dataset_dependency_messages.len()
+            )?;
+
+            for msg in &guard.dataset_dependency_messages {
+                writeln!(f, "  Deps Updated {{",)?;
+                writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
+                writeln!(
+                    f,
+                    "    Added: [{}]",
+                    msg.added_upstream_ids
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )?;
+                writeln!(
+                    f,
+                    "    Obsolete: [{}]",
+                    msg.obsolete_upstream_ids
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )?;
+                writeln!(f, "  }}")?;
+            }
         }
 
         Ok(())

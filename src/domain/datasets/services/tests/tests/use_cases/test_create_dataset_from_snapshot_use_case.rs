@@ -11,30 +11,17 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
-use dill::Component;
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetLifecycleMessage,
-    DatasetReferenceMessage,
-    DatasetReferenceRepository,
-    MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
-use kamu_datasets_inmem::InMemoryDatasetReferenceRepository;
-use kamu_datasets_services::testing::TestDatasetOutboxListener;
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    DatasetEntryWriter,
-    DatasetReferenceServiceImpl,
-    MockDatasetEntryWriter,
-};
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
-use mockall::predicate::{always, eq};
+use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceStub;
+
+use super::dataset_base_use_case_harness::{
+    DatasetBaseUseCaseHarness,
+    DatasetBaseUseCaseHarnessOpts,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,15 +30,7 @@ async fn test_create_root_dataset_from_snapshot() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .with(always(), always(), eq(alias_foo.dataset_name.clone()))
-        .once()
-        .returning(|_, _, _| Ok(()));
-
-    let harness =
-        CreateFromSnapshotUseCaseHarness::new(mock_dataset_entry_writer, vec![predefined_foo_id]);
+    let harness = CreateFromSnapshotUseCaseHarness::new(vec![predefined_foo_id.clone()]).await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -80,21 +59,23 @@ async fn test_create_root_dataset_from_snapshot() {
             r#"
             Dataset Lifecycle Messages: 1
               Created {
-                Dataset ID: did:odf:fed01666f6fb3b7370000666f6fb3b737000060f6f60600000000895cddbcb7f7b8cc
+                Dataset ID: <foo_id>
                 Dataset Name: foo
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
             Dataset Reference Messages: 1
               Ref Updated {
-                Dataset ID: did:odf:fed01666f6fb3b7370000666f6fb3b737000060f6f60600000000895cddbcb7f7b8cc
+                Dataset ID: <foo_id>
                 Ref: head
                 Prev Head: None
-                New Head: Multihash<Sha3_256>(f162017e757a57a4851490c0f8d576f65e2eb12dfc1e5e09cbaf281a3b761f7841f7e)
+                New Head: Multihash<Sha3_256>(<foo_head>)
               }
             "#
-        ),
-        format!("{}", harness.test_dataset_outbox_listener.as_ref())
+        )
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<foo_head>", foo_created.head.to_string().as_str()),
+        harness.collected_outbox_messages(),
     );
 }
 
@@ -107,22 +88,11 @@ async fn test_create_derived_dataset_from_snapshot() {
     let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let predefined_bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .with(always(), always(), eq(alias_foo.dataset_name.clone()))
-        .once()
-        .returning(|_, _, _| Ok(()));
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .with(always(), always(), eq(alias_bar.dataset_name.clone()))
-        .once()
-        .returning(|_, _, _| Ok(()));
-
-    let harness = CreateFromSnapshotUseCaseHarness::new(
-        mock_dataset_entry_writer,
-        vec![predefined_foo_id.clone(), predefined_bar_id.clone()],
-    );
+    let harness = CreateFromSnapshotUseCaseHarness::new(vec![
+        predefined_foo_id.clone(),
+        predefined_bar_id.clone(),
+    ])
+    .await;
 
     let snapshot_root = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -176,93 +146,79 @@ async fn test_create_derived_dataset_from_snapshot() {
             r#"
             Dataset Lifecycle Messages: 2
               Created {
-                Dataset ID: did:odf:fed01666f6fb3b7370000666f6fb3b737000060f6f60600000000895cddbcb7f7b8cc
+                Dataset ID: <foo_id>
                 Dataset Name: foo
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
               Created {
-                Dataset ID: did:odf:fed01626172b130390000626172b1303900002016260700000000508ebebd3079f00e
+                Dataset ID: <bar_id>
                 Dataset Name: bar
                 Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
                 Visibility: private
               }
             Dataset Reference Messages: 2
               Ref Updated {
-                Dataset ID: did:odf:fed01666f6fb3b7370000666f6fb3b737000060f6f60600000000895cddbcb7f7b8cc
+                Dataset ID: <foo_id>
                 Ref: head
                 Prev Head: None
-                New Head: Multihash<Sha3_256>(f162017e757a57a4851490c0f8d576f65e2eb12dfc1e5e09cbaf281a3b761f7841f7e)
+                New Head: Multihash<Sha3_256>(<foo_head>)
               }
               Ref Updated {
-                Dataset ID: did:odf:fed01626172b130390000626172b1303900002016260700000000508ebebd3079f00e
+                Dataset ID: <bar_id>
                 Ref: head
                 Prev Head: None
-                New Head: Multihash<Sha3_256>(f16203eae1d761a2c8076ca7bc2d0c54c86105e1684fb5acadf667649fc31dd4afd64)
+                New Head: Multihash<Sha3_256>(<bar_head>)
+              }
+            Dataset Dependency Messages: 1
+              Deps Updated {
+                Dataset ID: <bar_id>
+                Added: [<foo_id>]
+                Obsolete: []
               }
             "#
-        ),
-        format!("{}", harness.test_dataset_outbox_listener.as_ref())
+        )
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<bar_id>", predefined_bar_id.to_string().as_str())
+        .replace("<foo_head>", foo_created.head.to_string().as_str())
+        .replace("<bar_head>", bar_created.head.to_string().as_str()),
+        harness.collected_outbox_messages(),
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
+#[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct CreateFromSnapshotUseCaseHarness {
-    base_use_case_harness: BaseUseCaseHarness,
+    dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
-    test_dataset_outbox_listener: Arc<TestDatasetOutboxListener>,
 }
 
 impl CreateFromSnapshotUseCaseHarness {
-    fn new(
-        mock_dataset_entry_writer: MockDatasetEntryWriter,
-        predefined_dataset_ids: Vec<odf::DatasetID>,
-    ) -> Self {
-        let base_use_case_harness = BaseUseCaseHarness::new(
-            BaseUseCaseHarnessOptions::new()
-                .with_system_time_source_stub(SystemTimeSourceStub::new_set(
+    async fn new(predefined_dataset_ids: Vec<odf::DatasetID>) -> Self {
+        let dataset_base_use_case_harness =
+            DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
+                maybe_system_time_source_stub: Some(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-                ))
-                .without_outbox()
-                .with_maybe_mock_did_generator(Some(MockDidGenerator::predefined_dataset_ids(
+                )),
+                maybe_mock_did_generator: Some(MockDidGenerator::predefined_dataset_ids(
                     predefined_dataset_ids,
-                ))),
-        );
+                )),
+                ..DatasetBaseUseCaseHarnessOpts::default()
+            })
+            .await;
 
-        let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
-        b.add_builder(
-            messaging_outbox::OutboxImmediateImpl::builder()
-                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-        )
-        .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .add::<CreateDatasetUseCaseHelper>()
-        .add_value(mock_dataset_entry_writer)
-        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>()
-        .add::<TestDatasetOutboxListener>();
-
-        register_message_dispatcher::<DatasetLifecycleMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-        );
-
-        register_message_dispatcher::<DatasetReferenceMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-        );
+        let mut b = dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.catalog());
+        b.add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>();
 
         let catalog = b.build();
 
         Self {
-            base_use_case_harness,
+            dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
             dataset_reference_repo: catalog.get_one().unwrap(),
-            test_dataset_outbox_listener: catalog.get_one().unwrap(),
         }
     }
 

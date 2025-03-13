@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{DatasetRegistry, DidGenerator};
+use kamu_core::{DatasetRegistry, DidGenerator, ResolvedDataset};
 use kamu_datasets::{
     CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
@@ -124,7 +124,10 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
 
         // Set initial dataset HEAD
         self.create_helper
-            .set_created_head(&store_result.dataset_id, &append_result.proposed_head)
+            .set_created_head(
+                ResolvedDataset::from_stored(&store_result, &canonical_alias),
+                &append_result.proposed_head,
+            )
             .await?;
 
         Ok(CreateDatasetResult {

@@ -10,15 +10,17 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
+use chrono::{TimeZone, Utc};
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{RenameDatasetError, RenameDatasetUseCase};
-use kamu_datasets_services::{
-    DatasetEntryWriter,
-    MockDatasetEntryWriter,
-    RenameDatasetUseCaseImpl,
+use kamu_datasets_services::RenameDatasetUseCaseImpl;
+use time_source::SystemTimeSourceStub;
+
+use super::dataset_base_use_case_harness::{
+    DatasetBaseUseCaseHarness,
+    DatasetBaseUseCaseHarnessOpts,
 };
-use mockall::predicate::function;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,25 +30,14 @@ async fn test_rename_dataset_success_via_ref() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let (_, foo_id) = odf::DatasetID::new_generated_ed25519();
 
-    let foo_id_clone = foo_id.clone();
-    let mut mock_entry_writer = MockDatasetEntryWriter::new();
-    mock_entry_writer
-        .expect_rename_entry()
-        .with(
-            function(move |hdl: &odf::DatasetHandle| hdl.id == foo_id_clone),
-            function(|new_name: &odf::DatasetName| new_name.as_str() == "bar"),
-        )
-        .once()
-        .returning(|_, _| Ok(()));
-
     let mock_authorizer =
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&foo_id, 1, true);
 
     let harness = RenameUseCaseHarness::new(
-        mock_entry_writer,
         mock_authorizer,
         Some(MockDidGenerator::predefined_dataset_ids(vec![foo_id])),
-    );
+    )
+    .await;
     harness.create_root_dataset(&alias_foo).await;
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
@@ -72,11 +63,7 @@ async fn test_rename_dataset_success_via_ref() {
 
 #[tokio::test]
 async fn test_rename_dataset_not_found() {
-    let harness = RenameUseCaseHarness::new(
-        MockDatasetEntryWriter::new(),
-        MockDatasetActionAuthorizer::new(),
-        None,
-    );
+    let harness = RenameUseCaseHarness::new(MockDatasetActionAuthorizer::new(), None).await;
 
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     assert_matches!(
@@ -99,12 +86,12 @@ async fn test_rename_dataset_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = RenameUseCaseHarness::new(
-        MockDatasetEntryWriter::new(),
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             dataset_id_foo,
         ])),
-    );
+    )
+    .await;
 
     harness.create_root_dataset(&alias_foo).await;
 
@@ -124,34 +111,36 @@ async fn test_rename_dataset_unauthorized() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
+#[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct RenameUseCaseHarness {
-    base_use_case_harness: BaseUseCaseHarness,
+    dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn RenameDatasetUseCase>,
 }
 
 impl RenameUseCaseHarness {
-    fn new(
-        mock_dataset_entry_writer: MockDatasetEntryWriter,
+    async fn new(
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         maybe_mock_did_generator: Option<MockDidGenerator>,
     ) -> Self {
-        let base_use_case_harness = BaseUseCaseHarness::new(
-            BaseUseCaseHarnessOptions::new()
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
-                .with_maybe_mock_did_generator(maybe_mock_did_generator),
-        );
+        let dataset_base_use_case_harness =
+            DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
+                maybe_system_time_source_stub: Some(SystemTimeSourceStub::new_set(
+                    Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+                )),
+                maybe_mock_did_generator,
+                maybe_mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
+                ..DatasetBaseUseCaseHarnessOpts::default()
+            })
+            .await;
 
-        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
+        let catalog = dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.catalog())
             .add::<RenameDatasetUseCaseImpl>()
-            .add_value(mock_dataset_entry_writer)
-            .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .build();
 
         let use_case = catalog.get_one::<dyn RenameDatasetUseCase>().unwrap();
 
         Self {
-            base_use_case_harness,
+            dataset_base_use_case_harness,
             use_case,
         }
     }
