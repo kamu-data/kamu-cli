@@ -319,21 +319,48 @@ pub async fn test_try_insert_duplicate_entities_relation(catalog: &Catalog) {
 
     let account = Entity::new_account("kamu");
     let dataset = Entity::new_account("dataset");
-    let relationship = Relation::account_is_a_dataset_reader();
+    let reader = Relation::account_is_a_dataset_reader();
 
     assert_matches!(
         rebac_repo
-            .insert_entities_relation(&account, relationship, &dataset)
+            .insert_entities_relation(&account, reader, &dataset)
             .await,
         Ok(())
     );
     assert_matches!(
         rebac_repo
-            .insert_entities_relation(&account, relationship, &dataset)
+            .insert_entities_relation(&account, reader, &dataset)
             .await,
-        Err(InsertEntitiesRelationError::Duplicate(e))
+        Err(InsertEntitiesRelationError::SomeRoleIsAlreadyPresent(e))
             if e.subject_entity == account
-                && e.relationship == relationship
+                && e.object_entity == dataset
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_try_insert_another_entities_relation(catalog: &Catalog) {
+    let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
+
+    let account = Entity::new_account("kamu");
+    let dataset = Entity::new_account("dataset");
+    let reader = Relation::account_is_a_dataset_reader();
+
+    assert_matches!(
+        rebac_repo
+            .insert_entities_relation(&account, reader, &dataset)
+            .await,
+        Ok(())
+    );
+
+    let editor = Relation::account_is_a_dataset_editor();
+
+    assert_matches!(
+        rebac_repo
+            .insert_entities_relation(&account, editor, &dataset)
+            .await,
+        Err(InsertEntitiesRelationError::SomeRoleIsAlreadyPresent(e))
+            if e.subject_entity == account
                 && e.object_entity == dataset
     );
 }

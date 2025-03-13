@@ -255,16 +255,17 @@ impl RebacRepository for PostgresRebacRepository {
         )
         .execute(connection_mut)
         .await
-            .map_err(|e| match e {
+        .map_err(|e| {
+            match e {
                 sqlx::Error::Database(e) if e.is_unique_violation() => {
-                    InsertEntitiesRelationError::duplicate(
+                    InsertEntitiesRelationError::some_role_is_already_present(
                         subject_entity,
-                        relationship,
                         object_entity,
                     )
                 }
                 _ => InsertEntitiesRelationError::Internal(e.int_err()),
-            })?;
+            }
+        })?;
 
         Ok(())
     }
@@ -317,8 +318,8 @@ impl RebacRepository for PostgresRebacRepository {
         let row_models = sqlx::query_as!(
             EntityWithRelationRowModel,
             r#"
-            SELECT object_entity_type as "entity_type: EntityType",
-                   object_entity_id as entity_id,
+            SELECT object_entity_type AS "entity_type: EntityType",
+                   object_entity_id AS entity_id,
                    relationship
             FROM auth_rebac_relations
             WHERE subject_entity_type = $1
@@ -350,8 +351,8 @@ impl RebacRepository for PostgresRebacRepository {
         let row_models = sqlx::query_as!(
             EntityWithRelationRowModel,
             r#"
-            SELECT subject_entity_type as "entity_type: EntityType",
-                   subject_entity_id as entity_id,
+            SELECT subject_entity_type AS "entity_type: EntityType",
+                   subject_entity_id AS entity_id,
                    relationship
             FROM auth_rebac_relations
             WHERE object_entity_type = $1
@@ -442,8 +443,8 @@ impl RebacRepository for PostgresRebacRepository {
         let row_models = sqlx::query_as!(
             EntityWithRelationRowModel,
             r#"
-            SELECT object_entity_type as "entity_type: EntityType",
-                   object_entity_id as entity_id,
+            SELECT object_entity_type AS "entity_type: EntityType",
+                   object_entity_id AS entity_id,
                    relationship
             FROM auth_rebac_relations
             WHERE subject_entity_type = $1

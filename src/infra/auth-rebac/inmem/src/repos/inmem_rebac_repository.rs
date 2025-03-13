@@ -209,20 +209,10 @@ impl RebacRepository for InMemoryRebacRepository {
 
         for row in &writable_state.entities_relations_rows {
             if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
-                let error = if row.relation == relation {
-                    Err(InsertEntitiesRelationError::duplicate(
-                        subject_entity,
-                        relation,
-                        object_entity,
-                    ))
-                } else {
-                    Err(InsertEntitiesRelationError::another_role_present(
-                        subject_entity,
-                        object_entity,
-                    ))
-                };
-
-                return error;
+                return Err(InsertEntitiesRelationError::some_role_is_already_present(
+                    subject_entity,
+                    object_entity,
+                ));
             }
         }
 

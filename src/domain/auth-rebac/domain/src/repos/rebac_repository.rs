@@ -220,30 +220,15 @@ pub enum GetEntityPropertiesError {
 #[derive(Error, Debug)]
 pub enum InsertEntitiesRelationError {
     #[error(transparent)]
-    Duplicate(InsertEntitiesRelationDuplicateError),
-
-    #[error(transparent)]
-    AnotherRolePresent(InsertEntitiesRelationAnotherRolePresentError),
+    SomeRoleIsAlreadyPresent(InsertEntitiesRelationSomeRoleIsAlreadyPresentError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 impl InsertEntitiesRelationError {
-    pub fn duplicate(
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Self {
-        Self::Duplicate(InsertEntitiesRelationDuplicateError {
-            subject_entity: subject_entity.clone().into_owned(),
-            relationship,
-            object_entity: object_entity.clone().into_owned(),
-        })
-    }
-
-    pub fn another_role_present(subject_entity: &Entity, object_entity: &Entity) -> Self {
-        Self::AnotherRolePresent(InsertEntitiesRelationAnotherRolePresentError {
+    pub fn some_role_is_already_present(subject_entity: &Entity, object_entity: &Entity) -> Self {
+        Self::SomeRoleIsAlreadyPresent(InsertEntitiesRelationSomeRoleIsAlreadyPresentError {
             subject_entity: subject_entity.clone().into_owned(),
             object_entity: object_entity.clone().into_owned(),
         })
@@ -252,21 +237,10 @@ impl InsertEntitiesRelationError {
 
 #[derive(Error, Debug)]
 #[error(
-    "Duplicate entity relation not inserted: subject_entity='{subject_entity:?}', \
-     relationship='{relationship:?}', object_entity='{object_entity:?}'"
-)]
-pub struct InsertEntitiesRelationDuplicateError {
-    pub subject_entity: Entity<'static>,
-    pub relationship: Relation,
-    pub object_entity: Entity<'static>,
-}
-
-#[derive(Error, Debug)]
-#[error(
-    "Another role is present: subject_entity='{subject_entity:?}', \
+    "Some role is already present: subject_entity='{subject_entity:?}', \
      object_entity='{object_entity:?}'"
 )]
-pub struct InsertEntitiesRelationAnotherRolePresentError {
+pub struct InsertEntitiesRelationSomeRoleIsAlreadyPresentError {
     pub subject_entity: Entity<'static>,
     pub object_entity: Entity<'static>,
 }

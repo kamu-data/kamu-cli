@@ -28,7 +28,6 @@ use kamu_auth_rebac::{
     EntityWithRelation,
     GetObjectEntityRelationsError,
     GetPropertiesError,
-    InsertEntitiesRelationError,
     PropertiesCountError,
     PropertyName,
     PropertyValue,
@@ -275,24 +274,16 @@ impl RebacService for RebacServiceImpl {
             .int_err()?;
 
         // ... before setting up a new one.
-        let insert_res = self
-            .rebac_repo
+        self.rebac_repo
             .insert_entities_relation(
                 &account_entity,
                 Relation::AccountToDataset(relationship),
                 &dataset_entity,
             )
-            .await;
+            .await
+            .int_err()?;
 
-        use InsertEntitiesRelationError::{AnotherRolePresent, Duplicate, Internal};
-
-        match insert_res {
-            Ok(_) => Ok(()),
-            Err(e) => match e {
-                Duplicate(_) => Ok(()),
-                e @ (Internal(_) | AnotherRolePresent(_)) => Err(e.int_err().into()),
-            },
-        }
+        Ok(())
     }
 
     async fn unset_accounts_dataset_relations(
