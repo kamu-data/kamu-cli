@@ -19,6 +19,7 @@ use kamu_auth_rebac::{
     DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     DeleteSubjectEntitiesObjectEntityRelationsError,
+    EntitiesWithRelation,
     Entity,
     EntityType,
     EntityWithRelation,
@@ -576,6 +577,147 @@ pub async fn test_delete_subject_entities_object_entity_relations(catalog: &Cata
 
     for expected_state in &expected_states {
         assert_get_relations("after", &rebac_repo, expected_state).await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
+    let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
+
+    let account_1 = Entity::new_account("account1");
+    let account_2 = Entity::new_account("account2");
+    let account_3 = Entity::new_account("account3");
+    let account_4 = Entity::new_account("account4");
+
+    let dataset_1 = Entity::new_dataset("dataset1");
+    let dataset_2 = Entity::new_dataset("dataset2");
+    let dataset_3 = Entity::new_dataset("dataset3");
+
+    let reader = Relation::account_is_a_dataset_reader();
+    let editor = Relation::account_is_a_dataset_editor();
+    let maintainer = Relation::account_is_a_dataset_maintainer();
+
+    for (dataset, account, relationship) in [
+        // dataset_1
+        (&dataset_1, &account_1, reader),
+        (&dataset_1, &account_2, editor),
+        (&dataset_1, &account_3, reader),
+        (&dataset_1, &account_4, maintainer),
+        // dataset2
+        (&dataset_2, &account_2, maintainer),
+        (&dataset_2, &account_3, maintainer),
+        // dataset3
+        //   no relations
+    ] {
+        assert_matches!(
+            rebac_repo
+                .insert_entities_relation(account, relationship, dataset)
+                .await,
+            Ok(())
+        );
+    }
+
+    // get_object_entity_relations()
+
+    {
+        macro_rules! get_object_entity_relations_sorted {
+            ($repo: expr, $object: expr) => {{
+                let r = $repo.get_object_entity_relations($object).await;
+                assert_matches!(r, Ok(_));
+                let mut r = r.unwrap();
+                r.sort();
+                r
+            }};
+        }
+
+        use EntityWithRelation as E;
+
+        // dataset_1
+        pretty_assertions::assert_eq!(
+            [
+                E::new_account("account1", reader),
+                E::new_account("account2", editor),
+                E::new_account("account3", reader),
+                E::new_account("account4", maintainer),
+            ],
+            *get_object_entity_relations_sorted!(&rebac_repo, &dataset_1)
+        );
+        // dataset_2
+        pretty_assertions::assert_eq!(
+            [
+                E::new_account("account2", maintainer),
+                E::new_account("account3", maintainer),
+            ],
+            *get_object_entity_relations_sorted!(&rebac_repo, &dataset_2)
+        );
+        // dataset_3
+        pretty_assertions::assert_eq!(
+            *Vec::<E>::new(),
+            *get_object_entity_relations_sorted!(&rebac_repo, &dataset_3)
+        );
+    }
+
+    // get_object_entities_relations()
+
+    {
+        macro_rules! get_object_entities_relations_sorted {
+            ($repo: expr, $objects: expr) => {{
+                let r = $repo.get_object_entities_relations($objects).await;
+                assert_matches!(r, Ok(_));
+                let mut r = r.unwrap();
+                r.sort();
+                r
+            }};
+        }
+
+        use EntitiesWithRelation as E;
+
+        // [dataset1]
+        pretty_assertions::assert_eq!(
+            [
+                E::new_account_dataset_relation("account1", reader, "dataset1"),
+                E::new_account_dataset_relation("account2", editor, "dataset1"),
+                E::new_account_dataset_relation("account3", reader, "dataset1"),
+                E::new_account_dataset_relation("account4", maintainer, "dataset1"),
+            ],
+            *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_1.clone()]),
+        );
+        // [dataset2]
+        pretty_assertions::assert_eq!(
+            [
+                E::new_account_dataset_relation("account2", maintainer, "dataset2"),
+                E::new_account_dataset_relation("account3", maintainer, "dataset2"),
+            ],
+            *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_2.clone()]),
+        );
+        // [dataset3]
+        pretty_assertions::assert_eq!(
+            *Vec::<E>::new(),
+            *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_3.clone()]),
+        );
+        // [dataset1, dataset3]
+        pretty_assertions::assert_eq!(
+            [
+                E::new_account_dataset_relation("account1", reader, "dataset1"),
+                E::new_account_dataset_relation("account2", editor, "dataset1"),
+                E::new_account_dataset_relation("account3", reader, "dataset1"),
+                E::new_account_dataset_relation("account4", maintainer, "dataset1"),
+            ],
+            *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_1.clone(), dataset_3]),
+        );
+        // [dataset1, dataset2]
+        pretty_assertions::assert_eq!(
+            [
+                E::new_account_dataset_relation("account1", reader, "dataset1"),
+                E::new_account_dataset_relation("account2", editor, "dataset1"),
+                E::new_account_dataset_relation("account2", maintainer, "dataset2"),
+                E::new_account_dataset_relation("account3", reader, "dataset1"),
+                E::new_account_dataset_relation("account3", maintainer, "dataset2"),
+                E::new_account_dataset_relation("account4", maintainer, "dataset1"),
+            ],
+            *get_object_entities_relations_sorted!(&rebac_repo, &[dataset_1, dataset_2]),
+        );
     }
 }
 

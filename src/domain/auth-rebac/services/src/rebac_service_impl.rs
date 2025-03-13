@@ -263,8 +263,6 @@ impl RebacService for RebacServiceImpl {
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), SetRelationError> {
-        use futures::FutureExt;
-
         let account_id_stack = account_id.as_did_str().to_stack_string();
         let account_entity = Entity::new_account(account_id_stack.as_str());
 

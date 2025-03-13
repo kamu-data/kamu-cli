@@ -90,6 +90,13 @@ database_transactional_test!(
     fixture = kamu_auth_rebac_repo_tests::test_delete_subject_entities_object_entity_relations,
     harness = InMemoryRebacRepositoryHarness
 );
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_get_object_entity_relations_matrix,
+    harness = InMemoryRebacRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

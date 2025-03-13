@@ -103,6 +103,18 @@ impl EntitiesWithRelation<'_> {
             object_entity: self.object_entity.clone().into_owned(),
         }
     }
+
+    pub fn new_account_dataset_relation<'a>(
+        account_entity_id: impl Into<EntityId<'a>>,
+        relation: Relation,
+        dataset_entity_id: impl Into<EntityId<'a>>,
+    ) -> EntitiesWithRelation<'a> {
+        EntitiesWithRelation {
+            subject_entity: Entity::new_account(account_entity_id),
+            relation,
+            object_entity: Entity::new_dataset(dataset_entity_id),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
