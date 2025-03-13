@@ -33,6 +33,8 @@ pub struct VectorRepositoryQdrant {
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn VectorRepository)]
 impl VectorRepositoryQdrant {
+    const UPSERT_POINTS_PER_CHUNK: usize = 1000;
+
     pub fn new(config: Arc<VectorRepositoryConfigQdrant>) -> Self {
         Self {
             config,
@@ -88,7 +90,12 @@ impl VectorRepository for VectorRepositoryQdrant {
             .await
             .int_err()?;
 
-        Ok(usize::try_from(res.result.unwrap().points_count.unwrap()).unwrap())
+        let points_count = res
+            .result
+            .expect("collection info result should not be empty")
+            .points_count();
+
+        Ok(usize::try_from(points_count).unwrap())
     }
 
     async fn insert(&self, points: Vec<NewPoint>) -> Result<(), InsertError> {
@@ -118,7 +125,7 @@ impl VectorRepository for VectorRepositoryQdrant {
                     &self.config.collection_name,
                     points,
                 ),
-                1000,
+                Self::UPSERT_POINTS_PER_CHUNK,
             )
             .await
             .int_err()?;
@@ -148,7 +155,12 @@ impl VectorRepository for VectorRepositoryQdrant {
             .result
             .into_iter()
             .map(|p| FoundPoint {
-                point_id: match p.id.unwrap().point_id_options.unwrap() {
+                point_id: match p
+                    .id
+                    .expect("point id should not be empty")
+                    .point_id_options
+                    .expect("point id options should not be empty")
+                {
                     point_id::PointIdOptions::Num(v) => v.to_string(),
                     point_id::PointIdOptions::Uuid(v) => v.to_string(),
                 },
