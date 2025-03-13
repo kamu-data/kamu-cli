@@ -158,4 +158,20 @@ impl VectorRepository for VectorRepositoryQdrant {
             })
             .collect())
     }
+
+    async fn clear(&self) -> Result<(), InternalError> {
+        use ::qdrant_client::qdrant::*;
+
+        self.client()
+            .await?
+            .delete_points(
+                DeletePointsBuilder::new(&self.config.collection_name)
+                    .wait(true)
+                    .build(),
+            )
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
 }

@@ -44,6 +44,11 @@ use crate::prelude::{AccessTokenID, AccountID, AccountName};
 /// );
 /// ```
 macro_rules! from_catalog_n {
+    ($gql_ctx:ident, Option<$T:ty> ) => {{
+        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
+
+        catalog.get::<dill::Maybe<dill::OneOf<$T>>>().unwrap()
+    }};
     ($gql_ctx:ident, $T:ty ) => {{
         let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
 

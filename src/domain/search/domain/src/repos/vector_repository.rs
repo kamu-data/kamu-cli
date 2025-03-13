@@ -31,6 +31,9 @@ pub trait VectorRepository: Send + Sync {
         vec: Vec<f32>,
         opts: SearchPointsOpts,
     ) -> Result<Vec<FoundPoint>, InternalError>;
+
+    /// Clear all points
+    async fn clear(&self) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

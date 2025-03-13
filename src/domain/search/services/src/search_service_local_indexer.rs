@@ -18,6 +18,14 @@ use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+pub struct SearchServiceLocalIndexerConfig {
+    // Whether to clear and re-index on start or work with existing vectors is any exist
+    pub clear_on_start: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[dill::component(pub)]
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
@@ -26,6 +34,7 @@ use kamu_search::*;
     requires_transaction: true,
 })]
 pub struct SearchServiceLocalIndexer {
+    config: Arc<SearchServiceLocalIndexerConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     embeddings_chunker: Arc<dyn EmbeddingsChunker>,
     embeddings_encoder: Arc<dyn EmbeddingsEncoder>,
@@ -117,8 +126,10 @@ impl SearchServiceLocalIndexer {
 impl InitOnStartup for SearchServiceLocalIndexer {
     #[tracing::instrument(level = "info", skip_all)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        // Skip init if collection already exists
-        if self.vector_repo.num_points().await? != 0 {
+        if self.config.clear_on_start {
+            self.vector_repo.clear().await?;
+        } else if self.vector_repo.num_points().await? != 0 {
+            // Skip init if collection already exists
             return Ok(());
         }
 

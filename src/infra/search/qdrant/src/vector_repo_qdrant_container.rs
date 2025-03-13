@@ -109,4 +109,8 @@ impl VectorRepository for VectorRepositoryQdrantContainer {
     ) -> Result<Vec<FoundPoint>, InternalError> {
         self.inner().await?.search_points(vec, opts).await
     }
+
+    async fn clear(&self) -> Result<(), InternalError> {
+        self.inner().await?.clear().await
+    }
 }

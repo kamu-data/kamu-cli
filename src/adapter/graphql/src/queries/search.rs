@@ -105,7 +105,11 @@ impl Search {
         // page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultExConnection> {
-        let search_service = from_catalog_n!(ctx, dyn kamu_search::SearchServiceLocal);
+        let Some(search_service) =
+            from_catalog_n!(ctx, Option<dyn kamu_search::SearchServiceLocal>)
+        else {
+            return Err(async_graphql::Error::new("Semantic search is not enabled").into());
+        };
 
         // TODO: Support "next page token" style pagination
         let page = 0;
