@@ -40,11 +40,12 @@ impl RenameDatasetUseCaseImpl {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "RenameDatasetUseCase::execute",
+        name = RenameDatasetUseCaseImpl_execute,
         skip_all,
         fields(dataset_ref, new_name)
     )]
@@ -68,10 +69,9 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
             }
         }?;
 
-        // TODO: Private Datasets: use access helper
-        // Ensure write permissions
+        // Ensure maintain permissions
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
+            .check_action_allowed(&dataset_handle.id, DatasetAction::Maintain)
             .await
             .map_err(|e| match e {
                 DatasetActionUnauthorizedError::Access(e) => RenameDatasetError::Access(e),
