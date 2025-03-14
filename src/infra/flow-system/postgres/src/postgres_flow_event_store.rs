@@ -112,10 +112,10 @@ impl PostgresFlowEventStore {
             }
             match event {
                 FlowEvent::ScheduledForActivation(e) => {
-                    maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at)
+                    maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
                 }
                 FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) => {
-                    maybe_scheduled_for_activation_at = None
+                    maybe_scheduled_for_activation_at = None;
                 }
                 _ => {
                     let connection_mut = tr.connection_mut().await?;
@@ -130,7 +130,7 @@ impl PostgresFlowEventStore {
                     .map(|result| result.activation_time)
                     .fetch_one(connection_mut)
                     .await
-                    .int_err()?
+                    .int_err()?;
                 }
             }
         }

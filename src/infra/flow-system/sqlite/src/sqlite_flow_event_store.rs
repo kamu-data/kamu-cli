@@ -123,10 +123,10 @@ impl SqliteFlowEventStore {
             }
             match event {
                 FlowEvent::ScheduledForActivation(e) => {
-                    maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at)
+                    maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
                 }
                 FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) => {
-                    maybe_scheduled_for_activation_at = None
+                    maybe_scheduled_for_activation_at = None;
                 }
                 _ => {
                     #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
