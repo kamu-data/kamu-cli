@@ -1,0 +1,37 @@
+[package]
+name = "kamu-search"
+description = "Domain model of the search subsystem"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+
+
+[dependencies]
+internal-error = { workspace = true }
+odf = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+futures = { version = "0.3", default-features = false }
+serde_json = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+
+[dev-dependencies]

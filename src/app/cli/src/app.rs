@@ -34,6 +34,7 @@ use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
 use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
+use merge::Merge as _;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{warn, Instrument};
@@ -433,7 +434,7 @@ pub fn configure_base_catalog(
     b.add::<CompactionPlannerImpl>();
     b.add::<CompactionExecutorImpl>();
 
-    b.add::<SearchServiceImpl>();
+    b.add::<SearchServiceRemoteImpl>();
 
     b.add::<SyncServiceImpl>();
     b.add::<SyncRequestBuilder>();
@@ -888,6 +889,67 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
         Duration::seconds(task_agent_config.task_checking_interval_secs.unwrap()),
     ));
+    //
+
+    // Search configuration
+    let crate::config::SearchConfig {
+        indexer,
+        embeddings_chunker,
+        embeddings_encoder,
+        vector_repo,
+    } = config.search.clone().unwrap();
+
+    catalog_builder.add::<kamu_search_services::SearchServiceLocalImplLazyInit>();
+    catalog_builder.add_value(kamu_search_services::SearchServiceLocalIndexerConfig {
+        clear_on_start: indexer.unwrap_or_default().clear_on_start,
+    });
+
+    match embeddings_chunker.unwrap_or_default() {
+        config::EmbeddingsChunkerConfig::Simple(cfg) => {
+            catalog_builder.add::<kamu_search_services::EmbeddingsChunkerSimple>();
+            catalog_builder.add_value(kamu_search_services::EmbeddingsChunkerConfigSimple {
+                split_sections: cfg.split_sections.unwrap(),
+                split_paragraphs: cfg.split_paragraphs.unwrap(),
+            });
+        }
+    }
+
+    match embeddings_encoder.unwrap_or_default() {
+        config::EmbeddingsEncoderConfig::OpenAi(mut cfg) => {
+            cfg.merge(config::EmbeddingsEncoderConfigOpenAi::default());
+
+            catalog_builder.add::<kamu_search_openai::EmbeddingsEncoderOpenAi>();
+            catalog_builder.add_value(kamu_search_openai::EmbeddingsEncoderConfigOpenAI {
+                url: cfg.url,
+                api_key: cfg.api_key.map(Into::into),
+                model_name: cfg.model_name.unwrap(),
+                dimensions: cfg.dimensions.unwrap(),
+            });
+        }
+    }
+
+    match vector_repo.unwrap_or_default() {
+        config::VectorRepoConfig::Qdrant(mut cfg) => {
+            cfg.merge(config::VectorRepoConfigQdrant::default());
+
+            catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrant>();
+            catalog_builder.add_value(kamu_search_qdrant::VectorRepositoryConfigQdrant {
+                url: cfg.url,
+                collection_name: cfg.collection_name.unwrap(),
+                dimensions: cfg.dimensions.unwrap(),
+            });
+        }
+        config::VectorRepoConfig::QdrantContainer(mut cfg) => {
+            cfg.merge(config::VectorRepoConfigQdrantContainer::default());
+
+            catalog_builder.add::<kamu_search_qdrant::VectorRepositoryQdrantContainer>();
+            catalog_builder.add_value(kamu_search_qdrant::VectorRepositoryConfigQdrantContainer {
+                image: cfg.image.unwrap(),
+                dimensions: cfg.dimensions.unwrap(),
+                start_timeout: cfg.start_timeout.unwrap().into(),
+            });
+        }
+    }
     //
 }
 

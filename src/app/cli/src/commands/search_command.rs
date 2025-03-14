@@ -9,26 +9,34 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
+use datafusion::arrow::array::{Float32Array, RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use internal_error::*;
 use kamu::domain::*;
+use kamu_search::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
 
 pub struct SearchCommand {
-    search_svc: Arc<dyn SearchService>,
+    search_svc: Arc<dyn SearchServiceRemote>,
+    search_local_svc: Arc<dyn SearchServiceLocal>,
     output_config: Arc<OutputConfig>,
     query: Option<String>,
     repository_names: Vec<odf::RepoName>,
+    local: bool,
+    max_results: usize,
 }
 
 impl SearchCommand {
     pub fn new<S, I>(
-        search_svc: Arc<dyn SearchService>,
+        search_svc: Arc<dyn SearchServiceRemote>,
+        search_local_svc: Arc<dyn SearchServiceLocal>,
         output_config: Arc<OutputConfig>,
         query: Option<S>,
         repository_names: I,
+        local: bool,
+        max_results: usize,
     ) -> Self
     where
         S: Into<String>,
@@ -36,9 +44,12 @@ impl SearchCommand {
     {
         Self {
             search_svc,
+            search_local_svc,
             output_config,
             query: query.map(Into::into),
             repository_names: repository_names.into_iter().collect(),
+            local,
+            max_results,
         }
     }
 
@@ -57,16 +68,67 @@ impl SearchCommand {
         }
         num.to_formatted_string(&Locale::en)
     }
-}
 
-#[async_trait::async_trait(?Send)]
-impl Command for SearchCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn search_local(&mut self) -> Result<(), CLIError> {
+        let prompt = self.query.clone().unwrap_or_default();
+        if prompt.is_empty() {
+            return Err(CLIError::usage_error("Please provide a search prompt"));
+        }
+
+        let res = self
+            .search_local_svc
+            .search_natural_language(
+                &prompt,
+                SearchNatLangOpts {
+                    limit: self.max_results,
+                },
+            )
+            .await
+            .int_err()?;
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("Alias", DataType::Utf8, false),
+            Field::new("Score", DataType::Float32, false),
+        ]));
+
+        let records_format = RecordsFormat::new()
+            .with_default_column_format(ColumnFormat::default().with_null_value("-"))
+            .with_column_formats(vec![
+                ColumnFormat::new().with_style_spec("l"), // Alias
+                ColumnFormat::new().with_style_spec("l"), // Score
+            ]);
+
+        let records = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from_iter_values(
+                    res.datasets.iter().map(|h| h.handle.alias.to_string()),
+                )),
+                Arc::new(
+                    res.datasets
+                        .iter()
+                        .map(|h| h.score)
+                        .collect::<Float32Array>(),
+                ),
+            ],
+        )
+        .unwrap();
+
+        let mut writer = self
+            .output_config
+            .get_records_writer(&schema, records_format);
+        writer.write_batch(&records)?;
+        writer.finish()?;
+
+        Ok(())
+    }
+
+    async fn search_remote(&mut self) -> Result<(), CLIError> {
         let mut result = self
             .search_svc
             .search(
                 self.query.as_deref(),
-                SearchOptions {
+                SearchRemoteOpts {
                     repository_names: self.repository_names.clone(),
                 },
             )
@@ -137,5 +199,16 @@ impl Command for SearchCommand {
         writer.finish()?;
 
         Ok(())
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Command for SearchCommand {
+    async fn run(&mut self) -> Result<(), CLIError> {
+        if self.local {
+            self.search_local().await
+        } else {
+            self.search_remote().await
+        }
     }
 }

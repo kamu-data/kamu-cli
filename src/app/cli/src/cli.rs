@@ -1201,6 +1201,14 @@ Search only specific repositories:
     kamu search covid19 --repo kamu --repo statcan.gc.ca
 "#)]
 pub struct Search {
+    /// Search local datasets instead of searching in remote repositories
+    #[arg(long, short = 'l')]
+    pub local: bool,
+
+    /// Maximum results to fetch
+    #[arg(long, short = 'n', default_value_t = 10)]
+    pub max_results: usize,
+
     /// Format to display the results in
     #[arg(long, short = 'o', value_name = "FMT", value_enum)]
     pub output_format: Option<OutputFormat>,

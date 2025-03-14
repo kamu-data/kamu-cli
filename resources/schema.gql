@@ -2515,9 +2515,16 @@ input ScheduleInput @oneOf {
 
 type Search {
 	"""
-	Perform search across all resources
+	This endpoint uses heuristics to infer whether the query string is a DSL
+	or a natural language query and is suitable to present the most
+	versatile interface to the user consisting of just one input field.
 	"""
 	query(query: String!, page: Int, perPage: Int): SearchResultConnection!
+	"""
+	Searches for datasets and other objects managed by the
+	current node using a prompt in natural language
+	"""
+	queryNaturalLanguage(prompt: String!, perPage: Int): SearchResultExConnection!
 	"""
 	Perform lightweight search among resource names.
 	Useful for autocomplete.
@@ -2545,6 +2552,31 @@ type SearchResultConnection {
 
 type SearchResultEdge {
 	node: SearchResult!
+}
+
+type SearchResultEx {
+	item: SearchResult!
+	score: Float!
+}
+
+type SearchResultExConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [SearchResultEx!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [SearchResultExEdge!]!
+}
+
+type SearchResultExEdge {
+	node: SearchResultEx!
 }
 
 """

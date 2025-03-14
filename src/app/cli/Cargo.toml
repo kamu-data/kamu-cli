@@ -99,6 +99,11 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-auth-rebac-postgres = { workspace = true }
 kamu-auth-rebac-sqlite = { workspace = true }
 
+kamu-search = { workspace = true }
+kamu-search-services = { workspace = true }
+kamu-search-openai = { workspace = true }
+kamu-search-qdrant = { workspace = true }
+
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
 clap = "4"

@@ -12,7 +12,13 @@ use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
 use internal_error::InternalError;
-use kamu_core::{DatasetRegistry, SearchError, SearchOptions, SearchService, TenancyConfig};
+use kamu_core::{
+    DatasetRegistry,
+    SearchRemoteError,
+    SearchRemoteOpts,
+    SearchServiceRemote,
+    TenancyConfig,
+};
 use tokio_stream::Stream;
 
 type FilteredDatasetHandleStream<'a> = Pin<
@@ -61,7 +67,7 @@ pub fn filter_datasets_by_local_pattern(
 
 pub fn filter_datasets_by_any_pattern<'a>(
     dataset_registry: &'a dyn DatasetRegistry,
-    search_svc: Arc<dyn SearchService>,
+    search_svc: Arc<dyn SearchServiceRemote>,
     dataset_ref_any_patterns: Vec<odf::DatasetRefAnyPattern>,
     current_account_name: &odf::AccountName,
     tenancy_config: TenancyConfig,
@@ -107,7 +113,7 @@ fn get_static_datasets_stream(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn get_remote_datasets_stream(
-    search_svc: Arc<dyn SearchService>,
+    search_svc: Arc<dyn SearchServiceRemote>,
     remote_ref_patterns: Vec<odf::DatasetRefAnyPattern>,
     is_multitenant_mode: bool,
 ) -> impl Stream<Item = Result<odf::DatasetRefAny, odf::DatasetRefUnresolvedError>> + 'static {
@@ -117,13 +123,13 @@ fn get_remote_datasets_stream(
             // Should be improved after search will support wildcarding.
             let repo_name = remote_ref_pattern.pattern_repo_name(is_multitenant_mode).expect("Invalid repository name");
 
-            let search_options = SearchOptions {
+            let search_options = SearchRemoteOpts {
                 repository_names: vec![repo_name],
             };
 
             let remote_datasets: Vec<_> = match search_svc.search(None, search_options).await {
                 Err(err) => match err {
-                    SearchError::RepositoryNotFound(_) => vec![],
+                    SearchRemoteError::RepositoryNotFound(_) => vec![],
                     _ => Err(odf::DatasetRefUnresolvedError::Internal(InternalError::new(err)))?,
                 },
                 Ok(result) => result.datasets,

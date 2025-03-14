@@ -21,7 +21,7 @@ mod test_remote_status_service;
 mod test_reset_services_impl;
 mod test_resource_loader_impl;
 mod test_schema_utils;
-mod test_search_service_impl;
+mod test_search_service_remote_impl;
 mod test_serde_yaml;
 mod test_setup;
 mod test_sync_service_impl;

@@ -372,8 +372,11 @@ pub fn get_command(
         cli::Command::Search(c) => Box::new(SearchCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             c.query,
             c.repo.unwrap_or_default(),
+            c.local,
+            c.max_results,
         )),
         cli::Command::Sql(c) => match c.subcommand {
             None => Box::new(SqlShellCommand::new(

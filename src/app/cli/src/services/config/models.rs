@@ -68,6 +68,10 @@ pub struct CLIConfig {
     /// Uploads configuration
     #[merge(strategy = merge_recursive)]
     pub uploads: Option<UploadsConfig>,
+
+    /// Seach configuration
+    #[merge(strategy = merge_recursive)]
+    pub search: Option<SearchConfig>,
 }
 
 impl CLIConfig {
@@ -84,6 +88,7 @@ impl CLIConfig {
             users: None,
             uploads: None,
             flow_system: None,
+            search: None,
         }
     }
 
@@ -104,6 +109,7 @@ impl CLIConfig {
             users: Some(PredefinedAccountsConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
             flow_system: Some(FlowSystemConfig::sample()),
+            search: Some(SearchConfig::sample()),
         }
     }
 }
@@ -122,6 +128,7 @@ impl Default for CLIConfig {
             users: Some(PredefinedAccountsConfig::default()),
             uploads: Some(UploadsConfig::default()),
             flow_system: Some(FlowSystemConfig::default()),
+            search: Some(SearchConfig::default()),
         }
     }
 }
@@ -833,6 +840,216 @@ impl IdentityConfig {
         self.private_key
             .clone()
             .map(|private_key| kamu_adapter_http::data::query_types::IdentityConfig { private_key })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Search
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchConfig {
+    pub indexer: Option<SearchIndexerConfig>,
+    pub embeddings_chunker: Option<EmbeddingsChunkerConfig>,
+    pub embeddings_encoder: Option<EmbeddingsEncoderConfig>,
+    pub vector_repo: Option<VectorRepoConfig>,
+}
+
+impl SearchConfig {
+    pub const DEFAULT_MODEL: &str = "text-embedding-ada-002";
+    pub const DEFAULT_DIMENSIONS: usize = 1536;
+
+    pub fn sample() -> Self {
+        Self {
+            indexer: Some(SearchIndexerConfig::default()),
+            embeddings_chunker: Some(EmbeddingsChunkerConfig::Simple(
+                EmbeddingsChunkerConfigSimple::default(),
+            )),
+            embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
+                EmbeddingsEncoderConfigOpenAi {
+                    url: Some("https://api.openai.com/v1".to_string()),
+                    api_key: Some("<key>".to_string()),
+                    model_name: Some(Self::DEFAULT_MODEL.to_string()),
+                    dimensions: Some(Self::DEFAULT_DIMENSIONS),
+                },
+            )),
+            vector_repo: Some(VectorRepoConfig::Qdrant(VectorRepoConfigQdrant {
+                url: "http://localhost:6333".to_string(),
+                api_key: None,
+                collection_name: Some("kamu-datasets".to_string()),
+                dimensions: Some(Self::DEFAULT_DIMENSIONS),
+            })),
+        }
+    }
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        Self {
+            indexer: Some(SearchIndexerConfig::default()),
+            embeddings_chunker: Some(EmbeddingsChunkerConfig::Simple(
+                EmbeddingsChunkerConfigSimple::default(),
+            )),
+            embeddings_encoder: Some(EmbeddingsEncoderConfig::OpenAi(
+                EmbeddingsEncoderConfigOpenAi::default(),
+            )),
+            vector_repo: Some(VectorRepoConfig::QdrantContainer(
+                VectorRepoConfigQdrantContainer::default(),
+            )),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchIndexerConfig {
+    // Whether to clear and re-index on start or use existing vectors if any
+    pub clear_on_start: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum EmbeddingsChunkerConfig {
+    Simple(EmbeddingsChunkerConfigSimple),
+}
+
+impl Default for EmbeddingsChunkerConfig {
+    fn default() -> Self {
+        Self::Simple(EmbeddingsChunkerConfigSimple::default())
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddingsChunkerConfigSimple {
+    // Whether to chunk separately major dataset sections like name, schema, readme, or to combine
+    // them all into one chunk
+    pub split_sections: Option<bool>,
+
+    // Whether to split section content by paragraph
+    pub split_paragraphs: Option<bool>,
+}
+
+impl Default for EmbeddingsChunkerConfigSimple {
+    fn default() -> Self {
+        Self {
+            split_sections: Some(false),
+            split_paragraphs: Some(false),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum EmbeddingsEncoderConfig {
+    OpenAi(EmbeddingsEncoderConfigOpenAi),
+}
+
+impl Default for EmbeddingsEncoderConfig {
+    fn default() -> Self {
+        Self::OpenAi(EmbeddingsEncoderConfigOpenAi::default())
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddingsEncoderConfigOpenAi {
+    pub url: Option<String>,
+    pub api_key: Option<String>,
+    pub model_name: Option<String>,
+    pub dimensions: Option<usize>,
+}
+
+impl Default for EmbeddingsEncoderConfigOpenAi {
+    fn default() -> Self {
+        Self {
+            url: None,
+            api_key: None,
+            model_name: Some(SearchConfig::DEFAULT_MODEL.to_string()),
+            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind")]
+pub enum VectorRepoConfig {
+    Qdrant(VectorRepoConfigQdrant),
+    QdrantContainer(VectorRepoConfigQdrantContainer),
+}
+
+impl Default for VectorRepoConfig {
+    fn default() -> Self {
+        Self::QdrantContainer(VectorRepoConfigQdrantContainer::default())
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct VectorRepoConfigQdrant {
+    #[merge(skip)]
+    pub url: String,
+    pub api_key: Option<String>,
+    pub collection_name: Option<String>,
+    pub dimensions: Option<usize>,
+}
+
+impl Default for VectorRepoConfigQdrant {
+    fn default() -> Self {
+        Self {
+            url: String::new(),
+            api_key: None,
+            collection_name: Some("kamu-datasets".to_string()),
+            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct VectorRepoConfigQdrantContainer {
+    pub image: Option<String>,
+    pub dimensions: Option<usize>,
+    pub start_timeout: Option<DurationString>,
+}
+
+impl Default for VectorRepoConfigQdrantContainer {
+    fn default() -> Self {
+        Self {
+            image: Some(kamu::utils::docker_images::QDRANT.to_string()),
+            dimensions: Some(SearchConfig::DEFAULT_DIMENSIONS),
+            start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
+        }
     }
 }
 

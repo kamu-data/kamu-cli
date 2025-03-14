@@ -1,0 +1,42 @@
+[package]
+name = "kamu-search-qdrant"
+description = "Implementation of vector repository using Qdrant"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+container-runtime = { workspace = true }
+internal-error = { workspace = true }
+kamu-search = { workspace = true }
+odf = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+dill = { version = "0.11", default-features = false }
+futures = { version = "0.3", default-features = false }
+qdrant-client = { version = "1.13.0", default-features = false, features = [
+    "serde",
+] }
+rand = "0.8"
+serde_json = { version = "1", default-features = false }
+tokio = { version = "1", default-features = false }
+tonic = { version = "0.12", default-features = false }
+
+
+[dev-dependencies]
