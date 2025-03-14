@@ -53,7 +53,8 @@ pub(crate) use metadata::*;
 pub(crate) use multihash::*;
 pub(crate) use odf_generated::*;
 pub(crate) use os_path::*;
-pub(crate) use pagination::*;
+// Public only for tests
+pub use pagination::*;
 pub(crate) use task_id::*;
 pub(crate) use task_status_outcome::*;
 
