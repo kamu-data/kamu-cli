@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
-use internal_error::ErrorIntoInternal;
+use internal_error::ResultIntoInternal;
 use kamu_accounts::AccessToken;
 use uuid::Uuid;
 
@@ -198,7 +198,7 @@ impl AccessTokenRepository for InMemoryAccessTokenRepository {
             .account_repository
             .get_account_by_id(&access_token.account_id)
             .await
-            .map_err(|err| FindAccountByTokenError::Internal(err.int_err()))?;
+            .int_err()?;
 
         Ok(account)
     }

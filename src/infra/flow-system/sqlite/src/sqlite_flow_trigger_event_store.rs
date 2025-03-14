@@ -261,8 +261,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
         Ok(dataset_ids
             .into_iter()
             .map(|event_row| {
-                odf::DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str())
-                    .map_err(InternalError::new)
+                odf::DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str()).int_err()
             })
             .collect::<Result<Vec<_>, InternalError>>()?)
     }

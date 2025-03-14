@@ -175,9 +175,9 @@ impl RebacService for RebacServiceImpl {
             .await
         {
             Ok(_) => Ok(()),
-            Err(err) => match err {
+            Err(e) => match e {
                 DeleteEntityPropertiesError::NotFound(_) => Ok(()),
-                DeleteEntityPropertiesError::Internal(e) => Err(DeletePropertiesError::Internal(e)),
+                e @ DeleteEntityPropertiesError::Internal(_) => Err(e.int_err().into()),
             },
         }
     }
@@ -340,9 +340,9 @@ fn map_delete_entity_property_result(
 ) -> Result<(), UnsetEntityPropertyError> {
     match res {
         Ok(_) => Ok(()),
-        Err(err) => match err {
+        Err(e) => match e {
             DeleteEntityPropertyError::NotFound(_) => Ok(()),
-            DeleteEntityPropertyError::Internal(e) => Err(UnsetEntityPropertyError::Internal(e)),
+            e @ DeleteEntityPropertyError::Internal(_) => Err(e.int_err().into()),
         },
     }
 }

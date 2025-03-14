@@ -7,20 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use chrono::prelude::*;
-use kamu_core::ServerUrlConfig;
+use kamu_core::{auth, ResolvedDataset, ServerUrlConfig};
 use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
+use tokio::sync::OnceCell;
 
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils::{ensure_dataset_env_vars_enabled, get_dataset};
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct Dataset {
-    owner: Account,
-    dataset_handle: odf::DatasetHandle,
+    dataset_request_state: DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
@@ -29,8 +31,7 @@ impl Dataset {
     #[graphql(skip)]
     pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
         Self {
-            owner,
-            dataset_handle,
+            dataset_request_state: DatasetRequestState::new(owner, dataset_handle),
         }
     }
 
@@ -73,34 +74,31 @@ impl Dataset {
 
     /// Unique identifier of the dataset
     async fn id(&self) -> DatasetID {
-        (&self.dataset_handle.id).into()
+        (&self.dataset_request_state.dataset_handle.id).into()
     }
 
     /// Symbolic name of the dataset.
     /// Name can change over the dataset's lifetime. For unique identifier use
     /// `id()`.
     async fn name(&self) -> DatasetName {
-        (&self.dataset_handle.alias.dataset_name).into()
+        (&self.dataset_request_state.dataset_handle.alias.dataset_name).into()
     }
 
     /// Returns the user or organization that owns this dataset
     async fn owner(&self) -> &Account {
-        &self.owner
+        &self.dataset_request_state.owner
     }
 
     /// Returns dataset alias (user + name)
     async fn alias(&self) -> DatasetAlias {
-        (&self.dataset_handle.alias).into()
+        (&self.dataset_request_state.dataset_handle.alias).into()
     }
 
     /// Returns the kind of dataset (Root or Derivative)
     #[tracing::instrument(level = "info", name = Dataset_kind, skip_all)]
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
-        let summary = resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?;
+        let summary = self.dataset_request_state.dataset_summary(ctx).await?;
+
         Ok(summary.kind.into())
     }
 
@@ -109,7 +107,7 @@ impl Dataset {
     async fn visibility(&self, ctx: &Context<'_>) -> Result<DatasetVisibilityOutput> {
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         let properties = rebac_svc
             .get_dataset_properties(resolved_dataset.get_id())
             .await
@@ -126,34 +124,34 @@ impl Dataset {
 
     /// Access to the data of the dataset
     async fn data(&self) -> DatasetData {
-        DatasetData::new(self.dataset_handle.clone())
+        DatasetData::new(&self.dataset_request_state)
     }
 
     /// Access to the metadata of the dataset
     async fn metadata(&self) -> DatasetMetadata {
-        DatasetMetadata::new(self.dataset_handle.clone())
+        DatasetMetadata::new(&self.dataset_request_state)
     }
 
     /// Access to the environment variable of this dataset
     #[expect(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
-        ensure_dataset_env_vars_enabled(ctx)?;
+        utils::ensure_dataset_env_vars_enabled(ctx)?;
 
-        Ok(DatasetEnvVars::new(self.dataset_handle.clone()))
+        Ok(DatasetEnvVars::new(&self.dataset_request_state))
     }
 
     /// Access to the flow configurations of this dataset
     async fn flows(&self) -> DatasetFlows {
-        DatasetFlows::new(self.dataset_handle.clone())
+        DatasetFlows::new(&self.dataset_request_state)
     }
 
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     #[tracing::instrument(level = "info", name = Dataset_created_at, skip_all)]
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
-        use odf::dataset::MetadataChainExt as _;
+        use odf::dataset::MetadataChainExt;
         Ok(resolved_dataset
             .as_metadata_chain()
             .accept_one(odf::dataset::SearchSeedVisitor::new())
@@ -167,9 +165,9 @@ impl Dataset {
     /// Creation time of the most recent metadata block in the chain
     #[tracing::instrument(level = "info", name = Dataset_last_updated_at, skip_all)]
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
-        use odf::dataset::MetadataChainExt as __;
+        use odf::dataset::MetadataChainExt;
         Ok(resolved_dataset
             .as_metadata_chain()
             .get_block_by_ref(&odf::BlockRef::Head)
@@ -180,12 +178,9 @@ impl Dataset {
     /// Permissions of the current user
     #[tracing::instrument(level = "info", name = Dataset_permissions, skip_all)]
     async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
-        use kamu_core::auth;
-
-        let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
-
-        let allowed_actions = dataset_action_authorizer
-            .get_allowed_actions(&self.dataset_handle.id)
+        let allowed_actions = self
+            .dataset_request_state
+            .allowed_dataset_actions(ctx)
             .await?;
         let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
@@ -201,9 +196,78 @@ impl Dataset {
 
     /// Various endpoints for interacting with data
     async fn endpoints(&self, ctx: &Context<'_>) -> DatasetEndpoints<'_> {
-        let config = crate::utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
+        let config = utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
 
-        DatasetEndpoints::new(&self.owner, self.dataset_handle.clone(), config)
+        DatasetEndpoints::new(&self.dataset_request_state, config)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub(crate) struct DatasetRequestState {
+    owner: Account,
+    dataset_handle: odf::DatasetHandle,
+    resolved_dataset: OnceCell<ResolvedDataset>,
+    dataset_summary: OnceCell<odf::DatasetSummary>,
+    allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
+}
+
+impl DatasetRequestState {
+    pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
+        Self {
+            owner,
+            dataset_handle,
+            allowed_dataset_actions: OnceCell::new(),
+            resolved_dataset: OnceCell::new(),
+            dataset_summary: OnceCell::new(),
+        }
+    }
+
+    #[inline]
+    pub fn owner(&self) -> &Account {
+        &self.owner
+    }
+
+    #[inline]
+    pub fn dataset_handle(&self) -> &odf::DatasetHandle {
+        &self.dataset_handle
+    }
+
+    pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
+        utils::get_resolved_dataset(ctx, &self.resolved_dataset, &self.dataset_handle).await
+    }
+
+    pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
+        utils::get_dataset_summary(
+            ctx,
+            &self.resolved_dataset,
+            &self.dataset_summary,
+            &self.dataset_handle,
+        )
+        .await
+    }
+
+    pub async fn check_dataset_read_access(&self, ctx: &Context<'_>) -> Result<()> {
+        utils::check_dataset_access(
+            ctx,
+            &self.allowed_dataset_actions,
+            &self.dataset_handle,
+            auth::DatasetAction::Read,
+        )
+        .await
+    }
+
+    async fn allowed_dataset_actions(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<&HashSet<auth::DatasetAction>> {
+        utils::get_allowed_dataset_actions(
+            ctx,
+            &self.allowed_dataset_actions,
+            &self.dataset_handle.id,
+        )
+        .await
     }
 }
 

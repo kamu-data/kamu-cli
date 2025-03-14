@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::ErrorIntoInternal;
+use internal_error::ResultIntoInternal;
 use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarNotFoundError,
@@ -58,7 +58,7 @@ impl DatasetKeyValueService for DatasetKeyValueServiceImpl {
         if let Some(existing_dataset_env_var) = dataset_env_vars.get(dataset_env_var_key) {
             let exposed_value = existing_dataset_env_var
                 .get_exposed_decrypted_value(self.dataset_env_var_encryption_key.expose_secret())
-                .map_err(|err| FindDatasetEnvVarError::Internal(err.int_err()))?;
+                .int_err()?;
             return if existing_dataset_env_var.secret_nonce.is_some() {
                 Ok(DatasetEnvVarValue::Secret(SecretString::from(
                     exposed_value,

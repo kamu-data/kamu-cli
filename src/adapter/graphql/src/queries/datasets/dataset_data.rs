@@ -10,28 +10,30 @@
 use kamu_core::{self as domain, QueryError};
 
 use crate::prelude::*;
-use crate::utils::get_dataset;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetData {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetData<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetData {
+impl<'a> DatasetData<'a> {
     const DEFAULT_TAIL_LIMIT: u64 = 20;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
     }
 
     /// Total number of records in this dataset
     #[tracing::instrument(level = "info", name = DatasetData_num_records_total, skip_all)]
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         let summary = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
@@ -43,7 +45,7 @@ impl DatasetData {
     /// caching
     #[tracing::instrument(level = "info", name = DatasetData_estimated_size, skip_all)]
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         let summary = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
@@ -85,7 +87,7 @@ impl DatasetData {
 
         let tail_result = query_svc
             .tail(
-                &self.dataset_handle.as_local_ref(),
+                &self.dataset_request_state.dataset_handle().as_local_ref(),
                 skip.unwrap_or(0),
                 limit,
             )

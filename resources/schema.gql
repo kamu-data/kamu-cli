@@ -1422,7 +1422,7 @@ input FlowConfigurationResetCustom {
 }
 
 input FlowConfigurationResetToSeedDummy {
-	dummy: String!
+	dummy: String
 }
 
 union FlowConfigurationSnapshot = FlowConfigurationCompactionRule | FlowConfigurationIngest | FlowConfigurationReset
@@ -1475,7 +1475,7 @@ type FlowDescriptionDatasetReset {
 }
 
 type FlowDescriptionHardCompactionNothingToDo {
-	dummy: String!
+	dummy: String
 	message: String!
 }
 
@@ -2497,7 +2497,6 @@ interface SetDatasetVisibilityResult {
 }
 
 type SetDatasetVisibilityResultSuccess implements SetDatasetVisibilityResult {
-	dummy: String
 	message: String!
 }
 
@@ -2638,7 +2637,6 @@ interface SetWatermarkResult {
 }
 
 type SetWatermarkUpToDate implements SetWatermarkResult {
-	dummy: String!
 	message: String!
 }
 
@@ -2652,7 +2650,7 @@ type SnapshotConfigurationResetCustom {
 }
 
 type SnapshotConfigurationResetToSeedDummy {
-	dummy: String!
+	dummy: String
 }
 
 union SnapshotPropagationMode = SnapshotConfigurationResetCustom | SnapshotConfigurationResetToSeedDummy
@@ -2885,12 +2883,10 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 }
 
 type UpdateEmailInvalid implements UpdateEmailResult {
-	dummy: Boolean!
 	message: String!
 }
 
 type UpdateEmailNonUnique implements UpdateEmailResult {
-	dummy: Boolean!
 	message: String!
 }
 

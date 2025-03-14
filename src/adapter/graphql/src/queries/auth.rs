@@ -48,10 +48,7 @@ impl Auth {
         let access_token_listing = access_token_service
             .get_access_tokens_by_account_id(
                 &account_id,
-                &PaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                },
+                &PaginationOpts::from_page(page, per_page),
             )
             .await
             .int_err()?;

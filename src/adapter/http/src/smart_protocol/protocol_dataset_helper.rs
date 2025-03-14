@@ -682,12 +682,12 @@ pub async fn dataset_export_object_file(
     let size = source_object_repository
         .get_size(&object_file_reference.physical_hash)
         .await
-        .map_err(|e| SyncError::Internal(e.int_err()))?;
+        .int_err()?;
 
     let stream = source_object_repository
         .get_stream(&object_file_reference.physical_hash)
         .await
-        .map_err(|e| SyncError::Internal(e.int_err()))?;
+        .int_err()?;
 
     use tokio_util::io::ReaderStream;
     let reader_stream = ReaderStream::new(stream);
@@ -709,7 +709,7 @@ pub async fn dataset_export_object_file(
         .body(reqwest::Body::wrap_stream(reader_stream))
         .send()
         .await
-        .map_err(|e| SyncError::Internal(e.int_err()))?;
+        .int_err()?;
 
     if response.status().is_success() {
         Ok(())

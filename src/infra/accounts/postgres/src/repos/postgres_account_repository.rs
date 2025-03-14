@@ -154,13 +154,14 @@ impl AccountRepository for PostgresAccountRepository {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+        let account_id_stack = account_id.as_did_str().to_stack_string();
 
         let update_result = sqlx::query!(
             r#"
             UPDATE accounts SET email = $1 WHERE id = $2
             "#,
             new_email.as_ref(),
-            account_id.to_string(),
+            account_id_stack.as_str(),
         )
         .execute(connection_mut)
         .await
@@ -228,8 +229,12 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError> {
+        if account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;

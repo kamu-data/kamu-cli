@@ -7,11 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{
+    mysql_generate_placeholders_list,
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
+use sqlx::mysql::MySqlRow;
 use sqlx::Row;
 
 use crate::domain::*;
@@ -54,6 +60,21 @@ impl MySqlAccountRepository {
         };
 
         AccountErrorDuplicate { account_field }
+    }
+
+    fn map_account_row(account_row: &MySqlRow) -> Account {
+        Account {
+            id: account_row.get(0),
+            account_name: odf::AccountName::new_unchecked(account_row.get::<&str, _>(1)),
+            email: Email::parse(account_row.get(2)).unwrap(),
+            display_name: account_row.get(3),
+            account_type: account_row.get_unchecked(4),
+            avatar_url: account_row.get(5),
+            registered_at: account_row.get(6),
+            is_admin: account_row.get(7),
+            provider: account_row.get(8),
+            provider_identity_key: account_row.get(9),
+        }
     }
 }
 
@@ -158,13 +179,14 @@ impl AccountRepository for MySqlAccountRepository {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+        let account_id_stack = account_id.as_did_str().to_stack_string();
 
         let update_result = sqlx::query!(
             r#"
             UPDATE accounts SET email = ? WHERE id = ?
             "#,
             new_email.as_ref(),
-            account_id.to_string(),
+            account_id_stack.as_str(),
         )
         .execute(connection_mut)
         .await
@@ -232,19 +254,15 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError> {
+        if account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-
-        let placeholders = account_ids.iter().map(|_| "?").collect::<Vec<_>>();
-        let placeholders_str = if placeholders.is_empty() {
-            // MySQL does not consider the “in ()” syntax correct, so we add NULL
-            "NULL".to_string()
-        } else {
-            placeholders.join(", ")
-        };
 
         let query_str = format!(
             r#"
@@ -260,36 +278,21 @@ impl AccountRepository for MySqlAccountRepository {
                     provider,
                     provider_identity_key
                 FROM accounts
-                WHERE id IN ({placeholders_str})
+                WHERE id IN ({})
                 "#,
+            mysql_generate_placeholders_list(account_ids.len())
         );
 
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
         let mut query = sqlx::query(&query_str);
-        for account_id in &account_ids {
+        for account_id in account_ids {
             query = query.bind(account_id.to_string());
         }
 
         let account_rows = query.fetch_all(connection_mut).await.int_err()?;
 
-        Ok(account_rows
-            .into_iter()
-            .map(|account_row| Account {
-                id: account_row.get_unchecked("id"),
-                account_name: odf::AccountName::new_unchecked(
-                    &account_row.get::<String, &str>("account_name"),
-                ),
-                email: Email::parse(account_row.get("email")).unwrap(),
-                display_name: account_row.get("display_name"),
-                account_type: account_row.get_unchecked("account_type"),
-                avatar_url: account_row.get("avatar_url"),
-                registered_at: account_row.get("registered_at"),
-                is_admin: account_row.get::<bool, &str>("is_admin"),
-                provider: account_row.get("provider"),
-                provider_identity_key: account_row.get("provider_identity_key"),
-            })
-            .collect())
+        Ok(account_rows.iter().map(Self::map_account_row).collect())
     }
 
     async fn get_account_by_name(
@@ -494,8 +497,7 @@ impl PasswordHashRepository for MySqlAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .int_err()
-        .map_err(SavePasswordHashError::Internal)?;
+        .int_err()?;
 
         Ok(())
     }

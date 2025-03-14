@@ -40,20 +40,16 @@ impl AccountServiceImpl {
 
 #[async_trait::async_trait]
 impl AccountService for AccountServiceImpl {
-    async fn account_by_id(
+    async fn get_account_by_id(
         &self,
         account_id: &odf::AccountID,
-    ) -> Result<Option<Account>, InternalError> {
-        match self.account_repo.get_account_by_id(account_id).await {
-            Ok(account) => Ok(Some(account.clone())),
-            Err(GetAccountByIdError::NotFound(_)) => Ok(None),
-            Err(GetAccountByIdError::Internal(e)) => Err(e),
-        }
+    ) -> Result<Account, GetAccountByIdError> {
+        self.account_repo.get_account_by_id(account_id).await
     }
 
     async fn accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, InternalError> {
         self.account_repo
             .get_accounts_by_ids(account_ids)
@@ -63,7 +59,7 @@ impl AccountService for AccountServiceImpl {
 
     async fn get_account_map(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<HashMap<odf::AccountID, Account>, GetAccountMapError> {
         let account_map = match self.account_repo.get_accounts_by_ids(account_ids).await {
             Ok(accounts) => {

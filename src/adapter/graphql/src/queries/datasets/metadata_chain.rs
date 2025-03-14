@@ -11,8 +11,7 @@ use futures::{StreamExt, TryStreamExt};
 use odf::dataset::MetadataChainExt as _;
 
 use crate::prelude::*;
-use crate::queries::Account;
-use crate::utils::get_dataset;
+use crate::queries::{Account, DatasetRequestState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MetadataRef
@@ -28,24 +27,26 @@ pub struct BlockRef {
 // MetadataChain
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChain {
-    dataset_handle: odf::DatasetHandle,
+pub struct MetadataChain<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl MetadataChain {
+impl<'a> MetadataChain<'a> {
     const DEFAULT_BLOCKS_PER_PAGE: usize = 20;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
     }
 
     /// Returns all named metadata block references
     #[tracing::instrument(level = "info", name = MetadataChain_refs, skip_all)]
     async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         Ok(vec![BlockRef {
             name: "head".to_owned(),
             block_hash: resolved_dataset
@@ -64,14 +65,15 @@ impl MetadataChain {
         ctx: &Context<'_>,
         hash: Multihash<'static>,
     ) -> Result<Option<MetadataBlockExtended>> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         let block_maybe = resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
             .await?;
-        let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
-            .await?
-            .expect("Account must exist");
+        let account =
+            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
+                .await?
+                .expect("Account must exist");
         Ok(if let Some(block) = block_maybe {
             Some(MetadataBlockExtended::new(ctx, hash, block, account).await?)
         } else {
@@ -90,7 +92,7 @@ impl MetadataChain {
     ) -> Result<Option<String>> {
         use odf::metadata::serde::MetadataBlockSerializer;
 
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         match resolved_dataset
             .as_metadata_chain()
             .try_get_block(&hash)
@@ -119,7 +121,7 @@ impl MetadataChain {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MetadataBlockConnection> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
@@ -137,9 +139,12 @@ impl MetadataChain {
 
         let mut nodes = Vec::new();
         while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
-            let account = Account::from_dataset_alias(ctx, &self.dataset_handle.alias)
-                .await?
-                .expect("Account must exist");
+            let account = Account::from_dataset_alias(
+                ctx,
+                &self.dataset_request_state.dataset_handle().alias,
+            )
+            .await?
+            .expect("Account must exist");
             let block = MetadataBlockExtended::new(ctx, hash, block, account).await?;
             nodes.push(block);
         }
