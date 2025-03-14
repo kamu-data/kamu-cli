@@ -115,6 +115,8 @@ impl DatasetMut {
     #[graphql(guard = "LoggedInGuard::new()")]
     #[tracing::instrument(level = "info", name = DatasetMut_delete, skip_all)]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
+        // NOTE: Access verification is handled by the use-case
+
         let delete_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::DeleteDatasetUseCase);
 
         let dataset_handle = &self.dataset_mut_request_state.dataset_handle;
@@ -250,16 +252,6 @@ impl DatasetMutRequestState {
             &self.allowed_dataset_actions,
             &self.dataset_handle,
             auth::DatasetAction::Maintain,
-        )
-        .await
-    }
-
-    pub async fn check_dataset_own_access(&self, ctx: &Context<'_>) -> Result<()> {
-        utils::check_dataset_access(
-            ctx,
-            &self.allowed_dataset_actions,
-            &self.dataset_handle,
-            auth::DatasetAction::Own,
         )
         .await
     }
