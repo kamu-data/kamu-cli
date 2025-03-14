@@ -121,10 +121,34 @@ impl SqliteFlowEventStore {
             if let Some(new_status) = event.new_status() {
                 maybe_latest_status = Some(new_status);
             }
-            if let FlowEvent::ScheduledForActivation(e) = event {
-                maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
-            } else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = event {
-                maybe_scheduled_for_activation_at = None;
+            match event {
+                FlowEvent::ScheduledForActivation(e) => {
+                    maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at)
+                }
+                FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) => {
+                    maybe_scheduled_for_activation_at = None
+                }
+                _ => {
+                    #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+                    #[allow(dead_code)]
+                    pub struct ActivationRow {
+                        pub activation_time: Option<DateTime<Utc>>,
+                    }
+
+                    let connection_mut = tr.connection_mut().await?;
+                    maybe_scheduled_for_activation_at = sqlx::query_as!(
+                        ActivationRow,
+                        r#"
+                            SELECT scheduled_for_activation_at as "activation_time: _"
+                                FROM flows WHERE flow_id = $1
+                            "#,
+                        flow_id
+                    )
+                    .map(|result| result.activation_time)
+                    .fetch_one(connection_mut)
+                    .await
+                    .int_err()?;
+                }
             }
         }
 
@@ -134,7 +158,7 @@ impl SqliteFlowEventStore {
                 UPDATE flows
                     SET flow_status = CASE WHEN $2 IS NOT NULL THEN $2 ELSE flow_status END,
                     last_event_id = $3,
-                    scheduled_for_activation_at = CASE WHEN $4 IS NOT NULL THEN $4 ELSE scheduled_for_activation_at END
+                    scheduled_for_activation_at = $4
                 WHERE flow_id = $1 AND (
                     last_event_id IS NULL AND CAST($5 as INT8) IS NULL OR
                     last_event_id IS NOT NULL AND CAST($5 as INT8) IS NOT NULL AND last_event_id = $5
