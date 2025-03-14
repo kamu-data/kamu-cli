@@ -34,6 +34,15 @@ pub fn alias(account: &impl AsRef<str>, dataset_name: &impl AsRef<str>) -> Datas
     )
 }
 
+pub fn account_id(name: &impl AsRef<str>) -> AccountID {
+    let name = AccountName::new_unchecked(name.as_ref());
+    AccountID::new_seeded_ed25519(name.as_bytes())
+}
+
+pub fn account_name(value: &impl AsRef<str>) -> AccountName {
+    AccountName::new_unchecked(value.as_ref())
+}
+
 pub fn account_id_by_maybe_name(maybe_name: &Option<AccountName>, default_name: &str) -> AccountID {
     if let Some(name) = maybe_name {
         AccountID::new_seeded_ed25519(name.as_bytes())

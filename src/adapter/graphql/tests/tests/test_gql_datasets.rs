@@ -7,12 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use bon::bon;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use indoc::indoc;
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
@@ -37,7 +40,10 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 macro_rules! test_dataset_create_empty_without_visibility {
     ($tenancy_config:expr) => {
-        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
+        let harness = GraphQLDatasetsHarness::builder()
+            .tenancy_config($tenancy_config)
+            .build()
+            .await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -79,7 +85,10 @@ macro_rules! test_dataset_create_empty_without_visibility {
 
 macro_rules! test_dataset_create_empty_public {
     ($tenancy_config:expr) => {
-        let harness = GraphQLDatasetsHarness::new($tenancy_config).await;
+        let harness = GraphQLDatasetsHarness::builder()
+            .tenancy_config($tenancy_config)
+            .build()
+            .await;
 
         let request_code = indoc::indoc!(
             r#"
@@ -123,7 +132,11 @@ macro_rules! test_dataset_create_empty_public {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_id_does_not_exist() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
     let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
@@ -152,7 +165,10 @@ async fn test_dataset_by_id_does_not_exist() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_id() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -195,9 +211,12 @@ async fn test_dataset_by_id() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_account_and_name_case_insensitive() {
-    let account_name = odf::AccountName::new_unchecked("KaMu");
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
 
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
+    let account_name = odf::AccountName::new_unchecked("KaMu");
 
     harness
         .create_root_dataset(
@@ -244,7 +263,11 @@ async fn test_dataset_by_account_and_name_case_insensitive() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_by_account_id() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
     harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("Foo"))
         .await;
@@ -322,7 +345,10 @@ async fn test_dataset_create_empty_public_mt() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_from_snapshot() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::MultiTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
@@ -382,7 +408,10 @@ async fn test_dataset_create_from_snapshot() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_create_from_snapshot_malformed() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let res = harness
         .execute_authorized_query(indoc!(
@@ -417,7 +446,10 @@ async fn test_dataset_create_from_snapshot_malformed() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_rename_success() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -470,7 +502,10 @@ async fn test_dataset_rename_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_rename_no_changes() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -521,7 +556,10 @@ async fn test_dataset_rename_no_changes() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_rename_name_collision() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -575,7 +613,10 @@ async fn test_dataset_rename_name_collision() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_delete_success() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -625,7 +666,10 @@ async fn test_dataset_delete_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_delete_dangling_ref() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -682,8 +726,157 @@ async fn test_dataset_delete_dangling_ref() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_view_permissions() {
-    let harness = GraphQLDatasetsHarness::new(TenancyConfig::SingleTenant).await;
+async fn test_dataset_view_permissions_for_a_reader() {
+    test_dataset_view_permissions(
+        &[DatasetAction::Read],
+        async_graphql::value!({
+            "collaboration": {
+                "canView": false,
+                "canUpdate": false,
+            },
+            "envVars": {
+                "canView": true,
+                "canUpdate": false,
+            },
+            "flows": {
+                "canView": true,
+                "canRun": false,
+            },
+            "general": {
+                "canRename": false,
+                "canSetVisibility": false,
+                "canDelete": false,
+            },
+            "metadata": {
+                "canCommit": false,
+            },
+        }),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_view_permissions_for_an_editor() {
+    test_dataset_view_permissions(
+        &[DatasetAction::Read, DatasetAction::Write],
+        async_graphql::value!({
+            "collaboration": {
+                "canView": false,
+                "canUpdate": false,
+            },
+            "envVars": {
+                "canView": true,
+                "canUpdate": false,
+            },
+            "flows": {
+                "canView": true,
+                "canRun": false,
+            },
+            "general": {
+                "canRename": false,
+                "canSetVisibility": false,
+                "canDelete": false,
+            },
+            "metadata": {
+                "canCommit": true,
+            },
+        }),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_view_permissions_for_a_maintainer() {
+    test_dataset_view_permissions(
+        &[
+            DatasetAction::Read,
+            DatasetAction::Write,
+            DatasetAction::Maintain,
+        ],
+        async_graphql::value!({
+            "collaboration": {
+                "canView": true,
+                "canUpdate": true,
+            },
+            "envVars": {
+                "canView": true,
+                "canUpdate": true,
+            },
+            "flows": {
+                "canView": true,
+                "canRun": true,
+            },
+            "general": {
+                "canRename": true,
+                "canSetVisibility": true,
+                "canDelete": false,
+            },
+            "metadata": {
+                "canCommit": true,
+            },
+        }),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_view_permissions_for_an_owner() {
+    test_dataset_view_permissions(
+        &[
+            DatasetAction::Read,
+            DatasetAction::Write,
+            DatasetAction::Maintain,
+            DatasetAction::Own,
+        ],
+        async_graphql::value!({
+            "collaboration": {
+                "canView": true,
+                "canUpdate": true,
+            },
+            "envVars": {
+                "canView": true,
+                "canUpdate": true,
+            },
+            "flows": {
+                "canView": true,
+                "canRun": true,
+            },
+            "general": {
+                "canRename": true,
+                "canSetVisibility": true,
+                "canDelete": true,
+            },
+            "metadata": {
+                "canCommit": true,
+            },
+        }),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_dataset_view_permissions(
+    allowed_actions: &[DatasetAction],
+    expected_permission: async_graphql::Value,
+) {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .mock_dataset_action_authorizer(
+            MockDatasetActionAuthorizer::new()
+                .expect_check_read_a_dataset(1, true)
+                .make_expect_get_allowed_actions(allowed_actions, 1),
+        )
+        .build()
+        .await;
 
     let foo_result = harness
         .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
@@ -695,11 +888,26 @@ async fn test_dataset_view_permissions() {
             datasets {
                 byId (datasetId: "<id>") {
                     permissions {
-                        canView
-                        canDelete
-                        canRename
-                        canCommit
-                        canSchedule
+                        collaboration {
+                            canView
+                            canUpdate
+                        }
+                        envVars {
+                            canView
+                            canUpdate
+                        }
+                        flows {
+                            canView
+                            canRun
+                        }
+                        general {
+                            canRename
+                            canSetVisibility
+                            canDelete
+                        }
+                        metadata {
+                            canCommit
+                        }
                     }
                 }
             }
@@ -715,13 +923,7 @@ async fn test_dataset_view_permissions() {
         async_graphql::value!({
             "datasets": {
                 "byId": {
-                    "permissions": {
-                        "canView": true,
-                        "canDelete": true,
-                        "canRename": true,
-                        "canCommit": true,
-                        "canSchedule": true,
-                    }
+                    "permissions": expected_permission
                 }
             }
         }),
@@ -739,8 +941,13 @@ struct GraphQLDatasetsHarness {
     catalog_anonymous: dill::Catalog,
 }
 
+#[bon]
 impl GraphQLDatasetsHarness {
-    pub async fn new(tenancy_config: TenancyConfig) -> Self {
+    #[builder]
+    pub async fn new(
+        tenancy_config: TenancyConfig,
+        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -765,7 +972,6 @@ impl GraphQLDatasetsHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<RebacServiceImpl>()
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
                 .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
@@ -776,6 +982,13 @@ impl GraphQLDatasetsHarness {
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<RebacDatasetLifecycleMessageConsumer>();
+
+            if let Some(mock) = mock_dataset_action_authorizer {
+                b.add_value(mock)
+                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+            } else {
+                b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
+            }
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

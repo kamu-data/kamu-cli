@@ -185,7 +185,7 @@ pub async fn test_delete_warning(mut kamu_node_api_client: KamuApiServerClient) 
         .success();
 
     let kamu_node_url = kamu_node_api_client.get_base_url().clone();
-    let token = kamu_node_api_client.auth().login_as_e2e_user().await;
+    let (token, _) = kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu.assert_success_command_execution(
         [

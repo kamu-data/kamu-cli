@@ -54,10 +54,7 @@ impl PredefinedAccountsRegistrator {
         self.account_repository
             .create_account(&account)
             .await
-            .map_err(|e| match e {
-                CreateAccountError::Duplicate(e) => e.int_err(),
-                CreateAccountError::Internal(e) => e,
-            })?;
+            .int_err()?;
 
         if account_config.provider == PROVIDER_PASSWORD {
             self.login_password_auth_provider

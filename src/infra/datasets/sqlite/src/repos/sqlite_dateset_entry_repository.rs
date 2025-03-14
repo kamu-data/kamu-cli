@@ -8,9 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{
+    sqlite_generate_placeholders_list,
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -163,12 +169,6 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let placeholders = dataset_ids
-            .iter()
-            .map(|_| "?")
-            .collect::<Vec<_>>()
-            .join(", ");
-
         let query_str = format!(
             r#"
             SELECT dataset_id as id,
@@ -176,9 +176,10 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                    dataset_name as name,
                    created_at
             FROM dataset_entries
-            WHERE dataset_id IN ({placeholders})
+            WHERE dataset_id IN ({})
             ORDER BY created_at
             "#,
+            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(1).unwrap())
         );
 
         // ToDo replace it by macro once sqlx will support it
@@ -188,20 +189,16 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             query = query.bind(dataset_id.to_string());
         }
 
-        let dataset_rows = query
-            .fetch_all(connection_mut)
-            .await
-            .int_err()
-            .map_err(GetMultipleDatasetEntriesError::Internal)?;
+        let dataset_rows = query.fetch_all(connection_mut).await.int_err()?;
 
         let resolved_entries: Vec<_> = dataset_rows
             .into_iter()
             .map(|row| {
                 DatasetEntry::new(
-                    row.get_unchecked("id"),
-                    row.get_unchecked("owner_id"),
-                    odf::DatasetName::new_unchecked(&row.get::<String, &str>("name")),
-                    row.get_unchecked("created_at"),
+                    row.get(0),
+                    row.get(1),
+                    odf::DatasetName::new_unchecked(row.get::<&str, _>(2)),
+                    row.get(3),
                 )
             })
             .collect();
@@ -390,10 +387,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         {
             let mut tr = self.transaction.lock().await;
 
-            let connection_mut = tr
-                .connection_mut()
-                .await
-                .map_err(DeleteEntryDatasetError::Internal)?;
+            let connection_mut = tr.connection_mut().await?;
 
             let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
             let dataset_id_as_str = stack_dataset_id.as_str();

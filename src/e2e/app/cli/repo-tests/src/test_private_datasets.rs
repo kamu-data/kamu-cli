@@ -28,6 +28,8 @@ use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use odf::metadata::testing::MetadataFactory;
 
+// TODO: Private Datasets: cover new paths
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
@@ -116,7 +118,7 @@ pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
                 .dataset()
                 .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
                 .await,
-            Err(SetDatasetVisibilityError::ForbiddenOnlyOwner)
+            Err(SetDatasetVisibilityError::Forbidden)
         );
 
         assert_matches!(

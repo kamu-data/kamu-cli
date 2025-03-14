@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use kamu_adapter_http::general::DatasetInfoResponse;
+use kamu_adapter_http::general::{DatasetInfoResponse, DatasetOwnerInfo};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     DatasetByIdError,
@@ -20,8 +20,6 @@ use kamu_cli_e2e_common::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient) {
-    // TODO: Remove login after fixing
-    //       https://github.com/kamu-data/kamu-cli/issues/730 -->
     let (_, nonexistent_dataset_id) = odf::DatasetID::new_generated_ed25519();
 
     assert_matches!(
@@ -32,7 +30,7 @@ pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient
         Err(DatasetByIdError::NotFound)
     );
 
-    kamu_api_server_client.auth().login_as_kamu().await;
+    let (_, logged_account_id) = kamu_api_server_client.auth().login_as_kamu().await;
 
     assert_matches!(
         kamu_api_server_client
@@ -41,18 +39,16 @@ pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient
             .await,
         Err(DatasetByIdError::NotFound)
     );
-    // <--
 
     let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
         .dataset()
         .create_player_scores_dataset()
         .await;
 
-    // let expected_owner = DatasetOwnerInfo {
-    //     account_name: odf::AccountName::new_unchecked("kamu"),
-    //     // TODO: Private Datasets: replace with account id
-    //     account_id: None,
-    // };
+    let expected_owner = DatasetOwnerInfo {
+        account_name: odf::AccountName::new_unchecked("kamu"),
+        account_id: Some(logged_account_id),
+    };
 
     assert_matches!(
         kamu_api_server_client.dataset().by_id(&dataset_id).await,
@@ -62,7 +58,7 @@ pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient
             dataset_name
         })
             if id == dataset_id
-                && owner.is_none() // TODO: Private Datasets: use expected_owner
+                && owner == Some(expected_owner)
                 && dataset_name == odf::DatasetName::new_unchecked("player-scores")
     );
 }

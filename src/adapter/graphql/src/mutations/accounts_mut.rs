@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::Context;
-use kamu_accounts::AccountService;
+use kamu_accounts::{AccountService, AccountServiceExt};
 
 use crate::mutations::AccountMut;
 use crate::prelude::*;

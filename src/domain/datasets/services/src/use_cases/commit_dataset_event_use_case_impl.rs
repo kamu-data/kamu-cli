@@ -79,11 +79,12 @@ impl CommitDatasetEventUseCaseImpl {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "CommitDatasetEventUseCase::execute",
+        name = CommitDatasetEventUseCaseImpl_execute,
         skip_all,
         fields(dataset_handle, ?event)
     )]

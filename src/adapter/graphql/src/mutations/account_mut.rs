@@ -13,6 +13,8 @@ use kamu_accounts::{Account, AccountRepository, UpdateAccountError};
 use super::AccountFlowsMut;
 use crate::prelude::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub struct AccountMut {
     account: Account,
@@ -34,9 +36,9 @@ impl AccountMut {
         new_email: String,
     ) -> Result<UpdateEmailResult> {
         let Ok(new_email) = Email::parse(&new_email) else {
-            return Ok(UpdateEmailResult::InvalidEmail(UpdateEmailInvalid {
-                dummy: false,
-            }));
+            return Ok(UpdateEmailResult::InvalidEmail(
+                UpdateEmailInvalid::default(),
+            ));
         };
 
         let account_repo = from_catalog_n!(ctx, dyn AccountRepository);
@@ -47,13 +49,9 @@ impl AccountMut {
             Ok(_) => Ok(UpdateEmailResult::Success(UpdateEmailSuccess {
                 new_email: new_email.as_ref().to_string(),
             })),
-
-            Err(UpdateAccountError::Duplicate(_)) => {
-                Ok(UpdateEmailResult::NonUniqueEmail(UpdateEmailNonUnique {
-                    dummy: false,
-                }))
-            }
-
+            Err(UpdateAccountError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
+                UpdateEmailNonUnique::default(),
+            )),
             Err(UpdateAccountError::NotFound(e)) => Err(e.int_err().into()),
             Err(UpdateAccountError::Internal(e)) => Err(e.into()),
         }
@@ -93,30 +91,30 @@ impl UpdateEmailSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
-#[graphql(complex)]
 pub struct UpdateEmailInvalid {
-    pub dummy: bool,
+    message: String,
 }
 
-#[ComplexObject]
-impl UpdateEmailInvalid {
-    pub async fn message(&self) -> String {
-        "Invalid email".to_string()
+impl Default for UpdateEmailInvalid {
+    fn default() -> Self {
+        Self {
+            message: "Invalid email".to_string(),
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
-#[graphql(complex)]
 pub struct UpdateEmailNonUnique {
-    pub dummy: bool,
+    message: String,
 }
 
-#[ComplexObject]
-impl UpdateEmailNonUnique {
-    pub async fn message(&self) -> String {
-        "Non-unique email".to_string()
+impl Default for UpdateEmailNonUnique {
+    fn default() -> Self {
+        Self {
+            message: "Non-unique email".to_string(),
+        }
     }
 }
 

@@ -9,6 +9,7 @@
 
 use kamu_accounts::{
     AccountService,
+    AccountServiceExt,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,

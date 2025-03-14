@@ -29,7 +29,7 @@ pub trait AccountRepository: Send + Sync {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError>;
 
     async fn get_account_by_name(
@@ -51,6 +51,13 @@ pub trait AccountRepository: Send + Sync {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError>;
+
+    fn search_accounts_by_name_pattern<'a>(
+        &'a self,
+        name_pattern: &'a str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream<'a>;
 
     async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError>;
 
@@ -106,6 +113,13 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type AccountPageStream<'a> = EntityPageStream<'a, Account>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct SearchAccountsByNamePatternFilters {
+    pub exclude_accounts_by_ids: Option<Vec<odf::AccountID>>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors

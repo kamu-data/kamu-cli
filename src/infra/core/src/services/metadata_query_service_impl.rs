@@ -25,7 +25,7 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     /// Returns an active polling source, if any
     async fn get_active_polling_source(
         &self,
-        target: ResolvedDataset,
+        target: &ResolvedDataset,
     ) -> Result<Option<PollingSourceBlockInfo>, InternalError> {
         // TODO: Support source evolution
         use odf::dataset::MetadataChainExt;
@@ -40,7 +40,7 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     /// Returns the set of active push sources
     async fn get_active_push_sources(
         &self,
-        target: ResolvedDataset,
+        target: &ResolvedDataset,
     ) -> Result<
         Vec<(
             odf::Multihash,
@@ -64,7 +64,7 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     /// Returns an active transform, if any
     async fn get_active_transform(
         &self,
-        target: ResolvedDataset,
+        target: &ResolvedDataset,
     ) -> Result<
         Option<(
             odf::Multihash,
@@ -86,7 +86,7 @@ impl MetadataQueryService for MetadataQueryServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn try_get_current_watermark(
         &self,
-        resolved_dataset: ResolvedDataset,
+        resolved_dataset: &ResolvedDataset,
     ) -> Result<Option<DateTime<Utc>>, InternalError> {
         use odf::dataset::MetadataChainExt;
         let mut add_data_visitor = odf::dataset::SearchAddDataVisitor::new();

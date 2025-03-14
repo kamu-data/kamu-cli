@@ -113,6 +113,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_search_accounts_by_name_pattern,
+    harness = MySqlAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = mysql,
     fixture = kamu_accounts_repo_tests::test_update_email_errors,
     harness = MySqlAccountRepositoryHarness
 );

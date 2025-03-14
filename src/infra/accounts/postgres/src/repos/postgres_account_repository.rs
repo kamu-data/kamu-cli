@@ -154,13 +154,14 @@ impl AccountRepository for PostgresAccountRepository {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+        let account_id_stack = account_id.as_did_str().to_stack_string();
 
         let update_result = sqlx::query!(
             r#"
             UPDATE accounts SET email = $1 WHERE id = $2
             "#,
             new_email.as_ref(),
-            account_id.to_string(),
+            account_id_stack.as_str(),
         )
         .execute(connection_mut)
         .await
@@ -228,8 +229,12 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError> {
+        if account_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -377,6 +382,62 @@ impl AccountRepository for PostgresAccountRepository {
         .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
+    }
+
+    fn search_accounts_by_name_pattern<'a>(
+        &'a self,
+        name_pattern: &'a str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream<'a> {
+        Box::pin(async_stream::stream! {
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
+
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let excluded_account_ids = filters
+                .exclude_accounts_by_ids
+                .unwrap_or_default()
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+
+            let mut query_stream = sqlx::query_as!(
+                AccountRowModel,
+                r#"
+                SELECT id           AS "id: _",
+                       account_name,
+                       email,
+                       display_name,
+                       account_type AS "account_type: AccountType",
+                       avatar_url,
+                       registered_at,
+                       is_admin,
+                       provider,
+                       provider_identity_key
+                FROM accounts
+                WHERE (account_name ILIKE '%'||$1||'%'
+                    OR display_name ILIKE '%'||$1||'%')
+                  AND id != ALL($4)
+                ORDER BY account_name
+                LIMIT $2 OFFSET $3
+                "#,
+                name_pattern,
+                limit,
+                offset,
+                &excluded_account_ids
+            )
+            .fetch(connection_mut)
+            .map_err(ErrorIntoInternal::int_err);
+
+            use futures::TryStreamExt;
+
+            while let Some(account_row) = query_stream.try_next().await? {
+                yield Ok(account_row.into());
+            }
+        })
     }
 }
 

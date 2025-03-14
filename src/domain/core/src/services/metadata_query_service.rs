@@ -19,13 +19,13 @@ pub trait MetadataQueryService: Send + Sync {
     /// Returns an active polling source, if any
     async fn get_active_polling_source(
         &self,
-        target: ResolvedDataset,
+        target: &ResolvedDataset,
     ) -> Result<Option<PollingSourceBlockInfo>, InternalError>;
 
     /// Returns the set of active push sources
     async fn get_active_push_sources(
         &self,
-        target: ResolvedDataset,
+        target: &ResolvedDataset,
     ) -> Result<
         Vec<(
             odf::Multihash,
@@ -37,7 +37,7 @@ pub trait MetadataQueryService: Send + Sync {
     /// Returns an active transform, if any
     async fn get_active_transform(
         &self,
-        target: ResolvedDataset,
+        target: &ResolvedDataset,
     ) -> Result<
         Option<(
             odf::Multihash,
@@ -49,7 +49,7 @@ pub trait MetadataQueryService: Send + Sync {
     /// Attempt reading watermark that is currently associated with a dataset
     async fn try_get_current_watermark(
         &self,
-        dataset: ResolvedDataset,
+        dataset: &ResolvedDataset,
     ) -> Result<Option<DateTime<Utc>>, InternalError>;
 }
 

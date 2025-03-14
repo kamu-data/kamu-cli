@@ -49,7 +49,7 @@ pub enum StartupJobsError {
     DependsOnLoop(StartupJobsDependsOnLoopError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
@@ -114,13 +114,10 @@ pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError>
                     let job = job_builder.get(&transactional_catalog).unwrap();
                     job.run_initialization().await
                 })
-                .await
-                .map_err(StartupJobsError::Internal)?;
+                .await?;
         } else {
             let job = job_builder.get(catalog).unwrap();
-            job.run_initialization()
-                .await
-                .map_err(StartupJobsError::Internal)?;
+            job.run_initialization().await?;
         }
     }
 

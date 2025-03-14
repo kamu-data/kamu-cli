@@ -90,9 +90,8 @@ impl SqliteTaskSystemEventStore {
             )
             .fetch_all(connection_mut)
             .await
-            .map_err(|e| SaveEventsError::Internal(e.int_err()))?
-            .len()
-        ;
+            .int_err()?
+            .len();
 
         // If a previously stored event id does not match the expected,
         // this means we've just detected a concurrent modification (version conflict)
@@ -217,8 +216,7 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
 
             // Make registration
             self.register_task(&mut tr, *task_id, &e.logical_plan)
-                .await
-                .map_err(SaveEventsError::Internal)?;
+                .await?;
         }
 
         // Save events one by one
@@ -299,7 +297,7 @@ impl TaskEventStore for SqliteTaskSystemEventStore {
         })
         .fetch_optional(connection_mut)
         .await
-        .map_err(ErrorIntoInternal::int_err)?;
+        .int_err()?;
 
         Ok(maybe_task_id)
     }

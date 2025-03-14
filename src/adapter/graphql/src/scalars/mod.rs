@@ -12,6 +12,7 @@ mod account;
 mod data_batch;
 mod data_query;
 mod data_schema;
+mod dataset_collaboration;
 mod dataset_endpoints;
 mod dataset_env_var;
 mod dataset_id_name;
@@ -36,6 +37,7 @@ pub(crate) use account::*;
 pub(crate) use data_batch::*;
 pub(crate) use data_query::*;
 pub(crate) use data_schema::*;
+pub(crate) use dataset_collaboration::*;
 pub(crate) use dataset_endpoints::*;
 pub(crate) use dataset_env_var::*;
 pub(crate) use dataset_id_name::*;
@@ -51,7 +53,8 @@ pub(crate) use metadata::*;
 pub(crate) use multihash::*;
 pub(crate) use odf_generated::*;
 pub(crate) use os_path::*;
-pub(crate) use pagination::*;
+// Public only for tests
+pub use pagination::*;
 pub(crate) use task_id::*;
 pub(crate) use task_status_outcome::*;
 

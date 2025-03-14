@@ -244,7 +244,7 @@ impl WatermarkTestHarness {
 
     async fn current_watermark(&self, target: ResolvedDataset) -> Option<DateTime<Utc>> {
         self.metadata_query_svc
-            .try_get_current_watermark(target)
+            .try_get_current_watermark(&target)
             .await
             .unwrap()
     }

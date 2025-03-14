@@ -22,7 +22,7 @@ async fn test_compact_dataset_success() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -47,8 +47,8 @@ async fn test_compact_multiple_datasets_success() {
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()
-            .expect_check_write_dataset(&dataset_id_foo, 1, true)
-            .expect_check_write_dataset(&dataset_id_bar, 1, true),
+            .expect_check_maintain_dataset(&dataset_id_foo, 1, true)
+            .expect_check_maintain_dataset(&dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
 
@@ -89,7 +89,7 @@ async fn test_compact_dataset_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
+        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, false),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -114,8 +114,8 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()
-            .expect_check_write_dataset(&dataset_id_foo, 1, false)
-            .expect_check_write_dataset(&dataset_id_bar, 1, true),
+            .expect_check_maintain_dataset(&dataset_id_foo, 1, false)
+            .expect_check_maintain_dataset(&dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
 

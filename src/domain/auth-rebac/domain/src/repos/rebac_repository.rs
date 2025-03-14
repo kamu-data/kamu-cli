@@ -7,10 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
-use crate::{Entity, EntityType, EntityWithRelation, PropertyName, PropertyValue, Relation};
+use crate::{
+    EntitiesWithRelation,
+    Entity,
+    EntityType,
+    EntityWithRelation,
+    PropertyName,
+    PropertyValue,
+    Relation,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,7 +67,6 @@ pub trait RebacRepository: Send + Sync {
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError>;
 
@@ -68,17 +75,66 @@ pub trait RebacRepository: Send + Sync {
         subject_entity: &Entity,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError>;
 
+    async fn get_object_entity_relations(
+        &self,
+        object_entity: &Entity,
+    ) -> Result<Vec<EntityWithRelation>, GetObjectEntityRelationsError>;
+
+    async fn get_object_entities_relations(
+        &self,
+        object_entities: &[Entity],
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError>;
+
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,
         object_entity_type: EntityType,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsByObjectTypeError>;
 
-    async fn get_relations_between_entities(
+    async fn get_relation_between_entities(
         &self,
         subject_entity: &Entity,
         object_entity: &Entity,
-    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError>;
+    ) -> Result<Relation, GetRelationBetweenEntitiesError>;
+
+    async fn delete_subject_entities_object_entity_relations(
+        &self,
+        subject_entities: Vec<Entity<'static>>,
+        object_entity: &Entity,
+    ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait RebacRepositoryExt: RebacRepository {
+    async fn try_get_relation_between_entities(
+        &self,
+        subject_entity: &Entity,
+        object_entity: &Entity,
+    ) -> Result<Option<Relation>, InternalError>;
+}
+
+#[async_trait::async_trait]
+impl<T> RebacRepositoryExt for T
+where
+    T: RebacRepository,
+    T: ?Sized,
+{
+    async fn try_get_relation_between_entities(
+        &self,
+        subject_entity: &Entity,
+        object_entity: &Entity,
+    ) -> Result<Option<Relation>, InternalError> {
+        match self
+            .get_relation_between_entities(subject_entity, object_entity)
+            .await
+        {
+            Ok(relation) => Ok(Some(relation)),
+            Err(GetRelationBetweenEntitiesError::NotFound(_)) => Ok(None),
+            Err(e) => Err(e.int_err()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,21 +220,16 @@ pub enum GetEntityPropertiesError {
 #[derive(Error, Debug)]
 pub enum InsertEntitiesRelationError {
     #[error(transparent)]
-    Duplicate(InsertEntitiesRelationDuplicateError),
+    SomeRoleIsAlreadyPresent(InsertEntitiesRelationSomeRoleIsAlreadyPresentError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 impl InsertEntitiesRelationError {
-    pub fn duplicate(
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Self {
-        Self::Duplicate(InsertEntitiesRelationDuplicateError {
+    pub fn some_role_is_already_present(subject_entity: &Entity, object_entity: &Entity) -> Self {
+        Self::SomeRoleIsAlreadyPresent(InsertEntitiesRelationSomeRoleIsAlreadyPresentError {
             subject_entity: subject_entity.clone().into_owned(),
-            relationship,
             object_entity: object_entity.clone().into_owned(),
         })
     }
@@ -186,12 +237,11 @@ impl InsertEntitiesRelationError {
 
 #[derive(Error, Debug)]
 #[error(
-    "Duplicate entity relation not inserted: subject_entity='{subject_entity:?}', \
-     relationship='{relationship:?}', object_entity='{object_entity:?}'"
+    "Some role is already present: subject_entity='{subject_entity:?}', \
+     object_entity='{object_entity:?}'"
 )]
-pub struct InsertEntitiesRelationDuplicateError {
+pub struct InsertEntitiesRelationSomeRoleIsAlreadyPresentError {
     pub subject_entity: Entity<'static>,
-    pub relationship: Relation,
     pub object_entity: Entity<'static>,
 }
 
@@ -207,14 +257,9 @@ pub enum DeleteEntitiesRelationError {
 }
 
 impl DeleteEntitiesRelationError {
-    pub fn not_found(
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Self {
+    pub fn not_found(subject_entity: &Entity, object_entity: &Entity) -> Self {
         Self::NotFound(EntitiesRelationNotFoundError {
             subject_entity: subject_entity.clone().into_owned(),
-            relationship,
             object_entity: object_entity.clone().into_owned(),
         })
     }
@@ -223,11 +268,10 @@ impl DeleteEntitiesRelationError {
 #[derive(Error, Debug)]
 #[error(
     "Entities relation not found: subject_entity='{subject_entity:?}', \
-     relationship='{relationship:?}', object_entity='{object_entity:?}'"
+     object_entity='{object_entity:?}'"
 )]
 pub struct EntitiesRelationNotFoundError {
     pub subject_entity: Entity<'static>,
-    pub relationship: Relation,
     pub object_entity: Entity<'static>,
 }
 
@@ -235,6 +279,14 @@ pub struct EntitiesRelationNotFoundError {
 
 #[derive(Error, Debug)]
 pub enum SubjectEntityRelationsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetObjectEntityRelationsError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -250,9 +302,51 @@ pub enum SubjectEntityRelationsByObjectTypeError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetRelationsBetweenEntitiesError {
+pub enum GetRelationBetweenEntitiesError {
+    #[error(transparent)]
+    NotFound(EntitiesRelationNotFoundError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl GetRelationBetweenEntitiesError {
+    pub fn not_found(subject_entity: &Entity, object_entity: &Entity) -> Self {
+        Self::NotFound(EntitiesRelationNotFoundError {
+            subject_entity: subject_entity.clone().into_owned(),
+            object_entity: object_entity.clone().into_owned(),
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteSubjectEntitiesObjectEntityRelationsError {
+    #[error(transparent)]
+    NotFound(#[from] SubjectEntitiesObjectEntityRelationsNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl DeleteSubjectEntitiesObjectEntityRelationsError {
+    pub fn not_found(subject_entities: Vec<Entity<'static>>, object_entity: &Entity) -> Self {
+        Self::NotFound(SubjectEntitiesObjectEntityRelationsNotFoundError {
+            subject_entities,
+            object_entity: object_entity.clone().into_owned(),
+        })
+    }
+}
+
+#[derive(Error, Debug)]
+#[error(
+    "Entities relations not found: subject_entities='{subject_entities:?}', \
+     object_entity='{object_entity:?}'"
+)]
+pub struct SubjectEntitiesObjectEntityRelationsNotFoundError {
+    pub subject_entities: Vec<Entity<'static>>,
+    pub object_entity: Entity<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

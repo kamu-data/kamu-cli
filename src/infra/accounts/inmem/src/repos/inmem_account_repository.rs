@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
 use dill::*;
 use email_utils::Email;
-use odf::AccountName;
 
 use crate::domain::*;
 
@@ -43,7 +42,10 @@ impl State {
         }
     }
 
-    fn check_unique_name(&self, account_name: &AccountName) -> Result<(), AccountErrorDuplicate> {
+    fn check_unique_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), AccountErrorDuplicate> {
         if self.accounts_by_name.contains_key(account_name) {
             return Err(AccountErrorDuplicate {
                 account_field: AccountDuplicateField::Name,
@@ -244,13 +246,13 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError> {
         let guard = self.state.lock().unwrap();
 
         let accounts: Vec<Account> = account_ids
-            .into_iter()
-            .filter_map(|account_id| guard.accounts_by_id.get(&account_id).cloned())
+            .iter()
+            .filter_map(|account_id| guard.accounts_by_id.get(account_id).cloned())
             .collect();
 
         Ok(accounts)
@@ -303,6 +305,60 @@ impl AccountRepository for InMemoryAccountRepository {
         let guard = self.state.lock().unwrap();
         let maybe_account = guard.accounts_by_name.get(account_name);
         Ok(maybe_account.map(|a| a.id.clone()))
+    }
+
+    fn search_accounts_by_name_pattern(
+        &self,
+        name_pattern: &str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream {
+        let exclude_accounts_by_ids_set = filters.exclude_accounts_by_ids.map(|ids| {
+            let mut set = HashSet::new();
+            set.extend(ids);
+            set
+        });
+
+        let found_accounts = {
+            let readable_state = self.state.lock().unwrap();
+
+            let mut found_accounts_without_pagination = readable_state
+                .accounts_by_id
+                .values()
+                .filter(|account| {
+                    if let Some(exclude_accounts_by_ids) = &exclude_accounts_by_ids_set
+                        && exclude_accounts_by_ids.contains(&account.id)
+                    {
+                        return false;
+                    }
+                    if !account
+                        .account_name
+                        .to_lowercase()
+                        .contains(&name_pattern.to_lowercase())
+                        && !account
+                            .display_name
+                            .to_lowercase()
+                            .contains(&name_pattern.to_lowercase())
+                    {
+                        return false;
+                    }
+
+                    true
+                })
+                .collect::<Vec<_>>();
+
+            found_accounts_without_pagination.sort_by(|a, b| a.account_name.cmp(&b.account_name));
+
+            found_accounts_without_pagination
+                .into_iter()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .cloned()
+                .map(Ok)
+                .collect::<Vec<_>>()
+        };
+
+        Box::pin(futures::stream::iter(found_accounts))
     }
 }
 

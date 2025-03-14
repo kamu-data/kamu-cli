@@ -8,10 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::str::FromStr;
 
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,38 +49,20 @@ pub trait DatasetActionAuthorizer: Sync + Send {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, strum::EnumString, strum::Display)]
+#[strum(serialize_all = "snake_case")]
 pub enum DatasetAction {
     Read,
     Write,
-}
-
-impl FromStr for DatasetAction {
-    type Err = InternalError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "read" {
-            Ok(DatasetAction::Read)
-        } else if s == "write" {
-            Ok(DatasetAction::Write)
-        } else {
-            Err(format!("Invalid DatasetAction: {s}").int_err())
-        }
-    }
-}
-
-impl std::fmt::Display for DatasetAction {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            DatasetAction::Read => write!(f, "read"),
-            DatasetAction::Write => write!(f, "write"),
-        }
-    }
+    Maintain,
+    Own,
 }
 
 #[cfg(feature = "oso")]
 impl oso::FromPolar for DatasetAction {
     fn from_polar(polar_value: oso::PolarValue) -> oso::Result<Self> {
+        use std::str::FromStr;
+
         use oso::errors::{OsoError, TypeError};
         use oso::PolarValue;
 
@@ -260,7 +241,14 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
         &self,
         _dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetAction>, InternalError> {
-        Ok(HashSet::from([DatasetAction::Read, DatasetAction::Write]))
+        let all_actions = [
+            DatasetAction::Read,
+            DatasetAction::Write,
+            DatasetAction::Maintain,
+            DatasetAction::Own,
+        ];
+
+        Ok(all_actions.into())
     }
 
     async fn filter_datasets_allowing(

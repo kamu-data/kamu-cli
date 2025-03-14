@@ -18,6 +18,7 @@ use crate::{
     DatasetPropertyName,
     EntityNotFoundError,
     EntityWithRelation,
+    GetObjectEntityRelationsError,
     PropertiesCountError,
     PropertyValue,
     SetEntityPropertyError,
@@ -27,6 +28,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait RebacService: Send + Sync {
     async fn properties_count(&self) -> Result<usize, PropertiesCountError>;
@@ -80,24 +82,33 @@ pub trait RebacService: Send + Sync {
     ) -> Result<HashMap<odf::DatasetID, DatasetProperties>, GetPropertiesError>;
 
     // Relations
-    async fn insert_account_dataset_relation(
+    async fn set_account_dataset_relation(
         &self,
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), InsertRelationError>;
+    ) -> Result<(), SetRelationError>;
 
-    async fn delete_account_dataset_relation(
+    async fn unset_accounts_dataset_relations(
         &self,
-        account_id: &odf::AccountID,
-        relationship: AccountToDatasetRelation,
+        account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeleteRelationError>;
+    ) -> Result<(), UnsetRelationError>;
 
     async fn get_account_dataset_relations(
         &self,
         account_id: &odf::AccountID,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError>;
+
+    async fn get_authorized_accounts(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<AuthorizedAccount>, GetObjectEntityRelationsError>;
+
+    async fn get_authorized_accounts_by_ids(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<HashMap<odf::DatasetID, Vec<AuthorizedAccount>>, GetObjectEntityRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,6 +150,13 @@ impl DatasetProperties {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct AuthorizedAccount {
+    pub account_id: odf::AccountID,
+    pub role: AccountToDatasetRelation,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -148,7 +166,7 @@ pub enum UnsetEntityPropertyError {
     NotFound(EntityNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +174,7 @@ pub enum UnsetEntityPropertyError {
 #[derive(Error, Debug)]
 pub enum DeletePropertiesError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,17 +188,17 @@ pub enum GetPropertiesError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum InsertRelationError {
+pub enum SetRelationError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum DeleteRelationError {
+pub enum UnsetRelationError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

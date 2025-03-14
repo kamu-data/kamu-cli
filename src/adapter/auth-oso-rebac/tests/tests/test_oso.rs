@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_adapter_auth_oso_rebac::{DatasetResource, KamuAuthOso, UserActor};
+use kamu_auth_rebac::AccountToDatasetRelation as Role;
 use kamu_core::auth::DatasetAction;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,7 +118,7 @@ async fn test_having_explicit_read_permission_in_private_dataset() {
     let allows_public_read = false;
     let mut private_dataset_resource =
         DatasetResource::new(&random_account_id(), allows_public_read);
-    private_dataset_resource.authorize_reader(&reader_account_id);
+    private_dataset_resource.authorize_account(&reader_account_id, Role::Reader);
 
     let oso = KamuAuthOso::new();
 
@@ -147,7 +148,7 @@ async fn test_having_explicit_write_permission_in_private_dataset() {
     let allows_public_read = false;
     let mut private_dataset_resource =
         DatasetResource::new(&random_account_id(), allows_public_read);
-    private_dataset_resource.authorize_editor(&editor_account_id);
+    private_dataset_resource.authorize_account(&editor_account_id, Role::Editor);
 
     let oso = KamuAuthOso::new();
 
