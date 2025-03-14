@@ -185,7 +185,7 @@ impl DatasetMut {
         visibility: DatasetVisibilityInput,
     ) -> Result<SetDatasetVisibilityResult> {
         self.dataset_mut_request_state
-            .check_dataset_own_access(ctx)
+            .check_dataset_maintain_access(ctx)
             .await?;
 
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
