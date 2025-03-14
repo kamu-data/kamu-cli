@@ -79,6 +79,8 @@ impl DatasetMut {
         ctx: &Context<'_>,
         new_name: DatasetName<'static>,
     ) -> Result<RenameResult<'_>> {
+        // NOTE: Access verification is handled by the use-case
+
         let dataset_handle = &self.dataset_mut_request_state.dataset_handle;
 
         if dataset_handle.alias.dataset_name.as_str() == new_name.as_str() {
