@@ -99,10 +99,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let maybe_access_token = self
-            .query_token_by_id(token_id, connection_mut)
-            .await
-            .map_err(GetAccessTokenError::Internal)?;
+        let maybe_access_token = self.query_token_by_id(token_id, connection_mut).await?;
 
         if let Some(access_token) = maybe_access_token {
             Ok(access_token)
@@ -180,10 +177,7 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let maybe_existing_token = self
-            .query_token_by_id(token_id, connection_mut)
-            .await
-            .map_err(RevokeTokenError::Internal)?;
+        let maybe_existing_token = self.query_token_by_id(token_id, connection_mut).await?;
 
         if maybe_existing_token.is_none() {
             return Err(RevokeTokenError::NotFound(AccessTokenNotFoundError {

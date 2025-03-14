@@ -148,7 +148,7 @@ pub enum UnsetEntityPropertyError {
     NotFound(EntityNotFoundError),
 
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +156,7 @@ pub enum UnsetEntityPropertyError {
 #[derive(Error, Debug)]
 pub enum DeletePropertiesError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,7 +172,7 @@ pub enum GetPropertiesError {
 #[derive(Error, Debug)]
 pub enum InsertRelationError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +180,7 @@ pub enum InsertRelationError {
 #[derive(Error, Debug)]
 pub enum DeleteRelationError {
     #[error(transparent)]
-    Internal(InternalError),
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

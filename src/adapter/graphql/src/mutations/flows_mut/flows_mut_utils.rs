@@ -7,21 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::DatasetRegistry;
 use kamu_datasets::ViewDatasetUseCase;
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
+use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
-use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn ensure_scheduling_permission(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_mut_request_state: &DatasetMutRequestState,
 ) -> Result<()> {
-    utils::check_dataset_write_access(ctx, dataset_handle).await
+    // TODO: Private Datasets: use check_dataset_maintain_access()
+    dataset_mut_request_state
+        .check_dataset_write_access(ctx)
+        .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,14 +37,14 @@ pub(crate) enum FlowInDatasetError {
 pub(crate) async fn check_if_flow_belongs_to_dataset(
     ctx: &Context<'_>,
     flow_id: FlowID,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_id: &odf::DatasetID,
 ) -> Result<Option<FlowInDatasetError>> {
     let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
     match flow_query_service.get_flow(flow_id.into()).await {
         Ok(flow_state) => match flow_state.flow_key {
             fs::FlowKey::Dataset(fk_dataset) => {
-                if fk_dataset.dataset_id != dataset_handle.id {
+                if fk_dataset.dataset_id != *dataset_id {
                     return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }
             }
@@ -67,7 +69,7 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
 
 pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_mut_request_state: &DatasetMutRequestState,
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
@@ -79,13 +81,8 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let resolved_dataset = utils::get_dataset(ctx, dataset_handle).await;
-
-            let dataset_kind = resolved_dataset
-                .get_summary(odf::dataset::GetSummaryOpts::default())
-                .await
-                .int_err()?
-                .kind;
+            let dataset_summary = dataset_mut_request_state.dataset_summary(ctx).await?;
+            let dataset_kind = dataset_summary.kind;
 
             if dataset_kind != expected_kind {
                 Ok(Some(FlowIncompatibleDatasetKind {
@@ -105,18 +102,17 @@ pub(crate) async fn ensure_expected_dataset_kind(
 // Check flow preconditions and set default configurations if needed
 pub(crate) async fn ensure_flow_preconditions(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_mut_request_state: &DatasetMutRequestState,
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
-    let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-    let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+    let resolved_dataset = dataset_mut_request_state.resolved_dataset(ctx).await?;
 
     match dataset_flow_type {
         DatasetFlowType::Ingest => {
             let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
             let source_res = metadata_query_service
-                .get_active_polling_source(target)
+                .get_active_polling_source(resolved_dataset)
                 .await
                 .int_err()?;
             if source_res.is_none() {
@@ -131,7 +127,9 @@ pub(crate) async fn ensure_flow_preconditions(
                 dyn kamu_core::MetadataQueryService,
                 dyn ViewDatasetUseCase
             );
-            let source_res = metadata_query_service.get_active_transform(target).await?;
+            let source_res = metadata_query_service
+                .get_active_transform(resolved_dataset)
+                .await?;
 
             match source_res {
                 Some((_, set_transform_block)) => {
@@ -169,7 +167,7 @@ pub(crate) async fn ensure_flow_preconditions(
             {
                 use odf::dataset::MetadataChainExt as _;
                 if let Some(new_head_hash) = &reset_configuration.new_head_hash() {
-                    let metadata_chain = target.as_metadata_chain();
+                    let metadata_chain = resolved_dataset.as_metadata_chain();
                     let current_head_hash_maybe = metadata_chain
                         .try_get_ref(&odf::BlockRef::Head)
                         .await

@@ -29,7 +29,7 @@ pub trait AccountRepository: Send + Sync {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError>;
 
     async fn get_account_by_name(

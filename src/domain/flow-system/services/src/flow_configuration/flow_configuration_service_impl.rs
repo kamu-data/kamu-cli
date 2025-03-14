@@ -134,10 +134,9 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
             let datasets_count = self.event_store.all_dataset_ids_count().await?;
 
             while datasets_count > current_page * dataset_list_per_page {
-                let dataset_ids: Vec<_> = self.event_store.list_dataset_ids(&PaginationOpts {
-                    limit: dataset_list_per_page,
-                    offset: current_page * dataset_list_per_page,
-                }).await?;
+                let dataset_ids: Vec<_> = self.event_store.list_dataset_ids(
+                    &PaginationOpts::from_page(current_page, dataset_list_per_page)
+                ).await?;
 
                 for dataset_id in dataset_ids {
                     for dataset_flow_type in DatasetFlowType::all() {

@@ -163,10 +163,10 @@ struct FlowDescriptionHardCompactionSuccess {
     new_head: Multihash<'static>,
 }
 
-#[derive(SimpleObject, Debug)]
+#[derive(SimpleObject, Debug, Default)]
 #[graphql(complex)]
 pub struct FlowDescriptionHardCompactionNothingToDo {
-    pub _dummy: String,
+    _dummy: Option<String>,
 }
 
 #[ComplexObject]
@@ -183,9 +183,7 @@ impl FlowDescriptionDatasetHardCompactionResult {
                 fs::FlowOutcome::Success(result) => match result {
                     fs::FlowResult::DatasetUpdate(_) | fs::FlowResult::DatasetReset(_) => None,
                     fs::FlowResult::Empty => Some(Self::NothingToDo(
-                        FlowDescriptionHardCompactionNothingToDo {
-                            _dummy: "Nothing to do".to_string(),
-                        },
+                        FlowDescriptionHardCompactionNothingToDo::default(),
                     )),
                     fs::FlowResult::DatasetCompact(compact) => {
                         Some(Self::Success(FlowDescriptionHardCompactionSuccess {
@@ -294,7 +292,7 @@ impl FlowDescriptionBuilder {
                         .int_err()?;
 
                     let polling_source_maybe = metadata_query_service
-                        .get_active_polling_source(target)
+                        .get_active_polling_source(&target)
                         .await
                         .int_err()?;
 
