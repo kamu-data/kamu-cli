@@ -12,6 +12,7 @@ use kamu_datasets::ViewDatasetUseCase;
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
+use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
 use crate::utils;
 
@@ -19,10 +20,11 @@ use crate::utils;
 
 pub(crate) async fn ensure_scheduling_permission(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_mut_request_state: &DatasetMutRequestState,
 ) -> Result<()> {
-    #[expect(deprecated)]
-    utils::check_dataset_write_access(ctx, dataset_handle).await
+    dataset_mut_request_state
+        .check_dataset_maintain_access(ctx)
+        .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

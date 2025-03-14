@@ -47,11 +47,11 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         paused: bool,
         trigger_input: FlowTriggerInput,
     ) -> Result<SetFlowTriggerResult> {
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
-
         if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         };
+
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, dataset_handle, dataset_flow_type, None).await?
@@ -64,7 +64,8 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             Err(e) => return Ok(SetFlowTriggerResult::FlowInvalidTriggerInput(e)),
         };
 
-        ensure_scheduling_permission(ctx, dataset_handle).await?;
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+
         if let Some(e) =
             ensure_flow_preconditions(ctx, dataset_handle, dataset_flow_type, None).await?
         {
@@ -95,11 +96,11 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
-
-        ensure_scheduling_permission(ctx, dataset_handle).await?;
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
         flow_trigger_service
             .pause_dataset_flows(
@@ -119,11 +120,11 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
-
-        ensure_scheduling_permission(ctx, dataset_handle).await?;
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
         flow_trigger_service
             .resume_dataset_flows(
@@ -136,6 +137,8 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         Ok(true)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
@@ -172,3 +175,5 @@ impl FlowInvalidTriggerInputError {
         self.reason.clone()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

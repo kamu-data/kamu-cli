@@ -105,37 +105,6 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: migrate to the DatasetState usage
-#[deprecated(note = "use DatasetState::check_dataset_write_access()")]
-pub(crate) async fn check_dataset_write_access(
-    ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
-) -> Result<(), GqlError> {
-    check_dataset_access_old(ctx, dataset_handle, auth::DatasetAction::Write).await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn check_dataset_access_old(
-    ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
-    action: auth::DatasetAction,
-) -> Result<(), GqlError> {
-    let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
-
-    dataset_action_authorizer
-        .check_action_allowed(&dataset_handle.id, action)
-        .await
-        .map_err(|e| match e {
-            auth::DatasetActionUnauthorizedError::Access(_) => {
-                make_dataset_access_error(dataset_handle)
-            }
-            auth::DatasetActionUnauthorizedError::Internal(e) => GqlError::Internal(e),
-        })?;
-
-    Ok(())
-}
-
 pub(crate) async fn get_resolved_dataset<'a>(
     ctx: &Context<'_>,
     lazy_resolved_dataset: &'a OnceCell<ResolvedDataset>,

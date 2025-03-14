@@ -95,7 +95,6 @@ impl Search {
         ))
     }
 
-    // TODO: Private Datasets: tests
     /// Perform lightweight search among resource names.
     /// Useful for autocomplete.
     #[tracing::instrument(level = "info", name = Search_name_lookup, skip_all, fields(%query, ?page, ?per_page))]

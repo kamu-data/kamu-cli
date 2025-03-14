@@ -62,7 +62,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             return Ok(TriggerFlowResult::IncompatibleDatasetKind(e));
         }
 
-        ensure_scheduling_permission(ctx, dataset_handle).await?;
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
         if let Some(e) = ensure_flow_preconditions(
             ctx,
@@ -120,7 +120,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
     ) -> Result<CancelScheduledTasksResult> {
         let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
-        ensure_scheduling_permission(ctx, dataset_handle).await?;
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
         if let Some(error) =
             check_if_flow_belongs_to_dataset(ctx, flow_id, &dataset_handle.id).await?

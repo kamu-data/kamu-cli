@@ -82,7 +82,8 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
         }
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state.dataset_handle()).await?;
+
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
