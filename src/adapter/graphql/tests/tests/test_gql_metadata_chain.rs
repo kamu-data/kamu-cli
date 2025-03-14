@@ -26,49 +26,54 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error, BaseG
 async fn test_metadata_chain_events() {
     let harness = GraphQLMetadataChainHarness::new(TenancyConfig::SingleTenant).await;
 
-    let create_dataset = harness
-        .catalog_authorized
-        .get_one::<dyn CreateDatasetUseCase>()
-        .unwrap();
+    // Prepare phase
+    let dataset_id = {
+        let create_dataset = harness
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetUseCase>()
+            .unwrap();
 
-    let create_result = create_dataset
-        .execute(
-            &"foo".try_into().unwrap(),
-            odf::dataset::make_seed_block(
-                harness.did_generator.generate_dataset_id().0,
-                odf::DatasetKind::Root,
-                Utc::now(),
-            ),
-            Default::default(),
-        )
-        .await
-        .unwrap();
+        let create_result = create_dataset
+            .execute(
+                &"foo".try_into().unwrap(),
+                odf::dataset::make_seed_block(
+                    harness.did_generator.generate_dataset_id().0,
+                    odf::DatasetKind::Root,
+                    Utc::now(),
+                ),
+                Default::default(),
+            )
+            .await
+            .unwrap();
 
-    create_result
-        .dataset
-        .commit_event(
-            MetadataFactory::set_data_schema().build().into(),
-            odf::dataset::CommitOpts::default(),
-        )
-        .await
-        .unwrap();
-    create_result
-        .dataset
-        .commit_event(
-            MetadataFactory::add_data()
-                .some_new_data_with_offset(0, 9)
-                .some_new_checkpoint()
-                .some_new_watermark()
-                .some_new_source_state()
-                .build()
-                .into(),
-            odf::dataset::CommitOpts {
-                check_object_refs: false, // Cheating a little
-                ..odf::dataset::CommitOpts::default()
-            },
-        )
-        .await
-        .unwrap();
+        create_result
+            .dataset
+            .commit_event(
+                MetadataFactory::set_data_schema().build().into(),
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap();
+        create_result
+            .dataset
+            .commit_event(
+                MetadataFactory::add_data()
+                    .some_new_data_with_offset(0, 9)
+                    .some_new_checkpoint()
+                    .some_new_watermark()
+                    .some_new_source_state()
+                    .build()
+                    .into(),
+                odf::dataset::CommitOpts {
+                    check_object_refs: false, // Cheating a little
+                    ..odf::dataset::CommitOpts::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        create_result.dataset_handle.id
+    };
 
     let request_code = indoc!(
         r#"
@@ -113,7 +118,7 @@ async fn test_metadata_chain_events() {
         }
         "#
     )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
+    .replace("<id>", &dataset_id.to_string());
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -153,7 +158,7 @@ async fn test_metadata_chain_events() {
                                 }, {
                                     "event": {
                                         "__typename": "Seed",
-                                        "datasetId": create_result.dataset_handle.id.to_string(),
+                                        "datasetId": dataset_id.to_string(),
                                         "datasetKind": "ROOT",
                                     }
                                 }]
@@ -177,16 +182,23 @@ async fn metadata_chain_append_event() {
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
 
-    let create_result = create_dataset
-        .execute(
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(odf::DatasetKind::Root)
-                .build(),
-            Default::default(),
+    let (dataset_id, original_head) = {
+        let create_dataset_result = create_dataset
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name("foo")
+                    .kind(odf::DatasetKind::Root)
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+
+        (
+            create_dataset_result.dataset_handle.id,
+            create_dataset_result.head,
         )
-        .await
-        .unwrap();
+    };
 
     let event = MetadataFactory::set_polling_source().build();
 
@@ -220,7 +232,7 @@ async fn metadata_chain_append_event() {
         }
         "#
     )
-    .replace("<id>", &create_result.dataset_handle.id.to_string())
+    .replace("<id>", &dataset_id.to_string())
     .replace("<content>", &event_yaml.escape_default().to_string());
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -242,7 +254,7 @@ async fn metadata_chain_append_event() {
                     "metadata": {
                         "chain": {
                             "commitEvent": {
-                                "oldHead": create_result.head.to_string(),
+                                "oldHead": original_head.to_string(),
                             }
                         }
                     }
@@ -263,7 +275,7 @@ async fn metadata_update_readme_new() {
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
         .unwrap();
 
-    let create_result = create_dataset
+    let foo_handle = create_dataset
         .execute(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
@@ -272,9 +284,8 @@ async fn metadata_update_readme_new() {
             Default::default(),
         )
         .await
-        .unwrap();
-
-    let dataset = create_result.dataset.clone();
+        .unwrap()
+        .dataset_handle;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -297,12 +308,12 @@ async fn metadata_update_readme_new() {
         }
         "#
     )
-    .replace("<id>", &create_result.dataset_handle.id.to_string());
+    .replace("<id>", &foo_handle.id.to_string());
 
     let res = schema
         .execute(
             async_graphql::Request::new(new_readme_request_code.clone())
-                .data(harness.catalog_anonymous),
+                .data(harness.catalog_anonymous.clone()),
         )
         .await;
     expect_anonymous_access_error(res);
@@ -335,7 +346,7 @@ async fn metadata_update_readme_new() {
     assert_result(res, "CommitResultSuccess");
 
     assert_attachments_eq(
-        dataset.clone(),
+        harness.get_dataset(&foo_handle).await,
         odf::metadata::SetAttachments {
             attachments: odf::metadata::Attachments::Embedded(odf::metadata::AttachmentsEmbedded {
                 items: vec![odf::metadata::AttachmentEmbedded {
@@ -369,7 +380,7 @@ async fn metadata_update_readme_new() {
                     }
                     "#
                 )
-                .replace("<id>", &create_result.dataset_handle.id.to_string()),
+                .replace("<id>", &foo_handle.id.to_string()),
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -378,7 +389,7 @@ async fn metadata_update_readme_new() {
     assert_result(res, "CommitResultSuccess");
 
     assert_attachments_eq(
-        dataset.clone(),
+        harness.get_dataset(&foo_handle).await,
         odf::metadata::SetAttachments {
             attachments: odf::metadata::Attachments::Embedded(odf::metadata::AttachmentsEmbedded {
                 items: vec![],
@@ -409,7 +420,7 @@ async fn metadata_update_readme_new() {
                     }
                     "#
                 )
-                .replace("<id>", &create_result.dataset_handle.id.to_string()),
+                .replace("<id>", &foo_handle.id.to_string()),
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -421,8 +432,9 @@ async fn metadata_update_readme_new() {
     // Preserves other attachments
     /////////////////////////////////////
 
-    create_result
-        .dataset
+    harness
+        .get_dataset(&foo_handle)
+        .await
         .commit_event(
             odf::metadata::SetAttachments {
                 attachments: odf::metadata::Attachments::Embedded(
@@ -464,16 +476,16 @@ async fn metadata_update_readme_new() {
                     }
                     "#
                 )
-                .replace("<id>", &create_result.dataset_handle.id.to_string()),
+                .replace("<id>", &foo_handle.id.to_string()),
             )
-            .data(harness.catalog_authorized),
+            .data(harness.catalog_authorized.clone()),
         )
         .await;
 
     assert_result(res, "CommitResultSuccess");
 
     assert_attachments_eq(
-        dataset.clone(),
+        harness.get_dataset(&foo_handle).await,
         odf::metadata::SetAttachments {
             attachments: odf::metadata::Attachments::Embedded(odf::metadata::AttachmentsEmbedded {
                 items: vec![
@@ -494,10 +506,7 @@ async fn metadata_update_readme_new() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn assert_attachments_eq(
-    dataset: Arc<dyn odf::Dataset>,
-    expected: odf::metadata::SetAttachments,
-) {
+async fn assert_attachments_eq(dataset: ResolvedDataset, expected: odf::metadata::SetAttachments) {
     use odf::dataset::{MetadataChainExt as _, TryStreamExtExt as _};
     use odf::metadata::EnumWithVariants;
 
@@ -521,13 +530,18 @@ async fn assert_attachments_eq(
 #[test_log::test(tokio::test)]
 async fn test_metadata_chain_set_transform_event() {
     let harness = GraphQLMetadataChainHarness::new(TenancyConfig::MultiTenant).await;
-    let create_root_result = harness
-        .create_root_dataset(Some(DEFAULT_ACCOUNT_NAME.clone()))
-        .await;
 
-    let create_derived_result = harness
+    let root_id = harness
+        .create_root_dataset(Some(DEFAULT_ACCOUNT_NAME.clone()))
+        .await
+        .dataset_handle
+        .id;
+
+    let derived_id = harness
         .create_derived_dataset(Some(DEFAULT_ACCOUNT_NAME.clone()))
-        .await;
+        .await
+        .dataset_handle
+        .id;
 
     let request_code = indoc!(
         r#"
@@ -559,7 +573,7 @@ async fn test_metadata_chain_set_transform_event() {
         }
         "#
     )
-    .replace("<id>", &create_derived_result.dataset_handle.id.to_string());
+    .replace("<id>", &derived_id.to_string());
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
@@ -578,7 +592,7 @@ async fn test_metadata_chain_set_transform_event() {
                                     "event": {
                                         "__typename": "SetTransform",
                                         "inputs": [{
-                                            "datasetRef": create_root_result.dataset_handle.id.to_string(),
+                                            "datasetRef": root_id.to_string(),
                                             "alias": "kamu/foo",
                                         }]
                                     }
@@ -684,5 +698,13 @@ impl GraphQLMetadataChainHarness {
             )
             .await
             .unwrap()
+    }
+
+    pub async fn get_dataset(&self, hdl: &odf::DatasetHandle) -> ResolvedDataset {
+        let dataset_registry = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap();
+        dataset_registry.get_dataset_by_handle(hdl).await
     }
 }

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use kamu_datasets::{DatasetReferenceService, GetDatasetReferenceError, SetDatasetReferenceError};
@@ -23,7 +24,7 @@ where
 }
 
 struct State {
-    // TODO: add references caching
+    cached_references: HashMap<odf::BlockRef, odf::Multihash>,
     maybe_dataset_ref_service: Option<Arc<dyn DatasetReferenceService>>,
 }
 
@@ -38,6 +39,7 @@ where
     ) -> Self {
         Self {
             state: RwLock::new(State {
+                cached_references: HashMap::new(),
                 maybe_dataset_ref_service: Some(dataset_ref_service),
             }),
             storage_ref_repo,
@@ -67,8 +69,13 @@ where
         &self,
         r: &odf::BlockRef,
     ) -> Result<odf::Multihash, odf::storage::GetRefError> {
+        // Try cache first
         let maybe_dataset_ref_service = {
             let guard = self.state.read().unwrap();
+            if let Some(cached_ref) = guard.cached_references.get(r) {
+                return Ok(cached_ref.clone());
+            }
+
             guard.maybe_dataset_ref_service.clone()
         };
 
@@ -85,6 +92,12 @@ where
                     }
                     GetDatasetReferenceError::Internal(e) => odf::storage::GetRefError::Internal(e),
                 })?;
+
+            // Update cache
+            let mut write_guard = self.state.write().unwrap();
+            write_guard
+                .cached_references
+                .insert(r.clone(), resolved_ref.clone());
 
             return Ok(resolved_ref);
         }
@@ -115,8 +128,12 @@ where
         }?;
 
         let maybe_dataset_ref_service = {
-            let guard = self.state.read().unwrap();
-            guard.maybe_dataset_ref_service.clone()
+            // Drop cached reference: if commit succeeds, we will find it out on next read.
+            // If commit fails, we did nothing harmful
+            let mut writable_guard = self.state.write().unwrap();
+            writable_guard.cached_references.remove(r);
+
+            writable_guard.maybe_dataset_ref_service.clone()
         };
 
         if let Some(dataset_ref_service) = maybe_dataset_ref_service {
