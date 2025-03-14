@@ -12,9 +12,9 @@ use axum::response::Json;
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::AccountService;
-use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
+use kamu_datasets::{DatasetEntryService, ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,10 @@ use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 pub struct DatasetOwnerInfo {
     pub account_name: odf::AccountName,
 
-    // TODO: This should not be optional. Awaiting dataset repository refactoring.
+    // TODO: This should not be optional
+    //
+    //       REST API: `GET /datasets/{id}`: make the `owner` field mandatory
+    //       https://github.com/kamu-data/kamu-cli/issues/1140
     #[schema(value_type = String, required = false)]
     pub account_id: Option<odf::AccountID>,
 }
@@ -33,6 +36,10 @@ pub struct DatasetOwnerInfo {
 pub struct DatasetInfoResponse {
     pub id: odf::DatasetID,
 
+    // TODO: This should not be optional
+    //
+    //       REST API: `GET /datasets/{id}`: make the `owner` field mandatory
+    //       https://github.com/kamu-data/kamu-cli/issues/1140
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = DatasetOwnerInfo, required = false)]
     pub owner: Option<DatasetOwnerInfo>,
@@ -43,17 +50,15 @@ pub struct DatasetInfoResponse {
 impl DatasetInfoResponse {
     fn into_response(
         dataset_handle: odf::DatasetHandle,
-        account_id_maybe: Option<odf::AccountID>,
+        account_id: odf::AccountID,
+        account_name: odf::AccountName,
     ) -> Self {
         Self {
             id: dataset_handle.id,
-            owner: dataset_handle
-                .alias
-                .account_name
-                .map(|account_name| DatasetOwnerInfo {
-                    account_name,
-                    account_id: account_id_maybe,
-                }),
+            owner: Some(DatasetOwnerInfo {
+                account_name,
+                account_id: Some(account_id),
+            }),
             dataset_name: dataset_handle.alias.dataset_name,
         }
     }
@@ -104,21 +109,22 @@ async fn get_dataset_by_id(
             unexpected_error => unexpected_error.int_err().api_err(),
         })?;
 
-    // TODO: Private Datasets: Use the real owner_id, not the alias name
-    //       Context: In the case of single-tenant, we have None
-    let account_id = if let Some(account_name) = dataset_handle.alias.account_name.as_ref() {
-        let account_service = catalog.get_one::<dyn AccountService>().unwrap();
-        account_service
-            .account_by_name(account_name)
-            .await?
-            .map(|account| account.id)
-    } else {
-        None
-    };
+    let dataset_entry_service = catalog.get_one::<dyn DatasetEntryService>().unwrap();
+    let account_service = catalog.get_one::<dyn AccountService>().unwrap();
+
+    let dataset_entry = dataset_entry_service
+        .get_entry(dataset_id)
+        .await
+        .int_err()?;
+    let owner = account_service
+        .get_account_by_id(&dataset_entry.owner_id)
+        .await
+        .int_err()?;
 
     Ok(Json(DatasetInfoResponse::into_response(
         dataset_handle,
-        account_id,
+        owner.id,
+        owner.account_name,
     )))
 }
 

@@ -264,11 +264,11 @@ pub struct AuthApi<'a> {
 }
 
 impl AuthApi<'_> {
-    pub async fn login_as_kamu(&mut self) -> AccessToken {
+    pub async fn login_as_kamu(&mut self) -> (AccessToken, odf::AccountID) {
         self.login_with_password("kamu", "kamu").await
     }
 
-    pub async fn login_as_e2e_user(&mut self) -> AccessToken {
+    pub async fn login_as_e2e_user(&mut self) -> (AccessToken, odf::AccountID) {
         // We are using DummyOAuthGithub, so the loginCredentialsJson can be arbitrary
         self.login(indoc::indoc!(
             r#"
@@ -276,6 +276,9 @@ impl AuthApi<'_> {
               auth {
                 login(loginMethod: "oauth_github", loginCredentialsJson: "") {
                   accessToken
+                  account {
+                    id
+                  }
                 }
               }
             }
@@ -284,7 +287,11 @@ impl AuthApi<'_> {
         .await
     }
 
-    pub async fn login_with_password(&mut self, user: &str, password: &str) -> AccessToken {
+    pub async fn login_with_password(
+        &mut self,
+        user: &str,
+        password: &str,
+    ) -> (AccessToken, odf::AccountID) {
         self.login(
             indoc::indoc!(
                 r#"
@@ -292,6 +299,9 @@ impl AuthApi<'_> {
                   auth {
                     login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
                       accessToken
+                      account {
+                        id
+                      }
                     }
                   }
                 }
@@ -346,16 +356,22 @@ impl AuthApi<'_> {
         }
     }
 
-    async fn login(&mut self, login_request: &str) -> AccessToken {
+    async fn login(&mut self, login_request: &str) -> (AccessToken, odf::AccountID) {
         let login_response = self.client.graphql_api_call(login_request).await.data();
-        let access_token = login_response["auth"]["login"]["accessToken"]
+        let login_node = &login_response["auth"]["login"];
+
+        let access_token = login_node["accessToken"]
             .as_str()
             .map(ToOwned::to_owned)
+            .unwrap();
+        let account_id = login_node["account"]["id"]
+            .as_str()
+            .map(|s| odf::AccountID::from_did_str(s).unwrap())
             .unwrap();
 
         self.client.set_token(Some(access_token.clone()));
 
-        access_token
+        (access_token, account_id)
     }
 }
 

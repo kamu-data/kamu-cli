@@ -236,7 +236,7 @@ impl TestRootQuery {
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         let items = (0..count)
-            .map(|i| Item::new(i))
+            .map(Item::new)
             .skip(page * per_page)
             .take(per_page)
             .collect::<Vec<_>>();
