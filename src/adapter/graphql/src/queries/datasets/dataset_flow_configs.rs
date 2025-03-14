@@ -10,19 +10,22 @@
 use kamu_flow_system::{FlowConfigurationService, FlowKeyDataset};
 
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowConfigs {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetFlowConfigs<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetFlowConfigs {
+impl<'a> DatasetFlowConfigs<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
     }
 
     /// Returns defined configuration for a flow of specified type
@@ -35,8 +38,11 @@ impl DatasetFlowConfigs {
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
         let maybe_flow_config = flow_config_service
             .find_configuration(
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(
+                    self.dataset_request_state.dataset_handle().id.clone(),
+                    dataset_flow_type.into(),
+                )
+                .into(),
             )
             .await
             .int_err()?;

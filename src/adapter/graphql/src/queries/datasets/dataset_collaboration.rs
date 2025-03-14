@@ -25,9 +25,9 @@ impl<'a> DatasetCollaboration<'a> {
     const DEFAULT_RESULTS_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_state: &'a DatasetRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_request_state: dataset_state,
+            dataset_request_state,
         }
     }
 

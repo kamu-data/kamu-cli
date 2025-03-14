@@ -106,14 +106,6 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Private Datasets: migrate to the DatasetState usage
-#[deprecated(note = "use DatasetState::check_dataset_read_access()")]
-pub(crate) async fn check_dataset_read_access(
-    ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
-) -> Result<(), GqlError> {
-    check_dataset_access_old(ctx, dataset_handle, auth::DatasetAction::Read).await
-}
-
 #[deprecated(note = "use DatasetState::check_dataset_write_access()")]
 pub(crate) async fn check_dataset_write_access(
     ctx: &Context<'_>,

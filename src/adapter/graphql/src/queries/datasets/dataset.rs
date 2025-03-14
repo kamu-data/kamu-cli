@@ -124,18 +124,12 @@ impl Dataset {
 
     /// Access to the data of the dataset
     async fn data(&self) -> DatasetData {
-        // TODO: Eliminate cloning
-        //       GQL: Dataset: cache `ResolvedDataset`
-        //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetData::new(self.dataset_request_state.dataset_handle.clone())
+        DatasetData::new(&self.dataset_request_state)
     }
 
     /// Access to the metadata of the dataset
     async fn metadata(&self) -> DatasetMetadata {
-        // TODO: Eliminate cloning
-        //       GQL: Dataset: cache `ResolvedDataset`
-        //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetMetadata::new(self.dataset_request_state.dataset_handle.clone())
+        DatasetMetadata::new(&self.dataset_request_state)
     }
 
     /// Access to the environment variable of this dataset
@@ -143,20 +137,12 @@ impl Dataset {
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
         utils::ensure_dataset_env_vars_enabled(ctx)?;
 
-        // TODO: Eliminate cloning
-        //       GQL: Dataset: cache `ResolvedDataset`
-        //       https://github.com/kamu-data/kamu-cli/issues/1114
-        Ok(DatasetEnvVars::new(
-            self.dataset_request_state.dataset_handle.clone(),
-        ))
+        Ok(DatasetEnvVars::new(&self.dataset_request_state))
     }
 
     /// Access to the flow configurations of this dataset
     async fn flows(&self) -> DatasetFlows {
-        // TODO: Eliminate cloning
-        //       GQL: Dataset: cache `ResolvedDataset`
-        //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetFlows::new(self.dataset_request_state.dataset_handle.clone())
+        DatasetFlows::new(&self.dataset_request_state)
     }
 
     // TODO: PERF: Avoid traversing the entire chain
@@ -232,16 +218,9 @@ impl Dataset {
 
     /// Various endpoints for interacting with data
     async fn endpoints(&self, ctx: &Context<'_>) -> DatasetEndpoints<'_> {
-        let config = crate::utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
+        let config = utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
 
-        // TODO: Eliminate cloning
-        //       GQL: Dataset: cache `ResolvedDataset`
-        //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetEndpoints::new(
-            &self.dataset_request_state.owner,
-            self.dataset_request_state.dataset_handle.clone(),
-            config,
-        )
+        DatasetEndpoints::new(&self.dataset_request_state, config)
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -267,6 +246,11 @@ impl DatasetRequestState {
     }
 
     #[inline]
+    pub fn owner(&self) -> &Account {
+        &self.owner
+    }
+
+    #[inline]
     pub fn dataset_handle(&self) -> &odf::DatasetHandle {
         &self.dataset_handle
     }
@@ -288,6 +272,16 @@ impl DatasetRequestState {
                 Ok(summary)
             })
             .await
+    }
+
+    pub async fn check_dataset_read_access(&self, ctx: &Context<'_>) -> Result<()> {
+        utils::check_dataset_access(
+            ctx,
+            &self.allowed_dataset_actions,
+            &self.dataset_handle,
+            auth::DatasetAction::Read,
+        )
+        .await
     }
 
     pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {

@@ -36,14 +36,14 @@ pub(crate) enum FlowInDatasetError {
 pub(crate) async fn check_if_flow_belongs_to_dataset(
     ctx: &Context<'_>,
     flow_id: FlowID,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_id: &odf::DatasetID,
 ) -> Result<Option<FlowInDatasetError>> {
     let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
     match flow_query_service.get_flow(flow_id.into()).await {
         Ok(flow_state) => match flow_state.flow_key {
             fs::FlowKey::Dataset(fk_dataset) => {
-                if fk_dataset.dataset_id != dataset_handle.id {
+                if fk_dataset.dataset_id != *dataset_id {
                     return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }
             }
@@ -117,7 +117,7 @@ pub(crate) async fn ensure_flow_preconditions(
         DatasetFlowType::Ingest => {
             let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
             let source_res = metadata_query_service
-                .get_active_polling_source(target)
+                .get_active_polling_source(&target)
                 .await
                 .int_err()?;
             if source_res.is_none() {
@@ -132,7 +132,7 @@ pub(crate) async fn ensure_flow_preconditions(
                 dyn kamu_core::MetadataQueryService,
                 dyn ViewDatasetUseCase
             );
-            let source_res = metadata_query_service.get_active_transform(target).await?;
+            let source_res = metadata_query_service.get_active_transform(&target).await?;
 
             match source_res {
                 Some((_, set_transform_block)) => {

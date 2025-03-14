@@ -292,7 +292,7 @@ impl FlowDescriptionBuilder {
                         .int_err()?;
 
                     let polling_source_maybe = metadata_query_service
-                        .get_active_polling_source(target)
+                        .get_active_polling_source(&target)
                         .await
                         .int_err()?;
 

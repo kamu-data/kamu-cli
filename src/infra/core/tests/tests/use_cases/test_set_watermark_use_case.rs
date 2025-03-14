@@ -105,7 +105,7 @@ impl SetWatermarkUseCaseHarness {
         created_result: &CreateDatasetResult,
     ) -> Option<DateTime<Utc>> {
         self.metadata_query_svc
-            .try_get_current_watermark(ResolvedDataset::from_created(created_result))
+            .try_get_current_watermark(&ResolvedDataset::from_created(created_result))
             .await
             .unwrap()
     }

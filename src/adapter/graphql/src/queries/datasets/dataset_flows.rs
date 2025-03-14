@@ -9,33 +9,36 @@
 
 use super::{DatasetFlowConfigs, DatasetFlowRuns, DatasetFlowTriggers};
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlows {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetFlows<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[Object]
-impl DatasetFlows {
+impl<'a> DatasetFlows<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
     }
 
     /// Returns interface for flow configurations queries
     async fn configs(&self) -> DatasetFlowConfigs {
-        DatasetFlowConfigs::new(self.dataset_handle.clone())
+        DatasetFlowConfigs::new(self.dataset_request_state)
     }
 
     /// Returns interface for flow triggers queries
     async fn triggers(&self) -> DatasetFlowTriggers {
-        DatasetFlowTriggers::new(self.dataset_handle.clone())
+        DatasetFlowTriggers::new(self.dataset_request_state)
     }
 
     /// Returns interface for flow runs queries
     async fn runs(&self) -> DatasetFlowRuns {
-        DatasetFlowRuns::new(self.dataset_handle.clone())
+        DatasetFlowRuns::new(self.dataset_request_state)
     }
 }
 

@@ -16,28 +16,34 @@ use kamu_flow_system as fs;
 
 use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
 use crate::prelude::*;
-use crate::queries::{Account, Flow};
+use crate::queries::{Account, DatasetRequestState, Flow};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowRuns {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetFlowRuns<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetFlowRuns {
+impl<'a> DatasetFlowRuns<'a> {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
     }
 
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_get_flow, skip_all, fields(%flow_id))]
     async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
-        if let Some(error) =
-            check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
+        if let Some(error) = check_if_flow_belongs_to_dataset(
+            ctx,
+            flow_id,
+            &self.dataset_request_state.dataset_handle().id,
+        )
+        .await?
         {
             return Ok(match error {
                 FlowInDatasetError::NotFound(e) => GetFlowResult::NotFound(e),
@@ -100,7 +106,7 @@ impl DatasetFlowRuns {
 
         let flows_state_listing = flow_query_service
             .list_all_flows_by_dataset(
-                &self.dataset_handle.id,
+                &self.dataset_request_state.dataset_handle().id,
                 filters,
                 PaginationOpts::from_page(page, per_page),
             )
@@ -124,7 +130,7 @@ impl DatasetFlowRuns {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let flow_initiator_ids: Vec<_> = flow_query_service
-            .list_all_flow_initiators_by_dataset(&self.dataset_handle.id)
+            .list_all_flow_initiators_by_dataset(&self.dataset_request_state.dataset_handle().id)
             .await
             .int_err()?
             .matched_stream
