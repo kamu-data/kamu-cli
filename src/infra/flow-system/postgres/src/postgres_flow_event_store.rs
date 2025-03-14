@@ -117,49 +117,13 @@ impl PostgresFlowEventStore {
             }
         }
 
-        // We either have determined the latest status, or should read the previous
-        let latest_status = if let Some(latest_status) = maybe_latest_status {
-            latest_status
-        } else {
-            // Find out current flow status recorded
-            let connection_mut = tr.connection_mut().await?;
-            sqlx::query!(
-                r#"
-                SELECT flow_status as "flow_status: FlowStatus" FROM flows
-                WHERE flow_id = $1
-                "#,
-                flow_id
-            )
-            .fetch_one(connection_mut)
-            .await
-            .map_err(|e| SaveEventsError::Internal(e.int_err()))?
-            .flow_status
-        };
-
-        let latest_scheduled_for_activation_at = if maybe_scheduled_for_activation_at.is_some() {
-            maybe_scheduled_for_activation_at
-        } else {
-            // Find out current flow activation time recorded
-            let connection_mut = tr.connection_mut().await?;
-            sqlx::query!(
-                r#"
-                    SELECT scheduled_for_activation_at as activation_time
-                        FROM flows
-                        WHERE flow_id = $1
-                "#,
-                flow_id
-            )
-            .map(|result| result.activation_time)
-            .fetch_one(connection_mut)
-            .await
-            .int_err()?
-        };
-
         let connection_mut = tr.connection_mut().await?;
         let rows = sqlx::query!(
             r#"
-            UPDATE flows
-                SET flow_status = $2, last_event_id = $3, scheduled_for_activation_at = $4
+                UPDATE flows
+                    SET flow_status = CASE WHEN $2::flow_status_type IS NOT NULL THEN $2::flow_status_type ELSE flow_status END,
+                    last_event_id = $3,
+                    scheduled_for_activation_at = CASE WHEN $4::TIMESTAMPTZ IS NOT NULL THEN $4::TIMESTAMPTZ ELSE scheduled_for_activation_at END
                 WHERE flow_id = $1 AND (
                     last_event_id IS NULL AND CAST($5 as BIGINT) IS NULL OR
                     last_event_id IS NOT NULL AND CAST($5 as BIGINT) IS NOT NULL AND last_event_id = $5
@@ -167,9 +131,9 @@ impl PostgresFlowEventStore {
                 RETURNING flow_id
             "#,
             flow_id,
-            latest_status as FlowStatus,
+            maybe_latest_status as Option<FlowStatus>,
             last_event_id,
-            latest_scheduled_for_activation_at,
+            maybe_scheduled_for_activation_at,
             maybe_prev_stored_event_id,
         )
         .fetch_all(connection_mut)
