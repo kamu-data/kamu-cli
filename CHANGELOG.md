@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.227.1] - 2025-03-14
+### Fixed
+- Trigger activation during flow throttling correctly save next activation time
+
 ## [0.227.0] - 2025-03-13
 ### Added
 - `kamu search` now supports `--local` flag which will use natural language search on datasets in the local workspace (#1136)
