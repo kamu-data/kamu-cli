@@ -47,6 +47,8 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         paused: bool,
         trigger_input: FlowTriggerInput,
     ) -> Result<SetFlowTriggerResult> {
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+
         if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         };
@@ -66,8 +68,6 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             Ok(rule) => rule,
             Err(e) => return Ok(SetFlowTriggerResult::FlowInvalidTriggerInput(e)),
         };
-
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
         if let Some(e) =
             ensure_flow_preconditions(ctx, self.dataset_mut_request_state, dataset_flow_type, None)
