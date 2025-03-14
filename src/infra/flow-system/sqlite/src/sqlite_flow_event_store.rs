@@ -147,6 +147,31 @@ impl SqliteFlowEventStore {
             .flow_status
         };
 
+        let latest_scheduled_for_activation_at = if maybe_scheduled_for_activation_at.is_some() {
+            maybe_scheduled_for_activation_at
+        } else {
+            #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+            #[allow(dead_code)]
+            pub struct ActivationRow {
+                pub activation_time: Option<DateTime<Utc>>,
+            }
+
+            // Find out current flow activation time recorded
+            let connection_mut = tr.connection_mut().await?;
+            sqlx::query_as!(
+                ActivationRow,
+                r#"
+                    SELECT scheduled_for_activation_at as "activation_time: _"
+                        FROM flows WHERE flow_id = $1
+                    "#,
+                flow_id
+            )
+            .map(|result| result.activation_time)
+            .fetch_one(connection_mut)
+            .await
+            .int_err()?
+        };
+
         let connection_mut = tr.connection_mut().await?;
         let rows = sqlx::query!(
             r#"
@@ -161,7 +186,7 @@ impl SqliteFlowEventStore {
             flow_id,
             latest_status,
             last_event_id,
-            maybe_scheduled_for_activation_at,
+            latest_scheduled_for_activation_at,
             maybe_prev_stored_event_id,
         )
         .fetch_all(connection_mut)

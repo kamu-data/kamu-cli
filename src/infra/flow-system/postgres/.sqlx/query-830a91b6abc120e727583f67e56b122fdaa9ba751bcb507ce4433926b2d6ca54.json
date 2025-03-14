@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT scheduled_for_activation_at as activation_time\n                        FROM flows\n                        WHERE flow_id = $1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "activation_time",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "830a91b6abc120e727583f67e56b122fdaa9ba751bcb507ce4433926b2d6ca54"
+}
