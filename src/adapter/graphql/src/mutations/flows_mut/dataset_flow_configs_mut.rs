@@ -58,7 +58,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,
-            self.dataset_mut_request_state.dataset_handle(),
+            self.dataset_mut_request_state,
             dataset_flow_type,
             Some(&flow_run_config),
         )

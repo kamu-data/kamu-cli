@@ -260,18 +260,13 @@ impl DatasetRequestState {
     }
 
     pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
-        self.dataset_summary
-            .get_or_try_init(|| async {
-                let resolved_dataset = self.resolved_dataset(ctx).await?;
-
-                let summary = resolved_dataset
-                    .get_summary(odf::dataset::GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-
-                Ok(summary)
-            })
-            .await
+        utils::get_dataset_summary(
+            ctx,
+            &self.resolved_dataset,
+            &self.dataset_summary,
+            &self.dataset_handle,
+        )
+        .await
     }
 
     pub async fn check_dataset_read_access(&self, ctx: &Context<'_>) -> Result<()> {

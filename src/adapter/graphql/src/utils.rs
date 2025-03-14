@@ -121,6 +121,29 @@ pub(crate) async fn get_resolved_dataset<'a>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn get_dataset_summary<'a>(
+    ctx: &Context<'_>,
+    lazy_resolved_dataset: &'a OnceCell<ResolvedDataset>,
+    lazy_dataset_summary: &'a OnceCell<odf::DatasetSummary>,
+    dataset_handle: &odf::DatasetHandle,
+) -> Result<&'a odf::DatasetSummary, GqlError> {
+    lazy_dataset_summary
+        .get_or_try_init(|| async {
+            let resolved_dataset =
+                get_resolved_dataset(ctx, lazy_resolved_dataset, dataset_handle).await?;
+
+            let summary = resolved_dataset
+                .get_summary(odf::dataset::GetSummaryOpts::default())
+                .await
+                .int_err()?;
+
+            Ok(summary)
+        })
+        .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn check_dataset_access(
     ctx: &Context<'_>,
     lazy_allowed_dataset_actions: &OnceCell<HashSet<auth::DatasetAction>>,

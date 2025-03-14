@@ -51,10 +51,13 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         };
 
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
-
-        if let Some(e) =
-            ensure_expected_dataset_kind(ctx, dataset_handle, dataset_flow_type, None).await?
+        if let Some(e) = ensure_expected_dataset_kind(
+            ctx,
+            self.dataset_mut_request_state,
+            dataset_flow_type,
+            None,
+        )
+        .await?
         {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }
@@ -65,6 +68,8 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         };
 
         ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
         if let Some(e) =
             ensure_flow_preconditions(ctx, dataset_handle, dataset_flow_type, None).await?

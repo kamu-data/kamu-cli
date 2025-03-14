@@ -225,6 +225,7 @@ impl DatasetMut {
 pub(crate) struct DatasetMutRequestState {
     dataset_handle: odf::DatasetHandle,
     resolved_dataset: OnceCell<ResolvedDataset>,
+    dataset_summary: OnceCell<odf::DatasetSummary>,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
 }
 
@@ -233,6 +234,7 @@ impl DatasetMutRequestState {
         Self {
             dataset_handle,
             resolved_dataset: OnceCell::new(),
+            dataset_summary: OnceCell::new(),
             allowed_dataset_actions: OnceCell::new(),
         }
     }
@@ -244,6 +246,16 @@ impl DatasetMutRequestState {
 
     pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
         utils::get_resolved_dataset(ctx, &self.resolved_dataset, &self.dataset_handle).await
+    }
+
+    pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
+        utils::get_dataset_summary(
+            ctx,
+            &self.resolved_dataset,
+            &self.dataset_summary,
+            &self.dataset_handle,
+        )
+        .await
     }
 
     pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {

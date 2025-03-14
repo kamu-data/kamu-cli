@@ -49,11 +49,9 @@ impl<'a> DatasetFlowRunsMut<'a> {
         dataset_flow_type: DatasetFlowType,
         flow_run_configuration: Option<FlowRunConfiguration>,
     ) -> Result<TriggerFlowResult> {
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
-
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,
-            dataset_handle,
+            self.dataset_mut_request_state,
             dataset_flow_type,
             flow_run_configuration.as_ref(),
         )
@@ -61,6 +59,8 @@ impl<'a> DatasetFlowRunsMut<'a> {
         {
             return Ok(TriggerFlowResult::IncompatibleDatasetKind(e));
         }
+
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
         ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 

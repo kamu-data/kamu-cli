@@ -14,7 +14,6 @@ use kamu_flow_system as fs;
 use super::FlowNotFound;
 use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
-use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,7 +69,7 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
 
 pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_mut_request_state: &DatasetMutRequestState,
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
@@ -82,13 +81,8 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let resolved_dataset = utils::get_dataset(ctx, dataset_handle).await;
-
-            let dataset_kind = resolved_dataset
-                .get_summary(odf::dataset::GetSummaryOpts::default())
-                .await
-                .int_err()?
-                .kind;
+            let dataset_summary = dataset_mut_request_state.dataset_summary(ctx).await?;
+            let dataset_kind = dataset_summary.kind;
 
             if dataset_kind != expected_kind {
                 Ok(Some(FlowIncompatibleDatasetKind {
