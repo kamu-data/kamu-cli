@@ -12,10 +12,20 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- DB: utilities for working with bind parameter placeholders
 ### Changed
 - Replaced default GraphQL playground with better maintained `graphiql` (old playground is still available)
 - Improved API server web console looks
 - Upgraded to `datafusion v45` (#1146)
+- CI: terminate tests after 5 minutes of execution
+- GQL: cleaning up unnecessary `dummy` fields where it can be avoided
+- GQL: improve performance by adding shared query state (for query and mutation requests)
+- Cleaning up unnecessary `.map_err()` constructs
+- DB: cleanup of unnecessary allocations during parameter bindings
+- Various small refactorings extracting common methods (e.g. `PaginationOpts::from_page()`)
+### Fixed
+- REST API: `GET /datasets/{id}` returns account data as it should 
 
 ## [0.227.1] - 2025-03-14
 ### Fixed
@@ -25,7 +35,7 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - `kamu search` now supports `--local` flag which will use natural language search on datasets in the local workspace (#1136)
   - To use this feature you'll need to configure the OpenAI key in kamu config or set it via `OPENAI_API_KEY` env var
-  - By default uses [Qdrant](https://qdrant.tech/) vector database spawned per command in a container
+  - By default, uses [Qdrant](https://qdrant.tech/) vector database spawned per command in a container
 ### Fixed
 - `kamu sql server` now works again inside containers (e.g. jupyter)
 
@@ -201,7 +211,7 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - Massive crates restructuring around Open Data Fabric code:
   - `src/odf` concentrates large number of related crates now, preparing for future separation in different Git repo
-  - old `opendatafabric` crate becamse `odf-metadata`
+  - old `opendatafabric` crate became `odf-metadata`
   - low-level repository implementations became `odf-storage[-...]` crates
   - specific storage technologies are gated via features (`lfs`, `s3`, `http`)
   - `DatasetFactory`, `Dataset`, `DatasetSummary`, `DatasetLayout`, `BlockRef`, 
