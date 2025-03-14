@@ -106,6 +106,8 @@ impl PostgresFlowEventStore {
         // Determine if we have a status change between these events
         let mut maybe_latest_status = None;
         let mut maybe_scheduled_for_activation_at = None;
+        let mut reset_scheduled_for_activation_at = false;
+
         for event in events {
             if let Some(new_status) = event.new_status() {
                 maybe_latest_status = Some(new_status);
@@ -116,23 +118,28 @@ impl PostgresFlowEventStore {
                 }
                 FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) => {
                     maybe_scheduled_for_activation_at = None;
+                    reset_scheduled_for_activation_at = true;
                 }
                 _ => {
-                    let connection_mut = tr.connection_mut().await?;
-                    maybe_scheduled_for_activation_at = sqlx::query!(
-                        r#"
+                    reset_scheduled_for_activation_at = false;
+                }
+            }
+        }
+
+        if maybe_scheduled_for_activation_at.is_none() && !reset_scheduled_for_activation_at {
+            let connection_mut = tr.connection_mut().await?;
+            maybe_scheduled_for_activation_at = sqlx::query!(
+                r#"
                             SELECT scheduled_for_activation_at as activation_time
                                 FROM flows
                                 WHERE flow_id = $1
                         "#,
-                        flow_id
-                    )
-                    .map(|result| result.activation_time)
-                    .fetch_one(connection_mut)
-                    .await
-                    .int_err()?;
-                }
-            }
+                flow_id
+            )
+            .map(|result| result.activation_time)
+            .fetch_one(connection_mut)
+            .await
+            .int_err()?;
         }
 
         let connection_mut = tr.connection_mut().await?;
