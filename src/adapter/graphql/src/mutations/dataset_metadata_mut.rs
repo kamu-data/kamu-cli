@@ -44,6 +44,10 @@ impl<'a> DatasetMetadataMut<'a> {
         ctx: &Context<'_>,
         content: Option<String>,
     ) -> Result<UpdateReadmeResult> {
+        self.dataset_mut_request_state
+            .check_dataset_maintain_access(ctx)
+            .await?;
+
         let resolved_dataset = self.dataset_mut_request_state.resolved_dataset(ctx).await?;
 
         let old_attachments = resolved_dataset
