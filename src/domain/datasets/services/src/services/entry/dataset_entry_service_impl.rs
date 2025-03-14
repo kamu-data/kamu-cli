@@ -16,6 +16,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountNotFoundByNameError,
     AccountService,
+    AccountServiceExt,
     CurrentAccountSubject,
     GetAccountByNameError,
 };
@@ -122,7 +123,7 @@ impl DatasetEntryServiceImpl {
 
             let accounts = self
                 .account_svc
-                .accounts_by_ids(account_ids)
+                .accounts_by_ids(&account_ids)
                 .await
                 .int_err()?;
 
@@ -495,18 +496,12 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
             .dataset_entry_repo
             .get_multiple_dataset_entries(&dataset_ids)
             .await
-            .map_err(|e| match e {
-                GetMultipleDatasetEntriesError::Internal(e) => {
-                    GetMultipleDatasetsError::Internal(e)
-                }
-            })?;
+            .int_err()?;
 
         let resolved_handles = self
             .entries_as_handles(entries_resolution.resolved_entries)
             .await
-            .map_err(|e| match e {
-                ListDatasetEntriesError::Internal(e) => GetMultipleDatasetsError::Internal(e),
-            })?;
+            .int_err()?;
 
         let unresolved_datasets = entries_resolution
             .unresolved_entries

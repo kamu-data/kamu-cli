@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT object_entity_type as \"entity_type: EntityType\",\n                   object_entity_id as entity_id,\n                   relationship\n            FROM auth_rebac_relations\n            WHERE subject_entity_type = $1\n              AND subject_entity_id = $2\n              AND object_entity_type = $3\n            ",
+  "query": "\n            SELECT object_entity_type AS \"entity_type: EntityType\",\n                   object_entity_id AS entity_id,\n                   relationship\n            FROM auth_rebac_relations\n            WHERE subject_entity_type = $1\n              AND subject_entity_id = $2\n              AND object_entity_type = $3\n            ORDER BY entity_id\n            ",
   "describe": {
     "columns": [
       {
@@ -28,5 +28,5 @@
       false
     ]
   },
-  "hash": "f10cf32d74bd01d20525a1e94e19afb7750728b4e4796e01ab8c52bd8497ff69"
+  "hash": "92685ee701dbfa536c5fa10aaec60d8d99ea553ca0166133cf475e91a3e512ab"
 }

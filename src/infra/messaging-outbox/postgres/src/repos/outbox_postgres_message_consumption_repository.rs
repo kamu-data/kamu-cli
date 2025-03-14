@@ -78,7 +78,7 @@ impl OutboxMessageConsumptionRepository for PostgresOutboxMessageConsumptionRepo
         )
         .fetch_optional(connection_mut)
         .await
-        .map_err(ErrorIntoInternal::int_err)
+        .int_err()
     }
 
     async fn create_consumption_boundary(

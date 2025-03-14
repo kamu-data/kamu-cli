@@ -70,7 +70,7 @@ impl PostgresFlowEventStore {
             )
                 .execute(connection_mut)
                 .await
-                .map_err(ErrorIntoInternal::int_err)?;
+                .int_err()?;
             }
             FlowKey::System(fk_system) => {
                 sqlx::query!(
@@ -84,7 +84,7 @@ impl PostgresFlowEventStore {
                 )
                 .execute(connection_mut)
                 .await
-                .map_err(ErrorIntoInternal::int_err)?;
+                .int_err()?;
             }
         }
 
@@ -432,9 +432,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
             }
 
             // Make registration
-            self.register_flow(&mut tr, e)
-                .await
-                .map_err(SaveEventsError::Internal)?;
+            self.register_flow(&mut tr, e).await?;
         }
 
         // Save events one by one

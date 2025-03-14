@@ -161,8 +161,7 @@ impl AuthenticationServiceImpl {
 
         match decoded_access_token {
             AccessTokenType::JWTToken(token_data) => {
-                let account_id = odf::AccountID::from_did_str(&token_data.claims.sub)
-                    .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
+                let account_id = odf::AccountID::from_did_str(&token_data.claims.sub).int_err()?;
 
                 match self.account_repository.get_account_by_id(&account_id).await {
                     Ok(account) => Ok(account),
