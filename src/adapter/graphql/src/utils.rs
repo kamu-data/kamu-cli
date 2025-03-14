@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
-use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{auth, DatasetRegistry, ResolvedDataset};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
+use tokio::sync::OnceCell;
 
 use crate::prelude::{AccessTokenID, AccountID, AccountName};
 
@@ -109,7 +111,7 @@ pub(crate) async fn check_dataset_read_access(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_handle, auth::DatasetAction::Read).await
+    check_dataset_access_old(ctx, dataset_handle, auth::DatasetAction::Read).await
 }
 
 #[deprecated(note = "use DatasetState::check_dataset_write_access()")]
@@ -117,12 +119,12 @@ pub(crate) async fn check_dataset_write_access(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_handle, auth::DatasetAction::Write).await
+    check_dataset_access_old(ctx, dataset_handle, auth::DatasetAction::Write).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn check_dataset_access(
+async fn check_dataset_access_old(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
     action: auth::DatasetAction,
@@ -133,11 +135,47 @@ async fn check_dataset_access(
         .check_action_allowed(&dataset_handle.id, action)
         .await
         .map_err(|e| match e {
-            DatasetActionUnauthorizedError::Access(_) => make_dataset_access_error(dataset_handle),
-            DatasetActionUnauthorizedError::Internal(e) => GqlError::Internal(e),
+            auth::DatasetActionUnauthorizedError::Access(_) => {
+                make_dataset_access_error(dataset_handle)
+            }
+            auth::DatasetActionUnauthorizedError::Internal(e) => GqlError::Internal(e),
         })?;
 
     Ok(())
+}
+
+pub(crate) async fn check_dataset_access(
+    ctx: &Context<'_>,
+    lazy_allowed_dataset_actions: &OnceCell<HashSet<auth::DatasetAction>>,
+    dataset_handle: &odf::DatasetHandle,
+    action: auth::DatasetAction,
+) -> Result<(), GqlError> {
+    let allowed_actions =
+        get_allowed_dataset_actions(ctx, lazy_allowed_dataset_actions, &dataset_handle.id).await?;
+
+    if allowed_actions.contains(&action) {
+        Ok(())
+    } else {
+        Err(make_dataset_access_error(dataset_handle))
+    }
+}
+
+pub(crate) async fn get_allowed_dataset_actions<'a>(
+    ctx: &Context<'_>,
+    lazy_allowed_dataset_actions: &'a OnceCell<HashSet<auth::DatasetAction>>,
+    dataset_id: &odf::DatasetID,
+) -> Result<&'a HashSet<auth::DatasetAction>, GqlError> {
+    lazy_allowed_dataset_actions
+        .get_or_try_init(|| async {
+            let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
+
+            let allowed_actions = dataset_action_authorizer
+                .get_allowed_actions(dataset_id)
+                .await?;
+
+            Ok(allowed_actions)
+        })
+        .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

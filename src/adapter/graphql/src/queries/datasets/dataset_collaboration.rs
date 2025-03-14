@@ -50,7 +50,7 @@ impl<'a> DatasetCollaboration<'a> {
             from_catalog_n!(ctx, dyn RebacService, dyn AccountService);
 
         let authorized_accounts = rebac_service
-            .get_authorized_accounts(&self.dataset_request_state.dataset_handle.id)
+            .get_authorized_accounts(&self.dataset_request_state.dataset_handle().id)
             .await
             .int_err()?;
         let authorized_account_ids = authorized_accounts

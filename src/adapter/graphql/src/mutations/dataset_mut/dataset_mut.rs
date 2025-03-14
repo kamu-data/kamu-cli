@@ -22,7 +22,7 @@ use crate::mutations::{
 };
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils::{ensure_dataset_env_vars_enabled, from_catalog_n, make_dataset_access_error};
+use crate::utils::{self, from_catalog_n};
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +61,7 @@ impl DatasetMut {
     /// Access to the mutable flow configurations of this dataset
     #[allow(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
-        ensure_dataset_env_vars_enabled(ctx)?;
+        utils::ensure_dataset_env_vars_enabled(ctx)?;
 
         // TODO: Eliminate cloning
         //       GQL: Dataset: cache `ResolvedDataset`
@@ -107,7 +107,9 @@ impl DatasetMut {
                     colliding_alias: e.alias.into(),
                 }))
             }
-            Err(RenameDatasetError::Access(_)) => Err(make_dataset_access_error(dataset_handle)),
+            Err(RenameDatasetError::Access(_)) => {
+                Err(utils::make_dataset_access_error(dataset_handle))
+            }
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(RenameDatasetError::Internal(e)) => Err(e.into()),
@@ -139,7 +141,9 @@ impl DatasetMut {
                         .collect(),
                 },
             )),
-            Err(DeleteDatasetError::Access(_)) => Err(make_dataset_access_error(dataset_handle)),
+            Err(DeleteDatasetError::Access(_)) => {
+                Err(utils::make_dataset_access_error(dataset_handle))
+            }
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
@@ -220,11 +224,9 @@ impl DatasetMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: extract common with DatasetRequestState parts into
-// helpers/utils
 #[derive(Debug)]
 pub(crate) struct DatasetMutRequestState {
-    pub dataset_handle: odf::DatasetHandle,
+    dataset_handle: odf::DatasetHandle,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
 }
 
@@ -236,46 +238,29 @@ impl DatasetMutRequestState {
         }
     }
 
+    #[inline]
+    pub fn dataset_handle(&self) -> &odf::DatasetHandle {
+        &self.dataset_handle
+    }
+
     pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {
-        self.check_dataset_access(ctx, auth::DatasetAction::Maintain)
-            .await
+        utils::check_dataset_access(
+            ctx,
+            &self.allowed_dataset_actions,
+            &self.dataset_handle,
+            auth::DatasetAction::Maintain,
+        )
+        .await
     }
 
     pub async fn check_dataset_own_access(&self, ctx: &Context<'_>) -> Result<()> {
-        self.check_dataset_access(ctx, auth::DatasetAction::Own)
-            .await
-    }
-
-    async fn check_dataset_access(
-        &self,
-        ctx: &Context<'_>,
-        action: auth::DatasetAction,
-    ) -> Result<()> {
-        let allowed_actions = self.allowed_dataset_actions(ctx).await?;
-
-        if allowed_actions.contains(&action) {
-            Ok(())
-        } else {
-            Err(make_dataset_access_error(&self.dataset_handle))
-        }
-    }
-
-    async fn allowed_dataset_actions(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<&HashSet<auth::DatasetAction>> {
-        self.allowed_dataset_actions
-            .get_or_try_init(|| async {
-                let dataset_action_authorizer =
-                    from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
-
-                let allowed_actions = dataset_action_authorizer
-                    .get_allowed_actions(&self.dataset_handle.id)
-                    .await?;
-
-                Ok(allowed_actions)
-            })
-            .await
+        utils::check_dataset_access(
+            ctx,
+            &self.allowed_dataset_actions,
+            &self.dataset_handle,
+            auth::DatasetAction::Own,
+        )
+        .await
     }
 }
 

@@ -47,7 +47,7 @@ impl<'a> DatasetCollaborationMut<'a> {
             .set_account_dataset_relation(
                 &account_id,
                 role.into(),
-                &self.dataset_mut_request_state.dataset_handle.id,
+                &self.dataset_mut_request_state.dataset_handle().id,
             )
             .await
             .int_err()?;
@@ -77,7 +77,7 @@ impl<'a> DatasetCollaborationMut<'a> {
         rebac_service
             .unset_accounts_dataset_relations(
                 &odf_account_ids_refs[..],
-                &self.dataset_mut_request_state.dataset_handle.id,
+                &self.dataset_mut_request_state.dataset_handle().id,
             )
             .await
             .int_err()?;
