@@ -40,7 +40,7 @@ async fn test_rename_dataset_success_via_ref() {
         .returning(|_, _| Ok(()));
 
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&foo_id, 1, true);
+        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&foo_id, 1, true);
 
     let harness = RenameUseCaseHarness::new(
         mock_entry_writer,
@@ -100,7 +100,7 @@ async fn test_rename_dataset_unauthorized() {
 
     let harness = RenameUseCaseHarness::new(
         MockDatasetEntryWriter::new(),
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
+        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, false),
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             dataset_id_foo,
         ])),

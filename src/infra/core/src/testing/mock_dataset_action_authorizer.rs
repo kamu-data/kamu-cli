@@ -110,6 +110,36 @@ impl MockDatasetActionAuthorizer {
         )
     }
 
+    pub fn expect_check_maintain_dataset(
+        self,
+        expected_dataset_id: &odf::DatasetID,
+        times: usize,
+        success: bool,
+    ) -> Self {
+        let expected_dataset_id = expected_dataset_id.clone();
+        self.expect_check_action_allowed_internal(
+            function(move |dataset_id| *dataset_id == expected_dataset_id),
+            DatasetAction::Maintain,
+            times,
+            success,
+        )
+    }
+
+    pub fn expect_check_own_dataset(
+        self,
+        expected_dataset_id: &odf::DatasetID,
+        times: usize,
+        success: bool,
+    ) -> Self {
+        let expected_dataset_id = expected_dataset_id.clone();
+        self.expect_check_action_allowed_internal(
+            function(move |dataset_id| *dataset_id == expected_dataset_id),
+            DatasetAction::Own,
+            times,
+            success,
+        )
+    }
+
     pub fn expect_check_read_a_dataset(self, times: usize, success: bool) -> Self {
         self.expect_check_action_allowed_internal(always(), DatasetAction::Read, times, success)
     }
