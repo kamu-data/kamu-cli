@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::DatasetRegistry;
 use kamu_datasets::ViewDatasetUseCase;
 use kamu_flow_system as fs;
 
@@ -102,18 +101,17 @@ pub(crate) async fn ensure_expected_dataset_kind(
 // Check flow preconditions and set default configurations if needed
 pub(crate) async fn ensure_flow_preconditions(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_mut_request_state: &DatasetMutRequestState,
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
-    let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-    let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+    let resolved_dataset = dataset_mut_request_state.resolved_dataset(ctx).await?;
 
     match dataset_flow_type {
         DatasetFlowType::Ingest => {
             let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
             let source_res = metadata_query_service
-                .get_active_polling_source(&target)
+                .get_active_polling_source(resolved_dataset)
                 .await
                 .int_err()?;
             if source_res.is_none() {
@@ -128,7 +126,9 @@ pub(crate) async fn ensure_flow_preconditions(
                 dyn kamu_core::MetadataQueryService,
                 dyn ViewDatasetUseCase
             );
-            let source_res = metadata_query_service.get_active_transform(&target).await?;
+            let source_res = metadata_query_service
+                .get_active_transform(resolved_dataset)
+                .await?;
 
             match source_res {
                 Some((_, set_transform_block)) => {
@@ -166,7 +166,7 @@ pub(crate) async fn ensure_flow_preconditions(
             {
                 use odf::dataset::MetadataChainExt as _;
                 if let Some(new_head_hash) = &reset_configuration.new_head_hash() {
-                    let metadata_chain = target.as_metadata_chain();
+                    let metadata_chain = resolved_dataset.as_metadata_chain();
                     let current_head_hash_maybe = metadata_chain
                         .try_get_ref(&odf::BlockRef::Head)
                         .await

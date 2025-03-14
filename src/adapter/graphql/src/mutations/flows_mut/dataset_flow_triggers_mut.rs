@@ -69,15 +69,15 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
         ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
-
         if let Some(e) =
-            ensure_flow_preconditions(ctx, dataset_handle, dataset_flow_type, None).await?
+            ensure_flow_preconditions(ctx, self.dataset_mut_request_state, dataset_flow_type, None)
+                .await?
         {
             return Ok(SetFlowTriggerResult::PreconditionsNotMet(e));
         }
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
         let res = flow_trigger_service
             .set_trigger(

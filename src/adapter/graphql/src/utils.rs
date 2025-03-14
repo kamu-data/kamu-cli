@@ -82,16 +82,6 @@ pub(crate) use unsafe_from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn get_dataset(
-    ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
-) -> ResolvedDataset {
-    let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-    dataset_registry.get_dataset_by_handle(dataset_handle).await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
@@ -112,7 +102,9 @@ pub(crate) async fn get_resolved_dataset<'a>(
 ) -> Result<&'a ResolvedDataset, GqlError> {
     lazy_resolved_dataset
         .get_or_try_init(|| async {
-            let resolved_dataset = get_dataset(ctx, dataset_handle).await;
+            let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
+
+            let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
             Ok(resolved_dataset)
         })

@@ -60,13 +60,11 @@ impl<'a> DatasetFlowRunsMut<'a> {
             return Ok(TriggerFlowResult::IncompatibleDatasetKind(e));
         }
 
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
-
         ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
         if let Some(e) = ensure_flow_preconditions(
             ctx,
-            dataset_handle,
+            self.dataset_mut_request_state,
             dataset_flow_type,
             flow_run_configuration.as_ref(),
         )
@@ -80,6 +78,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
         let logged_account = utils::get_logged_account(ctx);
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
         let flow_run_snapshot = match FlowRunConfiguration::try_into_snapshot(
             ctx,

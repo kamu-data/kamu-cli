@@ -72,13 +72,9 @@ impl<'a> DatasetFlowConfigsMut<'a> {
             Err(e) => return Ok(SetFlowConfigResult::FlowInvalidConfigInput(e)),
         };
 
-        if let Some(e) = ensure_flow_preconditions(
-            ctx,
-            self.dataset_mut_request_state.dataset_handle(),
-            dataset_flow_type,
-            None,
-        )
-        .await?
+        if let Some(e) =
+            ensure_flow_preconditions(ctx, self.dataset_mut_request_state, dataset_flow_type, None)
+                .await?
         {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
         }
