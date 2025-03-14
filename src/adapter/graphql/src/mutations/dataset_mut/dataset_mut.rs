@@ -157,6 +157,8 @@ impl DatasetMut {
         ctx: &Context<'_>,
         watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult> {
+        // NOTE: Access verification is handled by the use-case
+
         let set_watermark_use_case = from_catalog_n!(ctx, dyn SetWatermarkUseCase);
 
         match set_watermark_use_case
