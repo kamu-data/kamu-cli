@@ -77,8 +77,15 @@ impl<'a> DatasetCollaboration<'a> {
             })
             .collect::<Vec<_>>();
         let total = nodes.len();
+        let page_nodes = nodes
+            .into_iter()
+            .skip(page * per_page)
+            .take(per_page)
+            .collect::<Vec<_>>();
 
-        Ok(AccountWithRoleConnection::new(nodes, page, per_page, total))
+        Ok(AccountWithRoleConnection::new(
+            page_nodes, page, per_page, total,
+        ))
     }
 }
 
