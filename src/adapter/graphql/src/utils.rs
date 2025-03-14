@@ -144,6 +144,22 @@ async fn check_dataset_access_old(
     Ok(())
 }
 
+pub(crate) async fn get_resolved_dataset<'a>(
+    ctx: &Context<'_>,
+    lazy_resolved_dataset: &'a OnceCell<ResolvedDataset>,
+    dataset_handle: &odf::DatasetHandle,
+) -> Result<&'a ResolvedDataset, GqlError> {
+    lazy_resolved_dataset
+        .get_or_try_init(|| async {
+            let resolved_dataset = get_dataset(ctx, dataset_handle).await;
+
+            Ok(resolved_dataset)
+        })
+        .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn check_dataset_access(
     ctx: &Context<'_>,
     lazy_allowed_dataset_actions: &OnceCell<HashSet<auth::DatasetAction>>,
@@ -159,6 +175,8 @@ pub(crate) async fn check_dataset_access(
         Err(make_dataset_access_error(dataset_handle))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn get_allowed_dataset_actions<'a>(
     ctx: &Context<'_>,

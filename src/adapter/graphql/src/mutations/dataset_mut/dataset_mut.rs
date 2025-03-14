@@ -10,7 +10,13 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use kamu_core::{self as domain, auth, SetWatermarkPlanningError, SetWatermarkUseCase};
+use kamu_core::{
+    self as domain,
+    auth,
+    ResolvedDataset,
+    SetWatermarkPlanningError,
+    SetWatermarkUseCase,
+};
 use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
 use tokio::sync::OnceCell;
 
@@ -44,18 +50,12 @@ impl DatasetMut {
 
     /// Access to the mutable metadata of the dataset
     async fn metadata(&self) -> DatasetMetadataMut {
-        // TODO: Eliminate cloning
-        //       GQL: Dataset: cache `ResolvedDataset`
-        //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetMetadataMut::new(self.dataset_mut_request_state.dataset_handle.clone())
+        DatasetMetadataMut::new(&self.dataset_mut_request_state)
     }
 
     /// Access to the mutable flow configurations of this dataset
     async fn flows(&self) -> DatasetFlowsMut {
-        // TODO: Eliminate cloning
-        //       GQL: Dataset: cache `ResolvedDataset`
-        //       https://github.com/kamu-data/kamu-cli/issues/1114
-        DatasetFlowsMut::new(self.dataset_mut_request_state.dataset_handle.clone())
+        DatasetFlowsMut::new(&self.dataset_mut_request_state)
     }
 
     /// Access to the mutable flow configurations of this dataset
@@ -63,12 +63,7 @@ impl DatasetMut {
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
         utils::ensure_dataset_env_vars_enabled(ctx)?;
 
-        // TODO: Eliminate cloning
-        //       GQL: Dataset: cache `ResolvedDataset`
-        //       https://github.com/kamu-data/kamu-cli/issues/1114
-        Ok(DatasetEnvVarsMut::new(
-            self.dataset_mut_request_state.dataset_handle.clone(),
-        ))
+        Ok(DatasetEnvVarsMut::new(&self.dataset_mut_request_state))
     }
 
     /// Access to collaboration management methods
@@ -227,6 +222,7 @@ impl DatasetMut {
 #[derive(Debug)]
 pub(crate) struct DatasetMutRequestState {
     dataset_handle: odf::DatasetHandle,
+    resolved_dataset: OnceCell<ResolvedDataset>,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
 }
 
@@ -234,6 +230,7 @@ impl DatasetMutRequestState {
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
         Self {
             dataset_handle,
+            resolved_dataset: OnceCell::new(),
             allowed_dataset_actions: OnceCell::new(),
         }
     }
@@ -241,6 +238,10 @@ impl DatasetMutRequestState {
     #[inline]
     pub fn dataset_handle(&self) -> &odf::DatasetHandle {
         &self.dataset_handle
+    }
+
+    pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
+        utils::get_resolved_dataset(ctx, &self.resolved_dataset, &self.dataset_handle).await
     }
 
     pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {

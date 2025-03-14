@@ -9,24 +9,27 @@
 
 use kamu_datasets::CommitDatasetEventUseCase;
 
+use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
 use crate::utils::make_dataset_access_error;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChainMut {
-    dataset_handle: odf::DatasetHandle,
+pub struct MetadataChainMut<'a> {
+    dataset_mut_request_state: &'a DatasetMutRequestState,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl MetadataChainMut {
+impl<'a> MetadataChainMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+        Self {
+            dataset_mut_request_state,
+        }
     }
 
     /// Commits new event to the metadata chain
@@ -59,11 +62,9 @@ impl MetadataChainMut {
         };
 
         let commit_dataset_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
 
-        let result = match commit_dataset_event
-            .execute(&self.dataset_handle, event)
-            .await
-        {
+        let result = match commit_dataset_event.execute(dataset_handle, event).await {
             Ok(result) => CommitResult::Success(CommitResultSuccess {
                 old_head: result.old_head.map(Into::into),
                 new_head: result.new_head.into(),
@@ -79,7 +80,7 @@ impl MetadataChainMut {
                 })
             }
             Err(odf::dataset::CommitError::Access(_)) => {
-                return Err(make_dataset_access_error(&self.dataset_handle))
+                return Err(make_dataset_access_error(dataset_handle))
             }
             Err(e @ odf::dataset::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };

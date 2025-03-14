@@ -15,22 +15,24 @@ use kamu_datasets::{
 };
 use secrecy::SecretString;
 
+use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
 use crate::queries::ViewDatasetEnvVar;
-use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetEnvVarsMut {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetEnvVarsMut<'a> {
+    dataset_mut_request_state: &'a DatasetMutRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetEnvVarsMut {
+impl<'a> DatasetEnvVarsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+        Self {
+            dataset_mut_request_state,
+        }
     }
 
     #[tracing::instrument(level = "info", name = DatasetEnvVarsMut_upsert_env_variable, skip_all)]
@@ -41,8 +43,9 @@ impl DatasetEnvVarsMut {
         value: String,
         is_secret: bool,
     ) -> Result<UpsertDatasetEnvVarResult> {
-        #[expect(deprecated)]
-        utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
+        self.dataset_mut_request_state
+            .check_dataset_maintain_access(ctx)
+            .await?;
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
@@ -56,7 +59,7 @@ impl DatasetEnvVarsMut {
             .upsert_dataset_env_var(
                 key.as_str(),
                 &dataset_env_var_value,
-                &self.dataset_handle.id,
+                &self.dataset_mut_request_state.dataset_handle().id,
             )
             .await?;
 
@@ -83,8 +86,9 @@ impl DatasetEnvVarsMut {
         ctx: &Context<'_>,
         id: DatasetEnvVarID<'static>,
     ) -> Result<DeleteDatasetEnvVarResult> {
-        #[expect(deprecated)]
-        utils::check_dataset_write_access(ctx, &self.dataset_handle).await?;
+        self.dataset_mut_request_state
+            .check_dataset_maintain_access(ctx)
+            .await?;
 
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 

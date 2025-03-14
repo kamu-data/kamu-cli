@@ -23,21 +23,24 @@ use super::{
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
 };
+use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowConfigsMut {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetFlowConfigsMut<'a> {
+    dataset_mut_request_state: &'a DatasetMutRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetFlowConfigsMut {
+impl<'a> DatasetFlowConfigsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+        Self {
+            dataset_mut_request_state,
+        }
     }
 
     #[tracing::instrument(level = "info", name = DatasetFlowConfigsMut_set_config, skip_all)]
@@ -55,7 +58,7 @@ impl DatasetFlowConfigsMut {
 
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,
-            &self.dataset_handle,
+            self.dataset_mut_request_state.dataset_handle(),
             dataset_flow_type,
             Some(&flow_run_config),
         )
@@ -69,19 +72,27 @@ impl DatasetFlowConfigsMut {
             Err(e) => return Ok(SetFlowConfigResult::FlowInvalidConfigInput(e)),
         };
 
-        if let Some(e) =
-            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, None).await?
+        if let Some(e) = ensure_flow_preconditions(
+            ctx,
+            self.dataset_mut_request_state.dataset_handle(),
+            dataset_flow_type,
+            None,
+        )
+        .await?
         {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
         }
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state.dataset_handle()).await?;
 
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
         let res = flow_config_service
             .set_configuration(
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(
+                    self.dataset_mut_request_state.dataset_handle().id.clone(),
+                    dataset_flow_type.into(),
+                )
+                .into(),
                 configuration_rule,
             )
             .await

@@ -250,9 +250,9 @@ impl Dataset {
 pub(crate) struct DatasetRequestState {
     owner: Account,
     dataset_handle: odf::DatasetHandle,
-    allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
     resolved_dataset: OnceCell<ResolvedDataset>,
     dataset_summary: OnceCell<odf::DatasetSummary>,
+    allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
 }
 
 impl DatasetRequestState {
@@ -269,6 +269,25 @@ impl DatasetRequestState {
     #[inline]
     pub fn dataset_handle(&self) -> &odf::DatasetHandle {
         &self.dataset_handle
+    }
+
+    pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
+        utils::get_resolved_dataset(ctx, &self.resolved_dataset, &self.dataset_handle).await
+    }
+
+    pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
+        self.dataset_summary
+            .get_or_try_init(|| async {
+                let resolved_dataset = self.resolved_dataset(ctx).await?;
+
+                let summary = resolved_dataset
+                    .get_summary(odf::dataset::GetSummaryOpts::default())
+                    .await
+                    .int_err()?;
+
+                Ok(summary)
+            })
+            .await
     }
 
     pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {
@@ -291,31 +310,6 @@ impl DatasetRequestState {
             &self.dataset_handle.id,
         )
         .await
-    }
-
-    pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
-        self.resolved_dataset
-            .get_or_try_init(|| async {
-                let resolved_dataset = utils::get_dataset(ctx, &self.dataset_handle).await;
-
-                Ok(resolved_dataset)
-            })
-            .await
-    }
-
-    pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
-        self.dataset_summary
-            .get_or_try_init(|| async {
-                let resolved_dataset = self.resolved_dataset(ctx).await?;
-
-                let summary = resolved_dataset
-                    .get_summary(odf::dataset::GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-
-                Ok(summary)
-            })
-            .await
     }
 }
 

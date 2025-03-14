@@ -18,21 +18,24 @@ use super::{
     FlowPreconditionsNotMet,
     FlowTypeIsNotSupported,
 };
+use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowTriggersMut {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetFlowTriggersMut<'a> {
+    dataset_mut_request_state: &'a DatasetMutRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetFlowTriggersMut {
+impl<'a> DatasetFlowTriggersMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+        Self {
+            dataset_mut_request_state,
+        }
     }
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_set_trigger, skip_all)]
@@ -44,12 +47,14 @@ impl DatasetFlowTriggersMut {
         paused: bool,
         trigger_input: FlowTriggerInput,
     ) -> Result<SetFlowTriggerResult> {
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+
         if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         };
 
         if let Some(e) =
-            ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type, None).await?
+            ensure_expected_dataset_kind(ctx, dataset_handle, dataset_flow_type, None).await?
         {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }
@@ -59,9 +64,9 @@ impl DatasetFlowTriggersMut {
             Err(e) => return Ok(SetFlowTriggerResult::FlowInvalidTriggerInput(e)),
         };
 
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+        ensure_scheduling_permission(ctx, dataset_handle).await?;
         if let Some(e) =
-            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, None).await?
+            ensure_flow_preconditions(ctx, dataset_handle, dataset_flow_type, None).await?
         {
             return Ok(SetFlowTriggerResult::PreconditionsNotMet(e));
         }
@@ -71,8 +76,7 @@ impl DatasetFlowTriggersMut {
         let res = flow_trigger_service
             .set_trigger(
                 Utc::now(),
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(dataset_handle.id.clone(), dataset_flow_type.into()).into(),
                 paused,
                 trigger_rule,
             )
@@ -91,14 +95,16 @@ impl DatasetFlowTriggersMut {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+
+        ensure_scheduling_permission(ctx, dataset_handle).await?;
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         flow_trigger_service
             .pause_dataset_flows(
                 Utc::now(),
-                &self.dataset_handle.id,
+                &dataset_handle.id,
                 dataset_flow_type.map(Into::into),
             )
             .await?;
@@ -113,14 +119,16 @@ impl DatasetFlowTriggersMut {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+
+        ensure_scheduling_permission(ctx, dataset_handle).await?;
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         flow_trigger_service
             .resume_dataset_flows(
                 Utc::now(),
-                &self.dataset_handle.id,
+                &dataset_handle.id,
                 dataset_flow_type.map(Into::into),
             )
             .await?;
