@@ -41,6 +41,8 @@ impl<'a> MetadataChainMut<'a> {
         event: String,
         event_format: MetadataManifestFormat,
     ) -> Result<CommitResult> {
+        // NOTE: Access verification is handled by the use-case
+
         let event = match event_format {
             MetadataManifestFormat::Yaml => {
                 let de = odf::metadata::serde::yaml::YamlMetadataEventDeserializer;
