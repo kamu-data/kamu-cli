@@ -139,9 +139,14 @@ impl Search {
 
         let nodes = account_nodes;
         let total = nodes.len();
+        let page_nodes = nodes
+            .into_iter()
+            .skip(page * per_page)
+            .take(per_page)
+            .collect::<Vec<_>>();
 
         Ok(NameLookupResultConnection::new(
-            nodes, page, per_page, total,
+            page_nodes, page, per_page, total,
         ))
     }
 }
