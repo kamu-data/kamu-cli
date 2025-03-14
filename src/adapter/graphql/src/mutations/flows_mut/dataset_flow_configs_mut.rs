@@ -51,6 +51,8 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         dataset_flow_type: DatasetFlowType,
         config_input: FlowConfigurationInput,
     ) -> Result<SetFlowConfigResult> {
+        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+
         let flow_run_config: FlowRunConfiguration = config_input.into();
         if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowConfigResult::TypeIsNotSupported(err));
@@ -78,8 +80,6 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
         }
-
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
 
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
