@@ -22,6 +22,7 @@ members = [
     "src/utils/random-names",
     "src/utils/repo-tools",
     "src/utils/s3-utils",
+    "src/utils/server-console",
     "src/utils/test-utils",
     "src/utils/time-source",
     "src/utils/tracing-perfetto",
@@ -134,6 +135,7 @@ multiformats = { version = "0.227.1", path = "src/utils/multiformats", default-f
 observability = { version = "0.227.1", path = "src/utils/observability", default-features = false }
 random-names = { version = "0.227.1", path = "src/utils/random-names", default-features = false }
 s3-utils = { version = "0.227.1", path = "src/utils/s3-utils", default-features = false }
+server-console = { version = "0.227.1", path = "src/utils/server-console", default-features = false }
 test-utils = { version = "0.227.1", path = "src/utils/test-utils", default-features = false }
 time-source = { version = "0.227.1", path = "src/utils/time-source", default-features = false }
 tracing-perfetto = { version = "0.227.1", path = "src/utils/tracing-perfetto", default-features = false }

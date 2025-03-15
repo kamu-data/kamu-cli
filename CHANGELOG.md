@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Replaced default GraphQL playground with better maintained `graphiql` (old playground is still available)
+- Improved API server web console looks
+
 ## [0.227.1] - 2025-03-14
 ### Fixed
 - Trigger activation during flow throttling correctly save next activation time

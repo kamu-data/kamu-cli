@@ -1,0 +1,29 @@
+[package]
+name = "server-console"
+description = "Web console for kamu server components"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+axum = { version = "0.8", default-features = false }
+async-graphql = { version = "7", default-features = false, features = [
+    "graphiql",
+    "playground",
+] }
