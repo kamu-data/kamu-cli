@@ -26,7 +26,7 @@ pub struct Dataset {
 #[Object]
 impl Dataset {
     #[graphql(skip)]
-    pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
+    pub fn new_access_checked(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
         Self {
             dataset_request_state: DatasetRequestState::new(dataset_handle).with_owner(owner),
         }
@@ -41,7 +41,7 @@ impl Dataset {
             .await?
             .expect("Account must exist");
 
-        Ok(Dataset::new(account, handle))
+        Ok(Dataset::new_access_checked(account, handle))
     }
 
     #[graphql(skip)]
@@ -64,7 +64,7 @@ impl Dataset {
         let account = Account::from_dataset_alias(ctx, &handle.alias)
             .await?
             .expect("Account must exist");
-        let dataset = Dataset::new(account, handle);
+        let dataset = Dataset::new_access_checked(account, handle);
 
         Ok(TransformInputDataset::accessible(dataset))
     }

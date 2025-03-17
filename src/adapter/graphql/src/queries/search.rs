@@ -82,7 +82,9 @@ impl Search {
         {
             let maybe_account = Account::from_dataset_alias(ctx, &hdl.alias).await?;
             if let Some(account) = maybe_account {
-                nodes.push(SearchResult::Dataset(Dataset::new(account, hdl)));
+                nodes.push(SearchResult::Dataset(Dataset::new_access_checked(
+                    account, hdl,
+                )));
             } else {
                 tracing::warn!("Skipped dataset '{}' with unresolved account", hdl.alias);
             }
@@ -135,7 +137,7 @@ impl Search {
             };
 
             nodes.push(SearchResultEx {
-                item: SearchResult::Dataset(Dataset::new(account, hit.handle)),
+                item: SearchResult::Dataset(Dataset::new_access_checked(account, hit.handle)),
                 score: hit.score,
             });
         }
