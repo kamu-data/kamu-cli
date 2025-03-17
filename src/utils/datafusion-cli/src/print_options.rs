@@ -105,6 +105,7 @@ impl PrintOptions {
         schema: SchemaRef,
         batches: &[RecordBatch],
         query_start_time: Instant,
+        row_count: usize,
     ) -> Result<()> {
         let stdout = std::io::stdout();
         let mut writer = stdout.lock();
@@ -112,7 +113,6 @@ impl PrintOptions {
         self.format
             .print_batches(&mut writer, schema, batches, self.maxrows, true)?;
 
-        let row_count: usize = batches.iter().map(|b| b.num_rows()).sum();
         let formatted_exec_details = get_execution_details_formatted(
             row_count,
             if self.format == PrintFormat::Table {

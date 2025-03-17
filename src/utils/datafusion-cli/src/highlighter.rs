@@ -68,7 +68,7 @@ impl Highlighter for SyntaxHighlighter {
         }
     }
 
-    fn highlight_char(&self, line: &str, _pos: usize, _kind: CmdKind) -> bool {
+    fn highlight_char(&self, line: &str, _pos: usize, _cmd: CmdKind) -> bool {
         !line.is_empty()
     }
 }

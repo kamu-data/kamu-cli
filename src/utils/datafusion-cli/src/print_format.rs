@@ -24,7 +24,7 @@ use arrow::datatypes::SchemaRef;
 use arrow::json::{ArrayWriter, LineDelimitedWriter};
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches_with_options;
-use datafusion::common::format::DEFAULT_FORMAT_OPTIONS;
+use datafusion::common::format::DEFAULT_CLI_FORMAT_OPTIONS;
 use datafusion::error::Result;
 
 use crate::print_options::MaxRows;
@@ -132,7 +132,7 @@ fn format_batches_with_maxrows<W: std::io::Write>(
             }
 
             let formatted =
-                pretty_format_batches_with_options(&filtered_batches, &DEFAULT_FORMAT_OPTIONS)?;
+                pretty_format_batches_with_options(&filtered_batches, &DEFAULT_CLI_FORMAT_OPTIONS)?;
             if over_limit {
                 let mut formatted_str = format!("{}", formatted);
                 formatted_str = keep_only_maxrows(&formatted_str, maxrows);
@@ -142,7 +142,8 @@ fn format_batches_with_maxrows<W: std::io::Write>(
             }
         }
         MaxRows::Unlimited => {
-            let formatted = pretty_format_batches_with_options(batches, &DEFAULT_FORMAT_OPTIONS)?;
+            let formatted =
+                pretty_format_batches_with_options(batches, &DEFAULT_CLI_FORMAT_OPTIONS)?;
             writeln!(writer, "{}", formatted)?;
         }
     }
@@ -192,8 +193,10 @@ impl PrintFormat {
             // Print column headers for Table format
             Self::Table if !schema.fields().is_empty() => {
                 let empty_batch = RecordBatch::new_empty(schema);
-                let formatted =
-                    pretty_format_batches_with_options(&[empty_batch], &DEFAULT_FORMAT_OPTIONS)?;
+                let formatted = pretty_format_batches_with_options(
+                    &[empty_batch],
+                    &DEFAULT_CLI_FORMAT_OPTIONS,
+                )?;
                 writeln!(writer, "{}", formatted)?;
             }
             _ => {}

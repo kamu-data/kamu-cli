@@ -544,17 +544,22 @@ pub(crate) fn map_query_error(err: QueryError) -> ApiError {
         QueryError::DatasetNotFound(_)
         | QueryError::DatasetBlockNotFound(_)
         | QueryError::DatasetSchemaNotAvailable(_) => ApiError::not_found(err),
-        QueryError::DataFusionError(DataFusionError {
-            source: datafusion::error::DataFusionError::SQL(err, _),
-            ..
-        }) => ApiError::bad_request(err),
-        QueryError::DataFusionError(DataFusionError {
-            source: err @ datafusion::error::DataFusionError::Plan(_),
-            ..
-        }) => ApiError::bad_request(err),
-        QueryError::DataFusionError(_) => err.int_err().api_err(),
+        QueryError::DataFusionError(DataFusionError { source, .. }) => map_datafusion_error(source),
         QueryError::Access(err) => err.api_err(),
         QueryError::Internal(err) => err.api_err(),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_datafusion_error(err: datafusion::error::DataFusionError) -> ApiError {
+    match err {
+        datafusion::error::DataFusionError::SQL(err, _) => ApiError::bad_request(err),
+        datafusion::error::DataFusionError::Plan(_) => ApiError::bad_request(err),
+        datafusion::error::DataFusionError::Diagnostic(_diag, inner) => {
+            map_datafusion_error(*inner)
+        }
+        _ => err.int_err().api_err(),
     }
 }
 
