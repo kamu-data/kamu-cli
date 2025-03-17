@@ -17,6 +17,7 @@ use secrecy::SecretString;
 
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, ViewDatasetEnvVar};
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,10 +29,17 @@ pub struct DatasetEnvVarsMut<'a> {
 #[Object]
 impl<'a> DatasetEnvVarsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
+    pub async fn new(
+        ctx: &Context<'_>,
+        dataset_request_state: &'a DatasetRequestState,
+    ) -> Result<Self> {
+        utils::ensure_dataset_env_vars_enabled(ctx)?;
+        // TODO: Private Datasets: use check_dataset_maintain_access()
+        utils::check_dataset_write_access(ctx, dataset_request_state).await?;
+
+        Ok(Self {
             dataset_request_state,
-        }
+        })
     }
 
     #[tracing::instrument(level = "info", name = DatasetEnvVarsMut_upsert_env_variable, skip_all)]
@@ -42,11 +50,6 @@ impl<'a> DatasetEnvVarsMut<'a> {
         value: String,
         is_secret: bool,
     ) -> Result<UpsertDatasetEnvVarResult> {
-        // TODO: Private Datasets: use check_dataset_maintain_access()
-        self.dataset_request_state
-            .check_dataset_write_access(ctx)
-            .await?;
-
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
         let dataset_env_var_value = if is_secret {
@@ -86,11 +89,6 @@ impl<'a> DatasetEnvVarsMut<'a> {
         ctx: &Context<'_>,
         id: DatasetEnvVarID<'static>,
     ) -> Result<DeleteDatasetEnvVarResult> {
-        // TODO: Private Datasets: use check_dataset_maintain_access()
-        self.dataset_request_state
-            .check_dataset_write_access(ctx)
-            .await?;
-
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
 
         match dataset_env_var_service.delete_dataset_env_var(&id).await {

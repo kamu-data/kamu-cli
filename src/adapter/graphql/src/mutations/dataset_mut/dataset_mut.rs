@@ -50,11 +50,8 @@ impl DatasetMut {
     }
 
     /// Access to the mutable flow configurations of this dataset
-    #[allow(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
-        utils::ensure_dataset_env_vars_enabled(ctx)?;
-
-        Ok(DatasetEnvVarsMut::new(&self.dataset_request_state))
+        DatasetEnvVarsMut::new(ctx, &self.dataset_request_state).await
     }
 
     /// Rename the dataset

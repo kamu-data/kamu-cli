@@ -10,10 +10,12 @@
 use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
+use kamu_core::auth;
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
 
 use crate::prelude::{AccessTokenID, AccountID, AccountName};
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,6 +88,40 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
         CurrentAccountSubject::Anonymous(_) => {
             unreachable!("We are not expecting anonymous accounts")
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn check_dataset_read_access(
+    ctx: &Context<'_>,
+    dataset_request_state: &DatasetRequestState,
+) -> Result<(), GqlError> {
+    check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Read).await
+}
+
+pub(crate) async fn check_dataset_write_access(
+    ctx: &Context<'_>,
+    dataset_request_state: &DatasetRequestState,
+) -> Result<(), GqlError> {
+    check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Write).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn check_dataset_access(
+    ctx: &Context<'_>,
+    dataset_request_state: &DatasetRequestState,
+    action: auth::DatasetAction,
+) -> Result<(), GqlError> {
+    let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
+
+    if allowed_actions.contains(&action) {
+        Ok(())
+    } else {
+        Err(make_dataset_access_error(
+            dataset_request_state.dataset_handle(),
+        ))
     }
 }
 
