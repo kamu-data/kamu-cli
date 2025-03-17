@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Upgraded to `datafusion v45` (#1146)
+
 ## [0.227.1] - 2025-03-14
 ### Fixed
 - Trigger activation during flow throttling correctly save next activation time
