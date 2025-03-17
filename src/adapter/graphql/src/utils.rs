@@ -7,15 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
-use kamu_core::{auth, DatasetRegistry, ResolvedDataset};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
-use tokio::sync::OnceCell;
 
 use crate::prelude::{AccessTokenID, AccountID, AccountName};
 
@@ -91,85 +87,6 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
             unreachable!("We are not expecting anonymous accounts")
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn get_resolved_dataset<'a>(
-    ctx: &Context<'_>,
-    lazy_resolved_dataset: &'a OnceCell<ResolvedDataset>,
-    dataset_handle: &odf::DatasetHandle,
-) -> Result<&'a ResolvedDataset, GqlError> {
-    lazy_resolved_dataset
-        .get_or_try_init(|| async {
-            let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-
-            let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
-
-            Ok(resolved_dataset)
-        })
-        .await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn get_dataset_summary<'a>(
-    ctx: &Context<'_>,
-    lazy_resolved_dataset: &'a OnceCell<ResolvedDataset>,
-    lazy_dataset_summary: &'a OnceCell<odf::DatasetSummary>,
-    dataset_handle: &odf::DatasetHandle,
-) -> Result<&'a odf::DatasetSummary, GqlError> {
-    lazy_dataset_summary
-        .get_or_try_init(|| async {
-            let resolved_dataset =
-                get_resolved_dataset(ctx, lazy_resolved_dataset, dataset_handle).await?;
-
-            let summary = resolved_dataset
-                .get_summary(odf::dataset::GetSummaryOpts::default())
-                .await
-                .int_err()?;
-
-            Ok(summary)
-        })
-        .await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn check_dataset_access(
-    ctx: &Context<'_>,
-    lazy_allowed_dataset_actions: &OnceCell<HashSet<auth::DatasetAction>>,
-    dataset_handle: &odf::DatasetHandle,
-    action: auth::DatasetAction,
-) -> Result<(), GqlError> {
-    let allowed_actions =
-        get_allowed_dataset_actions(ctx, lazy_allowed_dataset_actions, &dataset_handle.id).await?;
-
-    if allowed_actions.contains(&action) {
-        Ok(())
-    } else {
-        Err(make_dataset_access_error(dataset_handle))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn get_allowed_dataset_actions<'a>(
-    ctx: &Context<'_>,
-    lazy_allowed_dataset_actions: &'a OnceCell<HashSet<auth::DatasetAction>>,
-    dataset_id: &odf::DatasetID,
-) -> Result<&'a HashSet<auth::DatasetAction>, GqlError> {
-    lazy_allowed_dataset_actions
-        .get_or_try_init(|| async {
-            let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
-
-            let allowed_actions = dataset_action_authorizer
-                .get_allowed_actions(dataset_id)
-                .await?;
-
-            Ok(allowed_actions)
-        })
-        .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -18,23 +18,23 @@ use super::{
     FlowPreconditionsNotMet,
     FlowTypeIsNotSupported,
 };
-use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlowTriggersMut<'a> {
-    dataset_mut_request_state: &'a DatasetMutRequestState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl<'a> DatasetFlowTriggersMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state,
+            dataset_request_state,
         }
     }
 
@@ -47,19 +47,15 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         paused: bool,
         trigger_input: FlowTriggerInput,
     ) -> Result<SetFlowTriggerResult> {
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
 
         if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         };
 
-        if let Some(e) = ensure_expected_dataset_kind(
-            ctx,
-            self.dataset_mut_request_state,
-            dataset_flow_type,
-            None,
-        )
-        .await?
+        if let Some(e) =
+            ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type, None)
+                .await?
         {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }
@@ -70,14 +66,14 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         };
 
         if let Some(e) =
-            ensure_flow_preconditions(ctx, self.dataset_mut_request_state, dataset_flow_type, None)
+            ensure_flow_preconditions(ctx, self.dataset_request_state, dataset_flow_type, None)
                 .await?
         {
             return Ok(SetFlowTriggerResult::PreconditionsNotMet(e));
         }
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         let res = flow_trigger_service
             .set_trigger(
@@ -101,11 +97,11 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         flow_trigger_service
             .pause_dataset_flows(
@@ -125,11 +121,11 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         flow_trigger_service
             .resume_dataset_flows(

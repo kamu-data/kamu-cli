@@ -8,34 +8,34 @@
 // by the Apache License, Version 2.0.
 
 use super::{DatasetFlowConfigsMut, DatasetFlowRunsMut, DatasetFlowTriggersMut};
-use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlowsMut<'a> {
-    dataset_mut_request_state: &'a DatasetMutRequestState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[Object]
 impl<'a> DatasetFlowsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state,
+            dataset_request_state,
         }
     }
 
     async fn configs(&self) -> DatasetFlowConfigsMut {
-        DatasetFlowConfigsMut::new(self.dataset_mut_request_state)
+        DatasetFlowConfigsMut::new(self.dataset_request_state)
     }
 
     async fn runs(&self) -> DatasetFlowRunsMut {
-        DatasetFlowRunsMut::new(self.dataset_mut_request_state)
+        DatasetFlowRunsMut::new(self.dataset_request_state)
     }
 
     async fn triggers(&self) -> DatasetFlowTriggersMut {
-        DatasetFlowTriggersMut::new(self.dataset_mut_request_state)
+        DatasetFlowTriggersMut::new(self.dataset_request_state)
     }
 }
 

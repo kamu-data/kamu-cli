@@ -15,23 +15,22 @@ use kamu_datasets::{
 };
 use secrecy::SecretString;
 
-use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
-use crate::queries::ViewDatasetEnvVar;
+use crate::queries::{DatasetRequestState, ViewDatasetEnvVar};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetEnvVarsMut<'a> {
-    dataset_mut_request_state: &'a DatasetMutRequestState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl<'a> DatasetEnvVarsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state,
+            dataset_request_state,
         }
     }
 
@@ -44,7 +43,7 @@ impl<'a> DatasetEnvVarsMut<'a> {
         is_secret: bool,
     ) -> Result<UpsertDatasetEnvVarResult> {
         // TODO: Private Datasets: use check_dataset_maintain_access()
-        self.dataset_mut_request_state
+        self.dataset_request_state
             .check_dataset_write_access(ctx)
             .await?;
 
@@ -60,7 +59,7 @@ impl<'a> DatasetEnvVarsMut<'a> {
             .upsert_dataset_env_var(
                 key.as_str(),
                 &dataset_env_var_value,
-                &self.dataset_mut_request_state.dataset_handle().id,
+                self.dataset_request_state.dataset_id(),
             )
             .await?;
 
@@ -88,7 +87,7 @@ impl<'a> DatasetEnvVarsMut<'a> {
         id: DatasetEnvVarID<'static>,
     ) -> Result<DeleteDatasetEnvVarResult> {
         // TODO: Private Datasets: use check_dataset_maintain_access()
-        self.dataset_mut_request_state
+        self.dataset_request_state
             .check_dataset_write_access(ctx)
             .await?;
 

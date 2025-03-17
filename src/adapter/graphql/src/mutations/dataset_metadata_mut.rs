@@ -10,30 +10,31 @@
 use kamu_datasets::CommitDatasetEventUseCase;
 use odf::dataset::MetadataChainExt as _;
 
-use super::{CommitResultAppendError, CommitResultSuccess, DatasetMutRequestState, NoChanges};
+use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
 use crate::mutations::MetadataChainMut;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 use crate::{utils, LoggedInGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetMetadataMut<'a> {
-    dataset_mut_request_state: &'a DatasetMutRequestState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl<'a> DatasetMetadataMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state,
+            dataset_request_state,
         }
     }
 
     /// Access to the mutable metadata chain of the dataset
     async fn chain(&self) -> MetadataChainMut {
-        MetadataChainMut::new(self.dataset_mut_request_state)
+        MetadataChainMut::new(self.dataset_request_state)
     }
 
     /// Updates or clears the dataset readme
@@ -44,7 +45,7 @@ impl<'a> DatasetMetadataMut<'a> {
         ctx: &Context<'_>,
         content: Option<String>,
     ) -> Result<UpdateReadmeResult> {
-        let resolved_dataset = self.dataset_mut_request_state.resolved_dataset(ctx).await?;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
         let old_attachments = resolved_dataset
             .as_metadata_chain()
@@ -106,7 +107,7 @@ impl<'a> DatasetMetadataMut<'a> {
         };
 
         let commit_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         let result = match commit_event.execute(dataset_handle, event.into()).await {
             Ok(result) => UpdateReadmeResult::Success(CommitResultSuccess {

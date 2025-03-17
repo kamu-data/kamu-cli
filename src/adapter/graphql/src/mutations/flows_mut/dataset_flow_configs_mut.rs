@@ -23,23 +23,23 @@ use super::{
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
 };
-use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlowConfigsMut<'a> {
-    dataset_mut_request_state: &'a DatasetMutRequestState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl<'a> DatasetFlowConfigsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state,
+            dataset_request_state,
         }
     }
 
@@ -51,7 +51,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         dataset_flow_type: DatasetFlowType,
         config_input: FlowConfigurationInput,
     ) -> Result<SetFlowConfigResult> {
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
 
         let flow_run_config: FlowRunConfiguration = config_input.into();
         if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
@@ -60,7 +60,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,
-            self.dataset_mut_request_state,
+            self.dataset_request_state,
             dataset_flow_type,
             Some(&flow_run_config),
         )
@@ -75,7 +75,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         };
 
         if let Some(e) =
-            ensure_flow_preconditions(ctx, self.dataset_mut_request_state, dataset_flow_type, None)
+            ensure_flow_preconditions(ctx, self.dataset_request_state, dataset_flow_type, None)
                 .await?
         {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
@@ -86,7 +86,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         let res = flow_config_service
             .set_configuration(
                 FlowKeyDataset::new(
-                    self.dataset_mut_request_state.dataset_handle().id.clone(),
+                    self.dataset_request_state.dataset_id().clone(),
                     dataset_flow_type.into(),
                 )
                 .into(),

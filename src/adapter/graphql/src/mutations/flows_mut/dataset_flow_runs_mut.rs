@@ -20,24 +20,23 @@ use super::{
     FlowNotFound,
     FlowPreconditionsNotMet,
 };
-use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
-use crate::queries::Flow;
+use crate::queries::{DatasetRequestState, Flow};
 use crate::{utils, LoggedInGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlowRunsMut<'a> {
-    dataset_mut_request_state: &'a DatasetMutRequestState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl<'a> DatasetFlowRunsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state,
+            dataset_request_state,
         }
     }
 
@@ -49,11 +48,11 @@ impl<'a> DatasetFlowRunsMut<'a> {
         dataset_flow_type: DatasetFlowType,
         flow_run_configuration: Option<FlowRunConfiguration>,
     ) -> Result<TriggerFlowResult> {
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
 
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,
-            self.dataset_mut_request_state,
+            self.dataset_request_state,
             dataset_flow_type,
             flow_run_configuration.as_ref(),
         )
@@ -64,7 +63,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
         if let Some(e) = ensure_flow_preconditions(
             ctx,
-            self.dataset_mut_request_state,
+            self.dataset_request_state,
             dataset_flow_type,
             flow_run_configuration.as_ref(),
         )
@@ -78,7 +77,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
         let logged_account = utils::get_logged_account(ctx);
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         let flow_run_snapshot = match FlowRunConfiguration::try_into_snapshot(
             ctx,
@@ -117,9 +116,9 @@ impl<'a> DatasetFlowRunsMut<'a> {
         ctx: &Context<'_>,
         flow_id: FlowID,
     ) -> Result<CancelScheduledTasksResult> {
-        ensure_scheduling_permission(ctx, self.dataset_mut_request_state).await?;
+        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
 
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         if let Some(error) =
             check_if_flow_belongs_to_dataset(ctx, flow_id, &dataset_handle.id).await?
