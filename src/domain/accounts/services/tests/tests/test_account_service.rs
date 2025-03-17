@@ -75,7 +75,7 @@ async fn test_multi_find() {
         .unwrap();
 
     let mut accounts = account_svc
-        .accounts_by_ids(&[wasya_id.clone(), petya_id.clone()])
+        .get_accounts_by_ids(&[wasya_id.clone(), petya_id.clone()])
         .await
         .unwrap();
     assert_eq!(2, accounts.len());
