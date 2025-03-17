@@ -22,17 +22,17 @@ use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, Initiator
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountFlowRuns {
-    account: AccountEntity,
+pub struct AccountFlowRuns<'a> {
+    account: &'a AccountEntity,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl AccountFlowRuns {
+impl<'a> AccountFlowRuns<'a> {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(account: AccountEntity) -> Self {
+    pub fn new(account: &'a AccountEntity) -> Self {
         Self { account }
     }
 
