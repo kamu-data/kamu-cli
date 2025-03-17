@@ -13,6 +13,7 @@ use kamu_datasets::{DatasetEnvVarService, GetDatasetEnvVarError};
 use super::ViewDatasetEnvVar;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,10 +27,12 @@ impl<'a> DatasetEnvVars<'a> {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
+    pub fn new(ctx: &Context<'_>, dataset_request_state: &'a DatasetRequestState) -> Result<Self> {
+        utils::ensure_dataset_env_vars_enabled(ctx)?;
+
+        Ok(Self {
             dataset_request_state,
-        }
+        })
     }
 
     #[tracing::instrument(level = "info", name = DatasetEnvVars_exposed_value, skip_all)]
