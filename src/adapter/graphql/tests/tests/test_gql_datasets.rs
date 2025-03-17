@@ -22,6 +22,7 @@ use kamu_datasets_services::{
     DatasetEntryServiceImpl,
     DeleteDatasetUseCaseImpl,
     DependencyGraphServiceImpl,
+    EditDatasetUseCaseImpl,
     RenameDatasetUseCaseImpl,
     ViewDatasetUseCaseImpl,
 };
@@ -775,7 +776,8 @@ impl GraphQLDatasetsHarness {
                 .add::<InMemoryRebacRepository>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
-                .add::<RebacDatasetLifecycleMessageConsumer>();
+                .add::<RebacDatasetLifecycleMessageConsumer>()
+                .add::<EditDatasetUseCaseImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
