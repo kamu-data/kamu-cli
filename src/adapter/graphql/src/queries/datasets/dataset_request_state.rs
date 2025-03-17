@@ -151,6 +151,7 @@ impl DatasetRequestStateWithOwner {
 impl Deref for DatasetRequestStateWithOwner {
     type Target = DatasetRequestState;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.inner
     }

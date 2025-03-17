@@ -130,6 +130,8 @@ pub fn postgres_generate_placeholders_tuple_list_2(
     tuples_count: usize,
     index_offset: NonZeroUsize,
 ) -> String {
+    // Postgres also uses $N (e.g. $1) as placeholders, so we reuse the function
+    // https://www.postgresql.org/docs/current/sql-prepare.html
     sqlite_generate_placeholders_tuple_list_2(tuples_count, index_offset)
 }
 
