@@ -178,8 +178,8 @@ async fn test_statement_anonymous() {
         indoc!(
             "
             message arrow_schema {
-              OPTIONAL INT32 id;
-              OPTIONAL BYTE_ARRAY name (STRING);
+              REQUIRED INT32 id;
+              REQUIRED BYTE_ARRAY name (STRING);
             }
             "
         ),
@@ -232,8 +232,8 @@ async fn test_statement_bearer() {
         indoc!(
             "
             message arrow_schema {
-              OPTIONAL INT32 id;
-              OPTIONAL BYTE_ARRAY name (STRING);
+              REQUIRED INT32 id;
+              REQUIRED BYTE_ARRAY name (STRING);
             }
             "
         ),

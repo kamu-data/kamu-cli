@@ -105,9 +105,6 @@ ignore = [
     # Unmaintained (backoff)
     # https://rustsec.org/advisories/RUSTSEC-2025-0012
     "RUSTSEC-2025-0012",
-    # Unmaintained (humantime)
-    # https://rustsec.org/advisories/RUSTSEC-2025-0014
-    "RUSTSEC-2025-0014",
     # Unmaintained (instant)
     # https://rustsec.org/advisories/RUSTSEC-2024-0384
     "RUSTSEC-2024-0384",
