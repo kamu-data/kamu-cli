@@ -33,7 +33,7 @@ pub struct DatasetMut {
 #[Object]
 impl DatasetMut {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
+    pub fn new_access_checked(dataset_handle: odf::DatasetHandle) -> Self {
         Self {
             dataset_request_state: DatasetRequestState::new(dataset_handle),
         }

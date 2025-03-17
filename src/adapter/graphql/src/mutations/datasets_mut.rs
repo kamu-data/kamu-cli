@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::DatasetRegistryExt;
-use kamu_datasets::CreateDatasetFromSnapshotError;
+use kamu_datasets::{CreateDatasetFromSnapshotError, EditDatasetUseCaseError};
 
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
@@ -31,11 +30,19 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         dataset_id: DatasetID<'_>,
     ) -> Result<Option<DatasetMut>> {
-        let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
-        let hdl = dataset_registry
-            .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
-            .await?;
-        Ok(hdl.map(DatasetMut::new))
+        let edit_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::EditDatasetUseCase);
+
+        // To perform mutation operations, we must have editor permissions at a minimum.
+        match edit_dataset_use_case
+            .execute(&dataset_id.as_local_ref())
+            .await
+        {
+            Ok(dataset_handle) => Ok(Some(DatasetMut::new_access_checked(dataset_handle))),
+            Err(EditDatasetUseCaseError::NotFound(_) | EditDatasetUseCaseError::Access(_)) => {
+                Ok(None)
+            }
+            Err(e @ EditDatasetUseCaseError::Internal(_)) => Err(e.int_err().into()),
+        }
     }
 
     /// Creates a new empty dataset
