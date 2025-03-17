@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::{DatasetFlowConfigsMut, DatasetFlowRunsMut, DatasetFlowTriggersMut};
+use crate::mutations::ensure_scheduling_permission;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
 
@@ -20,10 +21,15 @@ pub struct DatasetFlowsMut<'a> {
 #[Object]
 impl<'a> DatasetFlowsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
+    pub async fn new(
+        ctx: &Context<'_>,
+        dataset_request_state: &'a DatasetRequestState,
+    ) -> Result<Self> {
+        ensure_scheduling_permission(ctx, dataset_request_state).await?;
+
+        Ok(Self {
             dataset_request_state,
-        }
+        })
     }
 
     async fn configs(&self) -> DatasetFlowConfigsMut {

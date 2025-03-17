@@ -13,6 +13,7 @@ use kamu_flow_system as fs;
 use super::FlowNotFound;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +22,7 @@ pub(crate) async fn ensure_scheduling_permission(
     dataset_request_state: &DatasetRequestState,
 ) -> Result<()> {
     // TODO: Private Datasets: use check_dataset_maintain_access()
-    dataset_request_state.check_dataset_write_access(ctx).await
+    utils::check_dataset_write_access(ctx, dataset_request_state).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

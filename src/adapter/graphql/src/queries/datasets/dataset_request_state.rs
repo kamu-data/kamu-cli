@@ -15,7 +15,6 @@ use tokio::sync::OnceCell;
 
 use crate::prelude::*;
 use crate::queries::*;
-use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -90,16 +89,6 @@ impl DatasetRequestState {
             .await
     }
 
-    pub async fn check_dataset_read_access(&self, ctx: &Context<'_>) -> Result<()> {
-        self.check_dataset_access(ctx, auth::DatasetAction::Read)
-            .await
-    }
-
-    pub async fn check_dataset_write_access(&self, ctx: &Context<'_>) -> Result<()> {
-        self.check_dataset_access(ctx, auth::DatasetAction::Write)
-            .await
-    }
-
     pub(crate) async fn allowed_dataset_actions(
         &self,
         ctx: &Context<'_>,
@@ -116,20 +105,6 @@ impl DatasetRequestState {
                 Ok(allowed_actions)
             })
             .await
-    }
-
-    async fn check_dataset_access(
-        &self,
-        ctx: &Context<'_>,
-        action: auth::DatasetAction,
-    ) -> Result<()> {
-        let allowed_actions = self.allowed_dataset_actions(ctx).await?;
-
-        if allowed_actions.contains(&action) {
-            Ok(())
-        } else {
-            Err(utils::make_dataset_access_error(&self.dataset_handle))
-        }
     }
 }
 

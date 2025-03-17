@@ -13,7 +13,6 @@ use kamu_flow_system::{FlowKeyDataset, FlowTriggerRule, FlowTriggerService};
 use super::{
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
-    ensure_scheduling_permission,
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
     FlowTypeIsNotSupported,
@@ -47,8 +46,6 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         paused: bool,
         trigger_input: FlowTriggerInput,
     ) -> Result<SetFlowTriggerResult> {
-        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
-
         if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
         };
@@ -97,8 +94,6 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
-
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let dataset_handle = self.dataset_request_state.dataset_handle();
@@ -121,8 +116,6 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
-
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let dataset_handle = self.dataset_request_state.dataset_handle();

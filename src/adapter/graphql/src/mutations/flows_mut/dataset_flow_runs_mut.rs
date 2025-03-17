@@ -14,7 +14,6 @@ use super::{
     check_if_flow_belongs_to_dataset,
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
-    ensure_scheduling_permission,
     FlowInDatasetError,
     FlowIncompatibleDatasetKind,
     FlowNotFound,
@@ -48,8 +47,6 @@ impl<'a> DatasetFlowRunsMut<'a> {
         dataset_flow_type: DatasetFlowType,
         flow_run_configuration: Option<FlowRunConfiguration>,
     ) -> Result<TriggerFlowResult> {
-        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
-
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,
             self.dataset_request_state,
@@ -116,8 +113,6 @@ impl<'a> DatasetFlowRunsMut<'a> {
         ctx: &Context<'_>,
         flow_id: FlowID,
     ) -> Result<CancelScheduledTasksResult> {
-        ensure_scheduling_permission(ctx, self.dataset_request_state).await?;
-
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
         if let Some(error) =

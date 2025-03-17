@@ -45,8 +45,8 @@ impl DatasetMut {
     }
 
     /// Access to the mutable flow configurations of this dataset
-    async fn flows(&self) -> DatasetFlowsMut {
-        DatasetFlowsMut::new(&self.dataset_request_state)
+    async fn flows(&self, ctx: &Context<'_>) -> Result<DatasetFlowsMut> {
+        DatasetFlowsMut::new(ctx, &self.dataset_request_state).await
     }
 
     /// Access to the mutable flow configurations of this dataset
