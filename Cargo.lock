@@ -1183,12 +1183,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ascii_utils"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71938f30533e4d95a6d17aa530939da3842c2ab6f4f84b9dae68447e4129f74a"
-
-[[package]]
 name = "assert_cmd"
 version = "2.0.16"
 source = "git+https://github.com/kamu-data/assert_cmd?branch=deactivate-output-truncation#c83b0859dcbce6f9bb941ea07b615cc90aebd003"
@@ -1235,7 +1229,6 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "chrono",
- "fast_chemail",
  "fnv",
  "futures-timer",
  "futures-util",
@@ -1251,7 +1244,6 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "static_assertions_next",
- "tempfile",
  "thiserror 1.0.69",
  "url",
 ]
@@ -4208,15 +4200,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fast_chemail"
-version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "495a39d30d624c2caabe6312bfead73e7717692b44e0b32df168c275a2e8e9e4"
-dependencies = [
- "ascii_utils",
-]
-
-[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6246,6 +6229,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "server-console",
  "shlex",
  "strum",
  "tempfile",
@@ -10172,6 +10156,14 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "server-console"
+version = "0.227.1"
+dependencies = [
+ "async-graphql",
+ "axum 0.8.1",
 ]
 
 [[package]]

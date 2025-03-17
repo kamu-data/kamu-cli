@@ -44,7 +44,7 @@ kamu-flow-system-services = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-search = { workspace = true }
 
-async-graphql = { version = "7", features = [
+async-graphql = { version = "7", default-features = false, features = [
     "chrono",
     "url",
     "apollo_tracing",

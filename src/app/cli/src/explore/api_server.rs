@@ -18,7 +18,6 @@ use axum::{middleware, Extension};
 use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
 use http_common::ApiError;
-use indoc::indoc;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_adapter_http::e2e::e2e_router;
@@ -130,17 +129,18 @@ impl APIServer {
             )
             .build(),
         )
-        .route("/", axum::routing::get(root))
         .route(
             "/ui-config",
             axum::routing::get(ui_configuration_handler),
         )
         .route(
-            // IMPORTANT: The same name is used inside e2e_middleware_fn().
-            //            If there is a need to change, please update there too.
             "/graphql",
-            axum::routing::get(graphql_playground_handler).post(graphql_handler),
+            axum::routing::post(graphql_handler),
         )
+        .merge(server_console::router(
+            "Kamu API Server".to_string(),
+            format!("v{} embedded", crate::VERSION),
+        ).into())
         .routes(routes!(kamu_adapter_http::platform_login_handler))
         .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
         .routes(routes!(
@@ -262,20 +262,6 @@ impl APIServer {
 // Handlers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn root() -> impl axum::response::IntoResponse {
-    axum::response::Html(indoc!(
-        r#"
-        <h1>Kamu HTTP Server</h1>
-        <ul>
-            <li><a href="/graphql">GraphQL Playground</li>
-            <li><a href="/openapi">OpenAPI Playground</li>
-        </ul>
-        "#
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 async fn ui_configuration_handler(
     ui_configuration: axum::extract::Extension<UIConfiguration>,
 ) -> axum::Json<UIConfiguration> {
@@ -294,14 +280,6 @@ async fn graphql_handler(
     let graphql_response = schema.execute(graphql_request).await.into();
 
     Ok(graphql_response)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn graphql_playground_handler() -> impl axum::response::IntoResponse {
-    axum::response::Html(async_graphql::http::playground_source(
-        async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
-    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -155,10 +155,7 @@ impl WebUIServer {
             axum::routing::get(runtime_configuration_handler),
         )
         .route("/ui-config", axum::routing::get(ui_configuration_handler))
-        .route(
-            "/graphql",
-            axum::routing::get(graphql_playground_handler).post(graphql_handler),
-        )
+        .route("/graphql", axum::routing::post(graphql_handler))
         .merge(kamu_adapter_http::data::root_router())
         .routes(routes!(
             kamu_adapter_http::platform_file_upload_prepare_post_handler
@@ -311,14 +308,6 @@ async fn graphql_handler(
     let graphql_response = schema.execute(graphql_request).await.into();
 
     Ok(graphql_response)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn graphql_playground_handler() -> impl IntoResponse {
-    axum::response::Html(async_graphql::http::playground_source(
-        async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
-    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

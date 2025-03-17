@@ -13,6 +13,8 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Changed
+- Replaced default GraphQL playground with better maintained `graphiql` (old playground is still available)
+- Improved API server web console looks
 - Upgraded to `datafusion v45` (#1146)
 
 ## [0.227.1] - 2025-03-14
