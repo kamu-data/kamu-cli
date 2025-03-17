@@ -29,7 +29,7 @@ pub struct DatasetEnvVarsMut<'a> {
 #[Object]
 impl<'a> DatasetEnvVarsMut<'a> {
     #[graphql(skip)]
-    pub async fn new(
+    pub async fn new_with_access_check(
         ctx: &Context<'_>,
         dataset_request_state: &'a DatasetRequestState,
     ) -> Result<Self> {

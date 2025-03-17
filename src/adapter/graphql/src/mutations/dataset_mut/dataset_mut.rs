@@ -46,12 +46,12 @@ impl DatasetMut {
 
     /// Access to the mutable flow configurations of this dataset
     async fn flows(&self, ctx: &Context<'_>) -> Result<DatasetFlowsMut> {
-        DatasetFlowsMut::new(ctx, &self.dataset_request_state).await
+        DatasetFlowsMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to the mutable flow configurations of this dataset
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
-        DatasetEnvVarsMut::new(ctx, &self.dataset_request_state).await
+        DatasetEnvVarsMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Rename the dataset
