@@ -57,7 +57,7 @@ impl Dataset {
     }
 
     #[graphql(skip)]
-    pub fn from_resolved_dataset(
+    pub fn from_resolved_authorized_dataset(
         owner: Account,
         resolved_dataset: &kamu_core::ResolvedDataset,
     ) -> Self {

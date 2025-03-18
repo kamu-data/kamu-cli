@@ -154,7 +154,7 @@ impl DatasetsMut {
                 let account = Account::from_dataset_alias(ctx, &result.dataset_handle.alias)
                     .await?
                     .expect("Account must exist");
-                let dataset = Dataset::from_resolved_dataset(
+                let dataset = Dataset::from_resolved_authorized_dataset(
                     account,
                     &kamu_core::ResolvedDataset::from_created(&result),
                 );
