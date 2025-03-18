@@ -24,7 +24,6 @@ use kamu_datasets_services::{
     DatasetEntryServiceImpl,
     DatasetEnvVarServiceImpl,
     DependencyGraphServiceImpl,
-    EditDatasetUseCaseImpl,
     ViewDatasetUseCaseImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -354,8 +353,7 @@ impl DatasetEnvVarsHarness {
                 .add::<DatasetEnvVarServiceImpl>()
                 .add::<InMemoryDatasetEnvVarRepository>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
-                .add::<EditDatasetUseCaseImpl>();
+                .add::<InMemoryDatasetEntryRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

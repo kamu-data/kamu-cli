@@ -20,7 +20,6 @@ use kamu_datasets_services::{
     CreateDatasetUseCaseImpl,
     DatasetEntryServiceImpl,
     DependencyGraphServiceImpl,
-    EditDatasetUseCaseImpl,
     ViewDatasetUseCaseImpl,
 };
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
@@ -595,8 +594,7 @@ impl FlowConfigHarness {
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
-                .add::<EditDatasetUseCaseImpl>();
+                .add::<InMemoryDatasetEntryRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

@@ -23,7 +23,6 @@ use kamu_datasets_services::{
     CreateDatasetUseCaseImpl,
     DatasetEntryServiceImpl,
     DependencyGraphServiceImpl,
-    EditDatasetUseCaseImpl,
     ViewDatasetUseCaseImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -644,8 +643,7 @@ impl GraphQLMetadataChainHarness {
                 )
                 .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
-                .add::<EditDatasetUseCaseImpl>();
+                .add::<InMemoryDatasetEntryRepository>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

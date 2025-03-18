@@ -160,7 +160,6 @@ impl ClientSideHarness {
         b.add::<CommitDatasetEventUseCaseImpl>();
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
-        b.add::<EditDatasetUseCaseImpl>();
         b.add::<PullDatasetUseCaseImpl>();
         b.add::<PushDatasetUseCaseImpl>();
         b.add::<ViewDatasetUseCaseImpl>();

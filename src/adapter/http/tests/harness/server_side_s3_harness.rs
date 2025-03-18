@@ -117,7 +117,6 @@ impl ServerSideS3Harness {
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<ViewDatasetUseCaseImpl>()
-                .add::<EditDatasetUseCaseImpl>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<AuthenticationServiceImpl>()

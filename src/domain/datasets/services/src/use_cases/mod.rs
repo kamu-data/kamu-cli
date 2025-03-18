@@ -12,7 +12,6 @@ mod commit_dataset_event_use_case_impl;
 mod create_dataset_from_snapshot_use_case_impl;
 mod create_dataset_use_case_impl;
 mod delete_dataset_use_case_impl;
-mod edit_dataset_use_case_impl;
 mod rename_dataset_use_case_impl;
 mod view_dataset_use_case_impl;
 
@@ -21,6 +20,5 @@ pub use commit_dataset_event_use_case_impl::*;
 pub use create_dataset_from_snapshot_use_case_impl::*;
 pub use create_dataset_use_case_impl::*;
 pub use delete_dataset_use_case_impl::*;
-pub use edit_dataset_use_case_impl::*;
 pub use rename_dataset_use_case_impl::*;
 pub use view_dataset_use_case_impl::*;
