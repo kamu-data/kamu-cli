@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #![feature(assert_matches)]
+#![feature(maybe_uninit_uninit_array)]
 
 pub mod commands;
 pub mod rest_api;

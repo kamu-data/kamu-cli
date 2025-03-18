@@ -29,6 +29,7 @@ impl<'a> DatasetCollaborationMut<'a> {
         }
     }
 
+    // TODO: Private Datasets: add account not found error
     /// Grant account access as the specified role for the dataset
     #[tracing::instrument(level = "info", name = DatasetCollaborationMut_set_role, skip_all)]
     async fn set_role(
@@ -55,6 +56,7 @@ impl<'a> DatasetCollaborationMut<'a> {
         Ok(SetRoleResultSuccess::default().into())
     }
 
+    // TODO: Private Datasets: add account not found error
     /// Revoking account accesses for the dataset
     #[tracing::instrument(level = "info", name = DatasetCollaborationMut_unset_roles, skip_all)]
     async fn unset_roles(

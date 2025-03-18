@@ -9,9 +9,12 @@
 
 use std::assert_matches::assert_matches;
 
+use kamu_auth_rebac::AccountToDatasetRelation;
 use kamu_cli_e2e_common::{
     AccountDataset,
+    AccountRolesResponse,
     CreateDatasetResponse,
+    DatasetCollaborationAccountRolesError,
     DatasetDependencies,
     DatasetDependency,
     FoundDatasetItem,
@@ -42,10 +45,16 @@ pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
           - accountName: admin
             isAdmin: true
             email: admin@example.com
-          - accountName: alice
-            email: alice@example.com
-          - accountName: bob
-            email: bob@example.com
+          - accountName: owner
+            email: owner@example.com
+          - accountName: not-owner
+            email: not-owner@example.com
+          - accountName: reader
+            email: reader@example.com
+          - accountName: editor
+            email: editor@example.com
+          - accountName: maintainer
+            email: maintainer@example.com
     "#
 );
 
@@ -1363,6 +1372,175 @@ pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_
         Some([r#"1 dataset\(s\) up-to-date"#]),
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_minimum_dataset_maintainer_can_access_roles(anonymous: KamuApiServerClient) {
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
+
+    let CreateDatasetResponse { dataset_id, .. } = owner
+        .dataset()
+        .create_dataset_with_visibility(
+            &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+
+    // No roles granted
+    {
+        let success = Ok(AccountRolesResponse::new(Vec::new()));
+        let failure = Err(DatasetCollaborationAccountRolesError::DatasetNotFound);
+
+        for (tag, client, expected_result) in [
+            // failure
+            ("anonymous", &anonymous, &failure),
+            ("not_owner", &not_owner, &failure),
+            ("reader", &reader, &failure),
+            ("editor", &editor, &failure),
+            ("maintainer", &maintainer, &failure),
+            // success
+            ("owner", &owner, &success),
+            ("admin", &admin, &success),
+        ] {
+            pretty_assertions::assert_eq!(
+                *expected_result,
+                client
+                    .dataset()
+                    .collaboration()
+                    .account_roles(&dataset_id)
+                    .await,
+                "Tag: {}",
+                tag
+            );
+        }
+    }
+
+    // Grant roles
+    {
+        use AccountToDatasetRelation as R;
+
+        for (tag, role_granting_client, target_account_id, role) in [
+            (
+                "admin to maintainer",
+                &admin,
+                maintainer.auth().logged_account_id(),
+                R::Maintainer,
+            ),
+            (
+                "owner to editor",
+                &owner,
+                editor.auth().logged_account_id(),
+                R::Editor,
+            ),
+            (
+                "maintainer to reader",
+                &maintainer,
+                reader.auth().logged_account_id(),
+                R::Reader,
+            ),
+        ] {
+            pretty_assertions::assert_eq!(
+                Ok(()),
+                role_granting_client
+                    .dataset()
+                    .collaboration()
+                    .set_role(&dataset_id, &target_account_id, role)
+                    .await,
+                "Tag: {}",
+                tag
+            );
+        }
+    }
+
+    // Validate granted roles
+    {
+        use odf::metadata::testing::account_name as name;
+        use AccountToDatasetRelation as R;
+
+        let success = Ok(vec![
+            (name(&"editor"), R::Editor),
+            (name(&"maintainer"), R::Maintainer),
+            (name(&"reader"), R::Reader),
+        ]);
+        let not_found_failure = Err(DatasetCollaborationAccountRolesError::DatasetNotFound);
+        let access_failure = Err(DatasetCollaborationAccountRolesError::Access);
+
+        for (tag, client, expected_result) in [
+            // not_found_failure
+            ("anonymous", &anonymous, &not_found_failure),
+            ("not_owner", &not_owner, &not_found_failure),
+            // access_failure
+            ("reader", &reader, &access_failure),
+            ("editor", &editor, &access_failure),
+            // success
+            ("maintainer", &maintainer, &success),
+            ("owner", &owner, &success),
+            ("admin", &admin, &success),
+        ] {
+            pretty_assertions::assert_eq!(
+                *expected_result,
+                client
+                    .dataset()
+                    .collaboration()
+                    .account_roles(&dataset_id)
+                    .await
+                    .map(|r| r
+                        .accounts_with_roles
+                        .into_iter()
+                        .map(|a| (a.account_name, a.role))
+                        .collect::<Vec<_>>()),
+                "Tag: {}",
+                tag
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn make_logged_client(
+    anonymous: &KamuApiServerClient,
+    account_name: &str,
+) -> KamuApiServerClient {
+    let mut new_client = anonymous.clone();
+    let password_same_as_account_name = account_name;
+
+    new_client
+        .auth()
+        .login_with_password(account_name, password_same_as_account_name)
+        .await;
+
+    new_client
+}
+
+async fn make_logged_clients<const N: usize>(
+    anonymous: &KamuApiServerClient,
+    account_names: [&str; N],
+) -> [KamuApiServerClient; N] {
+    use std::mem::MaybeUninit;
+
+    let mut logged_clients: [MaybeUninit<KamuApiServerClient>; N] = MaybeUninit::uninit_array();
+
+    for (i, account_name) in account_names.iter().enumerate() {
+        let logged_client = make_logged_client(anonymous, account_name).await;
+        logged_clients[i].write(logged_client);
+    }
+
+    unsafe { logged_clients.map(|item| item.assume_init()) }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
