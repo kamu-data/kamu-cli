@@ -89,9 +89,8 @@ impl PostgresTaskEventStore {
             )
             .fetch_all(connection_mut)
             .await
-            .map_err(|e| SaveEventsError::Internal(e.int_err()))?
-            .len()
-        ;
+            .int_err()?
+            .len();
 
         // If a previously stored event id does not match the expected,
         // this means we've just detected a concurrent modification (version conflict)
@@ -242,8 +241,7 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
 
             // Make registration
             self.register_task(&mut tr, *task_id, &e.logical_plan)
-                .await
-                .map_err(SaveEventsError::Internal)?;
+                .await?;
         }
 
         // Save events one by one

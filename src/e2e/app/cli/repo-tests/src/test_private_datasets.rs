@@ -90,7 +90,7 @@ pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
                 .dataset()
                 .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
                 .await,
-            Err(SetDatasetVisibilityError::ForbiddenAnonymous)
+            Err(SetDatasetVisibilityError::NotFound)
         );
 
         assert_matches!(
@@ -116,7 +116,7 @@ pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
                 .dataset()
                 .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
                 .await,
-            Err(SetDatasetVisibilityError::ForbiddenOnlyOwner)
+            Err(SetDatasetVisibilityError::NotFound)
         );
 
         assert_matches!(

@@ -8,31 +8,33 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_flow_system::{FlowKeyDataset, FlowTriggerRule, FlowTriggerService, SetFlowTriggerError};
+use kamu_flow_system::{FlowKeyDataset, FlowTriggerRule, FlowTriggerService};
 
 use super::{
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
-    ensure_scheduling_permission,
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
     FlowTypeIsNotSupported,
 };
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowTriggersMut {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetFlowTriggersMut<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetFlowTriggersMut {
+impl<'a> DatasetFlowTriggersMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
     }
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_set_trigger, skip_all)]
@@ -49,7 +51,8 @@ impl DatasetFlowTriggersMut {
         };
 
         if let Some(e) =
-            ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type, None).await?
+            ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type, None)
+                .await?
         {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }
@@ -59,27 +62,25 @@ impl DatasetFlowTriggersMut {
             Err(e) => return Ok(SetFlowTriggerResult::FlowInvalidTriggerInput(e)),
         };
 
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
         if let Some(e) =
-            ensure_flow_preconditions(ctx, &self.dataset_handle, dataset_flow_type, None).await?
+            ensure_flow_preconditions(ctx, self.dataset_request_state, dataset_flow_type, None)
+                .await?
         {
             return Ok(SetFlowTriggerResult::PreconditionsNotMet(e));
         }
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         let res = flow_trigger_service
             .set_trigger(
                 Utc::now(),
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(dataset_handle.id.clone(), dataset_flow_type.into()).into(),
                 paused,
                 trigger_rule,
             )
             .await
-            .map_err(|e| match e {
-                SetFlowTriggerError::Internal(e) => GqlError::Internal(e),
-            })?;
+            .int_err()?;
 
         Ok(SetFlowTriggerResult::Success(SetFlowTriggerSuccess {
             trigger: res.into(),
@@ -93,14 +94,14 @@ impl DatasetFlowTriggersMut {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         flow_trigger_service
             .pause_dataset_flows(
                 Utc::now(),
-                &self.dataset_handle.id,
+                &dataset_handle.id,
                 dataset_flow_type.map(Into::into),
             )
             .await?;
@@ -115,14 +116,14 @@ impl DatasetFlowTriggersMut {
         ctx: &Context<'_>,
         dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<bool> {
-        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
-
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         flow_trigger_service
             .resume_dataset_flows(
                 Utc::now(),
-                &self.dataset_handle.id,
+                &dataset_handle.id,
                 dataset_flow_type.map(Into::into),
             )
             .await?;
@@ -130,6 +131,8 @@ impl DatasetFlowTriggersMut {
         Ok(true)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
@@ -166,3 +169,5 @@ impl FlowInvalidTriggerInputError {
         self.reason.clone()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

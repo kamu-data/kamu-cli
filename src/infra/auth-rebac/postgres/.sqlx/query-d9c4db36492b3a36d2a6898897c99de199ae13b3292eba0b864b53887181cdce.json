@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT relationship\n            FROM auth_rebac_relations\n            WHERE subject_entity_type = $1\n              AND subject_entity_id = $2\n              AND object_entity_type = $3\n              AND object_entity_id = $4\n            ",
+  "query": "\n            SELECT relationship\n            FROM auth_rebac_relations\n            WHERE subject_entity_type = $1\n              AND subject_entity_id = $2\n              AND object_entity_type = $3\n              AND object_entity_id = $4\n            ORDER BY relationship\n            ",
   "describe": {
     "columns": [
       {
@@ -41,5 +41,5 @@
       false
     ]
   },
-  "hash": "11a0b4385de929f616da3e4ba5f13564ddb7d6779fa74ec5db27b42e30cf7c0d"
+  "hash": "d9c4db36492b3a36d2a6898897c99de199ae13b3292eba0b864b53887181cdce"
 }

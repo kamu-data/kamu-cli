@@ -13,9 +13,11 @@ use crate::prelude::*;
 // Page-based connection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Public only for tests
+#[macro_export]
 macro_rules! page_based_connection {
     ($node_type:ident, $connection_type:ident, $edge_type:ident) => {
-        #[derive(SimpleObject)]
+        #[derive(async_graphql::SimpleObject)]
         #[graphql(complex)]
         pub struct $connection_type {
             /// A shorthand for `edges { node { ... } }`
@@ -25,10 +27,10 @@ macro_rules! page_based_connection {
             pub total_count: usize,
 
             /// Page information
-            pub page_info: crate::scalars::PageBasedInfo,
+            pub page_info: $crate::scalars::PageBasedInfo,
         }
 
-        #[ComplexObject]
+        #[async_graphql::ComplexObject]
         impl $connection_type {
             #[graphql(skip)]
             pub fn new(
@@ -54,7 +56,7 @@ macro_rules! page_based_connection {
                 Self {
                     nodes,
                     total_count,
-                    page_info: crate::scalars::PageBasedInfo {
+                    page_info: $crate::scalars::PageBasedInfo {
                         has_previous_page: current_page > 0,
                         has_next_page,
                         current_page,
@@ -68,7 +70,7 @@ macro_rules! page_based_connection {
             }
         }
 
-        #[derive(SimpleObject)]
+        #[derive(async_graphql::SimpleObject)]
         pub struct $edge_type<'a> {
             pub node: &'a $node_type,
         }
@@ -76,6 +78,8 @@ macro_rules! page_based_connection {
 }
 
 pub(crate) use page_based_connection;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
 pub struct PageBasedInfo {
@@ -92,3 +96,5 @@ pub struct PageBasedInfo {
     /// stays the same
     pub total_pages: Option<usize>,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

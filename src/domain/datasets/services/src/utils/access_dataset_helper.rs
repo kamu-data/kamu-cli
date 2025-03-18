@@ -12,17 +12,13 @@ use std::sync::Arc;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::DatasetRegistry;
-use kamu_datasets::{
-    EditDatasetUseCaseError,
-    EditMultiResponse,
-    ViewDatasetUseCaseError,
-    ViewMultiResponse,
-};
+use kamu_datasets::{ViewDatasetUseCaseError, ViewMultiResponse};
 use odf::dataset::{DatasetNotFoundError, DatasetRefUnresolvedError};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: replace with RebacDatasetRegistry
 pub(crate) struct AccessDatasetHelper<'a> {
     dataset_registry: &'a Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: &'a Arc<dyn DatasetActionAuthorizer>,
@@ -119,19 +115,6 @@ impl From<AccessMultiDatasetResponse> for ViewMultiResponse {
     }
 }
 
-impl From<AccessMultiDatasetResponse> for EditMultiResponse {
-    fn from(v: AccessMultiDatasetResponse) -> Self {
-        Self {
-            editable_resolved_refs: v.accessible_resolved_refs,
-            inaccessible_refs: v
-                .inaccessible_refs
-                .into_iter()
-                .map(|(dr, e)| (dr, e.into()))
-                .collect(),
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -155,16 +138,6 @@ pub(crate) enum DatasetAccessError {
 }
 
 impl From<DatasetAccessError> for ViewDatasetUseCaseError {
-    fn from(value: DatasetAccessError) -> Self {
-        match value {
-            DatasetAccessError::NotFound(e) => Self::NotFound(e),
-            DatasetAccessError::Access(e) => Self::Access(e),
-            DatasetAccessError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<DatasetAccessError> for EditDatasetUseCaseError {
     fn from(value: DatasetAccessError) -> Self {
         match value {
             DatasetAccessError::NotFound(e) => Self::NotFound(e),

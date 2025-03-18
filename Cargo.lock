@@ -6094,7 +6094,6 @@ name = "kamu-auth-rebac-services"
 version = "0.227.1"
 dependencies = [
  "async-trait",
- "database-common",
  "dill",
  "futures",
  "init-on-startup",
@@ -6102,7 +6101,6 @@ dependencies = [
  "kamu-accounts",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
- "kamu-core",
  "kamu-datasets",
  "kamu-datasets-services",
  "messaging-outbox",
@@ -6319,7 +6317,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
 ]
 
 [[package]]

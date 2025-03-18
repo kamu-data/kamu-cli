@@ -37,4 +37,3 @@ sqlx = { version = "0.8", default-features = false, features = [
 ] }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = [] }

@@ -415,9 +415,7 @@ impl WsSmartTransferProtocolClient {
                         self
                             .push_send_objects_upload_progress(socket, uploaded_files_count)
                             .await
-                            .map_err(
-                                |e| SyncError::Internal(e.int_err())
-                            )?;
+                            .int_err()?;
                     }
                 res = &mut export_task => {
                     let join_res = res.int_err()?;
@@ -763,7 +761,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             transfer_options.force_update_if_diverged,
         )
         .await
-        .map_err(|e| SyncError::Internal(e.int_err()))?;
+        .int_err()?;
 
         let num_blocks = transfer_plan.num_blocks;
         if num_blocks == 0 {

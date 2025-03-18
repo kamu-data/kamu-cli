@@ -13,7 +13,6 @@ use std::sync::{Arc, Mutex};
 use database_common::PaginationOpts;
 use dill::*;
 use email_utils::Email;
-use odf::AccountName;
 
 use crate::domain::*;
 
@@ -43,7 +42,10 @@ impl State {
         }
     }
 
-    fn check_unique_name(&self, account_name: &AccountName) -> Result<(), AccountErrorDuplicate> {
+    fn check_unique_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), AccountErrorDuplicate> {
         if self.accounts_by_name.contains_key(account_name) {
             return Err(AccountErrorDuplicate {
                 account_field: AccountDuplicateField::Name,
@@ -244,13 +246,13 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn get_accounts_by_ids(
         &self,
-        account_ids: Vec<odf::AccountID>,
+        account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, GetAccountByIdError> {
         let guard = self.state.lock().unwrap();
 
         let accounts: Vec<Account> = account_ids
-            .into_iter()
-            .filter_map(|account_id| guard.accounts_by_id.get(&account_id).cloned())
+            .iter()
+            .filter_map(|account_id| guard.accounts_by_id.get(account_id).cloned())
             .collect();
 
         Ok(accounts)

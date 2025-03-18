@@ -13,26 +13,28 @@ use odf::dataset::MetadataChainExt as _;
 use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
 use crate::mutations::MetadataChainMut;
 use crate::prelude::*;
-use crate::utils::{get_dataset, make_dataset_access_error};
-use crate::LoggedInGuard;
+use crate::queries::DatasetRequestState;
+use crate::{utils, LoggedInGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetMetadataMut {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetMetadataMut<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetMetadataMut {
+impl<'a> DatasetMetadataMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
     }
 
     /// Access to the mutable metadata chain of the dataset
     async fn chain(&self) -> MetadataChainMut {
-        MetadataChainMut::new(self.dataset_handle.clone())
+        MetadataChainMut::new(self.dataset_request_state)
     }
 
     /// Updates or clears the dataset readme
@@ -43,7 +45,7 @@ impl DatasetMetadataMut {
         ctx: &Context<'_>,
         content: Option<String>,
     ) -> Result<UpdateReadmeResult> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
         let old_attachments = resolved_dataset
             .as_metadata_chain()
@@ -105,11 +107,9 @@ impl DatasetMetadataMut {
         };
 
         let commit_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        let result = match commit_event
-            .execute(&self.dataset_handle, event.into())
-            .await
-        {
+        let result = match commit_event.execute(dataset_handle, event.into()).await {
             Ok(result) => UpdateReadmeResult::Success(CommitResultSuccess {
                 old_head: result.old_head.map(Into::into),
                 new_head: result.new_head.into(),
@@ -125,7 +125,7 @@ impl DatasetMetadataMut {
                 })
             }
             Err(odf::dataset::CommitError::Access(_)) => {
-                return Err(make_dataset_access_error(&self.dataset_handle))
+                return Err(utils::make_dataset_access_error(dataset_handle))
             }
             Err(e @ odf::dataset::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };

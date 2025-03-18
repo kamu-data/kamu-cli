@@ -477,7 +477,6 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_datasets_services::AppendDatasetMetadataBatchUseCaseImpl>();
     b.add::<kamu_datasets_services::CommitDatasetEventUseCaseImpl>();
-    b.add::<kamu_datasets_services::EditDatasetUseCaseImpl>();
     b.add::<kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl>();
     b.add::<kamu_datasets_services::CreateDatasetUseCaseImpl>();
     b.add::<kamu_datasets_services::DeleteDatasetUseCaseImpl>();

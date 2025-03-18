@@ -17,8 +17,7 @@ use crate::queries::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetEndpoints<'a> {
-    owner: &'a Account,
-    dataset_handle: odf::DatasetHandle,
+    dataset_request_state: &'a DatasetRequestStateWithOwner,
     config: Arc<ServerUrlConfig>,
 }
 
@@ -26,13 +25,11 @@ pub struct DatasetEndpoints<'a> {
 impl<'a> DatasetEndpoints<'a> {
     #[graphql(skip)]
     pub fn new(
-        owner: &'a Account,
-        dataset_handle: odf::DatasetHandle,
+        dataset_request_state: &'a DatasetRequestStateWithOwner,
         config: Arc<ServerUrlConfig>,
     ) -> Self {
         Self {
-            owner,
-            dataset_handle,
+            dataset_request_state,
             config,
         }
     }
@@ -40,13 +37,16 @@ impl<'a> DatasetEndpoints<'a> {
     #[graphql(skip)]
     #[inline]
     fn account(&self) -> &str {
-        self.owner.account_name_internal().as_str()
+        self.dataset_request_state
+            .owner()
+            .account_name_internal()
+            .as_str()
     }
 
     #[graphql(skip)]
     #[inline]
     fn dataset(&self) -> &str {
-        self.dataset_handle.alias.dataset_name.as_str()
+        self.dataset_request_state.dataset_name().as_str()
     }
 
     #[expect(clippy::unused_async)]
@@ -67,7 +67,7 @@ impl<'a> DatasetEndpoints<'a> {
             "odf+{}{}",
             self.config.protocols.base_url_rest,
             // to respect both kinds of workspaces: single-tenant & multi-tenant
-            self.dataset_handle.alias
+            self.dataset_request_state.dataset_alias()
         );
 
         let pull_command = format!("kamu pull {url}");
@@ -85,7 +85,7 @@ impl<'a> DatasetEndpoints<'a> {
             "{}{}",
             self.config.protocols.base_url_rest,
             // to respect both kinds of workspaces: single-tenant & multi-tenant
-            self.dataset_handle.alias
+            self.dataset_request_state.dataset_alias()
         );
 
         let tail_url = format!("{dataset_base_url}/tail?limit=10");
@@ -145,13 +145,13 @@ impl<'a> DatasetEndpoints<'a> {
     async fn odata(&self) -> Result<OdataProtocolDesc> {
         let mut url = format!("{}odata", self.config.protocols.base_url_rest);
         // to respect both kinds of workspaces: single-tenant & multi-tenant
-        let collection_url = format!("{url}/{}", self.dataset_handle.alias);
+        let collection_url = format!("{url}/{}", self.dataset_request_state.dataset_alias());
 
         let service_url = {
             // Optional for single-tenant workspaces
             let maybe_account_url_segment = self
-                .dataset_handle
-                .alias
+                .dataset_request_state
+                .dataset_alias()
                 .account_name
                 .as_ref()
                 .map(odf::AccountName::as_str);

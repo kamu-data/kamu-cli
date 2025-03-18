@@ -8,31 +8,40 @@
 // by the Apache License, Version 2.0.
 
 use super::{DatasetFlowConfigsMut, DatasetFlowRunsMut, DatasetFlowTriggersMut};
+use crate::mutations::ensure_scheduling_permission;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowsMut {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetFlowsMut<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[Object]
-impl DatasetFlowsMut {
+impl<'a> DatasetFlowsMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub async fn new_with_access_check(
+        ctx: &Context<'_>,
+        dataset_request_state: &'a DatasetRequestState,
+    ) -> Result<Self> {
+        ensure_scheduling_permission(ctx, dataset_request_state).await?;
+
+        Ok(Self {
+            dataset_request_state,
+        })
     }
 
     async fn configs(&self) -> DatasetFlowConfigsMut {
-        DatasetFlowConfigsMut::new(self.dataset_handle.clone())
+        DatasetFlowConfigsMut::new(self.dataset_request_state)
     }
 
     async fn runs(&self) -> DatasetFlowRunsMut {
-        DatasetFlowRunsMut::new(self.dataset_handle.clone())
+        DatasetFlowRunsMut::new(self.dataset_request_state)
     }
 
     async fn triggers(&self) -> DatasetFlowTriggersMut {
-        DatasetFlowTriggersMut::new(self.dataset_handle.clone())
+        DatasetFlowTriggersMut::new(self.dataset_request_state)
     }
 }
 

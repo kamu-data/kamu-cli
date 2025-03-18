@@ -8,10 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::vec;
 
 use database_common::NoOpDatabasePlugin;
-use kamu_accounts::{AccountConfig, AccountService, PredefinedAccountsConfig};
+use kamu_accounts::{AccountConfig, AccountService, AccountServiceExt, PredefinedAccountsConfig};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
@@ -76,7 +75,7 @@ async fn test_multi_find() {
         .unwrap();
 
     let mut accounts = account_svc
-        .accounts_by_ids(vec![wasya_id.clone(), petya_id.clone()])
+        .get_accounts_by_ids(&[wasya_id.clone(), petya_id.clone()])
         .await
         .unwrap();
     assert_eq!(2, accounts.len());
@@ -85,7 +84,7 @@ async fn test_multi_find() {
     assert_eq!(accounts[1].account_name.as_str(), WASYA);
 
     let accounts_map = account_svc
-        .get_account_map(vec![wasya_id.clone(), petya_id.clone()])
+        .get_account_map(&[wasya_id.clone(), petya_id.clone()])
         .await
         .unwrap();
     assert_eq!(2, accounts.len());

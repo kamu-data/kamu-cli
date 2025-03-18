@@ -10,12 +10,12 @@
 use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
-use kamu_core::auth::DatasetActionUnauthorizedError;
-use kamu_core::{auth, DatasetRegistry, ResolvedDataset};
+use kamu_core::auth;
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
 
 use crate::prelude::{AccessTokenID, AccountID, AccountName};
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -80,16 +80,6 @@ pub(crate) use unsafe_from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn get_dataset(
-    ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
-) -> ResolvedDataset {
-    let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-    dataset_registry.get_dataset_by_handle(dataset_handle).await
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
@@ -103,38 +93,47 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[expect(dead_code)]
 pub(crate) async fn check_dataset_read_access(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_request_state: &DatasetRequestState,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_handle, auth::DatasetAction::Read).await
+    check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Read).await
 }
 
 pub(crate) async fn check_dataset_write_access(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_request_state: &DatasetRequestState,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_handle, auth::DatasetAction::Write).await
+    check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Write).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn check_dataset_access(
     ctx: &Context<'_>,
-    dataset_handle: &odf::DatasetHandle,
+    dataset_request_state: &DatasetRequestState,
     action: auth::DatasetAction,
 ) -> Result<(), GqlError> {
-    let dataset_action_authorizer = from_catalog_n!(ctx, dyn auth::DatasetActionAuthorizer);
+    if is_action_allowed(ctx, dataset_request_state, action).await? {
+        Ok(())
+    } else {
+        Err(make_dataset_access_error(
+            dataset_request_state.dataset_handle(),
+        ))
+    }
+}
 
-    dataset_action_authorizer
-        .check_action_allowed(&dataset_handle.id, action)
-        .await
-        .map_err(|e| match e {
-            DatasetActionUnauthorizedError::Access(_) => make_dataset_access_error(dataset_handle),
-            DatasetActionUnauthorizedError::Internal(e) => GqlError::Internal(e),
-        })?;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    Ok(())
+pub(crate) async fn is_action_allowed(
+    ctx: &Context<'_>,
+    dataset_request_state: &DatasetRequestState,
+    action: auth::DatasetAction,
+) -> Result<bool, GqlError> {
+    let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
+
+    Ok(allowed_actions.contains(&action))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

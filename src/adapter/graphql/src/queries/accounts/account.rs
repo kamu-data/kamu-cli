@@ -9,6 +9,7 @@
 
 use kamu_accounts::{
     AccountService,
+    AccountServiceExt,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
@@ -190,9 +191,9 @@ impl Account {
     async fn flows(&self, ctx: &Context<'_>) -> Result<Option<AccountFlows>> {
         check_logged_account_id_match(ctx, &self.account_id)?;
 
-        Ok(Some(AccountFlows::new(
-            self.get_full_account_info(ctx).await?.clone(),
-        )))
+        let full_account_info = self.get_full_account_info(ctx).await?;
+
+        Ok(Some(AccountFlows::new(full_account_info)))
     }
 }
 

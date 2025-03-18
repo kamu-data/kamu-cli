@@ -19,6 +19,7 @@ mod test_gql_dataset_flow_triggers;
 mod test_gql_datasets;
 mod test_gql_metadata;
 mod test_gql_metadata_chain;
+mod test_gql_pagination;
 mod test_gql_remote_statuses;
 mod test_gql_search;
 mod test_guards;

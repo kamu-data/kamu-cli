@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{TransactionRef, TransactionRefT};
+use std::num::NonZeroUsize;
+
+use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -155,26 +157,26 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let placeholders = obsolete_upstream_dataset_ids
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("${}", i + 2))
-            .collect::<Vec<_>>()
-            .join(", ");
-
         let query_str = format!(
             r#"
             DELETE FROM dataset_dependencies
             WHERE
                 downstream_dataset_id = $1 AND
-                upstream_dataset_id IN ({placeholders})
+                upstream_dataset_id IN ({})
             "#,
+            sqlite_generate_placeholders_list(
+                obsolete_upstream_dataset_ids.len(),
+                NonZeroUsize::new(2).unwrap()
+            )
         );
 
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
         let mut query = sqlx::query(&query_str);
-        query = query.bind(downstream_dataset_id.to_string());
+
+        let stack_downstream_dataset_id = downstream_dataset_id.as_did_str().to_stack_string();
+        query = query.bind(stack_downstream_dataset_id.as_str());
+
         for upstream_dataset_id in obsolete_upstream_dataset_ids {
             query = query.bind(upstream_dataset_id.to_string());
         }

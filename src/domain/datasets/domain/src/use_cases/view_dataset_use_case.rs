@@ -14,6 +14,7 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Private Datasets: replace with RebacDatasetRegistry
 #[async_trait::async_trait]
 pub trait ViewDatasetUseCase: Send + Sync {
     async fn execute(

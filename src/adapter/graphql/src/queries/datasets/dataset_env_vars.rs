@@ -12,21 +12,27 @@ use kamu_datasets::{DatasetEnvVarService, GetDatasetEnvVarError};
 
 use super::ViewDatasetEnvVar;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetEnvVars {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetEnvVars<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetEnvVars {
+impl<'a> DatasetEnvVars<'a> {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(ctx: &Context<'_>, dataset_request_state: &'a DatasetRequestState) -> Result<Self> {
+        utils::ensure_dataset_env_vars_enabled(ctx)?;
+
+        Ok(Self {
+            dataset_request_state,
+        })
     }
 
     #[tracing::instrument(level = "info", name = DatasetEnvVars_exposed_value, skip_all)]
@@ -63,11 +69,8 @@ impl DatasetEnvVars {
 
         let dataset_env_var_listing = dataset_env_var_service
             .get_all_dataset_env_vars_by_dataset_id(
-                &self.dataset_handle.id,
-                Some(PaginationOpts {
-                    offset: (page * per_page),
-                    limit: per_page,
-                }),
+                &self.dataset_request_state.dataset_handle().id,
+                Some(PaginationOpts::from_page(page, per_page)),
             )
             .await
             .int_err()?;

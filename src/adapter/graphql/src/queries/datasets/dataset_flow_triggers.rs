@@ -10,20 +10,22 @@
 use kamu_flow_system::{FlowKeyDataset, FlowTriggerService};
 
 use crate::prelude::*;
-use crate::utils::check_dataset_read_access;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowTriggers {
-    dataset_handle: odf::DatasetHandle,
+pub struct DatasetFlowTriggers<'a> {
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl DatasetFlowTriggers {
+impl<'a> DatasetFlowTriggers<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self { dataset_handle }
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
+        Self {
+            dataset_request_state,
+        }
     }
 
     /// Returns defined trigger for a flow of specified type
@@ -33,13 +35,14 @@ impl DatasetFlowTriggers {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
     ) -> Result<Option<FlowTrigger>> {
-        check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         let maybe_flow_trigger = flow_trigger_service
             .find_trigger(
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
+                FlowKeyDataset::new(
+                    self.dataset_request_state.dataset_handle().id.clone(),
+                    dataset_flow_type.into(),
+                )
+                .into(),
             )
             .await
             .int_err()?;
@@ -50,13 +53,15 @@ impl DatasetFlowTriggers {
     /// Checks if all triggers of this dataset are disabled
     #[tracing::instrument(level = "info", name = DatasetFlowTriggers_all_paused, skip_all)]
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        check_dataset_read_access(ctx, &self.dataset_handle).await?;
-
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
             let maybe_flow_trigger = flow_trigger_service
                 .find_trigger(
-                    FlowKeyDataset::new(self.dataset_handle.id.clone(), *dataset_flow_type).into(),
+                    FlowKeyDataset::new(
+                        self.dataset_request_state.dataset_handle().id.clone(),
+                        *dataset_flow_type,
+                    )
+                    .into(),
                 )
                 .await
                 .int_err()?;

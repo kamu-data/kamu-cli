@@ -12,7 +12,7 @@ use axum::response::Json;
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
-use kamu_accounts::{Account, AccountService, CurrentAccountSubject};
+use kamu_accounts::{Account, AccountService, AccountServiceExt, CurrentAccountSubject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
