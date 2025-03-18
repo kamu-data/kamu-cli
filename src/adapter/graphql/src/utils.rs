@@ -115,15 +115,25 @@ async fn check_dataset_access(
     dataset_request_state: &DatasetRequestState,
     action: auth::DatasetAction,
 ) -> Result<(), GqlError> {
-    let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
-
-    if allowed_actions.contains(&action) {
+    if is_action_allowed(ctx, dataset_request_state, action).await? {
         Ok(())
     } else {
         Err(make_dataset_access_error(
             dataset_request_state.dataset_handle(),
         ))
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn is_action_allowed(
+    ctx: &Context<'_>,
+    dataset_request_state: &DatasetRequestState,
+    action: auth::DatasetAction,
+) -> Result<bool, GqlError> {
+    let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
+
+    Ok(allowed_actions.contains(&action))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

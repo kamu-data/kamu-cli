@@ -33,17 +33,10 @@ pub struct DatasetMut {
 #[Object]
 impl DatasetMut {
     #[graphql(skip)]
-    pub async fn new_with_access_check(
-        ctx: &Context<'_>,
-        dataset_handle: odf::DatasetHandle,
-    ) -> Result<Self> {
-        let dataset_request_state = DatasetRequestState::new(dataset_handle);
-
-        utils::check_dataset_write_access(ctx, &dataset_request_state).await?;
-
-        Ok(Self {
+    pub fn new_access_checked(dataset_request_state: DatasetRequestState) -> Self {
+        Self {
             dataset_request_state,
-        })
+        }
     }
 
     /// Access to the mutable metadata of the dataset
