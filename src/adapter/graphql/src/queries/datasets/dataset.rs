@@ -9,7 +9,6 @@
 
 use chrono::prelude::*;
 use kamu_core::{auth, ServerUrlConfig};
-use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -30,18 +29,6 @@ impl Dataset {
         Self {
             dataset_request_state: DatasetRequestState::new(dataset_handle).with_owner(owner),
         }
-    }
-
-    #[graphql(skip)]
-    pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
-
-        let handle = view_dataset_use_case.execute(dataset_ref).await.int_err()?;
-        let account = Account::from_dataset_alias(ctx, &handle.alias)
-            .await?
-            .expect("Account must exist");
-
-        Ok(Dataset::new_access_checked(account, handle))
     }
 
     #[graphql(skip)]
@@ -72,26 +59,12 @@ impl Dataset {
     #[graphql(skip)]
     pub fn from_resolved_dataset(
         owner: Account,
-        resolved_dataset: kamu_core::ResolvedDataset,
+        resolved_dataset: &kamu_core::ResolvedDataset,
     ) -> Self {
         Self {
             dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())
                 .with_owner(owner),
         }
-    }
-
-    #[graphql(skip)]
-    async fn resolve_dataset(&self, ctx: &Context<'_>) -> Result<kamu_core::ResolvedDataset> {
-        let resolved_dataset = get_dataset(ctx, &self.dataset_handle).await;
-        Ok(resolved_dataset)
-    }
-
-    #[graphql(skip)]
-    #[inline]
-    async fn get_resolved_dataset(&self, ctx: &Context<'_>) -> Result<&kamu_core::ResolvedDataset> {
-        self.resolved_dataset
-            .get_or_try_init(|| self.resolve_dataset(ctx))
-            .await
     }
 
     /// Unique identifier of the dataset

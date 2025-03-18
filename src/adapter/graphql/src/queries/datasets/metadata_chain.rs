@@ -49,8 +49,7 @@ impl<'a> MetadataChain<'a> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         Ok(vec![BlockRef {
             name: "head".to_owned(),
-            block_hash: self
-                .resolved_dataset
+            block_hash: resolved_dataset
                 .as_metadata_chain()
                 .resolve_ref(&odf::BlockRef::Head)
                 .await
@@ -127,7 +126,7 @@ impl<'a> MetadataChain<'a> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
 
-        let chain = self.resolved_dataset.as_metadata_chain();
+        let chain = resolved_dataset.as_metadata_chain();
 
         let head = chain.resolve_ref(&odf::BlockRef::Head).await.int_err()?;
         let total_count =

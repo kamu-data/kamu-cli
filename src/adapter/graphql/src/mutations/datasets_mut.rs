@@ -12,7 +12,7 @@ use kamu_datasets::CreateDatasetFromSnapshotError;
 
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
-use crate::queries::{Dataset, DatasetRequestState};
+use crate::queries::{Account, Dataset, DatasetRequestState};
 use crate::{utils, LoggedInGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +156,7 @@ impl DatasetsMut {
                     .expect("Account must exist");
                 let dataset = Dataset::from_resolved_dataset(
                     account,
-                    kamu_core::ResolvedDataset::from_created(&result),
+                    &kamu_core::ResolvedDataset::from_created(&result),
                 );
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })
             }
