@@ -237,11 +237,7 @@ impl FlowHarness {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
-                DatasetDependenciesMessage {
-                    dataset_id: dataset_id.clone(),
-                    obsolete_upstream_ids: vec![],
-                    added_upstream_ids: input_ids,
-                },
+                DatasetDependenciesMessage::updated(dataset_id.clone(), input_ids, vec![]),
             )
             .await
             .unwrap();

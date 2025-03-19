@@ -17,16 +17,37 @@ const DATASET_DEPENDENCIES_OUTBOX_VERSION: u32 = 1;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetDependenciesMessage {
-    pub dataset_id: odf::DatasetID,
-    pub obsolete_upstream_ids: Vec<odf::DatasetID>,
-    pub added_upstream_ids: Vec<odf::DatasetID>,
+pub enum DatasetDependenciesMessage {
+    Updated(DatasetDependenciesMessageUpdated),
+}
+
+impl DatasetDependenciesMessage {
+    pub fn updated(
+        dataset_id: odf::DatasetID,
+        added_upstream_ids: Vec<odf::DatasetID>,
+        removed_upstream_ids: Vec<odf::DatasetID>,
+    ) -> Self {
+        Self::Updated(DatasetDependenciesMessageUpdated {
+            dataset_id,
+            added_upstream_ids,
+            removed_upstream_ids,
+        })
+    }
 }
 
 impl Message for DatasetDependenciesMessage {
     fn version() -> u32 {
         DATASET_DEPENDENCIES_OUTBOX_VERSION
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetDependenciesMessageUpdated {
+    pub dataset_id: odf::DatasetID,
+    pub added_upstream_ids: Vec<odf::DatasetID>,
+    pub removed_upstream_ids: Vec<odf::DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

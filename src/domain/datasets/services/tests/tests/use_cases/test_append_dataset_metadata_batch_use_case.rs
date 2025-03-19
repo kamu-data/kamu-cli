@@ -234,7 +234,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
               Deps Updated {
                 Dataset ID: <bar_id>
                 Added: [<baz_id>]
-                Obsolete: [<foo_id>]
+                Removed: [<foo_id>]
               }
             "#
         )

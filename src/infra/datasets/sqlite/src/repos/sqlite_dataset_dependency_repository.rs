@@ -147,9 +147,9 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
     async fn remove_upstream_dependencies(
         &self,
         downstream_dataset_id: &odf::DatasetID,
-        obsolete_upstream_dataset_ids: &[&odf::DatasetID],
+        upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), RemoveDependenciesError> {
-        if obsolete_upstream_dataset_ids.is_empty() {
+        if upstream_dataset_ids.is_empty() {
             return Ok(());
         }
 
@@ -165,7 +165,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
                 upstream_dataset_id IN ({})
             "#,
             sqlite_generate_placeholders_list(
-                obsolete_upstream_dataset_ids.len(),
+                upstream_dataset_ids.len(),
                 NonZeroUsize::new(2).unwrap()
             )
         );
@@ -177,7 +177,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
         let stack_downstream_dataset_id = downstream_dataset_id.as_did_str().to_stack_string();
         query = query.bind(stack_downstream_dataset_id.as_str());
 
-        for upstream_dataset_id in obsolete_upstream_dataset_ids {
+        for upstream_dataset_id in upstream_dataset_ids {
             query = query.bind(upstream_dataset_id.to_string());
         }
 

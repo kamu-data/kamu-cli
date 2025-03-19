@@ -227,7 +227,7 @@ async fn test_commit_event_with_new_dependencies() {
               Deps Updated {
                 Dataset ID: <baz_id>
                 Added: [<bar_id>]
-                Obsolete: [<foo_id>]
+                Removed: [<foo_id>]
               }
             "#
         )

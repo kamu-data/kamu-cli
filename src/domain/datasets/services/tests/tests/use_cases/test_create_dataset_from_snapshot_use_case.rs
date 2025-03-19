@@ -174,7 +174,7 @@ async fn test_create_derived_dataset_from_snapshot() {
               Deps Updated {
                 Dataset ID: <bar_id>
                 Added: [<foo_id>]
-                Obsolete: []
+                Removed: []
               }
             "#
         )

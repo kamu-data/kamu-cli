@@ -100,8 +100,8 @@ impl DependencyGraphImmediateListener {
             return Ok(());
         }
 
-        // Classify changes: obsolete, added
-        let obsolete_dependencies: Vec<_> = existing_upstream_ids
+        // Classify changes: removed, added
+        let removed_dependencies: Vec<_> = existing_upstream_ids
             .difference(&new_upstream_ids)
             .collect();
         let added_dependencies: Vec<_> = new_upstream_ids
@@ -110,7 +110,7 @@ impl DependencyGraphImmediateListener {
 
         // Update database dependencies
         dependency_graph_repo
-            .remove_upstream_dependencies(&message.dataset_id, &obsolete_dependencies)
+            .remove_upstream_dependencies(&message.dataset_id, &removed_dependencies)
             .await
             .int_err()?;
 
@@ -124,11 +124,11 @@ impl DependencyGraphImmediateListener {
         outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
-                DatasetDependenciesMessage {
-                    dataset_id: message.dataset_id.clone(),
-                    obsolete_upstream_ids: obsolete_dependencies.into_iter().cloned().collect(),
-                    added_upstream_ids: added_dependencies.into_iter().cloned().collect(),
-                },
+                DatasetDependenciesMessage::updated(
+                    message.dataset_id.clone(),
+                    added_dependencies.into_iter().cloned().collect(),
+                    removed_dependencies.into_iter().cloned().collect(),
+                ),
             )
             .await?;
 

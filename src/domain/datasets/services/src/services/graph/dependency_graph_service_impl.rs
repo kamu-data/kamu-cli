@@ -452,14 +452,22 @@ impl MessageConsumerT<DatasetDependenciesMessage> for DependencyGraphServiceImpl
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset dependencies message");
 
-        let mut state = self.state.write().await;
+        match message {
+            DatasetDependenciesMessage::Updated(updated_message) => {
+                let mut state = self.state.write().await;
 
-        for obsolete_upstream_id in &message.obsolete_upstream_ids {
-            self.remove_dependency(&mut state, obsolete_upstream_id, &message.dataset_id);
-        }
+                for removed_upstream_id in &updated_message.removed_upstream_ids {
+                    self.remove_dependency(
+                        &mut state,
+                        removed_upstream_id,
+                        &updated_message.dataset_id,
+                    );
+                }
 
-        for added_id in &message.added_upstream_ids {
-            self.add_dependency(&mut state, added_id, &message.dataset_id);
+                for added_id in &updated_message.added_upstream_ids {
+                    self.add_dependency(&mut state, added_id, &updated_message.dataset_id);
+                }
+            }
         }
 
         Ok(())

@@ -168,27 +168,31 @@ impl std::fmt::Display for TestDatasetOutboxListener {
             )?;
 
             for msg in &guard.dataset_dependency_messages {
-                writeln!(f, "  Deps Updated {{",)?;
-                writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
-                writeln!(
-                    f,
-                    "    Added: [{}]",
-                    msg.added_upstream_ids
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )?;
-                writeln!(
-                    f,
-                    "    Obsolete: [{}]",
-                    msg.obsolete_upstream_ids
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )?;
-                writeln!(f, "  }}")?;
+                match msg {
+                    DatasetDependenciesMessage::Updated(msg) => {
+                        writeln!(f, "  Deps Updated {{",)?;
+                        writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
+                        writeln!(
+                            f,
+                            "    Added: [{}]",
+                            msg.added_upstream_ids
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )?;
+                        writeln!(
+                            f,
+                            "    Removed: [{}]",
+                            msg.removed_upstream_ids
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )?;
+                        writeln!(f, "  }}")?;
+                    }
+                }
             }
         }
 
