@@ -22,6 +22,7 @@ use kamu_cli_e2e_common::{
     KamuApiServerClient,
     KamuApiServerClientExt,
     QueryError,
+    QueryExecutionError,
     ResolvedDatasetDependency,
     SetDatasetVisibilityError,
     UnresolvedDatasetDependency,
@@ -416,35 +417,26 @@ pub async fn test_a_private_dataset_is_available_only_to_authorized_users_in_the
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_a_private_dataset_is_available_in_queries_only_for_the_owner_or_admin(
-    kamu_api_server_client: KamuApiServerClient,
+pub async fn test_a_private_dataset_is_available_in_queries_only_to_authorized_users(
+    anonymous: KamuApiServerClient,
 ) {
-    // 4 actors:
-    // - anonymous
-    // - alice (owner) w/ datasets
-    // - bob (not owner)
-    // - admin
-    let anonymous_client = kamu_api_server_client.clone();
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
 
-    let mut owner_client = kamu_api_server_client.clone();
-    owner_client
-        .auth()
-        .login_with_password("alice", "alice")
-        .await;
-
-    let mut not_owner_client = kamu_api_server_client.clone();
-    not_owner_client
-        .auth()
-        .login_with_password("bob", "bob")
-        .await;
-
-    let mut admin_client = kamu_api_server_client;
-    admin_client
-        .auth()
-        .login_with_password("admin", "admin")
-        .await;
-
-    owner_client
+    let CreateDatasetResponse {
+        dataset_id: private_dataset_id,
+        ..
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -453,7 +445,10 @@ pub async fn test_a_private_dataset_is_available_in_queries_only_for_the_owner_o
             odf::DatasetVisibility::Private,
         )
         .await;
-    owner_client
+    let CreateDatasetResponse {
+        dataset_id: public_dataset_id,
+        ..
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -463,97 +458,88 @@ pub async fn test_a_private_dataset_is_available_in_queries_only_for_the_owner_o
         )
         .await;
 
-    let sql_query_private_dataset = indoc::indoc!(
-        r#"
-        SELECT COUNT(*) AS private_count
-        FROM "alice/private-dataset";
-        "#
-    );
-    let expected_private_dataset_output = indoc::indoc!(
-        r#"
-        private_count
-        0"#
-    );
+    authorize_users_by_roles(
+        &owner,
+        &[&private_dataset_id, &public_dataset_id],
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
 
-    assert_matches!(
-        anonymous_client
-            .odf_query()
-            .query(sql_query_private_dataset)
-            .await,
-        Err(QueryError::ExecutionError(e))
-            if e.error_kind == "INVALID_SQL"
-                && e.error_message == "table 'kamu.kamu.alice/private-dataset' not found"
-    );
-    assert_matches!(
-        not_owner_client
-            .odf_query()
-            .query(sql_query_private_dataset)
-            .await,
-        Err(QueryError::ExecutionError(e))
-            if e.error_kind == "INVALID_SQL"
-                && e.error_message == "table 'kamu.kamu.alice/private-dataset' not found"
-    );
-    assert_matches!(
-        owner_client
-            .odf_query()
-            .query(sql_query_private_dataset)
-            .await,
-        Ok(result)
-            if result == expected_private_dataset_output
-    );
-    assert_matches!(
-        admin_client
-            .odf_query()
-            .query(sql_query_private_dataset)
-            .await,
-        Ok(result)
-            if result == expected_private_dataset_output
-    );
+    // public-dataset
+    {
+        let expected_result = Ok(indoc::indoc!(
+            r#"
+            public_count
+            0"#
+        )
+        .to_string());
 
-    let sql_query_public_dataset = indoc::indoc!(
-        r#"
-        SELECT COUNT(*) AS public_count
-        FROM "alice/public-dataset";
-        "#
-    );
-    let expected_public_dataset_output = indoc::indoc!(
-        r#"
-        public_count
-        0"#
-    );
+        for (tag, client) in [
+            ("anonymous", &anonymous),
+            ("not_owner", &not_owner),
+            ("reader", &reader),
+            ("editor", &editor),
+            ("maintainer", &maintainer),
+            ("owner", &owner),
+            ("admin", &admin),
+        ] {
+            pretty_assertions::assert_eq!(
+                expected_result,
+                client
+                    .odf_query()
+                    .query(indoc::indoc!(
+                        r#"
+                        SELECT COUNT(*) AS public_count
+                        FROM "owner/public-dataset";
+                        "#
+                    ))
+                    .await,
+                "Tag: {}",
+                tag,
+            );
+        }
+    }
 
-    assert_matches!(
-        anonymous_client
-            .odf_query()
-            .query(sql_query_public_dataset)
-            .await,
-        Ok(result)
-            if result == expected_public_dataset_output
-    );
-    assert_matches!(
-        not_owner_client
-            .odf_query()
-            .query(sql_query_public_dataset)
-            .await,
-        Ok(result)
-            if result == expected_public_dataset_output
-    );
-    assert_matches!(
-        owner_client
-            .odf_query()
-            .query(sql_query_public_dataset)
-            .await,
-        Ok(result)
-            if result == expected_public_dataset_output
-    );
-    assert_matches!(
-        admin_client
-            .odf_query()
-            .query(sql_query_public_dataset)
-            .await,
-        Ok(result)
-            if result == expected_public_dataset_output
-    );
+    // private-dataset
+    {
+        let success = Ok(indoc::indoc!(
+            r#"
+            private_count
+            0"#
+        )
+        .to_string());
+        let failure = Err(QueryError::ExecutionError(QueryExecutionError {
+            error_kind: "INVALID_SQL".to_string(),
+            error_message: "table 'kamu.kamu.owner/private-dataset' not found".to_string(),
+        }));
+
+        for (tag, client, expected_result) in [
+            ("anonymous", &anonymous, &failure),
+            ("not_owner", &not_owner, &failure),
+            ("reader", &reader, &success),
+            ("editor", &editor, &success),
+            ("maintainer", &maintainer, &success),
+            ("owner", &owner, &success),
+            ("admin", &admin, &success),
+        ] {
+            pretty_assertions::assert_eq!(
+                *expected_result,
+                client
+                    .odf_query()
+                    .query(indoc::indoc!(
+                        r#"
+                        SELECT COUNT(*) AS private_count
+                        FROM "owner/private-dataset";
+                        "#
+                    ))
+                    .await,
+                "Tag: {}",
+                tag,
+            );
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
