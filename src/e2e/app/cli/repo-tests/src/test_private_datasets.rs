@@ -1451,6 +1451,7 @@ pub async fn test_minimum_dataset_maintainer_can_access_roles(anonymous: KamuApi
         }
     }
 }
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_granted_role_is_correctly_replaced_by_another_one(
@@ -1509,6 +1510,113 @@ pub async fn test_granted_role_is_correctly_replaced_by_another_one(
         pretty_assertions::assert_eq!(
             Ok(vec![(name(&"bob"), R::Editor)]),
             alice
+                .dataset()
+                .collaboration()
+                .account_roles(&dataset_id)
+                .await
+                .map(|r| r
+                    .accounts_with_roles
+                    .into_iter()
+                    .map(|a| (a.account_name, a.role))
+                    .collect::<Vec<_>>()),
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_granted_role_is_correctly_revoked(anonymous: KamuApiServerClient) {
+    let [mut reader, mut editor, mut maintainer, owner] =
+        make_logged_clients(&anonymous, ["reader", "editor", "maintainer", "owner"]).await;
+
+    let CreateDatasetResponse { dataset_id, .. } = owner
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot().name("dataset").build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+
+    use odf::metadata::testing::account_name as name;
+    use AccountToDatasetRelation as R;
+
+    // Initial
+    {
+        authorize_users_by_roles(
+            &owner,
+            &[&dataset_id],
+            &mut reader,
+            &mut editor,
+            &mut maintainer,
+        )
+        .await;
+
+        pretty_assertions::assert_eq!(
+            Ok(vec![
+                (name(&"editor"), R::Editor),
+                (name(&"maintainer"), R::Maintainer),
+                (name(&"reader"), R::Reader),
+            ]),
+            owner
+                .dataset()
+                .collaboration()
+                .account_roles(&dataset_id)
+                .await
+                .map(|r| r
+                    .accounts_with_roles
+                    .into_iter()
+                    .map(|a| (a.account_name, a.role))
+                    .collect::<Vec<_>>()),
+        );
+    }
+
+    // Without reader
+    {
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            owner
+                .dataset()
+                .collaboration()
+                .unset_role(&dataset_id, &[&reader.auth().logged_account_id()],)
+                .await
+        );
+        pretty_assertions::assert_eq!(
+            Ok(vec![
+                (name(&"editor"), R::Editor),
+                (name(&"maintainer"), R::Maintainer),
+            ]),
+            owner
+                .dataset()
+                .collaboration()
+                .account_roles(&dataset_id)
+                .await
+                .map(|r| r
+                    .accounts_with_roles
+                    .into_iter()
+                    .map(|a| (a.account_name, a.role))
+                    .collect::<Vec<_>>()),
+        );
+    }
+
+    // Without editor + maintainer
+    {
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            owner
+                .dataset()
+                .collaboration()
+                .unset_role(
+                    &dataset_id,
+                    &[
+                        &editor.auth().logged_account_id(),
+                        &maintainer.auth().logged_account_id()
+                    ],
+                )
+                .await
+        );
+        pretty_assertions::assert_eq!(
+            Ok(Vec::new()),
+            owner
                 .dataset()
                 .collaboration()
                 .account_roles(&dataset_id)

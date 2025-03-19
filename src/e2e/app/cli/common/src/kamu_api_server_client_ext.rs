@@ -1377,6 +1377,16 @@ pub enum DatasetCollaborationUnsetRoleError {
     Internal(#[from] InternalError),
 }
 
+impl PartialEq for DatasetCollaborationUnsetRoleError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::DatasetNotFound, Self::DatasetNotFound) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // API: Flow
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
