@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.228.0] - 2025-03-19
 ### Added
 - DB: utilities for working with bind parameter placeholders
 - DB-backed dataset references: they are now stored in the database, supporting transactional updates.  
