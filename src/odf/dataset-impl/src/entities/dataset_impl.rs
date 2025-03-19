@@ -93,6 +93,7 @@ where
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn update_summary(
         &self,
         prev: Option<DatasetSummary>,
@@ -372,6 +373,11 @@ where
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
+    /// Detaches this metadata chain from any transaction references
+    fn detach_from_transaction(&self) {
+        self.metadata_chain.detach_from_transaction();
+    }
+
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.

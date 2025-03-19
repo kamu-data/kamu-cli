@@ -94,10 +94,14 @@ impl TaskDefinitionPlannerImpl {
             .await;
 
         match plan_res {
-            Ok(pull_job) => Ok(TaskDefinition::Update(TaskDefinitionUpdate {
-                pull_options,
-                pull_job,
-            })),
+            Ok(pull_job) => {
+                pull_job.detach_from_transaction();
+
+                Ok(TaskDefinition::Update(TaskDefinitionUpdate {
+                    pull_options,
+                    pull_job,
+                }))
+            }
             Err(e) => {
                 assert!(e.result.is_err());
                 tracing::error!(
@@ -131,8 +135,10 @@ impl TaskDefinitionPlannerImpl {
             .await
             .int_err()?;
 
+        target.detach_from_transaction();
+
         Ok(TaskDefinition::Reset(TaskDefinitionReset {
-            target,
+            dataset_handle: target.take_handle(),
             reset_plan,
         }))
     }
@@ -159,6 +165,8 @@ impl TaskDefinitionPlannerImpl {
             .plan_compaction(target.clone(), compaction_options, None)
             .await
             .int_err()?;
+
+        target.detach_from_transaction();
 
         Ok(TaskDefinition::HardCompact(TaskDefinitionHardCompact {
             target,

@@ -15,6 +15,7 @@ use container_runtime::*;
 use datafusion::prelude::*;
 use dill::Component;
 use indoc::indoc;
+use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -1263,6 +1264,8 @@ impl IngestTestHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()
@@ -1311,14 +1314,35 @@ impl IngestTestHarness {
                 .await
                 .unwrap();
 
-        self.ingest_svc
+        let ingest_result = self
+            .ingest_svc
             .ingest(
-                target,
+                target.clone(),
                 Box::new(metadata_state),
                 PollingIngestOptions::default(),
                 None,
             )
-            .await
+            .await;
+
+        if let Ok(PollingIngestResult::Updated {
+            old_head, new_head, ..
+        }) = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .int_err()?;
+        }
+
+        ingest_result
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {

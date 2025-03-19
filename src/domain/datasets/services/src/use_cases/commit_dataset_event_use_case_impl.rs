@@ -9,40 +9,37 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface, Catalog};
+use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::DatasetRegistry;
 use kamu_datasets::{CommitDatasetEventUseCase, ViewMultiResponse};
 use odf::dataset::{AppendError, InvalidEventError};
 use odf::metadata::EnumWithVariants;
+use time_source::SystemTimeSource;
 
 use crate::utils::access_dataset_helper::{AccessDatasetHelper, DatasetAccessError};
-use crate::DependencyGraphWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn CommitDatasetEventUseCase)]
 pub struct CommitDatasetEventUseCaseImpl {
-    catalog: Catalog,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
+    system_time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl CommitDatasetEventUseCaseImpl {
     pub fn new(
-        catalog: Catalog,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        dependency_graph_writer: Arc<dyn DependencyGraphWriter>,
+        system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
-            catalog,
             dataset_registry,
             dataset_action_authorizer,
-            dependency_graph_writer,
+            system_time_source,
         }
     }
 
@@ -108,42 +105,21 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
 
         let event = self.validate_event(access_dataset_helper, event).await?;
 
-        let mut new_upstream_ids: Vec<odf::DatasetID> = vec![];
-        let mut dependencies_modified = false;
-
-        if let odf::MetadataEvent::SetTransform(transform) = &event {
-            dependencies_modified = true;
-            for new_input in &transform.inputs {
-                if let Some(id) = new_input.dataset_ref.id() {
-                    new_upstream_ids.push(id.clone());
-                } else {
-                    // Normally all references must be resolved to IDs already.
-                    // We continue here while expecting MetadataChain to reject
-                    // this event.
-                }
-            }
-        }
-
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_handle(dataset_handle)
             .await;
 
+        use odf::dataset::CommitOpts;
         let commit_result = resolved_dataset
-            .commit_event(event, odf::dataset::CommitOpts::default())
+            .commit_event(
+                event,
+                CommitOpts {
+                    system_time: Some(self.system_time_source.now()),
+                    ..CommitOpts::default()
+                },
+            )
             .await?;
-
-        // Note: modify dependencies only after `commit_event` succeeds.
-        // TODO: the dependencies should be updated as a part of HEAD change
-        if dependencies_modified {
-            self.dependency_graph_writer
-                .update_dataset_node_dependencies(
-                    &self.catalog,
-                    &dataset_handle.id,
-                    new_upstream_ids,
-                )
-                .await?;
-        }
 
         Ok(commit_result)
     }

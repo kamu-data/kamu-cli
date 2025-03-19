@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod compact_dataset_use_case;
-mod get_dataset_downstream_dependencies_use_case;
-mod get_dataset_upstream_dependencies_use_case;
+
 mod pull_dataset_use_case;
 mod push_dataset_use_case;
 mod reset_dataset_use_case;
@@ -17,8 +16,6 @@ mod set_watermark_use_case;
 mod verify_dataset_use_case;
 
 pub use compact_dataset_use_case::*;
-pub use get_dataset_downstream_dependencies_use_case::*;
-pub use get_dataset_upstream_dependencies_use_case::*;
 pub use pull_dataset_use_case::*;
 pub use push_dataset_use_case::*;
 pub use reset_dataset_use_case::*;

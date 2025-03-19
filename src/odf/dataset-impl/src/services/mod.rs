@@ -7,6 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#[cfg(feature = "lfs")]
+mod dataset_default_lfs_builder;
+#[cfg(feature = "s3")]
+mod dataset_default_s3_builder;
 mod dataset_factory_impl;
 
+#[cfg(feature = "lfs")]
+pub use dataset_default_lfs_builder::*;
+#[cfg(feature = "s3")]
+pub use dataset_default_s3_builder::*;
 pub use dataset_factory_impl::*;

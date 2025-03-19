@@ -8,27 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-use database_common::NoOpDatabasePlugin;
-use dill::*;
 use indoc::indoc;
 use kamu::*;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
 
-use crate::utils::authentication_catalogs;
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -179,56 +167,33 @@ async fn test_current_set_transform() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct DatasetMetadataHarness {
-    _tempdir: tempfile::TempDir,
-    _catalog_anonymous: dill::Catalog,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
 }
 
 impl DatasetMetadataHarness {
     async fn new() -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::MultiTenant);
 
         let catalog_base = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
-            b.add::<SystemTimeSourceDefault>()
-                .add::<DidGeneratorDefault>()
-                .add::<DummyOutboxImpl>()
-                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
-                .add::<ViewDatasetUseCaseImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add::<MetadataQueryServiceImpl>()
+            b.add::<MetadataQueryServiceImpl>()
                 .add::<EngineProvisionerNull>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<DataFormatRegistryImpl>()
-                .add_value(TenancyConfig::MultiTenant)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
                 .add_value(MockAuthenticationService::built_in())
-                .bind::<dyn AuthenticationService, MockAuthenticationService>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<DependencyGraphServiceImpl>()
-                .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
+                .bind::<dyn AuthenticationService, MockAuthenticationService>();
 
             b.build()
         };
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+        let (_, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         Self {
-            _tempdir: tempdir,
-            _catalog_anonymous: catalog_anonymous,
+            base_gql_harness,
             catalog_authorized,
         }
     }

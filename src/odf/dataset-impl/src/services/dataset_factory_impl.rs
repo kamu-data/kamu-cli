@@ -26,13 +26,11 @@ use odf_storage_http::*;
 #[cfg(feature = "lfs")]
 use odf_storage_lfs::*;
 #[cfg(feature = "s3")]
-use odf_storage_s3::*;
-#[cfg(feature = "s3")]
 use s3_utils::{S3Context, S3Metrics};
 use url::Url;
 
-#[cfg(feature = "lfs")]
-use crate::DatasetLayout;
+#[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
+use crate::MetadataChainReferenceRepositoryImpl;
 #[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
 use crate::{DatasetImpl, MetadataChainImpl};
 
@@ -56,7 +54,7 @@ type DatasetImplLocalFS = DatasetImpl<
         MetadataBlockRepositoryCachingInMem<
             MetadataBlockRepositoryImpl<ObjectRepositoryLocalFSSha3>,
         >,
-        ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>,
+        MetadataChainReferenceRepositoryImpl<ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>>,
     >,
     ObjectRepositoryLocalFSSha3,
     ObjectRepositoryLocalFSSha3,
@@ -108,16 +106,18 @@ impl DatasetFactoryImpl {
 impl DatasetFactoryImpl {
     #[cfg(feature = "lfs")]
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
+        use super::DatasetDefaultLfsBuilder;
+
         DatasetImpl::new(
             MetadataChainImpl::new(
-                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                    ObjectRepositoryLocalFSSha3::new(layout.blocks_dir),
-                )),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
+                DatasetDefaultLfsBuilder::build_meta_block_repo(layout.blocks_dir),
+                MetadataChainReferenceRepositoryImpl::new(
+                    DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
+                ),
             ),
-            ObjectRepositoryLocalFS::new(layout.data_dir),
-            ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
-            NamedObjectRepositoryLocalFS::new(layout.info_dir),
+            DatasetDefaultLfsBuilder::build_data_repo(layout.data_dir),
+            DatasetDefaultLfsBuilder::build_checkpoint_repo(layout.checkpoints_dir),
+            DatasetDefaultLfsBuilder::build_info_repo(layout.info_dir),
             Url::from_directory_path(&layout.root_dir).unwrap(),
         )
     }
@@ -141,10 +141,12 @@ impl DatasetFactoryImpl {
                         header_map.clone(),
                     ),
                 )),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
-                    client.clone(),
-                    base_url.join("refs/").unwrap(),
-                    header_map.clone(),
+                MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
+                    NamedObjectRepositoryHttp::new(
+                        client.clone(),
+                        base_url.join("refs/").unwrap(),
+                        header_map.clone(),
+                    ),
                 )),
             ),
             ObjectRepositoryHttp::new(
@@ -178,6 +180,8 @@ impl DatasetFactoryImpl {
         // TODO: PERF: We should ensure optimal credential reuse.
         //             Perhaps in future we should create a cache of S3Contexts keyed
         //             by an endpoint.
+
+        use super::DatasetDefaultS3Builder;
         let mut s3_context = S3Context::from_url(&base_url).await;
         if let Some(metrics) = maybe_s3_metrics {
             s3_context = s3_context.with_metrics(metrics);
@@ -185,16 +189,16 @@ impl DatasetFactoryImpl {
 
         DatasetImpl::new(
             MetadataChainImpl::new(
-                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
-                    ObjectRepositoryS3Sha3::new(s3_context.sub_context("blocks/")),
-                )),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
-                    s3_context.sub_context("refs/"),
-                )),
+                DatasetDefaultS3Builder::build_meta_block_repo(
+                    DatasetDefaultS3Builder::build_base_block_repo(&s3_context),
+                ),
+                MetadataChainReferenceRepositoryImpl::new(
+                    DatasetDefaultS3Builder::build_refs_repo(&s3_context),
+                ),
             ),
-            ObjectRepositoryS3Sha3::new(s3_context.sub_context("data/")),
-            ObjectRepositoryS3Sha3::new(s3_context.sub_context("checkpoints/")),
-            NamedObjectRepositoryS3::new(s3_context.into_sub_context("info/")),
+            DatasetDefaultS3Builder::build_data_repo(&s3_context),
+            DatasetDefaultS3Builder::build_checkpoint_repo(&s3_context),
+            DatasetDefaultS3Builder::build_info_repo(&s3_context),
             base_url,
         )
     }
@@ -263,9 +267,11 @@ impl DatasetFactoryImpl {
                         Default::default(),
                     ),
                 )),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryIpfsHttp::new(
-                    client.clone(),
-                    dataset_url.join("refs/").unwrap(),
+                MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
+                    NamedObjectRepositoryIpfsHttp::new(
+                        client.clone(),
+                        dataset_url.join("refs/").unwrap(),
+                    ),
                 )),
             ),
             ObjectRepositoryHttp::new(

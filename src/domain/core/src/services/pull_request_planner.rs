@@ -79,6 +79,20 @@ impl PullPlanIterationJob {
             Self::Sync(psi) => psi.maybe_original_request,
         }
     }
+
+    pub fn detach_from_transaction(&self) {
+        match self {
+            Self::Ingest(pii) => pii.target.detach_from_transaction(),
+            Self::Transform(pti) => {
+                pti.target.detach_from_transaction();
+                pti.plan.datasets_map.detach_from_transaction();
+            }
+            Self::Sync(psi) => {
+                psi.sync_request.src.detach_from_transaction();
+                psi.sync_request.dst.detach_from_transaction();
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

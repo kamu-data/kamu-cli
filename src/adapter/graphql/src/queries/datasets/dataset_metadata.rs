@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{
+use kamu_datasets::{
     DatasetDependency,
     GetDatasetDownstreamDependenciesUseCase,
     GetDatasetUpstreamDependenciesUseCase,

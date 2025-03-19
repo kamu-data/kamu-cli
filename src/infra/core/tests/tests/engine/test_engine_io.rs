@@ -149,15 +149,12 @@ async fn test_engine_io_common<
             .await
             .unwrap();
 
-    ingest_svc
-        .ingest(
-            root_target.clone(),
-            Box::new(root_metadata_state),
-            PollingIngestOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+    ingest(
+        &ingest_svc,
+        root_target.clone(),
+        Box::new(root_metadata_state),
+    )
+    .await;
 
     ///////////////////////////////////////////////////////////////////////////
     // Derivative setup
@@ -235,15 +232,12 @@ async fn test_engine_io_common<
             .await
             .unwrap();
 
-    ingest_svc
-        .ingest(
-            root_target,
-            Box::new(root_metadata_state),
-            PollingIngestOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+    ingest(
+        &ingest_svc,
+        root_target.clone(),
+        Box::new(root_metadata_state),
+    )
+    .await;
 
     let block_hash = match transform_helper
         .transform_dataset(deriv_target.clone())
@@ -297,6 +291,8 @@ async fn test_engine_io_local_file_mount() {
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
         .build();
 
     let storage_unit = catalog
@@ -344,6 +340,8 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
             odf::dataset::DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()),
         )
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
+        .add::<odf::dataset::DatasetDefaultS3Builder>()
+        .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3Builder>()
         .build();
 
     let storage_unit = catalog
@@ -373,3 +371,37 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn ingest(
+    ingest_svc: &dyn PollingIngestService,
+    target: ResolvedDataset,
+    metadata_state: Box<DataWriterMetadataState>,
+) {
+    let ingest_result = ingest_svc
+        .ingest(
+            target.clone(),
+            metadata_state,
+            PollingIngestOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    if let PollingIngestResult::Updated {
+        old_head, new_head, ..
+    } = &ingest_result
+    {
+        target
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(Some(old_head)),
+                },
+            )
+            .await
+            .unwrap();
+    }
+}

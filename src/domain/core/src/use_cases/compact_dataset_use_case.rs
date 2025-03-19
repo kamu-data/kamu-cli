@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
@@ -85,6 +85,18 @@ impl From<DatasetActionUnauthorizedError> for CompactionError {
         match v {
             DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
             DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<odf::dataset::SetChainRefError> for CompactionError {
+    fn from(v: odf::dataset::SetChainRefError) -> Self {
+        match v {
+            odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
+            odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
+            _ => Self::Internal(v.int_err()),
         }
     }
 }

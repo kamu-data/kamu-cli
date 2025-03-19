@@ -9,3 +9,6 @@
 
 mod auth_utils;
 pub use auth_utils::*;
+
+mod base_gql_dataset_harness;
+pub use base_gql_dataset_harness::*;

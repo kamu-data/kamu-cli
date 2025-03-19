@@ -86,6 +86,7 @@ odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }
 
 indoc = "2"
+oop = "0.0.2"
 pretty_assertions = { version = "1" }
 tempfile = "3"
 test-group = { version = "1" }

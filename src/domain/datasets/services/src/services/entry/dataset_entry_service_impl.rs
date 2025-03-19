@@ -590,7 +590,9 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
                     CreateDatasetEntryError::NameCollision(e)
                 }
                 SaveDatasetEntryError::Internal(e) => CreateDatasetEntryError::Internal(e),
-            })
+            })?;
+
+        Ok(())
     }
 
     async fn rename_entry(

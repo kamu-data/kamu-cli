@@ -10,93 +10,126 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
-use kamu_datasets::CreateDatasetUseCase;
-use kamu_datasets_services::testing::expect_outbox_dataset_created;
-use kamu_datasets_services::{
-    CreateDatasetUseCaseImpl,
-    DatasetEntryWriter,
-    DependencyGraphWriter,
-    MockDatasetEntryWriter,
-    MockDependencyGraphWriter,
-};
-use messaging_outbox::MockOutbox;
-use mockall::predicate::{always, eq};
+use chrono::{TimeZone, Utc};
+use kamu_core::MockDidGenerator;
+use kamu_datasets::{CreateDatasetUseCase, DatasetReferenceRepository};
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::CreateDatasetUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
+use time_source::SystemTimeSourceStub;
+
+use super::dataset_base_use_case_harness::{
+    DatasetBaseUseCaseHarness,
+    DatasetBaseUseCaseHarnessOpts,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_create_root_dataset() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
-    mock_dataset_entry_writer
-        .expect_create_entry()
-        .with(always(), always(), eq(alias_foo.dataset_name.clone()))
-        .once()
-        .returning(|_, _, _| Ok(()));
+    let harness = CreateUseCaseHarness::new(predefined_foo_id.clone()).await;
 
-    let mut mock_dependency_graph_writer = MockDependencyGraphWriter::new();
-    mock_dependency_graph_writer
-        .expect_create_dataset_node()
-        .once()
-        .returning(|_| Ok(()));
-
-    let mut mock_outbox = MockOutbox::new();
-    expect_outbox_dataset_created(&mut mock_outbox, 1);
-
-    let harness = CreateUseCaseHarness::new(
-        mock_dataset_entry_writer,
-        mock_dependency_graph_writer,
-        mock_outbox,
-    );
-
-    harness
+    let foo_created = harness
         .use_case
         .execute(
             &alias_foo,
-            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
-                .build_typed(),
+            MetadataFactory::metadata_block(
+                MetadataFactory::seed(odf::DatasetKind::Root)
+                    .id(predefined_foo_id.clone())
+                    .build(),
+            )
+            .system_time(harness.system_time_source().now())
+            .build_typed(),
             Default::default(),
         )
         .await
         .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
+
+    assert_eq!(
+        harness
+            .get_dataset_reference(&predefined_foo_id, &odf::BlockRef::Head)
+            .await,
+        foo_created.head,
+    );
+
+    // Note: the stability of these identifiers is ensured via
+    //  predefined dataset ID and stubbed system time
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            Dataset Lifecycle Messages: 1
+              Created {
+                Dataset ID: <foo_id>
+                Dataset Name: foo
+                Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
+                Visibility: private
+              }
+            Dataset Reference Messages: 1
+              Ref Updated {
+                Dataset ID: <foo_id>
+                Ref: head
+                Prev Head: None
+                New Head: Multihash<Sha3_256>(<new_head>)
+              }
+            "#
+        )
+        .replace("<foo_id>", predefined_foo_id.to_string().as_str())
+        .replace("<new_head>", foo_created.head.to_string().as_str()),
+        harness.collected_outbox_messages()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
+#[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct CreateUseCaseHarness {
-    base_use_case_harness: BaseUseCaseHarness,
+    dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetUseCase>,
+    dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
 }
 
 impl CreateUseCaseHarness {
-    fn new(
-        mock_dataset_entry_writer: MockDatasetEntryWriter,
-        mock_dependency_graph_writer: MockDependencyGraphWriter,
-        mock_outbox: MockOutbox,
-    ) -> Self {
-        let base_use_case_harness =
-            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().with_outbox(mock_outbox));
+    async fn new(predefined_dataset_id: odf::DatasetID) -> Self {
+        let dataset_base_use_case_harness =
+            DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
+                maybe_system_time_source_stub: Some(SystemTimeSourceStub::new_set(
+                    Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+                )),
+                maybe_mock_did_generator: Some(MockDidGenerator::predefined_dataset_ids(vec![
+                    predefined_dataset_id,
+                ])),
+                ..DatasetBaseUseCaseHarnessOpts::default()
+            })
+            .await;
 
-        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
-            .add::<CreateDatasetUseCaseImpl>()
-            .add_value(mock_dataset_entry_writer)
-            .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-            .add_value(mock_dependency_graph_writer)
-            .bind::<dyn DependencyGraphWriter, MockDependencyGraphWriter>()
-            .build();
+        let mut b = dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.catalog());
 
-        let use_case = catalog.get_one::<dyn CreateDatasetUseCase>().unwrap();
+        b.add::<CreateDatasetUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>();
+
+        let catalog = b.build();
 
         Self {
-            base_use_case_harness,
-            use_case,
+            dataset_base_use_case_harness,
+            use_case: catalog.get_one().unwrap(),
+            dataset_reference_repo: catalog.get_one().unwrap(),
         }
+    }
+
+    async fn get_dataset_reference(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> odf::Multihash {
+        self.dataset_reference_repo
+            .get_dataset_reference(dataset_id, block_ref)
+            .await
+            .unwrap()
     }
 }
 

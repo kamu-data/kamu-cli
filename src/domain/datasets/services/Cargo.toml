@@ -21,7 +21,9 @@ workspace = true
 doctest = false
 
 [features]
-default = []
+default = ["lfs"]
+lfs = []
+s3 = []
 testing = ["dep:mockall", "dep:serde_json"]
 
 
@@ -35,9 +37,10 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
 mockall = { optional = true, version = "0.13" }
-serde_json = { optional = true, version = "1" }
+s3-utils = { workspace = true }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }
 time-source = { workspace = true }
+
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
@@ -47,10 +50,12 @@ petgraph = { version = "0.7", default-features = false, features = [
     "stable_graph",
 ] }
 secrecy = "0.10"
+serde_json = { optional = true, version = "1" }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
+url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
 
 

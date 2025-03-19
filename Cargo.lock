@@ -5585,8 +5585,6 @@ dependencies = [
  "itertools 0.14.0",
  "kamu",
  "kamu-accounts",
- "kamu-accounts-inmem",
- "kamu-accounts-services",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -5892,6 +5890,7 @@ dependencies = [
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "messaging-outbox",
+ "oop",
  "opendatafabric",
  "pretty_assertions",
  "secrecy",
@@ -6509,6 +6508,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tracing",
  "uuid",
 ]
 
@@ -6556,6 +6556,7 @@ dependencies = [
  "opendatafabric",
  "petgraph 0.7.1",
  "pretty_assertions",
+ "s3-utils",
  "secrecy",
  "serde_json",
  "tempfile",
@@ -6565,6 +6566,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -6586,6 +6588,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tracing",
  "uuid",
 ]
 
@@ -8032,6 +8035,7 @@ dependencies = [
  "opendatafabric-metadata",
  "opendatafabric-storage",
  "pin-project",
+ "s3-utils",
  "serde",
  "serde_with",
  "strum",
@@ -9509,9 +9513,9 @@ dependencies = [
 
 [[package]]
 name = "ring"
-version = "0.17.12"
+version = "0.17.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed9b823fa29b721a59671b41d6b06e66b29e0628e207e8b1c3ceeda701ec928d"
+checksum = "70ac5d832aa16abd7d1def883a8545280c20a60f523a370aa3a9617c2b8550ee"
 dependencies = [
  "cc",
  "cfg-if",

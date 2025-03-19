@@ -12,7 +12,7 @@ use std::assert_matches::assert_matches;
 use odf::dataset::*;
 use odf::metadata::testing::MetadataFactory;
 use odf::metadata::*;
-use opendatafabric_dataset_impl::{DatasetFactoryImpl, DatasetLayout};
+use opendatafabric_dataset_impl::DatasetFactoryImpl;
 
 #[tokio::test]
 async fn test_summary_updates() {

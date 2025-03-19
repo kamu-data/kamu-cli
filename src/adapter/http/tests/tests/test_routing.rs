@@ -23,15 +23,15 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::DatasetAuthorizationLayer;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
+use kamu_datasets::*;
+use kamu_datasets_inmem::{
+    InMemoryDatasetDependencyRepository,
+    InMemoryDatasetEntryRepository,
+    InMemoryDatasetReferenceRepository,
 };
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -56,18 +56,26 @@ async fn setup_repo() -> RepoFixture {
     let mut b = dill::CatalogBuilder::new();
     b.add::<SystemTimeSourceDefault>()
         .add::<DidGeneratorDefault>()
-        .add::<DummyOutboxImpl>()
+        .add_builder(
+            messaging_outbox::OutboxImmediateImpl::builder()
+                .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+        )
+        .bind::<dyn Outbox, OutboxImmediateImpl>()
+        .add::<DatabaseTransactionRunner>()
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDatasetDependencyRepository>()
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CreateDatasetUseCaseImpl>()
-        .add::<DatabaseTransactionRunner>()
+        .add::<CreateDatasetUseCaseHelper>()
+        .add::<DatasetReferenceServiceImpl>()
+        .add::<InMemoryDatasetReferenceRepository>()
         .add::<DatasetEntryServiceImpl>()
         .add::<InMemoryDatasetEntryRepository>()
         .add::<AccountServiceImpl>()
@@ -77,6 +85,16 @@ async fn setup_repo() -> RepoFixture {
         .add::<LoginPasswordAuthProvider>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
+
+    register_message_dispatcher::<DatasetLifecycleMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+    );
+
+    register_message_dispatcher::<DatasetReferenceMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    );
 
     let catalog = b.build();
 

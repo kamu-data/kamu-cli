@@ -57,6 +57,12 @@ impl ResolvedDatasetsMap {
                 .insert(handle.id.clone(), resolved_dataset);
         }
     }
+
+    pub fn detach_from_transaction(&self) {
+        for resolved_dataset in self.resolved_datasets_by_id.values() {
+            resolved_dataset.detach_from_transaction();
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

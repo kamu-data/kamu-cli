@@ -23,12 +23,9 @@ use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::CreateDatasetUseCase;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-};
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
 use mockall::predicate::{eq, function};
 use odf::metadata::testing::MetadataFactory;
@@ -229,6 +226,7 @@ impl ServerHarness {
                 ]))
                 .bind::<dyn DidGenerator, MockDidGenerator>()
                 .add::<DummyOutboxImpl>()
+                .add::<DatabaseTransactionRunner>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(MockAuthenticationService::resolving_token(
@@ -245,8 +243,11 @@ impl ServerHarness {
                 )
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
-                .add::<DatabaseTransactionRunner>()
+                .add::<CreateDatasetUseCaseHelper>()
+                .add::<DatasetReferenceServiceImpl>()
+                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<AccountServiceImpl>()

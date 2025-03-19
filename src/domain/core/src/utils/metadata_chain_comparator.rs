@@ -456,6 +456,10 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
     ) -> Result<odf::Multihash, odf::dataset::AppendError> {
         self.chain.append(block, opts).await
     }
+
+    fn as_uncached_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {
+        self.chain.as_uncached_ref_repo()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

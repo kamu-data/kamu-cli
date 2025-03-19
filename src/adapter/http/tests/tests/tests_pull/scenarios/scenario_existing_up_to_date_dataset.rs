@@ -58,7 +58,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
         let server_dataset_layout =
             server_harness.dataset_layout(&server_create_result.dataset_handle);
 
-        commit_add_data_event(
+        let server_commit_result = commit_add_data_event(
             server_harness.cli_dataset_registry().as_ref(),
             &make_dataset_ref(server_account_name.as_ref(), "foo"),
             &server_dataset_layout,
@@ -85,6 +85,17 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
                 &server_create_result.dataset_handle.id,
                 &client_harness.client_account_id(),
                 &server_create_result.dataset_handle.alias.dataset_name,
+            )
+            .await
+            .unwrap();
+
+        client_harness
+            .dataset_reference_service()
+            .set_reference(
+                &server_create_result.dataset_handle.id,
+                &odf::BlockRef::Head,
+                None,
+                &server_commit_result.new_head,
             )
             .await
             .unwrap();

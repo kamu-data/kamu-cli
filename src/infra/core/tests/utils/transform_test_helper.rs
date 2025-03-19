@@ -87,11 +87,29 @@ impl TransformTestHelper {
             TransformElaboration::UpToDate => return TransformResult::UpToDate,
         };
 
-        self.transform_executor
-            .execute_transform(derived_target, plan, None)
+        let transform_result = self
+            .transform_executor
+            .execute_transform(derived_target.clone(), plan, None)
             .await
             .1
-            .unwrap()
+            .unwrap();
+
+        if let TransformResult::Updated { old_head, new_head } = &transform_result {
+            derived_target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
+
+        transform_result
     }
 
     pub async fn verify_transform(

@@ -11,8 +11,6 @@
 
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
-use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::testing::MockDatasetChangesService;
@@ -24,41 +22,16 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
 };
 use kamu_core::{
-    auth,
     CompactionResult,
     DatasetChangesService,
     DatasetIntervalIncrement,
-    DidGeneratorDefault,
     PullResult,
     ResetResult,
     TenancyConfig,
 };
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
-use kamu_flow_system::{
-    Flow,
-    FlowAgentConfig,
-    FlowAgentTestDriver,
-    FlowConfigurationUpdatedMessage,
-    FlowEventStore,
-    FlowID,
-    FlowTriggerAutoPolling,
-    FlowTriggerType,
-    FlowTriggerUpdatedMessage,
-    METADATA_TASK_FLOW_ID,
-};
-use kamu_flow_system_inmem::{
-    InMemoryFlowConfigurationEventStore,
-    InMemoryFlowEventStore,
-    InMemoryFlowTriggerEventStore,
-};
+use kamu_datasets::*;
+use kamu_flow_system::*;
+use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
@@ -66,11 +39,10 @@ use kamu_flow_system_services::{
 use kamu_task_system::{self as ts, TaskMetadata};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
+use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt};
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
 
-use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
+use crate::utils::{authentication_catalogs, expect_anonymous_access_error, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -3083,8 +3055,9 @@ async fn test_config_snapshot_returned_correctly() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct FlowRunsHarness {
-    _tempdir: tempfile::TempDir,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
@@ -3096,59 +3069,38 @@ struct FlowRunsHarnessOverrides {
 
 impl FlowRunsHarness {
     async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
 
         let catalog_base = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
-            b.add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
-            )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<DidGeneratorDefault>()
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<MetadataQueryServiceImpl>()
-            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .add::<ViewDatasetUseCaseImpl>()
-            .add_value(dataset_changes_mock)
-            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
-            .add::<InMemoryFlowConfigurationEventStore>()
-            .add::<InMemoryFlowTriggerEventStore>()
-            .add::<InMemoryFlowEventStore>()
-            .add_value(FlowAgentConfig::new(
-                Duration::seconds(1),
-                Duration::minutes(1),
-            ))
-            .add::<TaskSchedulerImpl>()
-            .add::<InMemoryTaskEventStore>()
-            .add::<DatasetEntryServiceImpl>()
-            .add::<InMemoryDatasetEntryRepository>()
-            .add::<DatabaseTransactionRunner>();
+            b.add::<MetadataQueryServiceImpl>()
+                .add_value(dataset_changes_mock)
+                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+                .add::<InMemoryFlowConfigurationEventStore>()
+                .add::<InMemoryFlowTriggerEventStore>()
+                .add::<InMemoryFlowEventStore>()
+                .add_value(FlowAgentConfig::new(
+                    Duration::seconds(1),
+                    Duration::minutes(1),
+                ))
+                .add::<TaskSchedulerImpl>()
+                .add::<InMemoryTaskEventStore>();
 
-            NoOpDatabasePlugin::init_database_components(&mut b);
             kamu_flow_system_services::register_dependencies(&mut b);
 
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,
                 ts::MESSAGE_PRODUCER_KAMU_TASK_AGENT,
             );
+
             register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
             );
+
             register_message_dispatcher::<FlowTriggerUpdatedMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
@@ -3161,7 +3113,7 @@ impl FlowRunsHarness {
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         Self {
-            _tempdir: tempdir,
+            base_gql_harness,
             catalog_anonymous,
             catalog_authorized,
         }

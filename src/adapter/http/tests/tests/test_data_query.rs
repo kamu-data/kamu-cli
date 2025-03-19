@@ -121,17 +121,19 @@ impl Harness {
                 .unwrap();
         }
 
+        let target = ResolvedDataset::from_created(&create_result);
+
         let ctx = SessionContext::new();
         let mut writer = DataWriterDataFusion::from_metadata_chain(
             ctx.clone(),
-            ResolvedDataset::from_created(&create_result),
+            target.clone(),
             &odf::BlockRef::Head,
             None,
         )
         .await
         .unwrap();
 
-        writer
+        let write_result = writer
             .write(
                 Some(
                     ctx.read_batch(
@@ -155,6 +157,19 @@ impl Harness {
                     new_watermark: None,
                     new_source_state: None,
                     data_staging_path: run_info_dir.path().join(".temp-data.parquet"),
+                },
+            )
+            .await
+            .unwrap();
+
+        target
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &write_result.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(Some(&write_result.old_head)),
                 },
             )
             .await

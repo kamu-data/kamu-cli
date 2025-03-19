@@ -239,7 +239,7 @@ async fn test_smart_push_existing_ref_collision() {
 
         let dataset_result = &push_result.first().unwrap().result;
         match dataset_result {
-            Ok(_) => panic!(),
+            Ok(r) => panic!("{r:?}"),
             Err(e) => assert_matches!(e, PushError::SyncError(SyncError::RefCollision(_))),
         }
     };

@@ -113,9 +113,9 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
     async fn remove_upstream_dependencies(
         &self,
         downstream_dataset_id: &odf::DatasetID,
-        obsolete_upstream_dataset_ids: &[&odf::DatasetID],
+        upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), RemoveDependenciesError> {
-        if obsolete_upstream_dataset_ids.is_empty() {
+        if upstream_dataset_ids.is_empty() {
             return Ok(());
         }
 
@@ -123,7 +123,7 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
 
         let maybe_current_upstreams = guard.upstream_by_downstream.get_mut(downstream_dataset_id);
         if let Some(current_upstreams) = maybe_current_upstreams {
-            let some_missing = obsolete_upstream_dataset_ids
+            let some_missing = upstream_dataset_ids
                 .iter()
                 .any(|id| !current_upstreams.contains(*id));
             if some_missing {
@@ -134,13 +134,13 @@ impl DatasetDependencyRepository for InMemoryDatasetDependencyRepository {
                 ));
             }
 
-            for obsolete_upstream_id in obsolete_upstream_dataset_ids {
-                current_upstreams.remove(*obsolete_upstream_id);
+            for removed_upstream_id in upstream_dataset_ids {
+                current_upstreams.remove(*removed_upstream_id);
             }
 
-            for obsolete_upstream_id in obsolete_upstream_dataset_ids {
+            for removed_upstream_id in upstream_dataset_ids {
                 if let Some(downstreams) =
-                    guard.downstream_by_upstream.get_mut(*obsolete_upstream_id)
+                    guard.downstream_by_upstream.get_mut(*removed_upstream_id)
                 {
                     downstreams.remove(downstream_dataset_id);
                 }

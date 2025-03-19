@@ -21,8 +21,10 @@ const ACCESS_TOKEN_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Represents messages related to the lifecycle of an access token
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AccessTokenLifecycleMessage {
+    /// Message indicating that an access token has been created
     Created(AccessTokenLifecycleMessageCreated),
 }
 
@@ -45,8 +47,14 @@ impl Message for AccessTokenLifecycleMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Contains details about a newly created access token
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccessTokenLifecycleMessageCreated {
+    /// The name of the access token
     pub token_name: String,
+
+    /// The unique identifier of the account that owns the token
     pub owner_id: odf::AccountID,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

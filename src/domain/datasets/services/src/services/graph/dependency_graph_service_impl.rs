@@ -20,12 +20,24 @@ use kamu_core::{
     DependencyOrder,
     GetDependenciesError,
 };
-use kamu_datasets::{DatasetDependencies, DatasetDependencyRepository};
+use kamu_datasets::{
+    DatasetDependencies,
+    DatasetDependenciesMessage,
+    DatasetDependencyRepository,
+    DatasetLifecycleMessage,
+    MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
+use messaging_outbox::{
+    MessageConsumer,
+    MessageConsumerMeta,
+    MessageConsumerT,
+    MessageDeliveryMechanism,
+};
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
-
-use super::DependencyGraphWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -72,7 +84,17 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
-#[interface(dyn DependencyGraphWriter)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[interface(dyn MessageConsumerT<DatasetDependenciesMessage>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+    ],
+    delivery: MessageDeliveryMechanism::Transactional,
+})]
 #[scope(Singleton)]
 impl DependencyGraphServiceImpl {
     pub fn new() -> Self {
@@ -370,78 +392,82 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl MessageConsumer for DependencyGraphServiceImpl {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
-impl DependencyGraphWriter for DependencyGraphServiceImpl {
-    async fn create_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-
-        state.get_or_create_dataset_node(dataset_id);
-
-        Ok(())
-    }
-
-    async fn remove_dataset_node(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-
-        let node_index = state.get_dataset_node(dataset_id).int_err()?;
-
-        state.datasets_graph.remove_node(node_index);
-        state.dataset_node_indices.remove(dataset_id);
-
-        Ok(())
-    }
-
-    async fn update_dataset_node_dependencies(
+impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DependencyGraphServiceImpl[DatasetLifecycleMessage]"
+    )]
+    async fn consume_message(
         &self,
-        catalog: &Catalog,
-        dataset_id: &odf::DatasetID,
-        new_upstream_ids: Vec<odf::DatasetID>,
+        _: &Catalog,
+        message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
-        let repository = catalog
-            .get_one::<dyn DatasetDependencyRepository>()
-            .unwrap();
+        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
 
-        let mut state = self.state.write().await;
+        match message {
+            DatasetLifecycleMessage::Created(created) => {
+                let mut state = self.state.write().await;
 
-        let node_index = state.get_dataset_node(dataset_id).int_err()?;
+                state.get_or_create_dataset_node(&created.dataset_id);
 
-        let existing_upstream_ids: HashSet<_> = state
-            .datasets_graph
-            .neighbors_directed(node_index, Direction::Incoming)
-            .map(|node_index| {
-                state
-                    .datasets_graph
-                    .node_weight(node_index)
-                    .unwrap()
-                    .clone()
-            })
-            .collect();
+                Ok(())
+            }
 
-        let new_upstream_ids: HashSet<_> = new_upstream_ids.iter().cloned().collect();
+            DatasetLifecycleMessage::Deleted(deleted) => {
+                let mut state = self.state.write().await;
 
-        let obsolete_dependencies: Vec<_> = existing_upstream_ids
-            .difference(&new_upstream_ids)
-            .collect();
-        let added_dependencies: Vec<_> = new_upstream_ids
-            .difference(&existing_upstream_ids)
-            .collect();
+                let node_index = state.get_dataset_node(&deleted.dataset_id).int_err()?;
 
-        repository
-            .remove_upstream_dependencies(dataset_id, &obsolete_dependencies)
-            .await
-            .int_err()?;
+                state.datasets_graph.remove_node(node_index);
+                state.dataset_node_indices.remove(&deleted.dataset_id);
 
-        repository
-            .add_upstream_dependencies(dataset_id, &added_dependencies)
-            .await
-            .int_err()?;
+                Ok(())
+            }
 
-        for obsolete_upstream_id in obsolete_dependencies {
-            self.remove_dependency(&mut state, obsolete_upstream_id, dataset_id);
+            // No action required
+            DatasetLifecycleMessage::Renamed(_) => Ok(()),
         }
+    }
+}
 
-        for added_id in added_dependencies {
-            self.add_dependency(&mut state, added_id, dataset_id);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<DatasetDependenciesMessage> for DependencyGraphServiceImpl {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DependencyGraphServiceImpl[DatasetDependenciesMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &DatasetDependenciesMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received dataset dependencies message");
+
+        match message {
+            DatasetDependenciesMessage::Updated(updated_message) => {
+                let mut state = self.state.write().await;
+
+                for removed_upstream_id in &updated_message.removed_upstream_ids {
+                    self.remove_dependency(
+                        &mut state,
+                        removed_upstream_id,
+                        &updated_message.dataset_id,
+                    );
+                }
+
+                for added_id in &updated_message.added_upstream_ids {
+                    self.add_dependency(&mut state, added_id, &updated_message.dataset_id);
+                }
+            }
         }
 
         Ok(())

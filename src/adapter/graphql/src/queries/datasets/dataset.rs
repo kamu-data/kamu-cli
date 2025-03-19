@@ -9,7 +9,6 @@
 
 use chrono::prelude::*;
 use kamu_core::{auth, ServerUrlConfig};
-use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -33,28 +32,16 @@ impl Dataset {
     }
 
     #[graphql(skip)]
-    pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
-
-        let handle = view_dataset_use_case.execute(dataset_ref).await.int_err()?;
-        let account = Account::from_dataset_alias(ctx, &handle.alias)
-            .await?
-            .expect("Account must exist");
-
-        Ok(Dataset::new_access_checked(account, handle))
-    }
-
-    #[graphql(skip)]
     pub async fn try_from_ref(
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<TransformInputDataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
+        let view_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::ViewDatasetUseCase);
 
         let handle = match view_dataset_use_case.execute(dataset_ref).await {
             Ok(handle) => Ok(handle),
             Err(e) => match e {
-                ViewDatasetUseCaseError::Access(_) => {
+                kamu_datasets::ViewDatasetUseCaseError::Access(_) => {
                     return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
                 }
                 unexpected_error => Err(unexpected_error.int_err()),
@@ -67,6 +54,17 @@ impl Dataset {
         let dataset = Dataset::new_access_checked(account, handle);
 
         Ok(TransformInputDataset::accessible(dataset))
+    }
+
+    #[graphql(skip)]
+    pub fn from_resolved_authorized_dataset(
+        owner: Account,
+        resolved_dataset: &kamu_core::ResolvedDataset,
+    ) -> Self {
+        Self {
+            dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())
+                .with_owner(owner),
+        }
     }
 
     /// Unique identifier of the dataset

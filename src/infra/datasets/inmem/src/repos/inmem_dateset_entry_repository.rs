@@ -38,7 +38,7 @@ impl State {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetEntryRepository {
-    listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
+    removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
     state: Arc<RwLock<State>>,
 }
 
@@ -46,9 +46,9 @@ pub struct InMemoryDatasetEntryRepository {
 #[interface(dyn DatasetEntryRepository)]
 #[scope(Singleton)]
 impl InMemoryDatasetEntryRepository {
-    pub fn new(listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>) -> Self {
+    pub fn new(removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>) -> Self {
         Self {
-            listeners,
+            removal_listeners,
             state: Arc::new(RwLock::new(State::new())),
         }
     }
@@ -292,7 +292,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             }
         }
 
-        for listener in &self.listeners {
+        for listener in &self.removal_listeners {
             listener
                 .on_dataset_entry_removed(dataset_id)
                 .await

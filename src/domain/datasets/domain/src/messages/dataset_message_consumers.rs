@@ -12,4 +12,16 @@
 pub const MESSAGE_CONSUMER_KAMU_DATASET_ENTRY_SERVICE: &str =
     "dev.kamu.domain.datasets.DatasetEntryService";
 
+pub const MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE: &str =
+    "dev.kamu.domain.datasets.DependencyGraphService";
+
+pub const MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_IMMEDIATE_LISTENER: &str =
+    "dev.kamu.domain.datasets.DependencyGraphImmediateListener";
+
+pub const MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE: &str =
+    "dev.kamu.domain.datasets.DatasetReferenceService";
+
+pub const MESSAGE_CONSUMER_KAMU_DATASET_ALIAS_UPDATE_HANDLER: &str =
+    "dev.kamu.domain.datasets.DatasetAliasUpdateHandler";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

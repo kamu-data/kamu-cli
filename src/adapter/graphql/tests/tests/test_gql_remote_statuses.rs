@@ -10,28 +10,16 @@
 use std::sync::Arc;
 
 use async_graphql::*;
-use database_common::NoOpDatabasePlugin;
 use dill::*;
 use indoc::indoc;
 use internal_error::InternalError;
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
-use kamu_datasets::CreateDatasetFromSnapshotUseCase;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
-use messaging_outbox::DummyOutboxImpl;
+use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
-use tempfile::TempDir;
-use time_source::SystemTimeSourceDefault;
 use url::Url;
 
-use crate::utils::authentication_catalogs;
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,7 +28,7 @@ async fn test_remote_push_statuses() {
     let harness = PushStatusesTestHarness::new();
 
     // Init dataset with no sources
-    let (_, catalog_authorized) = authentication_catalogs(&harness.base_catalog).await;
+    let (_, catalog_authorized) = authentication_catalogs(&harness.catalog).await;
 
     let create_dataset_from_snapshot = catalog_authorized
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -135,50 +123,28 @@ async fn test_remote_push_statuses() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct PushStatusesTestHarness {
-    base_catalog: Catalog,
-    _tempdir: TempDir,
+    base_gql_harness: BaseGQLDatasetHarness,
+    catalog: Catalog,
 }
 
 impl PushStatusesTestHarness {
     fn new() -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
 
-        let base_catalog = {
-            let mut b = CatalogBuilder::new();
+        let catalog = {
+            let mut b = CatalogBuilder::new_chained(base_gql_harness.catalog());
 
-            b.add_value(RunInfoDir::new(tempdir.path().join("run")))
-                .add::<DidGeneratorDefault>()
-                .add::<DummyOutboxImpl>()
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
-                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
-                .add::<ViewDatasetUseCaseImpl>()
-                .add::<SystemTimeSourceDefault>()
-                .add_value(TenancyConfig::SingleTenant)
-                .add_value(FakeRemoteStatusService {})
-                .bind::<dyn RemoteStatusService, FakeRemoteStatusService>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
+            b.add_value(FakeRemoteStatusService {})
+                .bind::<dyn RemoteStatusService, FakeRemoteStatusService>();
 
             b.build()
         };
 
         Self {
-            base_catalog,
-            _tempdir: tempdir,
+            base_gql_harness,
+            catalog,
         }
     }
 }

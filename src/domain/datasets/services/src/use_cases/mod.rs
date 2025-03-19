@@ -12,6 +12,8 @@ mod commit_dataset_event_use_case_impl;
 mod create_dataset_from_snapshot_use_case_impl;
 mod create_dataset_use_case_impl;
 mod delete_dataset_use_case_impl;
+mod get_dataset_downstream_dependencies_use_case_impl;
+mod get_dataset_upstream_dependencies_use_case_impl;
 mod rename_dataset_use_case_impl;
 mod view_dataset_use_case_impl;
 
@@ -20,5 +22,7 @@ pub use commit_dataset_event_use_case_impl::*;
 pub use create_dataset_from_snapshot_use_case_impl::*;
 pub use create_dataset_use_case_impl::*;
 pub use delete_dataset_use_case_impl::*;
+pub use get_dataset_downstream_dependencies_use_case_impl::*;
+pub use get_dataset_upstream_dependencies_use_case_impl::*;
 pub use rename_dataset_use_case_impl::*;
 pub use view_dataset_use_case_impl::*;
