@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method;
+use database_common_macros::transactional_method1;
 use dill::*;
 use internal_error::InternalError;
 use kamu_core::*;
@@ -90,18 +90,20 @@ impl TaskRunnerImpl {
         }
     }
 
-    #[transactional_method]
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn run_sync_update(
         &self,
-        sync_request: SyncRequest,
+        mut sync_request: SyncRequest,
         sync_opts: SyncOptions,
     ) -> Result<TaskOutcome, InternalError> {
         sync_request
             .src
-            .reattach_to_transaction(&transaction_catalog);
+            .refresh_dataset_from_registry(dataset_registry.as_ref())
+            .await;
         sync_request
             .dst
-            .reattach_to_transaction(&transaction_catalog);
+            .refresh_dataset_from_registry(dataset_registry.as_ref())
+            .await;
 
         let sync_response = self.sync_service.sync(sync_request, sync_opts, None).await;
         match sync_response {
@@ -136,8 +138,12 @@ impl TaskRunnerImpl {
                 } = &ingest_result
                 {
                     // Update the reference transactionally
-                    self.update_dataset_head(ingest_item.target, Some(old_head), new_head)
-                        .await?;
+                    self.update_dataset_head(
+                        ingest_item.target.get_handle(),
+                        Some(old_head),
+                        new_head,
+                    )
+                    .await?;
                 }
 
                 Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
@@ -191,7 +197,7 @@ impl TaskRunnerImpl {
                         if let TransformResult::Updated { old_head, new_head } = &transform_result {
                             // Update the reference transactionally
                             self.update_dataset_head(
-                                transform_item.target,
+                                transform_item.target.get_handle(),
                                 Some(old_head),
                                 new_head,
                             )
@@ -215,19 +221,18 @@ impl TaskRunnerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?task_reset))]
-    #[transactional_method]
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn run_reset(
         &self,
         task_reset: TaskDefinitionReset,
     ) -> Result<TaskOutcome, InternalError> {
-        // Reattach the transaction
-        task_reset
-            .target
-            .reattach_to_transaction(&transaction_catalog);
+        let target = dataset_registry
+            .get_dataset_by_handle(&task_reset.dataset_handle)
+            .await;
 
         let reset_result_maybe = self
             .reset_executor
-            .execute(task_reset.target, task_reset.reset_plan)
+            .execute(target, task_reset.reset_plan)
             .await;
 
         match reset_result_maybe {
@@ -278,8 +283,12 @@ impl TaskRunnerImpl {
                 } = &compaction_result
                 {
                     // Update the reference transactionally
-                    self.update_dataset_head(task_compact.target, Some(old_head), new_head)
-                        .await?;
+                    self.update_dataset_head(
+                        task_compact.target.get_handle(),
+                        Some(old_head),
+                        new_head,
+                    )
+                    .await?;
                 }
 
                 Ok(TaskOutcome::Success(TaskResult::CompactionDatasetResult(
@@ -300,15 +309,15 @@ impl TaskRunnerImpl {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(dataset_handle=%target.get_handle(), %new_head))]
-    #[transactional_method]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_head))]
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn update_dataset_head(
         &self,
-        target: ResolvedDataset,
+        dataset_handle: &odf::DatasetHandle,
         old_head: Option<&odf::Multihash>,
         new_head: &odf::Multihash,
     ) -> Result<(), InternalError> {
-        target.reattach_to_transaction(&transaction_catalog);
+        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
         target
             .as_metadata_chain()

@@ -28,11 +28,6 @@ pub trait Dataset: Send + Sync {
         // Nothing to do by default
     }
 
-    /// Reattaches this dataset to new transaction catalog
-    fn reattach_to_transaction(&self, _catalog: &dill::Catalog) {
-        // Nothing to do by default
-    }
-
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.

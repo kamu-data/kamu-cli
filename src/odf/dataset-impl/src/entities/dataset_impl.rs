@@ -378,11 +378,6 @@ where
         self.metadata_chain.detach_from_transaction();
     }
 
-    /// Reattaches this dataset to new transaction catalog
-    fn reattach_to_transaction(&self, catalog: &dill::Catalog) {
-        self.metadata_chain.reattach_to_transaction(catalog);
-    }
-
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.

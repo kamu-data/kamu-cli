@@ -59,12 +59,6 @@ where
         write_guard.maybe_dataset_ref_service = None;
     }
 
-    fn reattach_to_transaction(&self, catalog: &dill::Catalog) {
-        let mut write_guard = self.state.write().unwrap();
-        write_guard.maybe_dataset_ref_service =
-            Some(catalog.get_one::<dyn DatasetReferenceService>().unwrap());
-    }
-
     #[tracing::instrument(level="debug", skip_all, fields(%r))]
     async fn get_ref(
         &self,

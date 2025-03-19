@@ -81,9 +81,9 @@ impl SyncRef {
         }
     }
 
-    pub fn reattach_to_transaction(&self, catalog: &dill::Catalog) {
+    pub async fn refresh_dataset_from_registry(&mut self, dataset_registry: &dyn DatasetRegistry) {
         if let Self::Local(r) = self {
-            r.reattach_to_transaction(catalog);
+            *r = dataset_registry.get_dataset_by_handle(r.get_handle()).await;
         }
     }
 }

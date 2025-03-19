@@ -27,10 +27,6 @@ pub trait MetadataChain: Send + Sync {
         // Nothing to do by default
     }
 
-    fn reattach_to_transaction(&self, _catalog: &dill::Catalog) {
-        // Nothing to do by default
-    }
-
     /// Returns true if chain contains block
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;
 

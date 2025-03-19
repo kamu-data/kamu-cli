@@ -138,7 +138,7 @@ impl TaskDefinitionPlannerImpl {
         target.detach_from_transaction();
 
         Ok(TaskDefinition::Reset(TaskDefinitionReset {
-            target,
+            dataset_handle: target.take_handle(),
             reset_plan,
         }))
     }

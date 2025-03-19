@@ -19,10 +19,6 @@ pub trait MetadataChainReferenceRepository: Send + Sync {
         // Nothing to do by default
     }
 
-    fn reattach_to_transaction(&self, _catalog: &dill::Catalog) {
-        // Nothing to do by default
-    }
-
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
     async fn set_ref<'a>(
