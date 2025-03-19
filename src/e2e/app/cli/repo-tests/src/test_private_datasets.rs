@@ -1016,33 +1016,36 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_authorized_users(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_be_pulled_by_anyone(
-    kamu_api_server_client: KamuApiServerClient,
+    anonymous: KamuApiServerClient,
 ) {
-    // 4 actors:
-    // - anonymous
-    // - alice (owner) w/ datasets
-    // - bob (not owner)
-    // - admin
-    let mut owner_client = kamu_api_server_client;
-    let owner_name = odf::AccountName::new_unchecked("alice");
-    owner_client
-        .auth()
-        .login_with_password(owner_name.as_str(), "alice")
-        .await;
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
 
     // ┌────────────────────────────┐
-    // │ alice/public-root-dataset  ├◄──┐
+    // │ owner/public-root-dataset  ├◄──┐
     // └────────────────────────────┘   │   ┌─────────────────────────────────┐
-    //                                  ├───┤ alice/public-derivative-dataset │
+    //                                  ├───┤ owner/public-derivative-dataset │
     // ┌────────────────────────────┐   │   └─────────────────────────────────┘
-    // │ alice/private-root-dataset ├◄──┘
+    // │ owner/private-root-dataset ├◄──┘
     // └────────────────────────────┘
     //
-    let public_root_dataset_alias = odf::metadata::testing::alias(&"alice", &"public-root-dataset");
+    use odf::metadata::testing::alias;
+
+    let public_root_dataset_alias = alias(&"owner", &"public-root-dataset");
     let CreateDatasetResponse {
         dataset_id: _public_root_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -1051,12 +1054,11 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
             odf::DatasetVisibility::Public,
         )
         .await;
-    let private_root_dataset_alias =
-        odf::metadata::testing::alias(&"alice", &"private-root-dataset");
+    let private_root_dataset_alias = alias(&"owner", &"private-root-dataset");
     let CreateDatasetResponse {
         dataset_id: _private_root_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -1065,9 +1067,11 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
             odf::DatasetVisibility::Private,
         )
         .await;
-    let public_derivative_dataset_alias =
-        odf::metadata::testing::alias(&"alice", &"public-derivative-dataset");
-    owner_client
+    let public_derivative_dataset_alias = alias(&"owner", &"public-derivative-dataset");
+    let CreateDatasetResponse {
+        dataset_id: private_derivative_dataset_id,
+        ..
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -1086,65 +1090,65 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
         )
         .await;
 
-    let public_derivative_dataset_ref: odf::DatasetRefAny = owner_client
+    authorize_users_by_roles(
+        &owner,
+        &[&private_derivative_dataset_id],
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
+
+    let node_url = owner.get_base_url();
+
+    let sitp_public_derivative_dataset_url = owner
         .dataset()
-        .get_odf_endpoint(&public_derivative_dataset_alias)
-        .into();
-    let node_url = owner_client.get_base_url();
+        .get_endpoint(&public_derivative_dataset_alias);
+    let sitp_public_derivative_dataset_ref: odf::DatasetRefAny =
+        sitp_public_derivative_dataset_url.clone().into();
 
-    {
-        let anonymous_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+    let smtp_public_derivative_dataset_url = owner
+        .dataset()
+        .get_endpoint(&public_derivative_dataset_alias);
+    let smtp_public_derivative_dataset_ref: odf::DatasetRefAny =
+        smtp_public_derivative_dataset_url.clone().into();
 
-        anonymous_workspace
-            .assert_success_command_execution(
-                ["pull", format!("{public_derivative_dataset_ref}").as_str()],
-                None,
-                Some([r#"1 dataset\(s\) updated"#]),
-            )
-            .await;
-    }
-    {
-        let bob_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
+    for (public_derivative_dataset_ref, private_dataset_url) in [
+        (
+            &sitp_public_derivative_dataset_ref,
+            &sitp_public_derivative_dataset_url,
+        ),
+        (
+            &smtp_public_derivative_dataset_ref,
+            &smtp_public_derivative_dataset_url,
+        ),
+    ] {
+        for maybe_account_name in [
+            None, /* anonymous */
+            Some("not-owner"),
+            Some("reader"),
+            Some("editor"),
+            Some("maintainer"),
+            Some("owner"),
+            Some("admin"),
+        ] {
+            let workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
-        bob_workspace.login_to_node(node_url, "bob", "bob").await;
+            if let Some(account_name) = maybe_account_name {
+                let password_same_as_account_name = account_name;
+                workspace
+                    .login_to_node(node_url, account_name, password_same_as_account_name)
+                    .await;
+            }
 
-        bob_workspace
-            .assert_success_command_execution(
-                ["pull", format!("{public_derivative_dataset_ref}").as_str()],
-                None,
-                Some([r#"1 dataset\(s\) updated"#]),
-            )
-            .await;
-    }
-    {
-        let owner_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
-
-        owner_workspace
-            .login_to_node(node_url, "alice", "alice")
-            .await;
-
-        owner_workspace
-            .assert_success_command_execution(
-                ["pull", format!("{public_derivative_dataset_ref}").as_str()],
-                None,
-                Some([r#"1 dataset\(s\) updated"#]),
-            )
-            .await;
-    }
-    {
-        let admin_workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
-
-        admin_workspace
-            .login_to_node(node_url, "admin", "admin")
-            .await;
-
-        admin_workspace
-            .assert_success_command_execution(
-                ["pull", format!("{public_derivative_dataset_ref}").as_str()],
-                None,
-                Some([r#"1 dataset\(s\) updated"#]),
-            )
-            .await;
+            workspace
+                .assert_success_command_execution(
+                    ["pull", format!("{public_derivative_dataset_ref}").as_str()],
+                    None,
+                    Some([r#"1 dataset\(s\) updated"#]),
+                )
+                .await;
+        }
     }
 }
 
