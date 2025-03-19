@@ -635,48 +635,37 @@ pub async fn test_a_private_dataset_is_available_only_to_authorized_users_in_a_u
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_to_the_owner_or_admin(
-    kamu_api_server_client: KamuApiServerClient,
+pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_to_authorized_users(
+    anonymous: KamuApiServerClient,
 ) {
-    // 4 actors:
-    // - anonymous
-    // - alice (owner) w/ datasets
-    // - bob (not owner)
-    // - admin
-    let anonymous_client = kamu_api_server_client.clone();
-
-    let mut owner_client = kamu_api_server_client.clone();
-    let owner_name = odf::AccountName::new_unchecked("alice");
-    owner_client
-        .auth()
-        .login_with_password(owner_name.as_str(), "alice")
-        .await;
-
-    let mut not_owner_client = kamu_api_server_client.clone();
-    not_owner_client
-        .auth()
-        .login_with_password("bob", "bob")
-        .await;
-
-    let mut admin_client = kamu_api_server_client;
-    admin_client
-        .auth()
-        .login_with_password("admin", "admin")
-        .await;
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
 
     //                                     ┌──────────────────────────────────┐
-    //                                 ┌───┤ alice/private-derivative-dataset │
+    //                                 ┌───┤ owner/private-derivative-dataset │
     // ┌───────────────────────────┐   │   └──────────────────────────────────┘
-    // │ alice/public-root-dataset ├◄──┤
+    // │ owner/public-root-dataset ├◄──┤
     // └───────────────────────────┘   │   ┌──────────────────────────────────┐
-    //                                 └───┤ alice/public-derivative-dataset  │
+    //                                 └───┤ owner/public-derivative-dataset  │
     //                                     └──────────────────────────────────┘
     //
-    let public_root_dataset_alias = odf::metadata::testing::alias(&"alice", &"public-root-dataset");
+    use odf::metadata::testing::alias;
+
+    let public_root_dataset_alias = alias(&"owner", &"public-root-dataset");
     let CreateDatasetResponse {
         dataset_id: public_root_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -685,12 +674,11 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
             odf::DatasetVisibility::Public,
         )
         .await;
-    let private_derivative_dataset_alias =
-        odf::metadata::testing::alias(&"alice", &"private-derivative-dataset");
+    let private_derivative_dataset_alias = alias(&"owner", &"private-derivative-dataset");
     let CreateDatasetResponse {
         dataset_id: private_derivative_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -705,12 +693,11 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
             odf::DatasetVisibility::Private,
         )
         .await;
-    let public_derivative_dataset_alias =
-        odf::metadata::testing::alias(&"alice", &"public-derivative-dataset");
+    let public_derivative_dataset_alias = alias(&"owner", &"public-derivative-dataset");
     let CreateDatasetResponse {
         dataset_id: public_derivative_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -726,70 +713,56 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
         )
         .await;
 
-    pretty_assertions::assert_eq!(
-        DatasetDependencies {
-            upstream: vec![],
-            downstream: vec![DatasetDependency::Resolved(ResolvedDatasetDependency {
-                id: public_derivative_dataset_id.clone(),
-                alias: public_derivative_dataset_alias.clone()
-            })]
-        },
-        anonymous_client
-            .dataset()
-            .dependencies(&public_root_dataset_id)
-            .await
-    );
-    pretty_assertions::assert_eq!(
-        DatasetDependencies {
-            upstream: vec![],
-            downstream: vec![DatasetDependency::Resolved(ResolvedDatasetDependency {
-                id: public_derivative_dataset_id.clone(),
-                alias: public_derivative_dataset_alias.clone()
-            })]
-        },
-        not_owner_client
-            .dataset()
-            .dependencies(&public_root_dataset_id)
-            .await
-    );
-    pretty_assertions::assert_eq!(
-        DatasetDependencies {
-            upstream: vec![],
-            downstream: vec![
-                DatasetDependency::Resolved(ResolvedDatasetDependency {
-                    id: private_derivative_dataset_id.clone(),
-                    alias: private_derivative_dataset_alias.clone()
-                }),
-                DatasetDependency::Resolved(ResolvedDatasetDependency {
-                    id: public_derivative_dataset_id.clone(),
-                    alias: public_derivative_dataset_alias.clone()
-                }),
-            ]
-        },
-        owner_client
-            .dataset()
-            .dependencies(&public_root_dataset_id)
-            .await
-    );
-    pretty_assertions::assert_eq!(
-        DatasetDependencies {
-            upstream: vec![],
-            downstream: vec![
-                DatasetDependency::Resolved(ResolvedDatasetDependency {
-                    id: private_derivative_dataset_id.clone(),
-                    alias: private_derivative_dataset_alias.clone()
-                }),
-                DatasetDependency::Resolved(ResolvedDatasetDependency {
-                    id: public_derivative_dataset_id.clone(),
-                    alias: public_derivative_dataset_alias.clone()
-                }),
-            ]
-        },
-        admin_client
-            .dataset()
-            .dependencies(&public_root_dataset_id)
-            .await
-    );
+    authorize_users_by_roles(
+        &owner,
+        &[
+            &public_root_dataset_id,
+            &private_derivative_dataset_id,
+            &public_derivative_dataset_id,
+        ],
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
+
+    let only_public_dataset = DatasetDependencies {
+        upstream: vec![],
+        downstream: vec![DatasetDependency::Resolved(ResolvedDatasetDependency {
+            id: public_derivative_dataset_id.clone(),
+            alias: public_derivative_dataset_alias.clone(),
+        })],
+    };
+    let public_and_private_datasets = DatasetDependencies {
+        upstream: vec![],
+        downstream: vec![
+            DatasetDependency::Resolved(ResolvedDatasetDependency {
+                id: private_derivative_dataset_id,
+                alias: private_derivative_dataset_alias,
+            }),
+            DatasetDependency::Resolved(ResolvedDatasetDependency {
+                id: public_derivative_dataset_id,
+                alias: public_derivative_dataset_alias,
+            }),
+        ],
+    };
+
+    for (tag, client, expected_result) in [
+        ("anonymous", &anonymous, &only_public_dataset),
+        ("not_owner", &not_owner, &only_public_dataset),
+        ("reader", &reader, &public_and_private_datasets),
+        ("editor", &editor, &public_and_private_datasets),
+        ("maintainer", &maintainer, &public_and_private_datasets),
+        ("owner", &owner, &public_and_private_datasets),
+        ("admin", &admin, &public_and_private_datasets),
+    ] {
+        pretty_assertions::assert_eq!(
+            *expected_result,
+            client.dataset().dependencies(&public_root_dataset_id).await,
+            "Tag: {}",
+            tag,
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
