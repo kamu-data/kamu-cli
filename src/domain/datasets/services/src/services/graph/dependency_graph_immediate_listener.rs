@@ -23,6 +23,7 @@ use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetDependencyRepository,
     DatasetReferenceMessage,
+    DatasetReferenceMessageUpdated,
     MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_IMMEDIATE_LISTENER,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
@@ -58,7 +59,7 @@ impl DependencyGraphImmediateListener {
         dependency_graph_repo: &dyn DatasetDependencyRepository,
         outbox: &dyn Outbox,
         target: ResolvedDataset,
-        message: &DatasetReferenceMessage,
+        message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
         // Compute if there are modified dependencies
         let dependency_change = self
@@ -125,7 +126,7 @@ impl DependencyGraphImmediateListener {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
                 DatasetDependenciesMessage::updated(
-                    message.dataset_id.clone(),
+                    &message.dataset_id,
                     added_dependencies.into_iter().cloned().collect(),
                     removed_dependencies.into_iter().cloned().collect(),
                 ),
@@ -199,43 +200,47 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
-        // For now, react only on Head updates
-        if message.block_ref != odf::dataset::BlockRef::Head {
-            return Ok(());
+        match message {
+            DatasetReferenceMessage::Updated(updated_message) => {
+                // For now, react only on Head updates
+                if updated_message.block_ref != odf::dataset::BlockRef::Head {
+                    return Ok(());
+                }
+
+                // Resolve dataset
+                let dataset_registry = transaction_catalog
+                    .get_one::<dyn DatasetRegistry>()
+                    .unwrap();
+                let target = dataset_registry
+                    .get_dataset_by_id(&updated_message.dataset_id)
+                    .await
+                    .int_err()?;
+
+                // Skip non-derived datasets
+                let summary = target
+                    .get_summary(odf::dataset::GetSummaryOpts::default())
+                    .await
+                    .int_err()?;
+                if summary.kind != odf::DatasetKind::Derivative {
+                    return Ok(());
+                }
+
+                // Deal with potential upstream changes
+                self.handle_derived_dependency_updates(
+                    transaction_catalog
+                        .get_one::<dyn DatasetDependencyRepository>()
+                        .unwrap()
+                        .as_ref(),
+                    transaction_catalog
+                        .get_one::<dyn Outbox>()
+                        .unwrap()
+                        .as_ref(),
+                    target,
+                    updated_message,
+                )
+                .await?;
+            }
         }
-
-        // Resolve dataset
-        let dataset_registry = transaction_catalog
-            .get_one::<dyn DatasetRegistry>()
-            .unwrap();
-        let target = dataset_registry
-            .get_dataset_by_id(&message.dataset_id)
-            .await
-            .int_err()?;
-
-        // Skip non-derived datasets
-        let summary = target
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?;
-        if summary.kind != odf::DatasetKind::Derivative {
-            return Ok(());
-        }
-
-        // Deal with potential upstream changes
-        self.handle_derived_dependency_updates(
-            transaction_catalog
-                .get_one::<dyn DatasetDependencyRepository>()
-                .unwrap()
-                .as_ref(),
-            transaction_catalog
-                .get_one::<dyn Outbox>()
-                .unwrap()
-                .as_ref(),
-            target,
-            message,
-        )
-        .await?;
 
         Ok(())
     }

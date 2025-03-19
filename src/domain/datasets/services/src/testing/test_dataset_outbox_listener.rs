@@ -151,12 +151,16 @@ impl std::fmt::Display for TestDatasetOutboxListener {
             )?;
 
             for msg in &guard.dataset_reference_messages {
-                writeln!(f, "  Ref Updated {{",)?;
-                writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
-                writeln!(f, "    Ref: {}", msg.block_ref)?;
-                writeln!(f, "    Prev Head: {:?}", msg.maybe_prev_block_hash)?;
-                writeln!(f, "    New Head: {:?}", msg.new_block_hash)?;
-                writeln!(f, "  }}")?;
+                match msg {
+                    DatasetReferenceMessage::Updated(msg) => {
+                        writeln!(f, "  Ref Updated {{",)?;
+                        writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
+                        writeln!(f, "    Ref: {}", msg.block_ref)?;
+                        writeln!(f, "    Prev Head: {:?}", msg.maybe_prev_block_hash)?;
+                        writeln!(f, "    New Head: {:?}", msg.new_block_hash)?;
+                        writeln!(f, "  }}")?;
+                    }
+                }
             }
         }
 

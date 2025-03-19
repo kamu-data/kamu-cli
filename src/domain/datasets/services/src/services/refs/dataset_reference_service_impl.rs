@@ -104,11 +104,11 @@ impl DatasetReferenceService for DatasetReferenceServiceImpl {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-                DatasetReferenceMessage::new(
-                    dataset_id.clone(),
-                    block_ref.clone(),
-                    maybe_prev_block_hash.cloned(),
-                    new_block_hash.clone(),
+                DatasetReferenceMessage::updated(
+                    dataset_id,
+                    block_ref,
+                    maybe_prev_block_hash,
+                    new_block_hash,
                 ),
             )
             .await?;
@@ -135,30 +135,37 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
-        let dataset_registry = transactional_catalog
-            .get_one::<dyn DatasetRegistry>()
-            .unwrap();
+        match message {
+            DatasetReferenceMessage::Updated(updated_message) => {
+                let dataset_registry = transactional_catalog
+                    .get_one::<dyn DatasetRegistry>()
+                    .unwrap();
 
-        // Resolve dataset
-        let dataset = dataset_registry
-            .get_dataset_by_id(&message.dataset_id)
-            .await
-            .int_err()?;
+                // Resolve dataset
+                let dataset = dataset_registry
+                    .get_dataset_by_id(&updated_message.dataset_id)
+                    .await
+                    .int_err()?;
 
-        // Update reference at storage level
-        dataset
-            .as_metadata_chain()
-            .as_uncached_ref_repo() // Access storage level directly!
-            .set(message.block_ref.as_str(), &message.new_block_hash)
-            .await
-            .int_err()?;
+                // Update reference at storage level
+                dataset
+                    .as_metadata_chain()
+                    .as_uncached_ref_repo() // Access storage level directly!
+                    .set(
+                        updated_message.block_ref.as_str(),
+                        &updated_message.new_block_hash,
+                    )
+                    .await
+                    .int_err()?;
 
-        tracing::debug!(
-            dataset_id = %message.dataset_id,
-            block_ref = %message.block_ref,
-            new_block_hash = %message.new_block_hash,
-            "Storage-level dataset references updated"
-        );
+                tracing::debug!(
+                    dataset_id = %updated_message.dataset_id,
+                    block_ref = %updated_message.block_ref,
+                    new_block_hash = %updated_message.new_block_hash,
+                    "Storage-level dataset references updated"
+                );
+            }
+        }
 
         Ok(())
     }

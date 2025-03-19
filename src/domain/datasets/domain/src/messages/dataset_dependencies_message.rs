@@ -23,12 +23,12 @@ pub enum DatasetDependenciesMessage {
 
 impl DatasetDependenciesMessage {
     pub fn updated(
-        dataset_id: odf::DatasetID,
+        dataset_id: &odf::DatasetID,
         added_upstream_ids: Vec<odf::DatasetID>,
         removed_upstream_ids: Vec<odf::DatasetID>,
     ) -> Self {
         Self::Updated(DatasetDependenciesMessageUpdated {
-            dataset_id,
+            dataset_id: dataset_id.clone(),
             added_upstream_ids,
             removed_upstream_ids,
         })
