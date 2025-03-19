@@ -183,7 +183,6 @@ impl DatasetMut {
     }
 
     /// Set visibility for the dataset
-    #[graphql(guard = "LoggedInGuard::new()")]
     #[tracing::instrument(level = "info", name = DatasetMut_set_visibility, skip_all)]
     async fn set_visibility(
         &self,

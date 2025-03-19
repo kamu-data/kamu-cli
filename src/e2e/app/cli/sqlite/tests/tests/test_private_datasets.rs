@@ -28,7 +28,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::private_datasets::test_only_the_dataset_owner_or_admin_can_change_its_visibility,
+    fixture = kamu_cli_e2e_repo_tests::private_datasets::test_minimum_dataset_maintainer_can_change_dataset_visibility,
     // We need synthetic time for the tests, but the third-party JWT code
     // uses the current time. Assuming that the token lifetime is 24 hours, we will
     // use the projected date (the current day) as a workaround.

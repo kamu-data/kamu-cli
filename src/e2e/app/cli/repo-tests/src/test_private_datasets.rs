@@ -146,144 +146,131 @@ pub async fn test_datasets_have_correct_visibility_after_creation(anonymous: Kam
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
-    kamu_api_server_client: KamuApiServerClient,
+pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
+    anonymous: KamuApiServerClient,
 ) {
-    // 4 actors:
-    // - anonymous
-    // - alice (owner) w/ dataset
-    // - bob (not owner)
-    // - admin
-    let anonymous_client = kamu_api_server_client.clone();
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
 
-    let mut owner_client = kamu_api_server_client.clone();
-    owner_client
-        .auth()
-        .login_with_password("alice", "alice")
-        .await;
-    let CreateDatasetResponse { dataset_id, .. } = owner_client
+    let CreateDatasetResponse { dataset_id, .. } = owner
         .dataset()
-        .create_dataset_with_visibility(
-            &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot().name("dataset").build(),
             odf::DatasetVisibility::Public,
         )
         .await;
 
-    let mut not_owner_client = kamu_api_server_client.clone();
-    not_owner_client
-        .auth()
-        .login_with_password("bob", "bob")
-        .await;
+    authorize_users_by_roles(
+        &owner,
+        &[&dataset_id],
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
 
-    let mut admin_client = kamu_api_server_client;
-    admin_client
-        .auth()
-        .login_with_password("admin", "admin")
-        .await;
-
-    {
-        assert_matches!(
-            anonymous_client
+    // Unauthorized attempts to change visibility
+    for (tag, client) in [
+        ("anonymous", &anonymous),
+        ("not_owner", &not_owner),
+        ("reader", &reader),
+        ("editor", &editor),
+        // ("maintainer", &maintainer),
+        // ("owner", &owner),
+        // ("admin", &admin),
+    ] {
+        pretty_assertions::assert_eq!(
+            Err(SetDatasetVisibilityError::Forbidden),
+            client
                 .dataset()
                 .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
                 .await,
-            Err(SetDatasetVisibilityError::ForbiddenAnonymous)
-        );
-
-        assert_matches!(
-            anonymous_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            owner_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            not_owner_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            admin_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
+            "Tag: {}",
+            tag,
         );
     }
-    {
-        assert_matches!(
-            not_owner_client
-                .dataset()
-                .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
-                .await,
-            Err(SetDatasetVisibilityError::Forbidden)
-        );
 
-        assert_matches!(
-            anonymous_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            owner_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            not_owner_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            admin_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-    }
-    {
-        assert_matches!(
-            owner_client
-                .dataset()
-                .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
-                .await,
-            Ok(_)
-        );
+    // For an authorized user, change the visibility back and forth
+    for (set_tag, set_client) in [
+        ("maintainer", &maintainer),
+        ("owner", &owner),
+        ("admin", &admin),
+    ] {
+        // Making it private
+        {
+            pretty_assertions::assert_eq!(
+                Ok(()),
+                set_client
+                    .dataset()
+                    .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
+                    .await,
+                "Tag: {}",
+                set_tag,
+            );
 
-        assert_matches!(
-            anonymous_client.dataset().get_visibility(&dataset_id).await,
-            Err(GetDatasetVisibilityError::NotFound)
-        );
-        assert_matches!(
-            owner_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Private)
-        );
-        assert_matches!(
-            not_owner_client.dataset().get_visibility(&dataset_id).await,
-            Err(GetDatasetVisibilityError::NotFound)
-        );
-        assert_matches!(
-            admin_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Private)
-        );
-    }
-    {
-        assert_matches!(
-            admin_client
-                .dataset()
-                .set_visibility(&dataset_id, odf::DatasetVisibility::Public)
-                .await,
-            Ok(_)
-        );
+            let failure =
+                Err(GetDatasetVisibilityError::NotFound) as Result<_, GetDatasetVisibilityError>;
+            let success = Ok(odf::DatasetVisibility::Private);
 
-        assert_matches!(
-            anonymous_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            owner_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            not_owner_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
-        assert_matches!(
-            admin_client.dataset().get_visibility(&dataset_id).await,
-            Ok(odf::DatasetVisibility::Public)
-        );
+            for (get_tag, get_client, expected_result) in [
+                ("anonymous", &anonymous, &failure),
+                ("not_owner", &not_owner, &failure),
+                ("reader", &reader, &success),
+                ("editor", &editor, &success),
+                ("maintainer", &maintainer, &success),
+                ("owner", &owner, &success),
+                ("admin", &admin, &success),
+            ] {
+                pretty_assertions::assert_eq!(
+                    *expected_result,
+                    get_client.dataset().get_visibility(&dataset_id).await,
+                    "Set tag: {}; Get tag: {}",
+                    set_tag,
+                    get_tag,
+                );
+            }
+        }
+
+        // Back to public
+        {
+            pretty_assertions::assert_eq!(
+                Ok(()),
+                set_client
+                    .dataset()
+                    .set_visibility(&dataset_id, odf::DatasetVisibility::Public)
+                    .await,
+                "Tag: {}",
+                set_tag,
+            );
+
+            for (get_tag, get_client) in [
+                ("anonymous", &anonymous),
+                ("not_owner", &not_owner),
+                ("reader", &reader),
+                ("editor", &editor),
+                ("maintainer", &maintainer),
+                ("owner", &owner),
+                ("admin", &admin),
+            ] {
+                pretty_assertions::assert_eq!(
+                    Ok(odf::DatasetVisibility::Public),
+                    get_client.dataset().get_visibility(&dataset_id).await,
+                    "Set tag: {}; Get tag: {}",
+                    set_tag,
+                    get_tag,
+                );
+            }
+        }
     }
 }
 

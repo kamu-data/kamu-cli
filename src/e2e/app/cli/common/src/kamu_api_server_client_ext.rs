@@ -711,9 +711,6 @@ impl DatasetApi<'_> {
 
                 match first_error.message.as_str() {
                     "Dataset access error" => Err(SetDatasetVisibilityError::Forbidden),
-                    "Anonymous access forbidden" => {
-                        Err(SetDatasetVisibilityError::ForbiddenAnonymous)
-                    }
                     unexpected_message => {
                         Err(format!("Unexpected error message: {unexpected_message}")
                             .int_err()
@@ -1310,8 +1307,6 @@ impl PartialEq for GetDatasetVisibilityError {
 pub enum SetDatasetVisibilityError {
     #[error("Forbidden")]
     Forbidden,
-    #[error("ForbiddenAnonymous")]
-    ForbiddenAnonymous,
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -1319,8 +1314,7 @@ pub enum SetDatasetVisibilityError {
 impl PartialEq for SetDatasetVisibilityError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Forbidden, Self::Forbidden)
-            | (Self::ForbiddenAnonymous, Self::ForbiddenAnonymous) => true,
+            (Self::Forbidden, Self::Forbidden) => true,
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
         }
