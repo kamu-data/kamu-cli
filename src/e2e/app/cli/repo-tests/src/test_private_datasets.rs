@@ -32,8 +32,6 @@ use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use odf::metadata::testing::MetadataFactory;
 
-// TODO: Private Datasets: cover new paths
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
@@ -43,9 +41,18 @@ pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
     content:
       users:
         predefined:
+          # Special:
           - accountName: admin
             isAdmin: true
             email: admin@example.com
+
+          # By names:
+          - accountName: alice
+            email: alice@example.com
+          - accountName: bob
+            email: bob@example.com
+
+          # By roles:
           - accountName: owner
             email: owner@example.com
           - accountName: not-owner
@@ -948,6 +955,8 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_authorized_users(
 
     let node_url = owner.get_base_url();
 
+    // TODO: PERF: Parallel execution?
+
     let sitp_private_dataset_url = owner.dataset().get_endpoint(&private_dataset_alias);
     let sitp_private_dataset_ref: odf::DatasetRefAny = sitp_private_dataset_url.clone().into();
 
@@ -1100,6 +1109,8 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
     .await;
 
     let node_url = owner.get_base_url();
+
+    // TODO: PERF: Parallel execution?
 
     let sitp_public_derivative_dataset_url = owner
         .dataset()
@@ -1325,9 +1336,9 @@ pub async fn test_minimum_dataset_maintainer_can_access_roles(anonymous: KamuApi
 
     let CreateDatasetResponse { dataset_id, .. } = owner
         .dataset()
-        .create_dataset_with_visibility(
-            &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
-            odf::DatasetVisibility::Private,
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot().name("dataset").build(),
+            odf::DatasetVisibility::Public,
         )
         .await;
 
@@ -1438,6 +1449,76 @@ pub async fn test_minimum_dataset_maintainer_can_access_roles(anonymous: KamuApi
                 tag
             );
         }
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_granted_role_is_correctly_replaced_by_another_one(
+    anonymous: KamuApiServerClient,
+) {
+    let [alice, mut bob] = make_logged_clients(&anonymous, ["alice", "bob"]).await;
+
+    let CreateDatasetResponse { dataset_id, .. } = alice
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot().name("dataset").build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+
+    use odf::metadata::testing::account_name as name;
+    use AccountToDatasetRelation as R;
+
+    // Bob is allowed to read
+    {
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            alice
+                .dataset()
+                .collaboration()
+                .set_role(&dataset_id, &bob.auth().logged_account_id(), R::Reader)
+                .await
+        );
+
+        pretty_assertions::assert_eq!(
+            Ok(vec![(name(&"bob"), R::Reader)]),
+            alice
+                .dataset()
+                .collaboration()
+                .account_roles(&dataset_id)
+                .await
+                .map(|r| r
+                    .accounts_with_roles
+                    .into_iter()
+                    .map(|a| (a.account_name, a.role))
+                    .collect::<Vec<_>>()),
+        );
+    }
+
+    // Bob is allowed to write
+    {
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            alice
+                .dataset()
+                .collaboration()
+                .set_role(&dataset_id, &bob.auth().logged_account_id(), R::Editor)
+                .await
+        );
+
+        pretty_assertions::assert_eq!(
+            Ok(vec![(name(&"bob"), R::Editor)]),
+            alice
+                .dataset()
+                .collaboration()
+                .account_roles(&dataset_id)
+                .await
+                .map(|r| r
+                    .accounts_with_roles
+                    .into_iter()
+                    .map(|a| (a.account_name, a.role))
+                    .collect::<Vec<_>>()),
+        );
     }
 }
 
