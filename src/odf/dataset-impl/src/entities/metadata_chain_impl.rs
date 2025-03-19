@@ -201,8 +201,8 @@ where
         Ok(())
     }
 
-    fn as_raw_ref_repo(&self) -> &dyn ReferenceRepository {
-        self.meta_ref_repo.as_raw_ref_repo()
+    fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository {
+        self.meta_ref_repo.as_uncached_ref_repo()
     }
 }
 

@@ -160,7 +160,7 @@ where
         panic!("Cannot set dataset reference without attached reference service")
     }
 
-    fn as_raw_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {
+    fn as_uncached_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {
         &self.storage_ref_repo
     }
 }

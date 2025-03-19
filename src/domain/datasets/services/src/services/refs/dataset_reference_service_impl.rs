@@ -148,7 +148,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
         // Update reference at storage level
         dataset
             .as_metadata_chain()
-            .as_raw_ref_repo() // Access storage level directly!
+            .as_uncached_ref_repo() // Access storage level directly!
             .set(message.block_ref.as_str(), &message.new_block_hash)
             .await
             .int_err()?;

@@ -457,8 +457,8 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         self.chain.append(block, opts).await
     }
 
-    fn as_raw_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {
-        self.chain.as_raw_ref_repo()
+    fn as_uncached_ref_repo(&self) -> &dyn odf::storage::ReferenceRepository {
+        self.chain.as_uncached_ref_repo()
     }
 }
 

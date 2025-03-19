@@ -70,7 +70,7 @@ impl DatasetReferenceIndexer {
 
             let head = dataset
                 .as_metadata_chain()
-                .as_raw_ref_repo()
+                .as_uncached_ref_repo()
                 .get(odf::BlockRef::Head.as_str())
                 .await
                 .int_err()?;

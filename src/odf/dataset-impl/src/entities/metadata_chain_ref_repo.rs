@@ -15,12 +15,16 @@ use odf_storage::*;
 
 #[async_trait::async_trait]
 pub trait MetadataChainReferenceRepository: Send + Sync {
+    /// Detaches this repository from any transaction references
     fn detach_from_transaction(&self) {
         // Nothing to do by default
     }
 
+    /// Accesses current value of the reference
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
+    /// Updates the value of the reference with optional check of what current
+    /// value is supposed to be equal to
     async fn set_ref<'a>(
         &'a self,
         r: &BlockRef,
@@ -28,7 +32,8 @@ pub trait MetadataChainReferenceRepository: Send + Sync {
         check_ref_is: Option<Option<&'a Multihash>>,
     ) -> Result<(), SetChainRefError>;
 
-    fn as_raw_ref_repo(&self) -> &dyn ReferenceRepository;
+    /// Returns storage-level reference repository without any caching involved
+    fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,7 +92,7 @@ where
         Ok(())
     }
 
-    fn as_raw_ref_repo(&self) -> &dyn ReferenceRepository {
+    fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository {
         &self.ref_repo
     }
 }

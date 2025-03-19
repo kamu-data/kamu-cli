@@ -57,7 +57,8 @@ pub trait MetadataChain: Send + Sync {
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetChainRefError>;
 
-    fn as_raw_ref_repo(&self) -> &dyn ReferenceRepository;
+    /// Returns storage-level reference repository without any caching involved
+    fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
