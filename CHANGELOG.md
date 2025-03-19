@@ -14,6 +14,10 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - DB: utilities for working with bind parameter placeholders
+- DB-backed dataset references: they are now stored in the database, supporting transactional updates.  
+- Ensured short transaction length in ingest & transform updates and compaction tasks.  
+- Dataset Reference indexing to build the initial state of the dataset references.  
+- Implemented in-memory caching for dataset references that works within the current transaction
 ### Changed
 - Replaced default GraphQL playground with better maintained `graphiql` (old playground is still available)
 - Improved API server web console looks
@@ -24,8 +28,14 @@ Recommendation: for ease of reading, use the following order:
 - Cleaning up unnecessary `.map_err()` constructs
 - DB: cleanup of unnecessary allocations during parameter bindings
 - Various small refactorings extracting common methods (e.g. `PaginationOpts::from_page()`)
+- Dependency graph updates are improved for transactional correctness.  
+- Setting dataset references is now the responsibility of computation service callers. 
+- Extracted ODF dataset builders for LFS and S3 to allow for custom implementations.  
+- Improved tests for dataset use cases.  
 ### Fixed
 - REST API: `GET /datasets/{id}` returns account data as it should 
+- If dataset creation is interrupted before a dataset entry is written, 
+   such a dataset is ignored and may be overwritten
 
 ## [0.227.1] - 2025-03-14
 ### Fixed
