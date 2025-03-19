@@ -1784,7 +1784,7 @@ pub enum QueryError {
 impl PartialEq for QueryError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::ExecutionError(a), Self::ExecutionError(b)) => a.eq(&b),
+            (Self::ExecutionError(a), Self::ExecutionError(b)) => a.eq(b),
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
         }

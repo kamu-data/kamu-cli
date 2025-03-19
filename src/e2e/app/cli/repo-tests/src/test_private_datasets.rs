@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
-
 use kamu_auth_rebac::AccountToDatasetRelation;
 use kamu_cli_e2e_common::{
     AccountDataset,
@@ -26,7 +24,6 @@ use kamu_cli_e2e_common::{
     ResolvedDatasetDependency,
     SetDatasetVisibilityError,
     UnresolvedDatasetDependency,
-    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
 };
 use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
@@ -915,18 +912,8 @@ pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to
 pub async fn test_a_private_dataset_can_only_be_pulled_by_authorized_users(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
-        &anonymous,
-        [
-            "not-owner",
-            "reader",
-            "editor",
-            "maintainer",
-            "owner",
-            "admin",
-        ],
-    )
-    .await;
+    let [mut reader, mut editor, mut maintainer, owner] =
+        make_logged_clients(&anonymous, ["reader", "editor", "maintainer", "owner"]).await;
 
     use odf::metadata::testing::alias;
 
@@ -1027,18 +1014,8 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_authorized_users(
 pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_be_pulled_by_anyone(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
-        &anonymous,
-        [
-            "not-owner",
-            "reader",
-            "editor",
-            "maintainer",
-            "owner",
-            "admin",
-        ],
-    )
-    .await;
+    let [mut reader, mut editor, mut maintainer, owner] =
+        make_logged_clients(&anonymous, ["reader", "editor", "maintainer", "owner"]).await;
 
     // ┌────────────────────────────┐
     // │ owner/public-root-dataset  ├◄──┐
@@ -1112,27 +1089,18 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
 
     // TODO: PERF: Parallel execution?
 
-    let sitp_public_derivative_dataset_url = owner
+    let sitp_public_derivative_dataset_ref: odf::DatasetRefAny = owner
         .dataset()
-        .get_endpoint(&public_derivative_dataset_alias);
-    let sitp_public_derivative_dataset_ref: odf::DatasetRefAny =
-        sitp_public_derivative_dataset_url.clone().into();
-
-    let smtp_public_derivative_dataset_url = owner
+        .get_endpoint(&public_derivative_dataset_alias)
+        .into();
+    let smtp_public_derivative_dataset_ref: odf::DatasetRefAny = owner
         .dataset()
-        .get_endpoint(&public_derivative_dataset_alias);
-    let smtp_public_derivative_dataset_ref: odf::DatasetRefAny =
-        smtp_public_derivative_dataset_url.clone().into();
+        .get_endpoint(&public_derivative_dataset_alias)
+        .into();
 
-    for (public_derivative_dataset_ref, private_dataset_url) in [
-        (
-            &sitp_public_derivative_dataset_ref,
-            &sitp_public_derivative_dataset_url,
-        ),
-        (
-            &smtp_public_derivative_dataset_ref,
-            &smtp_public_derivative_dataset_url,
-        ),
+    for public_derivative_dataset_ref in [
+        &sitp_public_derivative_dataset_ref,
+        &smtp_public_derivative_dataset_ref,
     ] {
         for maybe_account_name in [
             None, /* anonymous */
