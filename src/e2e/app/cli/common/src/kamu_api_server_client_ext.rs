@@ -1296,6 +1296,16 @@ pub enum GetDatasetVisibilityError {
     Internal(#[from] InternalError),
 }
 
+impl PartialEq for GetDatasetVisibilityError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Forbidden, Self::Forbidden) | (Self::NotFound, Self::NotFound) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum SetDatasetVisibilityError {
     #[error("Forbidden")]
@@ -1304,6 +1314,17 @@ pub enum SetDatasetVisibilityError {
     ForbiddenAnonymous,
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl PartialEq for SetDatasetVisibilityError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Forbidden, Self::Forbidden)
+            | (Self::ForbiddenAnonymous, Self::ForbiddenAnonymous) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -1332,16 +1353,6 @@ impl PartialEq for DatasetCollaborationAccountRolesError {
             (Self::Access, Self::Access) | (Self::DatasetNotFound, Self::DatasetNotFound) => true,
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
-        }
-    }
-}
-
-impl Clone for DatasetCollaborationAccountRolesError {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Access => Self::Access,
-            Self::DatasetNotFound => Self::DatasetNotFound,
-            Self::Internal(_) => unreachable!(),
         }
     }
 }

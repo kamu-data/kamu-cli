@@ -60,6 +60,92 @@ pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_datasets_have_correct_visibility_after_creation(anonymous: KamuApiServerClient) {
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
+
+    let CreateDatasetResponse {
+        dataset_id: public_dataset_id,
+        ..
+    } = owner
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot().name("public").build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: private_dataset_id,
+        ..
+    } = owner
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot().name("private").build(),
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+
+    authorize_users_by_roles(
+        &owner,
+        &[&public_dataset_id, &private_dataset_id],
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
+
+    // Public
+    for (tag, client) in [
+        ("anonymous", &anonymous),
+        ("not_owner", &not_owner),
+        ("reader", &reader),
+        ("editor", &editor),
+        ("maintainer", &maintainer),
+        ("owner", &owner),
+        ("admin", &admin),
+    ] {
+        pretty_assertions::assert_eq!(
+            Ok(odf::DatasetVisibility::Public),
+            client.dataset().get_visibility(&public_dataset_id).await,
+            "Tag: {}",
+            tag,
+        );
+    }
+
+    // Private
+    let failure = Err(GetDatasetVisibilityError::NotFound) as Result<_, GetDatasetVisibilityError>;
+    let success = Ok(odf::DatasetVisibility::Private);
+
+    for (tag, client, expected_result) in [
+        ("anonymous", &anonymous, &failure),
+        ("not_owner", &not_owner, &failure),
+        ("reader", &reader, &success),
+        ("editor", &editor, &success),
+        ("maintainer", &maintainer, &success),
+        ("owner", &owner, &success),
+        ("admin", &admin, &success),
+    ] {
+        pretty_assertions::assert_eq!(
+            *expected_result,
+            client.dataset().get_visibility(&private_dataset_id).await,
+            "Tag: {}",
+            tag,
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_only_the_dataset_owner_or_admin_can_change_its_visibility(
     kamu_api_server_client: KamuApiServerClient,
 ) {
@@ -1541,6 +1627,40 @@ async fn make_logged_clients<const N: usize>(
     }
 
     unsafe { logged_clients.map(|item| item.assume_init()) }
+}
+
+async fn authorize_users_by_roles(
+    owner: &KamuApiServerClient,
+    dataset_ids: &[&odf::DatasetID],
+    reader: &mut KamuApiServerClient,
+    editor: &mut KamuApiServerClient,
+    maintainer: &mut KamuApiServerClient,
+) {
+    use AccountToDatasetRelation as R;
+
+    for dataset_id in dataset_ids {
+        for (tag, target_account_id, role) in [
+            ("reader", reader.auth().logged_account_id(), R::Reader),
+            ("editor", editor.auth().logged_account_id(), R::Editor),
+            (
+                "maintainer",
+                maintainer.auth().logged_account_id(),
+                R::Maintainer,
+            ),
+        ] {
+            pretty_assertions::assert_eq!(
+                Ok(()),
+                owner
+                    .dataset()
+                    .collaboration()
+                    .set_role(dataset_id, &target_account_id, role)
+                    .await,
+                "Tag: {}, dataset_id: {}",
+                tag,
+                dataset_id.as_did_str().to_stack_string()
+            );
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
