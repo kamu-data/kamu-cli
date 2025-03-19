@@ -544,40 +544,31 @@ pub async fn test_a_private_dataset_is_available_in_queries_only_to_authorized_u
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_a_users_dataset_list(
-    kamu_api_server_client: KamuApiServerClient,
+pub async fn test_a_private_dataset_is_available_only_to_authorized_users_in_a_users_dataset_list(
+    anonymous: KamuApiServerClient,
 ) {
-    // 4 actors:
-    // - anonymous
-    // - alice (owner) w/ datasets
-    // - bob (not owner)
-    // - admin
-    let anonymous_client = kamu_api_server_client.clone();
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
 
-    let mut owner_client = kamu_api_server_client.clone();
-    let owner_name = odf::AccountName::new_unchecked("alice");
-    owner_client
-        .auth()
-        .login_with_password(owner_name.as_str(), "alice")
-        .await;
+    use odf::metadata::testing::alias;
 
-    let mut not_owner_client = kamu_api_server_client.clone();
-    not_owner_client
-        .auth()
-        .login_with_password("bob", "bob")
-        .await;
+    let owner_name = odf::AccountName::new_unchecked("owner");
 
-    let mut admin_client = kamu_api_server_client;
-    admin_client
-        .auth()
-        .login_with_password("admin", "admin")
-        .await;
-
-    let private_dataset_alias = odf::metadata::testing::alias(&owner_name, &"private-dataset");
+    let private_dataset_alias = alias(&owner_name, &"private-dataset");
     let CreateDatasetResponse {
         dataset_id: private_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -586,11 +577,11 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_a
             odf::DatasetVisibility::Private,
         )
         .await;
-    let public_dataset_alias = odf::metadata::testing::alias(&owner_name, &"public-dataset");
+    let public_dataset_alias = alias(&owner_name, &"public-dataset");
     let CreateDatasetResponse {
         dataset_id: public_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -600,52 +591,46 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_a
         )
         .await;
 
-    pretty_assertions::assert_eq!(
-        [AccountDataset {
-            id: public_dataset_id.clone(),
-            alias: public_dataset_alias.clone()
-        }],
-        *not_owner_client
-            .dataset()
-            .by_account_name(&owner_name)
-            .await
-    );
-    pretty_assertions::assert_eq!(
-        [
-            AccountDataset {
-                id: private_dataset_id.clone(),
-                alias: private_dataset_alias.clone()
-            },
-            AccountDataset {
-                id: public_dataset_id.clone(),
-                alias: public_dataset_alias.clone()
-            }
-        ],
-        *owner_client.dataset().by_account_name(&owner_name).await
-    );
-    pretty_assertions::assert_eq!(
-        [AccountDataset {
-            id: public_dataset_id.clone(),
-            alias: public_dataset_alias.clone()
-        }],
-        *anonymous_client
-            .dataset()
-            .by_account_name(&owner_name)
-            .await
-    );
-    pretty_assertions::assert_eq!(
-        [
-            AccountDataset {
-                id: private_dataset_id,
-                alias: private_dataset_alias
-            },
-            AccountDataset {
-                id: public_dataset_id,
-                alias: public_dataset_alias
-            }
-        ],
-        *owner_client.dataset().by_account_name(&owner_name).await
-    );
+    authorize_users_by_roles(
+        &owner,
+        &[&private_dataset_id, &public_dataset_id],
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
+
+    let only_public_dataset = [AccountDataset {
+        id: public_dataset_id.clone(),
+        alias: public_dataset_alias.clone(),
+    }];
+    let public_and_private_datasets = [
+        AccountDataset {
+            id: private_dataset_id,
+            alias: private_dataset_alias,
+        },
+        AccountDataset {
+            id: public_dataset_id,
+            alias: public_dataset_alias,
+        },
+    ];
+
+    for (tag, client, expected_result) in [
+        ("anonymous", &anonymous, &only_public_dataset[..]),
+        ("not_owner", &not_owner, &only_public_dataset[..]),
+        ("reader", &reader, &public_and_private_datasets[..]),
+        ("editor", &editor, &public_and_private_datasets[..]),
+        ("maintainer", &maintainer, &public_and_private_datasets[..]),
+        ("owner", &owner, &public_and_private_datasets[..]),
+        ("admin", &admin, &public_and_private_datasets[..]),
+    ] {
+        pretty_assertions::assert_eq!(
+            expected_result,
+            client.dataset().by_account_name(&owner_name).await,
+            "Tag: {}",
+            tag,
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
