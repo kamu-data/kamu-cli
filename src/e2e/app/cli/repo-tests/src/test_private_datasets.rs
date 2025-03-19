@@ -276,66 +276,62 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_the_search_results(
-    kamu_api_server_client: KamuApiServerClient,
+pub async fn test_a_private_dataset_is_available_only_to_authorized_users_in_the_search_results(
+    anonymous: KamuApiServerClient,
 ) {
-    // 4 actors:
-    // - anonymous
-    // - alice (owner) w/ datasets
-    // - bob (not owner)
-    // - admin
-    let anonymous_client = kamu_api_server_client.clone();
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
 
-    let mut owner_client = kamu_api_server_client.clone();
-    owner_client
-        .auth()
-        .login_with_password("alice", "alice")
-        .await;
-
-    let mut not_owner_client = kamu_api_server_client.clone();
-    not_owner_client
-        .auth()
-        .login_with_password("bob", "bob")
-        .await;
-
-    let mut admin_client = kamu_api_server_client;
-    admin_client
-        .auth()
-        .login_with_password("admin", "admin")
-        .await;
-
-    // - alice (owner) has datasets:
+    // - owner has datasets:
     //     - private-dataset
     //     - public-dataset
     //     - private-will-not-be-found
     //     - public-will-not-be-found
-    let private_dataset_alias = odf::metadata::testing::alias(&"alice", &"private-dataset");
+
+    use odf::metadata::testing::alias;
+
+    let searchable_private_dataset_alias = alias(&"owner", &"private-dataset");
     let CreateDatasetResponse {
-        dataset_id: private_dataset_id,
+        dataset_id: searchable_private_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
-                .name(private_dataset_alias.dataset_name.as_str())
+                .name(searchable_private_dataset_alias.dataset_name.as_str())
                 .build(),
             odf::DatasetVisibility::Private,
         )
         .await;
-    let public_dataset_alias = odf::metadata::testing::alias(&"alice", &"public-dataset");
+
+    let searchable_public_dataset_alias = alias(&"owner", &"public-dataset");
     let CreateDatasetResponse {
-        dataset_id: public_dataset_id,
+        dataset_id: searchable_public_dataset_id,
         ..
-    } = owner_client
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
-                .name(public_dataset_alias.dataset_name.as_str())
+                .name(searchable_public_dataset_alias.dataset_name.as_str())
                 .build(),
             odf::DatasetVisibility::Public,
         )
         .await;
-    owner_client
+
+    let CreateDatasetResponse {
+        dataset_id: public_dataset_id_will_not_be_found,
+        ..
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -344,7 +340,10 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_t
             odf::DatasetVisibility::Public,
         )
         .await;
-    owner_client
+    let CreateDatasetResponse {
+        dataset_id: private_dataset_id_will_not_be_found,
+        ..
+    } = owner
         .dataset()
         .create_dataset_from_snapshot_with_visibility(
             MetadataFactory::dataset_snapshot()
@@ -354,46 +353,65 @@ pub async fn test_a_private_dataset_is_available_only_to_the_owner_or_admin_in_t
         )
         .await;
 
-    pretty_assertions::assert_eq!(
-        [FoundDatasetItem {
-            id: public_dataset_id.clone(),
-            alias: public_dataset_alias.clone()
-        }],
-        *anonymous_client.search().search("data").await
-    );
-    pretty_assertions::assert_eq!(
-        [FoundDatasetItem {
-            id: public_dataset_id.clone(),
-            alias: public_dataset_alias.clone()
-        }],
-        *not_owner_client.search().search("data").await
-    );
-    pretty_assertions::assert_eq!(
-        [
-            FoundDatasetItem {
-                id: private_dataset_id.clone(),
-                alias: private_dataset_alias.clone()
-            },
-            FoundDatasetItem {
-                id: public_dataset_id.clone(),
-                alias: public_dataset_alias.clone()
-            }
+    authorize_users_by_roles(
+        &owner,
+        &[
+            &searchable_private_dataset_id,
+            &searchable_public_dataset_id,
+            &public_dataset_id_will_not_be_found,
+            &private_dataset_id_will_not_be_found,
         ],
-        *owner_client.search().search("data").await
-    );
-    pretty_assertions::assert_eq!(
-        [
-            FoundDatasetItem {
-                id: private_dataset_id,
-                alias: private_dataset_alias
-            },
-            FoundDatasetItem {
-                id: public_dataset_id,
-                alias: public_dataset_alias
-            }
-        ],
-        *owner_client.search().search("data").await
-    );
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
+
+    // Search
+
+    let searchable_public_dataset = [FoundDatasetItem {
+        id: searchable_public_dataset_id.clone(),
+        alias: searchable_public_dataset_alias.clone(),
+    }];
+    let searchable_public_and_private_datasets = [
+        FoundDatasetItem {
+            id: searchable_private_dataset_id,
+            alias: searchable_private_dataset_alias,
+        },
+        FoundDatasetItem {
+            id: searchable_public_dataset_id,
+            alias: searchable_public_dataset_alias,
+        },
+    ];
+
+    for (tag, client, expected_result) in [
+        ("anonymous", &anonymous, &searchable_public_dataset[..]),
+        ("not_owner", &not_owner, &searchable_public_dataset[..]),
+        (
+            "reader",
+            &reader,
+            &searchable_public_and_private_datasets[..],
+        ),
+        (
+            "editor",
+            &editor,
+            &searchable_public_and_private_datasets[..],
+        ),
+        (
+            "maintainer",
+            &maintainer,
+            &searchable_public_and_private_datasets[..],
+        ),
+        ("owner", &owner, &searchable_public_and_private_datasets[..]),
+        ("admin", &admin, &searchable_public_and_private_datasets[..]),
+    ] {
+        pretty_assertions::assert_eq!(
+            expected_result,
+            client.search().search("data").await,
+            "Tag: {}",
+            tag,
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
