@@ -16,6 +16,7 @@ const DATASET_DEPENDENCIES_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Represents messages related to dataset dependencies
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetDependenciesMessage {
     Updated(DatasetDependenciesMessageUpdated),
@@ -43,10 +44,16 @@ impl Message for DatasetDependenciesMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Contains details about an update to dataset dependencies.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetDependenciesMessageUpdated {
+    /// The unique identifier of the dataset
     pub dataset_id: odf::DatasetID,
+
+    /// List of newly added upstream dataset dependencies
     pub added_upstream_ids: Vec<odf::DatasetID>,
+
+    /// List of removed upstream dataset dependencies
     pub removed_upstream_ids: Vec<odf::DatasetID>,
 }
 

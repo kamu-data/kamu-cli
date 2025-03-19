@@ -16,10 +16,16 @@ const DATASET_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Represents messages related to the lifecycle of a dataset
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetLifecycleMessage {
+    /// Message indicating that a dataset has been created.
     Created(DatasetLifecycleMessageCreated),
+
+    /// Message indicating that a dataset has been renamed.
     Renamed(DatasetLifecycleMessageRenamed),
+
+    /// Message indicating that a dataset has been deleted.
     Deleted(DatasetLifecycleMessageDeleted),
 }
 
@@ -58,27 +64,41 @@ impl Message for DatasetLifecycleMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Contains details about a newly created dataset.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageCreated {
+    /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
+
+    /// The account ID of the dataset owner.
     pub owner_account_id: odf::AccountID,
+
+    /// The visibility setting of the dataset
     #[serde(default)]
     pub dataset_visibility: odf::DatasetVisibility,
+
+    /// The name assigned to the dataset.
     pub dataset_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Contains details about a dataset that has been renamed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageRenamed {
+    /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
+
+    /// The new name assigned to the dataset.
     pub new_dataset_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Contains details about a dataset that has been deleted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetLifecycleMessageDeleted {
+    /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 }
 
