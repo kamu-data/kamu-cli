@@ -11,6 +11,7 @@ use kamu_auth_rebac::RebacService;
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,18 +19,22 @@ pub struct DatasetCollaborationMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
-// TODO: Private Datasets: tests
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl<'a> DatasetCollaborationMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
+    pub async fn new_with_access_check(
+        ctx: &Context<'_>,
+        dataset_request_state: &'a DatasetRequestState,
+    ) -> Result<Self> {
+        utils::check_dataset_maintain_access(ctx, dataset_request_state).await?;
+
+        Ok(Self {
             dataset_request_state,
-        }
+        })
     }
 
-    // TODO: Private Datasets: add account not found error
+    // TODO: Private Datasets: add account not found error?
     /// Grant account access as the specified role for the dataset
     #[tracing::instrument(level = "info", name = DatasetCollaborationMut_set_role, skip_all)]
     async fn set_role(
@@ -38,11 +43,6 @@ impl<'a> DatasetCollaborationMut<'a> {
         account_id: AccountID<'_>,
         role: DatasetAccessRole,
     ) -> Result<SetRoleResult> {
-        // TODO: Private Datasets: access check (move to ctor)
-        // self.dataset_mut_request_state
-        //     .check_dataset_maintain_access(ctx)
-        //     .await?;
-
         let rebac_service = from_catalog_n!(ctx, dyn RebacService);
 
         rebac_service
@@ -57,7 +57,7 @@ impl<'a> DatasetCollaborationMut<'a> {
         Ok(SetRoleResultSuccess::default().into())
     }
 
-    // TODO: Private Datasets: add account not found error
+    // TODO: Private Datasets: add account not found error?
     /// Revoking account accesses for the dataset
     #[tracing::instrument(level = "info", name = DatasetCollaborationMut_unset_roles, skip_all)]
     async fn unset_roles(
@@ -65,11 +65,6 @@ impl<'a> DatasetCollaborationMut<'a> {
         ctx: &Context<'_>,
         account_ids: Vec<AccountID<'_>>,
     ) -> Result<UnsetRoleResult> {
-        // TODO: Private Datasets: access check (move to ctor)
-        // self.dataset_mut_request_state
-        //     .check_dataset_maintain_access(ctx)
-        //     .await?;
-
         let rebac_service = from_catalog_n!(ctx, dyn RebacService);
 
         let odf_account_ids = account_ids

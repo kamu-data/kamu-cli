@@ -55,8 +55,8 @@ impl DatasetMut {
     }
 
     /// Access to collaboration management methods
-    async fn collaboration(&self) -> DatasetCollaborationMut {
-        DatasetCollaborationMut::new(&self.dataset_request_state)
+    async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaborationMut> {
+        DatasetCollaborationMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Rename the dataset

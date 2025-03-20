@@ -101,6 +101,7 @@ pub(crate) async fn check_dataset_read_access(
     check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Read).await
 }
 
+#[expect(dead_code)]
 pub(crate) async fn check_dataset_write_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,

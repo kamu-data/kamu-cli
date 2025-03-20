@@ -45,7 +45,6 @@ impl<'a> DatasetMetadataMut<'a> {
         ctx: &Context<'_>,
         content: Option<String>,
     ) -> Result<UpdateReadmeResult> {
-        // TODO: Private Datasets: access check
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
         let old_attachments = resolved_dataset
