@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{auth, ServerUrlConfig};
 
 use crate::prelude::*;
@@ -180,17 +181,22 @@ impl Dataset {
         let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
         let is_owner = allowed_actions.contains(&auth::DatasetAction::Own);
 
+        let logged = {
+            let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
+            matches!(*current_account_subject, CurrentAccountSubject::Logged(_))
+        };
+
         Ok(DatasetPermissions {
             collaboration: DatasetCollaborationPermissions {
                 can_view: can_maintain,
                 can_update: can_maintain,
             },
             env_vars: DatasetEnvVarsPermissions {
-                can_view: can_read,
+                can_view: logged && can_read,
                 can_update: can_maintain,
             },
             flows: DatasetFlowsPermissions {
-                can_view: can_read,
+                can_view: logged && can_read,
                 can_run: can_maintain,
             },
             general: DatasetGeneralPermissions {
