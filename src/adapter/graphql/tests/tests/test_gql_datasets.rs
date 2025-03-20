@@ -13,7 +13,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
@@ -938,6 +938,7 @@ impl GraphQLDatasetsHarness {
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
+            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 
         let base_catalog = {
@@ -953,13 +954,6 @@ impl GraphQLDatasetsHarness {
                 })
                 .add::<InMemoryRebacRepository>()
                 .add::<RebacDatasetLifecycleMessageConsumer>();
-
-            if let Some(mock) = mock_dataset_action_authorizer {
-                b.add_value(mock)
-                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
-            } else {
-                b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
-            }
 
             b.build()
         };

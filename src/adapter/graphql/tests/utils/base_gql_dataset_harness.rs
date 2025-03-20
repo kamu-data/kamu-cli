@@ -10,7 +10,8 @@
 use bon::bon;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
-use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
+use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
@@ -30,7 +31,10 @@ pub struct BaseGQLDatasetHarness {
 #[bon]
 impl BaseGQLDatasetHarness {
     #[builder]
-    pub fn new(tenancy_config: TenancyConfig) -> Self {
+    pub fn new(
+        tenancy_config: TenancyConfig,
+        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -58,7 +62,6 @@ impl BaseGQLDatasetHarness {
             .add::<CreateDatasetUseCaseHelper>()
             .add::<ViewDatasetUseCaseImpl>()
             .add::<SystemTimeSourceDefault>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add::<DatasetReferenceServiceImpl>()
             .add::<InMemoryDatasetReferenceRepository>()
             .add::<DependencyGraphServiceImpl>()
@@ -67,6 +70,13 @@ impl BaseGQLDatasetHarness {
             .add::<DatasetEntryServiceImpl>()
             .add::<InMemoryDatasetEntryRepository>()
             .add_value(RunInfoDir::new(run_info_dir));
+
+            if let Some(mock) = mock_dataset_action_authorizer {
+                b.add_value(mock)
+                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+            } else {
+                b.add::<AlwaysHappyDatasetActionAuthorizer>();
+            }
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
