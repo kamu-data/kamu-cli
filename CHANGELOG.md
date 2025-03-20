@@ -11,6 +11,14 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Private Datasets, access sharing:
+  - ReBAC: there can be only one role between a subject (account) and an object (dataset)
+  - GQL: CRUD Collaboration API
+  - GQL: Implemented API for searching by account name
+  - OSO: Added `maintain` & `own` permissions in addition to `read` & `write`
+
 ## [0.228.0] - 2025-03-19
 ### Added
 - DB: utilities for working with bind parameter placeholders
