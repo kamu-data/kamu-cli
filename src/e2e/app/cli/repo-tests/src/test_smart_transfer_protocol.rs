@@ -130,7 +130,7 @@ async fn test_smart_push_smart_pull_sequence(
         .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let (token, _) = kamu_api_server_client.auth().login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
     {
@@ -299,7 +299,7 @@ async fn test_smart_push_force_smart_pull_force(
         .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let (token, _) = kamu_api_server_client.auth().login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
     {
@@ -468,7 +468,7 @@ async fn test_smart_push_no_alias_smart_pull_no_alias(
         .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let (token, _) = kamu_api_server_client.auth().login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Push command
     {
@@ -792,7 +792,7 @@ async fn test_smart_push_all_smart_pull_all(
         .get_odf_endpoint(&derivative_dataset_alias);
 
     // 1. Grub a token
-    let (token, _) = kamu_api_server_client.auth().login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     let mut kamu_in_push_workspace =
         KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
@@ -1103,7 +1103,7 @@ async fn test_smart_push_recursive_smart_pull_recursive(
     );
 
     // 1. Grub a token
-    let (token, _) = kamu_api_server_client.auth().login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     let mut kamu_in_push_workspace =
         KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
@@ -1378,7 +1378,7 @@ async fn test_smart_push_visibility(
         .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let (token, _) = kamu_api_server_client.auth().login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
     let dataset_id = {
@@ -1544,7 +1544,7 @@ async fn test_smart_push_pull_with_registered_repo_smart_pull(
         .get_odf_endpoint(&dataset_alias);
 
     // 1. Grub a token
-    let (token, _) = kamu_api_server_client.auth().login_as_e2e_user().await;
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
 
     // 2. Pushing the dataset to the API server
     {

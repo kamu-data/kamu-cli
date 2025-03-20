@@ -150,7 +150,7 @@ async fn test_login_logout_oauth(
     )
     .await;
 
-    let (oauth_token, _) = kamu_node_api_client.auth().login_as_e2e_user().await;
+    let oauth_token = kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu.assert_success_command_execution(
         [

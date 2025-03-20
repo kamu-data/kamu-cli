@@ -28,7 +28,6 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: tests
 #[async_trait::async_trait]
 pub trait RebacService: Send + Sync {
     async fn properties_count(&self) -> Result<usize, PropertiesCountError>;

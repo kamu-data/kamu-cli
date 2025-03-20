@@ -284,11 +284,11 @@ impl AuthApi<'_> {
         self.client.state.logged_in_user = None;
     }
 
-    pub async fn login_as_kamu(&mut self) -> (AccessToken, odf::AccountID) {
+    pub async fn login_as_kamu(&mut self) -> AccessToken {
         self.login_with_password("kamu", "kamu").await
     }
 
-    pub async fn login_as_e2e_user(&mut self) -> (AccessToken, odf::AccountID) {
+    pub async fn login_as_e2e_user(&mut self) -> AccessToken {
         // We are using DummyOAuthGithub, so the loginCredentialsJson can be arbitrary
         self.login(indoc::indoc!(
             r#"
@@ -307,11 +307,7 @@ impl AuthApi<'_> {
         .await
     }
 
-    pub async fn login_with_password(
-        &mut self,
-        user: &str,
-        password: &str,
-    ) -> (AccessToken, odf::AccountID) {
+    pub async fn login_with_password(&mut self, user: &str, password: &str) -> AccessToken {
         self.login(
             indoc::indoc!(
                 r#"
@@ -376,8 +372,7 @@ impl AuthApi<'_> {
         }
     }
 
-    // TODO: Private Datasets: return Response struct not tuple
-    async fn login(&mut self, login_request: &str) -> (AccessToken, odf::AccountID) {
+    async fn login(&mut self, login_request: &str) -> AccessToken {
         let login_response = self.client.graphql_api_call(login_request).await.data();
         let login_node = &login_response["auth"]["login"];
 
@@ -391,11 +386,11 @@ impl AuthApi<'_> {
             .unwrap();
 
         self.client.state.logged_in_user = Some(LoggedInUser {
-            account_id: account_id.clone(),
+            account_id,
             token: access_token.clone(),
         });
 
-        (access_token, account_id)
+        access_token
     }
 }
 
