@@ -128,7 +128,7 @@ pub async fn test_datasets_have_correct_visibility_after_creation(anonymous: Kam
     }
 
     // Private
-    let failure = Err(GetDatasetVisibilityError::NotFound) as Result<_, GetDatasetVisibilityError>;
+    let failure = Err(GetDatasetVisibilityError::DatasetNotFound);
     let success = Ok(odf::DatasetVisibility::Private);
 
     for (tag, client, expected_result) in [
@@ -186,12 +186,12 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
 
     // Unauthorized attempts to change visibility
     {
-        use SetDatasetVisibilityError::{Access, NotFound};
+        use SetDatasetVisibilityError::{Access, DatasetNotFound};
 
         for (tag, client, expected_error) in [
-            ("anonymous", &anonymous, NotFound),
-            ("not_owner", &not_owner, NotFound),
-            ("reader", &reader, NotFound),
+            ("anonymous", &anonymous, DatasetNotFound),
+            ("not_owner", &not_owner, DatasetNotFound),
+            ("reader", &reader, DatasetNotFound),
             ("editor", &editor, Access),
             // ("maintainer", &maintainer),
             // ("owner", &owner),
@@ -231,8 +231,7 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
                 set_tag,
             );
 
-            let failure =
-                Err(GetDatasetVisibilityError::NotFound) as Result<_, GetDatasetVisibilityError>;
+            let failure = Err(GetDatasetVisibilityError::DatasetNotFound);
             let success = Ok(odf::DatasetVisibility::Private);
 
             for (get_tag, get_client, expected_result) in [

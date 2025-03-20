@@ -459,7 +459,6 @@ impl DatasetApi<'_> {
 
         match response.status() {
             StatusCode::OK => Ok(response.json().await.int_err()?),
-            StatusCode::UNAUTHORIZED => Err(DatasetByIdError::Unauthorized),
             StatusCode::NOT_FOUND => Err(DatasetByIdError::NotFound),
             unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
                 .int_err()
@@ -641,7 +640,7 @@ impl DatasetApi<'_> {
                 let dataset = &data["datasets"]["byId"];
 
                 if dataset.is_null() {
-                    Err(GetDatasetVisibilityError::NotFound)
+                    Err(GetDatasetVisibilityError::DatasetNotFound)
                 } else {
                     let typename = dataset["visibility"]["__typename"].as_str().unwrap();
 
@@ -703,7 +702,7 @@ impl DatasetApi<'_> {
         match response {
             Ok(response) => {
                 if response["datasets"]["byId"].is_null() {
-                    Err(SetDatasetVisibilityError::NotFound)
+                    Err(SetDatasetVisibilityError::DatasetNotFound)
                 } else {
                     Ok(())
                 }
@@ -1289,8 +1288,8 @@ impl AccountRolesResponse {
 
 #[derive(Error, Debug)]
 pub enum GetDatasetVisibilityError {
-    #[error("Not found")]
-    NotFound,
+    #[error("Dataset not found")]
+    DatasetNotFound,
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -1298,7 +1297,7 @@ pub enum GetDatasetVisibilityError {
 impl PartialEq for GetDatasetVisibilityError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::NotFound, Self::NotFound) => true,
+            (Self::DatasetNotFound, Self::DatasetNotFound) => true,
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
         }
@@ -1307,9 +1306,8 @@ impl PartialEq for GetDatasetVisibilityError {
 
 #[derive(Error, Debug)]
 pub enum SetDatasetVisibilityError {
-    // TODO: Private Datasets: rename to DatasetNotFound (whole file)
-    #[error("NotFound")]
-    NotFound,
+    #[error("Dataset not found")]
+    DatasetNotFound,
     #[error("Access")]
     Access,
     #[error(transparent)]
@@ -1319,7 +1317,7 @@ pub enum SetDatasetVisibilityError {
 impl PartialEq for SetDatasetVisibilityError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::NotFound, Self::NotFound) | (Self::Access, Self::Access) => true,
+            (Self::DatasetNotFound, Self::DatasetNotFound) | (Self::Access, Self::Access) => true,
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
         }
@@ -1328,9 +1326,6 @@ impl PartialEq for SetDatasetVisibilityError {
 
 #[derive(Error, Debug)]
 pub enum DatasetByIdError {
-    // TODO: Private Datasets: do we need this enum item?
-    #[error("Unauthorized")]
-    Unauthorized,
     #[error("Not found")]
     NotFound,
     #[error(transparent)]
