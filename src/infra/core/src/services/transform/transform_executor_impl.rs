@@ -129,7 +129,7 @@ impl TransformExecutorImpl {
                             system_time: Some(request.system_time),
                             prev_block_hash: Some(Some(&new_head)),
                             check_object_refs: false,
-                            update_block_ref: true,
+                            update_block_ref: false,
                         },
                     )
                     .await?;
@@ -158,7 +158,7 @@ impl TransformExecutorImpl {
                     system_time: Some(request.system_time),
                     prev_block_hash: Some(Some(&new_head)),
                     check_object_refs: true,
-                    update_block_ref: true,
+                    update_block_ref: false,
                 },
             )
             .await

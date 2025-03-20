@@ -43,7 +43,7 @@ impl Datasets {
             .await?
             .expect("Account must exist");
 
-        Ok(Some(Dataset::new(account, handle)))
+        Ok(Some(Dataset::new_access_checked(account, handle)))
     }
 
     /// Returns dataset by its ID
@@ -105,7 +105,7 @@ impl Datasets {
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|handle| Dataset::new(account_ref.clone(), handle))
+            .map(|handle| Dataset::new_access_checked(account_ref.clone(), handle))
             .collect();
 
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))

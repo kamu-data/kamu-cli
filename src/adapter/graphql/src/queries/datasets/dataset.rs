@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use chrono::prelude::*;
-use kamu_core::{auth, ResolvedDataset, ServerUrlConfig};
-use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
-use tokio::sync::OnceCell;
+use kamu_core::{auth, ServerUrlConfig};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -22,29 +18,17 @@ use crate::utils;
 
 #[derive(Debug)]
 pub struct Dataset {
-    dataset_request_state: DatasetRequestState,
+    dataset_request_state: DatasetRequestStateWithOwner,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Dataset {
     #[graphql(skip)]
-    pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
+    pub fn new_access_checked(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
         Self {
-            dataset_request_state: DatasetRequestState::new(owner, dataset_handle),
+            dataset_request_state: DatasetRequestState::new(dataset_handle).with_owner(owner),
         }
-    }
-
-    #[graphql(skip)]
-    pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
-
-        let handle = view_dataset_use_case.execute(dataset_ref).await.int_err()?;
-        let account = Account::from_dataset_alias(ctx, &handle.alias)
-            .await?
-            .expect("Account must exist");
-
-        Ok(Dataset::new(account, handle))
     }
 
     #[graphql(skip)]
@@ -52,12 +36,12 @@ impl Dataset {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<TransformInputDataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
+        let view_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::ViewDatasetUseCase);
 
         let handle = match view_dataset_use_case.execute(dataset_ref).await {
             Ok(handle) => Ok(handle),
             Err(e) => match e {
-                ViewDatasetUseCaseError::Access(_) => {
+                kamu_datasets::ViewDatasetUseCaseError::Access(_) => {
                     return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
                 }
                 unexpected_error => Err(unexpected_error.int_err()),
@@ -67,31 +51,42 @@ impl Dataset {
         let account = Account::from_dataset_alias(ctx, &handle.alias)
             .await?
             .expect("Account must exist");
-        let dataset = Dataset::new(account, handle);
+        let dataset = Dataset::new_access_checked(account, handle);
 
         Ok(TransformInputDataset::accessible(dataset))
     }
 
+    #[graphql(skip)]
+    pub fn from_resolved_authorized_dataset(
+        owner: Account,
+        resolved_dataset: &kamu_core::ResolvedDataset,
+    ) -> Self {
+        Self {
+            dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())
+                .with_owner(owner),
+        }
+    }
+
     /// Unique identifier of the dataset
     async fn id(&self) -> DatasetID {
-        (&self.dataset_request_state.dataset_handle.id).into()
+        self.dataset_request_state.dataset_id().into()
     }
 
     /// Symbolic name of the dataset.
     /// Name can change over the dataset's lifetime. For unique identifier use
     /// `id()`.
     async fn name(&self) -> DatasetName {
-        (&self.dataset_request_state.dataset_handle.alias.dataset_name).into()
+        self.dataset_request_state.dataset_name().into()
     }
 
     /// Returns the user or organization that owns this dataset
     async fn owner(&self) -> &Account {
-        &self.dataset_request_state.owner
+        self.dataset_request_state.owner()
     }
 
     /// Returns dataset alias (user + name)
     async fn alias(&self) -> DatasetAlias {
-        (&self.dataset_request_state.dataset_handle.alias).into()
+        self.dataset_request_state.dataset_alias().into()
     }
 
     /// Returns the kind of dataset (Root or Derivative)
@@ -135,9 +130,7 @@ impl Dataset {
     /// Access to the environment variable of this dataset
     #[expect(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
-        utils::ensure_dataset_env_vars_enabled(ctx)?;
-
-        Ok(DatasetEnvVars::new(&self.dataset_request_state))
+        DatasetEnvVars::new(ctx, &self.dataset_request_state)
     }
 
     /// Access to the flow configurations of this dataset
@@ -221,84 +214,6 @@ impl Dataset {
         let config = utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
 
         DatasetEndpoints::new(&self.dataset_request_state, config)
-    }
-}
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub(crate) struct DatasetRequestState {
-    owner: Account,
-    dataset_handle: odf::DatasetHandle,
-    resolved_dataset: OnceCell<ResolvedDataset>,
-    dataset_summary: OnceCell<odf::DatasetSummary>,
-    allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
-}
-
-impl DatasetRequestState {
-    pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
-        Self {
-            owner,
-            dataset_handle,
-            allowed_dataset_actions: OnceCell::new(),
-            resolved_dataset: OnceCell::new(),
-            dataset_summary: OnceCell::new(),
-        }
-    }
-
-    #[inline]
-    pub fn owner(&self) -> &Account {
-        &self.owner
-    }
-
-    #[inline]
-    pub fn dataset_handle(&self) -> &odf::DatasetHandle {
-        &self.dataset_handle
-    }
-
-    pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
-        utils::get_resolved_dataset(ctx, &self.resolved_dataset, &self.dataset_handle).await
-    }
-
-    pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
-        utils::get_dataset_summary(
-            ctx,
-            &self.resolved_dataset,
-            &self.dataset_summary,
-            &self.dataset_handle,
-        )
-        .await
-    }
-
-    pub async fn check_dataset_read_access(&self, ctx: &Context<'_>) -> Result<()> {
-        utils::check_dataset_access(
-            ctx,
-            &self.allowed_dataset_actions,
-            &self.dataset_handle,
-            auth::DatasetAction::Read,
-        )
-        .await
-    }
-
-    pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {
-        utils::check_dataset_access(
-            ctx,
-            &self.allowed_dataset_actions,
-            &self.dataset_handle,
-            auth::DatasetAction::Maintain,
-        )
-        .await
-    }
-
-    async fn allowed_dataset_actions(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<&HashSet<auth::DatasetAction>> {
-        utils::get_allowed_dataset_actions(
-            ctx,
-            &self.allowed_dataset_actions,
-            &self.dataset_handle.id,
-        )
-        .await
     }
 }
 

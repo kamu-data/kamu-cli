@@ -24,7 +24,7 @@ doctest = false
 [features]
 default = []
 sqlx = ["dep:sqlx"]
-testing = []
+testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -43,7 +43,7 @@ futures = { version = "0.3", default-features = false }
 jsonwebtoken = "9"
 lazy_static = { version = "1" }
 merge = "0.1"
-mockall = "0.13"
+mockall = { optional = true, version = "0.13" }
 rand = "0.8"
 reusable = "0.1"
 serde = "1"

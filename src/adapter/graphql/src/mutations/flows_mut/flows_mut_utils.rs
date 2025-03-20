@@ -11,18 +11,18 @@ use kamu_datasets::ViewDatasetUseCase;
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
-use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn ensure_scheduling_permission(
     ctx: &Context<'_>,
-    dataset_mut_request_state: &DatasetMutRequestState,
+    dataset_request_state: &DatasetRequestState,
 ) -> Result<()> {
-    dataset_mut_request_state
-        .check_dataset_maintain_access(ctx)
-        .await
+    // TODO: Private Datasets: use check_dataset_maintain_access()
+    utils::check_dataset_write_access(ctx, dataset_request_state).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +68,7 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
 
 pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
-    dataset_mut_request_state: &DatasetMutRequestState,
+    dataset_request_state: &DatasetRequestState,
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
@@ -80,7 +80,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let dataset_summary = dataset_mut_request_state.dataset_summary(ctx).await?;
+            let dataset_summary = dataset_request_state.dataset_summary(ctx).await?;
             let dataset_kind = dataset_summary.kind;
 
             if dataset_kind != expected_kind {
@@ -101,11 +101,11 @@ pub(crate) async fn ensure_expected_dataset_kind(
 // Check flow preconditions and set default configurations if needed
 pub(crate) async fn ensure_flow_preconditions(
     ctx: &Context<'_>,
-    dataset_mut_request_state: &DatasetMutRequestState,
+    dataset_request_state: &DatasetRequestState,
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
-    let resolved_dataset = dataset_mut_request_state.resolved_dataset(ctx).await?;
+    let resolved_dataset = dataset_request_state.resolved_dataset(ctx).await?;
 
     match dataset_flow_type {
         DatasetFlowType::Ingest => {

@@ -7,18 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use chrono::{DateTime, Utc};
-use kamu_core::{
-    self as domain,
-    auth,
-    ResolvedDataset,
-    SetWatermarkPlanningError,
-    SetWatermarkUseCase,
-};
+use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
-use tokio::sync::OnceCell;
 
 use crate::mutations::{
     DatasetCollaborationMut,
@@ -35,40 +26,37 @@ use crate::LoggedInGuard;
 
 #[derive(Debug)]
 pub struct DatasetMut {
-    dataset_mut_request_state: DatasetMutRequestState,
+    dataset_request_state: DatasetRequestState,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetMut {
     #[graphql(skip)]
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
+    pub fn new_access_checked(dataset_request_state: DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state: DatasetMutRequestState::new(dataset_handle),
+            dataset_request_state,
         }
     }
 
     /// Access to the mutable metadata of the dataset
     async fn metadata(&self) -> DatasetMetadataMut {
-        DatasetMetadataMut::new(&self.dataset_mut_request_state)
+        DatasetMetadataMut::new(&self.dataset_request_state)
     }
 
     /// Access to the mutable flow configurations of this dataset
-    async fn flows(&self) -> DatasetFlowsMut {
-        DatasetFlowsMut::new(&self.dataset_mut_request_state)
+    async fn flows(&self, ctx: &Context<'_>) -> Result<DatasetFlowsMut> {
+        DatasetFlowsMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to the mutable flow configurations of this dataset
-    #[allow(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
-        utils::ensure_dataset_env_vars_enabled(ctx)?;
-
-        Ok(DatasetEnvVarsMut::new(&self.dataset_mut_request_state))
+        DatasetEnvVarsMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to collaboration management methods
     async fn collaboration(&self) -> DatasetCollaborationMut {
-        DatasetCollaborationMut::new(&self.dataset_mut_request_state)
+        DatasetCollaborationMut::new(&self.dataset_request_state)
     }
 
     /// Rename the dataset
@@ -81,7 +69,7 @@ impl DatasetMut {
     ) -> Result<RenameResult<'_>> {
         // NOTE: Access verification is handled by the use-case
 
-        let dataset_handle = &self.dataset_mut_request_state.dataset_handle;
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         if dataset_handle.alias.dataset_name.as_str() == new_name.as_str() {
             return Ok(RenameResult::NoChanges(RenameResultNoChanges {
@@ -121,7 +109,7 @@ impl DatasetMut {
 
         let delete_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::DeleteDatasetUseCase);
 
-        let dataset_handle = &self.dataset_mut_request_state.dataset_handle;
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         match delete_dataset_use_case
             .execute_via_handle(dataset_handle)
@@ -162,7 +150,7 @@ impl DatasetMut {
         let set_watermark_use_case = from_catalog_n!(ctx, dyn SetWatermarkUseCase);
 
         match set_watermark_use_case
-            .execute(&self.dataset_mut_request_state.dataset_handle, watermark)
+            .execute(self.dataset_request_state.dataset_handle(), watermark)
             .await
         {
             Ok(domain::SetWatermarkResult::UpToDate) => {
@@ -189,9 +177,10 @@ impl DatasetMut {
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
     ) -> Result<SetDatasetVisibilityResult> {
-        self.dataset_mut_request_state
-            .check_dataset_maintain_access(ctx)
-            .await?;
+        // TODO: Private Datasets: maintain
+        /*
+        ensure_account_is_owner_or_admin(ctx, self.dataset_request_state.dataset_handle()).await?;
+        */
 
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 
@@ -204,71 +193,19 @@ impl DatasetMut {
 
         use kamu_auth_rebac::DatasetPropertyName;
 
+        let dataset_id = self.dataset_request_state.dataset_id();
+
         for (name, value) in [
             DatasetPropertyName::allows_public_read(allows_public_read),
             DatasetPropertyName::allows_anonymous_read(allows_anonymous_read),
         ] {
             rebac_svc
-                .set_dataset_property(
-                    &self.dataset_mut_request_state.dataset_handle.id,
-                    name,
-                    &value,
-                )
+                .set_dataset_property(dataset_id, name, &value)
                 .await
                 .int_err()?;
         }
 
         Ok(SetDatasetVisibilityResultSuccess::default().into())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub(crate) struct DatasetMutRequestState {
-    dataset_handle: odf::DatasetHandle,
-    resolved_dataset: OnceCell<ResolvedDataset>,
-    dataset_summary: OnceCell<odf::DatasetSummary>,
-    allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
-}
-
-impl DatasetMutRequestState {
-    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
-        Self {
-            dataset_handle,
-            resolved_dataset: OnceCell::new(),
-            dataset_summary: OnceCell::new(),
-            allowed_dataset_actions: OnceCell::new(),
-        }
-    }
-
-    #[inline]
-    pub fn dataset_handle(&self) -> &odf::DatasetHandle {
-        &self.dataset_handle
-    }
-
-    pub async fn resolved_dataset(&self, ctx: &Context<'_>) -> Result<&ResolvedDataset> {
-        utils::get_resolved_dataset(ctx, &self.resolved_dataset, &self.dataset_handle).await
-    }
-
-    pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
-        utils::get_dataset_summary(
-            ctx,
-            &self.resolved_dataset,
-            &self.dataset_summary,
-            &self.dataset_handle,
-        )
-        .await
-    }
-
-    pub async fn check_dataset_maintain_access(&self, ctx: &Context<'_>) -> Result<()> {
-        utils::check_dataset_access(
-            ctx,
-            &self.allowed_dataset_actions,
-            &self.dataset_handle,
-            auth::DatasetAction::Maintain,
-        )
-        .await
     }
 }
 

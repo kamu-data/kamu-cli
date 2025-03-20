@@ -14,16 +14,16 @@
 // Re-exports
 pub use kamu_datasets as domain;
 
+mod dependencies;
 mod jobs;
-mod messages;
 mod services;
 mod use_cases;
-pub(crate) mod utils;
+pub mod utils;
 
 #[cfg(feature = "testing")]
 pub mod testing;
 
+pub use dependencies::*;
 pub use jobs::*;
-pub use messages::*;
 pub use services::*;
 pub use use_cases::*;

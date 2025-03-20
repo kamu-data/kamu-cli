@@ -705,18 +705,20 @@ impl DatasetApi<'_> {
             .await;
 
         match response {
-            Ok(_) => Ok(()),
+            Ok(response) => {
+                if response["datasets"]["byId"].is_null() {
+                    Err(SetDatasetVisibilityError::NotFound)
+                } else {
+                    Ok(())
+                }
+            }
             Err(errors) => {
                 let first_error = errors.first().unwrap();
+                let unexpected_message = first_error.message.as_str();
 
-                match first_error.message.as_str() {
-                    "Dataset access error" => Err(SetDatasetVisibilityError::Forbidden),
-                    unexpected_message => {
-                        Err(format!("Unexpected error message: {unexpected_message}")
-                            .int_err()
-                            .into())
-                    }
-                }
+                Err(format!("Unexpected error message: {unexpected_message}")
+                    .int_err()
+                    .into())
             }
         }
     }
@@ -1305,8 +1307,8 @@ impl PartialEq for GetDatasetVisibilityError {
 
 #[derive(Error, Debug)]
 pub enum SetDatasetVisibilityError {
-    #[error("Forbidden")]
-    Forbidden,
+    #[error("NotFound")]
+    NotFound,
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -1314,7 +1316,7 @@ pub enum SetDatasetVisibilityError {
 impl PartialEq for SetDatasetVisibilityError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Forbidden, Self::Forbidden) => true,
+            (Self::NotFound, Self::NotFound) => true,
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
         }
@@ -1323,6 +1325,7 @@ impl PartialEq for SetDatasetVisibilityError {
 
 #[derive(Error, Debug)]
 pub enum DatasetByIdError {
+    // TODO: Private Datasets: do we need this enum item?
     #[error("Unauthorized")]
     Unauthorized,
     #[error("Not found")]

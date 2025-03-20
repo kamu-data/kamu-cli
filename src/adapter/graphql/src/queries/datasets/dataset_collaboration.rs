@@ -39,9 +39,10 @@ impl<'a> DatasetCollaboration<'a> {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<AccountWithRoleConnection> {
-        self.dataset_request_state
-            .check_dataset_maintain_access(ctx)
-            .await?;
+        // TODO: Private Datasets: access check (move to ctor)
+        // self.dataset_request_state
+        //     .check_dataset_maintain_access(ctx)
+        //     .await?;
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);

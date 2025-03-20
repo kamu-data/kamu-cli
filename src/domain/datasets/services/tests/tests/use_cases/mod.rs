@@ -7,11 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub mod dataset_base_use_case_harness;
+
 mod test_append_dataset_metadata_batch_use_case;
 mod test_commit_dataset_event_use_case;
 mod test_create_dataset_from_snapshot_use_case;
 mod test_create_dataset_use_case;
 mod test_delete_dataset_use_case;
-mod test_edit_dataset_use_case;
+mod test_get_dataset_downstream_dependencies_use_case;
+mod test_get_dataset_upstream_dependencies_use_case;
 mod test_rename_dataset_use_case;
 mod test_view_dataset_use_case;

@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod fake_connecting_dataset_entry_writer;
 mod fake_dataset_entry_service;
-mod outbox_expectation_helpers;
+mod test_dataset_outbox_listener;
 
+pub use fake_connecting_dataset_entry_writer::*;
 pub use fake_dataset_entry_service::*;
-pub use outbox_expectation_helpers::*;
+pub use test_dataset_outbox_listener::*;

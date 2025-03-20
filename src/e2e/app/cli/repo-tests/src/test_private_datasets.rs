@@ -195,7 +195,7 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
         // ("admin", &admin),
     ] {
         pretty_assertions::assert_eq!(
-            Err(SetDatasetVisibilityError::Forbidden),
+            Err(SetDatasetVisibilityError::NotFound),
             client
                 .dataset()
                 .set_visibility(&dataset_id, odf::DatasetVisibility::Private)

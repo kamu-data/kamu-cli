@@ -123,7 +123,7 @@ impl DatasetEntryServiceImpl {
 
             let accounts = self
                 .account_svc
-                .accounts_by_ids(&account_ids)
+                .get_accounts_by_ids(&account_ids)
                 .await
                 .int_err()?;
 
@@ -590,7 +590,9 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
                     CreateDatasetEntryError::NameCollision(e)
                 }
                 SaveDatasetEntryError::Internal(e) => CreateDatasetEntryError::Internal(e),
-            })
+            })?;
+
+        Ok(())
     }
 
     async fn rename_entry(

@@ -23,10 +23,13 @@ const ACCOUNT_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Represents messages related to the lifecycle of an account
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AccountLifecycleMessage {
+    /// Message indicating that an account has been created
     Created(AccountLifecycleMessageCreated),
 }
+
 impl AccountLifecycleMessage {
     pub fn created(
         account_id: odf::AccountID,
@@ -51,9 +54,17 @@ impl Message for AccountLifecycleMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Contains details about a newly created account
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountLifecycleMessageCreated {
+    /// The unique identifier of the account
     pub account_id: odf::AccountID,
+
+    /// The email address associated with the account
     pub email: Email,
+
+    /// The display name of the account
     pub display_name: AccountDisplayName,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

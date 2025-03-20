@@ -809,6 +809,8 @@ impl IngestTestHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
@@ -872,10 +874,29 @@ impl IngestTestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_executor
-            .ingest_from_stream(target, ingest_plan, data, None)
+        let ingest_result = self
+            .push_ingest_executor
+            .ingest_from_stream(target.clone(), ingest_plan, data, None)
             .await
             .unwrap();
+
+        if let PushIngestResult::Updated {
+            old_head, new_head, ..
+        } = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
     }
 
     async fn ingest_from_url(
@@ -891,10 +912,29 @@ impl IngestTestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_executor
-            .ingest_from_url(target, ingest_plan, url, None)
+        let ingest_result = self
+            .push_ingest_executor
+            .ingest_from_url(target.clone(), ingest_plan, url, None)
             .await
             .unwrap();
+
+        if let PushIngestResult::Updated {
+            old_head, new_head, ..
+        } = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
     }
 }
 

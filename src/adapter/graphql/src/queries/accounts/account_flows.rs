@@ -14,25 +14,25 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountFlows {
-    account: Account,
+pub struct AccountFlows<'a> {
+    account: &'a Account,
 }
 
 #[Object]
-impl AccountFlows {
+impl<'a> AccountFlows<'a> {
     #[graphql(skip)]
-    pub fn new(account: Account) -> Self {
+    pub fn new(account: &'a Account) -> Self {
         Self { account }
     }
 
     /// Returns interface for flow runs queries
     async fn runs(&self) -> AccountFlowRuns {
-        AccountFlowRuns::new(self.account.clone())
+        AccountFlowRuns::new(self.account)
     }
 
     /// Returns interface for flow triggers queries
     async fn triggers(&self) -> AccountFlowTriggers {
-        AccountFlowTriggers::new(self.account.clone())
+        AccountFlowTriggers::new(self.account)
     }
 }
 

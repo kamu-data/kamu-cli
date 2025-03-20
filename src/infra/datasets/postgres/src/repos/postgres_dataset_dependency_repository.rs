@@ -144,9 +144,9 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
     async fn remove_upstream_dependencies(
         &self,
         downstream_dataset_id: &odf::DatasetID,
-        obsolete_upstream_dataset_ids: &[&odf::DatasetID],
+        upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), RemoveDependenciesError> {
-        if obsolete_upstream_dataset_ids.is_empty() {
+        if upstream_dataset_ids.is_empty() {
             return Ok(());
         }
 
@@ -155,7 +155,7 @@ impl DatasetDependencyRepository for PostgresDatasetDependencyRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let stack_downstream_dataset_id = downstream_dataset_id.as_did_str().to_stack_string();
-        let upstream_dataset_ids: Vec<_> = obsolete_upstream_dataset_ids
+        let upstream_dataset_ids: Vec<_> = upstream_dataset_ids
             .iter()
             .map(|id| id.as_did_str().to_string())
             .collect();

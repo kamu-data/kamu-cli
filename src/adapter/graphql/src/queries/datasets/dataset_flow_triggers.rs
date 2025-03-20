@@ -35,10 +35,6 @@ impl<'a> DatasetFlowTriggers<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
     ) -> Result<Option<FlowTrigger>> {
-        self.dataset_request_state
-            .check_dataset_read_access(ctx)
-            .await?;
-
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         let maybe_flow_trigger = flow_trigger_service
             .find_trigger(
@@ -57,10 +53,6 @@ impl<'a> DatasetFlowTriggers<'a> {
     /// Checks if all triggers of this dataset are disabled
     #[tracing::instrument(level = "info", name = DatasetFlowTriggers_all_paused, skip_all)]
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
-        self.dataset_request_state
-            .check_dataset_read_access(ctx)
-            .await?;
-
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
             let maybe_flow_trigger = flow_trigger_service

@@ -22,17 +22,17 @@ use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, Initiator
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountFlowRuns {
-    account: AccountEntity,
+pub struct AccountFlowRuns<'a> {
+    account: &'a AccountEntity,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl AccountFlowRuns {
+impl<'a> AccountFlowRuns<'a> {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(account: AccountEntity) -> Self {
+    pub fn new(account: &'a AccountEntity) -> Self {
         Self { account }
     }
 
@@ -87,6 +87,7 @@ impl AccountFlowRuns {
             .await
             .int_err()?;
 
+        // TODO: Private Datasets: access check
         let matched_flow_states: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
         let total_count = flows_state_listing.total_count;
         let matched_flows = Flow::build_batch(matched_flow_states, ctx).await?;
@@ -121,7 +122,10 @@ impl AccountFlowRuns {
 
         let matched_datasets: Vec<_> =
             filter_datasets_by_local_pattern(dataset_registry.as_ref(), datasets_with_flows)
-                .map_ok(|dataset_handle| Dataset::new(account.clone(), dataset_handle))
+                .map_ok(|dataset_handle| {
+                    // TODO: Private Datasets: validate access
+                    Dataset::new_access_checked(account.clone(), dataset_handle)
+                })
                 .try_collect()
                 .await
                 .int_err()?;

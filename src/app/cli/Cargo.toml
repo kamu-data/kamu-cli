@@ -50,6 +50,7 @@ init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 observability = { workspace = true, features = ["prometheus"] }
 time-source = { workspace = true }
+server-console = { workspace = true }
 
 kamu = { workspace = true }
 
@@ -120,11 +121,7 @@ webbrowser = "1"                                                  # For opening 
 
 # APIs
 arrow-flight = { version = "54", features = ["flight-sql-experimental"] }
-async-graphql = { version = "7", features = [
-    "chrono",
-    "url",
-    "apollo_tracing",
-] }
+async-graphql = { version = "7", default-features = false }
 async-graphql-axum = "7"
 axum = { version = "0.8", features = ["ws"] }
 http = "1"
@@ -169,7 +166,7 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "45", default-features = false, features = [
+datafusion = { version = "46", default-features = false, features = [
     "crypto_expressions",
     "encoding_expressions",
     "parquet",

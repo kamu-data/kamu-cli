@@ -30,7 +30,7 @@ pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient
         Err(DatasetByIdError::NotFound)
     );
 
-    let (_, logged_account_id) = kamu_api_server_client.auth().login_as_kamu().await;
+    kamu_api_server_client.auth().login_as_kamu().await;
 
     assert_matches!(
         kamu_api_server_client
@@ -47,7 +47,7 @@ pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient
 
     let expected_owner = DatasetOwnerInfo {
         account_name: odf::AccountName::new_unchecked("kamu"),
-        account_id: Some(logged_account_id),
+        account_id: Some(odf::AccountID::new_seeded_ed25519(b"kamu")),
     };
 
     assert_matches!(

@@ -24,7 +24,7 @@ pub trait AccountService: Sync + Send {
         account_id: &odf::AccountID,
     ) -> Result<Account, GetAccountByIdError>;
 
-    async fn accounts_by_ids(
+    async fn get_accounts_by_ids(
         &self,
         account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, InternalError>;

@@ -50,7 +50,7 @@ impl AccountService for AccountServiceImpl {
         self.account_repo.get_account_by_id(account_id).await
     }
 
-    async fn accounts_by_ids(
+    async fn get_accounts_by_ids(
         &self,
         account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, InternalError> {

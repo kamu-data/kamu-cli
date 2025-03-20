@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{
+use kamu_datasets::{
     DatasetDependency,
     GetDatasetDownstreamDependenciesUseCase,
     GetDatasetUpstreamDependenciesUseCase,
@@ -97,7 +97,7 @@ impl<'a> DatasetMetadata<'a> {
             .map(|dependency| match dependency {
                 DatasetDependency::Resolved(r) => {
                     let account = Account::new(r.owner_id.into(), r.owner_name.into());
-                    let dataset = Dataset::new(account, r.dataset_handle);
+                    let dataset = Dataset::new_access_checked(account, r.dataset_handle);
 
                     DependencyDatasetResult::accessible(dataset)
                 }
@@ -126,7 +126,7 @@ impl<'a> DatasetMetadata<'a> {
             .map(|dependency| match dependency {
                 DatasetDependency::Resolved(r) => {
                     let account = Account::new(r.owner_id.into(), r.owner_name.into());
-                    let dataset = Dataset::new(account, r.dataset_handle);
+                    let dataset = Dataset::new_access_checked(account, r.dataset_handle);
 
                     DependencyDatasetResult::accessible(dataset)
                 }

@@ -30,7 +30,7 @@ pub trait DatasetDependencyRepository: Send + Sync {
     async fn remove_upstream_dependencies(
         &self,
         downstream_dataset_id: &odf::DatasetID,
-        obsolete_upstream_dataset_ids: &[&odf::DatasetID],
+        upstream_dataset_ids: &[&odf::DatasetID],
     ) -> Result<(), RemoveDependenciesError>;
 }
 

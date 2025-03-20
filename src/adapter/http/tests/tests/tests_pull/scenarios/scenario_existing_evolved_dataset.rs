@@ -84,6 +84,17 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingEvolvedDatasetScenario<
             .await
             .unwrap();
 
+        client_harness
+            .dataset_reference_service()
+            .set_reference(
+                &server_create_result.dataset_handle.id,
+                &odf::BlockRef::Head,
+                None,
+                &server_create_result.head,
+            )
+            .await
+            .unwrap();
+
         // Extend server-side dataset with new nodes
         let server_repo = server_harness.cli_dataset_registry();
 

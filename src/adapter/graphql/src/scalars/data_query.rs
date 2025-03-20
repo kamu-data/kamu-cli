@@ -107,6 +107,7 @@ impl From<DataFusionError> for DataQueryResult {
         match e {
             DataFusionError::SQL(e, _backtrace) => DataQueryResult::invalid_sql(e.to_string()),
             DataFusionError::Plan(e) => DataQueryResult::invalid_sql(e),
+            DataFusionError::Diagnostic(_, source) => (*source).into(),
             _ => DataQueryResult::internal(e.to_string()),
         }
     }

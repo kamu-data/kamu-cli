@@ -51,7 +51,7 @@ pub struct TaskDefinitionUpdate {
 
 #[derive(Debug)]
 pub struct TaskDefinitionReset {
-    pub target: ResolvedDataset,
+    pub dataset_handle: odf::DatasetHandle,
     pub reset_plan: ResetPlan,
 }
 

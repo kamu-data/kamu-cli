@@ -848,7 +848,6 @@ impl DataWriter for DataWriterDataFusion {
 
         // Commit `SetDataSchema` event
         if let Some(new_schema) = staged.new_schema {
-            // TODO: Make commit of schema and data atomic
             let commit_schema_result = self
                 .target
                 .commit_event(
@@ -858,7 +857,7 @@ impl DataWriter for DataWriterDataFusion {
                         system_time: Some(staged.system_time),
                         prev_block_hash: Some(Some(&self.meta.head)),
                         check_object_refs: false,
-                        update_block_ref: true,
+                        update_block_ref: false,
                     },
                 )
                 .await?;
@@ -881,7 +880,7 @@ impl DataWriter for DataWriterDataFusion {
                         system_time: Some(staged.system_time),
                         prev_block_hash: Some(Some(&self.meta.head)),
                         check_object_refs: false,
-                        update_block_ref: true,
+                        update_block_ref: false,
                     },
                 )
                 .await?;

@@ -121,17 +121,19 @@ impl Harness {
                 .unwrap();
         }
 
+        let target = ResolvedDataset::from_created(&create_result);
+
         let ctx = SessionContext::new();
         let mut writer = DataWriterDataFusion::from_metadata_chain(
             ctx.clone(),
-            ResolvedDataset::from_created(&create_result),
+            target.clone(),
             &odf::BlockRef::Head,
             None,
         )
         .await
         .unwrap();
 
-        writer
+        let write_result = writer
             .write(
                 Some(
                     ctx.read_batch(
@@ -155,6 +157,19 @@ impl Harness {
                     new_watermark: None,
                     new_source_state: None,
                     data_staging_path: run_info_dir.path().join(".temp-data.parquet"),
+                },
+            )
+            .await
+            .unwrap();
+
+        target
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &write_result.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(Some(&write_result.old_head)),
                 },
             )
             .await
@@ -472,14 +487,14 @@ async fn test_data_query_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f162039d9e2a5a3ee3debee81b2dd00425beeb0278cbca16378ee36f30e5e57b66823",
+                    "inputHash": "f1620235d6ccf228130db950b89a874d53e136e316f5edb47df0dfc7f30ab5d3254bc",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uvEcw4qHKw6rSRBUHoiw0SnZONbdNZvmaxtuhRaZdymP-jOfzTm7A9AkdvETVPHUw4hWJTBpdBE2rZezVPOTWDQ",
+                    "proofValue": "uki98T-eH_HotKUTOB0JH8YFGNFFUHXDIyQJIBZlfWa4_K4O7Hv776IlWXiShjlGmkFgmQBRxoUEP4WLNKnKCDg",
                 }
             }),
             response
@@ -630,14 +645,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620445add4cae0c3760eb2f35923896b236191445f1b063258ab37a673bac80df08",
+                    "inputHash": "f162071b794eaea8fd42cefad188f7cd5aa55778f4098f3217365aae28cf2dc6221a7",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "ubO_90EmoUJpkBs3TrQJu2gYgg8NhjDah3SHV_Wz1qYACaMgUZOCtsimN-UvPp322jwtg_MkZiGGRF0tdgQxkBw",
+                    "proofValue": "u78JDIFOSevVAnYY0ZgAT9SCHC_GQ9m1rpFspwDA2xdcOBvX5ptbE6Pfj8GSc30iA0U3k-nxQxCTtoU5KE6utDA",
                 }
             }),
             response
@@ -962,13 +977,13 @@ async fn test_data_query_handler_dataset_does_not_exist() {
             .unwrap();
 
         let status = res.status();
-        let body = res.json::<serde_json::Value>().await.unwrap();
-
         pretty_assertions::assert_eq!(
             http::StatusCode::BAD_REQUEST,
             status,
-            "Unexpected response: {status} {body}"
+            "Unexpected response: {status}"
         );
+
+        let body = res.json::<serde_json::Value>().await.unwrap();
         pretty_assertions::assert_eq!(
             json!({
                 "message": "Error during planning: table 'kamu.kamu.does_not_exist' not found"

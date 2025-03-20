@@ -29,7 +29,7 @@ use time_source::SystemTimeSourceDefault;
 // crate.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, ingest, datafusion)]
+// #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
@@ -545,7 +545,7 @@ fn test_data_writer_offsets_are_sequential_partitioned() {
                           RepartitionExec: partitioning=Hash([1], 4), input_partitions=4
                             ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
                               ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
-                                JsonExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[event_time, city, population]
+                                DataSourceExec: file_groups={4 groups: [[tmp/data.ndjson:0..2991668], [tmp/data.ndjson:2991668..5983336], [tmp/data.ndjson:5983336..8975004], [tmp/data.ndjson:8975004..11966670]]}, projection=[event_time, city, population], file_type=json
             "#
         ).trim(),
         plan
@@ -575,7 +575,7 @@ fn test_data_writer_offsets_are_sequential_serialized() {
                     SortExec: expr=[event_time@1 ASC], preserve_partitioning=[false]
                       ProjectionExec: expr=[0 as op, CASE WHEN event_time@0 IS NULL THEN 946728000000 ELSE event_time@0 END as event_time, city@1 as city, population@2 as population, 1262347200000 as system_time]
                         ProjectionExec: expr=[CAST(event_time@0 AS Timestamp(Millisecond, Some("UTC"))) as event_time, city@1 as city, population@2 as population]
-                          JsonExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[event_time, city, population]
+                          DataSourceExec: file_groups={1 group: [[tmp/data.ndjson:0..11966670]]}, projection=[event_time, city, population], file_type=json
             "#
         ).trim(),
         plan
@@ -640,7 +640,7 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
     .await
     .unwrap();
 
-    writer
+    let write_result = writer
         .write(
             Some(df),
             WriteDataOpts {
@@ -649,6 +649,20 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
                 new_watermark: None,
                 new_source_state: None,
                 data_staging_path: harness.temp_dir.path().join("data.parquet"),
+            },
+        )
+        .await
+        .unwrap();
+
+    harness
+        .target
+        .as_metadata_chain()
+        .set_ref(
+            &odf::BlockRef::Head,
+            &write_result.new_head,
+            odf::dataset::SetRefOpts {
+                validate_block_present: true,
+                check_ref_is: Some(Some(&write_result.old_head)),
             },
         )
         .await
@@ -1222,6 +1236,8 @@ impl Harness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
             .build();
 
         let storage_unit = catalog
@@ -1238,6 +1254,7 @@ impl Harness {
                 )
                 .system_time(system_time)
                 .build_typed(),
+                odf::dataset::StoreDatasetOpts { set_head: true },
             )
             .await
             .unwrap();
@@ -1327,7 +1344,8 @@ impl Harness {
             Some(df)
         };
 
-        self.writer
+        let write_result = self
+            .writer
             .write(
                 df,
                 WriteDataOpts {
@@ -1338,7 +1356,22 @@ impl Harness {
                     data_staging_path: self.temp_dir.path().join("data.parquet"),
                 },
             )
+            .await?;
+
+        self.target
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &write_result.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(Some(&write_result.old_head)),
+                },
+            )
             .await
+            .unwrap();
+
+        Ok(write_result)
     }
 
     async fn write(&mut self, data: &str, schema: &str) -> Result<WriteDataResult, WriteDataError> {

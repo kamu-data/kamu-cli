@@ -100,6 +100,17 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
             .await
             .unwrap();
 
+        client_harness
+            .dataset_reference_service()
+            .set_reference(
+                &server_create_result.dataset_handle.id,
+                &odf::BlockRef::Head,
+                None,
+                &commit_result.as_ref().unwrap().new_head,
+            )
+            .await
+            .unwrap();
+
         let server_dataset = server_harness
             .cli_dataset_registry()
             .get_dataset_by_handle(&server_create_result.dataset_handle)
@@ -112,13 +123,33 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingDivergedDatasetScenario
             .execute(
                 server_dataset.clone(),
                 compaction_planner
-                    .plan_compaction(server_dataset, CompactionOptions::default(), None)
+                    .plan_compaction(server_dataset.clone(), CompactionOptions::default(), None)
                     .await
                     .unwrap(),
                 None,
             )
             .await
             .unwrap();
+
+        if let CompactionResult::Success {
+            old_head,
+            new_head: proposed_new_head,
+            ..
+        } = &server_compaction_result
+        {
+            server_dataset
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    proposed_new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
 
         let server_alias = odf::DatasetAlias::new(server_account_name, foo_name);
         let server_odf_url = server_harness.dataset_url(&server_alias);

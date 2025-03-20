@@ -118,41 +118,55 @@ impl SqliteFlowEventStore {
         // Determine if we have a status change between these events
         let mut maybe_latest_status = None;
         let mut maybe_scheduled_for_activation_at = None;
+        let mut reset_scheduled_for_activation_at = false;
+
         for event in events {
             if let Some(new_status) = event.new_status() {
                 maybe_latest_status = Some(new_status);
             }
-            if let FlowEvent::ScheduledForActivation(e) = event {
-                maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
-            } else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = event {
-                maybe_scheduled_for_activation_at = None;
+            match event {
+                FlowEvent::ScheduledForActivation(e) => {
+                    maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
+                }
+                FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) => {
+                    maybe_scheduled_for_activation_at = None;
+                    reset_scheduled_for_activation_at = true;
+                }
+                _ => {
+                    reset_scheduled_for_activation_at = false;
+                }
+            }
+
+            if maybe_scheduled_for_activation_at.is_none() && !reset_scheduled_for_activation_at {
+                #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+                #[allow(dead_code)]
+                pub struct ActivationRow {
+                    pub activation_time: Option<DateTime<Utc>>,
+                }
+
+                let connection_mut = tr.connection_mut().await?;
+                maybe_scheduled_for_activation_at = sqlx::query_as!(
+                    ActivationRow,
+                    r#"
+                            SELECT scheduled_for_activation_at as "activation_time: _"
+                                FROM flows WHERE flow_id = $1
+                            "#,
+                    flow_id
+                )
+                .map(|result| result.activation_time)
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
             }
         }
-
-        // We either have determined the lateststatus, or should read the previous
-        let latest_status = if let Some(latest_status) = maybe_latest_status {
-            latest_status
-        } else {
-            // Find out current flow status recorded
-            let connection_mut = tr.connection_mut().await?;
-            sqlx::query!(
-                r#"
-                SELECT flow_status as "flow_status: FlowStatus" FROM flows
-                WHERE flow_id = $1
-                "#,
-                flow_id
-            )
-            .fetch_one(connection_mut)
-            .await
-            .int_err()?
-            .flow_status
-        };
 
         let connection_mut = tr.connection_mut().await?;
         let rows = sqlx::query!(
             r#"
-            UPDATE flows
-                SET flow_status = $2, last_event_id = $3, scheduled_for_activation_at = $4
+                UPDATE flows
+                    SET flow_status = CASE WHEN $2 IS NOT NULL THEN $2 ELSE flow_status END,
+                    last_event_id = $3,
+                    scheduled_for_activation_at = $4
                 WHERE flow_id = $1 AND (
                     last_event_id IS NULL AND CAST($5 as INT8) IS NULL OR
                     last_event_id IS NOT NULL AND CAST($5 as INT8) IS NOT NULL AND last_event_id = $5
@@ -160,7 +174,7 @@ impl SqliteFlowEventStore {
                 RETURNING flow_id
             "#,
             flow_id,
-            latest_status,
+            maybe_latest_status,
             last_event_id,
             maybe_scheduled_for_activation_at,
             maybe_prev_stored_event_id,

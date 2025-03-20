@@ -9,15 +9,15 @@
 
 use kamu_datasets::CommitDatasetEventUseCase;
 
-use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 use crate::utils::make_dataset_access_error;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MetadataChainMut<'a> {
-    dataset_mut_request_state: &'a DatasetMutRequestState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,9 +26,9 @@ pub struct MetadataChainMut<'a> {
 #[Object]
 impl<'a> MetadataChainMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_mut_request_state: &'a DatasetMutRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state,
+            dataset_request_state,
         }
     }
 
@@ -64,7 +64,7 @@ impl<'a> MetadataChainMut<'a> {
         };
 
         let commit_dataset_event = from_catalog_n!(ctx, dyn CommitDatasetEventUseCase);
-        let dataset_handle = self.dataset_mut_request_state.dataset_handle();
+        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         let result = match commit_dataset_event.execute(dataset_handle, event).await {
             Ok(result) => CommitResult::Success(CommitResultSuccess {

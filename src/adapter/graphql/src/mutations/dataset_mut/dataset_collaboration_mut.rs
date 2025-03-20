@@ -9,13 +9,13 @@
 
 use kamu_auth_rebac::RebacService;
 
-use crate::mutations::DatasetMutRequestState;
 use crate::prelude::*;
+use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetCollaborationMut<'a> {
-    dataset_mut_request_state: &'a DatasetMutRequestState,
+    dataset_request_state: &'a DatasetRequestState,
 }
 
 // TODO: Private Datasets: tests
@@ -23,9 +23,9 @@ pub struct DatasetCollaborationMut<'a> {
 #[Object]
 impl<'a> DatasetCollaborationMut<'a> {
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetMutRequestState) -> Self {
+    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
         Self {
-            dataset_mut_request_state: dataset_request_state,
+            dataset_request_state,
         }
     }
 
@@ -38,9 +38,10 @@ impl<'a> DatasetCollaborationMut<'a> {
         account_id: AccountID<'_>,
         role: DatasetAccessRole,
     ) -> Result<SetRoleResult> {
-        self.dataset_mut_request_state
-            .check_dataset_maintain_access(ctx)
-            .await?;
+        // TODO: Private Datasets: access check (move to ctor)
+        // self.dataset_mut_request_state
+        //     .check_dataset_maintain_access(ctx)
+        //     .await?;
 
         let rebac_service = from_catalog_n!(ctx, dyn RebacService);
 
@@ -48,7 +49,7 @@ impl<'a> DatasetCollaborationMut<'a> {
             .set_account_dataset_relation(
                 &account_id,
                 role.into(),
-                &self.dataset_mut_request_state.dataset_handle().id,
+                &self.dataset_request_state.dataset_handle().id,
             )
             .await
             .int_err()?;
@@ -64,9 +65,10 @@ impl<'a> DatasetCollaborationMut<'a> {
         ctx: &Context<'_>,
         account_ids: Vec<AccountID<'_>>,
     ) -> Result<UnsetRoleResult> {
-        self.dataset_mut_request_state
-            .check_dataset_maintain_access(ctx)
-            .await?;
+        // TODO: Private Datasets: access check (move to ctor)
+        // self.dataset_mut_request_state
+        //     .check_dataset_maintain_access(ctx)
+        //     .await?;
 
         let rebac_service = from_catalog_n!(ctx, dyn RebacService);
 
@@ -79,7 +81,7 @@ impl<'a> DatasetCollaborationMut<'a> {
         rebac_service
             .unset_accounts_dataset_relations(
                 &odf_account_ids_refs[..],
-                &self.dataset_mut_request_state.dataset_handle().id,
+                &self.dataset_request_state.dataset_handle().id,
             )
             .await
             .int_err()?;

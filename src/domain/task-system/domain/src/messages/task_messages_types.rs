@@ -19,9 +19,13 @@ const TASK_PROGRESS_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Represents messages related to the progress of a task
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskProgressMessage {
+    /// Message indicating that a task is currently running
     Running(TaskProgressMessageRunning),
+
+    /// Message indicating that a task has finished execution
     Finished(TaskProgressMessageFinished),
 }
 
@@ -61,10 +65,16 @@ impl Message for TaskProgressMessage {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Contains details about a running task
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskProgressMessageRunning {
+    /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
+
+    /// The unique identifier of the task
     pub task_id: TaskID,
+
+    /// Metadata associated with the task
     pub task_metadata: TaskMetadata,
 }
 
@@ -72,9 +82,16 @@ pub struct TaskProgressMessageRunning {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaskProgressMessageFinished {
+    /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
+
+    /// The unique identifier of the task
     pub task_id: TaskID,
+
+    /// Metadata associated with the task
     pub task_metadata: TaskMetadata,
+
+    /// The outcome of the task execution
     pub outcome: TaskOutcome,
 }
 

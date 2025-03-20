@@ -134,16 +134,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         let mut base_catalog_builder = configure_base_catalog(
             &workspace_layout,
+            workspace_status,
             tenancy_config,
             args.system_time.map(Into::into),
             is_e2e_testing,
         );
-
-        if workspace_status.is_indexing_needed() {
-            base_catalog_builder.add::<kamu_datasets_services::DatasetEntryIndexer>();
-            base_catalog_builder.add::<kamu_datasets_services::DependencyGraphIndexer>();
-            base_catalog_builder.add::<kamu_auth_rebac_services::RebacIndexer>();
-        }
 
         base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
         base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
@@ -371,6 +366,7 @@ where
 // Public only for tests
 pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
+    workspace_status: WorkspaceStatus,
     tenancy_config: TenancyConfig,
     system_time: Option<DateTime<Utc>>,
     is_e2e_testing: bool,
@@ -403,6 +399,7 @@ pub fn configure_base_catalog(
     );
     b.bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>();
     b.bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>();
+    b.add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>();
 
     b.add::<odf::dataset::DatasetFactoryImpl>();
 
@@ -467,22 +464,11 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
     b.add::<CompactDatasetUseCaseImpl>();
-    b.add::<GetDatasetDownstreamDependenciesUseCaseImpl>();
-    b.add::<GetDatasetUpstreamDependenciesUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
     b.add::<PushDatasetUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
-
-    b.add::<kamu_datasets_services::AppendDatasetMetadataBatchUseCaseImpl>();
-    b.add::<kamu_datasets_services::CommitDatasetEventUseCaseImpl>();
-    b.add::<kamu_datasets_services::EditDatasetUseCaseImpl>();
-    b.add::<kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl>();
-    b.add::<kamu_datasets_services::CreateDatasetUseCaseImpl>();
-    b.add::<kamu_datasets_services::DeleteDatasetUseCaseImpl>();
-    b.add::<kamu_datasets_services::RenameDatasetUseCaseImpl>();
-    b.add::<kamu_datasets_services::ViewDatasetUseCaseImpl>();
 
     b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
 
@@ -505,16 +491,10 @@ pub fn configure_base_catalog(
     b.add::<odf_server::CLIAccessTokenStore>();
 
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
+    kamu_datasets_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
+    kamu_auth_rebac_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
 
     b.add::<DatabaseTransactionRunner>();
-
-    b.add::<kamu_auth_rebac_services::RebacDatasetLifecycleMessageConsumer>();
-    b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
-    b.add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false });
-    b.add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
-        allows_anonymous_read: false,
-        allows_public_read: false,
-    });
 
     b.add::<kamu_adapter_flight_sql::SessionAuthAnonymous>();
     b.add::<kamu_adapter_flight_sql::SessionManagerCaching>();
@@ -525,9 +505,6 @@ pub fn configure_base_catalog(
             .unwrap(),
     );
     b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
-
-    b.add::<kamu_datasets_services::DatasetEntryServiceImpl>();
-    b.add::<kamu_datasets_services::DependencyGraphServiceImpl>();
 
     b.add_builder(
         messaging_outbox::OutboxImmediateImpl::builder()
@@ -546,6 +523,16 @@ pub fn configure_base_catalog(
     register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
         &mut b,
         kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+    );
+
+    register_message_dispatcher::<kamu_datasets::DatasetReferenceMessage>(
+        &mut b,
+        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    );
+
+    register_message_dispatcher::<kamu_datasets::DatasetDependenciesMessage>(
+        &mut b,
+        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     );
 
     b

@@ -18,6 +18,7 @@ mod dataset_flow_runs;
 mod dataset_flow_triggers;
 mod dataset_flows;
 mod dataset_metadata;
+mod dataset_request_state;
 mod datasets;
 mod metadata_chain;
 
@@ -32,5 +33,6 @@ pub(crate) use dataset_flow_runs::*;
 pub(crate) use dataset_flow_triggers::*;
 pub(crate) use dataset_flows::*;
 pub(crate) use dataset_metadata::*;
+pub(crate) use dataset_request_state::*;
 pub(crate) use datasets::*;
 pub(crate) use metadata_chain::*;

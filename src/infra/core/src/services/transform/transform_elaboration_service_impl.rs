@@ -212,7 +212,24 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
                     .await
                     .int_err()?;
 
-                if let CompactionResult::Success { .. } = compaction_result {
+                if let CompactionResult::Success {
+                    old_head, new_head, ..
+                } = compaction_result
+                {
+                    // Set reference on the compacted dataset
+                    target
+                        .as_metadata_chain()
+                        .set_ref(
+                            &odf::BlockRef::Head,
+                            &new_head,
+                            odf::dataset::SetRefOpts {
+                                validate_block_present: true,
+                                check_ref_is: Some(Some(&old_head)),
+                            },
+                        )
+                        .await
+                        .int_err()?;
+
                     // Recursing to try again after compaction
                     self.elaborate_transform(
                         target.clone(),

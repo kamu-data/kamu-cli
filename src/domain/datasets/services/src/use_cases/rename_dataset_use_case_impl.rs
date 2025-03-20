@@ -12,7 +12,14 @@ use std::sync::Arc;
 use dill::{component, interface};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::DatasetRegistry;
-use kamu_datasets::{NameCollisionError, RenameDatasetError, RenameDatasetUseCase};
+use kamu_datasets::{
+    DatasetLifecycleMessage,
+    NameCollisionError,
+    RenameDatasetError,
+    RenameDatasetUseCase,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+};
+use messaging_outbox::{Outbox, OutboxExt};
 
 use crate::{DatasetEntryWriter, RenameDatasetEntryError};
 
@@ -22,6 +29,7 @@ pub struct RenameDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    outbox: Arc<dyn Outbox>,
 }
 
 #[component(pub)]
@@ -31,11 +39,13 @@ impl RenameDatasetUseCaseImpl {
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             dataset_registry,
             dataset_entry_writer,
             dataset_action_authorizer,
+            outbox,
         }
     }
 }
@@ -94,20 +104,13 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
                 }
             })?;
 
-        // Resolve target dataset
-        let target = self
-            .dataset_registry
-            .get_dataset_by_handle(&dataset_handle)
-            .await;
-
-        // Update stored alias file
-        // TODO: reconsider if we need this in general
-        // TODO: consider writing this change only after DB transaction succeeds
-        odf::dataset::write_dataset_alias(
-            target.as_ref(),
-            &odf::DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone()),
-        )
-        .await?;
+        // Issue outbox event
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::renamed(dataset_handle.id.clone(), new_name.clone()),
+            )
+            .await?;
 
         Ok(())
     }

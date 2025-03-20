@@ -44,7 +44,7 @@ kamu-flow-system-services = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-search = { workspace = true }
 
-async-graphql = { version = "7", features = [
+async-graphql = { version = "7", default-features = false, features = [
     "chrono",
     "url",
     "apollo_tracing",
@@ -52,7 +52,7 @@ async-graphql = { version = "7", features = [
 async-trait = { version = "0.1", default-features = false }
 chrono = "0.4"
 # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
-datafusion = { version = "45", default-features = false, features = [
+datafusion = { version = "46", default-features = false, features = [
     "serde",
 ] }
 dill = "0.11"
@@ -87,6 +87,7 @@ time-source = { workspace = true }
 
 bon = { version = "3", default-features = false }
 indoc = "2"
+oop = "0.0.2"
 pretty_assertions = { version = "1" }
 tempfile = "3"
 test-group = { version = "1" }

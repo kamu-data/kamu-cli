@@ -61,6 +61,8 @@ impl TransformTestHarness {
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
@@ -222,10 +224,29 @@ impl TransformTestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_executor
-            .ingest_from_stream(target, ingest_plan, Box::new(data), None)
+        let ingest_result = self
+            .push_ingest_executor
+            .ingest_from_stream(target.clone(), ingest_plan, Box::new(data), None)
             .await
             .unwrap();
+
+        if let PushIngestResult::Updated {
+            old_head, new_head, ..
+        } = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
     }
 
     async fn elaborate_transform(
@@ -258,12 +279,31 @@ impl TransformTestHarness {
 
         match elaboration {
             TransformElaboration::UpToDate => Ok(TransformResult::UpToDate),
-            TransformElaboration::Elaborated(plan) => self
-                .transform_executor
-                .execute_transform(target, plan, None)
-                .await
-                .1
-                .map_err(TransformError::Execute),
+            TransformElaboration::Elaborated(plan) => {
+                let transform_result = self
+                    .transform_executor
+                    .execute_transform(target.clone(), plan, None)
+                    .await
+                    .1
+                    .map_err(TransformError::Execute)?;
+
+                if let TransformResult::Updated { old_head, new_head } = &transform_result {
+                    target
+                        .as_metadata_chain()
+                        .set_ref(
+                            &odf::BlockRef::Head,
+                            new_head,
+                            odf::dataset::SetRefOpts {
+                                validate_block_present: true,
+                                check_ref_is: Some(Some(old_head)),
+                            },
+                        )
+                        .await
+                        .unwrap();
+                }
+
+                Ok(transform_result)
+            }
         }
     }
 
@@ -274,10 +314,31 @@ impl TransformTestHarness {
             .await
             .unwrap();
 
-        self.compaction_executor
-            .execute(target, compaction_plan, None)
+        let compaction_result = self
+            .compaction_executor
+            .execute(target.clone(), compaction_plan, None)
             .await
             .unwrap();
+
+        if let CompactionResult::Success {
+            old_head,
+            new_head: proposed_new_head,
+            ..
+        } = &compaction_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    proposed_new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
     }
 }
 

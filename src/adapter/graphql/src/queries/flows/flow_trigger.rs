@@ -49,7 +49,7 @@ impl FlowTriggerType {
                     .await?
                     .expect("Account must exist");
                 Self::InputDatasetFlow(FlowTriggerInputDatasetFlow::new(
-                    Dataset::new(account, hdl),
+                    Dataset::new_access_checked(account, hdl),
                     input.flow_type.into(),
                     input.flow_id.into(),
                 ))

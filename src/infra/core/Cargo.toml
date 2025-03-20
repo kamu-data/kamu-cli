@@ -81,7 +81,7 @@ ringbuf = "0.3"
 zip = "2"
 
 # Data
-datafusion = { version = "45", default-features = false }
+datafusion = { version = "46", default-features = false }
 object_store = { version = "0.11", features = ["aws"] }
 sha3 = "0.10"
 
@@ -130,8 +130,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "45" }
-datafusion-functions-json = { optional = true, version = "0.45" }
+datafusion-ethers = { optional = true, version = "46" }
+datafusion-functions-json = { optional = true, version = "0.46" }
 rumqttc = { optional = true, version = "0.24" }
 mockall = { optional = true, version = "0.13", default-features = false }
 oop = { optional = true, version = "0.0.2" }
@@ -145,8 +145,6 @@ libc = "0.2" # For getting uid:gid
 [dev-dependencies]
 kamu = { workspace = true, default-features = false, features = ["testing"] }
 kamu-accounts = { workspace = true, default-features = false, features = ["testing"] }
-kamu-accounts-inmem = { workspace = true, default-features = false }
-kamu-accounts-services = { workspace = true, default-features = false }
 kamu-core = { workspace = true, default-features = false, features = ["testing"] }
 kamu-datasets-services = { workspace = true, default-features = false, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true, default-features = false }
@@ -155,7 +153,7 @@ test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.5", features = ["async_tokio"] }
-datafusion = { version = "45", default-features = false, features = [
+datafusion = { version = "46", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"

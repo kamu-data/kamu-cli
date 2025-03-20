@@ -114,6 +114,9 @@ impl MessageConsumerT<DatasetLifecycleMessage> for RebacDatasetLifecycleMessageC
             DatasetLifecycleMessage::Deleted(message) => {
                 self.handle_dataset_lifecycle_deleted_message(message).await
             }
+
+            // No action required
+            DatasetLifecycleMessage::Renamed(_) => Ok(()),
         }
     }
 }

@@ -44,6 +44,11 @@ impl ResolvedDataset {
         }
     }
 
+    /// Detaches this dataset from any transaction references
+    pub fn detach_from_transaction(&self) {
+        self.dataset.detach_from_transaction();
+    }
+
     #[inline]
     pub fn get_id(&self) -> &odf::DatasetID {
         &self.handle.id

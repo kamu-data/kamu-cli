@@ -87,8 +87,31 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
         // Execute compacting
         let compaction_result = self
             .compaction_executor
-            .execute(target, compaction_plan, maybe_listener)
+            .execute(target.clone(), compaction_plan, maybe_listener)
             .await?;
+
+        // Set proposed reference, if something got compacted
+        match &compaction_result {
+            CompactionResult::NothingToDo => {
+                tracing::debug!(%dataset_handle, "Skipping setting reference. Dataset was not compacted");
+            }
+            CompactionResult::Success {
+                old_head, new_head, ..
+            } => {
+                tracing::debug!(%dataset_handle, %new_head, "Setting new compacted head");
+                target
+                    .as_metadata_chain()
+                    .set_ref(
+                        &odf::BlockRef::Head,
+                        new_head,
+                        odf::dataset::SetRefOpts {
+                            validate_block_present: true,
+                            check_ref_is: Some(Some(old_head)),
+                        },
+                    )
+                    .await?;
+            }
+        }
 
         Ok(compaction_result)
     }

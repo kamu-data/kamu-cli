@@ -12,6 +12,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{MockDidGenerator, TenancyConfig};
 use messaging_outbox::{MockOutbox, Outbox};
+use time_source::SystemTimeSourceStub;
 
 use crate::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
 
@@ -20,8 +21,9 @@ use crate::testing::{BaseRepoHarness, MockDatasetActionAuthorizer};
 pub struct BaseUseCaseHarnessOptions {
     tenancy_config: TenancyConfig,
     maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
-    mock_outbox: MockOutbox,
+    mock_outbox: Option<MockOutbox>,
     maybe_mock_did_generator: Option<MockDidGenerator>,
+    maybe_system_time_source_stub: Option<SystemTimeSourceStub>,
     current_account_subject: CurrentAccountSubject,
 }
 
@@ -44,7 +46,12 @@ impl BaseUseCaseHarnessOptions {
     }
 
     pub fn with_outbox(mut self, mock_outbox: MockOutbox) -> Self {
-        self.mock_outbox = mock_outbox;
+        self.mock_outbox = Some(mock_outbox);
+        self
+    }
+
+    pub fn without_outbox(mut self) -> Self {
+        self.mock_outbox = None;
         self
     }
 
@@ -63,6 +70,14 @@ impl BaseUseCaseHarnessOptions {
         self.current_account_subject = current_account_subject;
         self
     }
+
+    pub fn with_system_time_source_stub(
+        mut self,
+        system_time_source_stub: SystemTimeSourceStub,
+    ) -> Self {
+        self.maybe_system_time_source_stub = Some(system_time_source_stub);
+        self
+    }
 }
 
 impl Default for BaseUseCaseHarnessOptions {
@@ -70,8 +85,9 @@ impl Default for BaseUseCaseHarnessOptions {
         Self {
             tenancy_config: TenancyConfig::SingleTenant,
             maybe_mock_dataset_action_authorizer: None,
-            mock_outbox: MockOutbox::new(),
+            mock_outbox: Some(MockOutbox::new()),
             maybe_mock_did_generator: None,
+            maybe_system_time_source_stub: None,
             current_account_subject: CurrentAccountSubject::new_test(),
         }
     }
@@ -87,16 +103,20 @@ pub struct BaseUseCaseHarness {
 
 impl BaseUseCaseHarness {
     pub fn new(options: BaseUseCaseHarnessOptions) -> Self {
-        let base_repo_harness = BaseRepoHarness::builder()
+        let base_repo_harness_builder = BaseRepoHarness::builder()
             .tenancy_config(options.tenancy_config)
             .maybe_mock_did_generator(options.maybe_mock_did_generator)
             .current_account_subject(options.current_account_subject)
-            .build();
+            .maybe_system_time_source_stub(options.maybe_system_time_source_stub);
+
+        let base_repo_harness = base_repo_harness_builder.build();
 
         let catalog = {
             let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
-            b.add_value(options.mock_outbox)
-                .bind::<dyn Outbox, MockOutbox>();
+
+            if let Some(mock_outbox) = options.mock_outbox {
+                b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
+            }
 
             if let Some(mock_dataset_action_authorizer) =
                 options.maybe_mock_dataset_action_authorizer

@@ -8,27 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use dill::Component;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
-use kamu_core::{auth, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
-use kamu_datasets_services::{
-    CreateDatasetFromSnapshotUseCaseImpl,
-    CreateDatasetUseCaseImpl,
-    DatasetEntryServiceImpl,
-    DependencyGraphServiceImpl,
-    ViewDatasetUseCaseImpl,
-};
+use kamu_core::TenancyConfig;
+use kamu_datasets::*;
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
-use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
-use time_source::SystemTimeSourceDefault;
 
-use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
+use crate::utils::{authentication_catalogs, expect_anonymous_access_error, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -558,45 +546,23 @@ async fn test_anonymous_setters_fail() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct FlowConfigHarness {
-    _tempdir: tempfile::TempDir,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
 impl FlowConfigHarness {
     async fn make() -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
+        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
 
         let catalog_base = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
-            b.add::<DummyOutboxImpl>()
-                .add::<DidGeneratorDefault>()
-                .add_value(TenancyConfig::SingleTenant)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
-                .add::<MetadataQueryServiceImpl>()
-                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CreateDatasetUseCaseImpl>()
-                .add::<ViewDatasetUseCaseImpl>()
-                .add::<SystemTimeSourceDefault>()
-                .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-                .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
+            b.add::<MetadataQueryServiceImpl>()
                 .add::<FlowConfigurationServiceImpl>()
-                .add::<InMemoryFlowConfigurationEventStore>()
-                .add::<DatabaseTransactionRunner>()
-                .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
+                .add::<InMemoryFlowConfigurationEventStore>();
 
             b.build()
         };
@@ -605,7 +571,7 @@ impl FlowConfigHarness {
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
 
         Self {
-            _tempdir: tempdir,
+            base_gql_harness,
             catalog_anonymous,
             catalog_authorized,
         }

@@ -521,7 +521,7 @@ mod tests {
                 .unwrap_err();
 
             assert_eq!(
-                err.to_string(),
+                err.to_string().lines().next().unwrap_or_default(),
                 "Invalid or Unsupported Configuration: Invalid endpoint: http://endpoint33. HTTP \
                  is not allowed for S3 endpoints. To allow HTTP, set 'aws.allow_http' to true"
             );

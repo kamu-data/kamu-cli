@@ -10,6 +10,8 @@
 use std::assert_matches::assert_matches;
 
 use kamu_cli_e2e_common::{
+    DATASET_DERIVATIVE_LEADERBOARD_NAME,
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
@@ -66,6 +68,66 @@ pub async fn test_reset(kamu: KamuCliPuppet) {
     let block_records_after_resetting = kamu.list_blocks(&DATASET_ROOT_PLAYER_NAME).await;
 
     pretty_assertions::assert_eq!(block_records_after_ingesting, block_records_after_resetting);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_reset_with_change_of_dependencies(kamu: KamuCliPuppet) {
+    // 1. Root
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    // 2. Derivative (from 1.)
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    // There must be 3 blocks: Seed, SetTransform, and SetVocab
+    let block_records_in_derived = kamu.list_blocks(&DATASET_DERIVATIVE_LEADERBOARD_NAME).await;
+    pretty_assertions::assert_eq!(3, block_records_in_derived.len());
+
+    // Seed is the arliest event before transform inputs were defined
+    let seed_block_hash = block_records_in_derived[2]
+        .block_hash
+        .as_multibase()
+        .to_stack_string();
+
+    // Attempting to delete root non-recursively would be blocked
+    kamu.assert_failure_command_execution(
+        ["--yes", "delete", &DATASET_ROOT_PLAYER_NAME],
+        None,
+        Some(["Error: Dataset player-scores is referenced by: leaderboard"]),
+    )
+    .await;
+
+    // Let's reset the derived dataset to Seed - dependency must be lost
+    kamu.assert_success_command_execution(
+        [
+            "--yes",
+            "reset",
+            &DATASET_DERIVATIVE_LEADERBOARD_NAME,
+            &seed_block_hash,
+        ],
+        None,
+        Some(["Dataset was reset"]),
+    )
+    .await;
+
+    // There must be 1 block now: Seed
+    let block_records_in_derived = kamu.list_blocks(&DATASET_DERIVATIVE_LEADERBOARD_NAME).await;
+    pretty_assertions::assert_eq!(1, block_records_in_derived.len());
+
+    // Attempt deleting root again - it should succeed
+    kamu.assert_success_command_execution(
+        ["--yes", "delete", &DATASET_ROOT_PLAYER_NAME],
+        None,
+        Some([r#"Deleted 1 dataset\(s\)"#]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

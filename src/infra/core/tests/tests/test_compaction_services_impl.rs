@@ -958,7 +958,7 @@ async fn test_compact_offsets_are_sequential_impl() {
                 Optimized physical plan:
                 DataSinkExec: sink=ParquetSink(file_groups=[])
                   SortExec: expr=[offset@0 ASC NULLS LAST], preserve_partitioning=[false]
-                    ParquetExec: file_groups={1 group: [[...]]}, projection=[offset, op, system_time, date, city, population]
+                    DataSourceExec: file_groups={1 group: [[...]]}, projection=[offset, op, system_time, date, city, population], file_type=parquet
                 "#
             )
             .trim(),
@@ -1142,6 +1142,8 @@ impl CompactTestHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
@@ -1196,6 +1198,8 @@ impl CompactTestHarness {
             )
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
+            .add::<odf::dataset::DatasetDefaultS3Builder>()
+            .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3Builder>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
@@ -1405,10 +1409,29 @@ impl CompactTestHarness {
             .await
             .unwrap();
 
-        self.push_ingest_executor
-            .ingest_from_stream(target, ingest_plan, Box::new(data), None)
+        let ingest_result = self
+            .push_ingest_executor
+            .ingest_from_stream(target.clone(), ingest_plan, Box::new(data), None)
             .await
             .unwrap();
+
+        if let PushIngestResult::Updated {
+            old_head, new_head, ..
+        } = &ingest_result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
     }
 
     async fn commit_set_licence_block(&self, dataset_ref: &odf::DatasetRef, head: &odf::Multihash) {
@@ -1517,8 +1540,26 @@ impl CompactTestHarness {
 
         let result = self
             .compaction_executor
-            .execute(target, compaction_plan, None)
+            .execute(target.clone(), compaction_plan, None)
             .await?;
+
+        if let CompactionResult::Success {
+            old_head, new_head, ..
+        } = &result
+        {
+            target
+                .as_metadata_chain()
+                .set_ref(
+                    &odf::BlockRef::Head,
+                    new_head,
+                    odf::dataset::SetRefOpts {
+                        validate_block_present: true,
+                        check_ref_is: Some(Some(old_head)),
+                    },
+                )
+                .await
+                .unwrap();
+        }
 
         Ok(result)
     }

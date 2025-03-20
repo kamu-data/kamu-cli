@@ -90,6 +90,17 @@ impl<TServerHarness: ServerSideHarness>
             .await
             .unwrap();
 
+        server_harness
+            .cli_dataset_reference_service()
+            .set_reference(
+                &client_create_result.dataset_handle.id,
+                &odf::BlockRef::Head,
+                None,
+                &client_create_result.head,
+            )
+            .await
+            .unwrap();
+
         let client_registry = client_harness.dataset_registry();
 
         // Extend client-side dataset with new nodes
