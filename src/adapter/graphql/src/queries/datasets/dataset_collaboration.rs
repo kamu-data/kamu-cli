@@ -38,7 +38,7 @@ impl<'a> DatasetCollaboration<'a> {
     }
 
     /// Accounts (and their roles) that have access to the dataset
-    #[tracing::instrument(level = "info", name = DatasetCollaboration_account_roles, skip_all)]
+    #[tracing::instrument(level = "info", name = DatasetCollaboration_account_roles, skip_all, fields(?page, ?per_page))]
     async fn account_roles(
         &self,
         ctx: &Context<'_>,
