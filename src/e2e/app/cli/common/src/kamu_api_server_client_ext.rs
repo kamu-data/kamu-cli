@@ -660,14 +660,9 @@ impl DatasetApi<'_> {
                 let first_error = errors.first().unwrap();
                 let unexpected_message = first_error.message.as_str();
 
-                match unexpected_message {
-                    "Dataset access error" => Err(GetDatasetVisibilityError::Access),
-                    unexpected_message => {
-                        Err(format!("Unexpected error message: {unexpected_message}")
-                            .int_err()
-                            .into())
-                    }
-                }
+                Err(format!("Unexpected error message: {unexpected_message}")
+                    .int_err()
+                    .into())
             }
         }
     }

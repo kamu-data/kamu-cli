@@ -205,8 +205,8 @@ impl Dataset {
     }
 
     /// Access to the dataset collaboration data
-    async fn collaboration(&self) -> DatasetCollaboration {
-        DatasetCollaboration::new(&self.dataset_request_state)
+    async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaboration> {
+        DatasetCollaboration::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Various endpoints for interacting with data

@@ -12,6 +12,7 @@ use kamu_auth_rebac::RebacService;
 
 use crate::prelude::*;
 use crate::queries::{Account, DatasetRequestState};
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,10 +26,15 @@ impl<'a> DatasetCollaboration<'a> {
     const DEFAULT_RESULTS_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(dataset_request_state: &'a DatasetRequestState) -> Self {
-        Self {
+    pub async fn new_with_access_check(
+        ctx: &Context<'_>,
+        dataset_request_state: &'a DatasetRequestState,
+    ) -> Result<Self> {
+        utils::check_dataset_maintain_access(ctx, dataset_request_state).await?;
+
+        Ok(Self {
             dataset_request_state,
-        }
+        })
     }
 
     /// Accounts (and their roles) that have access to the dataset
@@ -39,11 +45,6 @@ impl<'a> DatasetCollaboration<'a> {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<AccountWithRoleConnection> {
-        // TODO: Private Datasets: access check (move to ctor)
-        // self.dataset_request_state
-        //     .check_dataset_maintain_access(ctx)
-        //     .await?;
-
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 

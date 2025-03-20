@@ -1321,7 +1321,7 @@ pub async fn test_minimum_dataset_maintainer_can_access_roles(anonymous: KamuApi
     // No roles granted
     {
         let success = Ok(AccountRolesResponse::new(Vec::new()));
-        let failure = Err(DatasetCollaborationAccountRolesError::DatasetNotFound);
+        let failure = Err(DatasetCollaborationAccountRolesError::Access);
 
         for (tag, client, expected_result) in [
             // failure
@@ -1394,16 +1394,14 @@ pub async fn test_minimum_dataset_maintainer_can_access_roles(anonymous: KamuApi
             (name(&"maintainer"), R::Maintainer),
             (name(&"reader"), R::Reader),
         ]);
-        let not_found_failure = Err(DatasetCollaborationAccountRolesError::DatasetNotFound);
-        let access_failure = Err(DatasetCollaborationAccountRolesError::Access);
+        let failure = Err(DatasetCollaborationAccountRolesError::Access);
 
         for (tag, client, expected_result) in [
-            // not_found_failure
-            ("anonymous", &anonymous, &not_found_failure),
-            ("not_owner", &not_owner, &not_found_failure),
-            // access_failure
-            ("reader", &reader, &access_failure),
-            ("editor", &editor, &access_failure),
+            // failure
+            ("anonymous", &anonymous, &failure),
+            ("not_owner", &not_owner, &failure),
+            ("reader", &reader, &failure),
+            ("editor", &editor, &failure),
             // success
             ("maintainer", &maintainer, &success),
             ("owner", &owner, &success),
