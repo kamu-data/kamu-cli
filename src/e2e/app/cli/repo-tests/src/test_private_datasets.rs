@@ -185,28 +185,36 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
     .await;
 
     // Unauthorized attempts to change visibility
-    for (tag, client) in [
-        ("anonymous", &anonymous),
-        ("not_owner", &not_owner),
-        ("reader", &reader),
-        ("editor", &editor),
-        // ("maintainer", &maintainer),
-        // ("owner", &owner),
-        // ("admin", &admin),
-    ] {
-        pretty_assertions::assert_eq!(
-            Err(SetDatasetVisibilityError::NotFound),
-            client
-                .dataset()
-                .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
-                .await,
-            "Tag: {}",
-            tag,
-        );
+    {
+        use SetDatasetVisibilityError::{Access, NotFound};
+
+        for (tag, client, expected_error) in [
+            ("anonymous", &anonymous, NotFound),
+            ("not_owner", &not_owner, NotFound),
+            ("reader", &reader, NotFound),
+            ("editor", &editor, Access),
+            // ("maintainer", &maintainer),
+            // ("owner", &owner),
+            // ("admin", &admin),
+        ] {
+            pretty_assertions::assert_eq!(
+                Err(expected_error),
+                client
+                    .dataset()
+                    .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
+                    .await,
+                "Tag: {}",
+                tag,
+            );
+        }
     }
 
     // For an authorized user, change the visibility back and forth
     for (set_tag, set_client) in [
+        // ("anonymous", &anonymous),
+        // ("not_owner", &not_owner),
+        // ("reader", &reader),
+        // ("editor", &editor),
         ("maintainer", &maintainer),
         ("owner", &owner),
         ("admin", &admin),

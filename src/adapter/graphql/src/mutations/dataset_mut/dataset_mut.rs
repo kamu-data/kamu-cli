@@ -177,10 +177,7 @@ impl DatasetMut {
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
     ) -> Result<SetDatasetVisibilityResult> {
-        // TODO: Private Datasets: maintain
-        /*
-        ensure_account_is_owner_or_admin(ctx, self.dataset_request_state.dataset_handle()).await?;
-        */
+        utils::check_dataset_maintain_access(ctx, &self.dataset_request_state).await?;
 
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 

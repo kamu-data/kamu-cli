@@ -108,6 +108,13 @@ pub(crate) async fn check_dataset_write_access(
     check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Write).await
 }
 
+pub(crate) async fn check_dataset_maintain_access(
+    ctx: &Context<'_>,
+    dataset_request_state: &DatasetRequestState,
+) -> Result<(), GqlError> {
+    check_dataset_access(ctx, dataset_request_state, auth::DatasetAction::Maintain).await
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn check_dataset_access(

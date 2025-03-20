@@ -658,9 +658,10 @@ impl DatasetApi<'_> {
             }
             Err(errors) => {
                 let first_error = errors.first().unwrap();
+                let unexpected_message = first_error.message.as_str();
 
-                match first_error.message.as_str() {
-                    "Dataset access error" => Err(GetDatasetVisibilityError::Forbidden),
+                match unexpected_message {
+                    "Dataset access error" => Err(GetDatasetVisibilityError::Access),
                     unexpected_message => {
                         Err(format!("Unexpected error message: {unexpected_message}")
                             .int_err()
@@ -716,9 +717,14 @@ impl DatasetApi<'_> {
                 let first_error = errors.first().unwrap();
                 let unexpected_message = first_error.message.as_str();
 
-                Err(format!("Unexpected error message: {unexpected_message}")
-                    .int_err()
-                    .into())
+                match unexpected_message {
+                    "Dataset access error" => Err(SetDatasetVisibilityError::Access),
+                    unexpected_message => {
+                        Err(format!("Unexpected error message: {unexpected_message}")
+                            .int_err()
+                            .into())
+                    }
+                }
             }
         }
     }
@@ -1086,8 +1092,9 @@ impl DatasetCollaborationApi<'_> {
             }
             Err(errors) => {
                 let first_error = errors.first().unwrap();
+                let unexpected_message = first_error.message.as_str();
 
-                match first_error.message.as_str() {
+                match unexpected_message {
                     "Dataset access error" => Err(DatasetCollaborationAccountRolesError::Access),
                     unexpected_message => {
                         Err(format!("Unexpected error message: {unexpected_message}")
@@ -1287,8 +1294,6 @@ impl AccountRolesResponse {
 
 #[derive(Error, Debug)]
 pub enum GetDatasetVisibilityError {
-    #[error("Forbidden")]
-    Forbidden,
     #[error("Not found")]
     NotFound,
     #[error(transparent)]
@@ -1298,7 +1303,7 @@ pub enum GetDatasetVisibilityError {
 impl PartialEq for GetDatasetVisibilityError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Forbidden, Self::Forbidden) | (Self::NotFound, Self::NotFound) => true,
+            (Self::NotFound, Self::NotFound) => true,
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
         }
@@ -1307,8 +1312,11 @@ impl PartialEq for GetDatasetVisibilityError {
 
 #[derive(Error, Debug)]
 pub enum SetDatasetVisibilityError {
+    // TODO: Private Datasets: rename to DatasetNotFound (whole file)
     #[error("NotFound")]
     NotFound,
+    #[error("Access")]
+    Access,
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -1316,7 +1324,7 @@ pub enum SetDatasetVisibilityError {
 impl PartialEq for SetDatasetVisibilityError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::NotFound, Self::NotFound) => true,
+            (Self::NotFound, Self::NotFound) | (Self::Access, Self::Access) => true,
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
         }
@@ -1336,10 +1344,10 @@ pub enum DatasetByIdError {
 
 #[derive(Error, Debug)]
 pub enum DatasetCollaborationAccountRolesError {
-    #[error("Access")]
-    Access,
     #[error("Dataset not found")]
     DatasetNotFound,
+    #[error("Access")]
+    Access,
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
