@@ -52,7 +52,9 @@ async fn create_catalog_with_local_workspace(
         panic!()
     }
 
-    let base_gql_harness = BaseGQLDatasetHarness::new(tenancy_config);
+    let base_gql_harness = BaseGQLDatasetHarness::builder()
+        .tenancy_config(tenancy_config)
+        .build();
 
     let catalog = {
         let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());

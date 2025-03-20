@@ -3069,7 +3069,9 @@ struct FlowRunsHarnessOverrides {
 
 impl FlowRunsHarness {
     async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::SingleTenant)
+            .build();
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
 

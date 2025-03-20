@@ -345,7 +345,9 @@ struct GqlSearchHarness {
 
 impl GqlSearchHarness {
     pub async fn new() -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::SingleTenant)
+            .build();
 
         let (catalog_anonymous, catalog_authorized) =
             authentication_catalogs(base_gql_harness.catalog()).await;

@@ -936,7 +936,9 @@ impl GraphQLDatasetsHarness {
         tenancy_config: TenancyConfig,
         mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
     ) -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::new(tenancy_config);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(tenancy_config)
+            .build();
 
         let base_catalog = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
