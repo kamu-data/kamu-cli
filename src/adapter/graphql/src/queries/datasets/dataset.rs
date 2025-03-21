@@ -172,6 +172,8 @@ impl Dataset {
     /// Permissions of the current user
     #[tracing::instrument(level = "info", name = Dataset_permissions, skip_all)]
     async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
+        let logged = utils::logged_account(ctx)?;
+
         let allowed_actions = self
             .dataset_request_state
             .allowed_dataset_actions(ctx)
@@ -180,11 +182,6 @@ impl Dataset {
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
         let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
         let is_owner = allowed_actions.contains(&auth::DatasetAction::Own);
-
-        let logged = {
-            let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
-            matches!(*current_account_subject, CurrentAccountSubject::Logged(_))
-        };
 
         Ok(DatasetPermissions {
             collaboration: DatasetCollaborationPermissions {

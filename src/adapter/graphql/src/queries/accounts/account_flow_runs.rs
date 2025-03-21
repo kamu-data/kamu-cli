@@ -19,6 +19,7 @@ use kamu_flow_system as fs;
 use super::Account;
 use crate::prelude::*;
 use crate::queries::{Dataset, DatasetConnection, Flow, FlowConnection, InitiatorFilterInput};
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,6 +103,11 @@ impl<'a> AccountFlowRuns<'a> {
 
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_datasets_with_flow, skip_all)]
     async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
+        let logged = utils::logged_account(ctx)?;
+        if !logged {
+            return Ok(DatasetConnection::new(Vec::new(), 0, 0, 0));
+        }
+
         let (flow_query_service, dataset_registry, dataset_action_authorizer) = from_catalog_n!(
             ctx,
             dyn fs::FlowQueryService,
