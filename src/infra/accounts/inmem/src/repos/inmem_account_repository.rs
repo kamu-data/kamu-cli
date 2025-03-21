@@ -313,11 +313,10 @@ impl AccountRepository for InMemoryAccountRepository {
         filters: SearchAccountsByNamePatternFilters,
         pagination: PaginationOpts,
     ) -> AccountPageStream {
-        let exclude_accounts_by_ids_set = filters.exclude_accounts_by_ids.map(|ids| {
-            let mut set = HashSet::new();
-            set.extend(ids);
-            set
-        });
+        let exclude_accounts_by_ids_set = filters
+            .exclude_accounts_by_ids
+            .into_iter()
+            .collect::<HashSet<_>>();
 
         let found_accounts = {
             let readable_state = self.state.lock().unwrap();
@@ -326,9 +325,7 @@ impl AccountRepository for InMemoryAccountRepository {
                 .accounts_by_id
                 .values()
                 .filter(|account| {
-                    if let Some(exclude_accounts_by_ids) = &exclude_accounts_by_ids_set
-                        && exclude_accounts_by_ids.contains(&account.id)
-                    {
+                    if exclude_accounts_by_ids_set.contains(&account.id) {
                         return false;
                     }
                     if !account

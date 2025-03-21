@@ -173,7 +173,9 @@ impl Search {
 
             let exclude_accounts_by_ids = filters
                 .exclude_accounts_by_ids
-                .map(|ids| ids.into_iter().map(Into::into).collect::<Vec<_>>());
+                .into_iter()
+                .map(Into::into)
+                .collect();
             let accounts = account_service
                 .search_accounts_by_name_pattern(
                     &query,
@@ -247,7 +249,7 @@ pub struct LookupFilters {
 
 #[derive(InputObject, Debug)]
 pub struct AccountLookupFilter {
-    exclude_accounts_by_ids: Option<Vec<AccountID<'static>>>,
+    exclude_accounts_by_ids: Vec<AccountID<'static>>,
 }
 
 page_based_connection!(

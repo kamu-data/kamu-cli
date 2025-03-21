@@ -267,7 +267,9 @@ async fn test_name_lookup_accounts() {
             .name_lookup_anonymous(
                 "kA",
                 value!({
-                    "byAccount": {}
+                    "byAccount": {
+                        "excludeAccountsByIds": [],
+                    },
                 })
             )
             .await

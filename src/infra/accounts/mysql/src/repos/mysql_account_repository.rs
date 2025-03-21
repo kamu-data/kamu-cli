@@ -422,12 +422,6 @@ impl AccountRepository for MySqlAccountRepository {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
-            let excluded_account_ids_count = filters
-                .exclude_accounts_by_ids
-                .as_ref()
-                .map(Vec::len)
-                .unwrap_or_default();
-
             let query_str = format!(
                 r#"
                 SELECT id,
@@ -447,7 +441,7 @@ impl AccountRepository for MySqlAccountRepository {
                 ORDER BY account_name
                 LIMIT ? OFFSET ?
                 "#,
-                mysql_generate_placeholders_list(excluded_account_ids_count)
+                mysql_generate_placeholders_list(filters.exclude_accounts_by_ids.len())
             );
 
             // ToDo replace it by macro once sqlx will support it
@@ -457,10 +451,8 @@ impl AccountRepository for MySqlAccountRepository {
                 .bind(name_pattern)
                 .bind(name_pattern);
 
-            if let Some(ids) = filters.exclude_accounts_by_ids {
-                for id in ids {
-                    query = query.bind(id.to_string());
-                }
+            for excluded_account_id in filters.exclude_accounts_by_ids {
+                query = query.bind(excluded_account_id.to_string());
             }
 
             query = query.bind(limit).bind(offset);

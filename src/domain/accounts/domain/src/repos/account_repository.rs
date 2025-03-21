@@ -118,7 +118,7 @@ pub type AccountPageStream<'a> = EntityPageStream<'a, Account>;
 
 #[derive(Debug, Default)]
 pub struct SearchAccountsByNamePatternFilters {
-    pub exclude_accounts_by_ids: Option<Vec<odf::AccountID>>,
+    pub exclude_accounts_by_ids: Vec<odf::AccountID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

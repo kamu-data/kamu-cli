@@ -464,13 +464,10 @@ impl AccountRepository for SqliteAccountRepository {
                 ORDER BY account_name
                 LIMIT $2 OFFSET $3
                 "#,
-                filters
-                    .exclude_accounts_by_ids
-                    .as_ref()
-                    .map(|ids| {
-                        sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(4).unwrap())
-                    })
-                    .unwrap_or_default()
+                sqlite_generate_placeholders_list(
+                    filters.exclude_accounts_by_ids.len(),
+                    NonZeroUsize::new(4).unwrap()
+                )
             );
 
             // ToDo replace it by macro once sqlx will support it
@@ -480,10 +477,8 @@ impl AccountRepository for SqliteAccountRepository {
                 .bind(limit)
                 .bind(offset);
 
-            if let Some(ids) = filters.exclude_accounts_by_ids {
-                for id in ids {
-                    query = query.bind(id.to_string());
-                }
+            for excluded_account_id in filters.exclude_accounts_by_ids {
+                query = query.bind(excluded_account_id.to_string());
             }
 
             let mut query_stream = query

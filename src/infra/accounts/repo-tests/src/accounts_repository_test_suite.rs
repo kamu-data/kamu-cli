@@ -477,7 +477,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
             &account_repo,
             "user",
             Filters {
-                exclude_accounts_by_ids: Some(vec![account_id(&"user1"), account_id(&"user3")])
+                exclude_accounts_by_ids: vec![account_id(&"user1"), account_id(&"user3")]
             }
         )
         .await
@@ -498,7 +498,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
             &account_repo,
             "ob",
             Filters {
-                exclude_accounts_by_ids: Some(vec![account_id(&"user3")])
+                exclude_accounts_by_ids: vec![account_id(&"user3")]
             }
         )
         .await

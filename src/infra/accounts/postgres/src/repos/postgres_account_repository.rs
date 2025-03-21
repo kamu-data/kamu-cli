@@ -399,7 +399,6 @@ impl AccountRepository for PostgresAccountRepository {
 
             let excluded_account_ids = filters
                 .exclude_accounts_by_ids
-                .unwrap_or_default()
                 .iter()
                 .map(ToString::to_string)
                 .collect::<Vec<_>>();

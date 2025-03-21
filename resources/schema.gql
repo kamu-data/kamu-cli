@@ -126,7 +126,7 @@ type AccountFlowsMut {
 scalar AccountID
 
 input AccountLookupFilter {
-	excludeAccountsByIds: [AccountID!]
+	excludeAccountsByIds: [AccountID!]!
 }
 
 type AccountMut {
