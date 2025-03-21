@@ -13,7 +13,7 @@ use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_accounts::Account as AccountEntity;
-use kamu_core::DatasetRegistry;
+use kamu_core::{auth, DatasetRegistry};
 use kamu_flow_system as fs;
 
 use super::Account;
@@ -102,38 +102,50 @@ impl<'a> AccountFlowRuns<'a> {
 
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_datasets_with_flow, skip_all)]
     async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
-        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
+        let (flow_query_service, dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+            ctx,
+            dyn fs::FlowQueryService,
+            dyn DatasetRegistry,
+            dyn auth::DatasetActionAuthorizer
+        );
 
-        let datasets_with_flows: Vec<_> = flow_query_service
+        let dataset_ids: Vec<_> = flow_query_service
             .list_all_datasets_with_flow_by_account(&self.account.id)
             .await
             .int_err()?
             .matched_stream
-            .map_ok(|dataset_id| odf::DatasetRefPattern::Ref(dataset_id.as_local_ref()))
             .try_collect()
             .await?;
+        let dataset_handles_resolution = dataset_registry
+            .resolve_multiple_dataset_handles_by_ids(dataset_ids)
+            .await
+            .int_err()?;
 
-        let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
+        for (dataset_id, _) in dataset_handles_resolution.unresolved_datasets {
+            tracing::warn!(
+                &dataset_id,
+                "Ignoring point that refers to a dataset not present in the registry",
+            );
+        }
+        let readable_dataset_handles = dataset_action_authorizer
+            .filter_datasets_allowing(
+                dataset_handles_resolution.resolved_handles,
+                auth::DatasetAction::Read,
+            )
+            .await?;
 
         let account = Account::new(
             self.account.id.clone().into(),
             self.account.account_name.clone().into(),
         );
-
-        let matched_datasets: Vec<_> =
-            filter_datasets_by_local_pattern(dataset_registry.as_ref(), datasets_with_flows)
-                .map_ok(|dataset_handle| {
-                    // TODO: Private Datasets: validate access
-                    Dataset::new_access_checked(account.clone(), dataset_handle)
-                })
-                .try_collect()
-                .await
-                .int_err()?;
-
-        let total_count = matched_datasets.len();
+        let readable_datasets: Vec<_> = readable_dataset_handles
+            .into_iter()
+            .map(|dataset_handle| Dataset::new_access_checked(account.clone(), dataset_handle))
+            .collect();
+        let total_count = readable_datasets.len();
 
         Ok(DatasetConnection::new(
-            matched_datasets,
+            readable_datasets,
             0,
             total_count,
             total_count,
