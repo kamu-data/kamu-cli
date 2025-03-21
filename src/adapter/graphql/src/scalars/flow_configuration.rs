@@ -19,6 +19,7 @@ use odf::dataset::MetadataChainExt as _;
 
 use crate::mutations::{FlowInvalidRunConfigurations, FlowTypeIsNotSupported};
 use crate::prelude::*;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -320,8 +321,7 @@ impl FlowRunConfiguration {
                 }
             }
             DatasetFlowType::Reset => {
-                let dataset_registry =
-                    crate::utils::unsafe_from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
+                let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
                 let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
                 // Assume unwrap safe such as we have checked this existence during

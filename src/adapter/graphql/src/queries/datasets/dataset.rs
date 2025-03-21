@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{auth, ServerUrlConfig};
 
 use crate::prelude::*;
@@ -172,7 +171,7 @@ impl Dataset {
     /// Permissions of the current user
     #[tracing::instrument(level = "info", name = Dataset_permissions, skip_all)]
     async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
-        let logged = utils::logged_account(ctx)?;
+        let logged = utils::logged_account(ctx);
 
         let allowed_actions = self
             .dataset_request_state
@@ -214,7 +213,7 @@ impl Dataset {
 
     /// Various endpoints for interacting with data
     async fn endpoints(&self, ctx: &Context<'_>) -> DatasetEndpoints<'_> {
-        let config = utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
+        let config = from_catalog_n!(ctx, ServerUrlConfig);
 
         DatasetEndpoints::new(&self.dataset_request_state, config)
     }

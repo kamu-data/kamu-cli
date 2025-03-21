@@ -26,9 +26,6 @@ use crate::queries::DatasetRequestState;
 /// If one of the required DI components is not found, `.int_err()?` will be
 /// initiated.
 ///
-/// There is also a variant of the macro for exceptional situations that uses
-/// `unwrap()` internally: [`unsafe_from_catalog_n!`].
-///
 /// # Examples
 ///
 /// ```
@@ -57,26 +54,6 @@ macro_rules! from_catalog_n {
 }
 
 pub(crate) use from_catalog_n;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Unsafe variant of [`from_catalog_n!`] macro.
-///
-/// Try to avoid using it.
-macro_rules! unsafe_from_catalog_n {
-    ($gql_ctx:ident, $T:ty ) => {{
-        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
-
-        catalog.get_one::<$T>().unwrap()
-    }};
-    ($gql_ctx:ident, $T:ty, $($Ts:ty),+) => {{
-        let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
-
-        ( catalog.get_one::<$T>().unwrap(), $( catalog.get_one::<$Ts>().unwrap() ),+ )
-    }};
-}
-
-pub(crate) use unsafe_from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -248,6 +225,13 @@ pub(crate) fn check_logged_account_name_match(
         async_graphql::Error::new("Account access error")
             .extend_with(|_, eev| eev.set("account_name", account_name.to_string())),
     ))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn logged_account(ctx: &Context<'_>) -> bool {
+    let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
+    matches!(*current_account_subject, CurrentAccountSubject::Logged(_))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

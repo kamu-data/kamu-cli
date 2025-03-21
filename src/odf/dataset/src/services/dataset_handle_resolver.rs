@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use odf_metadata::DatasetRef;
 use thiserror::Error;
 
 use crate::{DatasetUnresolvedIdError, GetStoredDatasetError};
@@ -52,7 +51,7 @@ impl From<GetStoredDatasetError> for DatasetRefUnresolvedError {
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset not found: {dataset_ref}")]
 pub struct DatasetNotFoundError {
-    pub dataset_ref: DatasetRef,
+    pub dataset_ref: odf_metadata::DatasetRef,
 }
 
 impl From<DatasetUnresolvedIdError> for DatasetNotFoundError {

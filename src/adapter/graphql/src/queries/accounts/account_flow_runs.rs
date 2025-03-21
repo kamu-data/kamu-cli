@@ -103,7 +103,7 @@ impl<'a> AccountFlowRuns<'a> {
 
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_datasets_with_flow, skip_all)]
     async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
-        let logged = utils::logged_account(ctx)?;
+        let logged = utils::logged_account(ctx);
         if !logged {
             return Ok(DatasetConnection::new(Vec::new(), 0, 0, 0));
         }
@@ -129,7 +129,7 @@ impl<'a> AccountFlowRuns<'a> {
 
         for (dataset_id, _) in dataset_handles_resolution.unresolved_datasets {
             tracing::warn!(
-                &dataset_id,
+                %dataset_id,
                 "Ignoring point that refers to a dataset not present in the registry",
             );
         }
