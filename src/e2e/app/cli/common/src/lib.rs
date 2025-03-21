@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #![feature(assert_matches)]
+#![feature(iter_intersperse)]
 
 mod e2e_harness;
 mod e2e_test;

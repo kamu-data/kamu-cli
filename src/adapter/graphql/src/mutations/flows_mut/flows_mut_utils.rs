@@ -21,8 +21,7 @@ pub(crate) async fn ensure_scheduling_permission(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
 ) -> Result<()> {
-    // TODO: Private Datasets: use check_dataset_maintain_access()
-    utils::check_dataset_write_access(ctx, dataset_request_state).await
+    utils::check_dataset_maintain_access(ctx, dataset_request_state).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

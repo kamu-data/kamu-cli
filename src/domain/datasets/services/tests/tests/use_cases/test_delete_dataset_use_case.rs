@@ -30,7 +30,7 @@ async fn test_delete_dataset_success_via_ref() {
     let (_, foo_id) = odf::DatasetID::new_generated_ed25519();
 
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&foo_id, 1, true);
+        MockDatasetActionAuthorizer::new().expect_check_own_dataset(&foo_id, 1, true);
 
     let harness = DeleteUseCaseHarness::new(
         mock_authorizer,
@@ -78,7 +78,7 @@ async fn test_delete_dataset_success_via_handle() {
     let (_, foo_id) = odf::DatasetID::new_generated_ed25519();
 
     let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&foo_id, 1, true);
+        MockDatasetActionAuthorizer::new().expect_check_own_dataset(&foo_id, 1, true);
 
     let harness = DeleteUseCaseHarness::new(
         mock_authorizer,
@@ -144,7 +144,7 @@ async fn test_delete_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = DeleteUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
+        MockDatasetActionAuthorizer::new().expect_check_own_dataset(&dataset_id_foo, 1, false),
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             dataset_id_foo,
         ])),

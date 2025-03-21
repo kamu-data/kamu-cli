@@ -188,12 +188,10 @@ impl Account {
     }
 
     /// Access to the flow configurations of this account
-    async fn flows(&self, ctx: &Context<'_>) -> Result<Option<AccountFlows>> {
-        check_logged_account_id_match(ctx, &self.account_id)?;
-
+    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlows> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
-        Ok(Some(AccountFlows::new(full_account_info)))
+        Ok(AccountFlows::new(full_account_info))
     }
 }
 

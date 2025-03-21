@@ -59,7 +59,7 @@ pub async fn test_upload(mut kamu_api_server_client: KamuApiServerClient) {
     );
 
     // Anonymous access
-    kamu_api_server_client.set_token(None);
+    kamu_api_server_client.auth().logout();
 
     assert_matches!(
         kamu_api_server_client

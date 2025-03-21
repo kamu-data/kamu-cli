@@ -32,6 +32,10 @@ impl Relation {
         Self::AccountToDataset(AccountToDatasetRelation::Editor)
     }
 
+    pub fn account_is_a_dataset_maintainer() -> Self {
+        Self::AccountToDataset(AccountToDatasetRelation::Maintainer)
+    }
+
     pub fn relation_group(&self) -> &'static str {
         match self {
             Relation::AccountToDataset(_) => RELATION_GROUP_ACCOUNT_TO_DATASET,
@@ -89,6 +93,7 @@ impl FromStr for Relation {
 pub enum AccountToDatasetRelation {
     Reader,
     Editor,
+    Maintainer,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

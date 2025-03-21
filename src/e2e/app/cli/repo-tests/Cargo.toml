@@ -40,6 +40,7 @@ database-common = { workspace = true, default-features = false }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
 kamu-adapter-http = { workspace = true }
+kamu-auth-rebac = { workspace = true }
 kamu-cli-e2e-common = { workspace = true }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",

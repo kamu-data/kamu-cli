@@ -9,12 +9,16 @@
 
 use std::collections::HashMap;
 
+use kamu_auth_rebac::AccountToDatasetRelation;
 use oso::PolarClass;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const ROLE_READER: &str = "Reader";
 const ROLE_EDITOR: &str = "Editor";
+const ROLE_MAINTAINER: &str = "Maintainer";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(PolarClass, Debug, Clone)]
 pub struct DatasetResource {
@@ -37,15 +41,18 @@ impl DatasetResource {
         }
     }
 
-    // TODO: Private Datasets: use for relations
-    pub fn authorize_reader(&mut self, reader_account_id: &odf::AccountID) {
-        self.authorized_users
-            .insert(reader_account_id.to_string(), ROLE_READER);
-    }
+    pub fn authorize_account(
+        &mut self,
+        account_id: &odf::AccountID,
+        relation: AccountToDatasetRelation,
+    ) {
+        let role = match relation {
+            AccountToDatasetRelation::Reader => ROLE_READER,
+            AccountToDatasetRelation::Editor => ROLE_EDITOR,
+            AccountToDatasetRelation::Maintainer => ROLE_MAINTAINER,
+        };
 
-    pub fn authorize_editor(&mut self, editor_account_id: &odf::AccountID) {
-        self.authorized_users
-            .insert(editor_account_id.to_string(), ROLE_EDITOR);
+        self.authorized_users.insert(account_id.to_string(), role);
     }
 }
 

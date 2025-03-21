@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 use std::sync::Arc;
 
 use dill::{component, interface, scope, Singleton};
@@ -16,11 +15,14 @@ use kamu_auth_rebac::{
     DeleteEntitiesRelationError,
     DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
+    DeleteSubjectEntitiesObjectEntityRelationsError,
+    EntitiesWithRelation,
     Entity,
     EntityType,
     EntityWithRelation,
     GetEntityPropertiesError,
-    GetRelationsBetweenEntitiesError,
+    GetObjectEntityRelationsError,
+    GetRelationBetweenEntitiesError,
     InsertEntitiesRelationError,
     PropertiesCountError,
     PropertyName,
@@ -43,7 +45,7 @@ type EntitiesPropertiesMap = HashMap<Entity<'static>, EntityProperties>;
 #[derive(Default)]
 struct State {
     entities_properties_map: EntitiesPropertiesMap,
-    entities_relations_rows: HashSet<EntitiesRelationsRow>,
+    entities_relations_rows: HashSet<EntitiesWithRelation<'static>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +66,7 @@ impl InMemoryRebacRepository {
 
     async fn get_rows<F, R>(&self, filter_map_predicate: F) -> Vec<R>
     where
-        F: Fn(&EntitiesRelationsRow) -> Option<R>,
+        F: Fn(&EntitiesWithRelation) -> Option<R>,
     {
         let readable_state = self.state.read().await;
 
@@ -200,23 +202,27 @@ impl RebacRepository for InMemoryRebacRepository {
     async fn insert_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: Relation,
+        relation: Relation,
         object_entity: &Entity,
     ) -> Result<(), InsertEntitiesRelationError> {
         let mut writable_state = self.state.write().await;
 
-        let row = EntitiesRelationsRow::new(subject_entity, relationship, object_entity);
-        let is_duplicate = writable_state.entities_relations_rows.contains(&row);
-
-        if is_duplicate {
-            return Err(InsertEntitiesRelationError::duplicate(
-                subject_entity,
-                relationship,
-                object_entity,
-            ));
+        for row in &writable_state.entities_relations_rows {
+            if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
+                return Err(InsertEntitiesRelationError::some_role_is_already_present(
+                    subject_entity,
+                    object_entity,
+                ));
+            }
         }
 
-        writable_state.entities_relations_rows.insert(row);
+        let new_row = EntitiesWithRelation {
+            subject_entity: subject_entity.clone().into_owned(),
+            relation,
+            object_entity: object_entity.clone().into_owned(),
+        };
+
+        writable_state.entities_relations_rows.insert(new_row);
 
         Ok(())
     }
@@ -224,23 +230,28 @@ impl RebacRepository for InMemoryRebacRepository {
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError> {
         let mut writable_state = self.state.write().await;
 
-        let row = EntitiesRelationsRow::new(subject_entity, relationship, object_entity);
-        let not_found = !writable_state.entities_relations_rows.remove(&row);
+        let maybe_row = writable_state
+            .entities_relations_rows
+            .iter()
+            .find(|row| {
+                row.subject_entity == *subject_entity && row.object_entity == *object_entity
+            })
+            .cloned();
 
-        if not_found {
-            return Err(DeleteEntitiesRelationError::not_found(
+        if let Some(row) = maybe_row {
+            writable_state.entities_relations_rows.remove(&row);
+
+            Ok(())
+        } else {
+            Err(DeleteEntitiesRelationError::not_found(
                 subject_entity,
-                relationship,
                 object_entity,
-            ));
+            ))
         }
-
-        Ok(())
     }
 
     async fn get_subject_entity_relations(
@@ -251,9 +262,48 @@ impl RebacRepository for InMemoryRebacRepository {
             .get_rows(|row| {
                 if row.subject_entity == *subject_entity {
                     Some(EntityWithRelation::new(
-                        row.object_entity.clone(),
-                        row.relationship,
+                        row.object_entity.clone().into_owned(),
+                        row.relation,
                     ))
+                } else {
+                    None
+                }
+            })
+            .await;
+
+        Ok(res)
+    }
+
+    async fn get_object_entity_relations(
+        &self,
+        object_entity: &Entity,
+    ) -> Result<Vec<EntityWithRelation>, GetObjectEntityRelationsError> {
+        let res = self
+            .get_rows(|row| {
+                if row.object_entity == *object_entity {
+                    Some(EntityWithRelation::new(
+                        row.subject_entity.clone().into_owned(),
+                        row.relation,
+                    ))
+                } else {
+                    None
+                }
+            })
+            .await;
+
+        Ok(res)
+    }
+
+    async fn get_object_entities_relations(
+        &self,
+        object_entities: &[Entity],
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError> {
+        let object_entities_set = object_entities.iter().collect::<HashSet<_>>();
+
+        let res = self
+            .get_rows(|row| {
+                if object_entities_set.contains(&row.object_entity) {
+                    Some(row.clone_owned())
                 } else {
                     None
                 }
@@ -274,8 +324,8 @@ impl RebacRepository for InMemoryRebacRepository {
                     && row.object_entity.entity_type == object_entity_type
                 {
                     Some(EntityWithRelation::new(
-                        row.object_entity.clone(),
-                        row.relationship,
+                        row.object_entity.clone().into_owned(),
+                        row.relation,
                     ))
                 } else {
                     None
@@ -286,45 +336,68 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(res)
     }
 
-    async fn get_relations_between_entities(
+    async fn get_relation_between_entities(
         &self,
         subject_entity: &Entity,
         object_entity: &Entity,
-    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError> {
-        let res = self
-            .get_rows(|row| {
-                if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
-                    Some(row.relationship)
-                } else {
-                    None
-                }
+    ) -> Result<Relation, GetRelationBetweenEntitiesError> {
+        let readable_state = self.state.read().await;
+
+        let maybe_row = readable_state
+            .entities_relations_rows
+            .iter()
+            .find(|row| {
+                row.subject_entity == *subject_entity && row.object_entity == *object_entity
             })
-            .await;
+            .cloned();
 
-        Ok(res)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct EntitiesRelationsRow {
-    subject_entity: Entity<'static>,
-    relationship: Relation,
-    object_entity: Entity<'static>,
-}
-
-impl EntitiesRelationsRow {
-    pub fn new(
-        subject_entity: &Entity<'_>,
-        relationship: Relation,
-        object_entity: &Entity<'_>,
-    ) -> Self {
-        Self {
-            subject_entity: subject_entity.clone().into_owned(),
-            relationship,
-            object_entity: object_entity.clone().into_owned(),
+        if let Some(row) = maybe_row {
+            Ok(row.relation)
+        } else {
+            Err(GetRelationBetweenEntitiesError::not_found(
+                subject_entity,
+                object_entity,
+            ))
         }
+    }
+
+    async fn delete_subject_entities_object_entity_relations(
+        &self,
+        subject_entities: Vec<Entity<'static>>,
+        object_entity: &Entity,
+    ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError> {
+        if subject_entities.is_empty() {
+            return Ok(());
+        }
+
+        let subject_entities_ids = subject_entities.iter().collect::<HashSet<_>>();
+
+        let mut writable_state = self.state.write().await;
+
+        let mut count_deleted = 0;
+        let mut rows_after_deletion = HashSet::new();
+
+        for row in writable_state.entities_relations_rows.drain() {
+            if row.object_entity == *object_entity
+                && subject_entities_ids.contains(&row.subject_entity)
+            {
+                count_deleted += 1;
+                continue;
+            }
+
+            rows_after_deletion.insert(row);
+        }
+
+        writable_state.entities_relations_rows = rows_after_deletion;
+
+        if count_deleted == 0 {
+            return Err(DeleteSubjectEntitiesObjectEntityRelationsError::not_found(
+                subject_entities,
+                object_entity,
+            ));
+        }
+
+        Ok(())
     }
 }
 

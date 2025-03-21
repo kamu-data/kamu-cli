@@ -38,11 +38,22 @@ pub enum ExpectedResponseBody {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
+pub struct LoggedInUser {
+    pub account_id: odf::AccountID,
+    pub token: AccessToken,
+}
+
+#[derive(Clone, Default)]
+pub struct KamuApiServerClientState {
+    pub logged_in_user: Option<LoggedInUser>,
+}
+
+#[derive(Clone)]
 pub struct KamuApiServerClient {
     http_client: reqwest::Client,
     server_base_url: Url,
     workspace_path: PathBuf,
-    token: Option<AccessToken>,
+    pub(crate) state: KamuApiServerClientState,
 }
 
 impl KamuApiServerClient {
@@ -53,12 +64,8 @@ impl KamuApiServerClient {
             http_client,
             workspace_path,
             server_base_url,
-            token: None,
+            state: KamuApiServerClientState::default(),
         }
-    }
-
-    pub fn set_token(&mut self, token: Option<AccessToken>) {
-        self.token = token;
     }
 
     pub fn e2e(&self) -> E2EApi {
@@ -99,8 +106,8 @@ impl KamuApiServerClient {
             }
         };
 
-        if let Some(token) = &self.token {
-            request_builder = request_builder.bearer_auth(token);
+        if let Some(logged_in_user) = &self.state.logged_in_user {
+            request_builder = request_builder.bearer_auth(&logged_in_user.token);
         }
 
         if let Some(request_body) = request_body {
@@ -188,8 +195,8 @@ impl KamuApiServerClient {
 
         let mut request_builder = self.http_client.post(endpoint).json(&request_data);
 
-        if let Some(token) = &self.token {
-            request_builder = request_builder.bearer_auth(token);
+        if let Some(logged_in_user) = &self.state.logged_in_user {
+            request_builder = request_builder.bearer_auth(&logged_in_user.token);
         }
 
         request_builder.send().await.unwrap()

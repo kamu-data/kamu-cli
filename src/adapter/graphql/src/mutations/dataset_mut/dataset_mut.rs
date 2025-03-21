@@ -12,7 +12,7 @@ use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
 
 use crate::mutations::{
-    ensure_account_is_owner_or_admin,
+    DatasetCollaborationMut,
     DatasetEnvVarsMut,
     DatasetFlowsMut,
     DatasetMetadataMut,
@@ -52,6 +52,11 @@ impl DatasetMut {
     /// Access to the mutable flow configurations of this dataset
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVarsMut> {
         DatasetEnvVarsMut::new_with_access_check(ctx, &self.dataset_request_state).await
+    }
+
+    /// Access to collaboration management methods
+    async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaborationMut> {
+        DatasetCollaborationMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Rename the dataset
@@ -166,14 +171,13 @@ impl DatasetMut {
     }
 
     /// Set visibility for the dataset
-    #[graphql(guard = "LoggedInGuard::new()")]
     #[tracing::instrument(level = "info", name = DatasetMut_set_visibility, skip_all)]
     async fn set_visibility(
         &self,
         ctx: &Context<'_>,
         visibility: DatasetVisibilityInput,
     ) -> Result<SetDatasetVisibilityResult> {
-        ensure_account_is_owner_or_admin(ctx, self.dataset_request_state.dataset_handle()).await?;
+        utils::check_dataset_maintain_access(ctx, &self.dataset_request_state).await?;
 
         let rebac_svc = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
 

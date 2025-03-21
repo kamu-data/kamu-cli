@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
@@ -119,7 +120,7 @@ async fn test_single_dataset_search() {
 }
 
 #[tokio::test]
-async fn test_correct_dataset_order_in_response() {
+async fn test_search_correct_dataset_order_in_response() {
     let harness = GqlSearchHarness::new().await;
 
     use odf::metadata::testing::alias;
@@ -257,6 +258,81 @@ async fn test_correct_dataset_order_in_response() {
     }
 }
 
+#[tokio::test]
+async fn test_name_lookup_accounts() {
+    let harness = GqlSearchHarness::new().await;
+
+    pretty_assertions::assert_eq!(
+        harness
+            .name_lookup_anonymous(
+                "kA",
+                value!({
+                    "byAccount": {
+                        "excludeAccountsByIds": [],
+                    },
+                })
+            )
+            .await
+            .data,
+        value!({
+            "search": {
+                "nameLookup": {
+                    "nodes": [
+                        {
+                            "__typename": "Account",
+                            "accountName": "kamu",
+                        }
+                    ],
+                    "totalCount": 1,
+                    "pageInfo": {
+                        "totalPages": 1,
+                        "hasNextPage": false,
+                        "hasPreviousPage": false,
+                    }
+                }
+            }
+        }),
+    );
+}
+
+#[tokio::test]
+async fn test_name_lookup_accounts_with_excluding() {
+    let harness = GqlSearchHarness::new().await;
+
+    let authorized_current_account_subject = harness
+        .catalog_authorized
+        .get_one::<CurrentAccountSubject>()
+        .unwrap();
+    let authorized_account_id = authorized_current_account_subject.account_id().to_string();
+
+    pretty_assertions::assert_eq!(
+        harness
+            .name_lookup_anonymous(
+                "kA",
+                value!({
+                    "byAccount": {
+                        "excludeAccountsByIds": [authorized_account_id]
+                    }
+                })
+            )
+            .await
+            .data,
+        value!({
+            "search": {
+                "nameLookup": {
+                    "nodes": [],
+                    "totalCount": 0,
+                    "pageInfo": {
+                        "totalPages": 0,
+                        "hasNextPage": false,
+                        "hasPreviousPage": false,
+                    }
+                }
+            }
+        })
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -264,20 +340,24 @@ async fn test_correct_dataset_order_in_response() {
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GqlSearchHarness {
     base_gql_harness: BaseGQLDatasetHarness,
+    catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
     schema: kamu_adapter_graphql::Schema,
 }
 
 impl GqlSearchHarness {
     pub async fn new() -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::SingleTenant)
+            .build();
 
-        let (_catalog_anonymous, catalog_authorized) =
+        let (catalog_anonymous, catalog_authorized) =
             authentication_catalogs(base_gql_harness.catalog()).await;
         let schema = kamu_adapter_graphql::schema_quiet();
 
         Self {
             base_gql_harness,
+            catalog_anonymous,
             catalog_authorized,
             schema,
         }
@@ -307,13 +387,24 @@ impl GqlSearchHarness {
         }
     }
 
+    pub async fn execute_anonymous(&self, request: &str) -> Response {
+        let res = self
+            .schema
+            .execute(Request::new(request).data(self.catalog_anonymous.clone()))
+            .await;
+
+        assert!(res.is_ok(), "{res:?}");
+
+        res
+    }
+
     pub async fn execute_authorized(&self, request: &str) -> Response {
         let res = self
             .schema
             .execute(Request::new(request).data(self.catalog_authorized.clone()))
             .await;
 
-        assert!(res.is_ok());
+        assert!(res.is_ok(), "{res:?}");
 
         res
     }
@@ -355,6 +446,43 @@ impl GqlSearchHarness {
             )
             .replace("<query>", query)
             .replace("<extra_arguments>", &extra_arguments),
+        )
+        .await
+    }
+
+    pub async fn name_lookup_anonymous(
+        &self,
+        query: &str,
+        filters: async_graphql::Value,
+    ) -> Response {
+        self.execute_anonymous(
+            &indoc::indoc!(
+                "
+                {
+                  search {
+                    nameLookup(
+                      query: \"<query>\",
+                      filters: <filters>
+                    ) {
+                      nodes {
+                        __typename
+                        ... on Account {
+                          accountName
+                        }
+                      }
+                      totalCount
+                      pageInfo {
+                        totalPages
+                        hasNextPage
+                        hasPreviousPage
+                      }
+                    }
+                  }
+                }
+                "
+            )
+            .replace("<query>", query)
+            .replace("<filters>", &format!("{filters}")),
         )
         .await
     }

@@ -106,11 +106,12 @@ impl DeleteDatasetUseCaseImpl {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "DeleteDatasetUseCase::execute_via_ref",
+        name = DeleteDatasetUseCaseImpl_execute_via_ref,
         skip_all,
         fields(dataset_ref)
     )]
@@ -137,7 +138,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = "DeleteDatasetUseCase::execute_via_handle",
+        name = DeleteDatasetUseCaseImpl_execute_via_handle,
         skip_all,
         fields(dataset_handle)
     )]
@@ -147,7 +148,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
     ) -> Result<(), DeleteDatasetError> {
         // Permission check
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
+            .check_action_allowed(&dataset_handle.id, DatasetAction::Own)
             .await
             .map_err(|e| match e {
                 DatasetActionUnauthorizedError::Access(e) => DeleteDatasetError::Access(e),

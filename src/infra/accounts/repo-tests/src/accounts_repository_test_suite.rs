@@ -8,7 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::sync::Arc;
 
+use chrono::Utc;
+use database_common::PaginationOpts;
 use dill::Catalog;
 use email_utils::Email;
 use kamu_accounts::*;
@@ -382,6 +385,123 @@ pub async fn test_duplicate_github_account_email(catalog: &Catalog) {
             ..make_test_account("petya", "wasya@example.com",kamu_adapter_oauth::PROVIDER_GITHUB, "12345")
         }).await,
         Err(CreateAccountError::Duplicate(AccountErrorDuplicate{ account_field: field })) if field == AccountDuplicateField::Email
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
+    fn account(account_name: &str, display_name: &str, email: &str) -> Account {
+        Account {
+            id: account_id(&account_name),
+            account_name: odf::AccountName::new_unchecked(account_name),
+            email: Email::parse(email).unwrap(),
+            display_name: display_name.to_string(),
+            account_type: AccountType::User,
+            avatar_url: None,
+            registered_at: Utc::now(),
+            is_admin: false,
+            provider: PROVIDER_PASSWORD.to_string(),
+            provider_identity_key: account_name.to_string(),
+        }
+    }
+
+    async fn search(
+        repo: &Arc<dyn AccountRepository>,
+        query: &str,
+        filters: SearchAccountsByNamePatternFilters,
+    ) -> Vec<odf::AccountName> {
+        use futures::TryStreamExt;
+
+        let accounts = repo
+            .search_accounts_by_name_pattern(
+                query,
+                filters,
+                PaginationOpts {
+                    limit: 20,
+                    offset: 0,
+                },
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap();
+
+        accounts.into_iter().map(|a| a.account_name).collect()
+    }
+
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    use odf::metadata::testing::{account_id, account_name as name};
+    use SearchAccountsByNamePatternFilters as Filters;
+
+    let accounts = [
+        account("user1", "alice (deactivated)", "alice@example.com"),
+        account("user2", "alice", "alice-new@example.com"),
+        account("user3", "bob", "bob@example.com"),
+        account("admin1", "admin", "admin@example.com"),
+    ];
+
+    for account in accounts {
+        account_repo.create_account(&account).await.unwrap();
+    }
+
+    let empty_accounts: [odf::AccountName; 0] = [];
+
+    // All
+    pretty_assertions::assert_eq!(
+        [
+            name(&"admin1"),
+            name(&"user1"),
+            name(&"user2"),
+            name(&"user3"),
+        ],
+        *search(&account_repo, "", Filters::default()).await
+    );
+
+    // Search by account name
+    pretty_assertions::assert_eq!(
+        [name(&"user1"), name(&"user2"), name(&"user3")],
+        *search(&account_repo, "uS", Filters::default()).await
+    );
+    pretty_assertions::assert_eq!(
+        [name(&"user1"), name(&"user2"), name(&"user3")],
+        *search(&account_repo, "sE", Filters::default()).await
+    );
+    pretty_assertions::assert_eq!(
+        [name(&"user1")],
+        *search(&account_repo, "r1", Filters::default()).await
+    );
+    pretty_assertions::assert_eq!(
+        [name(&"user2")],
+        *search(
+            &account_repo,
+            "user",
+            Filters {
+                exclude_accounts_by_ids: vec![account_id(&"user1"), account_id(&"user3")]
+            }
+        )
+        .await
+    );
+
+    // Search by display name
+    pretty_assertions::assert_eq!(
+        [name(&"user1"), name(&"user2")],
+        *search(&account_repo, "ali", Filters::default()).await
+    );
+    pretty_assertions::assert_eq!(
+        [name(&"user3")],
+        *search(&account_repo, "ob", Filters::default()).await
+    );
+    pretty_assertions::assert_eq!(
+        empty_accounts,
+        *search(
+            &account_repo,
+            "ob",
+            Filters {
+                exclude_accounts_by_ids: vec![account_id(&"user3")]
+            }
+        )
+        .await
     );
 }
 

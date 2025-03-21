@@ -85,6 +85,7 @@ messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }
 
+bon = { version = "3", default-features = false }
 indoc = "2"
 oop = "0.0.2"
 pretty_assertions = { version = "1" }
