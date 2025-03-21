@@ -18,6 +18,9 @@ Recommendation: for ease of reading, use the following order:
   - GQL: CRUD Collaboration API
   - GQL: Implemented API for searching by account name
   - OSO: Added `maintain` & `own` permissions in addition to `read` & `write`
+### Fixed
+- Private Datasets:
+  - GQL: Correct processing of access permissions when viewing flows of another account
 
 ## [0.228.0] - 2025-03-19
 ### Added
