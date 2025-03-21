@@ -1299,6 +1299,8 @@ impl PartialEq for GetDatasetVisibilityError {
     }
 }
 
+impl Eq for GetDatasetVisibilityError {}
+
 #[derive(Error, Debug)]
 pub enum SetDatasetVisibilityError {
     #[error("Dataset not found")]
@@ -1318,6 +1320,8 @@ impl PartialEq for SetDatasetVisibilityError {
         }
     }
 }
+
+impl Eq for SetDatasetVisibilityError {}
 
 #[derive(Error, Debug)]
 pub enum DatasetByIdError {
@@ -1347,6 +1351,8 @@ impl PartialEq for DatasetCollaborationAccountRolesError {
     }
 }
 
+impl Eq for DatasetCollaborationAccountRolesError {}
+
 #[derive(Error, Debug)]
 pub enum DatasetCollaborationSetRoleError {
     #[error("Dataset not found")]
@@ -1365,6 +1371,8 @@ impl PartialEq for DatasetCollaborationSetRoleError {
     }
 }
 
+impl Eq for DatasetCollaborationSetRoleError {}
+
 #[derive(Error, Debug)]
 pub enum DatasetCollaborationUnsetRoleError {
     #[error("Dataset not found")]
@@ -1382,6 +1390,8 @@ impl PartialEq for DatasetCollaborationUnsetRoleError {
         }
     }
 }
+
+impl Eq for DatasetCollaborationUnsetRoleError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // API: Flow
@@ -1786,6 +1796,8 @@ impl PartialEq for QueryError {
         }
     }
 }
+
+impl Eq for QueryError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // API: Search
