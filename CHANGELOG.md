@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Flow: Updated the `BatchingRule` trigger to accept 0 for both properties(`min_records_to_await` and `max_batching_interval`), enabling dependency flow execution even when no data is added to the root dataset.
+
 ## [0.228.0] - 2025-03-19
 ### Added
 - DB: utilities for working with bind parameter placeholders

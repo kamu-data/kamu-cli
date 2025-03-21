@@ -527,7 +527,7 @@ impl FlowSchedulingHelper {
         // TODO: it's likely assumed the accumulation is per each input separately, but
         // for now count overall number
         let mut accumulated_records_count = 0;
-        let mut watermark_modified = false;
+        let mut accumulated_something = false;
         let mut is_compacted = false;
 
         // Scan each accumulated trigger to decide
@@ -553,7 +553,7 @@ impl FlowSchedulingHelper {
                                 .int_err()?;
 
                             accumulated_records_count += increment.num_records;
-                            watermark_modified |= increment.updated_watermark.is_some();
+                            accumulated_something = true;
                         }
                     }
                 }
@@ -563,9 +563,6 @@ impl FlowSchedulingHelper {
         // The timeout for batching will happen at:
         let batching_deadline =
             flow.primary_trigger().trigger_time() + *batching_rule.max_batching_interval();
-
-        // Accumulated something if at least some input changed or watermark was touched
-        let accumulated_something = accumulated_records_count > 0 || watermark_modified;
 
         // The condition is satisfied if
         //   - we crossed the number of new records thresholds

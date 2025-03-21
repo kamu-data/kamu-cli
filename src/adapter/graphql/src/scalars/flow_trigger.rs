@@ -154,8 +154,8 @@ pub enum TimeUnit {
 impl From<chrono::Duration> for TimeDelta {
     fn from(value: chrono::Duration) -> Self {
         assert!(
-            value.num_seconds() > 0,
-            "Positive interval expected, but received [{value}]"
+            value.num_seconds() >= 0,
+            "Positive or zero interval expected, but received [{value}]"
         );
 
         let num_weeks = value.num_weeks();

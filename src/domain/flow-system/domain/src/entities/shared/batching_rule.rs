@@ -28,12 +28,8 @@ impl BatchingRule {
         min_records_to_await: u64,
         max_batching_interval: Duration,
     ) -> Result<Self, BatchingRuleValidationError> {
-        if min_records_to_await == 0 {
-            return Err(BatchingRuleValidationError::MinRecordsToAwaitNotPositive);
-        }
-
         let lower_interval_bound = Duration::seconds(0);
-        if lower_interval_bound >= max_batching_interval {
+        if lower_interval_bound > max_batching_interval {
             return Err(BatchingRuleValidationError::MinIntervalNotPositive);
         }
 
@@ -63,9 +59,6 @@ impl BatchingRule {
 
 #[derive(Error, Debug)]
 pub enum BatchingRuleValidationError {
-    #[error("Minimum records to await must be a positive number")]
-    MinRecordsToAwaitNotPositive,
-
     #[error("Minimum interval to await should be positive")]
     MinIntervalNotPositive,
 
@@ -94,22 +87,11 @@ mod tests {
             Ok(_)
         );
         assert_matches!(BatchingRule::new_checked(1, TimeDelta::hours(24)), Ok(_));
-    }
-
-    #[test]
-    fn test_non_positive_min_records() {
-        assert_matches!(
-            BatchingRule::new_checked(0, TimeDelta::minutes(15)),
-            Err(BatchingRuleValidationError::MinRecordsToAwaitNotPositive)
-        );
+        assert_matches!(BatchingRule::new_checked(0, TimeDelta::minutes(0)), Ok(_));
     }
 
     #[test]
     fn test_non_positive_max_interval() {
-        assert_matches!(
-            BatchingRule::new_checked(1, TimeDelta::minutes(0)),
-            Err(BatchingRuleValidationError::MinIntervalNotPositive)
-        );
         assert_matches!(
             BatchingRule::new_checked(1, TimeDelta::minutes(-1)),
             Err(BatchingRuleValidationError::MinIntervalNotPositive)
