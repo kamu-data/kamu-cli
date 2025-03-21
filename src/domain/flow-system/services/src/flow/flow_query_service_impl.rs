@@ -119,21 +119,32 @@ impl FlowQueryService for FlowQueryServiceImpl {
             owned_dataset_ids
         };
 
-        let account_dataset_ids: HashSet<odf::DatasetID> = HashSet::from_iter(filtered_dataset_ids);
+        let account_dataset_ids = HashSet::from_iter(filtered_dataset_ids);
 
         let dataset_flow_filters = DatasetFlowFilters {
             by_flow_status: filters.by_flow_status,
             by_flow_type: filters.by_flow_type,
             by_initiator: filters.by_initiator,
         };
+
+        self.list_all_flows_by_dataset_ids(account_dataset_ids, dataset_flow_filters, pagination)
+            .await
+    }
+
+    async fn list_all_flows_by_dataset_ids(
+        &self,
+        dataset_ids: HashSet<odf::DatasetID>,
+        filters: DatasetFlowFilters,
+        pagination: PaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
         let total_count = self
             .flow_event_store
-            .get_count_flows_by_datasets(account_dataset_ids.clone(), &dataset_flow_filters)
+            .get_count_flows_by_datasets(dataset_ids.clone(), &filters)
             .await?;
 
         let relevant_flow_ids: Vec<_> = self
             .flow_event_store
-            .get_all_flow_ids_by_datasets(account_dataset_ids, &dataset_flow_filters, pagination)
+            .get_all_flow_ids_by_datasets(dataset_ids, &filters, pagination)
             .try_collect()
             .await
             .int_err()?;
