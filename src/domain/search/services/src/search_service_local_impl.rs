@@ -35,6 +35,7 @@ impl SearchServiceLocalImpl {
     /// requested. To produce the desired number of results without querying too
     /// many times we request more points than was originally asked for.
     const OVERFETCH_FACTOR: usize = 2;
+    const OVERFETCH_AMOUNT: usize = 10;
 
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
@@ -76,80 +77,100 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             .next()
             .unwrap();
 
-        // Search for nearby points
-        let points = vector_repo
-            .search_points(
-                prompt_vec,
-                SearchPointsOpts {
-                    skip: 0,
-                    limit: options.limit * Self::OVERFETCH_FACTOR,
-                },
-            )
-            .await
-            .int_err()?;
+        // We will query vector store in a loop until desired number of results was
+        // reached or search space was exhausted.
+        let mut datasets: Vec<SearchLocalResultDataset> = Vec::new();
+        let mut points_to_skip = 0;
+        let points_limit = options.limit * Self::OVERFETCH_FACTOR + Self::OVERFETCH_AMOUNT;
 
-        // Extract dataset IDs from point payload
-        let points_with_dataset_ids: Vec<(FoundPoint, odf::DatasetID)> = points
-            .into_iter()
-            .map(|p| match p.payload["dataset_id"].as_str() {
-                Some(sid) => odf::DatasetID::from_did_str(sid)
-                    .int_err()
-                    .map(|id| (p, id)),
-                None => Err(InternalError::new(format!(
-                    "Point {} does not have associated dataset ID",
-                    p.point_id
-                ))),
-            })
-            .try_collect()?;
+        loop {
+            // Search for nearby points
+            let points = vector_repo
+                .search_points(
+                    &prompt_vec,
+                    SearchPointsOpts {
+                        skip: points_to_skip,
+                        limit: points_limit,
+                    },
+                )
+                .await
+                .int_err()?;
 
-        // Resolve dataset handles
-        let dataset_handles_res = self
-            .dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(
-                points_with_dataset_ids
-                    .iter()
-                    .map(|(_pooint, id)| id.clone())
-                    .collect(),
-            )
-            .await
-            .int_err()?;
+            // Adjust skip in case we'll need to make another request
+            points_to_skip += points_limit;
+            let has_more_points = points.len() >= points_limit;
 
-        let dataset_handles = dataset_handles_res.resolved_handles;
+            // Extract dataset IDs from point payload
+            let points_with_dataset_ids: Vec<(FoundPoint, odf::DatasetID)> = points
+                .into_iter()
+                .map(|p| match p.payload["dataset_id"].as_str() {
+                    Some(sid) => odf::DatasetID::from_did_str(sid)
+                        .int_err()
+                        .map(|id| (p, id)),
+                    None => Err(InternalError::new(format!(
+                        "Point {} does not have associated dataset ID",
+                        p.point_id
+                    ))),
+                })
+                .try_collect()?;
 
-        // Not being able to resolve an ID can be simply due to eventual consistency or
-        // can be a sign of a bug, so we log it
-        for (id, _) in dataset_handles_res.unresolved_datasets {
-            tracing::warn!(
-                dataset_id = %id,
-                "Ignoring point that refers to a dataset not present in the registry",
-            );
-        }
+            // Resolve dataset handles
+            let dataset_handles_res = self
+                .dataset_registry
+                .resolve_multiple_dataset_handles_by_ids(
+                    points_with_dataset_ids
+                        .iter()
+                        .map(|(_pooint, id)| id.clone())
+                        .collect(),
+                )
+                .await
+                .int_err()?;
 
-        // Filter by accessibility
-        let dataset_handles = self
-            .dataset_action_authorizer
-            .filter_datasets_allowing(dataset_handles, kamu_core::auth::DatasetAction::Read)
-            .await?;
+            let dataset_handles = dataset_handles_res.resolved_handles;
 
-        // Merge found points with accessible handles
-        let dataset_handles_by_id: std::collections::BTreeMap<odf::DatasetID, odf::DatasetHandle> =
-            dataset_handles
+            // Not being able to resolve an ID can be simply due to eventual consistency or
+            // can be a sign of a bug, so we log it
+            for (id, _) in dataset_handles_res.unresolved_datasets {
+                tracing::warn!(
+                    dataset_id = %id,
+                    "Ignoring point that refers to a dataset not present in the registry",
+                );
+            }
+
+            // Filter by accessibility
+            let dataset_handles = self
+                .dataset_action_authorizer
+                .filter_datasets_allowing(dataset_handles, kamu_core::auth::DatasetAction::Read)
+                .await?;
+
+            // Merge found points with accessible handles
+            let dataset_handles_by_id: std::collections::BTreeMap<
+                odf::DatasetID,
+                odf::DatasetHandle,
+            > = dataset_handles
                 .into_iter()
                 .map(|h| (h.id.clone(), h))
                 .collect();
 
-        // Note: We trim per requested limit to compensate for overfetch
-        let datasets: Vec<SearchLocalResultDataset> = points_with_dataset_ids
-            .into_iter()
-            .filter_map(|(p, id)| match dataset_handles_by_id.get(&id) {
-                None => None,
-                Some(handle) => Some(SearchLocalResultDataset {
-                    handle: handle.clone(),
-                    score: p.score,
-                }),
-            })
-            .take(options.limit)
-            .collect();
+            // Note: We trim to compensate for overfetch
+            datasets.extend(
+                points_with_dataset_ids
+                    .into_iter()
+                    .filter_map(|(p, id)| match dataset_handles_by_id.get(&id) {
+                        None => None,
+                        Some(handle) => Some(SearchLocalResultDataset {
+                            handle: handle.clone(),
+                            score: p.score,
+                        }),
+                    })
+                    .take(options.limit - datasets.len()),
+            );
+
+            // Break if we reached desired limit or exchausted the search
+            if datasets.len() >= options.limit || !has_more_points {
+                break;
+            }
+        }
 
         Ok(SearchLocalNatLangResult { datasets })
     }
