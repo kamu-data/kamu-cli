@@ -22,6 +22,17 @@ use kamu_search::*;
 pub struct SearchServiceLocalIndexerConfig {
     // Whether to clear and re-index on start or work with existing vectors is any exist
     pub clear_on_start: bool,
+
+    /// Whether to skip indexing datasets that have no readme or description
+    pub skip_datasets_with_no_description: bool,
+
+    /// Whether to skip indexing datasets that have no data
+    pub skip_datasets_with_no_data: bool,
+
+    /// Whether to include the original text as payload of the vectors when
+    /// storing them. It is not needed for normal service operations but can
+    /// help debug issues.
+    pub payload_include_content: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,10 +53,10 @@ pub struct SearchServiceLocalIndexer {
 }
 
 impl SearchServiceLocalIndexer {
-    async fn dataset_to_description(
+    async fn dataset_metadata_as_document(
         &self,
         dataset: ResolvedDataset,
-    ) -> Result<Vec<String>, InternalError> {
+    ) -> Result<Option<Vec<String>>, InternalError> {
         let mut attachments_visitor = odf::dataset::SearchSetAttachmentsVisitor::new();
         let mut info_visitor = odf::dataset::SearchSetInfoVisitor::new();
         let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
@@ -68,7 +79,13 @@ impl SearchServiceLocalIndexer {
             .int_err()?;
 
         let attachments = attachments_visitor.into_event();
-        let info = info_visitor.into_event();
+        let embedded_attachments = attachments
+            .map(|a| match a.attachments {
+                odf::metadata::Attachments::Embedded(a) => a.items,
+            })
+            .unwrap_or_default();
+
+        let info = info_visitor.into_event().unwrap_or_default();
         let schema = schema_visitor
             .into_event()
             .map(|schema| schema.schema_as_arrow())
@@ -77,16 +94,22 @@ impl SearchServiceLocalIndexer {
 
         let mut chunks = Vec::new();
 
+        if self.config.skip_datasets_with_no_data && schema.is_none() {
+            return Ok(None);
+        }
+        if self.config.skip_datasets_with_no_description
+            && info.description.is_none()
+            && embedded_attachments.is_empty()
+        {
+            return Ok(None);
+        }
+
         // Info
         chunks.push(format!(
-            "{} {}",
+            "{}\n{}\n{}",
             dataset.get_alias().dataset_name.replace(['.', '-'], " "),
-            info.map(|i| format!(
-                "{} {}",
-                i.description.unwrap_or_default(),
-                i.keywords.unwrap_or_default().join(" ")
-            ))
-            .unwrap_or_default()
+            info.description.unwrap_or_default(),
+            info.keywords.unwrap_or_default().join(" "),
         ));
 
         // Schema
@@ -103,20 +126,15 @@ impl SearchServiceLocalIndexer {
         );
 
         // Attachments
-        let embedded_attachments = attachments
-            .map(|a| match a.attachments {
-                odf::metadata::Attachments::Embedded(a) => a.items,
-            })
-            .unwrap_or_default();
+        chunks.extend(embedded_attachments.into_iter().map(|a| a.content));
 
-        for attachment in embedded_attachments {
-            chunks.push(attachment.content);
-        }
+        let chunks = chunks
+            .into_iter()
+            .map(|c| c.trim().to_string())
+            .filter(|c| !c.is_empty())
+            .collect();
 
-        chunks.iter_mut().for_each(|i| (*i) = i.trim().to_string());
-        chunks.retain(|i| !i.is_empty());
-
-        Ok(chunks)
+        Ok(Some(chunks))
     }
 }
 
@@ -140,10 +158,24 @@ impl InitOnStartup for SearchServiceLocalIndexer {
         while let Some(hdl) = datasets.try_next().await? {
             let dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
-            let description = self.dataset_to_description(dataset).await?;
+            let Some(document) = self.dataset_metadata_as_document(dataset).await? else {
+                continue;
+            };
 
-            for chunk in self.embeddings_chunker.chunk(description).await? {
-                payloads.push(serde_json::json!({"id": hdl.id.to_string()}));
+            for chunk in self.embeddings_chunker.chunk(document).await? {
+                let payload = if !self.config.payload_include_content {
+                    serde_json::json!({
+                        "dataset_id": hdl.id.to_string(),
+                    })
+                } else {
+                    serde_json::json!({
+                        "dataset_id": hdl.id.to_string(),
+                        "dataset_alias": hdl.alias.to_string(),
+                        "content": chunk,
+                    })
+                };
+
+                payloads.push(payload);
                 chunks.push(chunk);
             }
         }

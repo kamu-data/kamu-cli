@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- More configuration options for semantic search indexing, allowing to skip datasets without descriptions or no data.
 ### Changed
 - Flow: Updated the `BatchingRule` trigger to accept 0 for both properties(`min_records_to_await` and `max_batching_interval`), enabling dependency flow execution even when no data is added to the root dataset.
 

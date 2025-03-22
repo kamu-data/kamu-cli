@@ -910,8 +910,19 @@ impl Default for SearchConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchIndexerConfig {
-    // Whether to clear and re-index on start or use existing vectors if any
+    /// Whether to clear and re-index on start or use existing vectors if any
     pub clear_on_start: bool,
+
+    /// Whether to skip indexing datasets that have no readme or description
+    pub skip_datasets_with_no_description: bool,
+
+    /// Whether to skip indexing datasets that have no data
+    pub skip_datasets_with_no_data: bool,
+
+    /// Whether to include the original text as payload of the vectors when
+    /// storing them. It is not needed for normal service operations but can
+    /// help debug issues.
+    pub payload_include_content: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

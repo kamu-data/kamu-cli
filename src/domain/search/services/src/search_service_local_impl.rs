@@ -91,7 +91,7 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
         // Extract dataset IDs from point payload
         let points_with_dataset_ids: Vec<(FoundPoint, odf::DatasetID)> = points
             .into_iter()
-            .map(|p| match p.payload["id"].as_str() {
+            .map(|p| match p.payload["dataset_id"].as_str() {
                 Some(sid) => odf::DatasetID::from_did_str(sid)
                     .int_err()
                     .map(|id| (p, id)),
