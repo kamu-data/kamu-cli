@@ -82,6 +82,7 @@ impl VectorRepositoryQdrant {
 
 #[async_trait::async_trait]
 impl VectorRepository for VectorRepositoryQdrant {
+    #[tracing::instrument(level = "info", skip_all)]
     async fn num_points(&self) -> Result<usize, InternalError> {
         let res = self
             .client()
@@ -98,6 +99,7 @@ impl VectorRepository for VectorRepositoryQdrant {
         Ok(usize::try_from(points_count).unwrap())
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn insert(&self, points: Vec<NewPoint>) -> Result<(), InsertError> {
         if points.is_empty() {
             return Ok(());
@@ -133,6 +135,7 @@ impl VectorRepository for VectorRepositoryQdrant {
         Ok(())
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(?opts))]
     async fn search_points(
         &self,
         vec: &[f32],
@@ -175,6 +178,7 @@ impl VectorRepository for VectorRepositoryQdrant {
             .collect())
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn clear(&self) -> Result<(), InternalError> {
         use ::qdrant_client::qdrant::*;
 

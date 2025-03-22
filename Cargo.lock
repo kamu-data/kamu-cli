@@ -6943,6 +6943,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tonic",
+ "tracing",
 ]
 
 [[package]]

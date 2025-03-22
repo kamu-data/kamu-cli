@@ -17,7 +17,23 @@ use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+pub struct SearchServiceLocalConfig {
+    /// The multiplication factor that determines how many more points will be
+    /// requested from vector store to compensate for filtering out results that
+    /// may be inaccessible to user.
+    pub overfetch_factor: f32,
+
+    /// The additive value that determines how many more points will be
+    /// requested from vector store to compensate for filtering out results that
+    /// may be inaccessible to user.
+    pub overfetch_amount: usize,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct SearchServiceLocalImpl {
+    config: Arc<SearchServiceLocalConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
@@ -29,21 +45,15 @@ pub struct SearchServiceLocalImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn SearchServiceLocal)]
 impl SearchServiceLocalImpl {
-    /// Vector store returns results containing all datasets including private,
-    /// so we need to apply access policies to filter the inaccessible ones.
-    /// As we filter, we are likely to end up with less results than was
-    /// requested. To produce the desired number of results without querying too
-    /// many times we request more points than was originally asked for.
-    const OVERFETCH_FACTOR: usize = 2;
-    const OVERFETCH_AMOUNT: usize = 10;
-
     pub fn new(
+        config: Arc<SearchServiceLocalConfig>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
         vector_repo: Option<Arc<dyn VectorRepository>>,
     ) -> Self {
         Self {
+            config,
             dataset_registry,
             dataset_action_authorizer,
             embeddings_encoder,
@@ -56,6 +66,7 @@ impl SearchServiceLocalImpl {
 
 #[async_trait::async_trait]
 impl SearchServiceLocal for SearchServiceLocalImpl {
+    #[tracing::instrument(level = "info", skip_all)]
     async fn search_natural_language(
         &self,
         prompt: &str,
@@ -77,11 +88,25 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             .next()
             .unwrap();
 
+        // Vector store returns results containing all datasets including
+        // private, so we need to apply access policies to filter the
+        // inaccessible ones. As we filter, we are likely to end up
+        // with less results than was requested. To produce the desired
+        // number of results without querying too many times we request
+        // more points than was originally asked for.
+        let mut points_to_skip = 0;
+
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_precision_loss,
+            clippy::cast_sign_loss
+        )]
+        let points_limit = (options.limit as f32 * self.config.overfetch_factor) as usize
+            + self.config.overfetch_amount;
+
         // We will query vector store in a loop until desired number of results was
         // reached or search space was exhausted.
         let mut datasets: Vec<SearchLocalResultDataset> = Vec::new();
-        let mut points_to_skip = 0;
-        let points_limit = options.limit * Self::OVERFETCH_FACTOR + Self::OVERFETCH_AMOUNT;
 
         loop {
             // Search for nearby points

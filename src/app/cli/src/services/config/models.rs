@@ -852,10 +852,27 @@ impl IdentityConfig {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchConfig {
+    /// Indexer configuration
     pub indexer: Option<SearchIndexerConfig>,
+
+    /// Embeddings chunker configuration
     pub embeddings_chunker: Option<EmbeddingsChunkerConfig>,
+
+    /// Embeddings encoder configuration
     pub embeddings_encoder: Option<EmbeddingsEncoderConfig>,
+
+    /// Vector repository configuration
     pub vector_repo: Option<VectorRepoConfig>,
+
+    /// The multiplication factor that determines how many more points will be
+    /// requested from vector store to compensate for filtering out results that
+    /// may be inaccessible to user.
+    pub overfetch_factor: Option<f32>,
+
+    /// The additive value that determines how many more points will be
+    /// requested from vector store to compensate for filtering out results that
+    /// may be inaccessible to user.
+    pub overfetch_amount: Option<usize>,
 }
 
 impl SearchConfig {
@@ -882,6 +899,8 @@ impl SearchConfig {
                 collection_name: Some("kamu-datasets".to_string()),
                 dimensions: Some(Self::DEFAULT_DIMENSIONS),
             })),
+            overfetch_factor: Some(2.0),
+            overfetch_amount: Some(10),
         }
     }
 }
@@ -899,6 +918,8 @@ impl Default for SearchConfig {
             vector_repo: Some(VectorRepoConfig::QdrantContainer(
                 VectorRepoConfigQdrantContainer::default(),
             )),
+            overfetch_factor: Some(2.0),
+            overfetch_amount: Some(10),
         }
     }
 }

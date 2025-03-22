@@ -884,9 +884,15 @@ pub fn register_config_in_catalog(
         embeddings_chunker,
         embeddings_encoder,
         vector_repo,
+        overfetch_factor,
+        overfetch_amount,
     } = config.search.clone().unwrap();
 
     catalog_builder.add::<kamu_search_services::SearchServiceLocalImplLazyInit>();
+    catalog_builder.add_value(kamu_search_services::SearchServiceLocalConfig {
+        overfetch_factor: overfetch_factor.unwrap(),
+        overfetch_amount: overfetch_amount.unwrap(),
+    });
 
     let indexer = indexer.unwrap_or_default();
     catalog_builder.add_value(kamu_search_services::SearchServiceLocalIndexerConfig {

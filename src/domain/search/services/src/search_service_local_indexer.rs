@@ -151,6 +151,8 @@ impl InitOnStartup for SearchServiceLocalIndexer {
             return Ok(());
         }
 
+        tracing::info!("Fetching metadata of all datasets. This make take a while!");
+
         let mut chunks = Vec::new();
         let mut payloads = Vec::new();
         let mut datasets = self.dataset_registry.all_dataset_handles();
@@ -180,7 +182,7 @@ impl InitOnStartup for SearchServiceLocalIndexer {
             }
         }
 
-        tracing::debug!(?chunks, "Encoding chunks to embeddings");
+        tracing::info!(?chunks, "Encoding chunks to embeddings");
 
         // TODO: Split into batches?
         let vectors = self.embeddings_encoder.encode(chunks).await?;
