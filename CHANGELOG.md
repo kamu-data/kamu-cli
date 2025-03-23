@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.228.1] - 2025-03-23
 ### Added
 - Semantic search:
   - More configuration options for indexing, allowing to skip datasets without descriptions or no data.
