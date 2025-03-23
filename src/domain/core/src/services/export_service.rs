@@ -13,8 +13,6 @@ use datafusion::dataframe::DataFrame;
 use internal_error::{BoxedError, InternalError};
 use thiserror::Error;
 
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Service
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,17 +77,6 @@ pub enum ExportError {
         #[backtrace]
         InternalError,
     ),
-    #[error(transparent)]
-    DataFusionError(DataFusionError),
-}
-
-impl From<datafusion::error::DataFusionError> for ExportError {
-    fn from(value: datafusion::error::DataFusionError) -> Self {
-        Self::DataFusionError(DataFusionError {
-            source: value,
-            backtrace: std::backtrace::Backtrace::capture(),
-        })
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

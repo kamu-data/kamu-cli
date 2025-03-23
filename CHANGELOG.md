@@ -13,10 +13,15 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
-- More configuration options for semantic search indexing, allowing to skip datasets without descriptions or no data.
+- Semantic search:
+  - More configuration options for indexing, allowing to skip datasets without descriptions or no data.
+  - Overfetch is now configurable
+  - Service will make repeated queries to the vector store to fill the requested results page size.
 ### Changed
-- Semantic search service will make repeated queries to the vector store to return the desired number of datasets per results page.
 - Flow: Updated the `BatchingRule` trigger to accept 0 for both properties(`min_records_to_await` and `max_batching_interval`), enabling dependency flow execution even when no data is added to the root dataset.
+### Fixed
+- HTTP & GQL API: Fixed internal error when query contains an unknown column
+
 
 ## [0.228.0] - 2025-03-19
 ### Added
