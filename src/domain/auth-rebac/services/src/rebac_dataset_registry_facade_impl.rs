@@ -127,7 +127,8 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             inaccessible_refs: vec![],
         };
 
-        // TODO: Private Datasets: resolve multi refs at once
+        // TODO: Private Datasets:
+        // TODO: PERF: resolve multi refs at once
         for dataset_ref in dataset_refs {
             match self
                 .resolve_dataset_handle_by_ref(&dataset_ref, action)

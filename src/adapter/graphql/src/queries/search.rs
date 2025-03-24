@@ -51,7 +51,8 @@ impl Search {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        // TODO: Private Datasets: PERF: find a way to narrow down the number of records
+        // TODO: Private Datasets:
+        // TODO: PERF: find a way to narrow down the number of records
         //       to filter, e.g.:
         //       - Anonymous: get all the public
         //       - Logged: all owned datasets and datasets with relations

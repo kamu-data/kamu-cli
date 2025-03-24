@@ -12,11 +12,7 @@ use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{
-    RebacDatasetLifecycleMessageConsumer,
-    RebacDatasetRegistryFacadeImpl,
-    RebacServiceImpl,
-};
+use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::*;
@@ -957,7 +953,6 @@ impl GraphQLDatasetsHarness {
                     allows_public_read: false,
                 })
                 .add::<InMemoryRebacRepository>()
-                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<RebacDatasetLifecycleMessageConsumer>();
 
             b.build()

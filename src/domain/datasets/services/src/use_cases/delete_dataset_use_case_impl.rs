@@ -29,7 +29,6 @@ use crate::DatasetEntryWriter;
 #[component(pub)]
 #[interface(dyn DeleteDatasetUseCase)]
 pub struct DeleteDatasetUseCaseImpl {
-    // !!! заменить
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,

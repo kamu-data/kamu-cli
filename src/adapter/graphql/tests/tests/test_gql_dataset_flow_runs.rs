@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use futures::TryStreamExt;
@@ -21,7 +19,6 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
 };
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{
     CompactionResult,
     DatasetChangesService,
@@ -3090,7 +3087,6 @@ impl FlowRunsHarness {
                     Duration::minutes(1),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<InMemoryTaskEventStore>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
