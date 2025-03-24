@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use internal_error::*;
 use itertools::Itertools;
-use kamu_core::auth::DatasetActionAuthorizer;
-use kamu_core::DatasetRegistry;
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_core::auth;
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,8 +34,7 @@ pub struct SearchServiceLocalConfig {
 
 pub struct SearchServiceLocalImpl {
     config: Arc<SearchServiceLocalConfig>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
     vector_repo: Option<Arc<dyn VectorRepository>>,
 }
@@ -47,15 +46,13 @@ pub struct SearchServiceLocalImpl {
 impl SearchServiceLocalImpl {
     pub fn new(
         config: Arc<SearchServiceLocalConfig>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
         embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
         vector_repo: Option<Arc<dyn VectorRepository>>,
     ) -> Self {
         Self {
             config,
-            dataset_registry,
-            dataset_action_authorizer,
+            rebac_dataset_registry_facade,
             embeddings_encoder,
             vector_repo,
         }
@@ -140,41 +137,33 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
                 .try_collect()?;
 
             // Resolve dataset handles
-            let dataset_handles_res = self
-                .dataset_registry
-                .resolve_multiple_dataset_handles_by_ids(
-                    points_with_dataset_ids
-                        .iter()
-                        .map(|(_pooint, id)| id.clone())
-                        .collect(),
-                )
+            let dataset_refs = points_with_dataset_ids
+                .iter()
+                .map(|(_point, id)| id.clone().into_local_ref())
+                .collect();
+            let resolve_res = self
+                .rebac_dataset_registry_facade
+                .classify_dataset_refs_by_allowance(dataset_refs, auth::DatasetAction::Read)
                 .await
                 .int_err()?;
 
-            let dataset_handles = dataset_handles_res.resolved_handles;
-
             // Not being able to resolve an ID can be simply due to eventual consistency or
             // can be a sign of a bug, so we log it
-            for (id, _) in dataset_handles_res.unresolved_datasets {
+            for (dataset_ref, _) in resolve_res.inaccessible_refs {
                 tracing::warn!(
-                    dataset_id = %id,
+                    dataset_ref = %dataset_ref,
                     "Ignoring point that refers to a dataset not present in the registry",
                 );
             }
-
-            // Filter by accessibility
-            let dataset_handles = self
-                .dataset_action_authorizer
-                .filter_datasets_allowing(dataset_handles, kamu_core::auth::DatasetAction::Read)
-                .await?;
 
             // Merge found points with accessible handles
             let dataset_handles_by_id: std::collections::BTreeMap<
                 odf::DatasetID,
                 odf::DatasetHandle,
-            > = dataset_handles
+            > = resolve_res
+                .accessible_resolved_refs
                 .into_iter()
-                .map(|h| (h.id.clone(), h))
+                .map(|(_, h)| (h.id.clone(), h))
                 .collect();
 
             // Note: We trim to compensate for overfetch
