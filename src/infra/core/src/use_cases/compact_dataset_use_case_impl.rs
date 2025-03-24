@@ -10,8 +10,10 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use internal_error::ErrorIntoInternal;
+use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{
+    auth,
     CompactDatasetUseCase,
     CompactionError,
     CompactionExecutor,
@@ -21,7 +23,6 @@ use kamu_core::{
     CompactionPlanner,
     CompactionResponse,
     CompactionResult,
-    DatasetRegistry,
     NullCompactionMultiListener,
 };
 
@@ -32,22 +33,19 @@ use kamu_core::{
 pub struct CompactDatasetUseCaseImpl {
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 
 impl CompactDatasetUseCaseImpl {
     pub fn new(
         compaction_planner: Arc<dyn CompactionPlanner>,
         compaction_executor: Arc<dyn CompactionExecutor>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     ) -> Self {
         Self {
             compaction_planner,
             compaction_executor,
-            dataset_registry,
-            dataset_action_authorizer,
+            rebac_dataset_registry_facade,
         }
     }
 }
@@ -67,16 +65,17 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
         options: CompactionOptions,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionError> {
-        // Permission check
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Maintain)
-            .await?;
-
-        // Resolve dataset
         let target = self
-            .dataset_registry
-            .get_dataset_by_handle(dataset_handle)
-            .await;
+            .rebac_dataset_registry_facade
+            .resolve_dataset_for_action_by_handle(dataset_handle, auth::DatasetAction::Maintain)
+            .await
+            .map_err(|e| {
+                use RebacDatasetIdUnresolvedError as E;
+                match e {
+                    E::Access(e) => CompactionError::Access(e),
+                    e @ E::Internal(_) => CompactionError::Internal(e.int_err()),
+                }
+            })?;
 
         // Plan compacting
         let compaction_plan = self

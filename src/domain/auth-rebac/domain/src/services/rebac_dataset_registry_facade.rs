@@ -29,6 +29,12 @@ pub trait RebacDatasetRegistryFacade: Send + Sync {
         action: auth::DatasetAction,
     ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError>;
 
+    async fn resolve_dataset_for_action_by_handle(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        action: auth::DatasetAction,
+    ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError>;
+
     async fn access_multi_dataset_refs(
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
@@ -78,6 +84,25 @@ pub enum RebacDatasetRefUnresolvedError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
 
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum RebacDatasetIdUnresolvedError {
     #[error(transparent)]
     Access(
         #[from]

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_auth_rebac::{
     AccessMultiDatasetRefsResponse,
+    RebacDatasetIdUnresolvedError,
     RebacDatasetRefUnresolvedError,
     RebacDatasetRegistryFacade,
 };
@@ -86,6 +87,31 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_handle(&dataset_handle)
+            .await;
+
+        Ok(resolved_dataset)
+    }
+
+    async fn resolve_dataset_for_action_by_handle(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        action: auth::DatasetAction,
+    ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError> {
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle.id, action)
+            .await
+            .map_err(|e| {
+                use auth::DatasetActionUnauthorizedError as SourceError;
+                use RebacDatasetIdUnresolvedError as Error;
+
+                match e {
+                    SourceError::Access(e) => Error::Access(e),
+                    e @ SourceError::Internal(_) => Error::Internal(e.int_err()),
+                }
+            })?;
+        let resolved_dataset = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
             .await;
 
         Ok(resolved_dataset)
