@@ -1493,12 +1493,16 @@ type FlowDescriptionSystemGC {
 	dummy: Boolean!
 }
 
-union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess
+union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess | FlowDescriptionUpdateResultUnknown
 
 type FlowDescriptionUpdateResultSuccess {
 	numBlocks: Int!
 	numRecords: Int!
 	updatedWatermark: DateTime
+}
+
+type FlowDescriptionUpdateResultUnknown {
+	message: String!
 }
 
 type FlowDescriptionUpdateResultUpToDate {
