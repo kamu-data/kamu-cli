@@ -1747,7 +1747,7 @@ the data that already exists in the dataset.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
 """
-union MergeStrategy = MergeStrategyAppend | MergeStrategyLedger | MergeStrategySnapshot
+union MergeStrategy = MergeStrategyAppend | MergeStrategyLedger | MergeStrategySnapshot | MergeStrategyChangelogStream | MergeStrategyUpsertStream
 
 """
 Append merge strategy.
@@ -1759,6 +1759,24 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 """
 type MergeStrategyAppend {
 	dummy: String
+}
+
+"""
+Changelog stream merge strategy.
+
+This is the native stream format for ODF that accurately describes the
+evolution of all event records including appends, retractions, and
+corrections as per RFC-015. No pre-processing except for format validation
+is done.
+
+See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
+"""
+type MergeStrategyChangelogStream {
+	"""
+	Names of the columns that uniquely identify the record throughout its
+	lifetime
+	"""
+	primaryKey: [String!]!
 }
 
 """
@@ -1821,6 +1839,25 @@ type MergeStrategySnapshot {
 	between two snapshots.
 	"""
 	compareColumns: [String!]
+}
+
+"""
+Upsert stream merge strategy.
+
+This strategy should be used for data sources containing ledgers of
+insert-or-update and delete events. Unlike ChangelogStream the
+insert-or-update events only carry the new values, so this strategy will use
+primary key to re-classify the events into an append or a correction from/to
+pair, looking up the previous values.
+
+See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
+"""
+type MergeStrategyUpsertStream {
+	"""
+	Names of the columns that uniquely identify the record throughout its
+	lifetime
+	"""
+	primaryKey: [String!]!
 }
 
 type MetadataBlockConnection {

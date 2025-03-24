@@ -482,12 +482,16 @@ pub enum MergeStrategy {
     Append(MergeStrategyAppend),
     Ledger(MergeStrategyLedger),
     Snapshot(MergeStrategySnapshot),
+    ChangelogStream(MergeStrategyChangelogStream),
+    UpsertStream(MergeStrategyUpsertStream),
 }
 
 impl_enum_with_variants!(MergeStrategy);
 impl_enum_variant!(MergeStrategy::Append(MergeStrategyAppend));
 impl_enum_variant!(MergeStrategy::Ledger(MergeStrategyLedger));
 impl_enum_variant!(MergeStrategy::Snapshot(MergeStrategySnapshot));
+impl_enum_variant!(MergeStrategy::ChangelogStream(MergeStrategyChangelogStream));
+impl_enum_variant!(MergeStrategy::UpsertStream(MergeStrategyUpsertStream));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -499,6 +503,23 @@ impl_enum_variant!(MergeStrategy::Snapshot(MergeStrategySnapshot));
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyappend-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyAppend {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Changelog stream merge strategy.
+///
+/// This is the native stream format for ODF that accurately describes the
+/// evolution of all event records including appends, retractions, and
+/// corrections as per RFC-015. No pre-processing except for format validation
+/// is done.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct MergeStrategyChangelogStream {
+    /// Names of the columns that uniquely identify the record throughout its
+    /// lifetime
+    pub primary_key: Vec<String>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -556,6 +577,24 @@ pub struct MergeStrategySnapshot {
     /// Names of the columns to compared to determine if a row has changed
     /// between two snapshots.
     pub compare_columns: Option<Vec<String>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Upsert stream merge strategy.
+///
+/// This strategy should be used for data sources containing ledgers of
+/// insert-or-update and delete events. Unlike ChangelogStream the
+/// insert-or-update events only carry the new values, so this strategy will use
+/// primary key to re-classify the events into an append or a correction from/to
+/// pair, looking up the previous values.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct MergeStrategyUpsertStream {
+    /// Names of the columns that uniquely identify the record throughout its
+    /// lifetime
+    pub primary_key: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

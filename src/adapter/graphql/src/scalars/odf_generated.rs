@@ -741,6 +741,8 @@ pub enum MergeStrategy {
     Append(MergeStrategyAppend),
     Ledger(MergeStrategyLedger),
     Snapshot(MergeStrategySnapshot),
+    ChangelogStream(MergeStrategyChangelogStream),
+    UpsertStream(MergeStrategyUpsertStream),
 }
 
 impl From<odf::metadata::MergeStrategy> for MergeStrategy {
@@ -749,6 +751,8 @@ impl From<odf::metadata::MergeStrategy> for MergeStrategy {
             odf::metadata::MergeStrategy::Append(v) => Self::Append(v.into()),
             odf::metadata::MergeStrategy::Ledger(v) => Self::Ledger(v.into()),
             odf::metadata::MergeStrategy::Snapshot(v) => Self::Snapshot(v.into()),
+            odf::metadata::MergeStrategy::ChangelogStream(v) => Self::ChangelogStream(v.into()),
+            odf::metadata::MergeStrategy::UpsertStream(v) => Self::UpsertStream(v.into()),
         }
     }
 }
@@ -769,6 +773,31 @@ pub struct MergeStrategyAppend {
 impl From<odf::metadata::MergeStrategyAppend> for MergeStrategyAppend {
     fn from(v: odf::metadata::MergeStrategyAppend) -> Self {
         Self { _dummy: None }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Changelog stream merge strategy.
+///
+/// This is the native stream format for ODF that accurately describes the
+/// evolution of all event records including appends, retractions, and
+/// corrections as per RFC-015. No pre-processing except for format validation
+/// is done.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct MergeStrategyChangelogStream {
+    /// Names of the columns that uniquely identify the record throughout its
+    /// lifetime
+    pub primary_key: Vec<String>,
+}
+
+impl From<odf::metadata::MergeStrategyChangelogStream> for MergeStrategyChangelogStream {
+    fn from(v: odf::metadata::MergeStrategyChangelogStream) -> Self {
+        Self {
+            primary_key: v.primary_key.into_iter().map(Into::into).collect(),
+        }
     }
 }
 
@@ -845,6 +874,32 @@ impl From<odf::metadata::MergeStrategySnapshot> for MergeStrategySnapshot {
             compare_columns: v
                 .compare_columns
                 .map(|v| v.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Upsert stream merge strategy.
+///
+/// This strategy should be used for data sources containing ledgers of
+/// insert-or-update and delete events. Unlike ChangelogStream the
+/// insert-or-update events only carry the new values, so this strategy will use
+/// primary key to re-classify the events into an append or a correction from/to
+/// pair, looking up the previous values.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct MergeStrategyUpsertStream {
+    /// Names of the columns that uniquely identify the record throughout its
+    /// lifetime
+    pub primary_key: Vec<String>,
+}
+
+impl From<odf::metadata::MergeStrategyUpsertStream> for MergeStrategyUpsertStream {
+    fn from(v: odf::metadata::MergeStrategyUpsertStream) -> Self {
+        Self {
+            primary_key: v.primary_key.into_iter().map(Into::into).collect(),
         }
     }
 }

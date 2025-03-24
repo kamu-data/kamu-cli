@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Experimental support for `ChangelogStream` and `UpsertStream` ODF merge strategies.
+
 ## [0.228.1] - 2025-03-23
 ### Added
 - Semantic search:

@@ -652,11 +652,17 @@ impl DataWriterDataFusion {
             odf::metadata::MergeStrategy::Append(_cfg) => {
                 Arc::new(MergeStrategyAppend::new(vocab.clone()))
             }
+            odf::metadata::MergeStrategy::ChangelogStream(cfg) => {
+                Arc::new(MergeStrategyChangelogStream::new(vocab.clone(), cfg))
+            }
             odf::metadata::MergeStrategy::Ledger(cfg) => {
                 Arc::new(MergeStrategyLedger::new(vocab.clone(), cfg))
             }
             odf::metadata::MergeStrategy::Snapshot(cfg) => {
                 Arc::new(MergeStrategySnapshot::new(vocab.clone(), cfg))
+            }
+            odf::metadata::MergeStrategy::UpsertStream(cfg) => {
+                Arc::new(MergeStrategyUpsertStream::new(vocab.clone(), cfg))
             }
         }
     }

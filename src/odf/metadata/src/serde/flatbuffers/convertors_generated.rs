@@ -991,6 +991,14 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::MergeStrategy> for odf::MergeStra
                 fb::MergeStrategy::MergeStrategySnapshot,
                 v.serialize(fb).as_union_value(),
             ),
+            odf::MergeStrategy::ChangelogStream(v) => (
+                fb::MergeStrategy::MergeStrategyChangelogStream,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::MergeStrategy::UpsertStream(v) => (
+                fb::MergeStrategy::MergeStrategyUpsertStream,
+                v.serialize(fb).as_union_value(),
+            ),
         }
     }
 }
@@ -1012,6 +1020,16 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MergeStrategy> for odf::MergeSt
                 odf::MergeStrategy::Snapshot(odf::MergeStrategySnapshot::deserialize(unsafe {
                     fb::MergeStrategySnapshot::init_from_table(table)
                 }))
+            }
+            fb::MergeStrategy::MergeStrategyChangelogStream => {
+                odf::MergeStrategy::ChangelogStream(odf::MergeStrategyChangelogStream::deserialize(
+                    unsafe { fb::MergeStrategyChangelogStream::init_from_table(table) },
+                ))
+            }
+            fb::MergeStrategy::MergeStrategyUpsertStream => {
+                odf::MergeStrategy::UpsertStream(odf::MergeStrategyUpsertStream::deserialize(
+                    unsafe { fb::MergeStrategyUpsertStream::init_from_table(table) },
+                ))
             }
             _ => panic!("Invalid enum value: {}", t.0),
         }
@@ -1035,6 +1053,42 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MergeStrategyAppend {
 impl<'fb> FlatbuffersDeserializable<fb::MergeStrategyAppend<'fb>> for odf::MergeStrategyAppend {
     fn deserialize(proxy: fb::MergeStrategyAppend<'fb>) -> Self {
         odf::MergeStrategyAppend {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyChangelogStream
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::MergeStrategyChangelogStream {
+    type OffsetT = WIPOffset<fb::MergeStrategyChangelogStream<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let primary_key_offset = {
+            let offsets: Vec<_> = self
+                .primary_key
+                .iter()
+                .map(|i| fb.create_string(&i))
+                .collect();
+            fb.create_vector(&offsets)
+        };
+        let mut builder = fb::MergeStrategyChangelogStreamBuilder::new(fb);
+        builder.add_primary_key(primary_key_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::MergeStrategyChangelogStream<'fb>>
+    for odf::MergeStrategyChangelogStream
+{
+    fn deserialize(proxy: fb::MergeStrategyChangelogStream<'fb>) -> Self {
+        odf::MergeStrategyChangelogStream {
+            primary_key: proxy
+                .primary_key()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect())
+                .unwrap(),
+        }
     }
 }
 
@@ -1110,6 +1164,42 @@ impl<'fb> FlatbuffersDeserializable<fb::MergeStrategySnapshot<'fb>> for odf::Mer
             compare_columns: proxy
                 .compare_columns()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyUpsertStream
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::MergeStrategyUpsertStream {
+    type OffsetT = WIPOffset<fb::MergeStrategyUpsertStream<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let primary_key_offset = {
+            let offsets: Vec<_> = self
+                .primary_key
+                .iter()
+                .map(|i| fb.create_string(&i))
+                .collect();
+            fb.create_vector(&offsets)
+        };
+        let mut builder = fb::MergeStrategyUpsertStreamBuilder::new(fb);
+        builder.add_primary_key(primary_key_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::MergeStrategyUpsertStream<'fb>>
+    for odf::MergeStrategyUpsertStream
+{
+    fn deserialize(proxy: fb::MergeStrategyUpsertStream<'fb>) -> Self {
+        odf::MergeStrategyUpsertStream {
+            primary_key: proxy
+                .primary_key()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect())
+                .unwrap(),
         }
     }
 }
