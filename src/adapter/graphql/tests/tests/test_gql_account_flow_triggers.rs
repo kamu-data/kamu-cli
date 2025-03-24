@@ -15,6 +15,7 @@ use indoc::indoc;
 use kamu::testing::MockDatasetChangesService;
 use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_flow_system::FlowAgentConfig;
@@ -604,6 +605,7 @@ impl FlowTriggerHarness {
                     Duration::minutes(1),
                 ))
                 .add::<TaskSchedulerImpl>()
+                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<InMemoryTaskEventStore>();
 
             kamu_flow_system_services::register_dependencies(&mut b);

@@ -13,6 +13,7 @@ use async_graphql::*;
 use dill::*;
 use indoc::indoc;
 use internal_error::InternalError;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
 use kamu_datasets::*;
@@ -140,6 +141,7 @@ impl PushStatusesTestHarness {
 
             b.add_value(FakeRemoteStatusService {})
                 .bind::<dyn RemoteStatusService, FakeRemoteStatusService>();
+            b.add::<RebacDatasetRegistryFacadeImpl>();
 
             b.build()
         };

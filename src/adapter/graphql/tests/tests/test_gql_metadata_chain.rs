@@ -13,6 +13,7 @@ use async_graphql::*;
 use chrono::Utc;
 use indoc::indoc;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
@@ -630,6 +631,7 @@ impl GraphQLMetadataChainHarness {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
             b.add::<CommitDatasetEventUseCaseImpl>();
+            b.add::<RebacDatasetRegistryFacadeImpl>();
 
             b.build()
         };

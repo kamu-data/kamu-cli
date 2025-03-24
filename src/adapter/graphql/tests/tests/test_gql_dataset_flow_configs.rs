@@ -10,6 +10,7 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
@@ -564,6 +565,7 @@ impl FlowConfigHarness {
 
             b.add::<MetadataQueryServiceImpl>()
                 .add::<FlowConfigurationServiceImpl>()
+                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<InMemoryFlowConfigurationEventStore>();
 
             b.build()

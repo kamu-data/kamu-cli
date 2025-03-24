@@ -53,11 +53,12 @@ utoipa-axum = { version = "0.2", default-features = false, features = [] }
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
-kamu-accounts-services = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
+kamu-accounts-services = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 kamu-datasets = { workspace = true }
-kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
+kamu-datasets-services = { workspace = true }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 

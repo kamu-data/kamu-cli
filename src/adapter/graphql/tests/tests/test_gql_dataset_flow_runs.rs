@@ -21,6 +21,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
 };
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{
     CompactionResult,
     DatasetChangesService,
@@ -3089,6 +3090,7 @@ impl FlowRunsHarness {
                     Duration::minutes(1),
                 ))
                 .add::<TaskSchedulerImpl>()
+                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<InMemoryTaskEventStore>();
 
             kamu_flow_system_services::register_dependencies(&mut b);

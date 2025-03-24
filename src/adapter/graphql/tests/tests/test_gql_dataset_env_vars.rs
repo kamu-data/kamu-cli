@@ -9,6 +9,7 @@
 
 use async_graphql::value;
 use indoc::indoc;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
@@ -320,6 +321,7 @@ impl DatasetEnvVarsHarness {
 
             b.add_value(DatasetEnvVarsConfig::sample())
                 .add::<DatasetEnvVarServiceImpl>()
+                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<InMemoryDatasetEnvVarRepository>();
 
             b.build()

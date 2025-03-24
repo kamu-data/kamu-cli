@@ -23,6 +23,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
@@ -67,6 +68,7 @@ async fn create_catalog_with_local_workspace(
             .add::<LoginPasswordAuthProvider>()
             .add::<PredefinedAccountsRegistrator>()
             .add::<AccountServiceImpl>()
+            .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<InMemoryAccountRepository>();
 
         b.build()

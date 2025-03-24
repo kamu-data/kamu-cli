@@ -23,6 +23,7 @@ use kamu_accounts::*;
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
@@ -182,6 +183,8 @@ impl ClientSideHarness {
         b.add::<InMemoryAccountRepository>();
         b.add::<LoginPasswordAuthProvider>();
         b.add::<PredefinedAccountsRegistrator>();
+
+        b.add::<RebacDatasetRegistryFacadeImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());

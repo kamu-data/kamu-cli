@@ -114,8 +114,9 @@ kamu-core = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
-kamu-datasets-services = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
 observability = { workspace = true }

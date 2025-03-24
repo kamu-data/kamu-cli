@@ -15,6 +15,7 @@ use futures::{future, StreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
@@ -640,6 +641,7 @@ impl DependencyGraphHarness {
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<DidGeneratorDefault>()
+            .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<SystemTimeSourceDefault>();
 
         b.add_builder(
