@@ -94,7 +94,9 @@ impl<'a> AccountFlowRuns<'a> {
                 .get_owned_dataset_ids(&self.account.id)
                 .await
                 .int_err()?;
-            if let Some(expected_dataset_ids) = maybe_expected_dataset_ids {
+            if let Some(expected_dataset_ids) = maybe_expected_dataset_ids
+                && !expected_dataset_ids.is_empty()
+            {
                 account_dataset_ids
                     .into_iter()
                     .filter(|dataset_id| expected_dataset_ids.contains(dataset_id))
