@@ -13,14 +13,15 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ProvenanceServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 
 #[component(pub)]
@@ -28,11 +29,11 @@ pub struct ProvenanceServiceImpl {
 impl ProvenanceServiceImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     ) -> Self {
         Self {
             dataset_registry,
-            dataset_action_authorizer,
+            rebac_dataset_registry_facade,
         }
     }
 
@@ -42,14 +43,16 @@ impl ProvenanceServiceImpl {
         dataset_handle: &odf::DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, auth::DatasetAction::Read)
-            .await?;
-
         let resolved_dataset = self
-            .dataset_registry
-            .get_dataset_by_handle(dataset_handle)
-            .await;
+            .rebac_dataset_registry_facade
+            .resolve_dataset_for_action_by_handle(dataset_handle, auth::DatasetAction::Read)
+            .await
+            .map_err(|e| match e {
+                RebacDatasetIdUnresolvedError::Access(e) => GetLineageError::Access(e),
+                e @ RebacDatasetIdUnresolvedError::Internal(_) => {
+                    GetLineageError::Internal(e.int_err())
+                }
+            })?;
 
         let summary = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
@@ -58,6 +61,10 @@ impl ProvenanceServiceImpl {
 
         let mut resolved_inputs = Vec::new();
         for input_id in &summary.dependencies {
+            // TODO: Private Datasets: check inputs
+            //       Private Datasets: Checking dataset accessibility in `kamu` subcommands
+            //       (multi-tenant workspace)
+            //       https://github.com/kamu-data/kamu-cli/issues/1055
             let handle = self
                 .dataset_registry
                 .resolve_dataset_handle_by_ref(&input_id.as_local_ref())
