@@ -243,17 +243,19 @@ pub const ENUM_MIN_MERGE_STRATEGY: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_MERGE_STRATEGY: u8 = 3;
+pub const ENUM_MAX_MERGE_STRATEGY: u8 = 5;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_MERGE_STRATEGY: [MergeStrategy; 4] = [
+pub const ENUM_VALUES_MERGE_STRATEGY: [MergeStrategy; 6] = [
     MergeStrategy::NONE,
     MergeStrategy::MergeStrategyAppend,
     MergeStrategy::MergeStrategyLedger,
     MergeStrategy::MergeStrategySnapshot,
+    MergeStrategy::MergeStrategyChangelogStream,
+    MergeStrategy::MergeStrategyUpsertStream,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -266,14 +268,18 @@ impl MergeStrategy {
     pub const MergeStrategyAppend: Self = Self(1);
     pub const MergeStrategyLedger: Self = Self(2);
     pub const MergeStrategySnapshot: Self = Self(3);
+    pub const MergeStrategyChangelogStream: Self = Self(4);
+    pub const MergeStrategyUpsertStream: Self = Self(5);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 3;
+    pub const ENUM_MAX: u8 = 5;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::MergeStrategyAppend,
         Self::MergeStrategyLedger,
         Self::MergeStrategySnapshot,
+        Self::MergeStrategyChangelogStream,
+        Self::MergeStrategyUpsertStream,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
@@ -282,6 +288,8 @@ impl MergeStrategy {
             Self::MergeStrategyAppend => Some("MergeStrategyAppend"),
             Self::MergeStrategyLedger => Some("MergeStrategyLedger"),
             Self::MergeStrategySnapshot => Some("MergeStrategySnapshot"),
+            Self::MergeStrategyChangelogStream => Some("MergeStrategyChangelogStream"),
+            Self::MergeStrategyUpsertStream => Some("MergeStrategyUpsertStream"),
             _ => None,
         }
     }
@@ -4789,6 +4797,246 @@ impl core::fmt::Debug for MergeStrategySnapshot<'_> {
         ds.finish()
     }
 }
+pub enum MergeStrategyChangelogStreamOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct MergeStrategyChangelogStream<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for MergeStrategyChangelogStream<'a> {
+    type Inner = MergeStrategyChangelogStream<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> MergeStrategyChangelogStream<'a> {
+    pub const VT_PRIMARY_KEY: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        MergeStrategyChangelogStream { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args MergeStrategyChangelogStreamArgs<'args>,
+    ) -> flatbuffers::WIPOffset<MergeStrategyChangelogStream<'bldr>> {
+        let mut builder = MergeStrategyChangelogStreamBuilder::new(_fbb);
+        if let Some(x) = args.primary_key {
+            builder.add_primary_key(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn primary_key(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+            >>(MergeStrategyChangelogStream::VT_PRIMARY_KEY, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for MergeStrategyChangelogStream<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("primary_key", Self::VT_PRIMARY_KEY, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct MergeStrategyChangelogStreamArgs<'a> {
+    pub primary_key: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+}
+impl<'a> Default for MergeStrategyChangelogStreamArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        MergeStrategyChangelogStreamArgs { primary_key: None }
+    }
+}
+
+pub struct MergeStrategyChangelogStreamBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> MergeStrategyChangelogStreamBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_primary_key(
+        &mut self,
+        primary_key: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            MergeStrategyChangelogStream::VT_PRIMARY_KEY,
+            primary_key,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> MergeStrategyChangelogStreamBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        MergeStrategyChangelogStreamBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<MergeStrategyChangelogStream<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for MergeStrategyChangelogStream<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("MergeStrategyChangelogStream");
+        ds.field("primary_key", &self.primary_key());
+        ds.finish()
+    }
+}
+pub enum MergeStrategyUpsertStreamOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct MergeStrategyUpsertStream<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for MergeStrategyUpsertStream<'a> {
+    type Inner = MergeStrategyUpsertStream<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> MergeStrategyUpsertStream<'a> {
+    pub const VT_PRIMARY_KEY: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        MergeStrategyUpsertStream { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args MergeStrategyUpsertStreamArgs<'args>,
+    ) -> flatbuffers::WIPOffset<MergeStrategyUpsertStream<'bldr>> {
+        let mut builder = MergeStrategyUpsertStreamBuilder::new(_fbb);
+        if let Some(x) = args.primary_key {
+            builder.add_primary_key(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn primary_key(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+            >>(MergeStrategyUpsertStream::VT_PRIMARY_KEY, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for MergeStrategyUpsertStream<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("primary_key", Self::VT_PRIMARY_KEY, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct MergeStrategyUpsertStreamArgs<'a> {
+    pub primary_key: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+}
+impl<'a> Default for MergeStrategyUpsertStreamArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        MergeStrategyUpsertStreamArgs { primary_key: None }
+    }
+}
+
+pub struct MergeStrategyUpsertStreamBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> MergeStrategyUpsertStreamBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_primary_key(
+        &mut self,
+        primary_key: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            MergeStrategyUpsertStream::VT_PRIMARY_KEY,
+            primary_key,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> MergeStrategyUpsertStreamBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        MergeStrategyUpsertStreamBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<MergeStrategyUpsertStream<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for MergeStrategyUpsertStream<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("MergeStrategyUpsertStream");
+        ds.field("primary_key", &self.primary_key());
+        ds.finish()
+    }
+}
 pub enum AddPushSourceOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -5090,6 +5338,38 @@ impl<'a> AddPushSource<'a> {
             None
         }
     }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn merge_as_merge_strategy_changelog_stream(
+        &self,
+    ) -> Option<MergeStrategyChangelogStream<'a>> {
+        if self.merge_type() == MergeStrategy::MergeStrategyChangelogStream {
+            self.merge().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { MergeStrategyChangelogStream::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn merge_as_merge_strategy_upsert_stream(&self) -> Option<MergeStrategyUpsertStream<'a>> {
+        if self.merge_type() == MergeStrategy::MergeStrategyUpsertStream {
+            self.merge().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { MergeStrategyUpsertStream::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
 }
 
 impl flatbuffers::Verifiable for AddPushSource<'_> {
@@ -5124,6 +5404,8 @@ impl flatbuffers::Verifiable for AddPushSource<'_> {
           MergeStrategy::MergeStrategyAppend => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategyAppend>>("MergeStrategy::MergeStrategyAppend", pos),
           MergeStrategy::MergeStrategyLedger => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategyLedger>>("MergeStrategy::MergeStrategyLedger", pos),
           MergeStrategy::MergeStrategySnapshot => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategySnapshot>>("MergeStrategy::MergeStrategySnapshot", pos),
+          MergeStrategy::MergeStrategyChangelogStream => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategyChangelogStream>>("MergeStrategy::MergeStrategyChangelogStream", pos),
+          MergeStrategy::MergeStrategyUpsertStream => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategyUpsertStream>>("MergeStrategy::MergeStrategyUpsertStream", pos),
           _ => Ok(()),
         }
      })?
@@ -5347,6 +5629,26 @@ impl core::fmt::Debug for AddPushSource<'_> {
             }
             MergeStrategy::MergeStrategySnapshot => {
                 if let Some(x) = self.merge_as_merge_strategy_snapshot() {
+                    ds.field("merge", &x)
+                } else {
+                    ds.field(
+                        "merge",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            MergeStrategy::MergeStrategyChangelogStream => {
+                if let Some(x) = self.merge_as_merge_strategy_changelog_stream() {
+                    ds.field("merge", &x)
+                } else {
+                    ds.field(
+                        "merge",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            MergeStrategy::MergeStrategyUpsertStream => {
+                if let Some(x) = self.merge_as_merge_strategy_upsert_stream() {
                     ds.field("merge", &x)
                 } else {
                     ds.field(
@@ -9261,6 +9563,38 @@ impl<'a> SetPollingSource<'a> {
             None
         }
     }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn merge_as_merge_strategy_changelog_stream(
+        &self,
+    ) -> Option<MergeStrategyChangelogStream<'a>> {
+        if self.merge_type() == MergeStrategy::MergeStrategyChangelogStream {
+            self.merge().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { MergeStrategyChangelogStream::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn merge_as_merge_strategy_upsert_stream(&self) -> Option<MergeStrategyUpsertStream<'a>> {
+        if self.merge_type() == MergeStrategy::MergeStrategyUpsertStream {
+            self.merge().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { MergeStrategyUpsertStream::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
 }
 
 impl flatbuffers::Verifiable for SetPollingSource<'_> {
@@ -9305,6 +9639,8 @@ impl flatbuffers::Verifiable for SetPollingSource<'_> {
           MergeStrategy::MergeStrategyAppend => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategyAppend>>("MergeStrategy::MergeStrategyAppend", pos),
           MergeStrategy::MergeStrategyLedger => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategyLedger>>("MergeStrategy::MergeStrategyLedger", pos),
           MergeStrategy::MergeStrategySnapshot => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategySnapshot>>("MergeStrategy::MergeStrategySnapshot", pos),
+          MergeStrategy::MergeStrategyChangelogStream => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategyChangelogStream>>("MergeStrategy::MergeStrategyChangelogStream", pos),
+          MergeStrategy::MergeStrategyUpsertStream => v.verify_union_variant::<flatbuffers::ForwardsUOffset<MergeStrategyUpsertStream>>("MergeStrategy::MergeStrategyUpsertStream", pos),
           _ => Ok(()),
         }
      })?
@@ -9609,6 +9945,26 @@ impl core::fmt::Debug for SetPollingSource<'_> {
             }
             MergeStrategy::MergeStrategySnapshot => {
                 if let Some(x) = self.merge_as_merge_strategy_snapshot() {
+                    ds.field("merge", &x)
+                } else {
+                    ds.field(
+                        "merge",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            MergeStrategy::MergeStrategyChangelogStream => {
+                if let Some(x) = self.merge_as_merge_strategy_changelog_stream() {
+                    ds.field("merge", &x)
+                } else {
+                    ds.field(
+                        "merge",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            MergeStrategy::MergeStrategyUpsertStream => {
+                if let Some(x) = self.merge_as_merge_strategy_upsert_stream() {
                     ds.field("merge", &x)
                 } else {
                     ds.field(

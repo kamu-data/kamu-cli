@@ -916,6 +916,51 @@ async fn test_data_query_handler_error_sql_unparsable() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_data_query_handler_error_sql_missing_column() {
+    let harness = Harness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query = format!("select offzet from \"{}\"", harness.dataset_handle.alias);
+
+        let query_url = format!("{}query", harness.root_url);
+        let res = cl
+            .post(&query_url)
+            .json(&json!({
+                "query": query
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+        let body = res.json::<serde_json::Value>().await.unwrap();
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::BAD_REQUEST,
+            status,
+            "Unexpected response: {status} {body}"
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "No field named offzet. \
+                    Valid fields are \"kamu-server/population\".offset, \
+                    \"kamu-server/population\".op, \"kamu-server/population\".system_time, \
+                    \"kamu-server/population\".event_time, \"kamu-server/population\".city, \
+                    \"kamu-server/population\".population."
+            }),
+            body
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_data_query_handler_error_sql_missing_function() {
     let harness = Harness::new().await;
 
@@ -947,7 +992,7 @@ async fn test_data_query_handler_error_sql_missing_function() {
         );
         pretty_assertions::assert_eq!(
             json!({
-                "message": "Error during planning: Invalid function 'foobar'.\nDid you mean 'floor'?"
+                "message": "Invalid function 'foobar'.\nDid you mean 'floor'?"
             }),
             body
         );
@@ -960,7 +1005,7 @@ async fn test_data_query_handler_error_sql_missing_function() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_query_handler_dataset_does_not_exist() {
+async fn test_data_query_handler_error_dataset_does_not_exist() {
     let harness = Harness::new().await;
 
     let client = async move {
@@ -986,7 +1031,7 @@ async fn test_data_query_handler_dataset_does_not_exist() {
         let body = res.json::<serde_json::Value>().await.unwrap();
         pretty_assertions::assert_eq!(
             json!({
-                "message": "Error during planning: table 'kamu.kamu.does_not_exist' not found"
+                "message": "table 'kamu.kamu.does_not_exist' not found"
             }),
             body
         );
@@ -999,7 +1044,7 @@ async fn test_data_query_handler_dataset_does_not_exist() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_query_handler_dataset_does_not_exist_bad_alias() {
+async fn test_data_query_handler_dataset_error_bad_alias() {
     let harness = Harness::new().await;
 
     let client = async move {

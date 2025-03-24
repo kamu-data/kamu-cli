@@ -228,7 +228,6 @@ impl From<ExportError> for CLIError {
     fn from(e: ExportError) -> Self {
         match e {
             ExportError::Internal(_) => Self::critical(e),
-            ExportError::DataFusionError(_) => Self::failure(e),
         }
     }
 }

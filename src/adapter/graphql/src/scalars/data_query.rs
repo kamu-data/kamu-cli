@@ -94,7 +94,7 @@ impl From<QueryError> for DataQueryResult {
         match e {
             QueryError::DatasetNotFound(e) => DataQueryResult::invalid_sql(e.to_string()),
             QueryError::DatasetBlockNotFound(e) => DataQueryResult::internal(e.to_string()),
-            QueryError::DataFusionError(e) => e.source.into(),
+            QueryError::BadQuery(e) => DataQueryResult::invalid_sql(e.to_string()),
             QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
             QueryError::Access(e) => DataQueryResult::unauthorized(e.to_string()),
             QueryError::Internal(e) => DataQueryResult::internal(e.to_string()),
@@ -104,12 +104,7 @@ impl From<QueryError> for DataQueryResult {
 
 impl From<DataFusionError> for DataQueryResult {
     fn from(e: DataFusionError) -> Self {
-        match e {
-            DataFusionError::SQL(e, _backtrace) => DataQueryResult::invalid_sql(e.to_string()),
-            DataFusionError::Plan(e) => DataQueryResult::invalid_sql(e),
-            DataFusionError::Diagnostic(_, source) => (*source).into(),
-            _ => DataQueryResult::internal(e.to_string()),
-        }
+        Self::from(QueryError::from(e))
     }
 }
 

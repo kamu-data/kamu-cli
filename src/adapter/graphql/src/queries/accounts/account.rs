@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::{
+    AccountNotFoundByIdError,
     AccountService,
     AccountServiceExt,
     CurrentAccountSubject,
@@ -65,7 +66,10 @@ impl Account {
         let account_name = account_service
             .find_account_name_by_id(&account_id)
             .await?
-            .expect("Account must exist");
+            .ok_or_else(|| AccountNotFoundByIdError {
+                account_id: account_id.clone(),
+            })
+            .int_err()?;
 
         Ok(Self::new(account_id.into(), account_name.into()))
     }

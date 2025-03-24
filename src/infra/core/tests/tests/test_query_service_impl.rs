@@ -532,11 +532,8 @@ async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &
         .await;
 
     assert_matches!(
-        result.map_err(strip_diagnostics),
-        Err(QueryError::DataFusionError(DataFusionError {
-            source: datafusion::common::DataFusionError::Plan(s),
-            ..
-        })) if s.contains("table 'kamu.kamu.foo' not found")
+        result,
+        Err(QueryError::BadQuery(e)) if e.to_string().contains("table 'kamu.kamu.foo' not found")
     );
 }
 
@@ -583,27 +580,10 @@ async fn test_sql_statement_not_found() {
         .await;
 
     assert_matches!(
-        result.map_err(strip_diagnostics),
-        Err(QueryError::DataFusionError(DataFusionError {
-            source: ::datafusion::common::DataFusionError::Plan(s),
-            ..
-        }))  if s.contains("table 'kamu.kamu.does_not_exist' not found")
+        result,
+        Err(QueryError::BadQuery(e))
+        if e.to_string().contains("table 'kamu.kamu.does_not_exist' not found")
     );
-}
-
-fn strip_diagnostics(err: QueryError) -> QueryError {
-    match err {
-        QueryError::DataFusionError(DataFusionError { source, backtrace }) => match source {
-            ::datafusion::error::DataFusionError::Diagnostic(_, inner) => {
-                QueryError::DataFusionError(DataFusionError {
-                    source: *inner,
-                    backtrace,
-                })
-            }
-            _ => QueryError::DataFusionError(DataFusionError { source, backtrace }),
-        },
-        _ => err,
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -687,7 +667,7 @@ async fn test_sql_statement_alias_not_found() {
         .await;
 
     assert_matches!(
-        result.map_err(strip_diagnostics),
+        result,
         Err(QueryError::DatasetNotFound(odf::DatasetNotFoundError {
             dataset_ref,
         })) if dataset_ref == odf::DatasetID::new_seeded_ed25519(b"does-not-exist").as_local_ref()

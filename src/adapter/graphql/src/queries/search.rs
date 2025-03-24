@@ -128,6 +128,8 @@ impl Search {
 
         let total_count = res.datasets.len();
 
+        // TODO: PERF: Avoid expensive resolution of one account at a time by including
+        // account information into dataset handles
         let mut nodes: Vec<SearchResultEx> = Vec::new();
         for hit in res.datasets {
             let Some(account) = Account::from_dataset_alias(ctx, &hit.handle.alias).await? else {

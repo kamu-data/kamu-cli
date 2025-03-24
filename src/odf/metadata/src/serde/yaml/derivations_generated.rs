@@ -623,6 +623,12 @@ pub enum MergeStrategyDef {
     Ledger(#[serde_as(as = "MergeStrategyLedgerDef")] MergeStrategyLedger),
     #[serde(alias = "snapshot")]
     Snapshot(#[serde_as(as = "MergeStrategySnapshotDef")] MergeStrategySnapshot),
+    #[serde(alias = "changelogStream", alias = "changelogstream")]
+    ChangelogStream(
+        #[serde_as(as = "MergeStrategyChangelogStreamDef")] MergeStrategyChangelogStream,
+    ),
+    #[serde(alias = "upsertStream", alias = "upsertstream")]
+    UpsertStream(#[serde_as(as = "MergeStrategyUpsertStreamDef")] MergeStrategyUpsertStream),
 }
 
 implement_serde_as!(MergeStrategy, MergeStrategyDef, "MergeStrategyDef");
@@ -643,6 +649,26 @@ implement_serde_as!(
     MergeStrategyAppend,
     MergeStrategyAppendDef,
     "MergeStrategyAppendDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyChangelogStream
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "MergeStrategyChangelogStream")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct MergeStrategyChangelogStreamDef {
+    pub primary_key: Vec<String>,
+}
+
+implement_serde_as!(
+    MergeStrategyChangelogStream,
+    MergeStrategyChangelogStreamDef,
+    "MergeStrategyChangelogStreamDef"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -684,6 +710,26 @@ implement_serde_as!(
     MergeStrategySnapshot,
     MergeStrategySnapshotDef,
     "MergeStrategySnapshotDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MergeStrategyUpsertStream
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "MergeStrategyUpsertStream")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct MergeStrategyUpsertStreamDef {
+    pub primary_key: Vec<String>,
+}
+
+implement_serde_as!(
+    MergeStrategyUpsertStream,
+    MergeStrategyUpsertStreamDef,
+    "MergeStrategyUpsertStreamDef"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

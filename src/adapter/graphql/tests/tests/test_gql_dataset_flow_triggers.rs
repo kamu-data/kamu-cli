@@ -575,26 +575,12 @@ async fn test_batching_trigger_validation() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    for test_case in [
-        (
-            0,
-            30,
-            "MINUTES",
-            "Minimum records to await must be a positive number",
-        ),
-        (
-            1,
-            0,
-            "MINUTES",
-            "Minimum interval to await should be positive",
-        ),
-        (
-            1,
-            25,
-            "HOURS",
-            "Maximum interval to await should not exceed 24 hours",
-        ),
-    ] {
+    for test_case in [(
+        1,
+        25,
+        "HOURS",
+        "Maximum interval to await should not exceed 24 hours",
+    )] {
         let mutation_code = FlowTriggerHarness::set_trigger_batching_mutation(
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",

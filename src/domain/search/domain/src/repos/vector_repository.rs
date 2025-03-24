@@ -28,7 +28,7 @@ pub trait VectorRepository: Send + Sync {
     /// authorization.
     async fn search_points(
         &self,
-        vec: Vec<f32>,
+        vec: &[f32],
         opts: SearchPointsOpts,
     ) -> Result<Vec<FoundPoint>, InternalError>;
 

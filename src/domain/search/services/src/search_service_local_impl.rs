@@ -17,7 +17,23 @@ use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+pub struct SearchServiceLocalConfig {
+    /// The multiplication factor that determines how many more points will be
+    /// requested from vector store to compensate for filtering out results that
+    /// may be inaccessible to user.
+    pub overfetch_factor: f32,
+
+    /// The additive value that determines how many more points will be
+    /// requested from vector store to compensate for filtering out results that
+    /// may be inaccessible to user.
+    pub overfetch_amount: usize,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct SearchServiceLocalImpl {
+    config: Arc<SearchServiceLocalConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
@@ -29,20 +45,15 @@ pub struct SearchServiceLocalImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn SearchServiceLocal)]
 impl SearchServiceLocalImpl {
-    /// Vector store returns results containing all datasets including private,
-    /// so we need to apply access policies to filter the inaccessible ones.
-    /// As we filter, we are likely to end up with less results than was
-    /// requested. To produce the desired number of results without querying too
-    /// many times we request more points than was originally asked for.
-    const OVERFETCH_FACTOR: usize = 2;
-
     pub fn new(
+        config: Arc<SearchServiceLocalConfig>,
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         embeddings_encoder: Option<Arc<dyn EmbeddingsEncoder>>,
         vector_repo: Option<Arc<dyn VectorRepository>>,
     ) -> Self {
         Self {
+            config,
             dataset_registry,
             dataset_action_authorizer,
             embeddings_encoder,
@@ -55,6 +66,7 @@ impl SearchServiceLocalImpl {
 
 #[async_trait::async_trait]
 impl SearchServiceLocal for SearchServiceLocalImpl {
+    #[tracing::instrument(level = "info", skip_all)]
     async fn search_natural_language(
         &self,
         prompt: &str,
@@ -76,80 +88,114 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             .next()
             .unwrap();
 
-        // Search for nearby points
-        let points = vector_repo
-            .search_points(
-                prompt_vec,
-                SearchPointsOpts {
-                    skip: 0,
-                    limit: options.limit * Self::OVERFETCH_FACTOR,
-                },
-            )
-            .await
-            .int_err()?;
+        // Vector store returns results containing all datasets including
+        // private, so we need to apply access policies to filter the
+        // inaccessible ones. As we filter, we are likely to end up
+        // with less results than was requested. To produce the desired
+        // number of results without querying too many times we request
+        // more points than was originally asked for.
+        let mut points_to_skip = 0;
 
-        // Extract dataset IDs from point payload
-        let points_with_dataset_ids: Vec<(FoundPoint, odf::DatasetID)> = points
-            .into_iter()
-            .map(|p| match p.payload["id"].as_str() {
-                Some(sid) => odf::DatasetID::from_did_str(sid)
-                    .int_err()
-                    .map(|id| (p, id)),
-                None => Err(InternalError::new(format!(
-                    "Point {} does not have associated dataset ID",
-                    p.point_id
-                ))),
-            })
-            .try_collect()?;
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_precision_loss,
+            clippy::cast_sign_loss
+        )]
+        let points_limit = (options.limit as f32 * self.config.overfetch_factor) as usize
+            + self.config.overfetch_amount;
 
-        // Resolve dataset handles
-        let dataset_handles_res = self
-            .dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(
-                points_with_dataset_ids
-                    .iter()
-                    .map(|(_pooint, id)| id.clone())
-                    .collect(),
-            )
-            .await
-            .int_err()?;
+        // We will query vector store in a loop until desired number of results was
+        // reached or search space was exhausted.
+        let mut datasets: Vec<SearchLocalResultDataset> = Vec::new();
 
-        let dataset_handles = dataset_handles_res.resolved_handles;
+        loop {
+            // Search for nearby points
+            let points = vector_repo
+                .search_points(
+                    &prompt_vec,
+                    SearchPointsOpts {
+                        skip: points_to_skip,
+                        limit: points_limit,
+                    },
+                )
+                .await
+                .int_err()?;
 
-        // Not being able to resolve an ID can be simply due to eventual consistency or
-        // can be a sign of a bug, so we log it
-        for (id, _) in dataset_handles_res.unresolved_datasets {
-            tracing::warn!(
-                dataset_id = %id,
-                "Ignoring point that refers to a dataset not present in the registry",
-            );
-        }
+            // Adjust skip in case we'll need to make another request
+            points_to_skip += points_limit;
+            let has_more_points = points.len() >= points_limit;
 
-        // Filter by accessibility
-        let dataset_handles = self
-            .dataset_action_authorizer
-            .filter_datasets_allowing(dataset_handles, kamu_core::auth::DatasetAction::Read)
-            .await?;
+            // Extract dataset IDs from point payload
+            let points_with_dataset_ids: Vec<(FoundPoint, odf::DatasetID)> = points
+                .into_iter()
+                .map(|p| match p.payload["dataset_id"].as_str() {
+                    Some(sid) => odf::DatasetID::from_did_str(sid)
+                        .int_err()
+                        .map(|id| (p, id)),
+                    None => Err(InternalError::new(format!(
+                        "Point {} does not have associated dataset ID",
+                        p.point_id
+                    ))),
+                })
+                .try_collect()?;
 
-        // Merge found points with accessible handles
-        let dataset_handles_by_id: std::collections::BTreeMap<odf::DatasetID, odf::DatasetHandle> =
-            dataset_handles
+            // Resolve dataset handles
+            let dataset_handles_res = self
+                .dataset_registry
+                .resolve_multiple_dataset_handles_by_ids(
+                    points_with_dataset_ids
+                        .iter()
+                        .map(|(_pooint, id)| id.clone())
+                        .collect(),
+                )
+                .await
+                .int_err()?;
+
+            let dataset_handles = dataset_handles_res.resolved_handles;
+
+            // Not being able to resolve an ID can be simply due to eventual consistency or
+            // can be a sign of a bug, so we log it
+            for (id, _) in dataset_handles_res.unresolved_datasets {
+                tracing::warn!(
+                    dataset_id = %id,
+                    "Ignoring point that refers to a dataset not present in the registry",
+                );
+            }
+
+            // Filter by accessibility
+            let dataset_handles = self
+                .dataset_action_authorizer
+                .filter_datasets_allowing(dataset_handles, kamu_core::auth::DatasetAction::Read)
+                .await?;
+
+            // Merge found points with accessible handles
+            let dataset_handles_by_id: std::collections::BTreeMap<
+                odf::DatasetID,
+                odf::DatasetHandle,
+            > = dataset_handles
                 .into_iter()
                 .map(|h| (h.id.clone(), h))
                 .collect();
 
-        // Note: We trim per requested limit to compensate for overfetch
-        let datasets: Vec<SearchLocalResultDataset> = points_with_dataset_ids
-            .into_iter()
-            .filter_map(|(p, id)| match dataset_handles_by_id.get(&id) {
-                None => None,
-                Some(handle) => Some(SearchLocalResultDataset {
-                    handle: handle.clone(),
-                    score: p.score,
-                }),
-            })
-            .take(options.limit)
-            .collect();
+            // Note: We trim to compensate for overfetch
+            datasets.extend(
+                points_with_dataset_ids
+                    .into_iter()
+                    .filter_map(|(p, id)| match dataset_handles_by_id.get(&id) {
+                        None => None,
+                        Some(handle) => Some(SearchLocalResultDataset {
+                            handle: handle.clone(),
+                            score: p.score,
+                        }),
+                    })
+                    .take(options.limit - datasets.len()),
+            );
+
+            // Break if we reached desired limit or exchausted the search
+            if datasets.len() >= options.limit || !has_more_points {
+                break;
+            }
+        }
 
         Ok(SearchLocalNatLangResult { datasets })
     }

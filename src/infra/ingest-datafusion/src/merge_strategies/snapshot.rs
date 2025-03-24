@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use datafusion::common::DFSchema;
-use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{LogicalPlanBuilder, Operator, SortExpr};
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
@@ -106,14 +105,12 @@ impl MergeStrategySnapshot {
                 .alias(rank_col)])
             .int_err()?
             .filter(
-                col(Column::from_name(rank_col)).eq(lit(1)).and(or(
+                col(Column::from_name(rank_col)).eq(lit(1)).and(
                     // TODO: Cast to `u8` after Spark is updated
                     // See: https://github.com/kamu-data/kamu-cli/issues/445
                     col(Column::from_name(&self.vocab.operation_type_column))
-                        .eq(lit(Op::Append as i32)),
-                    col(Column::from_name(&self.vocab.operation_type_column))
-                        .eq(lit(Op::CorrectTo as i32)),
-                )),
+                        .not_eq(lit(Op::Retract as i32)),
+                ),
             )
             .int_err()?
             .without_columns(&[rank_col])
@@ -388,22 +385,5 @@ impl MergeStrategy for MergeStrategySnapshot {
                 col(Column::from_name(&self.vocab.operation_type_column)).sort(true, true),
             ))
             .collect()
-    }
-}
-
-/// Helps us capture backtraces as close to the point as possible
-#[derive(Debug, thiserror::Error)]
-#[error("{0}")]
-struct DataFusionErrorWrapped(InternalError);
-
-impl From<DataFusionError> for DataFusionErrorWrapped {
-    fn from(value: DataFusionError) -> Self {
-        Self(value.int_err())
-    }
-}
-
-impl From<DataFusionErrorWrapped> for MergeError {
-    fn from(value: DataFusionErrorWrapped) -> Self {
-        Self::Internal(value.0)
     }
 }

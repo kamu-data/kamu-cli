@@ -119,6 +119,7 @@ impl PushIngestExecutorImpl {
                     ingest_common::preprocess_default(
                         df,
                         &args.push_source.read,
+                        &args.push_source.merge,
                         data_writer.vocab(),
                         &args.opts.schema_inference,
                     )

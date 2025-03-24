@@ -48,9 +48,7 @@ pub async fn dataset_tail_handler(
         .await
         .map_err(|e| match e {
             QueryError::DatasetNotFound(e) => ApiError::not_found(e),
-            QueryError::DatasetBlockNotFound(_) | QueryError::DataFusionError(_) => {
-                e.int_err().api_err()
-            }
+            QueryError::DatasetBlockNotFound(_) | QueryError::BadQuery(_) => e.int_err().api_err(),
             QueryError::DatasetSchemaNotAvailable(e) => ApiError::no_content(e),
             QueryError::Access(_) => ApiError::not_found_without_reason(),
             QueryError::Internal(e) => e.api_err(),

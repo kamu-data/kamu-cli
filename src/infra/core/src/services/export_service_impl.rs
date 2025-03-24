@@ -100,7 +100,8 @@ impl ExportService for ExportServiceImpl {
                     .write_json(path_str, DataFrameWriteOptions::new(), None)
                     .await
             }
-        }?;
+        }
+        .int_err()?;
 
         self.records_written(&result)
     }

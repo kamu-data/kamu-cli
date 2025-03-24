@@ -92,11 +92,22 @@ impl DataWriterDataFusion {
     }
 
     fn validate_input(&self, df: &DataFrame) -> Result<(), BadInputSchemaError> {
-        for system_column in [
+        let mut system_columns = vec![
             &self.meta.vocab.offset_column,
-            &self.meta.vocab.operation_type_column,
             &self.meta.vocab.system_time_column,
-        ] {
+        ];
+
+        match &self.meta.merge_strategy {
+            odf::metadata::MergeStrategy::Append(_)
+            | odf::metadata::MergeStrategy::Ledger(_)
+            | odf::metadata::MergeStrategy::Snapshot(_) => {
+                system_columns.push(&self.meta.vocab.operation_type_column);
+            }
+            odf::metadata::MergeStrategy::ChangelogStream(_)
+            | odf::metadata::MergeStrategy::UpsertStream(_) => (),
+        }
+
+        for system_column in system_columns {
             if df.schema().has_column_with_unqualified_name(system_column) {
                 return Err(BadInputSchemaError::new(
                     format!(
@@ -652,11 +663,17 @@ impl DataWriterDataFusion {
             odf::metadata::MergeStrategy::Append(_cfg) => {
                 Arc::new(MergeStrategyAppend::new(vocab.clone()))
             }
+            odf::metadata::MergeStrategy::ChangelogStream(cfg) => {
+                Arc::new(MergeStrategyChangelogStream::new(vocab.clone(), cfg))
+            }
             odf::metadata::MergeStrategy::Ledger(cfg) => {
                 Arc::new(MergeStrategyLedger::new(vocab.clone(), cfg))
             }
             odf::metadata::MergeStrategy::Snapshot(cfg) => {
                 Arc::new(MergeStrategySnapshot::new(vocab.clone(), cfg))
+            }
+            odf::metadata::MergeStrategy::UpsertStream(cfg) => {
+                Arc::new(MergeStrategyUpsertStream::new(vocab.clone(), cfg))
             }
         }
     }

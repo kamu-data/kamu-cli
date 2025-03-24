@@ -22,6 +22,21 @@ Recommendation: for ease of reading, use the following order:
 - Private Datasets:
   - GQL: Correct processing of access permissions when viewing flows of another account
 
+## [0.229.0] - 2025-03-24
+### Added
+- Experimental support for `ChangelogStream` and `UpsertStream` ODF merge strategies.
+
+## [0.228.1] - 2025-03-23
+### Added
+- Semantic search:
+  - More configuration options for indexing, allowing to skip datasets without descriptions or no data.
+  - Overfetch is now configurable
+  - Service will make repeated queries to the vector store to fill the requested results page size.
+### Changed
+- Flow: Updated the `BatchingRule` trigger to accept 0 for both properties(`min_records_to_await` and `max_batching_interval`), enabling dependency flow execution even when no data is added to the root dataset.
+### Fixed
+- HTTP & GQL API: Fixed internal error when query contains an unknown column
+
 ## [0.228.0] - 2025-03-19
 ### Added
 - DB: utilities for working with bind parameter placeholders
