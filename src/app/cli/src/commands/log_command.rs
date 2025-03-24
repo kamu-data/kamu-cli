@@ -16,7 +16,7 @@ use chrono::prelude::*;
 use console::style;
 use futures::{StreamExt, TryStreamExt};
 use kamu::domain::*;
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
 
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
@@ -93,8 +93,7 @@ impl LogCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LogCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // TODO: Request not all
-        //
+        // TODO: Private Datasets: request not all
         //       Private Datasets: Checking dataset accessibility in `kamu` subcommands
         //       (multi-tenant workspace)
         //       https://github.com/kamu-data/kamu-cli/issues/1055
@@ -124,15 +123,7 @@ impl Command for LogCommand {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
             .resolve_dataset_for_action_by_ref(&self.dataset_ref, auth::DatasetAction::Read)
-            .await
-            .map_err(|e| {
-                use RebacDatasetRefUnresolvedError as E;
-                match e {
-                    E::NotFound(e) => CLIError::failure(e),
-                    E::Access(e) => CLIError::failure(e),
-                    e @ E::Internal(_) => CLIError::critical(e),
-                }
-            })?;
+            .await?;
 
         use odf::dataset::{MetadataChainExt, TryStreamExtExt};
 
