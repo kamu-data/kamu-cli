@@ -12,7 +12,6 @@ use indoc::indoc;
 use kamu::*;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME};
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
@@ -187,7 +186,6 @@ impl DatasetMetadataHarness {
                 .add::<EngineProvisionerNull>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<DataFormatRegistryImpl>()
-                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(MockAuthenticationService::built_in())
                 .bind::<dyn AuthenticationService, MockAuthenticationService>();
 
