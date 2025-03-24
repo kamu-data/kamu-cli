@@ -654,7 +654,6 @@ impl DependencyGraphHarness {
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CommitDatasetEventUseCaseImpl>()
         .add::<DeleteDatasetUseCaseImpl>()
-        .add::<ViewDatasetUseCaseImpl>()
         .add::<FakeConnectingDatasetEntryWriter>()
         .add::<CreateDatasetUseCaseHelper>()
         .add::<DatasetReferenceServiceImpl>()

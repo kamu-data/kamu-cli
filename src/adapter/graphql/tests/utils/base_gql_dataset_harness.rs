@@ -60,7 +60,6 @@ impl BaseGQLDatasetHarness {
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
-            .add::<ViewDatasetUseCaseImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<DatasetReferenceServiceImpl>()
             .add::<InMemoryDatasetReferenceRepository>()

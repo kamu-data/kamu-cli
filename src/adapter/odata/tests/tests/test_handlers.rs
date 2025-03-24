@@ -415,8 +415,7 @@ impl TestHarness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<LoginPasswordAuthProvider>()
                 .add::<AccountServiceImpl>()
-                .add::<InMemoryAccountRepository>()
-                .add::<ViewDatasetUseCaseImpl>();
+                .add::<InMemoryAccountRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

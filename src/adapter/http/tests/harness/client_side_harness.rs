@@ -172,7 +172,6 @@ impl ClientSideHarness {
         b.add::<CreateDatasetUseCaseImpl>();
         b.add::<PullDatasetUseCaseImpl>();
         b.add::<PushDatasetUseCaseImpl>();
-        b.add::<ViewDatasetUseCaseImpl>();
 
         b.add::<DatasetReferenceServiceImpl>();
         b.add::<InMemoryDatasetReferenceRepository>();
