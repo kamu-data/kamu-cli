@@ -20,13 +20,12 @@ use serde_with::{serde_as, skip_serializing_none};
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct DatasetSummary {
     pub id: DatasetID,
     #[serde_as(as = "DatasetKindDef")]
     pub kind: DatasetKind,
     pub last_block_hash: Multihash,
-    pub dependencies: Vec<DatasetID>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,

@@ -150,17 +150,6 @@ where
                     increment.seen_id.get_or_insert(seed.dataset_id);
                     increment.seen_kind.get_or_insert(seed.dataset_kind);
                 }
-                MetadataEvent::SetTransform(set_transform) => {
-                    if increment.seen_dependencies.is_none() {
-                        increment.seen_dependencies = Some(
-                            set_transform
-                                .inputs
-                                .into_iter()
-                                .map(|i| i.dataset_ref.id().cloned().unwrap())
-                                .collect(),
-                        );
-                    }
-                }
                 MetadataEvent::AddData(add_data) => {
                     increment.seen_last_pulled.get_or_insert(block.system_time);
 
@@ -194,6 +183,7 @@ where
                 | MetadataEvent::SetInfo(_)
                 | MetadataEvent::SetLicense(_)
                 | MetadataEvent::SetVocab(_)
+                | MetadataEvent::SetTransform(_)
                 | MetadataEvent::SetPollingSource(_)
                 | MetadataEvent::DisablePollingSource(_)
                 | MetadataEvent::AddPushSource(_)
@@ -320,7 +310,6 @@ struct UpdateSummaryIncrement {
     seen_id: Option<DatasetID>,
     seen_kind: Option<DatasetKind>,
     seen_head: Option<Multihash>,
-    seen_dependencies: Option<Vec<DatasetID>>,
     seen_last_pulled: Option<DateTime<Utc>>,
     // TODO: No longer needs to be incremental - can be based on `prevOffset`
     seen_num_records: u64,
@@ -340,7 +329,6 @@ impl UpdateSummaryIncrement {
             id: self.seen_id.unwrap(),
             kind: self.seen_kind.unwrap(),
             last_block_hash: self.seen_head.unwrap(),
-            dependencies: self.seen_dependencies.unwrap_or_default(),
             last_pulled: self.seen_last_pulled,
             num_records: self.seen_num_records,
             data_size: self.seen_data_size,
@@ -353,7 +341,6 @@ impl UpdateSummaryIncrement {
             id: self.seen_id.unwrap_or(summary.id),
             kind: self.seen_kind.unwrap_or(summary.kind),
             last_block_hash: self.seen_head.unwrap(),
-            dependencies: self.seen_dependencies.unwrap_or(summary.dependencies),
             last_pulled: self.seen_last_pulled.or(summary.last_pulled),
             num_records: summary.num_records + self.seen_num_records,
             data_size: summary.data_size + self.seen_data_size,

@@ -22,6 +22,7 @@ use kamu_core::*;
 pub struct ProvenanceServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
 #[component(pub)]
@@ -30,10 +31,12 @@ impl ProvenanceServiceImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
         Self {
             dataset_registry,
             rebac_dataset_registry_facade,
+            dependency_graph_service,
         }
     }
 
@@ -54,13 +57,22 @@ impl ProvenanceServiceImpl {
                 }
             })?;
 
+        use tokio_stream::StreamExt;
+        let upstream_dependencies = self
+            .dependency_graph_service
+            .get_upstream_dependencies(resolved_dataset.get_id())
+            .await
+            .int_err()?
+            .collect::<Vec<_>>()
+            .await;
+
         let summary = resolved_dataset
             .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .int_err()?;
 
         let mut resolved_inputs = Vec::new();
-        for input_id in &summary.dependencies {
+        for input_id in upstream_dependencies {
             // TODO: Private Datasets: check inputs
             //       Private Datasets: Checking dataset accessibility in `kamu` subcommands
             //       (multi-tenant workspace)
@@ -78,7 +90,7 @@ impl ProvenanceServiceImpl {
         }
 
         let dataset_info = NodeInfo::Local {
-            id: summary.id.clone(),
+            id: dataset_handle.id.clone(),
             alias: dataset_handle.alias.clone(),
             kind: summary.kind,
             dependencies: &resolved_inputs,

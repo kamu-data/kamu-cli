@@ -68,19 +68,44 @@ impl DependencyGraphIndexer {
             let span =
                 tracing::debug_span!("Scanning dataset dependencies", dataset = %dataset_handle);
 
-            let summary = self
+            let dataset = self
                 .dataset_registry
                 .get_dataset_by_handle(&dataset_handle)
-                .await
-                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .instrument(span)
+                .await;
+
+            // Important: read from storage, not from database cache!
+            let head = dataset
+                .as_metadata_chain()
+                .as_uncached_ref_repo()
+                .get(odf::BlockRef::Head.as_str())
                 .await
                 .int_err()?;
 
-            let upstream_dependencies: Vec<_> = summary.dependencies.iter().collect();
+            let mut upstream_ids = Vec::new();
+
+            let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new();
+
+            use odf::dataset::MetadataChainExt;
+            dataset
+                .as_metadata_chain()
+                .accept_by_hash(&mut [&mut set_transform_visitor], &head)
+                .await
+                .int_err()?;
+
+            if let Some(event) = set_transform_visitor.into_event() {
+                for new_input in &event.inputs {
+                    if let Some(id) = new_input.dataset_ref.id() {
+                        upstream_ids.push(id.clone());
+                    }
+                }
+            }
 
             self.dataset_dependency_repo
-                .add_upstream_dependencies(&dataset_handle.id, &upstream_dependencies)
+                .add_upstream_dependencies(
+                    &dataset_handle.id,
+                    &(upstream_ids.iter().collect::<Vec<_>>()),
+                )
                 .await
                 .int_err()?;
         }

@@ -180,18 +180,20 @@ impl VerifyCommand {
                 continue;
             }
 
-            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
-            let summary = resolved_dataset
-                .get_summary(odf::dataset::GetSummaryOpts::default())
+            let upstream_dependencies: Vec<odf::DatasetID> = self
+                .dependency_graph_service
+                .get_upstream_dependencies(&hdl.id)
                 .await
-                .unwrap();
+                .unwrap()
+                .collect()
+                .await;
 
             let mut current_missed_dependencies = vec![];
 
-            for dependency in summary.dependencies {
+            for dependency in upstream_dependencies {
                 if self
                     .dataset_registry
-                    .resolve_dataset_handle_by_ref(&odf::DatasetRef::ID(dependency.clone()))
+                    .resolve_dataset_handle_by_ref(&dependency.as_local_ref())
                     .await
                     .is_err()
                 {

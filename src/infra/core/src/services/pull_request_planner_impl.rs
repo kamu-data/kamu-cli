@@ -23,6 +23,7 @@ use crate::SyncRequestBuilder;
 
 pub struct PullRequestPlannerImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
     transform_request_planner: Arc<dyn TransformRequestPlanner>,
     sync_request_builder: Arc<SyncRequestBuilder>,
@@ -34,6 +35,7 @@ pub struct PullRequestPlannerImpl {
 impl PullRequestPlannerImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
         transform_request_planner: Arc<dyn TransformRequestPlanner>,
         sync_request_builder: Arc<SyncRequestBuilder>,
@@ -41,6 +43,7 @@ impl PullRequestPlannerImpl {
     ) -> Self {
         Self {
             dataset_registry,
+            dependency_graph_service,
             remote_alias_registry,
             transform_request_planner,
             sync_request_builder,
@@ -63,6 +66,7 @@ impl PullRequestPlannerImpl {
 
         let mut depth_first_traversal = PullGraphDepthFirstTraversal::new(
             self.dataset_registry.clone(),
+            self.dependency_graph_service.clone(),
             self.remote_alias_registry.clone(),
             self.current_account_subject.clone(),
             options,
@@ -104,6 +108,7 @@ impl PullRequestPlannerImpl {
     ) -> (Vec<PullItem>, Vec<PullResponse>) {
         let mut depth_first_traversal = PullGraphDepthFirstTraversal::new(
             self.dataset_registry.clone(),
+            self.dependency_graph_service.clone(),
             self.remote_alias_registry.clone(),
             self.current_account_subject.clone(),
             options,
@@ -386,6 +391,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
 
 struct PullGraphDepthFirstTraversal<'a> {
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
     current_account_subject: Arc<CurrentAccountSubject>,
     options: &'a PullOptions,
@@ -396,6 +402,7 @@ struct PullGraphDepthFirstTraversal<'a> {
 impl<'a> PullGraphDepthFirstTraversal<'a> {
     fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
         current_account_subject: Arc<CurrentAccountSubject>,
         options: &'a PullOptions,
@@ -403,6 +410,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     ) -> Self {
         Self {
             dataset_registry,
+            dependency_graph_service,
             remote_alias_registry,
             current_account_subject,
             options,
@@ -477,7 +485,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
 
             // Plan up-stream dependencies first
             let max_dep_depth = if traverse_dependencies {
-                self.traverse_upstream_datasets(summary).await?
+                self.traverse_upstream_datasets(&local_handle.id).await?
             } else {
                 // Without scanning upstreams, decide on depth based on Root/Derived kind.
                 // The exact depth is not important, as long as we keep `depth=>0` for derived
@@ -746,13 +754,22 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     // TODO: consider using data from dependency graph
     async fn traverse_upstream_datasets(
         &mut self,
-        summary: odf::DatasetSummary,
+        dataset_id: &odf::DatasetID,
     ) -> Result<i32, PullError> {
         // TODO: EVO: Should be accounting for historical dependencies, not only current
         // ones?
         let mut max_dep_depth = -1;
 
-        for dependency_id in summary.dependencies {
+        use tokio_stream::StreamExt;
+        let upstream_dependencies = self
+            .dependency_graph_service
+            .get_upstream_dependencies(dataset_id)
+            .await
+            .int_err()?
+            .collect::<Vec<_>>()
+            .await;
+
+        for dependency_id in upstream_dependencies {
             tracing::debug!(%dependency_id, "Descending into dependency");
 
             let depth = self

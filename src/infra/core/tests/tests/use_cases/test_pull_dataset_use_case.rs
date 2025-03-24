@@ -16,6 +16,8 @@ use kamu::*;
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::CreateDatasetResult;
+use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_datasets_services::{DependencyGraphIndexer, DependencyGraphServiceImpl};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
@@ -348,6 +350,8 @@ async fn test_pull_multi_recursive() {
         )
         .await;
 
+    harness.index_dataset_dependencies().await;
+
     let pull_responses = harness
         .use_case
         .execute_multi(
@@ -522,6 +526,8 @@ async fn test_pull_all_owned() {
         )
         .await;
 
+    harness.index_dataset_dependencies().await;
+
     let pull_responses = harness
         .use_case
         .execute_all_owned(PullOptions::default(), None)
@@ -622,6 +628,8 @@ async fn test_pull_authorization_issue() {
     let bar = harness.create_root_dataset(&alias_bar).await;
     let _baz = harness.create_root_dataset(&alias_baz).await;
 
+    harness.index_dataset_dependencies().await;
+
     let mut pull_responses = harness
         .use_case
         .execute_multi(
@@ -656,6 +664,7 @@ static REMOTE_REPO_NAME_STR: &str = "remote";
 struct PullUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PullDatasetUseCase>,
+    dependency_graph_indexer: Arc<DependencyGraphIndexer>,
     remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     remote_repo_name: odf::RepoName,
     remote_tmp_dir: TempDir,
@@ -691,10 +700,10 @@ impl PullUseCaseHarness {
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(IpfsGateway::default())
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
+            .add::<DependencyGraphIndexer>()
             .build();
-
-        let use_case = catalog.get_one().unwrap();
-        let remote_aliases_registry = catalog.get_one().unwrap();
 
         let remote_tmp_dir = tempfile::tempdir().unwrap();
         let remote_repo_url = Url::from_directory_path(remote_tmp_dir.path()).unwrap();
@@ -707,8 +716,9 @@ impl PullUseCaseHarness {
 
         Self {
             base_use_case_harness,
-            use_case,
-            remote_aliases_registry,
+            use_case: catalog.get_one().unwrap(),
+            dependency_graph_indexer: catalog.get_one().unwrap(),
+            remote_aliases_registry: catalog.get_one().unwrap(),
             remote_repo_name,
             remote_tmp_dir,
         }
@@ -737,6 +747,14 @@ impl PullUseCaseHarness {
         tokio::fs::create_dir_all(&dst_path).await.unwrap();
         let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
         fs_extra::dir::copy(src_path, dst_path, &copy_options).unwrap();
+    }
+
+    async fn index_dataset_dependencies(&self) {
+        use init_on_startup::InitOnStartup;
+        self.dependency_graph_indexer
+            .run_initialization()
+            .await
+            .unwrap();
     }
 }
 

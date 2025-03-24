@@ -21,9 +21,6 @@ fn serde_dataset_summary() {
           id: did:odf:fed01626f6f21b8373800626f6f21b837380020f6f606070000008d6edc2eb877e8cc
           kind: Root
           lastBlockHash: f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7
-          dependencies:
-          - did:odf:fed01666f6fb3b7370000666f6fb3b737000060f6f60600000000895cddbcb7f7b8cc
-          - did:odf:fed01626172b130390000626172b1303900002016260700000000508ebebd3079f00e
           lastPulled: 2020-01-01T12:00:00Z
           numRecords: 100
           dataSize: 1024
@@ -43,10 +40,6 @@ fn serde_dataset_summary() {
                 "zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr",
             )
             .unwrap(),
-            dependencies: vec![
-                odf::DatasetID::new_seeded_ed25519(b"foo"),
-                odf::DatasetID::new_seeded_ed25519(b"bar"),
-            ],
             last_pulled: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
             num_records: 100,
             data_size: 1024,

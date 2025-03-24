@@ -22,13 +22,18 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{DatasetReferenceMessage, MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE};
-use kamu_datasets_inmem::InMemoryDatasetReferenceRepository;
+use kamu_datasets_inmem::{
+    InMemoryDatasetDependencyRepository,
+    InMemoryDatasetReferenceRepository,
+};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetEntryWriter,
     DatasetReferenceServiceImpl,
+    DependencyGraphIndexer,
+    DependencyGraphServiceImpl,
     MockDatasetEntryWriter,
 };
 use messaging_outbox::{register_message_dispatcher, ConsumerFilter, Outbox, OutboxImmediateImpl};
@@ -270,6 +275,8 @@ async fn test_pull_batching_chain() {
     )
     .await;
 
+    harness.index_dataset_dependencies().await;
+
     assert_eq!(
         harness
             .pull(refs!["c"], PullOptions::default())
@@ -325,6 +332,8 @@ async fn test_pull_batching_chain_multi_tenant() {
         ],
     )
     .await;
+
+    harness.index_dataset_dependencies().await;
 
     assert_eq!(
         harness
@@ -387,6 +396,8 @@ async fn test_pull_batching_complex() {
         ],
     )
     .await;
+
+    harness.index_dataset_dependencies().await;
 
     assert_eq!(
         harness
@@ -454,6 +465,7 @@ async fn test_pull_batching_complex_with_remote() {
         names!("e"),
     )
     .await;
+
     create_graph(
         harness.dataset_registry(),
         harness.dataset_storage_unit_writer(),
@@ -465,6 +477,8 @@ async fn test_pull_batching_complex_with_remote() {
         ],
     )
     .await;
+
+    harness.index_dataset_dependencies().await;
 
     // Add remote pull alias to E
     harness
@@ -817,6 +831,7 @@ struct PullTestHarness {
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
+    dependency_graph_indexer: Arc<DependencyGraphIndexer>,
     tenancy_config: TenancyConfig,
 }
 
@@ -860,7 +875,10 @@ impl PullTestHarness {
             .add_value(mock_dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()
-            .add::<InMemoryDatasetReferenceRepository>();
+            .add::<InMemoryDatasetReferenceRepository>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
+            .add::<DependencyGraphIndexer>();
 
         register_message_dispatcher::<DatasetReferenceMessage>(
             &mut b,
@@ -877,6 +895,7 @@ impl PullTestHarness {
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_request_planner: catalog.get_one().unwrap(),
+            dependency_graph_indexer: catalog.get_one().unwrap(),
             tenancy_config,
         }
     }
@@ -953,6 +972,14 @@ impl PullTestHarness {
             .get_remote_aliases(&hdl)
             .await
             .unwrap()
+    }
+
+    async fn index_dataset_dependencies(&self) {
+        use init_on_startup::InitOnStartup;
+        self.dependency_graph_indexer
+            .run_initialization()
+            .await
+            .unwrap();
     }
 }
 
