@@ -35,22 +35,22 @@ pub trait RebacDatasetRegistryFacade: Send + Sync {
         action: auth::DatasetAction,
     ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError>;
 
-    async fn access_multi_dataset_refs(
+    async fn classify_dataset_refs_by_allowance(
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
         action: auth::DatasetAction,
-    ) -> Result<AccessMultiDatasetRefsResponse, InternalError>;
+    ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct AccessMultiDatasetRefsResponse {
+pub struct ClassifyDatasetRefsByAllowanceResponse {
     pub accessible_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
     pub inaccessible_refs: Vec<(odf::DatasetRef, RebacDatasetRefUnresolvedError)>,
 }
 
-impl AccessMultiDatasetRefsResponse {
+impl ClassifyDatasetRefsByAllowanceResponse {
     pub fn into_inaccessible_input_datasets_message(
         self,
         dataset_ref_alias_map: &HashMap<&odf::DatasetRef, &String>,

@@ -51,7 +51,7 @@ impl CommitDatasetEventUseCaseImpl {
 
             let access_multi_response = self
                 .rebac_dataset_registry_facade
-                .access_multi_dataset_refs(inputs_dataset_refs, auth::DatasetAction::Read)
+                .classify_dataset_refs_by_allowance(inputs_dataset_refs, auth::DatasetAction::Read)
                 .await?;
 
             if !access_multi_response.inaccessible_refs.is_empty() {

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_auth_rebac::{
-    AccessMultiDatasetRefsResponse,
+    ClassifyDatasetRefsByAllowanceResponse,
     RebacDatasetIdUnresolvedError,
     RebacDatasetRefUnresolvedError,
     RebacDatasetRegistryFacade,
@@ -117,12 +117,12 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         Ok(resolved_dataset)
     }
 
-    async fn access_multi_dataset_refs(
+    async fn classify_dataset_refs_by_allowance(
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
         action: auth::DatasetAction,
-    ) -> Result<AccessMultiDatasetRefsResponse, InternalError> {
-        let mut multi_result = AccessMultiDatasetRefsResponse {
+    ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
+        let mut res = ClassifyDatasetRefsByAllowanceResponse {
             accessible_resolved_refs: Vec::with_capacity(dataset_refs.len()),
             inaccessible_refs: vec![],
         };
@@ -134,15 +134,13 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
                 .await
             {
                 Ok(handle) => {
-                    multi_result
-                        .accessible_resolved_refs
-                        .push((dataset_ref, handle));
+                    res.accessible_resolved_refs.push((dataset_ref, handle));
                 }
                 Err(e) => {
                     use RebacDatasetRefUnresolvedError as E;
                     match e {
                         e @ (E::NotFound(_) | E::Access(_)) => {
-                            multi_result.inaccessible_refs.push((dataset_ref, e));
+                            res.inaccessible_refs.push((dataset_ref, e));
                         }
                         e @ E::Internal(_) => return Err(e.int_err()),
                     }
@@ -150,7 +148,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             }
         }
 
-        Ok(multi_result)
+        Ok(res)
     }
 }
 
