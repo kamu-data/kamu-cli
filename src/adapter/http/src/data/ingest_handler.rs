@@ -125,7 +125,7 @@ pub async fn dataset_ingest_handler(
         catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
 
     let target = rebac_dataset_registry_facade
-        .resolve_dataset_for_action_by_ref(&dataset_ref, auth::DatasetAction::Write)
+        .resolve_dataset_by_ref(&dataset_ref, auth::DatasetAction::Write)
         .await
         .map_err(|e| {
             use RebacDatasetRefUnresolvedError as E;

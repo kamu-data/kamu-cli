@@ -45,7 +45,7 @@ impl ProvenanceServiceImpl {
     ) -> Result<(), GetLineageError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_for_action_by_handle(dataset_handle, auth::DatasetAction::Read)
+            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Read)
             .await
             .map_err(|e| match e {
                 RebacDatasetIdUnresolvedError::Access(e) => GetLineageError::Access(e),

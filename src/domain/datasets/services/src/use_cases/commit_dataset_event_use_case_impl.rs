@@ -86,10 +86,7 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
     ) -> Result<odf::dataset::CommitResult, CommitError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_for_action_by_ref(
-                &dataset_handle.as_local_ref(),
-                auth::DatasetAction::Write,
-            )
+            .resolve_dataset_by_ref(&dataset_handle.as_local_ref(), auth::DatasetAction::Write)
             .await
             .map_err(|e| {
                 use RebacDatasetRefUnresolvedError as E;

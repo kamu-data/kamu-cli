@@ -177,7 +177,7 @@ impl Command for InspectQueryCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_for_action_by_ref(&self.dataset_ref, auth::DatasetAction::Read)
+            .resolve_dataset_by_ref(&self.dataset_ref, auth::DatasetAction::Read)
             .await?;
 
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {

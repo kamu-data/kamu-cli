@@ -17,19 +17,19 @@ use thiserror::Error;
 
 #[async_trait::async_trait]
 pub trait RebacDatasetRegistryFacade: Send + Sync {
-    async fn resolve_dataset_handle_for_action_by_ref(
+    async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
         action: auth::DatasetAction,
     ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError>;
 
-    async fn resolve_dataset_for_action_by_ref(
+    async fn resolve_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
         action: auth::DatasetAction,
     ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError>;
 
-    async fn resolve_dataset_for_action_by_handle(
+    async fn resolve_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
         action: auth::DatasetAction,

@@ -41,7 +41,7 @@ impl RebacDatasetRegistryFacadeImpl {
 
 #[async_trait::async_trait]
 impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
-    async fn resolve_dataset_handle_for_action_by_ref(
+    async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
         action: auth::DatasetAction,
@@ -76,13 +76,13 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         Ok(handle)
     }
 
-    async fn resolve_dataset_for_action_by_ref(
+    async fn resolve_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
         action: auth::DatasetAction,
     ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError> {
         let dataset_handle = self
-            .resolve_dataset_handle_for_action_by_ref(dataset_ref, action)
+            .resolve_dataset_handle_by_ref(dataset_ref, action)
             .await?;
         let resolved_dataset = self
             .dataset_registry
@@ -92,7 +92,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         Ok(resolved_dataset)
     }
 
-    async fn resolve_dataset_for_action_by_handle(
+    async fn resolve_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
         action: auth::DatasetAction,
@@ -130,7 +130,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         // TODO: Private Datasets: resolve multi refs at once
         for dataset_ref in dataset_refs {
             match self
-                .resolve_dataset_handle_for_action_by_ref(&dataset_ref, action)
+                .resolve_dataset_handle_by_ref(&dataset_ref, action)
                 .await
             {
                 Ok(handle) => {

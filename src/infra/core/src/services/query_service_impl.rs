@@ -316,7 +316,7 @@ impl QueryServiceImpl {
     ) -> Result<ResolvedDataset, QueryError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_for_action_by_ref(dataset_ref, auth::DatasetAction::Read)
+            .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Read)
             .await
             .map_err(|e| {
                 use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;

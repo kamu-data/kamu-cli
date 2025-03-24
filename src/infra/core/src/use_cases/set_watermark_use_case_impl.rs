@@ -56,7 +56,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         // Resolve dataset
         let target = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_for_action_by_handle(dataset_handle, auth::DatasetAction::Write)
+            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Write)
             .await
             .map_err(|e| {
                 use kamu_auth_rebac::RebacDatasetIdUnresolvedError as E;
