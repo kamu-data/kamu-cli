@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.229.0] - 2025-03-24
 ### Added
 - Experimental support for `ChangelogStream` and `UpsertStream` ODF merge strategies.
 
