@@ -11,43 +11,37 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::DatasetRegistry;
-use kamu_datasets::{CommitDatasetEventUseCase, ViewMultiResponse};
-use odf::dataset::{AppendError, InvalidEventError};
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::auth;
+use kamu_datasets::CommitDatasetEventUseCase;
+use odf::dataset::{AppendError, CommitError, InvalidEventError};
 use odf::metadata::EnumWithVariants;
 use time_source::SystemTimeSource;
-
-use crate::utils::access_dataset_helper::{AccessDatasetHelper, DatasetAccessError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn CommitDatasetEventUseCase)]
 pub struct CommitDatasetEventUseCaseImpl {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     system_time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl CommitDatasetEventUseCaseImpl {
     pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
         system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
-            dataset_registry,
-            dataset_action_authorizer,
+            rebac_dataset_registry_facade,
             system_time_source,
         }
     }
 
     async fn validate_event(
         &self,
-        access_dataset_helper: AccessDatasetHelper<'_>,
         event: odf::MetadataEvent,
-    ) -> Result<odf::MetadataEvent, odf::dataset::CommitError> {
+    ) -> Result<odf::MetadataEvent, CommitError> {
         if let Some(set_transform) = event.as_variant::<odf::metadata::SetTransform>() {
             let inputs_dataset_refs = set_transform
                 .inputs
@@ -55,14 +49,14 @@ impl CommitDatasetEventUseCaseImpl {
                 .map(|input| input.dataset_ref.clone())
                 .collect::<Vec<_>>();
 
-            let view_multi_result: ViewMultiResponse = access_dataset_helper
-                .access_multi_dataset(inputs_dataset_refs, DatasetAction::Read)
-                .await
-                .map(Into::into)?;
+            let access_multi_response = self
+                .rebac_dataset_registry_facade
+                .access_multi_dataset_refs(inputs_dataset_refs, auth::DatasetAction::Read)
+                .await?;
 
-            if !view_multi_result.inaccessible_refs.is_empty() {
+            if !access_multi_response.inaccessible_refs.is_empty() {
                 let dataset_ref_alias_map = set_transform.as_dataset_ref_alias_map();
-                let message = view_multi_result
+                let message = access_multi_response
                     .into_inaccessible_input_datasets_message(&dataset_ref_alias_map);
 
                 return Err(AppendError::InvalidBlock(
@@ -89,27 +83,22 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         &self,
         dataset_handle: &odf::DatasetHandle,
         event: odf::MetadataEvent,
-    ) -> Result<odf::dataset::CommitResult, odf::dataset::CommitError> {
-        let access_dataset_helper =
-            AccessDatasetHelper::new(&self.dataset_registry, &self.dataset_action_authorizer);
-
-        access_dataset_helper
-            .access_dataset(&dataset_handle.as_local_ref(), DatasetAction::Write)
+    ) -> Result<odf::dataset::CommitResult, CommitError> {
+        let resolved_dataset = self
+            .rebac_dataset_registry_facade
+            .resolve_dataset_for_action_by_ref(
+                &dataset_handle.as_local_ref(),
+                auth::DatasetAction::Write,
+            )
             .await
             .map_err(|e| {
-                use odf::dataset::CommitError;
+                use RebacDatasetRefUnresolvedError as E;
                 match e {
-                    DatasetAccessError::Access(e) => CommitError::Access(e),
-                    unexpected_error => CommitError::Internal(unexpected_error.int_err()),
+                    E::Access(e) => CommitError::Access(e),
+                    e @ (E::NotFound(_) | E::Internal(_)) => CommitError::Internal(e.int_err()),
                 }
             })?;
-
-        let event = self.validate_event(access_dataset_helper, event).await?;
-
-        let resolved_dataset = self
-            .dataset_registry
-            .get_dataset_by_handle(dataset_handle)
-            .await;
+        let event = self.validate_event(event).await?;
 
         use odf::dataset::CommitOpts;
         let commit_result = resolved_dataset
