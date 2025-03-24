@@ -49,14 +49,14 @@ impl CommitDatasetEventUseCaseImpl {
                 .map(|input| input.dataset_ref.clone())
                 .collect::<Vec<_>>();
 
-            let access_multi_response = self
+            let classify_response = self
                 .rebac_dataset_registry_facade
                 .classify_dataset_refs_by_allowance(inputs_dataset_refs, auth::DatasetAction::Read)
                 .await?;
 
-            if !access_multi_response.inaccessible_refs.is_empty() {
+            if !classify_response.inaccessible_refs.is_empty() {
                 let dataset_ref_alias_map = set_transform.as_dataset_ref_alias_map();
-                let message = access_multi_response
+                let message = classify_response
                     .into_inaccessible_input_datasets_message(&dataset_ref_alias_map);
 
                 return Err(AppendError::InvalidBlock(

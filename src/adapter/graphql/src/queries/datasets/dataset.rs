@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{auth, ServerUrlConfig};
 
 use crate::prelude::*;
@@ -36,16 +37,22 @@ impl Dataset {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<TransformInputDataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::ViewDatasetUseCase);
+        let rebac_dataset_registry_facade = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
 
-        let handle = match view_dataset_use_case.execute(dataset_ref).await {
+        let resolve_res = rebac_dataset_registry_facade
+            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Read)
+            .await;
+        let handle = match resolve_res {
             Ok(handle) => Ok(handle),
-            Err(e) => match e {
-                kamu_datasets::ViewDatasetUseCaseError::Access(_) => {
-                    return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
+            Err(e) => {
+                use RebacDatasetRefUnresolvedError as E;
+                match e {
+                    E::Access(_) => {
+                        return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
+                    }
+                    e @ (E::NotFound(_) | E::Internal(_)) => Err(e.int_err()),
                 }
-                unexpected_error => Err(unexpected_error.int_err()),
-            },
+            }
         }?;
 
         let account = Account::from_dataset_alias(ctx, &handle.alias)
