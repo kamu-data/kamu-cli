@@ -17,7 +17,6 @@ use kamu_auth_rebac::{
     RebacDatasetIdUnresolvedError,
     RebacDatasetRefUnresolvedError,
     RebacDatasetRegistryFacade,
-    ResolveDatasetsByRefsResponse,
 };
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetAction};
 use kamu_core::{ResolvedDataset, TenancyConfig};
@@ -102,14 +101,6 @@ async fn test_internal_error() {
             _dataset_handle: &DatasetHandle,
             _action: DatasetAction,
         ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError> {
-            unreachable!()
-        }
-
-        async fn resolve_datasets_by_refs(
-            &self,
-            _dataset_refs: Vec<DatasetRef>,
-            _action: DatasetAction,
-        ) -> Result<ResolveDatasetsByRefsResponse, InternalError> {
             unreachable!()
         }
 

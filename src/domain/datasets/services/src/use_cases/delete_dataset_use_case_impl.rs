@@ -29,6 +29,7 @@ use crate::DatasetEntryWriter;
 #[component(pub)]
 #[interface(dyn DeleteDatasetUseCase)]
 pub struct DeleteDatasetUseCaseImpl {
+    // !!! заменить
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
@@ -72,6 +73,8 @@ impl DeleteDatasetUseCaseImpl {
         if !downstream_dataset_ids.is_empty() {
             let mut dangling_children = Vec::with_capacity(downstream_dataset_ids.len());
             for downstream_dataset_id in downstream_dataset_ids {
+                // Intentionally checking downstream datasets without considering dataset
+                // visibility
                 match self
                     .dataset_registry
                     .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
