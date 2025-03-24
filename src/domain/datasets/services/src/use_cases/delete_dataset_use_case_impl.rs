@@ -125,7 +125,7 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         // Resolve handle
         let dataset_handle = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Read)
+            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Own)
             .await
             .map_err(|e| {
                 use RebacDatasetRefUnresolvedError as E;
