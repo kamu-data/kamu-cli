@@ -66,6 +66,9 @@ pub enum GetIncrementError {
     RefNotFound(odf::storage::RefNotFoundError),
 
     #[error(transparent)]
+    BlockNotFound(odf::storage::BlockNotFoundError),
+
+    #[error(transparent)]
     Access(odf::AccessError),
 
     #[error(transparent)]

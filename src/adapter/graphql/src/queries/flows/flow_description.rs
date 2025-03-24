@@ -14,6 +14,7 @@ use kamu_core::{
     DatasetChangesService,
     DatasetRegistry,
     DatasetRegistryExt,
+    GetIncrementError,
     MetadataQueryService,
     PollingSourceBlockInfo,
 };
@@ -89,6 +90,12 @@ pub(crate) struct FlowDescriptionDatasetReset {
 pub(crate) enum FlowDescriptionUpdateResult {
     UpToDate(FlowDescriptionUpdateResultUpToDate),
     Success(FlowDescriptionUpdateResultSuccess),
+    Unknown(FlowDescriptionUpdateResultUnknown),
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowDescriptionUpdateResultUnknown {
+    message: String,
 }
 
 #[derive(SimpleObject)]
@@ -118,20 +125,34 @@ impl FlowDescriptionUpdateResult {
                     | fs::FlowResult::DatasetReset(_) => Ok(None),
                     fs::FlowResult::DatasetUpdate(update) => match update {
                         FlowResultDatasetUpdate::Changed(update_result) => {
-                            let increment = dataset_changes_service
+                            match dataset_changes_service
                                 .get_increment_between(
                                     dataset_id,
                                     update_result.old_head.as_ref(),
                                     &update_result.new_head,
                                 )
                                 .await
-                                .int_err()?;
-
-                            Ok(Some(Self::Success(FlowDescriptionUpdateResultSuccess {
-                                num_blocks: increment.num_blocks,
-                                num_records: increment.num_records,
-                                updated_watermark: increment.updated_watermark,
-                            })))
+                            {
+                                Ok(increment) => {
+                                    Ok(Some(Self::Success(FlowDescriptionUpdateResultSuccess {
+                                        num_blocks: increment.num_blocks,
+                                        num_records: increment.num_records,
+                                        updated_watermark: increment.updated_watermark,
+                                    })))
+                                }
+                                Err(err) => {
+                                    let unknown_message = match err {
+                                        GetIncrementError::BlockNotFound(e) => format!(
+                                            "Failed to get increment. Block is missing: {}",
+                                            e.hash
+                                        ),
+                                        _ => "Failed to get increment".to_string(),
+                                    };
+                                    Ok(Some(Self::Unknown(FlowDescriptionUpdateResultUnknown {
+                                        message: unknown_message,
+                                    })))
+                                }
+                            }
                         }
                         FlowResultDatasetUpdate::UpToDate(up_to_date_result) => {
                             Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
