@@ -229,6 +229,7 @@ impl PollingIngestServiceImpl {
                     ingest_common::preprocess_default(
                         df,
                         &args.polling_source.read,
+                        &args.polling_source.merge,
                         args.data_writer.vocab(),
                         &args.options.schema_inference,
                     )

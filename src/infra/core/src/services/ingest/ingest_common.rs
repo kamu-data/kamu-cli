@@ -59,15 +59,22 @@ pub(crate) async fn preprocess(
 pub fn preprocess_default(
     df: DataFrame,
     read_step: &odf::metadata::ReadStep,
+    merge_strategy: &odf::metadata::MergeStrategy,
     vocab: &odf::metadata::DatasetVocabulary,
     opts: &SchemaInferenceOpts,
 ) -> Result<DataFrame, datafusion::error::DataFusionError> {
     let df = if read_step.schema().is_none() && opts.rename_on_conflict_with_system_column {
-        let system_cols = [
-            &vocab.offset_column,
-            &vocab.operation_type_column,
-            &vocab.system_time_column,
-        ];
+        let mut system_cols = vec![&vocab.offset_column, &vocab.system_time_column];
+
+        match merge_strategy {
+            odf::metadata::MergeStrategy::Append(_)
+            | odf::metadata::MergeStrategy::Ledger(_)
+            | odf::metadata::MergeStrategy::Snapshot(_) => {
+                system_cols.push(&vocab.operation_type_column);
+            }
+            odf::metadata::MergeStrategy::ChangelogStream(_)
+            | odf::metadata::MergeStrategy::UpsertStream(_) => (),
+        }
 
         let mut select = Vec::new();
         let mut noop = true;
