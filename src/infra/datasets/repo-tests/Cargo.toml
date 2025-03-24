@@ -29,7 +29,7 @@ kamu-datasets = { workspace = true }
 odf = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
-dill = "0.11"
+dill = "0.12"
 itertools = "0.14"
 futures = "0.3"
 secrecy = "0.10"
