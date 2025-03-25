@@ -18,7 +18,6 @@ fn serde_dataset_summary() {
         kind: DatasetSummary
         version: 1
         content:
-          id: did:odf:fed01626f6f21b8373800626f6f21b837380020f6f606070000008d6edc2eb877e8cc
           kind: Root
           lastBlockHash: f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7
           lastPulled: 2020-01-01T12:00:00Z
@@ -34,7 +33,6 @@ fn serde_dataset_summary() {
         kind: "DatasetSummary".to_owned(),
         version: 1,
         content: odf::DatasetSummary {
-            id: odf::DatasetID::new_seeded_ed25519(b"boop"),
             kind: odf::DatasetKind::Root,
             last_block_hash: odf::Multihash::from_multibase(
                 "zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr",

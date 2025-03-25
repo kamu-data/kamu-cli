@@ -43,7 +43,6 @@ async fn test_summary_updates() {
     assert_eq!(
         ds.get_summary(GetSummaryOpts::default()).await.unwrap(),
         DatasetSummary {
-            id: DatasetID::new_seeded_ed25519(b"foo"),
             kind: DatasetKind::Root,
             last_block_hash: hash_1.clone(),
             last_pulled: None,
@@ -89,7 +88,6 @@ async fn test_summary_updates() {
         .await
         .unwrap(),
         DatasetSummary {
-            id: DatasetID::new_seeded_ed25519(b"foo"),
             kind: DatasetKind::Root,
             last_block_hash: hash_1.clone(),
             last_pulled: None,
@@ -103,7 +101,6 @@ async fn test_summary_updates() {
     assert_eq!(
         ds.get_summary(GetSummaryOpts::default()).await.unwrap(),
         DatasetSummary {
-            id: DatasetID::new_seeded_ed25519(b"foo"),
             kind: DatasetKind::Root,
             last_block_hash: hash_3.clone(),
             last_pulled: Some(block_3.system_time),

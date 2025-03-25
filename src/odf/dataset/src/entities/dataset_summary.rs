@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use odf_metadata::serde::yaml::*;
-use odf_metadata::{DatasetID, DatasetKind, Multihash};
+use odf_metadata::{DatasetKind, Multihash};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none};
 
@@ -22,7 +22,6 @@ use serde_with::{serde_as, skip_serializing_none};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DatasetSummary {
-    pub id: DatasetID,
     #[serde_as(as = "DatasetKindDef")]
     pub kind: DatasetKind,
     pub last_block_hash: Multihash,

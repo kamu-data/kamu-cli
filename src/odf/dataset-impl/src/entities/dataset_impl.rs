@@ -121,7 +121,7 @@ where
             increment.into_summary()
         } else {
             // Increment applies to interval [head, prev.last_block_hash)
-            increment.apply_to_summary(prev.unwrap())
+            increment.apply_to_summary(prev.as_ref().unwrap())
         };
 
         self.write_summary(&summary).await?;
@@ -147,7 +147,6 @@ where
         while let Some((_, block)) = block_stream.try_next().await.int_err()? {
             match block.event {
                 MetadataEvent::Seed(seed) => {
-                    increment.seen_id.get_or_insert(seed.dataset_id);
                     increment.seen_kind.get_or_insert(seed.dataset_kind);
                 }
                 MetadataEvent::AddData(add_data) => {
@@ -307,7 +306,6 @@ where
 
 #[derive(Default)]
 struct UpdateSummaryIncrement {
-    seen_id: Option<DatasetID>,
     seen_kind: Option<DatasetKind>,
     seen_head: Option<Multihash>,
     seen_last_pulled: Option<DateTime<Utc>>,
@@ -321,12 +319,11 @@ impl UpdateSummaryIncrement {
     fn seen_chain_beginning(&self) -> bool {
         // Seed blocks are guaranteed to appear only once in a chain, and only at the
         // very beginning
-        self.seen_id.is_some()
+        self.seen_kind.is_some()
     }
 
     fn into_summary(self) -> DatasetSummary {
         DatasetSummary {
-            id: self.seen_id.unwrap(),
             kind: self.seen_kind.unwrap(),
             last_block_hash: self.seen_head.unwrap(),
             last_pulled: self.seen_last_pulled,
@@ -336,9 +333,8 @@ impl UpdateSummaryIncrement {
         }
     }
 
-    fn apply_to_summary(self, summary: DatasetSummary) -> DatasetSummary {
+    fn apply_to_summary(self, summary: &DatasetSummary) -> DatasetSummary {
         DatasetSummary {
-            id: self.seen_id.unwrap_or(summary.id),
             kind: self.seen_kind.unwrap_or(summary.kind),
             last_block_hash: self.seen_head.unwrap(),
             last_pulled: self.seen_last_pulled.or(summary.last_pulled),
