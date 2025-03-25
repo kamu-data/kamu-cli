@@ -31,7 +31,7 @@ odf = { workspace = true, features = ["sqlx-postgres"] }
 async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = "0.11"
+dill = "0.12"
 futures = { version = "0.3", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio-rustls",

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{
     DatasetChangesService,
     DatasetIntervalIncrement,
@@ -20,6 +20,7 @@ use kamu_core::{
     GetIncrementError,
     ResolvedDataset,
 };
+use odf::IterBlocksError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -72,7 +73,7 @@ impl DatasetChangesServiceImpl {
         resolved_dataset: &ResolvedDataset,
         old_head: Option<&odf::Multihash>,
         new_head: &odf::Multihash,
-    ) -> Result<DatasetIntervalIncrement, InternalError> {
+    ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
         // Analysis outputs
         let mut num_blocks = 0;
         let mut num_records = 0;
@@ -87,7 +88,10 @@ impl DatasetChangesServiceImpl {
             .as_metadata_chain()
             .iter_blocks_interval(new_head, old_head, false);
 
-        while let Some((_, block)) = block_stream.try_next().await.int_err()? {
+        while let Some((_, block)) = block_stream.try_next().await.map_err(|err| match err {
+            IterBlocksError::BlockNotFound(e) => GetIncrementError::BlockNotFound(e),
+            _ => GetIncrementError::Internal(err.int_err()),
+        })? {
             // Each block counts
             num_blocks += 1;
 

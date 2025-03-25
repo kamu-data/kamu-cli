@@ -20,6 +20,7 @@ Recommendation: for ease of reading, use the following order:
   - GQL: Implemented API for searching by account name
   - OSO: Added `maintain` & `own` permissions in addition to `read` & `write`
 ### Fixed
+- Flow APIs: correctly returns response for dataset with cleaned blocks
 - Private Datasets:
   - GQL: Correct processing of access permissions when viewing flows of another account
 
