@@ -23,6 +23,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -415,8 +416,8 @@ impl TestHarness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<LoginPasswordAuthProvider>()
                 .add::<AccountServiceImpl>()
-                .add::<InMemoryAccountRepository>()
-                .add::<ViewDatasetUseCaseImpl>();
+                .add::<RebacDatasetRegistryFacadeImpl>()
+                .add::<InMemoryAccountRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

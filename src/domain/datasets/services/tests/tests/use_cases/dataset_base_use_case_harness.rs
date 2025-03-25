@@ -14,6 +14,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::AccountServiceImpl;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
 use kamu_core::*;
 use kamu_datasets::*;
@@ -73,6 +74,7 @@ impl DatasetBaseUseCaseHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<DependencyGraphImmediateListener>()
+                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<TestDatasetOutboxListener>();
 
             if let Some(mock_dataset_action_authorizer) = opts.maybe_mock_dataset_action_authorizer

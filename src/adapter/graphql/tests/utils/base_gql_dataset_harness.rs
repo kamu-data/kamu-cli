@@ -11,6 +11,7 @@ use bon::bon;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
@@ -60,7 +61,6 @@ impl BaseGQLDatasetHarness {
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
-            .add::<ViewDatasetUseCaseImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<DatasetReferenceServiceImpl>()
             .add::<InMemoryDatasetReferenceRepository>()
@@ -69,6 +69,7 @@ impl BaseGQLDatasetHarness {
             .add::<DependencyGraphImmediateListener>()
             .add::<DatasetEntryServiceImpl>()
             .add::<InMemoryDatasetEntryRepository>()
+            .add::<RebacDatasetRegistryFacadeImpl>()
             .add_value(RunInfoDir::new(run_info_dir));
 
             if let Some(mock) = mock_dataset_action_authorizer {

@@ -9,6 +9,7 @@
 
 use dill::Catalog;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{MockDidGenerator, TenancyConfig};
 use messaging_outbox::{MockOutbox, Outbox};
@@ -113,6 +114,8 @@ impl BaseUseCaseHarness {
 
         let catalog = {
             let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
+
+            b.add::<RebacDatasetRegistryFacadeImpl>();
 
             if let Some(mock_outbox) = options.mock_outbox {
                 b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();

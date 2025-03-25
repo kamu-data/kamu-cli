@@ -12,9 +12,15 @@ use indoc::indoc;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
-use kamu_core::TenancyConfig;
-use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError, ViewMultiResponse};
+use kamu_auth_rebac::{
+    ClassifyDatasetRefsByAllowanceResponse,
+    RebacDatasetIdUnresolvedError,
+    RebacDatasetRefUnresolvedError,
+    RebacDatasetRegistryFacade,
+};
+use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetAction};
+use kamu_core::{ResolvedDataset, TenancyConfig};
+use odf::{DatasetHandle, DatasetRef};
 use thiserror::Error;
 use time_source::SystemTimeSourceDefault;
 
@@ -65,27 +71,45 @@ async fn test_malformed_argument() {
 #[test_log::test(tokio::test)]
 async fn test_internal_error() {
     #[component]
-    #[interface(dyn ViewDatasetUseCase)]
-    struct ErrorViewDatasetUseCaseImpl {}
+    #[interface(dyn RebacDatasetRegistryFacade)]
+    struct ErrorRebacDatasetRegistryFacadeImpl {}
 
     #[async_trait::async_trait]
-    impl ViewDatasetUseCase for ErrorViewDatasetUseCaseImpl {
-        async fn execute(
+    impl RebacDatasetRegistryFacade for ErrorRebacDatasetRegistryFacadeImpl {
+        async fn resolve_dataset_handle_by_ref(
             &self,
-            _: &odf::DatasetRef,
-        ) -> Result<odf::DatasetHandle, ViewDatasetUseCaseError> {
+            _dataset_ref: &DatasetRef,
+            _action: DatasetAction,
+        ) -> Result<DatasetHandle, RebacDatasetRefUnresolvedError> {
             #[derive(Debug, Error)]
             #[error("I'm a dummy error that should not propagate through")]
-            struct DummyError {}
+            struct DummyError;
 
-            Err(ViewDatasetUseCaseError::Internal((DummyError {}).int_err()))
+            Err(DummyError.int_err().into())
         }
 
-        async fn execute_multi(
+        async fn resolve_dataset_by_ref(
             &self,
-            _: Vec<odf::DatasetRef>,
-        ) -> Result<ViewMultiResponse, InternalError> {
-            unimplemented!()
+            _dataset_ref: &DatasetRef,
+            _action: DatasetAction,
+        ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError> {
+            unreachable!()
+        }
+
+        async fn resolve_dataset_by_handle(
+            &self,
+            _dataset_handle: &DatasetHandle,
+            _action: DatasetAction,
+        ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError> {
+            unreachable!()
+        }
+
+        async fn classify_dataset_refs_by_allowance(
+            &self,
+            _dataset_refs: Vec<DatasetRef>,
+            _action: DatasetAction,
+        ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
+            unreachable!()
         }
     }
 
@@ -101,7 +125,7 @@ async fn test_internal_error() {
         )
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .add::<DatasetRegistrySoloUnitBridge>()
-        .add::<ErrorViewDatasetUseCaseImpl>()
+        .add::<ErrorRebacDatasetRegistryFacadeImpl>()
         .add::<AlwaysHappyDatasetActionAuthorizer>()
         .build();
 

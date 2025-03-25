@@ -95,7 +95,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DatasetHandlesResolution {
     pub resolved_handles: Vec<odf::DatasetHandle>,
     pub unresolved_datasets: Vec<(odf::DatasetID, odf::DatasetRefUnresolvedError)>,

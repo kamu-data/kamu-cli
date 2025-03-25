@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - Private Datasets, access sharing:
   - ReBAC: there can be only one role between a subject (account) and an object (dataset)
+  - ReBAC: Added `RebacDatasetRegistryFacade` to simplify work with authorization validation
   - GQL: CRUD Collaboration API
   - GQL: Implemented API for searching by account name
   - OSO: Added `maintain` & `own` permissions in addition to `read` & `write`

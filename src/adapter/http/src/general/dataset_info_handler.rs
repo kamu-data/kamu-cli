@@ -14,7 +14,9 @@ use dill::Catalog;
 use http_common::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::AccountService;
-use kamu_datasets::{DatasetEntryService, ViewDatasetUseCase, ViewDatasetUseCaseError};
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::auth;
+use kamu_datasets::DatasetEntryService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -97,16 +99,18 @@ async fn get_dataset_by_id(
     catalog: &Catalog,
     dataset_id: &odf::DatasetID,
 ) -> Result<Json<DatasetInfoResponse>, ApiError> {
-    let view_dataset_use_case = catalog.get_one::<dyn ViewDatasetUseCase>().unwrap();
+    let rebac_dataset_registry_facade =
+        catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
 
-    let dataset_handle = view_dataset_use_case
-        .execute(&dataset_id.as_local_ref())
+    let dataset_handle = rebac_dataset_registry_facade
+        .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref(), auth::DatasetAction::Read)
         .await
-        .map_err(|e| match e {
-            ViewDatasetUseCaseError::NotFound(_) | ViewDatasetUseCaseError::Access(_) => {
-                ApiError::not_found_without_reason()
+        .map_err(|e| {
+            use RebacDatasetRefUnresolvedError as E;
+            match e {
+                E::NotFound(_) | E::Access(_) => ApiError::not_found_without_reason(),
+                e @ E::Internal(_) => e.int_err().api_err(),
             }
-            unexpected_error => unexpected_error.int_err().api_err(),
         })?;
 
     let dataset_entry_service = catalog.get_one::<dyn DatasetEntryService>().unwrap();
