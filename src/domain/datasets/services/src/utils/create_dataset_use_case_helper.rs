@@ -79,9 +79,15 @@ impl CreateDatasetUseCaseHelper {
         dataset_id: &odf::DatasetID,
         owner_account_id: &odf::AccountID,
         dataset_alias: &odf::DatasetAlias,
+        dataset_kind: odf::DatasetKind,
     ) -> Result<(), CreateDatasetError> {
         self.dataset_entry_writer
-            .create_entry(dataset_id, owner_account_id, &dataset_alias.dataset_name)
+            .create_entry(
+                dataset_id,
+                owner_account_id,
+                &dataset_alias.dataset_name,
+                dataset_kind,
+            )
             .await
             .map_err(|e| match e {
                 CreateDatasetEntryError::Internal(e) => CreateDatasetError::Internal(e),

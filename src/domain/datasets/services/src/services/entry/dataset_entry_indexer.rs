@@ -108,11 +108,30 @@ impl DatasetEntryIndexer {
                 continue;
             };
 
+            let dataset = self
+                .dataset_storage_unit
+                .get_stored_dataset_by_id(&dataset_handle.id)
+                .await
+                .int_err()?;
+
+            let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
+            use odf::dataset::MetadataChainExt;
+            dataset
+                .as_metadata_chain()
+                .accept(&mut [&mut seed_visitor])
+                .await
+                .int_err()?;
+
+            let seed = seed_visitor
+                .into_event()
+                .unwrap_or_else(|| panic!("No Seed event in the dataset {dataset_handle}"));
+
             let dataset_entry = DatasetEntry::new(
                 dataset_handle.id,
                 owner_account_id,
                 dataset_handle.alias.dataset_name,
                 self.time_source.now(),
+                seed.dataset_kind,
             );
 
             use tracing::Instrument;

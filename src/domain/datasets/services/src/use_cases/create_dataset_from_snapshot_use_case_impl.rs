@@ -75,6 +75,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 &seed_block.event.dataset_id,
                 &logged_account_id,
                 &canonical_alias,
+                snapshot.kind,
             )
             .await?;
 

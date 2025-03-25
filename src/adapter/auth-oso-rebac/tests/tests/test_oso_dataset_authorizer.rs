@@ -724,6 +724,7 @@ impl DatasetAuthorizerHarness {
                     &dataset_handle.id,
                     &account_id,
                     &dataset_handle.alias.dataset_name,
+                    odf::DatasetKind::Root,
                 )
                 .await
                 .unwrap();

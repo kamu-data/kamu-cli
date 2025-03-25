@@ -446,7 +446,7 @@ async fn test_pull_batching_complex_with_remote() {
     mock_dataset_entry_writer
         .expect_create_entry()
         .times(1)
-        .returning(|_, _, _| Ok(()));
+        .returning(|_, _, _, _| Ok(()));
 
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
 
@@ -750,7 +750,7 @@ async fn test_sync_from_url_same_id_different_aliases() {
     mock_dataset_entry_writer
         .expect_create_entry()
         .times(1)
-        .returning(|_, _, _| Ok(()));
+        .returning(|_, _, _, _| Ok(()));
 
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, mock_dataset_entry_writer);
 
@@ -789,7 +789,7 @@ async fn test_sync_from_same_url_different_accounts() {
     mock_dataset_entry_writer
         .expect_create_entry()
         .times(1)
-        .returning(|_, _, _| Ok(()));
+        .returning(|_, _, _, _| Ok(()));
 
     let harness = PullTestHarness::new(TenancyConfig::MultiTenant, mock_dataset_entry_writer);
 

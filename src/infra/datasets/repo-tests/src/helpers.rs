@@ -48,17 +48,27 @@ pub(crate) async fn new_account(account_repo: &Arc<dyn AccountRepository>) -> Ac
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn new_dataset_entry_with(owner: &Account, dataset_name: &str) -> DatasetEntry {
+pub(crate) fn new_dataset_entry_with(
+    owner: &Account,
+    dataset_name: &str,
+    dataset_kind: odf::DatasetKind,
+) -> DatasetEntry {
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let owner_id = owner.id.clone();
     let dataset_alias = odf::DatasetName::new_unchecked(dataset_name);
     let created_at = Utc::now().round_subsecs(6);
 
-    DatasetEntry::new(dataset_id, owner_id, dataset_alias, created_at)
+    DatasetEntry::new(
+        dataset_id,
+        owner_id,
+        dataset_alias,
+        created_at,
+        dataset_kind,
+    )
 }
 
-pub(crate) fn new_dataset_entry(owner: &Account) -> DatasetEntry {
-    new_dataset_entry_with(owner, "dataset")
+pub(crate) fn new_dataset_entry(owner: &Account, dataset_kind: odf::DatasetKind) -> DatasetEntry {
+    new_dataset_entry_with(owner, "dataset", dataset_kind)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

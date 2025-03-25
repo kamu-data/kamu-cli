@@ -565,6 +565,7 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         dataset_id: &odf::DatasetID,
         owner_account_id: &odf::AccountID,
         dataset_name: &odf::DatasetName,
+        dataset_kind: odf::DatasetKind,
     ) -> Result<(), CreateDatasetEntryError> {
         match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
             Ok(_) => return Ok(()), // idempotent handling of duplicates
@@ -579,6 +580,7 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
             owner_account_id.clone(),
             dataset_name.clone(),
             self.time_source.now(),
+            dataset_kind,
         );
 
         self.dataset_entry_repo

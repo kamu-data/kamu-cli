@@ -328,6 +328,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
             id: dataset_handle.id.clone(),
             owner_id: owner_id.clone(),
             name: dataset_handle.alias.dataset_name.clone(),
+            kind: odf::DatasetKind::Root,
         });
 
         self.outbox
@@ -361,6 +362,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
             id: dataset_handle.id.clone(),
             owner_id: owner_id.clone(),
             name: dataset_handle.alias.dataset_name.clone(),
+            kind: odf::DatasetKind::Derivative,
         });
 
         self.outbox

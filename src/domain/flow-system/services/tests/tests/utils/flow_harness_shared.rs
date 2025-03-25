@@ -185,6 +185,7 @@ impl FlowHarness {
             id: dataset_id.clone(),
             owner_id: owner_id.clone(),
             name: dataset_alias.dataset_name.clone(),
+            kind: odf::DatasetKind::Root,
         });
 
         self.outbox
@@ -219,6 +220,7 @@ impl FlowHarness {
             id: dataset_id.clone(),
             owner_id: owner_id.clone(),
             name: dataset_alias.dataset_name.clone(),
+            kind: odf::DatasetKind::Derivative,
         });
 
         self.outbox

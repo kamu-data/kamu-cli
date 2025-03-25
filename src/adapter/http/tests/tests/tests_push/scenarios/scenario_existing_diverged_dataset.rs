@@ -98,6 +98,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
                 &client_create_result.dataset_handle.id,
                 &server_harness.server_account_id(),
                 &client_create_result.dataset_handle.alias.dataset_name,
+                odf::DatasetKind::Root,
             )
             .await
             .unwrap();

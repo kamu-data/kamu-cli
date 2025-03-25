@@ -77,7 +77,7 @@ pub async fn test_insert_and_get_dataset_env_var(catalog: &Catalog) {
         DatasetEnvVarValue::Secret(SecretString::from(dataset_env_var_key_string.clone()));
 
     let account = new_account(&account_repo).await;
-    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
     dataset_entry_repo
         .save_dataset_entry(&entry_foo)
         .await
@@ -136,7 +136,7 @@ pub async fn test_insert_and_get_multiple_dataset_env_vars(catalog: &Catalog) {
     ));
 
     let account = new_account(&account_repo).await;
-    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
 
     dataset_entry_repo
         .save_dataset_entry(&entry_foo)
@@ -207,7 +207,7 @@ pub async fn test_delete_dataset_env_vars(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     let account = new_account(&account_repo).await;
-    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
 
     dataset_entry_repo
         .save_dataset_entry(&entry_foo)
@@ -273,7 +273,7 @@ pub async fn test_upsert_dataset_env_vars(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     let account = new_account(&account_repo).await;
-    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
 
     dataset_entry_repo
         .save_dataset_entry(&entry_foo)
@@ -334,7 +334,7 @@ pub async fn test_delete_all_dataset_env_vars(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
     let account = new_account(&account_repo).await;
-    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
 
     dataset_entry_repo
         .save_dataset_entry(&entry_foo)
