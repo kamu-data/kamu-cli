@@ -336,13 +336,16 @@ impl WorkspaceService {
             odf::dataset::DatasetLayout::new(dataset_dir_path),
         );
 
-        use odf::Dataset;
-        let dataset_summary = dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
+        use odf::dataset::{Dataset, MetadataChainExt};
+        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
+        dataset
+            .as_metadata_chain()
+            .accept(&mut [&mut seed_visitor])
             .await
             .int_err()?;
 
-        Ok(dataset_summary.id)
+        let seed = seed_visitor.into_event().unwrap();
+        Ok(seed.dataset_id)
     }
 
     async fn read_dataset_alias_from(
