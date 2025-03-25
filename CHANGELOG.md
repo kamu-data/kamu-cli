@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.230.0] - 2025-03-25
 ### Added
 - Private Datasets, access sharing:
   - ReBAC: there can be only one role between a subject (account) and an object (dataset)
