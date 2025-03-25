@@ -6642,6 +6642,7 @@ version = "0.230.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "chrono",
  "database-common",
  "database-common-macros",
  "dill",

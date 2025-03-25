@@ -12,3 +12,17 @@ UPDATE dataset_entries
     );
 
 /* ------------------------------ */
+
+CREATE TABLE dataset_statistics (
+    dataset_id VARCHAR(100) NOT NULL REFERENCES dataset_entries(dataset_id) ON DELETE CASCADE,
+    block_ref_name VARCHAR(50) NOT NULL,
+    last_pulled TIMESTAMPTZ DEFAULT NULL,
+    num_records BIGINT NOT NULL,
+    data_size BIGINT NOT NULL,
+    checkpoints_size BIGINT NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_dataset_statistics
+    ON dataset_statistics (dataset_id, block_ref_name);
+
+/* ------------------------------ */

@@ -11,8 +11,10 @@
 mod dataset_dependency_entry;
 mod dataset_entry;
 mod dataset_env_var;
+mod dataset_statistics;
 
 #[cfg(feature = "sqlx")]
 pub use dataset_dependency_entry::*;
 pub use dataset_entry::*;
 pub use dataset_env_var::*;
+pub use dataset_statistics::*;
