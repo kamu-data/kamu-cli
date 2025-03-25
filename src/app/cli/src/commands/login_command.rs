@@ -205,7 +205,7 @@ impl Command for LoginCommand {
         // Check token and exit
         // Note: try the URL as both backend or frontend
         if self.check {
-            return if let Some(token_find_report) = self
+            if let Some(token_find_report) = self
                 .access_token_registry_service
                 .find_by_frontend_or_backend_url(&odf_server_url)
             {
@@ -232,7 +232,8 @@ impl Command for LoginCommand {
                 Err(CLIError::usage_error(format!(
                     "No access token found for: {odf_server_url}",
                 )))
-            };
+            }?;
+            return Ok(());
         }
 
         // Login with existing token

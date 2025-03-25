@@ -190,7 +190,7 @@ impl Default for RecordsFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type ValueFormatterCallback = Box<dyn Fn(&ArrayRef, usize, &ColumnFormatRef) -> String>;
+type ValueFormatterCallback = Box<dyn Fn(&ArrayRef, usize, &ColumnFormatRef) -> String + Send>;
 
 #[derive(Default)]
 pub struct ColumnFormat {
@@ -240,7 +240,7 @@ impl ColumnFormat {
 
     pub fn with_value_fmt<F>(self, value_fmt: F) -> Self
     where
-        F: Fn(&ArrayRef, usize, &ColumnFormatRef) -> String + 'static,
+        F: Fn(&ArrayRef, usize, &ColumnFormatRef) -> String + Send + 'static,
     {
         Self {
             value_fmt: Some(Box::new(value_fmt)),
@@ -249,7 +249,7 @@ impl ColumnFormat {
     }
 
     pub fn with_value_fmt_t<T: 'static>(self, value_fmt_t: fn(T) -> String) -> Self {
-        let value_fmt_t: Box<dyn Any> = Box::new(value_fmt_t);
+        let value_fmt_t: Box<dyn Any + Send> = Box::new(value_fmt_t);
         Self {
             value_fmt: Some(Box::new(move |array, row, _| {
                 Self::value_fmt_t(array, row, value_fmt_t.as_ref(), std::any::type_name::<T>())

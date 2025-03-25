@@ -36,7 +36,7 @@ use super::{UIConfiguration, UIFeatureFlags};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServer {
-    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>>>>,
+    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>>,
     local_addr: SocketAddr,
     task_agent: Arc<dyn TaskAgent>,
     flow_agent: Arc<dyn FlowAgent>,
@@ -222,7 +222,7 @@ impl APIServer {
 
         let server = axum::serve(listener, router.into_make_service());
 
-        let server_future: Pin<Box<dyn Future<Output = _>>> =
+        let server_future: Pin<Box<dyn Future<Output = _> + Send>> =
             if let Some(shutdown_notify) = maybe_shutdown_notify {
                 Box::pin(async move {
                     server

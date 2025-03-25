@@ -113,7 +113,7 @@ pub use super::error::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
-pub trait Command {
+pub trait Command: Send + Sync {
     /// Symbolic name of the command
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
