@@ -30,13 +30,13 @@ CREATE UNIQUE INDEX idx_dataset_statistics
 INSERT INTO outbox_message_consumptions (consumer_name, producer_name, last_consumed_message_id)
     VALUES (
         'dev.kamu.domain.datasets.DatasetStatisticsUpdateHandler', 
-        'dev.kamu.domain.datasets.DatasetService', 
-        (
+        'dev.kamu.domain.datasets.DatasetReferenceService', 
+        (SELECT COALESCE((
             SELECT last_consumed_message_id 
                 FROM outbox_message_consumptions
-                WHERE producer_name = 'dev.kamu.domain.datasets.DatasetService'
+                WHERE producer_name = 'dev.kamu.domain.datasets.DatasetReferenceService'
                 LIMIT 1
-        )
+        ), 0))
     )
 
 /* ------------------------------ */

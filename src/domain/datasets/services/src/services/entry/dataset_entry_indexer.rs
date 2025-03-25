@@ -114,11 +114,18 @@ impl DatasetEntryIndexer {
                 .await
                 .int_err()?;
 
+            let head = dataset
+                .as_metadata_chain()
+                .as_uncached_ref_repo()
+                .get(odf::BlockRef::Head.as_str())
+                .await
+                .int_err()?;
+
             let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
             use odf::dataset::MetadataChainExt;
             dataset
                 .as_metadata_chain()
-                .accept(&mut [&mut seed_visitor])
+                .accept_by_hash(&mut [&mut seed_visitor], &head)
                 .await
                 .int_err()?;
 
