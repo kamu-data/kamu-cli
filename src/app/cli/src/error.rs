@@ -198,12 +198,6 @@ impl From<DeleteDatasetError> for CLIError {
     }
 }
 
-impl From<odf::dataset::GetSummaryError> for CLIError {
-    fn from(e: odf::dataset::GetSummaryError) -> Self {
-        Self::critical(e)
-    }
-}
-
 impl From<odf::GetRefError> for CLIError {
     fn from(e: odf::GetRefError) -> Self {
         Self::critical(e)

@@ -36,9 +36,6 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(test_case.hash_seed_block, new_head);
-
-    let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
-    assert_eq!(new_head, summary.last_block_hash);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,9 +59,6 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(current_head, new_head);
-
-    let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
-    assert_eq!(current_head, summary.last_block_hash);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,9 +129,6 @@ async fn test_reset_dataset_with_default_seed_block() {
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(test_case.hash_seed_block, new_head);
-
-    let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
-    assert_eq!(new_head, summary.last_block_hash);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -251,17 +242,6 @@ impl ResetTestHarness {
         resolved_dataset
             .as_metadata_chain()
             .resolve_ref(&odf::BlockRef::Head)
-            .await
-            .unwrap()
-    }
-
-    async fn get_dataset_summary(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> odf::DatasetSummary {
-        let resolved_dataset = self.resolve_dataset(dataset_handle).await;
-        resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
             .await
             .unwrap()
     }

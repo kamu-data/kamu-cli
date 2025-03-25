@@ -8,13 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use file_utils::OwnedFile;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use odf_dataset::*;
 use odf_metadata::*;
 use odf_storage::*;
-use serde::yaml::Manifest;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,146 +50,6 @@ where
             info_repo,
             storage_internal_url,
         }
-    }
-
-    async fn read_summary(&self) -> Result<Option<DatasetSummary>, GetSummaryError> {
-        let data = match self.info_repo.get("summary").await {
-            Ok(data) => data,
-            Err(GetNamedError::NotFound(_)) => return Ok(None),
-            Err(GetNamedError::Access(e)) => return Err(GetSummaryError::Access(e)),
-            Err(GetNamedError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
-        };
-
-        let manifest: Manifest<DatasetSummary> = serde_yaml::from_slice(&data[..]).int_err()?;
-
-        if manifest.kind != "DatasetSummary" {
-            return Err(InvalidObjectKind {
-                expected: "DatasetSummary".to_owned(),
-                actual: manifest.kind,
-            }
-            .int_err()
-            .into());
-        }
-
-        Ok(Some(manifest.content))
-    }
-
-    async fn write_summary(&self, summary: &DatasetSummary) -> Result<(), GetSummaryError> {
-        let manifest = Manifest {
-            kind: "DatasetSummary".to_owned(),
-            version: 1,
-            content: summary.clone(),
-        };
-
-        let data = serde_yaml::to_string(&manifest).int_err()?.into_bytes();
-
-        match self.info_repo.set("summary", &data).await {
-            Ok(()) => Ok(()),
-            Err(SetNamedError::Access(e)) => Err(GetSummaryError::Access(e)),
-            Err(SetNamedError::Internal(e)) => Err(GetSummaryError::Internal(e)),
-        }?;
-
-        Ok(())
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn update_summary(
-        &self,
-        prev: Option<DatasetSummary>,
-    ) -> Result<Option<DatasetSummary>, GetSummaryError> {
-        let current_head = match self.metadata_chain.resolve_ref(&BlockRef::Head).await {
-            Ok(h) => h,
-            Err(GetRefError::NotFound(_)) => return Ok(prev),
-            Err(GetRefError::Access(e)) => return Err(GetSummaryError::Access(e)),
-            Err(GetRefError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
-        };
-
-        let last_seen = prev.as_ref().map(|s| &s.last_block_hash);
-        if last_seen == Some(&current_head) {
-            return Ok(prev);
-        }
-
-        tracing::debug!(?current_head, ?last_seen, "Updating dataset summary");
-
-        let increment = self
-            .compute_summary_increment(&current_head, last_seen)
-            .await?;
-
-        let summary = if increment.seen_chain_beginning() {
-            // Increment includes the entire chain (most likely due to a history reset)
-            increment.into_summary()
-        } else {
-            // Increment applies to interval [head, prev.last_block_hash)
-            increment.apply_to_summary(prev.as_ref().unwrap())
-        };
-
-        self.write_summary(&summary).await?;
-
-        Ok(Some(summary))
-    }
-
-    async fn compute_summary_increment(
-        &self,
-        current_head: &Multihash,
-        last_seen: Option<&Multihash>,
-    ) -> Result<UpdateSummaryIncrement, GetSummaryError> {
-        use tokio_stream::StreamExt;
-
-        let mut block_stream =
-            self.metadata_chain
-                .iter_blocks_interval(current_head, last_seen, true);
-        let mut increment = UpdateSummaryIncrement {
-            seen_head: Some(current_head.clone()),
-            ..Default::default()
-        };
-
-        while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-            match block.event {
-                MetadataEvent::Seed(_) => {
-                    increment.seen_seed = true;
-                }
-                MetadataEvent::AddData(add_data) => {
-                    increment.seen_last_pulled.get_or_insert(block.system_time);
-
-                    if let Some(output_data) = add_data.new_data {
-                        let iv = output_data.offset_interval;
-                        increment.seen_num_records += iv.end - iv.start + 1;
-
-                        increment.seen_data_size += output_data.size;
-                    }
-
-                    if let Some(checkpoint) = add_data.new_checkpoint {
-                        increment.seen_checkpoints_size += checkpoint.size;
-                    }
-                }
-                MetadataEvent::ExecuteTransform(execute_transform) => {
-                    increment.seen_last_pulled.get_or_insert(block.system_time);
-
-                    if let Some(output_data) = execute_transform.new_data {
-                        let iv = output_data.offset_interval;
-                        increment.seen_num_records += iv.end - iv.start + 1;
-
-                        increment.seen_data_size += output_data.size;
-                    }
-
-                    if let Some(checkpoint) = execute_transform.new_checkpoint {
-                        increment.seen_checkpoints_size += checkpoint.size;
-                    }
-                }
-                MetadataEvent::SetDataSchema(_)
-                | MetadataEvent::SetAttachments(_)
-                | MetadataEvent::SetInfo(_)
-                | MetadataEvent::SetLicense(_)
-                | MetadataEvent::SetVocab(_)
-                | MetadataEvent::SetTransform(_)
-                | MetadataEvent::SetPollingSource(_)
-                | MetadataEvent::DisablePollingSource(_)
-                | MetadataEvent::AddPushSource(_)
-                | MetadataEvent::DisablePushSource(_) => (),
-            }
-        }
-
-        Ok(increment)
     }
 
     async fn prepare_objects(
@@ -299,47 +158,6 @@ where
         }
 
         Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-struct UpdateSummaryIncrement {
-    seen_seed: bool,
-    seen_head: Option<Multihash>,
-    seen_last_pulled: Option<DateTime<Utc>>,
-    // TODO: No longer needs to be incremental - can be based on `prevOffset`
-    seen_num_records: u64,
-    seen_data_size: u64,
-    seen_checkpoints_size: u64,
-}
-
-impl UpdateSummaryIncrement {
-    fn seen_chain_beginning(&self) -> bool {
-        // Seed blocks are guaranteed to appear only once in a chain, and only at the
-        // very beginning
-        self.seen_seed
-    }
-
-    fn into_summary(self) -> DatasetSummary {
-        DatasetSummary {
-            last_block_hash: self.seen_head.unwrap(),
-            last_pulled: self.seen_last_pulled,
-            num_records: self.seen_num_records,
-            data_size: self.seen_data_size,
-            checkpoints_size: self.seen_checkpoints_size,
-        }
-    }
-
-    fn apply_to_summary(self, summary: &DatasetSummary) -> DatasetSummary {
-        DatasetSummary {
-            last_block_hash: self.seen_head.unwrap(),
-            last_pulled: self.seen_last_pulled.or(summary.last_pulled),
-            num_records: summary.num_records + self.seen_num_records,
-            data_size: summary.data_size + self.seen_data_size,
-            checkpoints_size: summary.checkpoints_size + self.seen_checkpoints_size,
-        }
     }
 }
 
@@ -548,18 +366,6 @@ where
             new_checkpoint,
             new_watermark: params.new_watermark,
         })
-    }
-
-    async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError> {
-        let summary = self.read_summary().await?;
-
-        let summary = if opts.update_if_stale {
-            self.update_summary(summary).await?
-        } else {
-            summary
-        };
-
-        summary.ok_or_else(|| GetSummaryError::EmptyDataset)
     }
 
     fn get_storage_internal_url(&self) -> &Url {

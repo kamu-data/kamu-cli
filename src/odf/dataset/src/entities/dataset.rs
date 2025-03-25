@@ -17,7 +17,7 @@ use odf_storage::*;
 use thiserror::Error;
 use url::Url;
 
-use crate::{AppendError, BlockRef, DatasetSummary, MetadataChain};
+use crate::{AppendError, BlockRef, MetadataChain};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -77,24 +77,6 @@ pub trait Dataset: Send + Sync {
     fn as_data_repo(&self) -> &dyn ObjectRepository;
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository;
     fn as_info_repo(&self) -> &dyn NamedObjectRepository;
-
-    /// Returns a brief summary of the dataset
-    async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug)]
-pub struct GetSummaryOpts {
-    pub update_if_stale: bool,
-}
-
-impl Default for GetSummaryOpts {
-    fn default() -> Self {
-        Self {
-            update_if_stale: true,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,26 +125,6 @@ pub struct CommitResult {
 pub struct InvalidObjectKind {
     pub expected: String,
     pub actual: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum GetSummaryError {
-    #[error("Dataset is empty")]
-    EmptyDataset,
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
