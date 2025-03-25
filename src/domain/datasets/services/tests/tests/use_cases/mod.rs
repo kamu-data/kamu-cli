@@ -17,4 +17,3 @@ mod test_delete_dataset_use_case;
 mod test_get_dataset_downstream_dependencies_use_case;
 mod test_get_dataset_upstream_dependencies_use_case;
 mod test_rename_dataset_use_case;
-mod test_view_dataset_use_case;

@@ -1,23 +1,70 @@
-actor UserActor {}
+########################################################################################################################
+# Resources
+########################################################################################################################
 
-resource DatasetResource {
-    permissions = ["read", "write"];
+actor UserActor {
+    # ┌──────────────────────┬────────┐
+    # │        Field         │  Type  │
+    # ├──────────────────────┼────────┤
+    # │ account_id           │ String │
+    # │ anonymous (reserved) │ bool   │
+    # │ is_admin             │ bool   │
+    # └──────────────────────┴────────┘
 }
 
-has_permission(actor: UserActor, "read", dataset: DatasetResource) if
-    actor.is_admin or
+resource DatasetResource {
+    # ┌────────────────────┬───────────────────────────────────────────────┐
+    # │       Field        │                     Type                      │
+    # ├────────────────────┼───────────────────────────────────────────────┤
+    # │ owner_account_id   │ String                                        │
+    # │ allows_public_read │ bool                                          │
+    # │ authorized_users   │ Dictionary<                                   │
+    # │                    │   authorized_account_id: String,              │
+    # │                    │   role: ["Reader", "Editor", "Maintainer"]    │
+    # │                    │ >                                             │
+    # └────────────────────┴───────────────────────────────────────────────┘
+
+    permissions = ["read", "write", "maintain", "own"];
+}
+
+########################################################################################################################
+# Rules
+########################################################################################################################
+
+allow(user: UserActor, action: String, dataset: DatasetResource) if
+    has_permission(user, action, dataset);
+
+########################################################################################################################
+
+has_permission(user: UserActor, "read", dataset: DatasetResource) if
     dataset.allows_public_read or
-    dataset.owner_account_id == actor.account_id or (
-        actor_account_id = actor.account_id and
-        dataset.authorized_users.(actor_account_id) in ["Reader", "Editor"]
-    );
+    user.is_admin or
+    user_owns_dataset(user, dataset) or
+    user_authorized_for_dataset(user, dataset, ["Reader", "Editor", "Maintainer"]);
 
-has_permission(actor: UserActor, "write", dataset: DatasetResource) if
-    actor.is_admin or
-    dataset.owner_account_id == actor.account_id or (
-        actor_account_id = actor.account_id and
-        dataset.authorized_users.(actor_account_id) == "Editor"
-    );
+has_permission(user: UserActor, "write", dataset: DatasetResource) if
+    user.is_admin or
+    user_owns_dataset(user, dataset) or
+    user_authorized_for_dataset(user, dataset, ["Editor", "Maintainer"]);
 
-allow(actor: UserActor, action: String, dataset: DatasetResource) if
-    has_permission(actor, action, dataset);
+has_permission(user: UserActor, "maintain", dataset: DatasetResource) if
+    user.is_admin or
+    user_owns_dataset(user, dataset) or
+    user_authorized_for_dataset(user, dataset, ["Maintainer"]);
+
+has_permission(user: UserActor, "own", dataset: DatasetResource) if
+    user.is_admin or
+    user_owns_dataset(user, dataset);
+
+########################################################################################################################
+# Helpers
+########################################################################################################################
+
+user_owns_dataset(user: UserActor, dataset: DatasetResource) if
+    dataset.owner_account_id == user.account_id;
+
+user_authorized_for_dataset(user: UserActor, dataset: DatasetResource, allowed_roles: List) if
+    user_id = user.account_id and
+    dataset.authorized_users.(user_id) in allowed_roles;
+
+########################################################################################################################

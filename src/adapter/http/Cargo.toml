@@ -36,6 +36,7 @@ http-common = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-auth-rebac = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
 odf = { workspace = true, features = ["http", "lfs", "s3", "utoipa"] }
@@ -113,11 +114,12 @@ kamu-core = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
-kamu-datasets-services = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
-observability = { workspace = true}
+observability = { workspace = true }
 test-utils = { workspace = true }
 
 fs_extra = "1.3"                                               # Recursive folder copy

@@ -174,13 +174,14 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
         .as_str()
         .map(ToOwned::to_owned)
         .unwrap();
-
-    kamu_api_server_client.set_token(Some(access_token));
-
-    let account_id = login_response["auth"]["login"]["account"]["id"]
+    let account_id_str = login_response["auth"]["login"]["account"]["id"]
         .as_str()
-        .map(ToOwned::to_owned)
         .unwrap();
+    let account_id = odf::AccountID::from_did_str(account_id_str).unwrap();
+
+    kamu_api_server_client
+        .auth()
+        .set_logged_as(access_token, account_id.clone());
 
     // 2. Grub a kamu access token
     let create_token_response = kamu_api_server_client
@@ -204,7 +205,7 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
             }
             "#,
             )
-            .replace("<account_id>", account_id.as_str())
+            .replace("<account_id>", account_id_str)
             .as_str(),
         )
         .await
@@ -214,7 +215,9 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
         .map(ToOwned::to_owned)
         .unwrap();
 
-    kamu_api_server_client.set_token(Some(kamu_token));
+    kamu_api_server_client
+        .auth()
+        .set_logged_as(kamu_token, account_id);
 
     // 3. Create dataset from snapshot with new token
     kamu_api_server_client

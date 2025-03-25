@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use bon::bon;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
-use kamu_core::auth::AlwaysHappyDatasetActionAuthorizer;
+use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
+use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
@@ -23,11 +26,16 @@ use time_source::SystemTimeSourceDefault;
 
 pub struct BaseGQLDatasetHarness {
     _tempdir: TempDir,
-    catalog: dill::Catalog,
+    catalog: Catalog,
 }
 
+#[bon]
 impl BaseGQLDatasetHarness {
-    pub fn new(tenancy_config: TenancyConfig) -> Self {
+    #[builder]
+    pub fn new(
+        tenancy_config: TenancyConfig,
+        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -37,11 +45,10 @@ impl BaseGQLDatasetHarness {
         std::fs::create_dir(&run_info_dir).unwrap();
 
         let catalog = {
-            let mut b = dill::CatalogBuilder::new();
+            let mut b = CatalogBuilder::new();
 
             b.add_builder(
-                messaging_outbox::OutboxImmediateImpl::builder()
-                    .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
+                OutboxImmediateImpl::builder().with_consumer_filter(ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<DidGeneratorDefault>()
@@ -50,13 +57,11 @@ impl BaseGQLDatasetHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
+            .add::<DatabaseBackedOdfDatasetLfsBuilderImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
-            .add::<ViewDatasetUseCaseImpl>()
             .add::<SystemTimeSourceDefault>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
             .add::<DatasetReferenceServiceImpl>()
             .add::<InMemoryDatasetReferenceRepository>()
             .add::<DependencyGraphServiceImpl>()
@@ -64,7 +69,15 @@ impl BaseGQLDatasetHarness {
             .add::<DependencyGraphImmediateListener>()
             .add::<DatasetEntryServiceImpl>()
             .add::<InMemoryDatasetEntryRepository>()
+            .add::<RebacDatasetRegistryFacadeImpl>()
             .add_value(RunInfoDir::new(run_info_dir));
+
+            if let Some(mock) = mock_dataset_action_authorizer {
+                b.add_value(mock)
+                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+            } else {
+                b.add::<AlwaysHappyDatasetActionAuthorizer>();
+            }
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

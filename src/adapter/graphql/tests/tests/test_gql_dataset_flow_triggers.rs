@@ -1024,7 +1024,9 @@ struct FlowTriggerHarness {
 
 impl FlowTriggerHarness {
     async fn make() -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::SingleTenant)
+            .build();
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());

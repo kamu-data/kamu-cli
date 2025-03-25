@@ -10,33 +10,47 @@
 use std::collections::HashMap;
 
 use internal_error::InternalError;
+use kamu_core::{auth, ResolvedDataset};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Private Datasets: replace with RebacDatasetRegistry
 #[async_trait::async_trait]
-pub trait ViewDatasetUseCase: Send + Sync {
-    async fn execute(
+pub trait RebacDatasetRegistryFacade: Send + Sync {
+    async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<odf::DatasetHandle, ViewDatasetUseCaseError>;
+        action: auth::DatasetAction,
+    ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError>;
 
-    async fn execute_multi(
+    async fn resolve_dataset_by_ref(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        action: auth::DatasetAction,
+    ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError>;
+
+    async fn resolve_dataset_by_handle(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        action: auth::DatasetAction,
+    ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError>;
+
+    async fn classify_dataset_refs_by_allowance(
         &self,
         dataset_refs: Vec<odf::DatasetRef>,
-    ) -> Result<ViewMultiResponse, InternalError>;
+        action: auth::DatasetAction,
+    ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct ViewMultiResponse {
-    pub viewable_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
-    pub inaccessible_refs: Vec<(odf::DatasetRef, ViewDatasetUseCaseError)>,
+pub struct ClassifyDatasetRefsByAllowanceResponse {
+    pub accessible_resolved_refs: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
+    pub inaccessible_refs: Vec<(odf::DatasetRef, RebacDatasetRefUnresolvedError)>,
 }
 
-impl ViewMultiResponse {
+impl ClassifyDatasetRefsByAllowanceResponse {
     pub fn into_inaccessible_input_datasets_message(
         self,
         dataset_ref_alias_map: &HashMap<&odf::DatasetRef, &String>,
@@ -62,12 +76,33 @@ impl ViewMultiResponse {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum ViewDatasetUseCaseError {
+pub enum RebacDatasetRefUnresolvedError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
 
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum RebacDatasetIdUnresolvedError {
     #[error(transparent)]
     Access(
         #[from]

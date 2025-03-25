@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod rebac_dataset_registry_facade;
 mod rebac_service;
 
+pub use rebac_dataset_registry_facade::*;
 pub use rebac_service::*;

@@ -156,7 +156,6 @@ pub fn get_command(
             )),
             cli::InspectSubCommand::Query(sc) => Box::new(InspectQueryCommand::new(
                 cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
                 validate_dataset_ref(cli_catalog, sc.dataset)?,
                 cli_catalog.get_one()?,
             )),

@@ -19,6 +19,7 @@ use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::*;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
@@ -126,7 +127,6 @@ impl ServerSideS3Harness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()
-                .add::<ViewDatasetUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
@@ -140,6 +140,7 @@ impl ServerSideS3Harness {
                 .add_value(jwt_authentication_config)
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(predefined_accounts_config);
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);

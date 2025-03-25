@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
-use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::auth::{self, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -28,16 +28,21 @@ impl Datasets {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Dataset>> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn ViewDatasetUseCase);
+        let rebac_dataset_registry_facade = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
 
-        let handle = match view_dataset_use_case.execute(dataset_ref).await {
+        let resolve_res = rebac_dataset_registry_facade
+            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Read)
+            .await;
+        let handle = match resolve_res {
             Ok(handle) => Ok(handle),
-            Err(e) => match e {
-                ViewDatasetUseCaseError::NotFound(_) | ViewDatasetUseCaseError::Access(_) => {
-                    return Ok(None)
+            Err(e) => {
+                use RebacDatasetRefUnresolvedError as E;
+
+                match e {
+                    E::NotFound(_) | E::Access(_) => return Ok(None),
+                    e @ E::Internal(_) => Err(e.int_err()),
                 }
-                unexpected_error => Err(unexpected_error.int_err()),
-            },
+            }
         }?;
         let account = Account::from_dataset_alias(ctx, &handle.alias)
             .await?
@@ -92,7 +97,7 @@ impl Datasets {
         let account_owned_datasets_stream =
             dataset_registry.all_dataset_handles_by_owner(account_name);
         let readable_dataset_handles_stream = dataset_action_authorizer
-            .filtered_datasets_stream(account_owned_datasets_stream, DatasetAction::Read);
+            .filtered_datasets_stream(account_owned_datasets_stream, auth::DatasetAction::Read);
         let mut accessible_datasets_handles = readable_dataset_handles_stream
             .try_collect::<Vec<_>>()
             .await?;

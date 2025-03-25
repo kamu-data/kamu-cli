@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use futures::TryStreamExt;
@@ -3069,7 +3067,9 @@ struct FlowRunsHarnessOverrides {
 
 impl FlowRunsHarness {
     async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::SingleTenant)
+            .build();
 
         let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
 

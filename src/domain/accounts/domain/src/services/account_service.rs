@@ -9,10 +9,11 @@
 
 use std::collections::HashMap;
 
+use database_common::PaginationOpts;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Account, GetAccountByIdError};
+use crate::{Account, AccountPageStream, GetAccountByIdError, SearchAccountsByNamePatternFilters};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +48,13 @@ pub trait AccountService: Sync + Send {
         &self,
         account_id: &odf::AccountID,
     ) -> Result<Option<odf::AccountName>, InternalError>;
+
+    fn search_accounts_by_name_pattern<'a>(
+        &'a self,
+        name_pattern: &'a str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream<'a>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

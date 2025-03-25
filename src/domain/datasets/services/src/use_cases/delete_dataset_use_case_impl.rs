@@ -10,9 +10,9 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::{DatasetRegistry, DependencyGraphService};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::{auth, DatasetRegistry, DependencyGraphService};
 use kamu_datasets::{
     DanglingReferenceError,
     DatasetLifecycleMessage,
@@ -32,7 +32,7 @@ pub struct DeleteDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     outbox: Arc<dyn Outbox>,
 }
@@ -42,7 +42,7 @@ impl DeleteDatasetUseCaseImpl {
         dataset_registry: Arc<dyn DatasetRegistry>,
         dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
         dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
@@ -50,7 +50,7 @@ impl DeleteDatasetUseCaseImpl {
             dataset_registry,
             dataset_entry_writer,
             dataset_storage_unit_writer,
-            dataset_action_authorizer,
+            rebac_dataset_registry_facade,
             dependency_graph_service,
             outbox,
         }
@@ -72,6 +72,8 @@ impl DeleteDatasetUseCaseImpl {
         if !downstream_dataset_ids.is_empty() {
             let mut dangling_children = Vec::with_capacity(downstream_dataset_ids.len());
             for downstream_dataset_id in downstream_dataset_ids {
+                // Intentionally checking downstream datasets without considering dataset
+                // visibility
                 match self
                     .dataset_registry
                     .resolve_dataset_handle_by_ref(&downstream_dataset_id.as_local_ref())
@@ -106,11 +108,12 @@ impl DeleteDatasetUseCaseImpl {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "DeleteDatasetUseCase::execute_via_ref",
+        name = DeleteDatasetUseCaseImpl_execute_via_ref,
         skip_all,
         fields(dataset_ref)
     )]
@@ -118,48 +121,26 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<(), DeleteDatasetError> {
-        let dataset_handle = match self
-            .dataset_registry
-            .resolve_dataset_handle_by_ref(dataset_ref)
+        // Resolve handle
+        let dataset_handle = self
+            .rebac_dataset_registry_facade
+            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Own)
             .await
-        {
-            Ok(h) => Ok(h),
-            Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
-                Err(DeleteDatasetError::NotFound(e))
-            }
-            Err(odf::DatasetRefUnresolvedError::Internal(e)) => {
-                Err(DeleteDatasetError::Internal(e))
-            }
-        }?;
-
-        self.execute_via_handle(&dataset_handle).await
-    }
-
-    #[tracing::instrument(
-        level = "info",
-        name = "DeleteDatasetUseCase::execute_via_handle",
-        skip_all,
-        fields(dataset_handle)
-    )]
-    async fn execute_via_handle(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), DeleteDatasetError> {
-        // Permission check
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
-            .await
-            .map_err(|e| match e {
-                DatasetActionUnauthorizedError::Access(e) => DeleteDatasetError::Access(e),
-                DatasetActionUnauthorizedError::Internal(e) => DeleteDatasetError::Internal(e),
+            .map_err(|e| {
+                use RebacDatasetRefUnresolvedError as E;
+                match e {
+                    E::NotFound(e) => DeleteDatasetError::NotFound(e),
+                    E::Access(e) => DeleteDatasetError::Access(e),
+                    e @ E::Internal(_) => DeleteDatasetError::Internal(e.int_err()),
+                }
             })?;
 
         // Validate against dangling ref
-        self.ensure_no_dangling_references(dataset_handle).await?;
+        self.ensure_no_dangling_references(&dataset_handle).await?;
 
         // Remove entry
         self.dataset_entry_writer
-            .remove_entry(dataset_handle)
+            .remove_entry(&dataset_handle)
             .await?;
 
         // Do actual delete
@@ -171,11 +152,24 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::deleted(dataset_handle.id.clone()),
+                DatasetLifecycleMessage::deleted(dataset_handle.id),
             )
             .await?;
 
         Ok(())
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = DeleteDatasetUseCaseImpl_execute_via_handle,
+        skip_all,
+        fields(dataset_handle)
+    )]
+    async fn execute_via_handle(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<(), DeleteDatasetError> {
+        self.execute_via_ref(&dataset_handle.as_local_ref()).await
     }
 }
 

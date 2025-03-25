@@ -16,18 +16,18 @@ use kamu_auth_rebac::{
     AccountProperties,
     AccountPropertyName,
     AccountToDatasetRelation,
+    AuthorizedAccount,
     DatasetProperties,
     DatasetPropertyName,
-    DeleteEntitiesRelationError,
     DeleteEntityPropertiesError,
     DeleteEntityPropertyError,
     DeletePropertiesError,
-    DeleteRelationError,
+    DeleteSubjectEntitiesObjectEntityRelationsError,
+    EntitiesWithRelation,
     Entity,
     EntityWithRelation,
+    GetObjectEntityRelationsError,
     GetPropertiesError,
-    InsertEntitiesRelationError,
-    InsertRelationError,
     PropertiesCountError,
     PropertyName,
     PropertyValue,
@@ -35,8 +35,10 @@ use kamu_auth_rebac::{
     RebacService,
     Relation,
     SetEntityPropertyError,
+    SetRelationError,
     SubjectEntityRelationsError,
     UnsetEntityPropertyError,
+    UnsetRelationError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -254,63 +256,60 @@ impl RebacService for RebacServiceImpl {
         Ok(dataset_properties_map)
     }
 
-    async fn insert_account_dataset_relation(
+    async fn set_account_dataset_relation(
         &self,
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), InsertRelationError> {
-        use futures::FutureExt;
+    ) -> Result<(), SetRelationError> {
+        let account_id_stack = account_id.as_did_str().to_stack_string();
+        let account_entity = Entity::new_account(account_id_stack.as_str());
 
-        let account_id = account_id.as_did_str().to_stack_string();
-        let account_entity = Entity::new_account(account_id.as_str());
+        let dataset_id_stack = dataset_id.as_did_str().to_stack_string();
+        let dataset_entity = Entity::new_dataset(dataset_id_stack.as_str());
 
-        let dataset_id = dataset_id.as_did_str().to_stack_string();
-        let dataset_entity = Entity::new_dataset(dataset_id.as_str());
+        // Removes an existing role (if any), ...
+        self.unset_accounts_dataset_relations(&[account_id], dataset_id)
+            .await
+            .int_err()?;
 
+        // ... before setting up a new one.
         self.rebac_repo
             .insert_entities_relation(
                 &account_entity,
                 Relation::AccountToDataset(relationship),
                 &dataset_entity,
             )
-            .map(|res| match res {
-                Ok(_) => Ok(()),
-                Err(err) => match err {
-                    InsertEntitiesRelationError::Duplicate(_) => Ok(()),
-                    InsertEntitiesRelationError::Internal(e) => {
-                        Err(InsertRelationError::Internal(e))
-                    }
-                },
-            })
             .await
+            .int_err()?;
+
+        Ok(())
     }
 
-    async fn delete_account_dataset_relation(
+    async fn unset_accounts_dataset_relations(
         &self,
-        account_id: &odf::AccountID,
-        relationship: AccountToDatasetRelation,
+        account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), DeleteRelationError> {
-        let account_id = account_id.as_did_str().to_stack_string();
-        let account_entity = Entity::new_account(account_id.as_str());
+    ) -> Result<(), UnsetRelationError> {
+        let account_entities = account_ids
+            .iter()
+            .map(|id| Entity::new_account(id.to_string()))
+            .collect::<Vec<_>>();
 
         let dataset_id = dataset_id.as_did_str().to_stack_string();
         let dataset_entity = Entity::new_dataset(dataset_id.as_str());
 
         match self
             .rebac_repo
-            .delete_entities_relation(
-                &account_entity,
-                Relation::AccountToDataset(relationship),
-                &dataset_entity,
-            )
+            .delete_subject_entities_object_entity_relations(account_entities, &dataset_entity)
             .await
         {
             Ok(_) => Ok(()),
-            Err(err) => match err {
-                DeleteEntitiesRelationError::NotFound(_) => Ok(()),
-                DeleteEntitiesRelationError::Internal(e) => Err(DeleteRelationError::Internal(e)),
+            Err(e) => match e {
+                DeleteSubjectEntitiesObjectEntityRelationsError::NotFound(_) => Ok(()),
+                e @ DeleteSubjectEntitiesObjectEntityRelationsError::Internal(_) => {
+                    Err(e.int_err().into())
+                }
             },
         }
     }
@@ -328,6 +327,77 @@ impl RebacService for RebacServiceImpl {
             .await?;
 
         Ok(object_entities)
+    }
+
+    async fn get_authorized_accounts(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<AuthorizedAccount>, GetObjectEntityRelationsError> {
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
+        let dataset_entity = Entity::new_dataset(dataset_id.as_str());
+
+        let subject_entities = self
+            .rebac_repo
+            .get_object_entity_relations(&dataset_entity)
+            .await?;
+
+        let mut authorized_accounts = Vec::with_capacity(subject_entities.len());
+        for EntityWithRelation { entity, relation } in subject_entities {
+            let account_id = odf::AccountID::from_did_str(&entity.entity_id).int_err()?;
+
+            match relation {
+                Relation::AccountToDataset(role) => {
+                    let authorized_account = AuthorizedAccount { account_id, role };
+
+                    authorized_accounts.push(authorized_account);
+                }
+            }
+        }
+
+        Ok(authorized_accounts)
+    }
+
+    async fn get_authorized_accounts_by_ids(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<HashMap<odf::DatasetID, Vec<AuthorizedAccount>>, GetObjectEntityRelationsError>
+    {
+        let dataset_entities = dataset_ids
+            .iter()
+            .map(|id| Entity::new_dataset(id.to_string()))
+            .collect::<Vec<_>>();
+
+        let entities_with_relations = self
+            .rebac_repo
+            .get_object_entities_relations(&dataset_entities[..])
+            .await
+            .int_err()?;
+
+        let mut dataset_accounts_relation_map = HashMap::new();
+
+        for entities_with_relation in entities_with_relations {
+            let EntitiesWithRelation {
+                subject_entity,
+                relation,
+                object_entity,
+            } = entities_with_relation;
+
+            let account_id = odf::AccountID::from_did_str(&subject_entity.entity_id).int_err()?;
+            let dataset_id = odf::DatasetID::from_did_str(&object_entity.entity_id).int_err()?;
+
+            match relation {
+                Relation::AccountToDataset(role) => {
+                    let authorized_accounts = dataset_accounts_relation_map
+                        .entry(dataset_id)
+                        .or_insert_with(Vec::new);
+                    let authorized_account = AuthorizedAccount { account_id, role };
+
+                    authorized_accounts.push(authorized_account);
+                }
+            }
+        }
+
+        Ok(dataset_accounts_relation_map)
     }
 }
 

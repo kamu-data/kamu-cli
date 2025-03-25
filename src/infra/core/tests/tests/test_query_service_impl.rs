@@ -22,6 +22,7 @@ use kamu::domain::*;
 use kamu::testing::{MockDatasetActionAuthorizer, ParquetWriterHelper};
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -164,6 +165,7 @@ fn create_catalog_with_local_workspace(
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .add::<RebacDatasetRegistryFacadeImpl>()
         .build()
 }
 
@@ -195,6 +197,7 @@ async fn create_catalog_with_s3_workspace(
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .add::<RebacDatasetRegistryFacadeImpl>()
         .build()
 }
 

@@ -11,9 +11,18 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.230.0] - 2025-03-25
+### Added
+- Private Datasets, access sharing:
+  - ReBAC: there can be only one role between a subject (account) and an object (dataset)
+  - ReBAC: Added `RebacDatasetRegistryFacade` to simplify work with authorization validation
+  - GQL: CRUD Collaboration API
+  - GQL: Implemented API for searching by account name
+  - OSO: Added `maintain` & `own` permissions in addition to `read` & `write`
 ### Fixed
-- Flow APIs: correctly returns response for dataset with cleaned blocks 
+- Flow APIs: correctly returns response for dataset with cleaned blocks
+- Private Datasets:
+  - GQL: Correct processing of access permissions when viewing flows of another account
 
 ## [0.229.0] - 2025-03-24
 ### Added
@@ -29,7 +38,6 @@ Recommendation: for ease of reading, use the following order:
 - Flow: Updated the `BatchingRule` trigger to accept 0 for both properties(`min_records_to_await` and `max_batching_interval`), enabling dependency flow execution even when no data is added to the root dataset.
 ### Fixed
 - HTTP & GQL API: Fixed internal error when query contains an unknown column
-
 
 ## [0.228.0] - 2025-03-19
 ### Added

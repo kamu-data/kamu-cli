@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{auth, ServerUrlConfig};
 
 use crate::prelude::*;
@@ -36,16 +37,22 @@ impl Dataset {
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<TransformInputDataset> {
-        let view_dataset_use_case = from_catalog_n!(ctx, dyn kamu_datasets::ViewDatasetUseCase);
+        let rebac_dataset_registry_facade = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
 
-        let handle = match view_dataset_use_case.execute(dataset_ref).await {
+        let resolve_res = rebac_dataset_registry_facade
+            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Read)
+            .await;
+        let handle = match resolve_res {
             Ok(handle) => Ok(handle),
-            Err(e) => match e {
-                kamu_datasets::ViewDatasetUseCaseError::Access(_) => {
-                    return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
+            Err(e) => {
+                use RebacDatasetRefUnresolvedError as E;
+                match e {
+                    E::Access(_) => {
+                        return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
+                    }
+                    e @ (E::NotFound(_) | E::Internal(_)) => Err(e.int_err()),
                 }
-                unexpected_error => Err(unexpected_error.int_err()),
-            },
+            }
         }?;
 
         let account = Account::from_dataset_alias(ctx, &handle.alias)
@@ -171,25 +178,49 @@ impl Dataset {
     /// Permissions of the current user
     #[tracing::instrument(level = "info", name = Dataset_permissions, skip_all)]
     async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
+        let logged = utils::logged_account(ctx);
+
         let allowed_actions = self
             .dataset_request_state
             .allowed_dataset_actions(ctx)
             .await?;
         let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
         let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
+        let can_maintain = allowed_actions.contains(&auth::DatasetAction::Maintain);
+        let is_owner = allowed_actions.contains(&auth::DatasetAction::Own);
 
         Ok(DatasetPermissions {
-            can_view: can_read,
-            can_delete: can_write,
-            can_rename: can_write,
-            can_commit: can_write,
-            can_schedule: can_write,
+            collaboration: DatasetCollaborationPermissions {
+                can_view: can_maintain,
+                can_update: can_maintain,
+            },
+            env_vars: DatasetEnvVarsPermissions {
+                can_view: logged && can_read,
+                can_update: can_maintain,
+            },
+            flows: DatasetFlowsPermissions {
+                can_view: logged && can_read,
+                can_run: can_maintain,
+            },
+            general: DatasetGeneralPermissions {
+                can_rename: can_maintain,
+                can_set_visibility: can_maintain,
+                can_delete: is_owner,
+            },
+            metadata: DatasetMetadataPermissions {
+                can_commit: can_write,
+            },
         })
+    }
+
+    /// Access to the dataset collaboration data
+    async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaboration> {
+        DatasetCollaboration::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Various endpoints for interacting with data
     async fn endpoints(&self, ctx: &Context<'_>) -> DatasetEndpoints<'_> {
-        let config = utils::unsafe_from_catalog_n!(ctx, ServerUrlConfig);
+        let config = from_catalog_n!(ctx, ServerUrlConfig);
 
         DatasetEndpoints::new(&self.dataset_request_state, config)
     }
@@ -231,11 +262,41 @@ pub struct PublicDatasetVisibility {
 
 #[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetPermissions {
+    collaboration: DatasetCollaborationPermissions,
+    env_vars: DatasetEnvVarsPermissions,
+    flows: DatasetFlowsPermissions,
+    general: DatasetGeneralPermissions,
+    metadata: DatasetMetadataPermissions,
+}
+
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
+pub struct DatasetCollaborationPermissions {
     can_view: bool,
-    can_delete: bool,
+    can_update: bool,
+}
+
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
+pub struct DatasetEnvVarsPermissions {
+    can_view: bool,
+    can_update: bool,
+}
+
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
+pub struct DatasetFlowsPermissions {
+    can_view: bool,
+    can_run: bool,
+}
+
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
+pub struct DatasetGeneralPermissions {
     can_rename: bool,
+    can_set_visibility: bool,
+    can_delete: bool,
+}
+
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
+pub struct DatasetMetadataPermissions {
     can_commit: bool,
-    can_schedule: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
