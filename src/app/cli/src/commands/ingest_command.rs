@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 
 use super::{CLIError, Command};
@@ -88,12 +87,7 @@ impl IngestCommand {
             .dataset_registry
             .get_dataset_by_handle(dataset_handle)
             .await;
-        let dataset_kind = resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?
-            .kind;
-        if dataset_kind != odf::DatasetKind::Root {
+        if resolved_dataset.get_kind() != odf::DatasetKind::Root {
             return Err(CLIError::usage_error(
                 "Ingesting data available for root datasets only",
             ));

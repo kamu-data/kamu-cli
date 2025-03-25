@@ -17,17 +17,27 @@ use kamu_datasets::CreateDatasetResult;
 pub struct ResolvedDataset {
     dataset: Arc<dyn odf::Dataset>,
     handle: odf::DatasetHandle,
+    kind: odf::DatasetKind,
 }
 
 impl ResolvedDataset {
-    pub fn new(dataset: Arc<dyn odf::Dataset>, handle: odf::DatasetHandle) -> Self {
-        Self { dataset, handle }
+    pub fn new(
+        dataset: Arc<dyn odf::Dataset>,
+        handle: odf::DatasetHandle,
+        kind: odf::DatasetKind,
+    ) -> Self {
+        Self {
+            dataset,
+            handle,
+            kind,
+        }
     }
 
     pub fn from_created(create_dataset_result: &CreateDatasetResult) -> Self {
         Self {
             dataset: create_dataset_result.dataset.clone(),
             handle: create_dataset_result.dataset_handle.clone(),
+            kind: create_dataset_result.dataset_kind,
         }
     }
 
@@ -41,6 +51,7 @@ impl ResolvedDataset {
                 store_dataset_result.dataset_id.clone(),
                 dataset_alias.clone(),
             ),
+            kind: store_dataset_result.dataset_kind,
         }
     }
 
@@ -52,6 +63,11 @@ impl ResolvedDataset {
     #[inline]
     pub fn get_id(&self) -> &odf::DatasetID {
         &self.handle.id
+    }
+
+    #[inline]
+    pub fn get_kind(&self) -> odf::DatasetKind {
+        self.kind
     }
 
     #[inline]

@@ -117,6 +117,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             head: append_result.proposed_head,
             dataset: store_result.dataset,
             dataset_handle: odf::DatasetHandle::new(store_result.dataset_id, canonical_alias),
+            dataset_kind: store_result.dataset_kind,
         })
     }
 }

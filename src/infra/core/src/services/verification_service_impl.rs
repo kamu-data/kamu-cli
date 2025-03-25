@@ -273,14 +273,7 @@ impl VerificationService for VerificationServiceImpl {
         request: VerificationRequest<ResolvedDataset>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult {
-        let dataset_kind = match request
-            .target
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-        {
-            Ok(summary) => summary.kind,
-            Err(e) => return VerificationResult::err(request.target.take_handle(), e.int_err()),
-        };
+        let dataset_kind = request.target.get_kind();
 
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
         listener.begin();

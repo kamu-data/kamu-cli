@@ -169,6 +169,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
 
         // It's okay to create a new dataset by this point
         let dataset_id = seed_block.event.dataset_id.clone();
+        let dataset_kind = seed_block.event.dataset_kind;
 
         // Create dataset
         let dataset_path = self.get_dataset_path(&dataset_id);
@@ -209,6 +210,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
 
         Ok(StoreDatasetResult {
             dataset_id,
+            dataset_kind,
             dataset,
             seed,
         })

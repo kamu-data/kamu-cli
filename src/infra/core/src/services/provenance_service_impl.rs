@@ -46,7 +46,7 @@ impl ProvenanceServiceImpl {
         dataset_handle: &odf::DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
-        let resolved_dataset = self
+        let target = self
             .rebac_dataset_registry_facade
             .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Read)
             .await
@@ -60,16 +60,11 @@ impl ProvenanceServiceImpl {
         use tokio_stream::StreamExt;
         let upstream_dependencies = self
             .dependency_graph_service
-            .get_upstream_dependencies(resolved_dataset.get_id())
+            .get_upstream_dependencies(target.get_id())
             .await
             .int_err()?
             .collect::<Vec<_>>()
             .await;
-
-        let summary = resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?;
 
         let mut resolved_inputs = Vec::new();
         for input_id in upstream_dependencies {
@@ -92,7 +87,7 @@ impl ProvenanceServiceImpl {
         let dataset_info = NodeInfo::Local {
             id: dataset_handle.id.clone(),
             alias: dataset_handle.alias.clone(),
-            kind: summary.kind,
+            kind: target.get_kind(),
             dependencies: &resolved_inputs,
         };
 

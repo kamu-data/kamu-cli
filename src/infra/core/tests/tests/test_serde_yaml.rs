@@ -18,7 +18,6 @@ fn serde_dataset_summary() {
         kind: DatasetSummary
         version: 1
         content:
-          kind: Root
           lastBlockHash: f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7
           lastPulled: 2020-01-01T12:00:00Z
           numRecords: 100
@@ -33,7 +32,6 @@ fn serde_dataset_summary() {
         kind: "DatasetSummary".to_owned(),
         version: 1,
         content: odf::DatasetSummary {
-            kind: odf::DatasetKind::Root,
             last_block_hash: odf::Multihash::from_multibase(
                 "zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr",
             )

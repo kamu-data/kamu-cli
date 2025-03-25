@@ -217,11 +217,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
                     .int_err()?;
 
                 // Skip non-derived datasets
-                let summary = target
-                    .get_summary(odf::dataset::GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-                if summary.kind != odf::DatasetKind::Derivative {
+                if target.get_kind() != odf::DatasetKind::Derivative {
                     return Ok(());
                 }
 

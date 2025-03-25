@@ -534,8 +534,12 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 .cloned()
         };
 
+        // Resolve entry
+        // TODO: error handling
+        let dataset_entry = self.get_entry(&dataset_handle.id).await.unwrap();
+
         if let Some(cached_dataset) = maybe_cached_dataset {
-            ResolvedDataset::new(cached_dataset, dataset_handle.clone())
+            ResolvedDataset::new(cached_dataset, dataset_handle.clone(), dataset_entry.kind)
         } else {
             // Note: in future we will be resolving storage repository,
             // but for now we have just a single one
@@ -551,7 +555,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 .datasets_by_id
                 .insert(dataset_handle.id.clone(), dataset.clone());
 
-            ResolvedDataset::new(dataset, dataset_handle.clone())
+            ResolvedDataset::new(dataset, dataset_handle.clone(), dataset_entry.kind)
         }
     }
 }

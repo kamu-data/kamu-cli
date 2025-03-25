@@ -173,12 +173,27 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
     }
 
     async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
+        // Get dataset from storage unit
         let dataset = self
             .dataset_storage_unit
             .get_stored_dataset_by_id(&dataset_handle.id)
             .await
             .expect("Dataset must exist");
-        ResolvedDataset::new(dataset, dataset_handle.clone())
+
+        // Knowing kind requires scanning down to Seed, but is inevitable without
+        // database
+        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
+        use odf::dataset::MetadataChainExt;
+        dataset
+            .as_metadata_chain()
+            .accept(&mut [&mut seed_visitor])
+            .await
+            .unwrap();
+        let seed = seed_visitor
+            .into_event()
+            .unwrap_or_else(|| panic!("No Seed event in the dataset {dataset_handle}"));
+
+        ResolvedDataset::new(dataset, dataset_handle.clone(), seed.dataset_kind)
     }
 }
 

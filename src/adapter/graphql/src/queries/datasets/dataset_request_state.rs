@@ -22,7 +22,6 @@ use crate::queries::*;
 pub(crate) struct DatasetRequestState {
     dataset_handle: odf::DatasetHandle,
     resolved_dataset: OnceCell<ResolvedDataset>,
-    dataset_summary: OnceCell<odf::DatasetSummary>,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
 }
 
@@ -32,7 +31,6 @@ impl DatasetRequestState {
             dataset_handle,
             allowed_dataset_actions: OnceCell::new(),
             resolved_dataset: OnceCell::new(),
-            dataset_summary: OnceCell::new(),
         }
     }
 
@@ -70,21 +68,6 @@ impl DatasetRequestState {
                     .await;
 
                 Ok(resolved_dataset)
-            })
-            .await
-    }
-
-    pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
-        self.dataset_summary
-            .get_or_try_init(|| async {
-                let resolved_dataset = self.resolved_dataset(ctx).await?;
-
-                let summary = resolved_dataset
-                    .get_summary(odf::dataset::GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-
-                Ok(summary)
             })
             .await
     }

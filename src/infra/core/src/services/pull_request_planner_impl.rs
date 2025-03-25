@@ -474,14 +474,11 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             // Pulling an existing local root or derivative dataset
             let local_handle = maybe_local_handle.unwrap();
 
-            // Read summary
-            let summary = self
+            // Resolve dataset
+            let target = self
                 .dataset_registry
                 .get_dataset_by_handle(&local_handle)
-                .await
-                .get_summary(odf::dataset::GetSummaryOpts::default())
-                .await
-                .int_err()?;
+                .await;
 
             // Plan up-stream dependencies first
             let max_dep_depth = if traverse_dependencies {
@@ -490,7 +487,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 // Without scanning upstreams, decide on depth based on Root/Derived kind.
                 // The exact depth is not important, as long as we keep `depth=>0` for derived
                 // datasets.
-                match summary.kind {
+                match target.get_kind() {
                     odf::DatasetKind::Root => -1,
                     odf::DatasetKind::Derivative => 0,
                 }
