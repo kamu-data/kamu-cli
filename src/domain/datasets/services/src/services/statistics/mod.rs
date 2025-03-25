@@ -9,8 +9,10 @@
 
 mod dataset_statistics_helper;
 mod dataset_statistics_indexer;
+mod dataset_statistics_service_impl;
 mod dataset_statistics_update_handler;
 
 pub(crate) use dataset_statistics_helper::*;
 pub use dataset_statistics_indexer::*;
+pub use dataset_statistics_service_impl::*;
 pub use dataset_statistics_update_handler::*;

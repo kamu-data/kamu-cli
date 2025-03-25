@@ -27,6 +27,7 @@ use crate::{accounts, NotInMultiTenantWorkspace};
 pub struct ListCommand {
     tenancy_config: TenancyConfig,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_statistics_service: Arc<dyn kamu_datasets::DatasetStatisticsService>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
 
@@ -267,8 +268,10 @@ impl Command for ListCommand {
                 .as_metadata_chain()
                 .resolve_ref(&odf::BlockRef::Head)
                 .await?;
-            let summary = target
-                .get_summary(odf::dataset::GetSummaryOpts::default())
+
+            let statistics = self
+                .dataset_statistics_service
+                .get_statistics(&hdl.id, &odf::BlockRef::Head)
                 .await?;
 
             name.push(hdl.alias.dataset_name.to_string());
@@ -292,9 +295,9 @@ impl Command for ListCommand {
             }
 
             kind.push(self.get_kind(&target).await?);
-            pulled.push(summary.last_pulled.map(|t| t.timestamp_micros()));
-            records.push(summary.num_records);
-            size.push(summary.data_size);
+            pulled.push(statistics.last_pulled.map(|t| t.timestamp_micros()));
+            records.push(statistics.num_records);
+            size.push(statistics.data_size);
 
             if self.detail_level > 0 {
                 let num_blocks = target
