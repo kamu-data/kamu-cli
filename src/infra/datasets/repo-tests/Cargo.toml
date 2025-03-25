@@ -24,7 +24,7 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 email-utils = { workspace = true }
-kamu-accounts = { workspace = true }
+kamu-accounts = { workspace = true, default-features = false, features = [ "testing" ]}
 kamu-datasets = { workspace = true }
 odf = { workspace = true }
 

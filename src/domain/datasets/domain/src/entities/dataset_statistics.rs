@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DatasetStatistics {
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,

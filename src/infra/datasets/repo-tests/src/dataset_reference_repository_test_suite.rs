@@ -9,44 +9,10 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::Utc;
 use dill::Catalog;
-use kamu_accounts::{Account, AccountRepository, DEFAULT_ACCOUNT_ID};
 use kamu_datasets::*;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn init_test_account(catalog: &Catalog) -> odf::AccountID {
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-    account_repo
-        .create_account(&Account::dummy())
-        .await
-        .unwrap();
-
-    DEFAULT_ACCOUNT_ID.clone()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn init_dataset_entry(
-    catalog: &Catalog,
-    account_id: &odf::AccountID,
-    dataset_id: &odf::DatasetID,
-    dataset_name: &odf::DatasetName,
-    dataset_kind: odf::DatasetKind,
-) {
-    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
-    dataset_entry_repo
-        .save_dataset_entry(&DatasetEntry {
-            id: dataset_id.clone(),
-            owner_id: account_id.clone(),
-            name: dataset_name.clone(),
-            created_at: Utc::now(),
-            kind: dataset_kind,
-        })
-        .await
-        .unwrap();
-}
+use crate::helpers::{init_dataset_entry, init_test_account};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

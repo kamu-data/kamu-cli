@@ -13,6 +13,7 @@ mod dataset_dependencies_repository_test_suite;
 mod dataset_entry_repository_test_suite;
 mod dataset_env_var_repository_test_suite;
 mod dataset_reference_repository_test_suite;
+mod dataset_statistics_repository_test_suite;
 
 mod helpers;
 
@@ -27,4 +28,7 @@ pub mod dataset_env_var_repo {
 }
 pub mod dataset_reference_repo {
     pub use crate::dataset_reference_repository_test_suite::*;
+}
+pub mod dataset_statistics_repo {
+    pub use crate::dataset_statistics_repository_test_suite::*;
 }
