@@ -85,14 +85,9 @@ impl MergeStrategyUpsertStream {
     ) -> Result<DataFrame, DataFusionErrorWrapped> {
         let rank_col = "__rank";
 
-        let with_offsets = upserts
-        .with_column(
+        let with_offsets = upserts.with_column(
             &self.vocab.offset_column,
-            datafusion::functions_window::row_number::row_number()
-                //.order_by(self.merge_strategy.sort_order())
-                //.partition_by(vec![lit(1)])
-                //.build()
-                //.int_err()?,
+            datafusion::functions_window::row_number::row_number(),
         )?;
 
         let proj = with_offsets
