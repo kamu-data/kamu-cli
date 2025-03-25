@@ -37,6 +37,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add::<DependencyGraphServiceImpl>();
     b.add::<DependencyGraphImmediateListener>();
     b.add::<DatasetReferenceServiceImpl>();
+    b.add::<DatasetStatisticsUpdateHandler>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

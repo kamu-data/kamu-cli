@@ -11,12 +11,23 @@ use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DatasetStatistics {
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,
     pub data_size: u64,
     pub checkpoints_size: u64,
+}
+
+impl DatasetStatistics {
+    pub fn with_increment(&self, increment: &DatasetStatistics) -> Self {
+        Self {
+            last_pulled: increment.last_pulled.or(self.last_pulled),
+            num_records: self.num_records + increment.num_records,
+            data_size: self.data_size + increment.data_size,
+            checkpoints_size: self.checkpoints_size + increment.checkpoints_size,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

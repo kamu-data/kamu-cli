@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{
+    DatasetEntryRemovalListener,
     DatasetStatistics,
     DatasetStatisticsNotFoundError,
     DatasetStatisticsRepository,
@@ -35,6 +36,7 @@ pub struct InMemoryDatasetStatisticsRepository {
 
 #[component(pub)]
 #[interface(dyn DatasetStatisticsRepository)]
+#[interface(dyn DatasetEntryRemovalListener)]
 #[scope(Singleton)]
 impl InMemoryDatasetStatisticsRepository {
     pub fn new() -> Self {
@@ -86,6 +88,20 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
             .or_default()
             .insert(block_ref.clone(), statistics);
 
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DatasetEntryRemovalListener for InMemoryDatasetStatisticsRepository {
+    async fn on_dataset_entry_removed(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), InternalError> {
+        let mut guard = self.state.lock().unwrap();
+        guard.statistics.remove(dataset_id);
         Ok(())
     }
 }
