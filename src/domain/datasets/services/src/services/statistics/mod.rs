@@ -7,6 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_statistics_helper;
+mod dataset_statistics_indexer;
 mod dataset_statistics_update_handler;
 
+pub(crate) use dataset_statistics_helper::*;
+pub use dataset_statistics_indexer::*;
 pub use dataset_statistics_update_handler::*;

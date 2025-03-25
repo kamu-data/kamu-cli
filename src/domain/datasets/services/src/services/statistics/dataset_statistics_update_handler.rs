@@ -21,6 +21,8 @@ use kamu_datasets::{
 };
 use messaging_outbox::*;
 
+use super::compute_dataset_statistics_increment;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
@@ -45,71 +47,21 @@ impl DatasetStatisticsUpdateHandler {
         target: ResolvedDataset,
         updated_message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
-        use odf::dataset::MetadataChainExt;
-        let mut block_stream = target.as_metadata_chain().iter_blocks_interval(
+        let increment = compute_dataset_statistics_increment(
+            target.as_metadata_chain(),
             &updated_message.new_block_hash,
             updated_message.maybe_prev_block_hash.as_ref(),
-            true,
-        );
-
-        let mut increment = DatasetStatistics::default();
-        let mut seen_seed = false;
-
-        use tokio_stream::StreamExt;
-        while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-            match block.event {
-                odf::MetadataEvent::Seed(_) => {
-                    seen_seed = true;
-                }
-                odf::MetadataEvent::AddData(add_data) => {
-                    increment.last_pulled.get_or_insert(block.system_time);
-
-                    if let Some(output_data) = add_data.new_data {
-                        let iv = output_data.offset_interval;
-                        increment.num_records += iv.end - iv.start + 1;
-
-                        increment.data_size += output_data.size;
-                    }
-
-                    if let Some(checkpoint) = add_data.new_checkpoint {
-                        increment.checkpoints_size += checkpoint.size;
-                    }
-                }
-                odf::MetadataEvent::ExecuteTransform(execute_transform) => {
-                    increment.last_pulled.get_or_insert(block.system_time);
-
-                    if let Some(output_data) = execute_transform.new_data {
-                        let iv = output_data.offset_interval;
-                        increment.num_records += iv.end - iv.start + 1;
-
-                        increment.data_size += output_data.size;
-                    }
-
-                    if let Some(checkpoint) = execute_transform.new_checkpoint {
-                        increment.checkpoints_size += checkpoint.size;
-                    }
-                }
-                odf::MetadataEvent::SetDataSchema(_)
-                | odf::MetadataEvent::SetAttachments(_)
-                | odf::MetadataEvent::SetInfo(_)
-                | odf::MetadataEvent::SetLicense(_)
-                | odf::MetadataEvent::SetVocab(_)
-                | odf::MetadataEvent::SetTransform(_)
-                | odf::MetadataEvent::SetPollingSource(_)
-                | odf::MetadataEvent::DisablePollingSource(_)
-                | odf::MetadataEvent::AddPushSource(_)
-                | odf::MetadataEvent::DisablePushSource(_) => (),
-            }
-        }
+        )
+        .await?;
 
         // If we have seen Seed, the dataset has diverged,
         // and the increment represents the updated situation
-        if seen_seed {
+        if increment.seen_seed {
             dataset_stats_repo
                 .set_dataset_statistics(
                     &updated_message.dataset_id,
                     &updated_message.block_ref,
-                    increment,
+                    increment.statistics,
                 )
                 .await
                 .int_err()
@@ -125,7 +77,7 @@ impl DatasetStatisticsUpdateHandler {
             }?;
 
             // Save old + increment as new stats
-            let new_stats = older_stats.with_increment(&increment);
+            let new_stats = older_stats.with_increment(&increment.statistics);
             dataset_stats_repo
                 .set_dataset_statistics(
                     &updated_message.dataset_id,
