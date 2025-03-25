@@ -54,7 +54,7 @@ impl RepositoryListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryListCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let mut writer = self
             .output_config
             .get_records_writer(&self.schema(), self.records_format());

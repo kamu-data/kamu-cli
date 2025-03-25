@@ -68,7 +68,7 @@ impl Command for DeleteCommand {
         }
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let dataset_handles: Vec<odf::DatasetHandle> = if self.all {
             self.dataset_registry
                 .all_dataset_handles()

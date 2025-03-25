@@ -162,7 +162,7 @@ impl NewDatasetCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for NewDatasetCommand {
     // TODO: link to documentation
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let path = self.output_path.clone().unwrap_or_else(|| {
             let mut name = String::with_capacity(100);
             name.push_str(&self.name);

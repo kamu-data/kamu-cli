@@ -55,7 +55,7 @@ impl Command for RepositoryDeleteCommand {
         }
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let repo_names: Vec<_> = if self.all {
             self.remote_repo_reg.get_all_repositories().collect()
         } else {

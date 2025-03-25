@@ -232,7 +232,7 @@ impl PullCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for PullCommand {
     #[allow(clippy::match_same_arms)]
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match (self.refs.len(), self.recursive, self.all, &self.as_name) {
             (0, _, false, _) => Err(CLIError::usage_error("Specify a dataset or pass --all")),
             (0, false, true, None) => Ok(()),

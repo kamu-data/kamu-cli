@@ -69,7 +69,7 @@ impl SearchCommand {
         num.to_formatted_string(&Locale::en)
     }
 
-    async fn search_local(&mut self) -> Result<(), CLIError> {
+    async fn search_local(&self) -> Result<(), CLIError> {
         let prompt = self.query.clone().unwrap_or_default();
         if prompt.is_empty() {
             return Err(CLIError::usage_error("Please provide a search prompt"));
@@ -123,7 +123,7 @@ impl SearchCommand {
         Ok(())
     }
 
-    async fn search_remote(&mut self) -> Result<(), CLIError> {
+    async fn search_remote(&self) -> Result<(), CLIError> {
         let mut result = self
             .search_svc
             .search(
@@ -204,7 +204,7 @@ impl SearchCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SearchCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if self.local {
             self.search_local().await
         } else {

@@ -103,7 +103,7 @@ impl NotebookCommand {
         }
     }
 
-    async fn run_datafusion(&mut self) -> Result<(), CLIError> {
+    async fn run_datafusion(&self) -> Result<(), CLIError> {
         let environment_vars = self.collect_env_vars()?;
 
         let pull_progress = PullImageProgress::new(self.output_config.clone(), "Jupyter");
@@ -173,7 +173,7 @@ impl NotebookCommand {
         Ok(())
     }
 
-    async fn run_spark(&mut self) -> Result<(), CLIError> {
+    async fn run_spark(&self) -> Result<(), CLIError> {
         let environment_vars = self.collect_env_vars()?;
 
         // Pull images
@@ -261,7 +261,7 @@ impl NotebookCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for NotebookCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let engine = self.engine.unwrap_or(SqlShellEngine::Datafusion);
 
         match engine {

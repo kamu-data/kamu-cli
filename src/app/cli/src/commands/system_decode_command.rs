@@ -28,7 +28,7 @@ impl SystemDecodeCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SystemDecodeCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let data: Vec<u8> = if self.stdin {
             let mut buf = Vec::new();
             std::io::stdin().read_to_end(&mut buf).int_err()?;

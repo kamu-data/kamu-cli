@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use clap::CommandFactory as _;
 use dill::Catalog;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
@@ -67,14 +66,11 @@ pub fn get_command(
                     None
                 },
                 cli_catalog.get_one()?,
-                cli::Cli::command(),
                 c.input,
                 c.current,
             ))
         }
-        cli::Command::Completions(c) => {
-            Box::new(CompletionsCommand::new(cli::Cli::command(), c.shell))
-        }
+        cli::Command::Completions(c) => Box::new(CompletionsCommand::new(c.shell)),
         cli::Command::Config(c) => match c.subcommand {
             cli::ConfigSubCommand::List(sc) => Box::new(ConfigListCommand::new(
                 cli_catalog.get_one()?,

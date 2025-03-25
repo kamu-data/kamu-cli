@@ -155,7 +155,7 @@ impl Command for PushCommand {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let push_results = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet

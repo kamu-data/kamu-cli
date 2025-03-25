@@ -44,7 +44,7 @@ impl ResetCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ResetCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let dataset_handle = self
             .dataset_registry
             .resolve_dataset_handle_by_ref(&self.dataset_ref)

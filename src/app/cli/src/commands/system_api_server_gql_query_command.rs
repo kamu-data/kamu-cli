@@ -29,7 +29,7 @@ impl APIServerGqlQueryCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerGqlQueryCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         // TODO: Access token? Not every GraphQL can run unauthorized
         let gql_schema = kamu_adapter_graphql::schema();
         let response = gql_schema

@@ -52,7 +52,7 @@ impl SetWatermarkCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SetWatermarkCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if self.refs.len() != 1 {
             return Err(CLIError::usage_error(
                 "Only one dataset can be provided when setting a watermark",

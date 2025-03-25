@@ -46,7 +46,7 @@ impl LogoutCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for LogoutCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if self.server_url.is_some() && self.all {
             return Err(CLIError::usage_error(
                 "Can't use --all and particular server name simultaneously",

@@ -34,7 +34,7 @@ impl ConfigListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigListCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let result = self.config_svc.list(
             if self.user {
                 ConfigScope::User
@@ -79,7 +79,7 @@ impl ConfigGetCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigGetCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let scope = if self.user {
             ConfigScope::User
         } else {
@@ -125,7 +125,7 @@ impl ConfigSetCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigSetCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let scope = if self.user {
             ConfigScope::User
         } else {

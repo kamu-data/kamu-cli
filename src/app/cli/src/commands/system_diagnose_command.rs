@@ -71,7 +71,7 @@ impl SystemDiagnoseCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SystemDiagnoseCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let mut out = std::io::stdout();
 
         let mut diagnostic_checks: Vec<Box<dyn DiagnosticCheck>> = vec![

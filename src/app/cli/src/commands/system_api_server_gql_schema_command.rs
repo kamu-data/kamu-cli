@@ -20,7 +20,7 @@ impl APIServerGqlSchemaCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerGqlSchemaCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         println!("{}", self.get_schema());
         Ok(())
     }

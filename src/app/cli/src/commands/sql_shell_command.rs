@@ -256,7 +256,7 @@ impl Command for SqlShellCommand {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let engine = self.engine.unwrap_or(SqlShellEngine::Datafusion);
 
         match (engine, &self.command, &self.url, &self.output_path) {

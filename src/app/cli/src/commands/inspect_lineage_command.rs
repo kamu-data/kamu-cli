@@ -95,7 +95,7 @@ impl InspectLineageCommand {
 // TODO: Support temporality and evolution
 #[async_trait::async_trait(?Send)]
 impl Command for InspectLineageCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         use futures::{StreamExt, TryStreamExt};
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
             self.dataset_registry

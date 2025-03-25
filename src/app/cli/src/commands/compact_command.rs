@@ -97,7 +97,7 @@ impl CompactCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for CompactCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if self.dataset_ref_patterns.is_empty() {
             return Err(CLIError::usage_error("Specify a dataset or a pattern"));
         }

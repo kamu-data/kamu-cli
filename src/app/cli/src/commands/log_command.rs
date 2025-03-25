@@ -92,7 +92,7 @@ impl LogCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for LogCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         // TODO: Private Datasets: request not all
         //       Private Datasets: Checking dataset accessibility in `kamu` subcommands
         //       (multi-tenant workspace)

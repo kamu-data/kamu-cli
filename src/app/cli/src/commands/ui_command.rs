@@ -71,7 +71,7 @@ impl UICommand {
 #[cfg(feature = "web-ui")]
 #[async_trait::async_trait(?Send)]
 impl Command for UICommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let web_server = crate::explore::WebUIServer::new(
             self.server_catalog.clone(),
             self.tenancy_config,
@@ -127,7 +127,7 @@ impl Command for UICommand {
 #[cfg(not(feature = "web-ui"))]
 #[async_trait::async_trait(?Send)]
 impl Command for UICommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         Err(CLIError::usage_error(
             "This version of kamu was compiled without the embedded Web UI",
         ))

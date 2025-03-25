@@ -91,7 +91,7 @@ impl AliasListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AliasListCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.maybe_dataset_ref {
             let hdl = self
                 .dataset_registry

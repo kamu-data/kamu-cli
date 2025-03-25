@@ -36,7 +36,7 @@ impl RepositoryAddCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryAddCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         self.remote_repo_reg
             .add_repository(&self.name, self.url.clone())
             .map_err(CLIError::failure)?;

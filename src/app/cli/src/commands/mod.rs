@@ -124,7 +124,7 @@ pub trait Command {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError>;
+    async fn run(&self) -> Result<(), CLIError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,7 +133,7 @@ pub struct NoOpCommand;
 
 #[async_trait::async_trait(?Send)]
 impl Command for NoOpCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         Ok(())
     }
 }

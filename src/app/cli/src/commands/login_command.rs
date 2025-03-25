@@ -199,7 +199,7 @@ impl LoginCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for LoginCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let odf_server_url = self.get_server_url();
 
         // Check token and exit

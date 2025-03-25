@@ -142,7 +142,7 @@ impl IngestCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for IngestCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match (self.stdin, !self.files_refs.is_empty()) {
             (false, false) | (true, true) => Err(CLIError::usage_error(
                 "Specify a list of files or pass --stdin",

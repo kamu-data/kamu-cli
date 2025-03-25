@@ -251,7 +251,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             is_transactional,
             cli_catalog.clone(),
             |maybe_transactional_cli_catalog: Catalog| async move {
-                let mut command = cli_commands::get_command(
+                let command = cli_commands::get_command(
                     work_catalog,
                     &maybe_transactional_cli_catalog,
                     args,

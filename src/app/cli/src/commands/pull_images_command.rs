@@ -40,7 +40,7 @@ impl PullImagesCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for PullImagesCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let mut images = vec![
             self.engine_config.spark_image.as_str(),
             self.engine_config.flink_image.as_str(),

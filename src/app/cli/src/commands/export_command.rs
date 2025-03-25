@@ -50,7 +50,7 @@ impl ExportCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ExportCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let df = self
             .query_service
             .get_data(&self.dataset_ref)

@@ -244,7 +244,7 @@ impl Command for AddCommand {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let load_results = if self.recursive {
             self.load_recursive().await
         } else if self.stdin {

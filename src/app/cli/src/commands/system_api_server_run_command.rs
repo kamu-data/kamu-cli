@@ -141,7 +141,7 @@ impl Command for APIServerRunCommand {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let access_token = self.get_access_token().await?;
 
         let api_server = crate::explore::APIServer::new(

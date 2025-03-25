@@ -43,7 +43,7 @@ impl RenameCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for RenameCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match self
             .rename_dataset
             .execute(&self.dataset_ref, &self.new_name)

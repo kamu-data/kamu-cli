@@ -103,7 +103,7 @@ impl AliasDeleteCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AliasDeleteCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let count = if self.maybe_dataset_ref.is_some() {
             self.delete_dataset_alias().await
         } else if self.all {

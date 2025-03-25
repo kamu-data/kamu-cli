@@ -16,7 +16,7 @@ use kamu_cli::CLIError;
 
 #[test_log::test(tokio::test)]
 async fn test_ambiguity_is_punished() {
-    let mut cmd = NewDatasetCommand::new(
+    let cmd = NewDatasetCommand::new(
         odf::DatasetName::from_str("foo").unwrap(),
         false,
         false,
@@ -29,7 +29,7 @@ async fn test_ambiguity_is_punished() {
 async fn test_root_dataset_parses() {
     let tempdir = tempfile::tempdir().unwrap();
     let path = tempdir.path().join("ds.yaml");
-    let mut cmd = NewDatasetCommand::new(
+    let cmd = NewDatasetCommand::new(
         odf::DatasetName::from_str("foo").unwrap(),
         true,
         false,
@@ -48,7 +48,7 @@ async fn test_root_dataset_parses() {
 async fn test_derivative_dataset_parses() {
     let tempdir = tempfile::tempdir().unwrap();
     let path = tempdir.path().join("ds.yaml");
-    let mut cmd = NewDatasetCommand::new(
+    let cmd = NewDatasetCommand::new(
         odf::DatasetName::from_str("foo").unwrap(),
         false,
         true,

@@ -46,7 +46,7 @@ impl TailCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for TailCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let df = self
             .query_svc
             .tail(&self.dataset_ref, self.skip, self.limit)

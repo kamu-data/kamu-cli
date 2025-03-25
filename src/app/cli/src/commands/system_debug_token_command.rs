@@ -32,7 +32,7 @@ impl DebugTokenCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for DebugTokenCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let token = self
             .auth_service
             .decode_access_token(&self.access_token)

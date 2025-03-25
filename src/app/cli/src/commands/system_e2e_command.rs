@@ -52,7 +52,7 @@ impl SystemE2ECommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SystemE2ECommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match self.action.as_str() {
             "get-last-data-block-path" => {
                 let Some(dataset_ref) = self.dataset_ref.as_ref() else {

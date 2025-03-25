@@ -231,7 +231,7 @@ impl VerifyCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for VerifyCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if self.refs.len() != 1 {
             return Err(CLIError::usage_error(
                 "Verifying multiple datasets at once is not yet supported",

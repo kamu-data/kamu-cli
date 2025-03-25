@@ -126,7 +126,7 @@ impl InspectSchemaCommand {
         }
     }
 
-    async fn get_arrow_schema(&mut self) -> Result<Option<SchemaRef>, CLIError> {
+    async fn get_arrow_schema(&self) -> Result<Option<SchemaRef>, CLIError> {
         if !self.from_data_file {
             self.query_svc
                 .get_schema(&self.dataset_ref)
@@ -150,7 +150,7 @@ impl InspectSchemaCommand {
         }
     }
 
-    async fn get_parquet_schema(&mut self) -> Result<Option<Arc<Type>>, CLIError> {
+    async fn get_parquet_schema(&self) -> Result<Option<Arc<Type>>, CLIError> {
         if !self.from_data_file {
             let Some(arrow_schema) = self
                 .query_svc
@@ -178,7 +178,7 @@ impl InspectSchemaCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for InspectSchemaCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match self.output_format {
             None | Some(SchemaOutputFormat::Ddl) => {
                 if let Some(schema) = self.get_parquet_schema().await? {

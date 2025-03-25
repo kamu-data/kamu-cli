@@ -24,7 +24,7 @@ impl UpgradeWorkspaceCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for UpgradeWorkspaceCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if !self.workspace_svc.is_upgrade_needed()? {
             eprintln!("{}", console::style("Workspace is up-to-date").yellow());
             Ok(())

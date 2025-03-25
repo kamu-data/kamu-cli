@@ -223,7 +223,7 @@ impl Command for ListCommand {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         use datafusion::arrow::array::{
             ArrayRef,
             StringArray,
