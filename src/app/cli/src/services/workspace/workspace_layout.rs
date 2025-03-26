@@ -97,11 +97,13 @@ pub enum WorkspaceVersion {
     V5_BreakingMetadataChanges,
     // Repository layout unification
     V6_DatasetRepositoryUnification,
+    // No need in Summary files
+    V7_NoSummaryFiles,
     Unknown(u32),
 }
 
 impl WorkspaceVersion {
-    pub const LATEST: WorkspaceVersion = WorkspaceVersion::V6_DatasetRepositoryUnification;
+    pub const LATEST: WorkspaceVersion = WorkspaceVersion::V7_NoSummaryFiles;
 
     pub fn next(&self) -> Self {
         let v: u32 = (*self).into();
@@ -119,6 +121,7 @@ impl From<u32> for WorkspaceVersion {
             4 => WorkspaceVersion::V4_SavepointZeroCopy,
             5 => WorkspaceVersion::V5_BreakingMetadataChanges,
             6 => WorkspaceVersion::V6_DatasetRepositoryUnification,
+            7 => WorkspaceVersion::V7_NoSummaryFiles,
             _ => WorkspaceVersion::Unknown(value),
         }
     }
@@ -134,6 +137,7 @@ impl From<WorkspaceVersion> for u32 {
             WorkspaceVersion::V4_SavepointZeroCopy => 4,
             WorkspaceVersion::V5_BreakingMetadataChanges => 5,
             WorkspaceVersion::V6_DatasetRepositoryUnification => 6,
+            WorkspaceVersion::V7_NoSummaryFiles => 7,
             WorkspaceVersion::Unknown(value) => value,
         }
     }
