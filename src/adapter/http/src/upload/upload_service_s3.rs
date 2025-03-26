@@ -33,21 +33,16 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn UploadService)]
 pub struct UploadServiceS3 {
-    s3_upload_context: S3Context,
     upload_config: Arc<FileUploadLimitConfig>,
+
+    #[component(explicit)]
+    s3_upload_context: S3Context,
 }
 
 impl UploadServiceS3 {
-    pub fn new(s3_upload_context: S3Context, upload_config: Arc<FileUploadLimitConfig>) -> Self {
-        Self {
-            s3_upload_context,
-            upload_config,
-        }
-    }
-
     fn make_file_key(
         &self,
         account_id: &odf::AccountID,

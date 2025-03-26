@@ -20,7 +20,7 @@ use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn CommitDatasetEventUseCase)]
 pub struct CommitDatasetEventUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
@@ -28,16 +28,6 @@ pub struct CommitDatasetEventUseCaseImpl {
 }
 
 impl CommitDatasetEventUseCaseImpl {
-    pub fn new(
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-        system_time_source: Arc<dyn SystemTimeSource>,
-    ) -> Self {
-        Self {
-            rebac_dataset_registry_facade,
-            system_time_source,
-        }
-    }
-
     async fn validate_event(
         &self,
         event: odf::MetadataEvent,

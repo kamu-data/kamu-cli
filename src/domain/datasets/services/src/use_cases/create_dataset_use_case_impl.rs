@@ -23,23 +23,11 @@ use crate::utils::CreateDatasetUseCaseHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn CreateDatasetUseCase)]
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
-}
-
-impl CreateDatasetUseCaseImpl {
-    pub fn new(
-        current_account_subject: Arc<CurrentAccountSubject>,
-        create_helper: Arc<CreateDatasetUseCaseHelper>,
-    ) -> Self {
-        Self {
-            current_account_subject,
-            create_helper,
-        }
-    }
 }
 
 #[async_trait::async_trait]

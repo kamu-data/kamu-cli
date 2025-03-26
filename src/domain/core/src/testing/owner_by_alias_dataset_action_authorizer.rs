@@ -24,7 +24,7 @@ use crate::{DatasetRegistry, DatasetRegistryExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn DatasetActionAuthorizer)]
 pub struct OwnerByAliasDatasetActionAuthorizer {
     maybe_owner: Arc<Option<odf::AccountName>>,
@@ -32,16 +32,6 @@ pub struct OwnerByAliasDatasetActionAuthorizer {
 }
 
 impl OwnerByAliasDatasetActionAuthorizer {
-    pub fn new(
-        maybe_owner: Arc<Option<odf::AccountName>>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-    ) -> Self {
-        Self {
-            maybe_owner,
-            dataset_registry,
-        }
-    }
-
     fn owns_dataset_by_alias(&self, dataset_alias: &odf::DatasetAlias) -> bool {
         dataset_alias.account_name.as_ref() == (*self.maybe_owner).as_ref()
     }

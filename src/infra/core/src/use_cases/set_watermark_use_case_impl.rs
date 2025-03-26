@@ -17,26 +17,12 @@ use kamu_core::{auth, *};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn SetWatermarkUseCase)]
 pub struct SetWatermarkUseCaseImpl {
     set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
     set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-}
-
-impl SetWatermarkUseCaseImpl {
-    pub fn new(
-        set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
-        set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    ) -> Self {
-        Self {
-            set_watermark_planner,
-            set_watermark_executor,
-            rebac_dataset_registry_facade,
-        }
-    }
 }
 
 #[common_macros::method_names_consts]

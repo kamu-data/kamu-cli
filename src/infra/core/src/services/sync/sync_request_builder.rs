@@ -28,7 +28,7 @@ use crate::UrlExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 pub struct SyncRequestBuilder {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
@@ -37,20 +37,6 @@ pub struct SyncRequestBuilder {
 }
 
 impl SyncRequestBuilder {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
-        remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
-        remote_alias_resolver: Arc<dyn RemoteAliasResolver>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            dataset_factory,
-            remote_repo_registry,
-            remote_alias_resolver,
-        }
-    }
-
     #[tracing::instrument(level = "debug", skip_all, fields(?src_ref, ?dst_ref, %create_dst_if_not_exists))]
     pub async fn build_sync_request(
         &self,

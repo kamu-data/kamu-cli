@@ -26,7 +26,7 @@ use crate::DatasetEntryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn DeleteDatasetUseCase)]
 pub struct DeleteDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -38,24 +38,6 @@ pub struct DeleteDatasetUseCaseImpl {
 }
 
 impl DeleteDatasetUseCaseImpl {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-        dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        outbox: Arc<dyn Outbox>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            dataset_entry_writer,
-            dataset_storage_unit_writer,
-            rebac_dataset_registry_facade,
-            dependency_graph_service,
-            outbox,
-        }
-    }
-
     async fn ensure_no_dangling_references(
         &self,
         dataset_handle: &odf::DatasetHandle,

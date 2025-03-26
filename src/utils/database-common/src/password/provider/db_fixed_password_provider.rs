@@ -15,20 +15,14 @@ use crate::{DatabaseCredentials, DatabasePasswordProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseFixedPasswordProvider {
+    #[component(explicit)]
     db_user_name: SecretString,
-    fixed_password: SecretString,
-}
 
-impl DatabaseFixedPasswordProvider {
-    pub fn new(db_user_name: SecretString, fixed_password: SecretString) -> Self {
-        Self {
-            db_user_name,
-            fixed_password,
-        }
-    }
+    #[component(explicit)]
+    fixed_password: SecretString,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

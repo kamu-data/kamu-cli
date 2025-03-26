@@ -20,10 +20,6 @@ use url::Url;
 pub struct ResourceLoaderImpl {}
 
 impl ResourceLoaderImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-
     pub async fn load_dataset_snapshot_from_http(
         &self,
         url: &Url,

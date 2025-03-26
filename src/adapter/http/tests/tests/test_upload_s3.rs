@@ -11,7 +11,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use database_common::NoOpDatabasePlugin;
-use dill::Component;
 use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::ServerUrlConfig;
@@ -66,9 +65,7 @@ impl Harness {
                 .add_value(JwtAuthenticationConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
-                .add_builder(
-                    UploadServiceS3::builder().with_s3_upload_context(s3_upload_context.clone()),
-                )
+                .add_builder(UploadServiceS3::builder(s3_upload_context.clone()))
                 .bind::<dyn UploadService, UploadServiceS3>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DummyOutboxImpl>();

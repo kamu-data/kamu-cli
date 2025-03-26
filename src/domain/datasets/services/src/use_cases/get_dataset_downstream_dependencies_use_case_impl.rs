@@ -23,7 +23,7 @@ use kamu_datasets::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn GetDatasetDownstreamDependenciesUseCase)]
 pub struct GetDatasetDownstreamDependenciesUseCaseImpl {
     tenancy_config: Arc<TenancyConfig>,
@@ -31,24 +31,6 @@ pub struct GetDatasetDownstreamDependenciesUseCaseImpl {
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     account_service: Arc<dyn AccountService>,
-}
-
-impl GetDatasetDownstreamDependenciesUseCaseImpl {
-    pub fn new(
-        tenancy_config: Arc<TenancyConfig>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        dataset_entry_service: Arc<dyn DatasetEntryService>,
-        account_service: Arc<dyn AccountService>,
-    ) -> Self {
-        Self {
-            tenancy_config,
-            dependency_graph_service,
-            dataset_action_authorizer,
-            dataset_entry_service,
-            account_service,
-        }
-    }
 }
 
 #[async_trait::async_trait]

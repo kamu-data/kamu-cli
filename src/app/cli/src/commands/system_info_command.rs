@@ -61,18 +61,6 @@ pub struct VersionCommand {
     output_format: Option<SystemInfoOutputFormat>,
 }
 
-impl VersionCommand {
-    pub fn new(
-        output_config: Arc<OutputConfig>,
-        output_format: Option<SystemInfoOutputFormat>,
-    ) -> Self {
-        Self {
-            output_config,
-            output_format,
-        }
-    }
-}
-
 #[async_trait::async_trait(?Send)]
 impl Command for VersionCommand {
     async fn run(&self) -> Result<(), CLIError> {

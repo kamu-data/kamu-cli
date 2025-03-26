@@ -216,15 +216,9 @@ impl From<ClassifyByAllowanceResponse> for ClassifyByAllowanceIdsResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn DatasetActionAuthorizer)]
 pub struct AlwaysHappyDatasetActionAuthorizer {}
-
-impl AlwaysHappyDatasetActionAuthorizer {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 
 #[async_trait::async_trait]
 impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
