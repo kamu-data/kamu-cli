@@ -77,7 +77,7 @@ impl DatasetStatisticsUpdateHandler {
             }?;
 
             // Save old + increment as new stats
-            let new_stats = older_stats.with_increment(&increment.statistics);
+            let new_stats = older_stats + increment.statistics;
             dataset_stats_repo
                 .set_dataset_statistics(
                     &updated_message.dataset_id,
