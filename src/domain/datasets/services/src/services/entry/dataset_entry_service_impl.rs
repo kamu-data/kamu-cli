@@ -66,6 +66,7 @@ struct AccountsCache {
 #[derive(Default)]
 struct DatasetsCache {
     datasets_by_id: HashMap<odf::DatasetID, Arc<dyn odf::Dataset>>,
+    entries_by_id: HashMap<odf::DatasetID, DatasetEntry>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,6 +92,19 @@ impl DatasetEntryServiceImpl {
             current_account_subject,
             tenancy_config,
             cache: Arc::new(RwLock::new(Cache::default())),
+        }
+    }
+
+    fn update_entries_cache<'a, I>(&self, entries: I)
+    where
+        I: IntoIterator<Item = &'a DatasetEntry>,
+    {
+        let mut writable_cache = self.cache.write().unwrap();
+        for entry in entries {
+            writable_cache
+                .datasets
+                .entries_by_id
+                .insert(entry.id.clone(), entry.clone());
         }
     }
 
@@ -249,12 +263,14 @@ impl DatasetEntryServiceImpl {
             .dataset_entries_count()
             .await
             .int_err()?;
-        let entries = self
+        let entries: Vec<DatasetEntry> = self
             .dataset_entry_repo
             .get_dataset_entries(pagination)
             .await
             .try_collect()
             .await?;
+
+        self.update_entries_cache(&entries);
 
         Ok(EntityPageListing {
             list: entries,
@@ -288,12 +304,14 @@ impl DatasetEntryServiceImpl {
             .dataset_entry_repo
             .dataset_entries_count_by_owner_id(owner_id)
             .await?;
-        let entries = self
+        let entries: Vec<DatasetEntry> = self
             .dataset_entry_repo
             .get_dataset_entries_by_owner_id(owner_id, pagination)
             .await
             .try_collect()
             .await?;
+
+        self.update_entries_cache(&entries);
 
         Ok(EntityPageListing {
             list: entries,
@@ -352,16 +370,67 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
-        self.dataset_entry_repo.get_dataset_entry(dataset_id).await
+        // Try cache first
+        {
+            let readable_cache = &self.cache.read().unwrap();
+            if let Some(dataset_entry) = readable_cache.datasets.entries_by_id.get(dataset_id) {
+                return Ok(dataset_entry.clone());
+            }
+        }
+
+        // No luck, resolve in db
+        let dataset_entry = self
+            .dataset_entry_repo
+            .get_dataset_entry(dataset_id)
+            .await?;
+
+        // Update cache
+        self.update_entries_cache(std::iter::once(&dataset_entry));
+
+        Ok(dataset_entry)
     }
 
     async fn get_multiple_entries(
         &self,
         dataset_ids: &[odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
-        self.dataset_entry_repo
-            .get_multiple_dataset_entries(dataset_ids)
-            .await
+        let mut cached_entries = Vec::with_capacity(dataset_ids.len());
+        let mut missing_ids = Vec::with_capacity(dataset_ids.len());
+
+        // Try if some of these IDs have cached entries
+        {
+            // Read lock on cache
+            let readable_cache = self.cache.read().unwrap();
+            for dataset_id in dataset_ids {
+                if let Some(entry) = readable_cache.datasets.entries_by_id.get(dataset_id) {
+                    cached_entries.push(entry.clone());
+                } else {
+                    missing_ids.push(dataset_id.clone());
+                }
+            }
+        }
+
+        Ok(if !missing_ids.is_empty() {
+            // Query missing entries from DB
+            let mut fetched: DatasetEntriesResolution = self
+                .dataset_entry_repo
+                .get_multiple_dataset_entries(&missing_ids)
+                .await?;
+
+            // Update cache with fetched entries
+            self.update_entries_cache(fetched.resolved_entries.iter());
+
+            // Extend fetched with cached
+            fetched.resolved_entries.extend(cached_entries);
+
+            fetched
+        } else {
+            // Purely cached resolution
+            DatasetEntriesResolution {
+                resolved_entries: cached_entries,
+                unresolved_entries: vec![],
+            }
+        })
     }
 }
 
@@ -396,21 +465,28 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                     .get_dataset_entry_by_owner_and_name(&owner_id, &alias.dataset_name)
                     .await
                 {
-                    Ok(entry) => Ok(odf::DatasetHandle::new(
-                        entry.id.clone(),
-                        odf::DatasetAlias::new(
-                            match self.tenancy_config.as_ref() {
-                                TenancyConfig::SingleTenant => None,
-                                TenancyConfig::MultiTenant => Some(
-                                    // We know the name, but since the search is case-insensitive,
-                                    // we'd like to know the stored version rather than queried
-                                    self.resolve_account_name_by_id(&owner_id).await.int_err()?,
-                                ),
-                            },
-                            entry.name,
-                        ),
-                        entry.kind,
-                    )),
+                    Ok(entry) => {
+                        self.update_entries_cache(std::iter::once(&entry));
+
+                        Ok(odf::DatasetHandle::new(
+                            entry.id.clone(),
+                            odf::DatasetAlias::new(
+                                match self.tenancy_config.as_ref() {
+                                    TenancyConfig::SingleTenant => None,
+                                    TenancyConfig::MultiTenant => Some(
+                                        // We know the name, but since the search is
+                                        // case-insensitive,
+                                        // we'd like to know the stored version rather than queried
+                                        self.resolve_account_name_by_id(&owner_id)
+                                            .await
+                                            .int_err()?,
+                                    ),
+                                },
+                                entry.name,
+                            ),
+                            entry.kind,
+                        ))
+                    }
                     Err(GetDatasetEntryByNameError::NotFound(_)) => Err(
                         odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
                             dataset_ref: dataset_ref.clone(),
@@ -421,7 +497,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                     }
                 }
             }
-            odf::DatasetRef::ID(id) => match self.dataset_entry_repo.get_dataset_entry(id).await {
+            odf::DatasetRef::ID(id) => match self.get_entry(id).await {
                 Ok(entry) => {
                     let owner_name = self.resolve_account_name_by_id(&entry.owner_id).await?;
                     Ok(odf::DatasetHandle::new(
@@ -495,11 +571,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         &self,
         dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
-        let entries_resolution = self
-            .dataset_entry_repo
-            .get_multiple_dataset_entries(&dataset_ids)
-            .await
-            .int_err()?;
+        let entries_resolution = self.get_multiple_entries(&dataset_ids).await.int_err()?;
 
         let resolved_handles = self
             .entries_as_handles(entries_resolution.resolved_entries)
@@ -597,6 +669,8 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
                 SaveDatasetEntryError::Internal(e) => CreateDatasetEntryError::Internal(e),
             })?;
 
+        self.update_entries_cache(std::iter::once(&entry));
+
         Ok(())
     }
 
@@ -617,10 +691,25 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
                 UpdateDatasetEntryNameError::NameCollision(e) => {
                     RenameDatasetEntryError::NameCollision(e)
                 }
-            })
+            })?;
+
+        // Update name in cache, if cached
+        {
+            let mut writable_cache = self.cache.write().unwrap();
+            if let Some(entry) = writable_cache
+                .datasets
+                .entries_by_id
+                .get_mut(&dataset_handle.id)
+            {
+                entry.name = new_dataset_name.clone();
+            }
+        }
+
+        Ok(())
     }
 
     async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError> {
+        // Remove entry in repository
         match self
             .dataset_entry_repo
             .delete_dataset_entry(&dataset_handle.id)
@@ -628,7 +717,22 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         {
             Ok(_) | Err(DeleteEntryDatasetError::NotFound(_)) => Ok(()),
             Err(DeleteEntryDatasetError::Internal(e)) => Err(e),
+        }?;
+
+        // Remove entry from cache
+        {
+            let mut writable_cache = self.cache.write().unwrap();
+            writable_cache
+                .datasets
+                .datasets_by_id
+                .remove(&dataset_handle.id);
+            writable_cache
+                .datasets
+                .entries_by_id
+                .remove(&dataset_handle.id);
         }
+
+        Ok(())
     }
 }
 
