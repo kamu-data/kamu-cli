@@ -11,6 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- `DatasetSummary` files replaced with `DatasetStatistics` stored in the database
+- `DatasetHandle` and `DatasetEntry` now contain dataset kind marker
+- Provenance service and pull request planner fetch dependencies from the graph
+
 ## [0.230.0] - 2025-03-25
 ### Added
 - Private Datasets, access sharing:
