@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::{
     DatasetHandlesResolution,
@@ -73,6 +73,23 @@ impl DatasetRegistrySoloUnitBridge {
             }
         }
     }
+
+    async fn read_dataset_kind(&self, dataset: &dyn odf::Dataset) -> odf::DatasetKind {
+        // Knowing kind requires scanning down to Seed, but is inevitable without
+        // database
+        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
+        use odf::dataset::MetadataChainExt;
+        dataset
+            .as_metadata_chain()
+            .accept(&mut [&mut seed_visitor])
+            .await
+            .unwrap();
+        let seed = seed_visitor
+            .into_event()
+            .unwrap_or_else(|| panic!("No Seed event in the dataset"));
+
+        seed.dataset_kind
+    }
 }
 
 #[async_trait::async_trait]
@@ -107,7 +124,12 @@ impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
                     .await
                     .map_err(odf::DatasetRefUnresolvedError::from)?;
                 let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
-                Ok(odf::DatasetHandle::new(dataset_id.clone(), dataset_alias))
+                let dataset_kind = self.read_dataset_kind(dataset.as_ref()).await;
+                Ok(odf::DatasetHandle::new(
+                    dataset_id.clone(),
+                    dataset_alias,
+                    dataset_kind,
+                ))
             }
         }
     }
@@ -122,8 +144,9 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
             while let Some(dataset_id) = dataset_ids_stream.try_next().await? {
                 let dataset = self.dataset_storage_unit.get_stored_dataset_by_id(&dataset_id).await.int_err()?;
                 let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
+                let dataset_kind = self.read_dataset_kind(dataset.as_ref()).await;
 
-                yield odf::DatasetHandle::new(dataset_id, dataset_alias);
+                yield odf::DatasetHandle::new(dataset_id, dataset_alias, dataset_kind);
             }
         })
     }
@@ -172,35 +195,15 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
         Ok(res)
     }
 
-    async fn get_dataset_by_handle(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<ResolvedDataset, InternalError> {
+    async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         // Get dataset from storage unit
         let dataset = self
             .dataset_storage_unit
             .get_stored_dataset_by_id(&dataset_handle.id)
             .await
-            .int_err()?;
-
-        // Knowing kind requires scanning down to Seed, but is inevitable without
-        // database
-        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
-        use odf::dataset::MetadataChainExt;
-        dataset
-            .as_metadata_chain()
-            .accept(&mut [&mut seed_visitor])
-            .await
             .unwrap();
-        let seed = seed_visitor
-            .into_event()
-            .unwrap_or_else(|| panic!("No Seed event in the dataset {dataset_handle}"));
 
-        Ok(ResolvedDataset::new(
-            dataset,
-            dataset_handle.clone(),
-            seed.dataset_kind,
-        ))
+        ResolvedDataset::new(dataset, dataset_handle.clone())
     }
 }
 

@@ -99,11 +99,11 @@ impl TaskRunnerImpl {
         sync_request
             .src
             .refresh_dataset_from_registry(dataset_registry.as_ref())
-            .await?;
+            .await;
         sync_request
             .dst
             .refresh_dataset_from_registry(dataset_registry.as_ref())
-            .await?;
+            .await;
 
         let sync_response = self.sync_service.sync(sync_request, sync_opts, None).await;
         match sync_response {
@@ -228,7 +228,7 @@ impl TaskRunnerImpl {
     ) -> Result<TaskOutcome, InternalError> {
         let target = dataset_registry
             .get_dataset_by_handle(&task_reset.dataset_handle)
-            .await?;
+            .await;
 
         let reset_result_maybe = self
             .reset_executor
@@ -317,9 +317,7 @@ impl TaskRunnerImpl {
         old_head: Option<&odf::Multihash>,
         new_head: &odf::Multihash,
     ) -> Result<(), InternalError> {
-        let target = dataset_registry
-            .get_dataset_by_handle(dataset_handle)
-            .await?;
+        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
         target
             .as_metadata_chain()

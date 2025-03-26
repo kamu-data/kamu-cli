@@ -73,7 +73,7 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_handle(dataset_handle)
-            .await?;
+            .await;
 
         let config = Self::read_config(resolved_dataset.as_ref()).await?;
         tracing::debug!(?config, "Loaded dataset config");

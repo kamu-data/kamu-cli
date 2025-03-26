@@ -92,6 +92,7 @@ fn test_dataset_ref_pattern_match() {
             account_name: None,
             dataset_name: DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: DatasetKind::Root,
     };
 
     assert!(!pattern.matches(&dataset_handle));
@@ -103,6 +104,7 @@ fn test_dataset_ref_pattern_match() {
             account_name: None,
             dataset_name: DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: DatasetKind::Root,
     };
 
     assert!(pattern.matches(&dataset_handle));
@@ -115,6 +117,7 @@ fn test_dataset_ref_pattern_match() {
             account_name: Some(AccountName::from_str(dataset_account).unwrap()),
             dataset_name: DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: DatasetKind::Root,
     };
 
     assert!(pattern.matches(&dataset_handle));
@@ -131,6 +134,7 @@ fn test_dataset_ref_pattern_match() {
             account_name: Some(AccountName::from_str(dataset_account).unwrap()),
             dataset_name: DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: DatasetKind::Root,
     };
 
     assert!(pattern.matches(&dataset_handle));
@@ -142,6 +146,7 @@ fn test_dataset_ref_pattern_match() {
             account_name: Some(AccountName::from_str(dataset_account).unwrap()),
             dataset_name: DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: DatasetKind::Root,
     };
 
     assert!(!pattern.matches(&dataset_handle));
@@ -155,6 +160,7 @@ fn test_dataset_ref_pattern_match() {
             account_name: None,
             dataset_name: DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: DatasetKind::Root,
     };
 
     assert!(pattern.matches(&dataset_handle));
@@ -167,6 +173,7 @@ fn test_dataset_ref_pattern_match() {
             account_name: None,
             dataset_name: DatasetName::from_str(expression).unwrap(),
         },
+        kind: DatasetKind::Root,
     };
     assert!(pattern.matches(&dataset_handle));
 
@@ -179,6 +186,7 @@ fn test_dataset_ref_pattern_match() {
             account_name: None,
             dataset_name: DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: DatasetKind::Root,
     };
     assert!(pattern.matches(&dataset_handle));
 }

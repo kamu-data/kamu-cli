@@ -296,9 +296,8 @@ impl AxumServerPushProtocolInstance {
         let actual_head = if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref() {
             DatabaseTransactionRunner::new(self.catalog.clone())
                 .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                    let resolved_dataset = dataset_registry
-                        .get_dataset_by_handle(dataset_handle)
-                        .await?;
+                    let resolved_dataset =
+                        dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
                     match resolved_dataset
                         .as_metadata_chain()
@@ -402,7 +401,7 @@ impl AxumServerPushProtocolInstance {
             .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
                 let resolved_dataset = dataset_registry
                     .get_dataset_by_handle(&dataset_handle)
-                    .await?;
+                    .await;
 
                 let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();
                 for r in request.object_files {
@@ -495,7 +494,7 @@ impl AxumServerPushProtocolInstance {
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with2(
                 |dataset_registry: Arc<dyn DatasetRegistry>, append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
-                    let resolved_dataset = dataset_registry.get_dataset_by_handle(&dataset_handle).await?;
+                    let resolved_dataset = dataset_registry.get_dataset_by_handle(&dataset_handle).await;
                     append_dataset_metadata_batch
                         .execute(resolved_dataset.as_ref(), Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
                             set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged)),

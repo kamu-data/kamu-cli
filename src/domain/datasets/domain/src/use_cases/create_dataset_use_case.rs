@@ -37,7 +37,6 @@ pub struct CreateDatasetUseCaseOptions {
 
 pub struct CreateDatasetResult {
     pub dataset_handle: odf::DatasetHandle,
-    pub dataset_kind: odf::DatasetKind,
     pub dataset: Arc<dyn odf::Dataset>,
     pub head: odf::Multihash,
 }
@@ -45,13 +44,11 @@ pub struct CreateDatasetResult {
 impl CreateDatasetResult {
     pub fn new(
         dataset_handle: odf::DatasetHandle,
-        dataset_kind: odf::DatasetKind,
         dataset: Arc<dyn odf::Dataset>,
         head: odf::Multihash,
     ) -> Self {
         Self {
             dataset_handle,
-            dataset_kind,
             dataset,
             head,
         }
@@ -59,8 +56,7 @@ impl CreateDatasetResult {
 
     pub fn from_stored(stored: odf::dataset::StoreDatasetResult, alias: odf::DatasetAlias) -> Self {
         Self {
-            dataset_handle: odf::DatasetHandle::new(stored.dataset_id, alias),
-            dataset_kind: stored.dataset_kind,
+            dataset_handle: odf::DatasetHandle::new(stored.dataset_id, alias, stored.dataset_kind),
             dataset: stored.dataset,
             head: stored.seed,
         }

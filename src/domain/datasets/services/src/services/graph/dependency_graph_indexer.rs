@@ -74,7 +74,7 @@ impl DependencyGraphIndexer {
                 .dataset_registry
                 .get_dataset_by_handle(&dataset_handle)
                 .instrument(span)
-                .await?;
+                .await;
 
             // Important: read from storage, not from database cache!
             let head = dataset

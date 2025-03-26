@@ -67,7 +67,7 @@ impl DatasetRequestState {
 
                 let resolved_dataset = dataset_registry
                     .get_dataset_by_handle(&self.dataset_handle)
-                    .await?;
+                    .await;
 
                 Ok(resolved_dataset)
             })

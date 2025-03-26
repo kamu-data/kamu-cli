@@ -81,16 +81,10 @@ impl SyncRef {
         }
     }
 
-    pub async fn refresh_dataset_from_registry(
-        &mut self,
-        dataset_registry: &dyn DatasetRegistry,
-    ) -> Result<(), InternalError> {
+    pub async fn refresh_dataset_from_registry(&mut self, dataset_registry: &dyn DatasetRegistry) {
         if let Self::Local(r) = self {
-            *r = dataset_registry
-                .get_dataset_by_handle(r.get_handle())
-                .await?;
+            *r = dataset_registry.get_dataset_by_handle(r.get_handle()).await;
         }
-        Ok(())
     }
 }
 

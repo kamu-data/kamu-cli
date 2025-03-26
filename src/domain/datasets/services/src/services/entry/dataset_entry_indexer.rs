@@ -94,25 +94,6 @@ impl DatasetEntryIndexer {
             let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref())
                 .await
                 .int_err()?;
-            dataset_handles.push(odf::DatasetHandle::new(dataset_id, dataset_alias));
-        }
-
-        let account_name_id_mapping = self.build_account_name_id_mapping(&dataset_handles).await?;
-
-        for dataset_handle in dataset_handles {
-            let Some(owner_account_id) = account_name_id_mapping
-                .get(&dataset_handle.alias.account_name)
-                .cloned()
-            else {
-                tracing::warn!(dataset_handle=%dataset_handle, "Skipped indexing dataset due to unresolved owner");
-                continue;
-            };
-
-            let dataset = self
-                .dataset_storage_unit
-                .get_stored_dataset_by_id(&dataset_handle.id)
-                .await
-                .int_err()?;
 
             let head = dataset
                 .as_metadata_chain()
@@ -131,14 +112,32 @@ impl DatasetEntryIndexer {
 
             let seed = seed_visitor
                 .into_event()
-                .unwrap_or_else(|| panic!("No Seed event in the dataset {dataset_handle}"));
+                .unwrap_or_else(|| panic!("No Seed event in the dataset {dataset_id}"));
+
+            dataset_handles.push(odf::DatasetHandle::new(
+                dataset_id,
+                dataset_alias,
+                seed.dataset_kind,
+            ));
+        }
+
+        let account_name_id_mapping = self.build_account_name_id_mapping(&dataset_handles).await?;
+
+        for dataset_handle in dataset_handles {
+            let Some(owner_account_id) = account_name_id_mapping
+                .get(&dataset_handle.alias.account_name)
+                .cloned()
+            else {
+                tracing::warn!(dataset_handle=%dataset_handle, "Skipped indexing dataset due to unresolved owner");
+                continue;
+            };
 
             let dataset_entry = DatasetEntry::new(
                 dataset_handle.id,
                 owner_account_id,
                 dataset_handle.alias.dataset_name,
                 self.time_source.now(),
-                seed.dataset_kind,
+                dataset_handle.kind,
             );
 
             use tracing::Instrument;

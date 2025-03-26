@@ -156,16 +156,7 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self
-            .dataset_registry
-            .get_dataset_by_handle(&hdl)
-            .await
-            .map_err(|e| PullResponse {
-                maybe_original_request: pi.maybe_original_request.clone(),
-                maybe_local_ref: Some(hdl.as_local_ref()),
-                maybe_remote_ref: None,
-                result: Err(PullError::Internal(e)),
-            })?;
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
         match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None).await {
             Ok(metadata_state) => Ok(PullIngestItem {
@@ -194,16 +185,7 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self
-            .dataset_registry
-            .get_dataset_by_handle(&hdl)
-            .await
-            .map_err(|e| PullResponse {
-                maybe_original_request: pi.maybe_original_request.clone(),
-                maybe_local_ref: Some(hdl.as_local_ref()),
-                maybe_remote_ref: None,
-                result: Err(PullError::Internal(e)),
-            })?;
+        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
         match self
             .transform_request_planner
@@ -497,7 +479,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             let target = self
                 .dataset_registry
                 .get_dataset_by_handle(&local_handle)
-                .await?;
+                .await;
 
             // Plan up-stream dependencies first
             let max_dep_depth = if traverse_dependencies {

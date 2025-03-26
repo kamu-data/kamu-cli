@@ -169,7 +169,7 @@ impl AxumServerPullProtocolInstance {
             .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
                 let resolved_dataset = dataset_registry
                     .get_dataset_by_handle(&dataset_handle)
-                    .await?;
+                    .await;
 
                 let metadata_chain = resolved_dataset.as_metadata_chain();
                 let head = metadata_chain
@@ -242,7 +242,7 @@ impl AxumServerPullProtocolInstance {
                     .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
                         let resolved_dataset = dataset_registry
                             .get_dataset_by_handle(&dataset_handle)
-                            .await?;
+                            .await;
 
                         let metadata_chain = resolved_dataset.as_metadata_chain();
                         let head = metadata_chain
@@ -312,7 +312,7 @@ impl AxumServerPullProtocolInstance {
                             |dataset_registry: Arc<dyn DatasetRegistry>| async move {
                                 let resolved_dataset = dataset_registry
                                     .get_dataset_by_handle(&dataset_handle)
-                                    .await?;
+                                    .await;
 
                                 let mut object_transfer_strategies = Vec::new();
                                 for r in request.object_files {

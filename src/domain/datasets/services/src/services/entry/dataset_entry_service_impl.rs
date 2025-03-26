@@ -157,6 +157,7 @@ impl DatasetEntryServiceImpl {
                     entry.id.clone(),
                     self.tenancy_config
                         .make_alias(owner_name.clone(), entry.name.clone()),
+                    entry.kind,
                 ));
             }
         }
@@ -408,6 +409,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                             },
                             entry.name,
                         ),
+                        entry.kind,
                     )),
                     Err(GetDatasetEntryByNameError::NotFound(_)) => Err(
                         odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
@@ -426,6 +428,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                         entry.id.clone(),
                         self.tenancy_config
                             .make_alias(owner_name, entry.name.clone()),
+                        entry.kind,
                     ))
                 }
                 Err(GetDatasetEntryError::NotFound(_)) => Err(
@@ -524,10 +527,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
     // Note: in future we will be resolving storage repository,
     // but for now we have just a single one
-    async fn get_dataset_by_handle(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<ResolvedDataset, InternalError> {
+    async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         let maybe_cached_dataset = {
             let readable_cache = self.cache.read().unwrap();
             readable_cache
@@ -537,15 +537,8 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 .cloned()
         };
 
-        // Resolve entry
-        let dataset_entry = self.get_entry(&dataset_handle.id).await.int_err()?;
-
         if let Some(cached_dataset) = maybe_cached_dataset {
-            Ok(ResolvedDataset::new(
-                cached_dataset,
-                dataset_handle.clone(),
-                dataset_entry.kind,
-            ))
+            ResolvedDataset::new(cached_dataset, dataset_handle.clone())
         } else {
             // Note: in future we will be resolving storage repository,
             // but for now we have just a single one
@@ -561,11 +554,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 .datasets_by_id
                 .insert(dataset_handle.id.clone(), dataset.clone());
 
-            Ok(ResolvedDataset::new(
-                dataset,
-                dataset_handle.clone(),
-                dataset_entry.kind,
-            ))
+            ResolvedDataset::new(dataset, dataset_handle.clone())
         }
     }
 }

@@ -85,10 +85,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         .await
         {
             Ok(snapshot) => snapshot,
-            Err(FlowRunConfigurationTryIntoSnapshotError::Internal(e)) => return Err(e.into()),
-            Err(FlowRunConfigurationTryIntoSnapshotError::Invalid(e)) => {
-                return Ok(TriggerFlowResult::InvalidRunConfigurations(e))
-            }
+            Err(e) => return Ok(TriggerFlowResult::InvalidRunConfigurations(e)),
         };
 
         let flow_state = flow_query_service

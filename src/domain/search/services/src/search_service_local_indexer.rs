@@ -158,7 +158,7 @@ impl InitOnStartup for SearchServiceLocalIndexer {
         let mut datasets = self.dataset_registry.all_dataset_handles();
 
         while let Some(hdl) = datasets.try_next().await? {
-            let dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await?;
+            let dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
             let Some(document) = self.dataset_metadata_as_document(dataset).await? else {
                 continue;

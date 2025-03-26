@@ -87,7 +87,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_handle(&dataset_handle)
-            .await?;
+            .await;
 
         Ok(resolved_dataset)
     }
@@ -112,7 +112,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_handle(dataset_handle)
-            .await?;
+            .await;
 
         Ok(resolved_dataset)
     }

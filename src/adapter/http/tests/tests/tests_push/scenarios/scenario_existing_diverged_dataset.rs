@@ -81,6 +81,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
         let server_dataset_layout = server_harness.dataset_layout(&odf::DatasetHandle::new(
             client_create_result.dataset_handle.id.clone(),
             odf::DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
+            odf::DatasetKind::Root,
         ));
 
         // Hard folder synchronization
@@ -117,8 +118,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
         let client_dataset = client_harness
             .dataset_registry()
             .get_dataset_by_handle(&client_create_result.dataset_handle)
-            .await
-            .unwrap();
+            .await;
 
         // Compact at client side
         let compaction_planner = client_harness.compaction_planner();
