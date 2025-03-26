@@ -707,6 +707,6 @@ impl GraphQLMetadataChainHarness {
             .catalog_authorized
             .get_one::<dyn DatasetRegistry>()
             .unwrap();
-        dataset_registry.get_dataset_by_handle(hdl).await
+        dataset_registry.get_dataset_by_handle(hdl).await.unwrap()
     }
 }

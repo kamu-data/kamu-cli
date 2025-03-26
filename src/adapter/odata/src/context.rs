@@ -84,7 +84,10 @@ impl ServiceContext for ODataServiceContext {
             .await
             .map_err(ODataError::internal)?
         {
-            let resolved_dataset = registry.get_dataset_by_handle(&hdl).await;
+            let resolved_dataset = registry
+                .get_dataset_by_handle(&hdl)
+                .await
+                .map_err(ODataError::internal)?;
             let context: Arc<dyn CollectionContext> = Arc::new(ODataCollectionContext {
                 catalog: self.catalog.clone(),
                 addr: CollectionAddr {

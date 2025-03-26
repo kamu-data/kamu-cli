@@ -148,7 +148,7 @@ impl KamuSchema {
                     .inner
                     .dataset_registry
                     .get_dataset_by_handle(&hdl)
-                    .await;
+                    .await?;
 
                 tables.insert(
                     opts.alias.clone(),
@@ -182,7 +182,7 @@ impl KamuSchema {
                     .inner
                     .dataset_registry
                     .get_dataset_by_handle(&hdl)
-                    .await;
+                    .await?;
 
                 tables.insert(
                     hdl.alias.to_string(),

@@ -524,7 +524,10 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
     // Note: in future we will be resolving storage repository,
     // but for now we have just a single one
-    async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
+    async fn get_dataset_by_handle(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<ResolvedDataset, InternalError> {
         let maybe_cached_dataset = {
             let readable_cache = self.cache.read().unwrap();
             readable_cache
@@ -536,10 +539,14 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
         // Resolve entry
         // TODO: error handling
-        let dataset_entry = self.get_entry(&dataset_handle.id).await.unwrap();
+        let dataset_entry = self.get_entry(&dataset_handle.id).await.int_err()?;
 
         if let Some(cached_dataset) = maybe_cached_dataset {
-            ResolvedDataset::new(cached_dataset, dataset_handle.clone(), dataset_entry.kind)
+            Ok(ResolvedDataset::new(
+                cached_dataset,
+                dataset_handle.clone(),
+                dataset_entry.kind,
+            ))
         } else {
             // Note: in future we will be resolving storage repository,
             // but for now we have just a single one
@@ -555,7 +562,11 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                 .datasets_by_id
                 .insert(dataset_handle.id.clone(), dataset.clone());
 
-            ResolvedDataset::new(dataset, dataset_handle.clone(), dataset_entry.kind)
+            Ok(ResolvedDataset::new(
+                dataset,
+                dataset_handle.clone(),
+                dataset_entry.kind,
+            ))
         }
     }
 }

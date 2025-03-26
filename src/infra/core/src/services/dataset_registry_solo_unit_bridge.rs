@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::{
     DatasetHandlesResolution,
@@ -172,13 +172,16 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
         Ok(res)
     }
 
-    async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
+    async fn get_dataset_by_handle(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<ResolvedDataset, InternalError> {
         // Get dataset from storage unit
         let dataset = self
             .dataset_storage_unit
             .get_stored_dataset_by_id(&dataset_handle.id)
             .await
-            .expect("Dataset must exist");
+            .int_err()?;
 
         // Knowing kind requires scanning down to Seed, but is inevitable without
         // database
@@ -193,7 +196,11 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
             .into_event()
             .unwrap_or_else(|| panic!("No Seed event in the dataset {dataset_handle}"));
 
-        ResolvedDataset::new(dataset, dataset_handle.clone(), seed.dataset_kind)
+        Ok(ResolvedDataset::new(
+            dataset,
+            dataset_handle.clone(),
+            seed.dataset_kind,
+        ))
     }
 }
 

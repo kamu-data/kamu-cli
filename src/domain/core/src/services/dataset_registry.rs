@@ -28,7 +28,10 @@ pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
         dataset_ids: Vec<odf::DatasetID>,
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError>;
 
-    async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;
+    async fn get_dataset_by_handle(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<ResolvedDataset, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +80,7 @@ where
         dataset_ref: &odf::DatasetRef,
     ) -> Result<ResolvedDataset, odf::DatasetRefUnresolvedError> {
         let dataset_handle = self.resolve_dataset_handle_by_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_by_handle(&dataset_handle).await;
+        let dataset = self.get_dataset_by_handle(&dataset_handle).await?;
         Ok(dataset)
     }
 
@@ -88,7 +91,7 @@ where
         let dataset_handle = self
             .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await?;
-        let dataset = self.get_dataset_by_handle(&dataset_handle).await;
+        let dataset = self.get_dataset_by_handle(&dataset_handle).await?;
         Ok(dataset)
     }
 }

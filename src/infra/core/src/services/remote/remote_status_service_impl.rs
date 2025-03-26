@@ -99,7 +99,7 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
         let lhs_ds = self
             .dataset_registry
             .get_dataset_by_handle(dataset_handle)
-            .await;
+            .await?;
         let lhs_chain = lhs_ds.as_metadata_chain();
         let lhs_head = lhs_chain
             .resolve_ref(&odf::BlockRef::Head)

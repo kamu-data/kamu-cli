@@ -86,7 +86,8 @@ impl IngestCommand {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_handle(dataset_handle)
-            .await;
+            .await?;
+
         if resolved_dataset.get_kind() != odf::DatasetKind::Root {
             return Err(CLIError::usage_error(
                 "Ingesting data available for root datasets only",
@@ -173,7 +174,8 @@ impl Command for IngestCommand {
             let target = self
                 .dataset_registry
                 .get_dataset_by_handle(&dataset_handle)
-                .await;
+                .await?;
+
             let plan = self
                 .push_ingest_planner
                 .plan_ingest(

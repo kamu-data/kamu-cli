@@ -16,6 +16,7 @@ use kamu_flow_system::{
     ResetRule,
 };
 use odf::dataset::MetadataChainExt as _;
+use thiserror::Error;
 
 use crate::mutations::{FlowInvalidRunConfigurations, FlowTypeIsNotSupported};
 use crate::prelude::*;
@@ -263,13 +264,28 @@ impl From<FlowConfigurationInput> for FlowRunConfiguration {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Error, Debug)]
+pub enum FlowRunConfigurationTryIntoSnapshotError {
+    #[error("invalid run configuration")]
+    Invalid(FlowInvalidRunConfigurations),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl FlowRunConfiguration {
     pub async fn try_into_snapshot(
         ctx: &Context<'_>,
         dataset_flow_type: &DatasetFlowType,
         dataset_handle: &odf::DatasetHandle,
         flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
-    ) -> Result<Option<FlowConfigurationRule>, FlowInvalidRunConfigurations> {
+    ) -> Result<Option<FlowConfigurationRule>, FlowRunConfigurationTryIntoSnapshotError> {
         match dataset_flow_type {
             DatasetFlowType::Ingest => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
@@ -278,10 +294,12 @@ impl FlowRunConfiguration {
                             fetch_uncacheable: ingest_input.fetch_uncacheable,
                         })));
                     }
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
+                    return Err(FlowRunConfigurationTryIntoSnapshotError::Invalid(
+                        FlowInvalidRunConfigurations {
+                            error: "Incompatible flow run configuration and dataset flow type"
+                                .to_string(),
+                        },
+                    ));
                 }
             }
             DatasetFlowType::ExecuteTransform => return Ok(None),
@@ -298,10 +316,13 @@ impl FlowRunConfiguration {
                                             compaction_input.recursive,
                                         )
                                         .map_err(|_| {
-                                            FlowInvalidRunConfigurations {
-                                                error: "Invalid compaction flow run configuration"
-                                                    .to_string(),
-                                            }
+                                            FlowRunConfigurationTryIntoSnapshotError::Invalid(
+                                                FlowInvalidRunConfigurations {
+                                                    error: "Invalid compaction flow run \
+                                                            configuration"
+                                                        .to_string(),
+                                                },
+                                            )
                                         })?,
                                     )
                                 }
@@ -313,15 +334,19 @@ impl FlowRunConfiguration {
                             },
                         )));
                     }
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
+                    return Err(FlowRunConfigurationTryIntoSnapshotError::Invalid(
+                        FlowInvalidRunConfigurations {
+                            error: "Incompatible flow run configuration and dataset flow type"
+                                .to_string(),
+                        },
+                    ));
                 }
             }
             DatasetFlowType::Reset => {
                 let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
-                let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+                let resolved_dataset = dataset_registry
+                    .get_dataset_by_handle(dataset_handle)
+                    .await?;
 
                 // Assume unwrap safe such as we have checked this existence during
                 // validation step
@@ -329,8 +354,12 @@ impl FlowRunConfiguration {
                     .as_metadata_chain()
                     .try_get_ref(&odf::BlockRef::Head)
                     .await
-                    .map_err(|_| FlowInvalidRunConfigurations {
-                        error: "Cannot fetch default value".to_string(),
+                    .map_err(|_| {
+                        FlowRunConfigurationTryIntoSnapshotError::Invalid(
+                            FlowInvalidRunConfigurations {
+                                error: "Cannot fetch default value".to_string(),
+                            },
+                        )
                     })?;
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Reset(reset_input) = flow_run_configuration {
@@ -345,10 +374,12 @@ impl FlowRunConfiguration {
                             recursive: reset_input.recursive,
                         })));
                     }
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
+                    return Err(FlowRunConfigurationTryIntoSnapshotError::Invalid(
+                        FlowInvalidRunConfigurations {
+                            error: "Incompatible flow run configuration and dataset flow type"
+                                .to_string(),
+                        },
+                    ));
                 }
                 return Ok(Some(FlowConfigurationRule::ResetRule(ResetRule {
                     new_head_hash: None,

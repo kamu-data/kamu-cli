@@ -61,7 +61,7 @@ impl TransformRequestPlannerImpl {
                 .resolve_dataset_handle_by_ref(&input_decl.dataset_ref)
                 .await
                 .int_err()?;
-            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
+            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await?;
             datasets_map.register(resolved_dataset);
         }
 
@@ -222,7 +222,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                 .resolve_dataset_handle_by_ref(&input.dataset_ref)
                 .await
                 .int_err()?;
-            let resolved_input = self.dataset_registry.get_dataset_by_handle(&hdl).await;
+            let resolved_input = self.dataset_registry.get_dataset_by_handle(&hdl).await?;
             datasets_map.register(resolved_input);
         }
 

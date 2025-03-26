@@ -250,6 +250,7 @@ impl ResetTestHarness {
         self.dataset_registry()
             .get_dataset_by_handle(dataset_handle)
             .await
+            .unwrap()
     }
 }
 

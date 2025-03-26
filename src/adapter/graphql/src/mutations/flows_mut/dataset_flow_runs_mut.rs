@@ -85,7 +85,10 @@ impl<'a> DatasetFlowRunsMut<'a> {
         .await
         {
             Ok(snapshot) => snapshot,
-            Err(err) => return Ok(TriggerFlowResult::InvalidRunConfigurations(err)),
+            Err(FlowRunConfigurationTryIntoSnapshotError::Internal(e)) => return Err(e.into()),
+            Err(FlowRunConfigurationTryIntoSnapshotError::Invalid(e)) => {
+                return Ok(TriggerFlowResult::InvalidRunConfigurations(e))
+            }
         };
 
         let flow_state = flow_query_service
@@ -199,7 +202,7 @@ impl CancelScheduledTasksSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject)]
+#[derive(Debug, SimpleObject)]
 #[graphql(complex)]
 pub struct FlowInvalidRunConfigurations {
     pub error: String,

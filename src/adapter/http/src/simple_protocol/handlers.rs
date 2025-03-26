@@ -77,7 +77,7 @@ pub async fn dataset_refs_handler(
     }?;
 
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await?;
 
     match target_dataset
         .as_metadata_chain()
@@ -111,7 +111,7 @@ pub async fn dataset_blocks_handler(
     axum::extract::Path(hash_param): axum::extract::Path<BlockHashFromPath>,
 ) -> Result<Vec<u8>, ApiError> {
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await?;
 
     let block: odf::MetadataBlock = match target_dataset
         .as_metadata_chain()
@@ -152,7 +152,7 @@ pub async fn dataset_data_get_handler(
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<impl IntoResponse, ApiError> {
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await?;
 
     dataset_get_object_common(target_dataset.as_data_repo(), &hash_param.physical_hash).await
 }
@@ -178,7 +178,7 @@ pub async fn dataset_checkpoints_get_handler(
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<impl IntoResponse, ApiError> {
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await?;
 
     dataset_get_object_common(
         target_dataset.as_checkpoint_repo(),
@@ -228,7 +228,7 @@ pub async fn dataset_data_put_handler(
     body: axum::body::Body,
 ) -> Result<(), ApiError> {
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await?;
 
     dataset_put_object_common(
         target_dataset.as_data_repo(),
@@ -263,7 +263,7 @@ pub async fn dataset_checkpoints_put_handler(
     body: axum::body::Body,
 ) -> Result<(), ApiError> {
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
+    let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await?;
 
     dataset_put_object_common(
         target_dataset.as_checkpoint_repo(),

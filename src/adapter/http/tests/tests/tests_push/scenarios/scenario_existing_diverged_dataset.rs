@@ -117,7 +117,8 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingDivergedDatasetScenario
         let client_dataset = client_harness
             .dataset_registry()
             .get_dataset_by_handle(&client_create_result.dataset_handle)
-            .await;
+            .await
+            .unwrap();
 
         // Compact at client side
         let compaction_planner = client_harness.compaction_planner();
