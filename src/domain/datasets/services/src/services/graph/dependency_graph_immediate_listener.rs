@@ -30,6 +30,8 @@ use kamu_datasets::{
 };
 use messaging_outbox::*;
 
+use crate::{extract_modified_dependencies_in_interval, DependencyChange};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DependencyGraphImmediateListener {
@@ -62,13 +64,12 @@ impl DependencyGraphImmediateListener {
         message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
         // Compute if there are modified dependencies
-        let dependency_change = self
-            .extract_modified_dependencies_in_interval(
-                (*target).as_ref(),
-                &message.new_block_hash,
-                message.maybe_prev_block_hash.as_ref(),
-            )
-            .await?;
+        let dependency_change = extract_modified_dependencies_in_interval(
+            target.as_metadata_chain(),
+            &message.new_block_hash,
+            message.maybe_prev_block_hash.as_ref(),
+        )
+        .await?;
 
         // What's the situation now?
         let new_upstream_ids = match dependency_change {
@@ -135,49 +136,6 @@ impl DependencyGraphImmediateListener {
 
         Ok(())
     }
-
-    async fn extract_modified_dependencies_in_interval(
-        &self,
-        dataset: &dyn odf::Dataset,
-        head: &odf::Multihash,
-        maybe_tail: Option<&odf::Multihash>,
-    ) -> Result<DependencyChange, InternalError> {
-        let mut new_upstream_ids: HashSet<odf::DatasetID> = HashSet::new();
-
-        let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new();
-        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
-
-        use odf::dataset::MetadataChainExt;
-        dataset
-            .as_metadata_chain()
-            .accept_by_interval(
-                &mut [&mut set_transform_visitor, &mut seed_visitor],
-                Some(head),
-                maybe_tail,
-            )
-            .await
-            .int_err()?;
-
-        if let Some(event) = set_transform_visitor.into_event() {
-            for new_input in &event.inputs {
-                if let Some(id) = new_input.dataset_ref.id() {
-                    new_upstream_ids.insert(id.clone());
-                }
-            }
-        }
-
-        // 3 cases:
-        //  - we see `SetTransform` event that is relevant now (changed)
-        //  - we don't see it and stop where asked (unchanged)
-        //  - we don't see it and reach seed (dropped)
-        if !new_upstream_ids.is_empty() {
-            Ok(DependencyChange::Changed(new_upstream_ids))
-        } else if seed_visitor.into_event().is_some() {
-            Ok(DependencyChange::Dropped)
-        } else {
-            Ok(DependencyChange::Unchanged)
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -240,15 +198,6 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
 
         Ok(())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-enum DependencyChange {
-    Unchanged,
-    Dropped,
-    Changed(HashSet<odf::DatasetID>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

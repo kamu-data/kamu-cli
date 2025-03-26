@@ -16,6 +16,8 @@ use kamu_core::DatasetRegistry;
 use kamu_datasets::DatasetDependencyRepository;
 
 use crate::{
+    extract_modified_dependencies_in_interval,
+    DependencyChange,
     DependencyGraphServiceImpl,
     JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
     JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER,
@@ -82,32 +84,19 @@ impl DependencyGraphIndexer {
                 .await
                 .int_err()?;
 
-            let mut upstream_ids = Vec::new();
-
-            let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new();
-
-            use odf::dataset::MetadataChainExt;
-            dataset
-                .as_metadata_chain()
-                .accept_by_hash(&mut [&mut set_transform_visitor], &head)
-                .await
-                .int_err()?;
-
-            if let Some(event) = set_transform_visitor.into_event() {
-                for new_input in &event.inputs {
-                    if let Some(id) = new_input.dataset_ref.id() {
-                        upstream_ids.push(id.clone());
-                    }
-                }
+            // Compute if there are some dependencies
+            if let DependencyChange::Changed(upstream_ids) =
+                extract_modified_dependencies_in_interval(dataset.as_metadata_chain(), &head, None)
+                    .await?
+            {
+                self.dataset_dependency_repo
+                    .add_upstream_dependencies(
+                        &dataset_handle.id,
+                        &(upstream_ids.iter().collect::<Vec<_>>()),
+                    )
+                    .await
+                    .int_err()?;
             }
-
-            self.dataset_dependency_repo
-                .add_upstream_dependencies(
-                    &dataset_handle.id,
-                    &(upstream_ids.iter().collect::<Vec<_>>()),
-                )
-                .await
-                .int_err()?;
         }
 
         Ok(())
