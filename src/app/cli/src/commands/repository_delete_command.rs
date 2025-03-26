@@ -16,30 +16,17 @@ use crate::Interact;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct RepositoryDeleteCommand {
-    interact: Arc<Interact>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    names: Vec<odf::RepoName>,
-    all: bool,
-}
+    interact: Arc<Interact>,
 
-impl RepositoryDeleteCommand {
-    pub fn new<I>(
-        interact: Arc<Interact>,
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        names: I,
-        all: bool,
-    ) -> Self
-    where
-        I: IntoIterator<Item = odf::RepoName>,
-    {
-        Self {
-            interact,
-            remote_repo_reg,
-            names: names.into_iter().collect(),
-            all,
-        }
-    }
+    #[dill::component(explicit)]
+    names: Vec<odf::RepoName>,
+
+    #[dill::component(explicit)]
+    all: bool,
 }
 
 #[async_trait::async_trait(?Send)]

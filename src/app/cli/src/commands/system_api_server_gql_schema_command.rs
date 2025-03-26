@@ -9,6 +9,8 @@
 
 use super::{CLIError, Command};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct APIServerGqlSchemaCommand {}
 
 impl APIServerGqlSchemaCommand {

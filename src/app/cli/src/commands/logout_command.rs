@@ -15,28 +15,22 @@ use crate::{odf_server, CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct LogoutCommand {
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+
+    #[dill::component(explicit)]
     scope: odf_server::AccessTokenStoreScope,
+
+    #[dill::component(explicit)]
     server_url: Option<Url>,
+
+    #[dill::component(explicit)]
     all: bool,
 }
 
 impl LogoutCommand {
-    pub fn new(
-        access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
-        scope: odf_server::AccessTokenStoreScope,
-        server_url: Option<Url>,
-        all: bool,
-    ) -> Self {
-        Self {
-            access_token_registry_service,
-            scope,
-            server_url,
-            all,
-        }
-    }
-
     fn get_server_url(&self) -> Url {
         self.server_url
             .clone()

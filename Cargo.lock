@@ -3846,9 +3846,9 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cd044614e0c19800d097050febe939d115d9e3a7d41cf1cacb72a5da9c34449"
+checksum = "93e79ca2fe4d30835841fbedf86cc0cc4f00a4b16d325e205919c69d6e9d35ca"
 dependencies = [
  "dill-impl",
  "multimap",
@@ -3857,9 +3857,9 @@ dependencies = [
 
 [[package]]
 name = "dill-impl"
-version = "0.12.0"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e385a5f5818c87492145e1120a556f03e821a35945da75bd90a0c921590534c"
+checksum = "854ce1077e5d69e1f05fe55371b76a0e1cc801bb154e4a3b280ab974186bfa27"
 dependencies = [
  "proc-macro2",
  "quote",

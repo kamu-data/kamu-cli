@@ -12,14 +12,10 @@ use std::sync::Arc;
 use super::{CLIError, Command};
 use crate::{WorkspaceService, WorkspaceUpgradeError};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct UpgradeWorkspaceCommand {
     workspace_svc: Arc<WorkspaceService>,
-}
-
-impl UpgradeWorkspaceCommand {
-    pub fn new(workspace_svc: Arc<WorkspaceService>) -> Self {
-        Self { workspace_svc }
-    }
 }
 
 #[async_trait::async_trait(?Send)]

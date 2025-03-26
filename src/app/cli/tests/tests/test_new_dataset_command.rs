@@ -9,6 +9,7 @@
 
 use std::str::FromStr;
 
+use dill::TypedBuilder;
 use kamu::domain::*;
 use kamu::ResourceLoaderImpl;
 use kamu_cli::commands::*;
@@ -16,12 +17,15 @@ use kamu_cli::CLIError;
 
 #[test_log::test(tokio::test)]
 async fn test_ambiguity_is_punished() {
-    let cmd = NewDatasetCommand::new(
+    let cmd = NewDatasetCommand::builder(
         odf::DatasetName::from_str("foo").unwrap(),
         false,
         false,
-        None::<&str>,
-    );
+        None,
+    )
+    .get(&dill::Catalog::builder().build())
+    .unwrap();
+
     assert!(matches!(cmd.run().await, Err(CLIError::UsageError { .. })));
 }
 
@@ -29,12 +33,15 @@ async fn test_ambiguity_is_punished() {
 async fn test_root_dataset_parses() {
     let tempdir = tempfile::tempdir().unwrap();
     let path = tempdir.path().join("ds.yaml");
-    let cmd = NewDatasetCommand::new(
+    let cmd = NewDatasetCommand::builder(
         odf::DatasetName::from_str("foo").unwrap(),
         true,
         false,
-        Some(&path),
-    );
+        Some(path.clone()),
+    )
+    .get(&dill::Catalog::builder().build())
+    .unwrap();
+
     cmd.run().await.unwrap();
 
     let loader = ResourceLoaderImpl::new();
@@ -48,12 +55,15 @@ async fn test_root_dataset_parses() {
 async fn test_derivative_dataset_parses() {
     let tempdir = tempfile::tempdir().unwrap();
     let path = tempdir.path().join("ds.yaml");
-    let cmd = NewDatasetCommand::new(
+    let cmd = NewDatasetCommand::builder(
         odf::DatasetName::from_str("foo").unwrap(),
         false,
         true,
-        Some(&path),
-    );
+        Some(path.clone()),
+    )
+    .get(&dill::Catalog::builder().build())
+    .unwrap();
+
     cmd.run().await.unwrap();
 
     let loader = ResourceLoaderImpl::new();

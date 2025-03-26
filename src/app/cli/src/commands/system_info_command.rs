@@ -27,27 +27,15 @@ pub enum SystemInfoOutputFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SystemInfoCommand {
     output_config: Arc<OutputConfig>,
-    output_format: Option<SystemInfoOutputFormat>,
     workspace_svc: Arc<WorkspaceService>,
     container_runtime: Arc<ContainerRuntime>,
-}
 
-impl SystemInfoCommand {
-    pub fn new(
-        output_config: Arc<OutputConfig>,
-        container_runtime: Arc<ContainerRuntime>,
-        workspace_svc: Arc<WorkspaceService>,
-        output_format: Option<SystemInfoOutputFormat>,
-    ) -> Self {
-        Self {
-            output_config,
-            output_format,
-            workspace_svc,
-            container_runtime,
-        }
-    }
+    #[dill::component(explicit)]
+    output_format: Option<SystemInfoOutputFormat>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -64,8 +52,12 @@ impl Command for SystemInfoCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct VersionCommand {
     output_config: Arc<OutputConfig>,
+
+    #[dill::component(explicit)]
     output_format: Option<SystemInfoOutputFormat>,
 }
 

@@ -28,58 +28,40 @@ use crate::OutputConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct APIServerRunCommand {
-    base_catalog: Catalog,
-    cli_catalog: Catalog,
     tenancy_config: TenancyConfig,
     output_config: Arc<OutputConfig>,
-    address: Option<IpAddr>,
-    port: Option<u16>,
-    external_address: Option<IpAddr>,
-    get_token: bool,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
     dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
     github_auth_config: Arc<GithubAuthenticationConfig>,
+
+    #[dill::component(explicit)]
+    address: Option<IpAddr>,
+
+    #[dill::component(explicit)]
+    port: Option<u16>,
+
+    #[dill::component(explicit)]
+    external_address: Option<IpAddr>,
+
+    #[dill::component(explicit)]
+    get_token: bool,
+
+    #[dill::component(explicit)]
     e2e_output_data_path: Option<PathBuf>,
+
+    // TODO: Reconsider the injection approach
+    #[dill::component(explicit)]
+    base_catalog: Catalog,
+    #[dill::component(explicit)]
+    cli_catalog: Catalog,
 }
 
 impl APIServerRunCommand {
-    pub fn new(
-        base_catalog: Catalog,
-        cli_catalog: Catalog,
-        tenancy_config: TenancyConfig,
-        output_config: Arc<OutputConfig>,
-        address: Option<IpAddr>,
-        port: Option<u16>,
-        external_address: Option<IpAddr>,
-        get_token: bool,
-        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-        file_upload_limit_config: Arc<FileUploadLimitConfig>,
-        dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
-        account_subject: Arc<CurrentAccountSubject>,
-        github_auth_config: Arc<GithubAuthenticationConfig>,
-        e2e_output_data_path: Option<PathBuf>,
-    ) -> Self {
-        Self {
-            base_catalog,
-            cli_catalog,
-            tenancy_config,
-            output_config,
-            address,
-            port,
-            external_address,
-            get_token,
-            predefined_accounts_config,
-            file_upload_limit_config,
-            dataset_env_vars_config,
-            account_subject,
-            github_auth_config,
-            e2e_output_data_path,
-        }
-    }
-
     async fn get_access_token(&self) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),

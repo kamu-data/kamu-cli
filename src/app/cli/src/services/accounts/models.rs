@@ -11,7 +11,7 @@ use kamu_accounts::CurrentAccountSubject;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RelatedAccountIndication {
     pub target_account: TargetAccountSelection,
 }
@@ -26,7 +26,7 @@ impl RelatedAccountIndication {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum TargetAccountSelection {
     Current,
     Specific { account_name: String },

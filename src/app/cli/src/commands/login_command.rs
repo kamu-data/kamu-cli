@@ -18,46 +18,34 @@ use crate::{odf_server, CLIError, Command, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct LoginCommand {
     login_service: Arc<odf_server::LoginService>,
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     output_config: Arc<OutputConfig>,
+
+    #[dill::component(explicit)]
     scope: odf_server::AccessTokenStoreScope,
+
+    #[dill::component(explicit)]
     server: Option<Url>,
+
+    #[dill::component(explicit)]
     access_token: Option<String>,
+
+    #[dill::component(explicit)]
     check: bool,
+
+    #[dill::component(explicit)]
     repo_name: Option<odf::RepoName>,
+
+    #[dill::component(explicit)]
     skip_add_repo: bool,
 }
 
 impl LoginCommand {
-    pub fn new(
-        login_service: Arc<odf_server::LoginService>,
-        access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        output_config: Arc<OutputConfig>,
-        scope: odf_server::AccessTokenStoreScope,
-        server: Option<Url>,
-        access_token: Option<String>,
-        check: bool,
-        repo_name: Option<odf::RepoName>,
-        skip_add_repo: bool,
-    ) -> Self {
-        Self {
-            login_service,
-            access_token_registry_service,
-            remote_repo_reg,
-            output_config,
-            scope,
-            server,
-            access_token,
-            check,
-            repo_name,
-            skip_add_repo,
-        }
-    }
-
     fn get_server_url(&self) -> Url {
         self.server
             .clone()

@@ -22,14 +22,22 @@ type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct VerifyCommand {
     verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
+
+    #[dill::component(explicit)]
     refs: Vec<odf::DatasetRefPattern>,
+
+    #[dill::component(explicit)]
     recursive: bool,
+
+    #[dill::component(explicit)]
     integrity: bool,
 }
 
@@ -39,31 +47,6 @@ struct RemoteRefDependency {
 }
 
 impl VerifyCommand {
-    pub fn new<I>(
-        verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        output_config: Arc<OutputConfig>,
-        refs: I,
-        recursive: bool,
-        integrity: bool,
-    ) -> Self
-    where
-        I: Iterator<Item = odf::DatasetRefPattern>,
-    {
-        Self {
-            verify_dataset_use_case,
-            dataset_registry,
-            dependency_graph_service,
-            remote_alias_reg,
-            output_config,
-            refs: refs.collect(),
-            recursive,
-            integrity,
-        }
-    }
-
     async fn verify_with_progress(
         &self,
         options: VerificationOptions,

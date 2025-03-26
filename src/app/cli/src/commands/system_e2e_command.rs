@@ -18,36 +18,21 @@ use super::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SystemE2ECommand {
-    action: String,
-    arguments: Vec<String>,
-    dataset_ref: Option<odf::DatasetRef>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     account_repo: Arc<dyn AccountRepository>,
     login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
-}
 
-impl SystemE2ECommand {
-    pub fn new<S>(
-        action: S,
-        arguments: Vec<String>,
-        dataset_ref: Option<odf::DatasetRef>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        account_repo: Arc<dyn AccountRepository>,
-        login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
-    ) -> Self
-    where
-        S: Into<String>,
-    {
-        Self {
-            action: action.into(),
-            arguments,
-            dataset_ref,
-            dataset_registry,
-            account_repo,
-            login_password_auth_provider,
-        }
-    }
+    #[dill::component(explicit)]
+    action: String,
+
+    #[dill::component(explicit)]
+    arguments: Vec<String>,
+
+    #[dill::component(explicit)]
+    dataset_ref: Option<odf::DatasetRef>,
 }
 
 #[async_trait::async_trait(?Send)]

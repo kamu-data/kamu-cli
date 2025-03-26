@@ -16,30 +16,18 @@ use crate::Interact;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct ResetCommand {
     interact: Arc<Interact>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     reset_dataset_use_case: Arc<dyn ResetDatasetUseCase>,
-    dataset_ref: odf::DatasetRef,
-    block_hash: odf::Multihash,
-}
 
-impl ResetCommand {
-    pub fn new(
-        interact: Arc<Interact>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        reset_dataset_use_case: Arc<dyn ResetDatasetUseCase>,
-        dataset_ref: odf::DatasetRef,
-        block_hash: odf::Multihash,
-    ) -> Self {
-        Self {
-            interact,
-            dataset_registry,
-            reset_dataset_use_case,
-            dataset_ref,
-            block_hash,
-        }
-    }
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
+    block_hash: odf::Multihash,
 }
 
 #[async_trait::async_trait(?Send)]

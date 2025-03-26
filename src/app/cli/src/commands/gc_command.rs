@@ -12,14 +12,10 @@ use std::sync::Arc;
 use super::{CLIError, Command};
 use crate::GcService;
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct GcCommand {
     gc_service: Arc<GcService>,
-}
-
-impl GcCommand {
-    pub fn new(gc_service: Arc<GcService>) -> Self {
-        Self { gc_service }
-    }
 }
 
 #[async_trait::async_trait(?Send)]

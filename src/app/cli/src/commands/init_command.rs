@@ -14,27 +14,15 @@ use kamu::domain::TenancyConfig;
 use super::{CLIError, Command};
 use crate::{AlreadyInWorkspace, OutputConfig, WorkspaceLayout};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct InitCommand {
     output_config: Arc<OutputConfig>,
     workspace_layout: Arc<WorkspaceLayout>,
-    exists_ok: bool,
     tenancy_config: TenancyConfig,
-}
 
-impl InitCommand {
-    pub fn new(
-        output_config: Arc<OutputConfig>,
-        workspace_layout: Arc<WorkspaceLayout>,
-        exists_ok: bool,
-        tenancy_config: TenancyConfig,
-    ) -> Self {
-        Self {
-            output_config,
-            workspace_layout,
-            exists_ok,
-            tenancy_config,
-        }
-    }
+    #[dill::component(explicit)]
+    exists_ok: bool,
 }
 
 #[async_trait::async_trait(?Send)]

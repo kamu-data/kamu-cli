@@ -24,14 +24,12 @@ _kamu_()
 complete -F _kamu_ kamu
 ";
 
-pub struct CompletionsCommand {
-    shell: clap_complete::Shell,
-}
+#[dill::component]
+#[dill::interface(dyn Command)]
 
-impl CompletionsCommand {
-    pub fn new(shell: clap_complete::Shell) -> Self {
-        Self { shell }
-    }
+pub struct CompletionsCommand {
+    #[dill::component(explicit)]
+    shell: clap_complete::Shell,
 }
 
 #[async_trait::async_trait(?Send)]

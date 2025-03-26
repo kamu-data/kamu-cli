@@ -9,35 +9,27 @@
 
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::{CLIError, Command};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct NewDatasetCommand {
+    #[dill::component(explicit)]
     name: odf::DatasetName,
+
+    #[dill::component(explicit)]
     is_root: bool,
+
+    #[dill::component(explicit)]
     is_derivative: bool,
+
+    #[dill::component(explicit)]
     output_path: Option<PathBuf>,
 }
 
 impl NewDatasetCommand {
-    pub fn new<P>(
-        name: odf::DatasetName,
-        is_root: bool,
-        is_derivative: bool,
-        output_path: Option<P>,
-    ) -> Self
-    where
-        P: AsRef<Path>,
-    {
-        Self {
-            name,
-            is_root,
-            is_derivative,
-            output_path: output_path.map(|p| p.as_ref().to_owned()),
-        }
-    }
-
     pub fn get_content(name: &str, is_root: bool) -> String {
         if is_root {
             format!(

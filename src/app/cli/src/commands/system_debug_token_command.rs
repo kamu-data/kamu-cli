@@ -16,18 +16,13 @@ use crate::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct DebugTokenCommand {
     auth_service: Arc<AuthenticationServiceImpl>,
-    access_token: String,
-}
 
-impl DebugTokenCommand {
-    pub fn new(auth_service: Arc<AuthenticationServiceImpl>, access_token: String) -> Self {
-        Self {
-            auth_service,
-            access_token,
-        }
-    }
+    #[dill::component(explicit)]
+    access_token: String,
 }
 
 #[async_trait::async_trait(?Send)]

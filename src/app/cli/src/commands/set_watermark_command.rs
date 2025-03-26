@@ -14,40 +14,24 @@ use kamu::domain::*;
 
 use super::{CLIError, Command};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SetWatermarkCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     set_watermark_use_case: Arc<dyn SetWatermarkUseCase>,
     tenancy_config: TenancyConfig,
-    refs: Vec<odf::DatasetRefAnyPattern>,
-    all: bool,
-    recursive: bool,
-    watermark: String,
-}
 
-impl SetWatermarkCommand {
-    pub fn new<I, S>(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        set_watermark_use_case: Arc<dyn SetWatermarkUseCase>,
-        tenancy_config: TenancyConfig,
-        refs: I,
-        all: bool,
-        recursive: bool,
-        watermark: S,
-    ) -> Self
-    where
-        S: Into<String>,
-        I: IntoIterator<Item = odf::DatasetRefAnyPattern>,
-    {
-        Self {
-            dataset_registry,
-            set_watermark_use_case,
-            tenancy_config,
-            refs: refs.into_iter().collect(),
-            all,
-            recursive,
-            watermark: watermark.into(),
-        }
-    }
+    #[dill::component(explicit)]
+    refs: Vec<odf::DatasetRefAnyPattern>,
+
+    #[dill::component(explicit)]
+    all: bool,
+
+    #[dill::component(explicit)]
+    recursive: bool,
+
+    #[dill::component(explicit)]
+    watermark: String,
 }
 
 #[async_trait::async_trait(?Send)]

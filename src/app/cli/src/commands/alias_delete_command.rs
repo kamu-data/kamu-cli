@@ -14,37 +14,29 @@ use kamu::domain::*;
 
 use super::{CLIError, Command};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct AliasDeleteCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+
+    #[dill::component(explicit)]
     maybe_dataset_ref: Option<odf::DatasetRef>,
+
+    #[dill::component(explicit)]
     maybe_alias: Option<odf::DatasetRefRemote>,
+
+    #[dill::component(explicit)]
     all: bool,
+
+    #[dill::component(explicit)]
     pull: bool,
+
+    #[dill::component(explicit)]
     push: bool,
 }
 
 impl AliasDeleteCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        maybe_dataset_ref: Option<odf::DatasetRef>,
-        maybe_alias: Option<odf::DatasetRefRemote>,
-        all: bool,
-        pull: bool,
-        push: bool,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            remote_alias_reg,
-            maybe_dataset_ref,
-            maybe_alias,
-            all,
-            pull,
-            push,
-        }
-    }
-
     async fn delete_dataset_alias(&self) -> Result<usize, CLIError> {
         let dataset_handle = self
             .dataset_registry

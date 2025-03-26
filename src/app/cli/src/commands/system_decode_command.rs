@@ -15,15 +15,14 @@ use super::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SystemDecodeCommand {
+    #[dill::component(explicit)]
     manifest: Option<String>,
-    stdin: bool,
-}
 
-impl SystemDecodeCommand {
-    pub fn new(manifest: Option<String>, stdin: bool) -> Self {
-        Self { manifest, stdin }
-    }
+    #[dill::component(explicit)]
+    stdin: bool,
 }
 
 #[async_trait::async_trait(?Send)]

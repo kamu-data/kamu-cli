@@ -22,40 +22,28 @@ use crate::{accounts, NotInMultiTenantWorkspace};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct ListCommand {
+    tenancy_config: TenancyConfig,
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
+
+    #[dill::component(explicit)]
     current_account: accounts::CurrentAccountIndication,
+
+    #[dill::component(explicit)]
     related_account: accounts::RelatedAccountIndication,
+
+    #[dill::component(explicit)]
     output_config: Arc<OutputConfig>,
-    tenancy_config: TenancyConfig,
+
+    #[dill::component(explicit)]
     detail_level: u8,
 }
 
 impl ListCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
-        current_account: accounts::CurrentAccountIndication,
-        related_account: accounts::RelatedAccountIndication,
-        output_config: Arc<OutputConfig>,
-        tenancy_config: TenancyConfig,
-        detail_level: u8,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            remote_alias_reg,
-            rebac_service,
-            current_account,
-            related_account,
-            output_config,
-            tenancy_config,
-            detail_level,
-        }
-    }
-
     fn humanize_relative_date(last_pulled: DateTime<Utc>) -> String {
         format!("{}", HumanTime::from(last_pulled - Utc::now()))
     }

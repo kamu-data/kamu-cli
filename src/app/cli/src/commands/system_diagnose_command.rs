@@ -39,6 +39,8 @@ const FAILED_MESSAGE: &str = "failed";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SystemDiagnoseCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
@@ -47,20 +49,6 @@ pub struct SystemDiagnoseCommand {
 }
 
 impl SystemDiagnoseCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
-        container_runtime: Arc<ContainerRuntime>,
-        workspace_svc: Arc<WorkspaceService>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            verify_dataset_use_case,
-            container_runtime,
-            workspace_svc,
-        }
-    }
-
     fn run_info_dir(&self) -> Option<PathBuf> {
         if !self.workspace_svc.is_in_workspace() {
             return None;

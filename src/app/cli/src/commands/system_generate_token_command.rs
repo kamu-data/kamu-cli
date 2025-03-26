@@ -16,27 +16,19 @@ use crate::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct GenerateTokenCommand {
     auth_service: Arc<AuthenticationServiceImpl>,
-    login: Option<String>,
-    subject: Option<String>,
-    expiration_time_sec: usize,
-}
 
-impl GenerateTokenCommand {
-    pub fn new(
-        auth_service: Arc<AuthenticationServiceImpl>,
-        login: Option<String>,
-        subject: Option<String>,
-        expiration_time_sec: usize,
-    ) -> Self {
-        Self {
-            auth_service,
-            login,
-            subject,
-            expiration_time_sec,
-        }
-    }
+    #[dill::component(explicit)]
+    login: Option<String>,
+
+    #[dill::component(explicit)]
+    subject: Option<String>,
+
+    #[dill::component(explicit)]
+    expiration_time_sec: usize,
 }
 
 #[async_trait::async_trait(?Send)]

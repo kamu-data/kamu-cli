@@ -27,28 +27,22 @@ pub enum SchemaOutputFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
+
+    #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
     output_format: Option<SchemaOutputFormat>,
+
+    #[dill::component(explicit)]
     from_data_file: bool,
 }
 
 impl InspectSchemaCommand {
-    pub fn new(
-        query_svc: Arc<dyn QueryService>,
-        dataset_ref: odf::DatasetRef,
-        output_format: Option<SchemaOutputFormat>,
-        from_data_file: bool,
-    ) -> Self {
-        Self {
-            query_svc,
-            dataset_ref,
-            output_format,
-            from_data_file,
-        }
-    }
-
     fn print_schema_unavailable(&self) {
         eprintln!(
             "{}: Dataset schema is not yet available: {}",

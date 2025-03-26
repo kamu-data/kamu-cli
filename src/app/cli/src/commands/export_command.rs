@@ -16,36 +16,26 @@ use crate::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct ExportCommand {
     export_service: Arc<dyn ExportService>,
     query_service: Arc<dyn QueryService>,
-    dataset_ref: odf::DatasetRef,
-    output_path: Option<PathBuf>,
-    output_format: ExportFormat,
-    records_per_file: Option<usize>,
-    quiet: bool,
-}
 
-impl ExportCommand {
-    pub fn new(
-        export_service: Arc<dyn ExportService>,
-        query_service: Arc<dyn QueryService>,
-        dataset_ref: odf::DatasetRef,
-        output_path: Option<PathBuf>,
-        output_format: ExportFormat,
-        records_per_file: Option<usize>,
-        quiet: bool,
-    ) -> Self {
-        Self {
-            export_service,
-            query_service,
-            dataset_ref,
-            output_path,
-            output_format,
-            records_per_file,
-            quiet,
-        }
-    }
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
+    output_path: Option<PathBuf>,
+
+    #[dill::component(explicit)]
+    output_format: ExportFormat,
+
+    #[dill::component(explicit)]
+    records_per_file: Option<usize>,
+
+    #[dill::component(explicit)]
+    quiet: bool,
 }
 
 #[async_trait::async_trait(?Send)]

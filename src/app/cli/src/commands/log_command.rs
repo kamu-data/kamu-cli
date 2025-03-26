@@ -33,37 +33,27 @@ pub enum MetadataLogOutputFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct LogCommand {
+    output_config: Arc<OutputConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+
+    #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
     output_format: Option<MetadataLogOutputFormat>,
+
+    #[dill::component(explicit)]
     filter: Option<String>,
+
+    #[dill::component(explicit)]
     limit: usize,
-    output_config: Arc<OutputConfig>,
 }
 
 impl LogCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-        dataset_ref: odf::DatasetRef,
-        output_format: Option<MetadataLogOutputFormat>,
-        filter: Option<String>,
-        limit: usize,
-        output_config: Arc<OutputConfig>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            rebac_dataset_registry_facade,
-            dataset_ref,
-            output_format,
-            filter,
-            limit,
-            output_config,
-        }
-    }
-
     #[allow(clippy::match_same_arms)]
     fn filter_block(&self, block: &odf::MetadataBlock) -> bool {
         // Keep in sync with CLI parser

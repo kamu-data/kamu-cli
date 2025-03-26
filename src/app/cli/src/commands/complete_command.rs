@@ -21,39 +21,24 @@ use kamu::domain::*;
 use super::{CLIError, Command};
 use crate::config::ConfigService;
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct CompleteCommand {
     dataset_registry: Option<Arc<dyn DatasetRegistry>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
+
+    #[dill::component(explicit)]
     input: String,
+
+    #[dill::component(explicit)]
     current: usize,
 }
 
 // TODO: This is an extremely hacky way to implement the completion
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
-    pub fn new<S>(
-        dataset_registry: Option<Arc<dyn DatasetRegistry>>,
-        remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
-        remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
-        config_service: Arc<ConfigService>,
-        input: S,
-        current: usize,
-    ) -> Self
-    where
-        S: Into<String>,
-    {
-        Self {
-            dataset_registry,
-            remote_repo_reg,
-            remote_alias_reg,
-            config_service,
-            input: input.into(),
-            current,
-        }
-    }
-
     fn complete_timestamp(&self, output: &mut impl Write) {
         writeln!(
             output,

@@ -11,20 +11,17 @@ use dill::Catalog;
 
 use super::{CLIError, Command};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct APIServerGqlQueryCommand {
+    #[dill::component(explicit)]
     base_catalog: Catalog,
-    query: String,
-    full: bool,
-}
 
-impl APIServerGqlQueryCommand {
-    pub fn new<S: Into<String>>(base_catalog: Catalog, query: S, full: bool) -> Self {
-        Self {
-            base_catalog,
-            query: query.into(),
-            full,
-        }
-    }
+    #[dill::component(explicit)]
+    query: String,
+
+    #[dill::component(explicit)]
+    full: bool,
 }
 
 #[async_trait::async_trait(?Send)]

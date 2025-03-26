@@ -24,60 +24,36 @@ use crate::{ConfirmDeleteService, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct AddCommand {
+    output_config: Arc<OutputConfig>,
     resource_loader: Arc<dyn ResourceLoader>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
-    snapshot_refs: Vec<String>,
-    name: Option<odf::DatasetAlias>,
-    recursive: bool,
-    replace: bool,
-    stdin: bool,
-    dataset_visibility: odf::DatasetVisibility,
-    output_config: Arc<OutputConfig>,
     confirm_delete_service: Arc<ConfirmDeleteService>,
+
+    #[dill::component(explicit)]
+    snapshot_refs: Vec<String>,
+
+    #[dill::component(explicit)]
+    name: Option<odf::DatasetAlias>,
+
+    #[dill::component(explicit)]
+    recursive: bool,
+
+    #[dill::component(explicit)]
+    replace: bool,
+
+    #[dill::component(explicit)]
+    stdin: bool,
+
+    #[dill::component(explicit)]
+    dataset_visibility: odf::DatasetVisibility,
 }
 
 impl AddCommand {
-    pub fn new<I, S>(
-        resource_loader: Arc<dyn ResourceLoader>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        create_dataset_from_snapshot: Arc<dyn CreateDatasetFromSnapshotUseCase>,
-        delete_dataset: Arc<dyn DeleteDatasetUseCase>,
-        snapshot_refs_iter: I,
-        name: Option<odf::DatasetAlias>,
-        recursive: bool,
-        replace: bool,
-        stdin: bool,
-        maybe_dataset_visibility: Option<odf::DatasetVisibility>,
-        output_config: Arc<OutputConfig>,
-        tenancy_config: TenancyConfig,
-        confirm_delete_service: Arc<ConfirmDeleteService>,
-    ) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        let dataset_visibility =
-            maybe_dataset_visibility.unwrap_or_else(|| tenancy_config.default_dataset_visibility());
-
-        Self {
-            resource_loader,
-            dataset_registry,
-            create_dataset_from_snapshot,
-            delete_dataset,
-            snapshot_refs: snapshot_refs_iter.into_iter().map(Into::into).collect(),
-            name,
-            recursive,
-            replace,
-            stdin,
-            dataset_visibility,
-            output_config,
-            confirm_delete_service,
-        }
-    }
-
     async fn load_specific(&self) -> Vec<(String, Result<odf::DatasetSnapshot, ResourceError>)> {
         let mut res = Vec::new();
         for r in &self.snapshot_refs {
