@@ -59,8 +59,8 @@ pub enum DatasetAction {
 }
 
 impl DatasetAction {
-    pub fn resolve_access(set: &HashSet<Self>, action: &Self) -> DatasetActionAccess {
-        if set.contains(action) {
+    pub fn resolve_access(set: &HashSet<Self>, action: Self) -> DatasetActionAccess {
+        if set.contains(&action) {
             DatasetActionAccess::Full
         } else if set.contains(&Self::Read) {
             DatasetActionAccess::Limited
@@ -215,7 +215,7 @@ fn test_dataset_action_resolve_access() {
         for (sub_test_index, sub_test) in sub_tests.iter().enumerate() {
             assert_eq!(
                 sub_test.expected_access,
-                DatasetAction::resolve_access(allowed_actions, &sub_test.current_action),
+                DatasetAction::resolve_access(allowed_actions, sub_test.current_action),
                 "Fixture index: {fixture_index}; Sub-test index: {sub_test_index}",
             );
         }

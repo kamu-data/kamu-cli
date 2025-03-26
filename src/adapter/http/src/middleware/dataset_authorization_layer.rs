@@ -148,7 +148,7 @@ where
 
                         match auth::DatasetAction::resolve_access(
                             &allowed_actions,
-                            &current_dataset_action,
+                            current_dataset_action,
                         ) {
                             DatasetActionAccess::Full => Ok(CheckResult::Proceed),
                             DatasetActionAccess::Limited => {

@@ -184,14 +184,16 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
     )
     .await;
 
-    // Unauthorized attempts to change visibility
+    // Unauthorized attempts to change visibility from public to private
     {
-        use SetDatasetVisibilityError::{Access, DatasetNotFound};
+        use SetDatasetVisibilityError::Access;
 
+        // Roughly speaking, the public dataset grants the Reader role to everyone,
+        // so we don't get the DatasetNotFound error
         for (tag, client, expected_error) in [
-            ("anonymous", &anonymous, DatasetNotFound),
-            ("not_owner", &not_owner, DatasetNotFound),
-            ("reader", &reader, DatasetNotFound),
+            ("anonymous", &anonymous, Access),
+            ("not_owner", &not_owner, Access),
+            ("reader", &reader, Access),
             ("editor", &editor, Access),
             // ("maintainer", &maintainer),
             // ("owner", &owner),
@@ -249,6 +251,31 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
                     "Set tag: {}; Get tag: {}",
                     set_tag,
                     get_tag,
+                );
+            }
+        }
+
+        // Unauthorized attempts to change visibility from private to public
+        {
+            use SetDatasetVisibilityError::{Access, DatasetNotFound};
+
+            for (tag, client, expected_error) in [
+                ("anonymous", &anonymous, DatasetNotFound),
+                ("not_owner", &not_owner, DatasetNotFound),
+                ("reader", &reader, Access),
+                ("editor", &editor, Access),
+                // ("maintainer", &maintainer),
+                // ("owner", &owner),
+                // ("admin", &admin),
+            ] {
+                pretty_assertions::assert_eq!(
+                    Err(expected_error),
+                    client
+                        .dataset()
+                        .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
+                        .await,
+                    "Tag: {}",
+                    tag,
                 );
             }
         }
