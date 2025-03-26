@@ -33,7 +33,7 @@ use super::compute_dataset_statistics_increment;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    delivery: MessageDeliveryMechanism::Immediate,
 })]
 #[scope(Singleton)]
 pub struct DatasetStatisticsUpdateHandler {}

@@ -18,7 +18,7 @@ use kamu_auth_rebac::{AuthorizedAccount, RebacService};
 use kamu_datasets::{
     DatasetEntriesResolution,
     DatasetEntryNotFoundError,
-    DatasetEntryRepository,
+    DatasetEntryService,
     GetDatasetEntryError,
 };
 use thiserror::Error;
@@ -55,7 +55,7 @@ impl OsoResourceServiceImplStateHolder {
 
 pub struct OsoResourceServiceImpl {
     state_holder: Arc<OsoResourceServiceImplStateHolder>,
-    dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+    dataset_entry_svc: Arc<dyn DatasetEntryService>,
     rebac_service: Arc<dyn RebacService>,
     account_service: Arc<dyn AccountService>,
 }
@@ -64,13 +64,13 @@ pub struct OsoResourceServiceImpl {
 impl OsoResourceServiceImpl {
     pub fn new(
         state_holder: Arc<OsoResourceServiceImplStateHolder>,
-        dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+        dataset_entry_svc: Arc<dyn DatasetEntryService>,
         rebac_service: Arc<dyn RebacService>,
         account_service: Arc<dyn AccountService>,
     ) -> Self {
         Self {
             state_holder,
-            dataset_entry_repo,
+            dataset_entry_svc,
             rebac_service,
             account_service,
         }
@@ -132,7 +132,7 @@ impl OsoResourceServiceImpl {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetResource, GetDatasetResourceError> {
-        let dataset_entry = match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
+        let dataset_entry = match self.dataset_entry_svc.get_entry(dataset_id).await {
             Ok(found_dataset_entry) => found_dataset_entry,
             Err(e) => return Err(e.into()),
         };
@@ -166,8 +166,8 @@ impl OsoResourceServiceImpl {
             resolved_entries,
             unresolved_entries,
         } = self
-            .dataset_entry_repo
-            .get_multiple_dataset_entries(dataset_ids)
+            .dataset_entry_svc
+            .get_multiple_entries(dataset_ids)
             .await
             .int_err()?;
 

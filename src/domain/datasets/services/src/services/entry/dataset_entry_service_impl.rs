@@ -538,7 +538,6 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         };
 
         // Resolve entry
-        // TODO: error handling
         let dataset_entry = self.get_entry(&dataset_handle.id).await.int_err()?;
 
         if let Some(cached_dataset) = maybe_cached_dataset {
