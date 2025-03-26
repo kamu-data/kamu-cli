@@ -58,6 +58,24 @@ pub enum DatasetAction {
     Own,
 }
 
+impl DatasetAction {
+    pub fn resolve_access(set: &HashSet<Self>, action: &Self) -> DatasetActionAccess {
+        if set.contains(action) {
+            DatasetActionAccess::Full
+        } else if set.contains(&Self::Read) {
+            DatasetActionAccess::Limited
+        } else {
+            DatasetActionAccess::Forbidden
+        }
+    }
+}
+
+pub enum DatasetActionAccess {
+    Forbidden,
+    Limited,
+    Full,
+}
+
 #[cfg(feature = "oso")]
 impl oso::FromPolar for DatasetAction {
     fn from_polar(polar_value: oso::PolarValue) -> oso::Result<Self> {

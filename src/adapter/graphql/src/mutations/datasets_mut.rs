@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::auth::DatasetAction;
+use kamu_core::auth;
+use kamu_core::auth::DatasetActionAccess;
 use kamu_datasets::CreateDatasetFromSnapshotError;
 
 use crate::mutations::DatasetMut;
@@ -35,7 +36,6 @@ impl DatasetsMut {
 
         use kamu_core::DatasetRegistryExt;
 
-        // TODO: Private Datasets: replace with RebacDatasetRegistry
         let maybe_dataset_handle = dataset_registry
             .try_resolve_dataset_handle_by_ref(&dataset_id.as_local_ref())
             .await?;
@@ -44,11 +44,18 @@ impl DatasetsMut {
         };
 
         let dataset_request_state = DatasetRequestState::new(dataset_handle);
-        if !utils::is_action_allowed(ctx, &dataset_request_state, DatasetAction::Write).await? {
-            return Ok(None);
-        }
+        let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
+        let current_dataset_action = auth::DatasetAction::Write;
 
-        Ok(Some(DatasetMut::new_access_checked(dataset_request_state)))
+        match auth::DatasetAction::resolve_access(allowed_actions, &current_dataset_action) {
+            DatasetActionAccess::Full => {
+                Ok(Some(DatasetMut::new_access_checked(dataset_request_state)))
+            }
+            DatasetActionAccess::Limited => Err(utils::make_dataset_access_error(
+                dataset_request_state.dataset_handle(),
+            )),
+            DatasetActionAccess::Forbidden => Ok(None),
+        }
     }
 
     /// Creates a new empty dataset

@@ -14,7 +14,8 @@ use axum::body::Body;
 use axum::response::Response;
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_core::auth::DatasetActionAccess;
 use kamu_core::{auth, DatasetRegistry};
 use tower::{Layer, Service};
 
@@ -135,10 +136,8 @@ where
                                     // exist beforehand.
                                     return Ok(CheckResult::Proceed);
                                 }
-                                Err(E::Internal(_)) => {
-                                    return Ok(CheckResult::ErrorResponse(
-                                        internal_server_error_response(),
-                                    ))
+                                Err(e @ E::Internal(_)) => {
+                                    return Err(e.int_err());
                                 }
                             }
                         };
@@ -146,23 +145,18 @@ where
                         let allowed_actions = dataset_action_authorizer
                             .get_allowed_actions(&dataset_handle.id)
                             .await?;
-                        let allowed = allowed_actions.contains(&current_dataset_action);
 
-                        // If a user has access, we move on.
-                        if allowed {
-                            return Ok(CheckResult::Proceed);
-                        }
-
-                        let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
-
-                        // If not, check if the user knows about the existence of the dataset:
-                        if can_read {
-                            // In case the dataset is known to exist, we return that
-                            // there are not enough permissions.
-                            Ok(CheckResult::ErrorResponse(forbidden_access_response()))
-                        } else {
-                            // Otherwise, we pretend it doesn't exist.
-                            Ok(CheckResult::ErrorResponse(not_found_response()))
+                        match auth::DatasetAction::resolve_access(
+                            &allowed_actions,
+                            &current_dataset_action,
+                        ) {
+                            DatasetActionAccess::Full => Ok(CheckResult::Proceed),
+                            DatasetActionAccess::Limited => {
+                                Ok(CheckResult::ErrorResponse(forbidden_access_response()))
+                            }
+                            DatasetActionAccess::Forbidden => {
+                                Ok(CheckResult::ErrorResponse(not_found_response()))
+                            }
                         }
                     })
                     .await;

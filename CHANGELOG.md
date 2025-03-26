@@ -20,7 +20,9 @@ Recommendation: for ease of reading, use the following order:
 - Provenance service and pull request planner fetch dependencies from the graph
 - Implemented caching layer for `DatasetEntry` within the currently open transaction
 - Private Datasets:
-  - HTTP: Return 403 if the user does not have write permission while having read permission 
+  - HTTP: Return 403 if the user does not have write permission while having read permission
+  - GQL: `DatasetsMut::by_id()`: Return access error 
+      if the user does not have write permission while having read permission
 
 ## [0.230.0] - 2025-03-25
 ### Added
