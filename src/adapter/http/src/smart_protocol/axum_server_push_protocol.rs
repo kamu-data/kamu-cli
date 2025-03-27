@@ -522,6 +522,8 @@ impl AxumServerPushProtocolInstance {
             .await
             .protocol_int_err(PushPhase::CompleteRequest)?;
 
+        // Ignore outbox posting if dataset force push
+        // due to failure of scheduling dependent flows
         if !force_update_if_diverged {
             tracing::debug!("Push client sent a complete request. Send outbox message");
 

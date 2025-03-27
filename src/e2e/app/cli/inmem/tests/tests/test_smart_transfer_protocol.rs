@@ -385,7 +385,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
-    extra_test_groups = "engine, ingest, transform, datafusion"
+    extra_test_groups = "engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -419,7 +419,7 @@ kamu_cli_run_api_server_e2e_test!(
                   taskCheckingIntervalSecs: 1
             "#
         )),
-    extra_test_groups = "engine, ingest, transform, datafusion"
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
