@@ -12,6 +12,10 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- `kamu login {password,oauth}`:
+  - Saving the repository is the same as in `kamu login` 
+  - Add `--repo-name` & `--skip-add-repo` arguments to control the save settings of the remote repository
 ### Changed
 - `DatasetSummary` files replaced with `DatasetStatistics` stored in the database
      and updated synchronously with the HEAD reference updates

@@ -167,6 +167,8 @@ pub fn get_command(
                         provider: sc.provider,
                         access_token: sc.access_token,
                     }),
+                    c.repo_name,
+                    c.skip_add_repo,
                 )
                 .cast(),
             ),
@@ -182,6 +184,8 @@ pub fn get_command(
                         login: sc.login,
                         password: sc.password,
                     }),
+                    c.repo_name,
+                    c.skip_add_repo,
                 )
                 .cast(),
             ),

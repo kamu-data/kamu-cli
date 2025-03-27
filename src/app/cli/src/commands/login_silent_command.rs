@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
+use kamu::UrlExt;
 use kamu_adapter_oauth::PROVIDER_GITHUB;
 use url::Url;
 
@@ -41,6 +43,7 @@ pub struct LoginSilentModePassword {
 pub struct LoginSilentCommand {
     login_service: Arc<odf_server::LoginService>,
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
 
     #[dill::component(explicit)]
     scope: odf_server::AccessTokenStoreScope,
@@ -50,6 +53,12 @@ pub struct LoginSilentCommand {
 
     #[dill::component(explicit)]
     mode: LoginSilentMode,
+
+    #[dill::component(explicit)]
+    repo_name: Option<odf::RepoName>,
+
+    #[dill::component(explicit)]
+    skip_add_repo: bool,
 }
 
 impl LoginSilentCommand {
@@ -60,6 +69,23 @@ impl LoginSilentCommand {
     }
 
     async fn new_login(&self, odf_server_backend_url: Url) -> Result<(), CLIError> {
+        let maybe_repo_name = if self.skip_add_repo {
+            None
+        } else {
+            let repo_name = if let Some(repo_name) = self.repo_name.as_ref() {
+                repo_name.clone()
+            } else {
+                let host = odf_server_backend_url.host_str().ok_or_else(|| {
+                    CLIError::usage_error(format!(
+                        "Server URL does not contain the host part: {}",
+                        odf_server_backend_url.as_str()
+                    ))
+                })?;
+                odf::RepoName::try_from(host).map_err(CLIError::failure)?
+            };
+            Some(repo_name)
+        };
+
         // Execute login method depending on the input mode
         let login_response = match &self.mode {
             LoginSilentMode::OAuth(github_mode) => {
@@ -106,6 +132,10 @@ impl LoginSilentCommand {
             &odf_server_backend_url,
             login_response.access_token,
         )?;
+
+        if let Some(repo_name) = maybe_repo_name {
+            self.add_repository(&repo_name, &odf_server_backend_url)?;
+        }
 
         eprintln!(
             "{}: {}",
@@ -155,6 +185,22 @@ impl LoginSilentCommand {
             .map_err(CLIError::critical)?;
 
         Err(CLIError::failure(e))
+    }
+
+    fn add_repository(
+        &self,
+        repo_name: &odf::RepoName,
+        odf_server_backend_url: &Url,
+    ) -> Result<(), CLIError> {
+        match self.remote_repo_reg.add_repository(
+            repo_name,
+            odf_server_backend_url
+                .as_odf_protocol()
+                .map_err(CLIError::failure)?,
+        ) {
+            Ok(_) | Err(AddRepoError::AlreadyExists(_)) => Ok(()),
+            Err(e) => Err(CLIError::failure(e)),
+        }
     }
 }
 
