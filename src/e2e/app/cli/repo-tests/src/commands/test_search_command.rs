@@ -18,6 +18,9 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
+use odf::metadata::testing::MetadataFactory;
+
+use crate::utils::make_logged_clients;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_search_multi_user
@@ -59,6 +62,20 @@ pub async fn test_search_by_repo_st(kamu_node_api_client: KamuApiServerClient) {
 
 pub async fn test_search_by_repo_mt(kamu_node_api_client: KamuApiServerClient) {
     test_search_by_repo(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_search_private_dataset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_private_dataset_st(kamu_node_api_client: KamuApiServerClient) {
+    test_search_private_dataset(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_private_dataset_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_search_private_dataset(kamu_node_api_client, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -352,6 +369,113 @@ async fn test_search_by_repo(
         None::<Vec<&str>>,
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_search_private_dataset(
+    anonymous: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
+    let [alice, _bob] = make_logged_clients(&anonymous, ["alice", "bob"]).await;
+
+    // Alice has two datasets, one private and one public
+    alice
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name("public-dataset")
+                .build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+    alice
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot()
+                .name("private-dataset")
+                .build(),
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+
+    let kamu_node_url = anonymous.get_base_url().as_str();
+
+    // As an owner, she can find all the datasets
+    {
+        let kamu_workspace_alice =
+            KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
+
+        kamu_workspace_alice
+            .assert_success_command_execution(
+                [
+                    "login",
+                    "--repo-name",
+                    "kamu-node",
+                    "password",
+                    "alice",
+                    "alice",
+                    kamu_node_url,
+                ],
+                None,
+                Some([format!("Login successful: {kamu_node_url}").as_str()]),
+            )
+            .await;
+
+        kamu_workspace_alice
+            .assert_success_command_execution(
+                ["search", "dataset", "--output-format", "table"],
+                Some(indoc::indoc!(
+                    r#"
+                ┌─────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
+                │              Alias              │ Kind │ Description │ Blocks │ Records │ Size │
+                ├─────────────────────────────────┼──────┼─────────────┼────────┼─────────┼──────┤
+                │ kamu-node/alice/private-dataset │ Root │ -           │      1 │       - │    - │
+                │ kamu-node/alice/public-dataset  │ Root │ -           │      1 │       - │    - │
+                └─────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
+                "#
+                )),
+                None::<Vec<&str>>,
+            )
+            .await;
+    }
+
+    // Bob only finds the public dataset
+    {
+        let kamu_workspace_bob = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
+
+        kamu_workspace_bob
+            .assert_success_command_execution(
+                [
+                    "login",
+                    "--repo-name",
+                    "kamu-node",
+                    "password",
+                    "bob",
+                    "bob",
+                    kamu_node_url,
+                ],
+                None,
+                Some([format!("Login successful: {kamu_node_url}").as_str()]),
+            )
+            .await;
+
+        kamu_workspace_bob
+            .assert_success_command_execution(
+                ["search", "dataset", "--output-format", "table"],
+                Some(indoc::indoc!(
+                    r#"
+                    ┌────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────┐
+                    │             Alias              │ Kind │ Description │ Blocks │ Records │ Size │
+                    ├────────────────────────────────┼──────┼─────────────┼────────┼─────────┼──────┤
+                    │ kamu-node/alice/public-dataset │ Root │ -           │      1 │       - │    - │
+                    └────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────┘
+                    "#
+                )),
+                None::<Vec<&str>>,
+            )
+            .await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
