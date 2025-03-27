@@ -35,7 +35,6 @@ use super::compute_dataset_statistics_increment;
     ],
     delivery: MessageDeliveryMechanism::Immediate,
 })]
-#[scope(Singleton)]
 pub struct DatasetStatisticsUpdateHandler {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

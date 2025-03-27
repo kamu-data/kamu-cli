@@ -48,7 +48,6 @@ pub struct DependencyGraphImmediateListener {
     ],
     delivery: MessageDeliveryMechanism::Immediate,
 })]
-#[scope(Singleton)]
 impl DependencyGraphImmediateListener {
     pub fn new(dependency_graph_service: Arc<dyn DependencyGraphService>) -> Self {
         Self {
