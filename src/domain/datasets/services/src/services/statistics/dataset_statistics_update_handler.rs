@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
@@ -33,16 +35,19 @@ use super::compute_dataset_statistics_increment;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
+    // Update statistics immediately with reference changes
     delivery: MessageDeliveryMechanism::Immediate,
 })]
-pub struct DatasetStatisticsUpdateHandler {}
+pub struct DatasetStatisticsUpdateHandler {
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_stats_repo: Arc<dyn DatasetStatisticsRepository>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetStatisticsUpdateHandler {
     async fn update_dataset_statistics(
         &self,
-        dataset_stats_repo: &dyn DatasetStatisticsRepository,
         target: ResolvedDataset,
         updated_message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
@@ -56,7 +61,7 @@ impl DatasetStatisticsUpdateHandler {
         // If we have seen Seed, the dataset has diverged,
         // and the increment represents the updated situation
         if increment.seen_seed {
-            dataset_stats_repo
+            self.dataset_stats_repo
                 .set_dataset_statistics(
                     &updated_message.dataset_id,
                     &updated_message.block_ref,
@@ -66,7 +71,8 @@ impl DatasetStatisticsUpdateHandler {
                 .int_err()
         } else {
             // Otheriwse, load previous stats
-            let older_stats = match dataset_stats_repo
+            let older_stats = match self
+                .dataset_stats_repo
                 .get_dataset_statistics(&updated_message.dataset_id, &updated_message.block_ref)
                 .await
             {
@@ -77,7 +83,7 @@ impl DatasetStatisticsUpdateHandler {
 
             // Save old + increment as new stats
             let new_stats = older_stats + increment.statistics;
-            dataset_stats_repo
+            self.dataset_stats_repo
                 .set_dataset_statistics(
                     &updated_message.dataset_id,
                     &updated_message.block_ref,
@@ -104,18 +110,15 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetStatisticsUpdateHandle
     )]
     async fn consume_message(
         &self,
-        transaction_catalog: &Catalog,
+        _: &Catalog,
         message: &DatasetReferenceMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
         match message {
             DatasetReferenceMessage::Updated(updated_message) => {
-                let dataset_registry = transaction_catalog
-                    .get_one::<dyn DatasetRegistry>()
-                    .unwrap();
-
-                let target = match dataset_registry
+                let target = match self
+                    .dataset_registry
                     .get_dataset_by_id(&updated_message.dataset_id)
                     .await
                 {
@@ -130,11 +133,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetStatisticsUpdateHandle
                     Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
                 }?;
 
-                let dataset_stats_repo = transaction_catalog
-                    .get_one::<dyn DatasetStatisticsRepository>()
-                    .unwrap();
-
-                self.update_dataset_statistics(dataset_stats_repo.as_ref(), target, updated_message)
+                self.update_dataset_statistics(target, updated_message)
                     .await
             }
         }

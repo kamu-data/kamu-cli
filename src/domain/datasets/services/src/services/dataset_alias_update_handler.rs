@@ -29,9 +29,12 @@ use messaging_outbox::*;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
+    // Only write aliases after reference transaction succeeds!
     delivery: MessageDeliveryMechanism::Transactional,
 })]
-pub struct DatasetAliasUpdateHandler {}
+pub struct DatasetAliasUpdateHandler {
+    dataset_registry: Arc<dyn DatasetRegistry>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,7 +51,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetAliasUpdateHandler {
     )]
     async fn consume_message(
         &self,
-        transaction_catalog: &Catalog,
+        _: &Catalog,
         message: &DatasetLifecycleMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
@@ -60,10 +63,8 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetAliasUpdateHandler {
         match message {
             // Only react to renaming, creation writes alias immediately
             DatasetLifecycleMessage::Renamed(renamed_message) => {
-                let dataset_registry: Arc<dyn DatasetRegistry> =
-                    transaction_catalog.get_one().unwrap();
-
-                let target = match dataset_registry
+                let target = match self
+                    .dataset_registry
                     .get_dataset_by_id(&renamed_message.dataset_id)
                     .await
                 {

@@ -34,10 +34,6 @@ use crate::{extract_modified_dependencies_in_interval, DependencyChange};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DependencyGraphImmediateListener {
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-}
-
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetReferenceMessage>)]
@@ -48,17 +44,16 @@ pub struct DependencyGraphImmediateListener {
     ],
     delivery: MessageDeliveryMechanism::Immediate,
 })]
-impl DependencyGraphImmediateListener {
-    pub fn new(dependency_graph_service: Arc<dyn DependencyGraphService>) -> Self {
-        Self {
-            dependency_graph_service,
-        }
-    }
+pub struct DependencyGraphImmediateListener {
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dependency_graph_repo: Arc<dyn DatasetDependencyRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    outbox: Arc<dyn Outbox>,
+}
 
+impl DependencyGraphImmediateListener {
     async fn handle_derived_dependency_updates(
         &self,
-        dependency_graph_repo: &dyn DatasetDependencyRepository,
-        outbox: &dyn Outbox,
         target: ResolvedDataset,
         message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
@@ -110,19 +105,19 @@ impl DependencyGraphImmediateListener {
             .collect();
 
         // Update database dependencies
-        dependency_graph_repo
+        self.dependency_graph_repo
             .remove_upstream_dependencies(&message.dataset_id, &removed_dependencies)
             .await
             .int_err()?;
 
-        dependency_graph_repo
+        self.dependency_graph_repo
             .add_upstream_dependencies(&message.dataset_id, &added_dependencies)
             .await
             .int_err()?;
 
         // Send outbox message, so that in-memory graph version is synchronized
         // once the main transaction completes successfully
-        outbox
+        self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
                 DatasetDependenciesMessage::updated(
@@ -152,7 +147,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
     )]
     async fn consume_message(
         &self,
-        transaction_catalog: &Catalog,
+        _: &Catalog,
         message: &DatasetReferenceMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
@@ -165,10 +160,8 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
                 }
 
                 // Resolve dataset
-                let dataset_registry = transaction_catalog
-                    .get_one::<dyn DatasetRegistry>()
-                    .unwrap();
-                let target = dataset_registry
+                let target = self
+                    .dataset_registry
                     .get_dataset_by_id(&updated_message.dataset_id)
                     .await
                     .int_err()?;
@@ -179,19 +172,8 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
                 }
 
                 // Deal with potential upstream changes
-                self.handle_derived_dependency_updates(
-                    transaction_catalog
-                        .get_one::<dyn DatasetDependencyRepository>()
-                        .unwrap()
-                        .as_ref(),
-                    transaction_catalog
-                        .get_one::<dyn Outbox>()
-                        .unwrap()
-                        .as_ref(),
-                    target,
-                    updated_message,
-                )
-                .await?;
+                self.handle_derived_dependency_updates(target, updated_message)
+                    .await?;
             }
         }
 
