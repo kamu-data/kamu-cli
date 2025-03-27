@@ -10,6 +10,7 @@
 use std::fmt;
 
 use super::*;
+use crate::DatasetKind;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,11 +19,12 @@ use super::*;
 pub struct DatasetHandle {
     pub id: DatasetID,
     pub alias: DatasetAlias,
+    pub kind: DatasetKind,
 }
 
 impl DatasetHandle {
-    pub fn new(id: DatasetID, alias: DatasetAlias) -> Self {
-        Self { id, alias }
+    pub fn new(id: DatasetID, alias: DatasetAlias, kind: DatasetKind) -> Self {
+        Self { id, alias, kind }
     }
 
     pub fn as_local_ref(&self) -> DatasetRef {

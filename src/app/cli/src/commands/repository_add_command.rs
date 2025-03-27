@@ -14,29 +14,21 @@ use url::Url;
 
 use super::{CLIError, Command};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct RepositoryAddCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    name: odf::RepoName,
-    url: Url,
-}
 
-impl RepositoryAddCommand {
-    pub fn new(
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        name: odf::RepoName,
-        url: Url,
-    ) -> Self {
-        Self {
-            remote_repo_reg,
-            name,
-            url,
-        }
-    }
+    #[dill::component(explicit)]
+    name: odf::RepoName,
+
+    #[dill::component(explicit)]
+    url: Url,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryAddCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         self.remote_repo_reg
             .add_repository(&self.name, self.url.clone())
             .map_err(CLIError::failure)?;

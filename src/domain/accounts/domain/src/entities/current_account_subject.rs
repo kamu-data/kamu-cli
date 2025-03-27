@@ -70,6 +70,13 @@ impl CurrentAccountSubject {
         }
     }
 
+    pub fn get_maybe_logged_account_id(&self) -> Option<&odf::AccountID> {
+        match self {
+            CurrentAccountSubject::Anonymous(_) => None,
+            CurrentAccountSubject::Logged(logged_account) => Some(&logged_account.account_id),
+        }
+    }
+
     pub fn account_name(&self) -> &odf::AccountName {
         match self {
             CurrentAccountSubject::Anonymous(_) => {

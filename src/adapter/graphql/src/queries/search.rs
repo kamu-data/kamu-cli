@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
+use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
 use kamu_search::SearchLocalNatLangError;
 use odf::dataset::TryStreamExtExt as _;
@@ -49,7 +51,8 @@ impl Search {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        // TODO: Private Datasets: PERF: find a way to narrow down the number of records
+        // TODO: Private Datasets:
+        // TODO: PERF: find a way to narrow down the number of records
         //       to filter, e.g.:
         //       - Anonymous: get all the public
         //       - Logged: all owned datasets and datasets with relations
@@ -151,6 +154,63 @@ impl Search {
             total_count,
         ))
     }
+
+    /// Perform lightweight search among resource names.
+    /// Useful for autocomplete.
+    #[tracing::instrument(level = "info", name = Search_name_lookup, skip_all, fields(%query, ?page, ?per_page))]
+    async fn name_lookup(
+        &self,
+        ctx: &Context<'_>,
+        query: String,
+        filters: LookupFilters,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<NameLookupResultConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
+
+        let account_nodes = if let Some(filters) = filters.by_account {
+            use futures::TryStreamExt;
+
+            let account_service = from_catalog_n!(ctx, dyn AccountService);
+
+            let exclude_accounts_by_ids = filters
+                .exclude_accounts_by_ids
+                .into_iter()
+                .map(Into::into)
+                .collect();
+            let accounts = account_service
+                .search_accounts_by_name_pattern(
+                    &query,
+                    SearchAccountsByNamePatternFilters {
+                        exclude_accounts_by_ids,
+                    },
+                    PaginationOpts::from_page(page, per_page),
+                )
+                .try_collect::<Vec<_>>()
+                .await?;
+
+            accounts
+                .into_iter()
+                .map(Account::from_account)
+                .map(NameLookupResult::Account)
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let nodes = account_nodes;
+        let total = nodes.len();
+        let page_nodes = nodes
+            .into_iter()
+            .skip(page * per_page)
+            .take(per_page)
+            .collect::<Vec<_>>();
+
+        Ok(NameLookupResultConnection::new(
+            page_nodes, page, per_page, total,
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,5 +234,31 @@ pub struct SearchResultEx {
 }
 
 page_based_connection!(SearchResultEx, SearchResultExConnection, SearchResultExEdge);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug)]
+pub enum NameLookupResult {
+    Account(Account),
+    // Dataset
+    // Organization,
+    // Issue,
+}
+
+#[derive(InputObject, Debug)]
+pub struct LookupFilters {
+    by_account: Option<AccountLookupFilter>,
+}
+
+#[derive(InputObject, Debug)]
+pub struct AccountLookupFilter {
+    exclude_accounts_by_ids: Vec<AccountID<'static>>,
+}
+
+page_based_connection!(
+    NameLookupResult,
+    NameLookupResultConnection,
+    NameLookupResultEdge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,41 +13,29 @@ use kamu::domain::*;
 
 use super::{CLIError, Command};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct AliasAddCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    dataset_ref: odf::DatasetRef,
-    alias: odf::DatasetRefRemote,
-    pull: bool,
-    push: bool,
-}
 
-impl AliasAddCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset: odf::DatasetRef,
-        alias: odf::DatasetRefRemote,
-        pull: bool,
-        push: bool,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            remote_repo_reg,
-            remote_alias_reg,
-            dataset_ref: dataset,
-            alias,
-            pull,
-            push,
-        }
-    }
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
+    alias: odf::DatasetRefRemote,
+
+    #[dill::component(explicit)]
+    pull: bool,
+
+    #[dill::component(explicit)]
+    push: bool,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for AliasAddCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if !self.pull && !self.push {
             return Err(CLIError::usage_error(
                 "Specify either --pull or --push or both",

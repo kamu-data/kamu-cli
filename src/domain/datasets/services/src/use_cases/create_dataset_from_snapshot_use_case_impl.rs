@@ -25,7 +25,7 @@ use crate::utils::CreateDatasetUseCaseHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -33,24 +33,6 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
-}
-
-impl CreateDatasetFromSnapshotUseCaseImpl {
-    pub fn new(
-        current_account_subject: Arc<CurrentAccountSubject>,
-        system_time_source: Arc<dyn SystemTimeSource>,
-        did_generator: Arc<dyn DidGenerator>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        create_helper: Arc<CreateDatasetUseCaseHelper>,
-    ) -> Self {
-        Self {
-            current_account_subject,
-            system_time_source,
-            did_generator,
-            dataset_registry,
-            create_helper,
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -93,6 +75,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 &seed_block.event.dataset_id,
                 &logged_account_id,
                 &canonical_alias,
+                snapshot.kind,
             )
             .await?;
 
@@ -133,7 +116,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         Ok(CreateDatasetResult {
             head: append_result.proposed_head,
             dataset: store_result.dataset,
-            dataset_handle: odf::DatasetHandle::new(store_result.dataset_id, canonical_alias),
+            dataset_handle: odf::DatasetHandle::new(
+                store_result.dataset_id,
+                canonical_alias,
+                store_result.dataset_kind,
+            ),
         })
     }
 }

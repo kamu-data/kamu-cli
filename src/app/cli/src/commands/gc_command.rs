@@ -12,19 +12,15 @@ use std::sync::Arc;
 use super::{CLIError, Command};
 use crate::GcService;
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct GcCommand {
     gc_service: Arc<GcService>,
 }
 
-impl GcCommand {
-    pub fn new(gc_service: Arc<GcService>) -> Self {
-        Self { gc_service }
-    }
-}
-
 #[async_trait::async_trait(?Send)]
 impl Command for GcCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         eprint!("Cleaning cache...");
         let result = self.gc_service.purge_cache()?;
         if result.bytes_freed != 0 {

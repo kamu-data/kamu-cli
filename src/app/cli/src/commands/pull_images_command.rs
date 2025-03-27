@@ -15,32 +15,20 @@ use kamu::EngineProvisionerLocalConfig;
 use super::{CLIError, Command};
 use crate::config::JupyterConfig;
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct PullImagesCommand {
     container_runtime: Arc<ContainerRuntime>,
     engine_config: Arc<EngineProvisionerLocalConfig>,
     jupyter_config: Arc<JupyterConfig>,
-    list_only: bool,
-}
 
-impl PullImagesCommand {
-    pub fn new(
-        container_runtime: Arc<ContainerRuntime>,
-        engine_config: Arc<EngineProvisionerLocalConfig>,
-        jupyter_config: Arc<JupyterConfig>,
-        list_only: bool,
-    ) -> Self {
-        Self {
-            container_runtime,
-            engine_config,
-            jupyter_config,
-            list_only,
-        }
-    }
+    #[dill::component(explicit)]
+    list_only: bool,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for PullImagesCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let mut images = vec![
             self.engine_config.spark_image.as_str(),
             self.engine_config.flink_image.as_str(),

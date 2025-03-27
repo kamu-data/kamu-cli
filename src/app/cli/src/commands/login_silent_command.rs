@@ -16,19 +16,19 @@ use crate::{odf_server, CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LoginSilentMode {
     OAuth(LoginSilentModeOAuth),
     Password(LoginSilentModePassword),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoginSilentModeOAuth {
     pub provider: String,
     pub access_token: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoginSilentModePassword {
     pub login: String,
     pub password: String,
@@ -36,31 +36,23 @@ pub struct LoginSilentModePassword {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct LoginSilentCommand {
     login_service: Arc<odf_server::LoginService>,
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+
+    #[dill::component(explicit)]
     scope: odf_server::AccessTokenStoreScope,
+
+    #[dill::component(explicit)]
     server: Option<Url>,
+
+    #[dill::component(explicit)]
     mode: LoginSilentMode,
 }
 
 impl LoginSilentCommand {
-    pub fn new(
-        login_service: Arc<odf_server::LoginService>,
-        access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
-        scope: odf_server::AccessTokenStoreScope,
-        server: Option<Url>,
-        mode: LoginSilentMode,
-    ) -> Self {
-        Self {
-            login_service,
-            access_token_registry_service,
-            scope,
-            server,
-            mode,
-        }
-    }
-
     fn get_server_url(&self) -> Url {
         self.server
             .clone()
@@ -168,7 +160,7 @@ impl LoginSilentCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for LoginSilentCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let odf_server_backend_url = self.get_server_url();
 
         // Validate token and trigger browser login flow if needed

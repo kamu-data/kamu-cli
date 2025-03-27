@@ -70,11 +70,7 @@ impl DatasetEntryIndexer {
         Ok(stored_dataset_entries_count > 0)
     }
 
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "DatasetEntryIndexer::index_datasets"
-    )]
+    #[tracing::instrument(level = "info", skip_all, name = "DatasetEntryIndexer::index_datasets")]
     async fn index_datasets(&self) -> Result<(), InternalError> {
         use futures::TryStreamExt;
 
@@ -94,7 +90,31 @@ impl DatasetEntryIndexer {
             let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref())
                 .await
                 .int_err()?;
-            dataset_handles.push(odf::DatasetHandle::new(dataset_id, dataset_alias));
+
+            let head = dataset
+                .as_metadata_chain()
+                .as_uncached_ref_repo()
+                .get(odf::BlockRef::Head.as_str())
+                .await
+                .int_err()?;
+
+            let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
+            use odf::dataset::MetadataChainExt;
+            dataset
+                .as_metadata_chain()
+                .accept_by_hash(&mut [&mut seed_visitor], &head)
+                .await
+                .int_err()?;
+
+            let seed = seed_visitor
+                .into_event()
+                .unwrap_or_else(|| panic!("No Seed event in the dataset {dataset_id}"));
+
+            dataset_handles.push(odf::DatasetHandle::new(
+                dataset_id,
+                dataset_alias,
+                seed.dataset_kind,
+            ));
         }
 
         let account_name_id_mapping = self.build_account_name_id_mapping(&dataset_handles).await?;
@@ -113,6 +133,7 @@ impl DatasetEntryIndexer {
                 owner_account_id,
                 dataset_handle.alias.dataset_name,
                 self.time_source.now(),
+                dataset_handle.kind,
             );
 
             use tracing::Instrument;

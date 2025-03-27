@@ -64,7 +64,7 @@ struct WebUILoginInstructions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WebUIServer {
-    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>>>>,
+    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>>,
     local_addr: SocketAddr,
     access_token: String,
 }

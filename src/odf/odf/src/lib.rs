@@ -16,7 +16,6 @@ pub use odf_dataset::{
     DatasetRefUnresolvedError,
     DatasetStorageUnit,
     DatasetStorageUnitWriter,
-    DatasetSummary,
     DatasetVisibility,
     IterBlocksError,
     MetadataChain,

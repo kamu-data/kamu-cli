@@ -408,6 +408,66 @@ impl AccountRepository for MySqlAccountRepository {
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
+
+    fn search_accounts_by_name_pattern<'a>(
+        &'a self,
+        name_pattern: &'a str,
+        filters: SearchAccountsByNamePatternFilters,
+        pagination: PaginationOpts,
+    ) -> AccountPageStream<'a> {
+        Box::pin(async_stream::stream! {
+            let limit = i64::try_from(pagination.limit).int_err()?;
+            let offset = i64::try_from(pagination.offset).int_err()?;
+
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let query_str = format!(
+                r#"
+                SELECT id,
+                       account_name,
+                       email,
+                       display_name,
+                       account_type,
+                       avatar_url,
+                       registered_at,
+                       is_admin,
+                       provider,
+                       provider_identity_key
+                FROM accounts
+                WHERE (account_name LIKE CONCAT('%',?,'%')
+                    OR display_name LIKE CONCAT('%',?,'%'))
+                  AND id NOT IN ({})
+                ORDER BY account_name
+                LIMIT ? OFFSET ?
+                "#,
+                mysql_generate_placeholders_list(filters.exclude_accounts_by_ids.len())
+            );
+
+            // ToDo replace it by macro once sqlx will support it
+            // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+            let mut query = sqlx::query(&query_str)
+                // NOTE: it's intentionally twice
+                .bind(name_pattern)
+                .bind(name_pattern);
+
+            for excluded_account_id in filters.exclude_accounts_by_ids {
+                query = query.bind(excluded_account_id.to_string());
+            }
+
+            query = query.bind(limit).bind(offset);
+
+            let mut query_stream = query
+                .fetch(connection_mut)
+                .map_err(ErrorIntoInternal::int_err);
+
+            use futures::TryStreamExt;
+
+            while let Some(account_row) = query_stream.try_next().await? {
+                yield Ok(Self::map_account_row(&account_row));
+            }
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
+use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_datasets::DeleteDatasetError;
 use odf::utils::data::format::WriterError;
 use thiserror::Error;
@@ -197,12 +198,6 @@ impl From<DeleteDatasetError> for CLIError {
     }
 }
 
-impl From<odf::dataset::GetSummaryError> for CLIError {
-    fn from(e: odf::dataset::GetSummaryError) -> Self {
-        Self::critical(e)
-    }
-}
-
 impl From<odf::GetRefError> for CLIError {
     fn from(e: odf::GetRefError) -> Self {
         Self::critical(e)
@@ -228,6 +223,17 @@ impl From<ExportError> for CLIError {
     fn from(e: ExportError) -> Self {
         match e {
             ExportError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<RebacDatasetRefUnresolvedError> for CLIError {
+    fn from(e: RebacDatasetRefUnresolvedError) -> Self {
+        use RebacDatasetRefUnresolvedError as E;
+        match e {
+            E::NotFound(e) => Self::failure(e),
+            E::Access(e) => Self::failure(e),
+            e @ E::Internal(_) => Self::critical(e),
         }
     }
 }

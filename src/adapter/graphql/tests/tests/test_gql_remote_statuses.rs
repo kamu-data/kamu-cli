@@ -131,7 +131,9 @@ struct PushStatusesTestHarness {
 
 impl PushStatusesTestHarness {
     fn new() -> Self {
-        let base_gql_harness = BaseGQLDatasetHarness::new(TenancyConfig::SingleTenant);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::SingleTenant)
+            .build();
 
         let catalog = {
             let mut b = CatalogBuilder::new_chained(base_gql_harness.catalog());

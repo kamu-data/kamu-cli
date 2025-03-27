@@ -10,48 +10,26 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{
-    DatasetRegistry,
-    ResetDatasetUseCase,
-    ResetError,
-    ResetExecutor,
-    ResetPlanner,
-    ResetResult,
-};
+use internal_error::ErrorIntoInternal;
+use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::{auth, ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlanner, ResetResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn ResetDatasetUseCase)]
 pub struct ResetDatasetUseCaseImpl {
     reset_planner: Arc<dyn ResetPlanner>,
     reset_executor: Arc<dyn ResetExecutor>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 
-impl ResetDatasetUseCaseImpl {
-    pub fn new(
-        reset_planner: Arc<dyn ResetPlanner>,
-        reset_executor: Arc<dyn ResetExecutor>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    ) -> Self {
-        Self {
-            reset_planner,
-            reset_executor,
-            dataset_registry,
-            dataset_action_authorizer,
-        }
-    }
-}
-
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "ResetDatasetUseCase::execute",
+        name = ResetDatasetUseCaseImpl_execute,
         skip_all,
         fields(dataset_handle, ?maybe_new_head, ?maybe_old_head)
     )]
@@ -61,16 +39,18 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
         maybe_new_head: Option<&odf::Multihash>,
         maybe_old_head: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError> {
-        // Permission check
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
-            .await?;
-
         // Resolve dataset
         let target = self
-            .dataset_registry
-            .get_dataset_by_handle(dataset_handle)
-            .await;
+            .rebac_dataset_registry_facade
+            .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Maintain)
+            .await
+            .map_err(|e| {
+                use RebacDatasetIdUnresolvedError as E;
+                match e {
+                    E::Access(e) => ResetError::Access(e),
+                    e @ E::Internal(_) => ResetError::Internal(e.int_err()),
+                }
+            })?;
 
         // Make a plan
         let reset_plan = self

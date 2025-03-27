@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use auth::{DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use axum::extract::{Extension, Query};
 use chrono::{DateTime, Utc};
 use database_common_macros::transactional_handler;
@@ -15,6 +14,7 @@ use dill::Catalog;
 use http::HeaderMap;
 use http_common::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
 use kamu_datasets::{DatasetChangedMessage, MESSAGE_PRODUCER_KAMU_HTTP_INGEST};
 use messaging_outbox::{Outbox, OutboxExt};
@@ -123,20 +123,18 @@ pub async fn dataset_ingest_handler(
             });
 
     // Resolve dataset
-    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
-    let target = dataset_registry
-        .get_dataset_by_ref(&dataset_ref)
-        .await
-        .map_err(ApiError::not_found)?;
+    let rebac_dataset_registry_facade =
+        catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
 
-    // Authorization check
-    let authorizer = catalog.get_one::<dyn DatasetActionAuthorizer>().unwrap();
-    authorizer
-        .check_action_allowed(&target.get_handle().id, auth::DatasetAction::Write)
+    let target = rebac_dataset_registry_facade
+        .resolve_dataset_by_ref(&dataset_ref, auth::DatasetAction::Write)
         .await
-        .map_err(|e| match e {
-            DatasetActionUnauthorizedError::Access(_) => ApiError::not_found_without_reason(),
-            DatasetActionUnauthorizedError::Internal(e) => e.api_err(),
+        .map_err(|e| {
+            use RebacDatasetRefUnresolvedError as E;
+            match e {
+                E::NotFound(_) | E::Access(_) => ApiError::not_found_without_reason(),
+                e @ E::Internal(_) => e.int_err().api_err(),
+            }
         })?;
 
     // Plan and run ingestion

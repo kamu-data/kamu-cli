@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT last_pulled, num_records, data_size, checkpoints_size FROM dataset_statistics\n                WHERE dataset_id = $1 AND block_ref_name = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_pulled",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "num_records",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "data_size",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "checkpoints_size",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "12d02b547906a2dd10da033ba75b8eeef6ceea91173e3e1e9ec1280068810f4f"
+}

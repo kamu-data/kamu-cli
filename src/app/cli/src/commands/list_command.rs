@@ -22,40 +22,29 @@ use crate::{accounts, NotInMultiTenantWorkspace};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct ListCommand {
+    tenancy_config: TenancyConfig,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_statistics_service: Arc<dyn kamu_datasets::DatasetStatisticsService>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
+
+    #[dill::component(explicit)]
     current_account: accounts::CurrentAccountIndication,
+
+    #[dill::component(explicit)]
     related_account: accounts::RelatedAccountIndication,
+
+    #[dill::component(explicit)]
     output_config: Arc<OutputConfig>,
-    tenancy_config: TenancyConfig,
+
+    #[dill::component(explicit)]
     detail_level: u8,
 }
 
 impl ListCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
-        current_account: accounts::CurrentAccountIndication,
-        related_account: accounts::RelatedAccountIndication,
-        output_config: Arc<OutputConfig>,
-        tenancy_config: TenancyConfig,
-        detail_level: u8,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            remote_alias_reg,
-            rebac_service,
-            current_account,
-            related_account,
-            output_config,
-            tenancy_config,
-            detail_level,
-        }
-    }
-
     fn humanize_relative_date(last_pulled: DateTime<Utc>) -> String {
         format!("{}", HumanTime::from(last_pulled - Utc::now()))
     }
@@ -76,22 +65,18 @@ impl ListCommand {
         num.to_formatted_string(&Locale::en)
     }
 
-    async fn get_kind(
-        &self,
-        handle: &odf::DatasetHandle,
-        summary: &odf::DatasetSummary,
-    ) -> Result<String, CLIError> {
+    async fn get_kind(&self, target: &ResolvedDataset) -> Result<String, CLIError> {
         let is_remote = self
             .remote_alias_reg
-            .get_remote_aliases(handle)
+            .get_remote_aliases(target.get_handle())
             .await?
             .get_by_kind(RemoteAliasKind::Pull)
             .next()
             .is_some();
         Ok(if is_remote {
-            format!("Remote({:?})", summary.kind)
+            format!("Remote({:?})", target.get_kind())
         } else {
-            format!("{:?}", summary.kind)
+            format!("{:?}", target.get_kind())
         })
     }
 
@@ -223,7 +208,7 @@ impl Command for ListCommand {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         use datafusion::arrow::array::{
             ArrayRef,
             StringArray,
@@ -278,13 +263,16 @@ impl Command for ListCommand {
         };
 
         for hdl in &datasets {
-            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(hdl).await;
-            let current_head = resolved_dataset
+            let target = self.dataset_registry.get_dataset_by_handle(hdl).await;
+
+            let current_head = target
                 .as_metadata_chain()
                 .resolve_ref(&odf::BlockRef::Head)
                 .await?;
-            let summary = resolved_dataset
-                .get_summary(odf::dataset::GetSummaryOpts::default())
+
+            let statistics = self
+                .dataset_statistics_service
+                .get_statistics(&hdl.id, &odf::BlockRef::Head)
                 .await?;
 
             name.push(hdl.alias.dataset_name.to_string());
@@ -307,20 +295,20 @@ impl Command for ListCommand {
                 visibility.push(value.to_string());
             }
 
-            kind.push(self.get_kind(hdl, &summary).await?);
-            pulled.push(summary.last_pulled.map(|t| t.timestamp_micros()));
-            records.push(summary.num_records);
-            size.push(summary.data_size);
+            kind.push(self.get_kind(&target).await?);
+            pulled.push(statistics.last_pulled.map(|t| t.timestamp_micros()));
+            records.push(statistics.num_records);
+            size.push(statistics.data_size);
 
             if self.detail_level > 0 {
-                let num_blocks = resolved_dataset
+                let num_blocks = target
                     .as_metadata_chain()
                     .get_block(&current_head)
                     .await
                     .int_err()?
                     .sequence_number
                     + 1;
-                let last_watermark = resolved_dataset
+                let last_watermark = target
                     .as_metadata_chain()
                     .last_data_block()
                     .await

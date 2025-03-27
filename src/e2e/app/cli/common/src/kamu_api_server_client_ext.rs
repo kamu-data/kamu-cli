@@ -23,6 +23,7 @@ use kamu_adapter_http::data::query_types::{QueryRequest, QueryResponse};
 use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
+use kamu_auth_rebac::AccountToDatasetRelation;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
 use reqwest::{Method, StatusCode, Url};
@@ -31,6 +32,7 @@ use thiserror::Error;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 
+use crate::kamu_api_server_client::LoggedInUser;
 use crate::{AccessToken, GraphQLResponseExt, KamuApiServerClient, RequestBody};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -264,6 +266,24 @@ pub struct AuthApi<'a> {
 }
 
 impl AuthApi<'_> {
+    pub fn logged_account_id(&self) -> odf::AccountID {
+        self.client
+            .state
+            .logged_in_user
+            .as_ref()
+            .map(|x| &x.account_id)
+            .cloned()
+            .expect("Not logged in")
+    }
+
+    pub fn set_logged_as(&mut self, token: AccessToken, account_id: odf::AccountID) {
+        self.client.state.logged_in_user = Some(LoggedInUser { account_id, token });
+    }
+
+    pub fn logout(&mut self) {
+        self.client.state.logged_in_user = None;
+    }
+
     pub async fn login_as_kamu(&mut self) -> AccessToken {
         self.login_with_password("kamu", "kamu").await
     }
@@ -276,6 +296,9 @@ impl AuthApi<'_> {
               auth {
                 login(loginMethod: "oauth_github", loginCredentialsJson: "") {
                   accessToken
+                  account {
+                    id
+                  }
                 }
               }
             }
@@ -292,6 +315,9 @@ impl AuthApi<'_> {
                   auth {
                     login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
                       accessToken
+                      account {
+                        id
+                      }
                     }
                   }
                 }
@@ -348,12 +374,21 @@ impl AuthApi<'_> {
 
     async fn login(&mut self, login_request: &str) -> AccessToken {
         let login_response = self.client.graphql_api_call(login_request).await.data();
-        let access_token = login_response["auth"]["login"]["accessToken"]
+        let login_node = &login_response["auth"]["login"];
+
+        let access_token = login_node["accessToken"]
             .as_str()
             .map(ToOwned::to_owned)
             .unwrap();
+        let account_id = login_node["account"]["id"]
+            .as_str()
+            .map(|s| odf::AccountID::from_did_str(s).unwrap())
+            .unwrap();
 
-        self.client.set_token(Some(access_token.clone()));
+        self.client.state.logged_in_user = Some(LoggedInUser {
+            account_id,
+            token: access_token.clone(),
+        });
 
         access_token
     }
@@ -386,6 +421,12 @@ pub struct DatasetApi<'a> {
 }
 
 impl DatasetApi<'_> {
+    pub fn collaboration(&self) -> DatasetCollaborationApi {
+        DatasetCollaborationApi {
+            client: self.client,
+        }
+    }
+
     /// Used for Simple Transfer Protocol
     pub fn get_endpoint(&self, dataset_alias: &odf::DatasetAlias) -> Url {
         let node_url = self.client.get_base_url();
@@ -413,7 +454,6 @@ impl DatasetApi<'_> {
 
         match response.status() {
             StatusCode::OK => Ok(response.json().await.int_err()?),
-            StatusCode::UNAUTHORIZED => Err(DatasetByIdError::Unauthorized),
             StatusCode::NOT_FOUND => Err(DatasetByIdError::NotFound),
             unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
                 .int_err()
@@ -595,7 +635,7 @@ impl DatasetApi<'_> {
                 let dataset = &data["datasets"]["byId"];
 
                 if dataset.is_null() {
-                    Err(GetDatasetVisibilityError::NotFound)
+                    Err(GetDatasetVisibilityError::DatasetNotFound)
                 } else {
                     let typename = dataset["visibility"]["__typename"].as_str().unwrap();
 
@@ -612,17 +652,11 @@ impl DatasetApi<'_> {
             }
             Err(errors) => {
                 let first_error = errors.first().unwrap();
+                let unexpected_message = first_error.message.as_str();
 
-                match first_error.message.as_str() {
-                    "Only the dataset owner can perform this action" => {
-                        Err(GetDatasetVisibilityError::Forbidden)
-                    }
-                    unexpected_message => {
-                        Err(format!("Unexpected error message: {unexpected_message}")
-                            .int_err()
-                            .into())
-                    }
-                }
+                Err(format!("Unexpected error message: {unexpected_message}")
+                    .int_err()
+                    .into())
             }
         }
     }
@@ -663,18 +697,23 @@ impl DatasetApi<'_> {
         match response {
             Ok(response) => {
                 if response["datasets"]["byId"].is_null() {
-                    Err(SetDatasetVisibilityError::NotFound)
+                    Err(SetDatasetVisibilityError::DatasetNotFound)
                 } else {
                     Ok(())
                 }
             }
             Err(errors) => {
                 let first_error = errors.first().unwrap();
-                let message = first_error.message.as_str();
+                let unexpected_message = first_error.message.as_str();
 
-                Err(format!("Unexpected error message: {message}")
-                    .int_err()
-                    .into())
+                match unexpected_message {
+                    "Dataset access error" => Err(SetDatasetVisibilityError::Access),
+                    unexpected_message => {
+                        Err(format!("Unexpected error message: {unexpected_message}")
+                            .int_err()
+                            .into())
+                    }
+                }
             }
         }
     }
@@ -969,6 +1008,206 @@ impl DatasetApi<'_> {
     }
 }
 
+pub struct DatasetCollaborationApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl DatasetCollaborationApi<'_> {
+    pub async fn account_roles(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<AccountRolesResponse, DatasetCollaborationAccountRolesError> {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          collaboration {
+                            accountRoles {
+                              nodes {
+                                account {
+                                  id
+                                  accountName
+                                }
+                                role
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .as_str(),
+            )
+            .await;
+
+        match response {
+            Ok(data) => {
+                let dataset = &data["datasets"]["byId"];
+
+                if dataset.is_null() {
+                    return Err(DatasetCollaborationAccountRolesError::DatasetNotFound);
+                }
+
+                let nodes = dataset["collaboration"]["accountRoles"]["nodes"]
+                    .as_array()
+                    .unwrap();
+                let mut accounts_with_roles = nodes
+                    .iter()
+                    .map(|node| {
+                        let account_node = &node["account"];
+                        let account_id = account_node["id"].as_str().unwrap();
+                        let account_name = account_node["accountName"].as_str().unwrap();
+                        let role = node["role"].as_str().unwrap();
+
+                        AccountWithRole {
+                            account_id: odf::AccountID::from_did_str(account_id).unwrap(),
+                            account_name: odf::AccountName::from_str(account_name).unwrap(),
+                            role: role.to_lowercase().parse().unwrap(),
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                accounts_with_roles.sort_by(|a, b| a.account_name.cmp(&b.account_name));
+
+                Ok(AccountRolesResponse {
+                    accounts_with_roles,
+                })
+            }
+            Err(errors) => {
+                let first_error = errors.first().unwrap();
+                let unexpected_message = first_error.message.as_str();
+
+                match unexpected_message {
+                    "Dataset access error" => Err(DatasetCollaborationAccountRolesError::Access),
+                    unexpected_message => {
+                        Err(format!("Unexpected error message: {unexpected_message}")
+                            .int_err()
+                            .into())
+                    }
+                }
+            }
+        }
+    }
+
+    pub async fn set_role(
+        &self,
+        dataset_id: &odf::DatasetID,
+        account_id: &odf::AccountID,
+        role: AccountToDatasetRelation,
+    ) -> Result<(), DatasetCollaborationSetRoleError> {
+        let role = match role {
+            AccountToDatasetRelation::Reader => "READER",
+            AccountToDatasetRelation::Editor => "EDITOR",
+            AccountToDatasetRelation::Maintainer => "MAINTAINER",
+        };
+        let response = self
+            .client
+            .graphql_api_call(
+                &indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          collaboration {
+                            setRole(accountId: "<account_id>", role: <role>) {
+                              __typename
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .replace("<account_id>", &account_id.as_did_str().to_stack_string())
+                .replace("<role>", role),
+            )
+            .await;
+
+        match response {
+            Ok(data) => {
+                let dataset = &data["datasets"]["byId"];
+
+                if dataset.is_null() {
+                    return Err(DatasetCollaborationSetRoleError::DatasetNotFound);
+                }
+
+                Ok(())
+            }
+            Err(errors) => {
+                let first_error = errors.first().unwrap();
+                let unexpected_message = first_error.message.as_str();
+
+                Err(format!("Unexpected error message: {unexpected_message}")
+                    .int_err()
+                    .into())
+            }
+        }
+    }
+
+    pub async fn unset_role(
+        &self,
+        dataset_id: &odf::DatasetID,
+        account_ids: &[&odf::AccountID],
+    ) -> Result<(), DatasetCollaborationUnsetRoleError> {
+        let response = self
+            .client
+            .graphql_api_call(
+                &indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          collaboration {
+                            unsetRoles(accountIds: [<account_ids>]) {
+                              __typename
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .replace(
+                    "<account_ids>",
+                    &account_ids
+                        .iter()
+                        .map(|id| format!("\"{id}\""))
+                        .intersperse(",".to_string())
+                        .collect::<String>(),
+                ),
+            )
+            .await;
+
+        match response {
+            Ok(data) => {
+                let dataset = &data["datasets"]["byId"];
+
+                if dataset.is_null() {
+                    return Err(DatasetCollaborationUnsetRoleError::DatasetNotFound);
+                }
+
+                Ok(())
+            }
+            Err(errors) => {
+                let first_error = errors.first().unwrap();
+                let unexpected_message = first_error.message.as_str();
+
+                Err(format!("Unexpected error message: {unexpected_message}")
+                    .int_err()
+                    .into())
+            }
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct CreateDatasetResponse {
@@ -1020,20 +1259,72 @@ pub struct DatasetDependencies {
     pub downstream: Vec<DatasetDependency>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountWithRole {
+    pub account_id: odf::AccountID,
+    pub account_name: odf::AccountName,
+    pub role: AccountToDatasetRelation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountRolesResponse {
+    pub accounts_with_roles: Vec<AccountWithRole>,
+}
+
+impl AccountRolesResponse {
+    pub fn new(accounts_with_roles: Vec<AccountWithRole>) -> Self {
+        Self {
+            accounts_with_roles,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum GetDatasetVisibilityError {
-    #[error("Forbidden")]
-    Forbidden,
-    #[error("Not found")]
-    NotFound,
+    #[error("Dataset not found")]
+    DatasetNotFound,
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+impl PartialEq for GetDatasetVisibilityError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::DatasetNotFound, Self::DatasetNotFound) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for GetDatasetVisibilityError {}
 
 #[derive(Error, Debug)]
 pub enum SetDatasetVisibilityError {
+    #[error("Dataset not found")]
+    DatasetNotFound,
+    #[error("Access")]
+    Access,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl PartialEq for SetDatasetVisibilityError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::DatasetNotFound, Self::DatasetNotFound) | (Self::Access, Self::Access) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for SetDatasetVisibilityError {}
+
+#[derive(Error, Debug)]
+pub enum DatasetByIdError {
     #[error("Not found")]
     NotFound,
     #[error(transparent)]
@@ -1041,14 +1332,66 @@ pub enum SetDatasetVisibilityError {
 }
 
 #[derive(Error, Debug)]
-pub enum DatasetByIdError {
-    #[error("Unauthorized")]
-    Unauthorized,
-    #[error("Not found")]
-    NotFound,
+pub enum DatasetCollaborationAccountRolesError {
+    #[error("Dataset not found")]
+    DatasetNotFound,
+    #[error("Access")]
+    Access,
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+impl PartialEq for DatasetCollaborationAccountRolesError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Access, Self::Access) | (Self::DatasetNotFound, Self::DatasetNotFound) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for DatasetCollaborationAccountRolesError {}
+
+#[derive(Error, Debug)]
+pub enum DatasetCollaborationSetRoleError {
+    #[error("Dataset not found")]
+    DatasetNotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl PartialEq for DatasetCollaborationSetRoleError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::DatasetNotFound, Self::DatasetNotFound) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for DatasetCollaborationSetRoleError {}
+
+#[derive(Error, Debug)]
+pub enum DatasetCollaborationUnsetRoleError {
+    #[error("Dataset not found")]
+    DatasetNotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl PartialEq for DatasetCollaborationUnsetRoleError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::DatasetNotFound, Self::DatasetNotFound) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for DatasetCollaborationUnsetRoleError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // API: Flow
@@ -1431,7 +1774,7 @@ impl OdfQuery<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 #[error("{self:?}")]
 pub struct QueryExecutionError {
     pub error_kind: String,
@@ -1446,6 +1789,18 @@ pub enum QueryError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+impl PartialEq for QueryError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::ExecutionError(a), Self::ExecutionError(b)) => a.eq(b),
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for QueryError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // API: Search

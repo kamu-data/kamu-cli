@@ -158,7 +158,8 @@ impl WorkspaceService {
                 WorkspaceVersion::V3_SavepointCreatedAt => self.upgrade_3_to_4(),
                 WorkspaceVersion::V4_SavepointZeroCopy => self.upgrade_4_to_5(),
                 WorkspaceVersion::V5_BreakingMetadataChanges => self.upgrade_5_to_6().await,
-                WorkspaceVersion::V6_DatasetRepositoryUnification => {
+                WorkspaceVersion::V6_DatasetRepositoryUnification => self.upgrade_6_to_7(),
+                WorkspaceVersion::V7_NoSummaryFiles => {
                     panic!("Already of latest version")
                 }
                 WorkspaceVersion::Unknown(_) => {
@@ -336,13 +337,16 @@ impl WorkspaceService {
             odf::dataset::DatasetLayout::new(dataset_dir_path),
         );
 
-        use odf::Dataset;
-        let dataset_summary = dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
+        use odf::dataset::{Dataset, MetadataChainExt};
+        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
+        dataset
+            .as_metadata_chain()
+            .accept(&mut [&mut seed_visitor])
             .await
             .int_err()?;
 
-        Ok(dataset_summary.id)
+        let seed = seed_visitor.into_event().unwrap();
+        Ok(seed.dataset_id)
     }
 
     async fn read_dataset_alias_from(
@@ -369,6 +373,17 @@ impl WorkspaceService {
         std::fs::rename(existing_path, &migrated_path).int_err()?;
 
         Ok(migrated_path)
+    }
+
+    fn upgrade_6_to_7(&self) -> Result<(), WorkspaceUpgradeError> {
+        // Remove all summary files
+        for entry in self.workspace_layout.datasets_dir.read_dir().int_err()? {
+            let dataset_dir = entry.int_err()?;
+            let summary_path = dataset_dir.path().join("info").join("summary");
+
+            std::fs::remove_file(summary_path).int_err()?;
+        }
+        Ok(())
     }
 }
 

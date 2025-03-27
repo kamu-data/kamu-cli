@@ -46,7 +46,7 @@ impl OsoDatasetAuthorizer {
     }
 
     async fn user_actor(&self) -> Result<UserActor, InternalError> {
-        let maybe_account_id = self.get_maybe_logged_account_id();
+        let maybe_account_id = self.current_account_subject.get_maybe_logged_account_id();
 
         let user_actor = self
             .oso_resource_service
@@ -68,13 +68,6 @@ impl OsoDatasetAuthorizer {
             .int_err()?;
 
         Ok(dataset_resource)
-    }
-
-    fn get_maybe_logged_account_id(&self) -> Option<&odf::AccountID> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => None,
-            CurrentAccountSubject::Logged(logged_account) => Some(&logged_account.account_id),
-        }
     }
 }
 

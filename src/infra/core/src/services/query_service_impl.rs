@@ -20,9 +20,10 @@ use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
-use kamu_core::*;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_core::auth::DatasetActionAuthorizer;
+use kamu_core::{auth, *};
 
 use crate::services::query::*;
 use crate::utils::docker_images;
@@ -33,6 +34,7 @@ pub struct QueryServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
 }
 
 #[component(pub)]
@@ -42,11 +44,13 @@ impl QueryServiceImpl {
         dataset_registry: Arc<dyn DatasetRegistry>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     ) -> Self {
         Self {
             dataset_registry,
             object_store_registry,
             dataset_action_authorizer,
+            rebac_dataset_registry_facade,
         }
     }
 
@@ -310,19 +314,20 @@ impl QueryServiceImpl {
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<ResolvedDataset, QueryError> {
-        let dataset_handle = self
-            .dataset_registry
-            .resolve_dataset_handle_by_ref(dataset_ref)
-            .await?;
+        let resolved_dataset = self
+            .rebac_dataset_registry_facade
+            .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Read)
+            .await
+            .map_err(|e| {
+                use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
+                match e {
+                    E::NotFound(e) => QueryError::DatasetNotFound(e),
+                    E::Access(e) => QueryError::Access(e),
+                    e @ E::Internal(_) => QueryError::Internal(e.int_err()),
+                }
+            })?;
 
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Read)
-            .await?;
-
-        Ok(self
-            .dataset_registry
-            .get_dataset_by_handle(&dataset_handle)
-            .await)
+        Ok(resolved_dataset)
     }
 }
 

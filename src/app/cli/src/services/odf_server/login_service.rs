@@ -9,6 +9,7 @@
 
 use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::pin::Pin;
 use std::sync::Arc;
 
 use dill::component;
@@ -29,7 +30,7 @@ pub const DEFAULT_ODF_FRONTEND_URL: &str = "https://platform.demo.kamu.dev";
 pub const DEFAULT_ODF_BACKEND_URL: &str = "https://api.demo.kamu.dev";
 
 struct WebServer {
-    server_future: Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Unpin>,
+    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>>,
     local_addr: SocketAddr,
 }
 
@@ -102,7 +103,7 @@ impl LoginService {
             )
             .with_state(response_tx);
 
-        let server_future = Box::new(axum::serve(listener, app.into_make_service()).into_future());
+        let server_future = Box::pin(axum::serve(listener, app.into_make_service()).into_future());
 
         Ok(WebServer {
             server_future,
@@ -136,7 +137,7 @@ impl LoginService {
     pub async fn login_interactive(
         &self,
         odf_server_frontend_url: &Url,
-        web_server_started_callback: impl Fn(&String),
+        web_server_started_callback: impl Fn(&String) + Send,
     ) -> Result<FrontendLoginCallbackResponse, LoginError> {
         let (response_tx, response_rx) =
             tokio::sync::mpsc::channel::<FrontendLoginCallbackResponse>(1);

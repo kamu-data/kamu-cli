@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::ViewDatasetUseCase;
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_core::auth;
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
@@ -21,8 +22,7 @@ pub(crate) async fn ensure_scheduling_permission(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
 ) -> Result<()> {
-    // TODO: Private Datasets: use check_dataset_maintain_access()
-    utils::check_dataset_write_access(ctx, dataset_request_state).await
+    utils::check_dataset_maintain_access(ctx, dataset_request_state).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -80,8 +80,8 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let dataset_summary = dataset_request_state.dataset_summary(ctx).await?;
-            let dataset_kind = dataset_summary.kind;
+            let resolved_dataset = dataset_request_state.resolved_dataset(ctx).await?;
+            let dataset_kind = resolved_dataset.get_kind();
 
             if dataset_kind != expected_kind {
                 Ok(Some(FlowIncompatibleDatasetKind {
@@ -121,10 +121,10 @@ pub(crate) async fn ensure_flow_preconditions(
             }
         }
         DatasetFlowType::ExecuteTransform => {
-            let (metadata_query_service, view_dataset_use_case) = from_catalog_n!(
+            let (metadata_query_service, rebac_dataset_registry_facade) = from_catalog_n!(
                 ctx,
                 dyn kamu_core::MetadataQueryService,
-                dyn ViewDatasetUseCase
+                dyn RebacDatasetRegistryFacade
             );
             let source_res = metadata_query_service
                 .get_active_transform(resolved_dataset)
@@ -139,15 +139,18 @@ pub(crate) async fn ensure_flow_preconditions(
                         .map(|input| input.dataset_ref.clone())
                         .collect::<Vec<_>>();
 
-                    let view_result = view_dataset_use_case
-                        .execute_multi(inputs_dataset_refs)
+                    let classify_response = rebac_dataset_registry_facade
+                        .classify_dataset_refs_by_allowance(
+                            inputs_dataset_refs,
+                            auth::DatasetAction::Read,
+                        )
                         .await?;
 
-                    if !view_result.inaccessible_refs.is_empty() {
+                    if !classify_response.inaccessible_refs.is_empty() {
                         let dataset_ref_alias_map = set_transform.as_dataset_ref_alias_map();
 
                         return Ok(Some(FlowPreconditionsNotMet {
-                            preconditions: view_result
+                            preconditions: classify_response
                                 .into_inaccessible_input_datasets_message(&dataset_ref_alias_map),
                         }));
                     }

@@ -20,16 +20,11 @@ use crate::{DatabaseCredentials, DatabasePasswordProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseAwsSecretPasswordProvider {
+    #[component(explicit)]
     secret_name: String,
-}
-
-impl DatabaseAwsSecretPasswordProvider {
-    pub fn new(secret_name: String) -> Self {
-        Self { secret_name }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

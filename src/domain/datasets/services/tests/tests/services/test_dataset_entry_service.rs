@@ -137,18 +137,21 @@ async fn test_indexes_datasets_correctly() {
                 owner_id: owner_account_id_1.clone(),
                 name: odf::DatasetName::new_unchecked(dataset_name_1),
                 created_at: frozen_time_point(),
+                kind: odf::DatasetKind::Root,
             },
             DatasetEntry {
                 id: dataset_id_2,
                 owner_id: owner_account_id_1,
                 name: odf::DatasetName::new_unchecked(dataset_name_2),
                 created_at: frozen_time_point(),
+                kind: odf::DatasetKind::Root,
             },
             DatasetEntry {
                 id: dataset_id_3,
                 owner_id: owner_account_id_2,
                 name: odf::DatasetName::new_unchecked(dataset_name_3),
                 created_at: frozen_time_point(),
+                kind: odf::DatasetKind::Root,
             }
         ]
     );

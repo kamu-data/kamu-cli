@@ -13,12 +13,12 @@ use std::sync::Arc;
 use database_common::{EntityPageListing, EntityPageStreamer};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountNotFoundByIdError, AccountRepository, GetAccountByIdError};
-use kamu_auth_rebac::RebacService;
+use kamu_accounts::{AccountNotFoundByIdError, AccountService, GetAccountByIdError};
+use kamu_auth_rebac::{AuthorizedAccount, RebacService};
 use kamu_datasets::{
     DatasetEntriesResolution,
     DatasetEntryNotFoundError,
-    DatasetEntryRepository,
+    DatasetEntryService,
     GetDatasetEntryError,
 };
 use thiserror::Error;
@@ -55,24 +55,24 @@ impl OsoResourceServiceImplStateHolder {
 
 pub struct OsoResourceServiceImpl {
     state_holder: Arc<OsoResourceServiceImplStateHolder>,
-    dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+    dataset_entry_svc: Arc<dyn DatasetEntryService>,
     rebac_service: Arc<dyn RebacService>,
-    account_repo: Arc<dyn AccountRepository>,
+    account_service: Arc<dyn AccountService>,
 }
 
 #[component(pub)]
 impl OsoResourceServiceImpl {
     pub fn new(
         state_holder: Arc<OsoResourceServiceImplStateHolder>,
-        dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
+        dataset_entry_svc: Arc<dyn DatasetEntryService>,
         rebac_service: Arc<dyn RebacService>,
-        account_repo: Arc<dyn AccountRepository>,
+        account_service: Arc<dyn AccountService>,
     ) -> Self {
         Self {
             state_holder,
-            dataset_entry_repo,
+            dataset_entry_svc,
             rebac_service,
-            account_repo,
+            account_service,
         }
     }
 
@@ -101,7 +101,7 @@ impl OsoResourceServiceImpl {
 
         // The second attempt is from the database
         let user_actor = {
-            let account = match self.account_repo.get_account_by_id(account_id).await {
+            let account = match self.account_service.get_account_by_id(account_id).await {
                 Ok(found_account) => found_account,
                 Err(e) => return Err(e.into()),
             };
@@ -132,7 +132,7 @@ impl OsoResourceServiceImpl {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetResource, GetDatasetResourceError> {
-        let dataset_entry = match self.dataset_entry_repo.get_dataset_entry(dataset_id).await {
+        let dataset_entry = match self.dataset_entry_svc.get_entry(dataset_id).await {
             Ok(found_dataset_entry) => found_dataset_entry,
             Err(e) => return Err(e.into()),
         };
@@ -141,11 +141,19 @@ impl OsoResourceServiceImpl {
             .get_dataset_properties(&dataset_entry.id)
             .await
             .int_err()?;
+        let authorized_accounts = self
+            .rebac_service
+            .get_authorized_accounts(dataset_id)
+            .await
+            .int_err()?;
 
-        let dataset_resource = DatasetResource::new(
+        let mut dataset_resource = DatasetResource::new(
             &dataset_entry.owner_id,
             dataset_properties.allows_public_read,
         );
+        for AuthorizedAccount { account_id, role } in authorized_accounts {
+            dataset_resource.authorize_account(&account_id, role);
+        }
 
         Ok(dataset_resource)
     }
@@ -158,8 +166,8 @@ impl OsoResourceServiceImpl {
             resolved_entries,
             unresolved_entries,
         } = self
-            .dataset_entry_repo
-            .get_multiple_dataset_entries(dataset_ids)
+            .dataset_entry_svc
+            .get_multiple_entries(dataset_ids)
             .await
             .int_err()?;
 
@@ -190,6 +198,11 @@ impl OsoResourceServiceImpl {
                         .get_dataset_properties_by_ids(&dataset_ids)
                         .await
                         .int_err()?;
+                    let mut dataset_accounts_relation_map = self
+                        .rebac_service
+                        .get_authorized_accounts_by_ids(&dataset_ids)
+                        .await
+                        .int_err()?;
 
                     let mut dataset_resources = Vec::with_capacity(dataset_properties_map.len());
 
@@ -202,8 +215,16 @@ impl OsoResourceServiceImpl {
                                         .int_err()
                                 })?;
 
-                        let dataset_resource =
+                        let mut dataset_resource =
                             DatasetResource::new(owner_id, dataset_properties.allows_public_read);
+
+                        if let Some(authorized_accounts) =
+                            dataset_accounts_relation_map.remove(&dataset_id)
+                        {
+                            for AuthorizedAccount { account_id, role } in authorized_accounts {
+                                dataset_resource.authorize_account(&account_id, role);
+                            }
+                        }
 
                         dataset_resources.push((dataset_id, dataset_resource));
                     }
@@ -250,7 +271,7 @@ impl From<GetAccountByIdError> for GetUserActorError {
     fn from(err: GetAccountByIdError) -> Self {
         match err {
             GetAccountByIdError::NotFound(e) => Self::NotFound(e),
-            GetAccountByIdError::Internal(e) => Self::Internal(e),
+            e @ GetAccountByIdError::Internal(_) => Self::Internal(e.int_err()),
         }
     }
 }

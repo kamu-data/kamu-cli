@@ -14,43 +14,29 @@ use chrono::SecondsFormat;
 use console::style;
 use futures::TryStreamExt;
 use kamu::domain::*;
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
 
 use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct InspectQueryCommand {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-    dataset_ref: odf::DatasetRef,
     output_config: Arc<OutputConfig>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
 }
 
 impl InspectQueryCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-        dataset_ref: odf::DatasetRef,
-        output_config: Arc<OutputConfig>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            dataset_action_authorizer,
-            dataset_ref,
-            output_config,
-        }
-    }
-
     async fn render(
         &self,
         output: &mut impl Write,
-        dataset_handle: &odf::DatasetHandle,
+        resolved_dataset: ResolvedDataset,
     ) -> Result<(), CLIError> {
-        let resolved_dataset = self
-            .dataset_registry
-            .get_dataset_by_handle(dataset_handle)
-            .await;
+        use odf::dataset::MetadataChainExt;
 
-        use odf::dataset::MetadataChainExt as _;
         let mut blocks = resolved_dataset.as_metadata_chain().iter_blocks();
         while let Some((block_hash, block)) = blocks.try_next().await? {
             match &block.event {
@@ -60,7 +46,7 @@ impl InspectQueryCommand {
                 }) => {
                     self.render_transform(
                         output,
-                        dataset_handle,
+                        resolved_dataset.get_handle(),
                         &block_hash,
                         &block,
                         inputs,
@@ -73,7 +59,7 @@ impl InspectQueryCommand {
                 }) => {
                     self.render_transform(
                         output,
-                        dataset_handle,
+                        resolved_dataset.get_handle(),
                         &block_hash,
                         &block,
                         &Vec::new(),
@@ -178,33 +164,30 @@ impl InspectQueryCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for InspectQueryCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
-        let dataset_handle = self
-            .dataset_registry
-            .resolve_dataset_handle_by_ref(&self.dataset_ref)
+    async fn run(&self) -> Result<(), CLIError> {
+        let resolved_dataset = self
+            .rebac_dataset_registry_facade
+            .resolve_dataset_by_ref(&self.dataset_ref, auth::DatasetAction::Read)
             .await?;
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, auth::DatasetAction::Read)
-            .await
-            .map_err(|e| match e {
-                auth::DatasetActionUnauthorizedError::Access(e) => CLIError::failure(e),
-                auth::DatasetActionUnauthorizedError::Internal(e) => CLIError::critical(e),
-            })?;
 
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
             let mut pager = minus::Pager::new();
             pager
                 .set_exit_strategy(minus::ExitStrategy::PagerQuit)
                 .unwrap();
-            pager.set_prompt(dataset_handle.alias.to_string()).unwrap();
+            pager
+                .set_prompt(resolved_dataset.get_alias().to_string())
+                .unwrap();
 
-            self.render(&mut WritePager(&mut pager), &dataset_handle)
+            self.render(&mut WritePager(&mut pager), resolved_dataset)
                 .await?;
             minus::page_all(pager).unwrap();
         } else {
-            self.render(&mut std::io::stdout(), &dataset_handle).await?;
+            self.render(&mut std::io::stdout(), resolved_dataset)
+                .await?;
         }
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

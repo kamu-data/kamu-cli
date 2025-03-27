@@ -26,67 +26,45 @@ use crate::output::OutputConfig;
 // Command
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct PullCommand {
-    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
+    output_config: Arc<OutputConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     search_svc: Arc<dyn SearchServiceRemote>,
-    output_config: Arc<OutputConfig>,
+    pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     tenancy_config: TenancyConfig,
-    refs: Vec<odf::DatasetRefAnyPattern>,
     current_account_subject: Arc<CurrentAccountSubject>,
+
+    #[dill::component(explicit)]
+    refs: Vec<odf::DatasetRefAnyPattern>,
+
+    #[dill::component(explicit)]
     all: bool,
+
+    #[dill::component(explicit)]
     recursive: bool,
+
+    #[dill::component(explicit)]
     fetch_uncacheable: bool,
+
+    #[dill::component(explicit)]
     as_name: Option<odf::DatasetName>,
+
+    #[dill::component(explicit)]
     add_aliases: bool,
+
+    #[dill::component(explicit)]
     force: bool,
+
+    #[dill::component(explicit)]
     reset_derivatives_on_diverged_input: bool,
+
+    #[dill::component(explicit)]
     new_dataset_visibility: odf::DatasetVisibility,
 }
 
 impl PullCommand {
-    pub fn new<I>(
-        pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        search_svc: Arc<dyn SearchServiceRemote>,
-        output_config: Arc<OutputConfig>,
-        tenancy_config: TenancyConfig,
-        refs: I,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        all: bool,
-        recursive: bool,
-        fetch_uncacheable: bool,
-        as_name: Option<odf::DatasetName>,
-        add_aliases: bool,
-        force: bool,
-        reset_derivatives_on_diverged_input: bool,
-        maybe_new_dataset_visibility: Option<odf::DatasetVisibility>,
-    ) -> Self
-    where
-        I: IntoIterator<Item = odf::DatasetRefAnyPattern>,
-    {
-        let new_dataset_visibility = maybe_new_dataset_visibility
-            .unwrap_or_else(|| tenancy_config.default_dataset_visibility());
-
-        Self {
-            pull_dataset_use_case,
-            dataset_registry,
-            search_svc,
-            output_config,
-            tenancy_config,
-            refs: refs.into_iter().collect(),
-            current_account_subject,
-            all,
-            recursive,
-            fetch_uncacheable,
-            as_name,
-            add_aliases,
-            force,
-            reset_derivatives_on_diverged_input,
-            new_dataset_visibility,
-        }
-    }
-
     async fn sync_from(
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
@@ -232,7 +210,7 @@ impl PullCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for PullCommand {
     #[allow(clippy::match_same_arms)]
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match (self.refs.len(), self.recursive, self.all, &self.as_name) {
             (0, _, false, _) => Err(CLIError::usage_error("Specify a dataset or pass --all")),
             (0, false, true, None) => Ok(()),

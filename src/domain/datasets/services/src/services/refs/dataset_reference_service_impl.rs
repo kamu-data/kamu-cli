@@ -32,11 +32,6 @@ use messaging_outbox::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetReferenceServiceImpl {
-    dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
-    outbox: Arc<dyn Outbox>,
-}
-
 #[component(pub)]
 #[interface(dyn DatasetReferenceService)]
 #[interface(dyn MessageConsumer)]
@@ -48,16 +43,10 @@ pub struct DatasetReferenceServiceImpl {
     ],
     delivery: MessageDeliveryMechanism::Transactional,
 })]
-impl DatasetReferenceServiceImpl {
-    pub fn new(
-        dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
-        outbox: Arc<dyn Outbox>,
-    ) -> Self {
-        Self {
-            dataset_reference_repo,
-            outbox,
-        }
-    }
+pub struct DatasetReferenceServiceImpl {
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -130,19 +119,16 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
     )]
     async fn consume_message(
         &self,
-        transactional_catalog: &Catalog,
+        _: &Catalog,
         message: &DatasetReferenceMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
 
         match message {
             DatasetReferenceMessage::Updated(updated_message) => {
-                let dataset_registry = transactional_catalog
-                    .get_one::<dyn DatasetRegistry>()
-                    .unwrap();
-
                 // Resolve dataset
-                let dataset = dataset_registry
+                let dataset = self
+                    .dataset_registry
                     .get_dataset_by_id(&updated_message.dataset_id)
                     .await
                     .int_err()?;

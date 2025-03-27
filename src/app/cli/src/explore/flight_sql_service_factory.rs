@@ -76,7 +76,7 @@ impl FlightSqlServiceFactory {
 
 pub struct FlightSqlService {
     address: SocketAddr,
-    server_future: Pin<Box<dyn Future<Output = Result<(), tonic::transport::Error>>>>,
+    server_future: Pin<Box<dyn Future<Output = Result<(), tonic::transport::Error>> + Send>>,
 }
 
 impl FlightSqlService {

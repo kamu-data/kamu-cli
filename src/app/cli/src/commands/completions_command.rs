@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use clap::CommandFactory as _;
+
 use super::{CLIError, Command};
 
 const BASH_COMPLETIONS: &str = "
@@ -22,32 +24,25 @@ _kamu_()
 complete -F _kamu_ kamu
 ";
 
-pub struct CompletionsCommand {
-    cli: clap::Command,
-    shell: clap_complete::Shell,
-}
+#[dill::component]
+#[dill::interface(dyn Command)]
 
-impl CompletionsCommand {
-    pub fn new(cli: clap::Command, shell: clap_complete::Shell) -> Self {
-        Self { cli, shell }
-    }
+pub struct CompletionsCommand {
+    #[dill::component(explicit)]
+    shell: clap_complete::Shell,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for CompletionsCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         // TODO: Remove once clap allows to programmatically complete values
         // See: https://github.com/clap-rs/clap/issues/568
-        let bin_name = self.cli.get_name().to_owned();
+        let mut cli = crate::cli::Cli::command();
+        let bin_name = cli.get_name().to_owned();
         match self.shell {
             clap_complete::Shell::Bash => print!("{BASH_COMPLETIONS}"),
             _ => {
-                clap_complete::generate(
-                    self.shell,
-                    &mut self.cli,
-                    bin_name,
-                    &mut std::io::stdout(),
-                );
+                clap_complete::generate(self.shell, &mut cli, bin_name, &mut std::io::stdout());
             }
         };
         Ok(())

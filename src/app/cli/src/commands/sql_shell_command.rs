@@ -48,6 +48,8 @@ pub enum SqlShellEngine {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SqlShellCommand {
     query_svc: Arc<dyn QueryService>,
     workspace_layout: Arc<WorkspaceLayout>,
@@ -55,42 +57,24 @@ pub struct SqlShellCommand {
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
     export_service: Arc<dyn ExportService>,
+
+    #[dill::component(explicit)]
     command: Option<String>,
+
+    #[dill::component(explicit)]
     url: Option<String>,
+
+    #[dill::component(explicit)]
     engine: Option<SqlShellEngine>,
+
+    #[dill::component(explicit)]
     output_path: Option<PathBuf>,
+
+    #[dill::component(explicit)]
     records_per_file: Option<usize>,
 }
 
 impl SqlShellCommand {
-    pub fn new(
-        query_svc: Arc<dyn QueryService>,
-        workspace_layout: Arc<WorkspaceLayout>,
-        engine_prov_config: Arc<EngineProvisionerLocalConfig>,
-        output_config: Arc<OutputConfig>,
-        container_runtime: Arc<ContainerRuntime>,
-        export_service: Arc<dyn ExportService>,
-        command: Option<String>,
-        url: Option<String>,
-        engine: Option<SqlShellEngine>,
-        output_path: Option<PathBuf>,
-        records_per_file: Option<usize>,
-    ) -> Self {
-        Self {
-            query_svc,
-            workspace_layout,
-            engine_prov_config,
-            output_config,
-            container_runtime,
-            export_service,
-            command,
-            url,
-            engine,
-            output_path,
-            records_per_file,
-        }
-    }
-
     async fn run_spark_shell(&self) -> Result<(), CLIError> {
         let sql_shell = SqlShellImpl::new(
             self.container_runtime.clone(),
@@ -256,7 +240,7 @@ impl Command for SqlShellCommand {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let engine = self.engine.unwrap_or(SqlShellEngine::Datafusion);
 
         match (engine, &self.command, &self.url, &self.output_path) {

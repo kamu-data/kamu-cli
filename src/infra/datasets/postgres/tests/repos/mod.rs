@@ -11,3 +11,4 @@ mod test_postgres_dataset_dependency_repository;
 mod test_postgres_dataset_entry_repository;
 mod test_postgres_dataset_env_var_repository;
 mod test_postgres_dataset_reference_repository;
+mod test_postgres_dataset_statistics_repository;

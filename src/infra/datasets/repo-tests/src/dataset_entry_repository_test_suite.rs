@@ -34,7 +34,7 @@ pub async fn test_get_dataset_entry(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let dataset_entry = new_dataset_entry(&account);
+    let dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
     {
         let get_res = dataset_entry_repo
             .get_dataset_entry(&dataset_entry.id)
@@ -103,9 +103,12 @@ pub async fn test_stream_many_entries(catalog: &Catalog) {
     let account_1 = new_account_with_name(&account_repo, "user1").await;
     let account_2 = new_account_with_name(&account_repo, "user2").await;
 
-    let dataset_entry_acc_1_1 = new_dataset_entry_with(&account_1, "dataset1");
-    let dataset_entry_acc_1_2 = new_dataset_entry_with(&account_1, "dataset2");
-    let dataset_entry_acc_2_3 = new_dataset_entry_with(&account_2, "dataset3");
+    let dataset_entry_acc_1_1 =
+        new_dataset_entry_with(&account_1, "dataset1", odf::DatasetKind::Root);
+    let dataset_entry_acc_1_2 =
+        new_dataset_entry_with(&account_1, "dataset2", odf::DatasetKind::Root);
+    let dataset_entry_acc_2_3 =
+        new_dataset_entry_with(&account_2, "dataset3", odf::DatasetKind::Root);
 
     {
         let save_res = dataset_entry_repo
@@ -177,9 +180,9 @@ pub async fn test_get_multiple_entries(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let dataset_entry_acc_1 = new_dataset_entry_with(&account, "dataset1");
-    let dataset_entry_acc_2 = new_dataset_entry_with(&account, "dataset2");
-    let dataset_entry_acc_3 = new_dataset_entry_with(&account, "dataset3");
+    let dataset_entry_acc_1 = new_dataset_entry_with(&account, "dataset1", odf::DatasetKind::Root);
+    let dataset_entry_acc_2 = new_dataset_entry_with(&account, "dataset2", odf::DatasetKind::Root);
+    let dataset_entry_acc_3 = new_dataset_entry_with(&account, "dataset3", odf::DatasetKind::Root);
 
     {
         let save_res = dataset_entry_repo
@@ -212,11 +215,13 @@ pub async fn test_get_multiple_entries(catalog: &Catalog) {
             .await
             .unwrap();
 
-        get_multiple_res.resolved_entries.sort();
+        get_multiple_res
+            .resolved_entries
+            .sort_by(|e1, e2| e1.id.cmp(&e2.id));
 
         let mut expected_resolved_entries =
             vec![dataset_entry_acc_1.clone(), dataset_entry_acc_3.clone()];
-        expected_resolved_entries.sort();
+        expected_resolved_entries.sort_by(|e1, e2| e1.id.cmp(&e2.id));
 
         assert_eq!(
             get_multiple_res,
@@ -270,7 +275,7 @@ pub async fn test_get_dataset_entry_by_name(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let dataset_entry = new_dataset_entry(&account);
+    let dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
     {
         let get_res = dataset_entry_repo
             .get_dataset_entry_by_owner_and_name(&dataset_entry.owner_id, &dataset_entry.name)
@@ -371,9 +376,12 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
         );
     }
 
-    let dataset_entry_acc_1_1 = new_dataset_entry_with(&account_1, "dataset1");
-    let dataset_entry_acc_1_2 = new_dataset_entry_with(&account_1, "dataset2");
-    let dataset_entry_acc_2_3 = new_dataset_entry_with(&account_2, "dataset3");
+    let dataset_entry_acc_1_1 =
+        new_dataset_entry_with(&account_1, "dataset1", odf::DatasetKind::Root);
+    let dataset_entry_acc_1_2 =
+        new_dataset_entry_with(&account_1, "dataset2", odf::DatasetKind::Root);
+    let dataset_entry_acc_2_3 =
+        new_dataset_entry_with(&account_2, "dataset3", odf::DatasetKind::Root);
     {
         let save_res = dataset_entry_repo
             .save_dataset_entry(&dataset_entry_acc_1_1)
@@ -409,11 +417,11 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &Catalog) {
             .await;
         let mut expected_dataset_entries = vec![dataset_entry_acc_1_1, dataset_entry_acc_1_2];
 
-        expected_dataset_entries.sort();
+        expected_dataset_entries.sort_by(|e1, e2| e1.id.cmp(&e2.id));
 
         match get_res {
             Ok(mut actual_dataset_entries) => {
-                actual_dataset_entries.sort();
+                actual_dataset_entries.sort_by(|e1, e2| e1.id.cmp(&e2.id));
 
                 assert_eq!(expected_dataset_entries, actual_dataset_entries);
             }
@@ -473,7 +481,7 @@ pub async fn test_try_save_duplicate_dataset_entry(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let mut dataset_entry = new_dataset_entry(&account);
+    let mut dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
     {
         let save_res = dataset_entry_repo.save_dataset_entry(&dataset_entry).await;
 
@@ -501,7 +509,7 @@ pub async fn test_try_save_dataset_entry_with_name_collision(catalog: &Catalog) 
 
     let account = new_account(&account_repo).await;
 
-    let dataset_entry_1 = new_dataset_entry_with(&account, "dataset");
+    let dataset_entry_1 = new_dataset_entry_with(&account, "dataset", odf::DatasetKind::Root);
     {
         let save_res = dataset_entry_repo
             .save_dataset_entry(&dataset_entry_1)
@@ -511,7 +519,8 @@ pub async fn test_try_save_dataset_entry_with_name_collision(catalog: &Catalog) 
     }
 
     let same_dataset_name = dataset_entry_1.name.as_str();
-    let dataset_entry_2 = new_dataset_entry_with(&account, same_dataset_name);
+    let dataset_entry_2 =
+        new_dataset_entry_with(&account, same_dataset_name, odf::DatasetKind::Root);
     {
         let save_res = dataset_entry_repo
             .save_dataset_entry(&dataset_entry_2)
@@ -533,7 +542,7 @@ pub async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry(cata
 
     let account = new_account(&account_repo).await;
 
-    let dataset_entry_1 = new_dataset_entry_with(&account, "dataset1");
+    let dataset_entry_1 = new_dataset_entry_with(&account, "dataset1", odf::DatasetKind::Root);
     {
         let save_res = dataset_entry_repo
             .save_dataset_entry(&dataset_entry_1)
@@ -556,7 +565,7 @@ pub async fn test_try_set_same_dataset_name_for_another_owned_dataset_entry(cata
         assert_matches!(count_res, Ok(1));
     }
 
-    let dataset_entry_2 = new_dataset_entry_with(&account, "dataset2");
+    let dataset_entry_2 = new_dataset_entry_with(&account, "dataset2", odf::DatasetKind::Root);
     {
         let save_res = dataset_entry_repo
             .save_dataset_entry(&dataset_entry_2)
@@ -595,7 +604,7 @@ pub async fn test_update_dataset_entry_name(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let dataset_entry = new_dataset_entry(&account);
+    let dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
     let new_name = odf::DatasetName::new_unchecked("new-name");
     {
         let update_res = dataset_entry_repo
@@ -640,7 +649,7 @@ pub async fn test_delete_dataset_entry(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let dataset_entry = new_dataset_entry(&account);
+    let dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
     {
         let delete_res = dataset_entry_repo
             .delete_dataset_entry(&dataset_entry.id)

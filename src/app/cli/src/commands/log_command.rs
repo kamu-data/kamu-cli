@@ -16,6 +16,7 @@ use chrono::prelude::*;
 use console::style;
 use futures::{StreamExt, TryStreamExt};
 use kamu::domain::*;
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
 
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
@@ -32,37 +33,27 @@ pub enum MetadataLogOutputFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct LogCommand {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-    dataset_ref: odf::DatasetRef,
-    output_format: Option<MetadataLogOutputFormat>,
-    filter: Option<String>,
-    limit: usize,
     output_config: Arc<OutputConfig>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
+    output_format: Option<MetadataLogOutputFormat>,
+
+    #[dill::component(explicit)]
+    filter: Option<String>,
+
+    #[dill::component(explicit)]
+    limit: usize,
 }
 
 impl LogCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-        dataset_ref: odf::DatasetRef,
-        output_format: Option<MetadataLogOutputFormat>,
-        filter: Option<String>,
-        limit: usize,
-        output_config: Arc<OutputConfig>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            dataset_action_authorizer,
-            dataset_ref,
-            output_format,
-            filter,
-            limit,
-            output_config,
-        }
-    }
-
     #[allow(clippy::match_same_arms)]
     fn filter_block(&self, block: &odf::MetadataBlock) -> bool {
         // Keep in sync with CLI parser
@@ -91,7 +82,11 @@ impl LogCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for LogCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
+        // TODO: Private Datasets: request not all
+        //       Private Datasets: Checking dataset accessibility in `kamu` subcommands
+        //       (multi-tenant workspace)
+        //       https://github.com/kamu-data/kamu-cli/issues/1055
         let id_to_alias_lookup: BTreeMap<_, _> = self
             .dataset_registry
             .all_dataset_handles()
@@ -115,23 +110,10 @@ impl Command for LogCommand {
             (Some(MetadataLogOutputFormat::Yaml), false) => Box::new(YamlRenderer::new(self.limit)),
         };
 
-        let dataset_handle = self
-            .dataset_registry
-            .resolve_dataset_handle_by_ref(&self.dataset_ref)
-            .await?;
-
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, auth::DatasetAction::Read)
-            .await
-            .map_err(|e| match e {
-                auth::DatasetActionUnauthorizedError::Access(e) => CLIError::failure(e),
-                auth::DatasetActionUnauthorizedError::Internal(e) => CLIError::critical(e),
-            })?;
-
         let resolved_dataset = self
-            .dataset_registry
-            .get_dataset_by_handle(&dataset_handle)
-            .await;
+            .rebac_dataset_registry_facade
+            .resolve_dataset_by_ref(&self.dataset_ref, auth::DatasetAction::Read)
+            .await?;
 
         use odf::dataset::{MetadataChainExt, TryStreamExtExt};
 
@@ -142,7 +124,7 @@ impl Command for LogCommand {
                 .filter_ok(|(_, b)| self.filter_block(b)),
         );
 
-        renderer.show(&dataset_handle, blocks).await?;
+        renderer.show(resolved_dataset.get_handle(), blocks).await?;
 
         Ok(())
     }

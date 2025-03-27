@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use odf_metadata::{DatasetID, MetadataBlockTyped, Multihash, Seed};
+use odf_metadata::{DatasetID, DatasetKind, MetadataBlockTyped, Multihash, Seed};
 use thiserror::Error;
 
 use crate::{Dataset, DatasetUnresolvedIdError, GetStoredDatasetError};
@@ -42,14 +42,21 @@ pub struct StoreDatasetOpts {
 #[derive(Clone)]
 pub struct StoreDatasetResult {
     pub dataset_id: DatasetID,
+    pub dataset_kind: DatasetKind,
     pub dataset: Arc<dyn Dataset>,
     pub seed: Multihash,
 }
 
 impl StoreDatasetResult {
-    pub fn new(dataset_id: DatasetID, dataset: Arc<dyn Dataset>, seed: Multihash) -> Self {
+    pub fn new(
+        dataset_id: DatasetID,
+        dataset_kind: DatasetKind,
+        dataset: Arc<dyn Dataset>,
+        seed: Multihash,
+    ) -> Self {
         Self {
             dataset_id,
+            dataset_kind,
             dataset,
             seed,
         }

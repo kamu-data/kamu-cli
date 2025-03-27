@@ -74,13 +74,16 @@ macro_rules! assert_single_dataset {
     };
 }
 
+// TODO: Private Datasets: cover new paths
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_owner_can_read_and_write_owned_private_dataset() {
-    let owned_private_dataset_handle = odf::metadata::testing::handle(&"owner", &"private-dataset");
+    let owned_private_dataset_handle =
+        odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
@@ -96,7 +99,12 @@ async fn test_owner_can_read_and_write_owned_private_dataset() {
             read_result = Ok(()),
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
     );
 }
 
@@ -104,7 +112,8 @@ async fn test_owner_can_read_and_write_owned_private_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_owner_can_read_and_write_owned_public_dataset() {
-    let owned_public_dataset_handle = odf::metadata::testing::handle(&"owner", &"public-dataset");
+    let owned_public_dataset_handle =
+        odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
@@ -120,7 +129,12 @@ async fn test_owner_can_read_and_write_owned_public_dataset() {
             read_result = Ok(()),
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
     );
 }
 
@@ -128,7 +142,8 @@ async fn test_owner_can_read_and_write_owned_public_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_guest_can_read_but_not_write_public_dataset() {
-    let public_dataset_handle = odf::metadata::testing::handle(&"owner", &"public-dataset");
+    let public_dataset_handle =
+        odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
     harness
@@ -151,7 +166,8 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_guest_can_not_read_and_write_private_dataset() {
-    let private_dataset_handle = odf::metadata::testing::handle(&"owner", &"private-dataset");
+    let private_dataset_handle =
+        odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
     harness
@@ -175,7 +191,7 @@ async fn test_guest_can_not_read_and_write_private_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_not_owner_can_read_but_not_write_public_dataset() {
     let not_owned_public_dataset_handle =
-        odf::metadata::testing::handle(&"owner", &"public-dataset");
+        odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner")).await;
@@ -201,7 +217,7 @@ async fn test_not_owner_can_read_but_not_write_public_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_not_owner_can_not_read_and_write_private_dataset() {
     let not_owned_private_dataset_handle =
-        odf::metadata::testing::handle(&"owner", &"private-dataset");
+        odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner")).await;
@@ -227,7 +243,7 @@ async fn test_not_owner_can_not_read_and_write_private_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_admin_can_read_and_write_not_owned_public_dataset() {
     let not_owned_public_dataset_handle =
-        odf::metadata::testing::handle(&"owner", &"public-dataset");
+        odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged_admin()).await;
@@ -244,7 +260,12 @@ async fn test_admin_can_read_and_write_not_owned_public_dataset() {
             read_result = Ok(()),
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
     );
 }
 
@@ -253,7 +274,7 @@ async fn test_admin_can_read_and_write_not_owned_public_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_admin_can_read_and_write_not_owned_private_dataset() {
     let not_owned_private_dataset_handle =
-        odf::metadata::testing::handle(&"owner", &"private-dataset");
+        odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged_admin()).await;
@@ -270,7 +291,12 @@ async fn test_admin_can_read_and_write_not_owned_private_dataset() {
             read_result = Ok(()),
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read, DatasetAction::Write].into()
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
     );
 }
 
@@ -288,10 +314,12 @@ async fn test_multi_datasets_matrix() {
     }
     use odf::metadata::testing::handle;
 
-    let alice_private_dataset_1_handle = handle(&"alice", &"private-dataset-1");
-    let alice_public_dataset_2_handle = handle(&"alice", &"public-dataset-2");
-    let bob_private_dataset_3_handle = handle(&"bob", &"private-dataset-3");
-    let bob_public_dataset_4_handle = handle(&"bob", &"public-dataset-4");
+    let alice_private_dataset_1_handle =
+        handle(&"alice", &"private-dataset-1", odf::DatasetKind::Root);
+    let alice_public_dataset_2_handle =
+        handle(&"alice", &"public-dataset-2", odf::DatasetKind::Root);
+    let bob_private_dataset_3_handle = handle(&"bob", &"private-dataset-3", odf::DatasetKind::Root);
+    let bob_public_dataset_4_handle = handle(&"bob", &"public-dataset-4", odf::DatasetKind::Root);
 
     let all_dataset_handles = vec![
         alice_private_dataset_1_handle.clone(),
@@ -702,6 +730,7 @@ impl DatasetAuthorizerHarness {
                     &dataset_handle.id,
                     &account_id,
                     &dataset_handle.alias.dataset_name,
+                    odf::DatasetKind::Root,
                 )
                 .await
                 .unwrap();

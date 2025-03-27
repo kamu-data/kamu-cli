@@ -27,9 +27,11 @@ sqlx = ["dep:sqlx"]
 
 [dependencies]
 internal-error = { workspace = true }
+kamu-core = { workspace = true }
 odf = { workspace = true }
 
 async-trait = "0.1"
+itertools = { version = "0.14", default-features = false }
 strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 

@@ -29,46 +29,34 @@ use crate::{
     VerificationMultiProgress,
 };
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct CompactCommand {
     interact: Arc<Interact>,
     compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
     verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+
+    #[dill::component(explicit)]
     dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
+
+    #[dill::component(explicit)]
     max_slice_size: u64,
+
+    #[dill::component(explicit)]
     max_slice_records: u64,
+
+    #[dill::component(explicit)]
     is_hard: bool,
+
+    #[dill::component(explicit)]
     is_verify: bool,
+
+    #[dill::component(explicit)]
     keep_metadata_only: bool,
 }
 
 impl CompactCommand {
-    pub fn new(
-        interact: Arc<Interact>,
-        compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
-        verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
-        max_slice_size: u64,
-        max_slice_records: u64,
-        is_hard: bool,
-        is_verify: bool,
-        keep_metadata_only: bool,
-    ) -> Self {
-        Self {
-            interact,
-            compact_dataset_use_case,
-            verify_dataset_use_case,
-            dataset_registry,
-            dataset_ref_patterns,
-            max_slice_size,
-            max_slice_records,
-            is_hard,
-            is_verify,
-            keep_metadata_only,
-        }
-    }
-
     async fn verify_dataset(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), CLIError> {
         let progress = VerificationMultiProgress::new();
         let listener = Arc::new(progress.clone());
@@ -97,7 +85,7 @@ impl CompactCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for CompactCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if self.dataset_ref_patterns.is_empty() {
             return Err(CLIError::usage_error("Specify a dataset or a pattern"));
         }

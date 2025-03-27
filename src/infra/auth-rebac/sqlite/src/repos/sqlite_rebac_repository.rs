@@ -258,9 +258,8 @@ impl RebacRepository for SqliteRebacRepository {
         .await
         .map_err(|e| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
-                InsertEntitiesRelationError::duplicate(
+                InsertEntitiesRelationError::some_role_is_already_present(
                     subject_entity,
-                    relationship,
                     object_entity,
                 )
             }
@@ -273,14 +272,11 @@ impl RebacRepository for SqliteRebacRepository {
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
-        relationship: Relation,
         object_entity: &Entity,
     ) -> Result<(), DeleteEntitiesRelationError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-
-        let relation_as_str = relationship.to_string();
 
         let delete_result = sqlx::query!(
             r#"
@@ -288,13 +284,11 @@ impl RebacRepository for SqliteRebacRepository {
             FROM auth_rebac_relations
             WHERE subject_entity_type = $1
               AND subject_entity_id = $2
-              AND relationship = $3
-              AND object_entity_type = $4
-              AND object_entity_id = $5
+              AND object_entity_type = $3
+              AND object_entity_id = $4
             "#,
             subject_entity.entity_type,
             subject_entity.entity_id,
-            relation_as_str,
             object_entity.entity_type,
             object_entity.entity_id,
         )
@@ -305,7 +299,6 @@ impl RebacRepository for SqliteRebacRepository {
         if delete_result.rows_affected() == 0 {
             return Err(DeleteEntitiesRelationError::not_found(
                 subject_entity,
-                relationship,
                 object_entity,
             ));
         }
@@ -346,6 +339,97 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(Into::into)
     }
 
+    async fn get_object_entity_relations(
+        &self,
+        object_entity: &Entity,
+    ) -> Result<Vec<EntityWithRelation>, GetObjectEntityRelationsError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let row_models = sqlx::query_as!(
+            EntityWithRelationRowModel,
+            r#"
+            SELECT subject_entity_type AS "entity_type: EntityType",
+                   subject_entity_id AS entity_id,
+                   relationship
+            FROM auth_rebac_relations
+            WHERE object_entity_type = $1
+              AND object_entity_id = $2
+            ORDER BY entity_id
+            "#,
+            object_entity.entity_type,
+            object_entity.entity_id,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        row_models
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    async fn get_object_entities_relations(
+        &self,
+        object_entities: &[Entity],
+    ) -> Result<Vec<EntitiesWithRelation>, GetObjectEntityRelationsError> {
+        if object_entities.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        // TODO: replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let query_str = format!(
+            r#"
+            SELECT subject_entity_type,
+                   subject_entity_id,
+                   relationship,
+                   object_entity_type,
+                   object_entity_id
+            FROM auth_rebac_relations
+            WHERE (object_entity_type, object_entity_id) IN ({})
+            ORDER BY subject_entity_id, object_entity_id
+            "#,
+            sqlite_generate_placeholders_tuple_list_2(
+                object_entities.len(),
+                NonZeroUsize::new(1).unwrap()
+            )
+        );
+
+        let mut query = sqlx::query(&query_str);
+        for entity in object_entities {
+            query = query.bind(entity.entity_type);
+            query = query.bind(&entity.entity_id);
+        }
+
+        let raw_rows = query.fetch_all(connection_mut).await.int_err()?;
+        let rows = raw_rows
+            .into_iter()
+            .map(|row| {
+                let raw_entity = EntitiesWithRelationRowModel {
+                    subject_entity_type: row.get(0),
+                    subject_entity_id: row.get(1),
+                    relationship: row.get(2),
+                    object_entity_type: row.get(3),
+                    object_entity_id: row.get(4),
+                };
+                let entity = raw_entity.try_into()?;
+
+                Ok(entity)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(GetObjectEntityRelationsError::Internal)?;
+
+        Ok(rows)
+    }
+
     async fn get_subject_entity_relations_by_object_type(
         &self,
         subject_entity: &Entity,
@@ -382,16 +466,16 @@ impl RebacRepository for SqliteRebacRepository {
             .map_err(Into::into)
     }
 
-    async fn get_relations_between_entities(
+    async fn get_relation_between_entities(
         &self,
         subject_entity: &Entity,
         object_entity: &Entity,
-    ) -> Result<Vec<Relation>, GetRelationsBetweenEntitiesError> {
+    ) -> Result<Relation, GetRelationBetweenEntitiesError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let row_models = sqlx::query_as!(
+        let maybe_row_model = sqlx::query_as!(
             RelationRowModel,
             r#"
             SELECT relationship
@@ -407,15 +491,68 @@ impl RebacRepository for SqliteRebacRepository {
             object_entity.entity_type,
             object_entity.entity_id,
         )
-        .fetch_all(connection_mut)
+        .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
-        row_models
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(Into::into)
+        if let Some(row_model) = maybe_row_model {
+            let relation = row_model.try_into()?;
+            Ok(relation)
+        } else {
+            Err(GetRelationBetweenEntitiesError::not_found(
+                subject_entity,
+                object_entity,
+            ))
+        }
+    }
+
+    async fn delete_subject_entities_object_entity_relations(
+        &self,
+        subject_entities: Vec<Entity<'static>>,
+        object_entity: &Entity,
+    ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError> {
+        if subject_entities.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        // TODO: replace it by macro once sqlx will support it
+        // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+        let query_str = format!(
+            r#"
+            DELETE
+            FROM auth_rebac_relations
+            WHERE object_entity_type = $1
+              AND object_entity_id = $2
+              AND (subject_entity_type, subject_entity_id) in ({})
+            "#,
+            sqlite_generate_placeholders_tuple_list_2(
+                subject_entities.len(),
+                NonZeroUsize::new(3).unwrap()
+            )
+        );
+
+        let mut query = sqlx::query(&query_str)
+            .bind(object_entity.entity_type)
+            .bind(&object_entity.entity_id);
+        for subject_entity in &subject_entities {
+            query = query.bind(subject_entity.entity_type);
+            query = query.bind(&subject_entity.entity_id);
+        }
+
+        let delete_result = query.execute(&mut *connection_mut).await.int_err()?;
+
+        if delete_result.rows_affected() == 0 {
+            return Err(DeleteSubjectEntitiesObjectEntityRelationsError::not_found(
+                subject_entities,
+                object_entity,
+            ));
+        }
+
+        Ok(())
     }
 }
 

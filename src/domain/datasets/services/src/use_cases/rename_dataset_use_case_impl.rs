@@ -10,8 +10,9 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
-use kamu_core::DatasetRegistry;
+use internal_error::ErrorIntoInternal;
+use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_core::auth;
 use kamu_datasets::{
     DatasetLifecycleMessage,
     NameCollisionError,
@@ -26,9 +27,8 @@ use crate::{DatasetEntryWriter, RenameDatasetEntryError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RenameDatasetUseCaseImpl {
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -36,25 +36,24 @@ pub struct RenameDatasetUseCaseImpl {
 #[interface(dyn RenameDatasetUseCase)]
 impl RenameDatasetUseCaseImpl {
     pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
+        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
         dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
-            dataset_registry,
+            rebac_dataset_registry_facade,
             dataset_entry_writer,
-            dataset_action_authorizer,
             outbox,
         }
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "RenameDatasetUseCase::execute",
+        name = RenameDatasetUseCaseImpl_execute,
         skip_all,
         fields(dataset_ref, new_name)
     )]
@@ -64,27 +63,17 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
         new_name: &odf::DatasetName,
     ) -> Result<(), RenameDatasetError> {
         // Locate dataset
-        let dataset_handle = match self
-            .dataset_registry
-            .resolve_dataset_handle_by_ref(dataset_ref)
+        let dataset_handle = self
+            .rebac_dataset_registry_facade
+            .resolve_dataset_handle_by_ref(dataset_ref, auth::DatasetAction::Maintain)
             .await
-        {
-            Ok(h) => Ok(h),
-            Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
-                Err(RenameDatasetError::NotFound(e))
-            }
-            Err(odf::DatasetRefUnresolvedError::Internal(e)) => {
-                Err(RenameDatasetError::Internal(e))
-            }
-        }?;
-
-        // Ensure write permissions
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, DatasetAction::Write)
-            .await
-            .map_err(|e| match e {
-                DatasetActionUnauthorizedError::Access(e) => RenameDatasetError::Access(e),
-                DatasetActionUnauthorizedError::Internal(e) => RenameDatasetError::Internal(e),
+            .map_err(|e| {
+                use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;
+                match e {
+                    E::NotFound(e) => RenameDatasetError::NotFound(e),
+                    E::Access(e) => RenameDatasetError::Access(e),
+                    e @ E::Internal(_) => RenameDatasetError::Internal(e.int_err()),
+                }
             })?;
 
         // Rename entry in the entry repository

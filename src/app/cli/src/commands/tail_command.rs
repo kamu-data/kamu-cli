@@ -18,35 +18,25 @@ use crate::output::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct TailCommand {
-    query_svc: Arc<dyn QueryService>,
-    dataset_ref: odf::DatasetRef,
-    skip: u64,
-    limit: u64,
     output_cfg: Arc<OutputConfig>,
-}
+    query_svc: Arc<dyn QueryService>,
 
-impl TailCommand {
-    pub fn new(
-        query_svc: Arc<dyn QueryService>,
-        dataset_ref: odf::DatasetRef,
-        skip: u64,
-        limit: u64,
-        output_cfg: Arc<OutputConfig>,
-    ) -> Self {
-        Self {
-            query_svc,
-            dataset_ref,
-            skip,
-            limit,
-            output_cfg,
-        }
-    }
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
+    skip: u64,
+
+    #[dill::component(explicit)]
+    limit: u64,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for TailCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let df = self
             .query_svc
             .tail(&self.dataset_ref, self.skip, self.limit)

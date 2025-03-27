@@ -27,28 +27,22 @@ pub enum SchemaOutputFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
+
+    #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
     output_format: Option<SchemaOutputFormat>,
+
+    #[dill::component(explicit)]
     from_data_file: bool,
 }
 
 impl InspectSchemaCommand {
-    pub fn new(
-        query_svc: Arc<dyn QueryService>,
-        dataset_ref: odf::DatasetRef,
-        output_format: Option<SchemaOutputFormat>,
-        from_data_file: bool,
-    ) -> Self {
-        Self {
-            query_svc,
-            dataset_ref,
-            output_format,
-            from_data_file,
-        }
-    }
-
     fn print_schema_unavailable(&self) {
         eprintln!(
             "{}: Dataset schema is not yet available: {}",
@@ -126,7 +120,7 @@ impl InspectSchemaCommand {
         }
     }
 
-    async fn get_arrow_schema(&mut self) -> Result<Option<SchemaRef>, CLIError> {
+    async fn get_arrow_schema(&self) -> Result<Option<SchemaRef>, CLIError> {
         if !self.from_data_file {
             self.query_svc
                 .get_schema(&self.dataset_ref)
@@ -150,7 +144,7 @@ impl InspectSchemaCommand {
         }
     }
 
-    async fn get_parquet_schema(&mut self) -> Result<Option<Arc<Type>>, CLIError> {
+    async fn get_parquet_schema(&self) -> Result<Option<Arc<Type>>, CLIError> {
         if !self.from_data_file {
             let Some(arrow_schema) = self
                 .query_svc
@@ -178,7 +172,7 @@ impl InspectSchemaCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for InspectSchemaCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match self.output_format {
             None | Some(SchemaOutputFormat::Ddl) => {
                 if let Some(schema) = self.get_parquet_schema().await? {

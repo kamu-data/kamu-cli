@@ -21,24 +21,16 @@ use crate::{DatabaseConnectionSettings, DatabaseCredentials, DatabasePasswordPro
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn DatabasePasswordProvider)]
 pub struct DatabaseAwsIamTokenProvider {
-    db_user_name: SecretString,
     db_connection_settings: DatabaseConnectionSettings,
+
+    #[component(explicit)]
+    db_user_name: SecretString,
 }
 
 impl DatabaseAwsIamTokenProvider {
-    pub fn new(
-        db_user_name: SecretString,
-        db_connection_settings: DatabaseConnectionSettings,
-    ) -> Self {
-        Self {
-            db_user_name,
-            db_connection_settings,
-        }
-    }
-
     fn get_signature_key(
         key: &str,
         date_stamp: &str,

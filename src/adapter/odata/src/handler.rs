@@ -23,9 +23,10 @@ use database_common_macros::transactional_handler;
 use datafusion_odata::collection::{CollectionAddr, QueryParamsRaw};
 use datafusion_odata::error::ODataError;
 use dill::Catalog;
-use http_common::ApiError;
+use http_common::{ApiError, IntoApiError};
+use internal_error::ErrorIntoInternal;
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
-use kamu_datasets::{ViewDatasetUseCase, ViewDatasetUseCaseError};
 
 use crate::context::*;
 
@@ -218,23 +219,23 @@ pub async fn odata_collection_handler_common(
         return Err(ApiError::not_found_without_reason());
     };
 
-    let view_dataset_use_case: Arc<dyn ViewDatasetUseCase> = catalog.get_one().unwrap();
+    let rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade> =
+        catalog.get_one().unwrap();
 
     let requested_dataset_alias = odf::DatasetAlias::new(account_name, dataset_name);
-    let dataset_handle = match view_dataset_use_case
-        .execute(&requested_dataset_alias.into_local_ref())
+    let resolved_dataset = rebac_dataset_registry_facade
+        .resolve_dataset_by_ref(
+            &requested_dataset_alias.into_local_ref(),
+            auth::DatasetAction::Read,
+        )
         .await
-    {
-        Ok(hdl) => Ok(hdl),
-        Err(ViewDatasetUseCaseError::NotFound(_) | ViewDatasetUseCaseError::Access(_)) => {
-            return Err(ApiError::not_found_without_reason());
-        }
-        Err(e) => Err(e),
-    }
-    .unwrap();
-
-    let registry: Arc<dyn DatasetRegistry> = catalog.get_one().unwrap();
-    let resolved_dataset = registry.get_dataset_by_handle(&dataset_handle).await;
+        .map_err(|e| {
+            use RebacDatasetRefUnresolvedError as E;
+            match e {
+                E::NotFound(_) | E::Access(_) => ApiError::not_found_without_reason(),
+                e @ E::Internal(_) => e.int_err().api_err(),
+            }
+        })?;
 
     let ctx = ODataCollectionContext::new(catalog, addr, resolved_dataset);
     let response = datafusion_odata::handlers::odata_collection_handler(

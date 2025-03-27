@@ -33,14 +33,14 @@ database-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
 mockall = { optional = true, version = "0.13" }
-s3-utils = { workspace = true }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }
+s3-utils = { workspace = true }
 time-source = { workspace = true }
-
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
@@ -64,6 +64,7 @@ kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }

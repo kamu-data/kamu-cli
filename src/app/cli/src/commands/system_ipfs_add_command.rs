@@ -17,29 +17,19 @@ use super::{CLIError, Command};
 // Command
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SystemIpfsAddCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     sync_svc: Arc<dyn SyncService>,
-    dataset_ref: odf::DatasetRef,
-}
 
-impl SystemIpfsAddCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        sync_svc: Arc<dyn SyncService>,
-        dataset_ref: odf::DatasetRef,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            sync_svc,
-            dataset_ref,
-        }
-    }
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for SystemIpfsAddCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_ref(&self.dataset_ref)

@@ -122,7 +122,7 @@ async fn do_test_sync(
     mock_dataset_entry_writer_bar
         .expect_create_entry()
         .times(1)
-        .returning(|_, _, _| Ok(()));
+        .returning(|_, _, _, _| Ok(()));
 
     let mut catalog_bar_builder = dill::CatalogBuilder::new();
     catalog_bar_builder
