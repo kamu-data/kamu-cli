@@ -193,7 +193,7 @@ impl Dataset {
                 can_update: can_maintain,
             },
             env_vars: DatasetEnvVarsPermissions {
-                can_view: logged && can_read,
+                can_view: can_maintain,
                 can_update: can_maintain,
             },
             flows: DatasetFlowsPermissions {

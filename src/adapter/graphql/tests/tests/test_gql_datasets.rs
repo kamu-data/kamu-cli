@@ -722,7 +722,7 @@ async fn test_dataset_view_permissions_for_a_reader() {
                 "canUpdate": false,
             },
             "envVars": {
-                "canView": true,
+                "canView": false,
                 "canUpdate": false,
             },
             "flows": {
@@ -754,7 +754,7 @@ async fn test_dataset_view_permissions_for_an_editor() {
                 "canUpdate": false,
             },
             "envVars": {
-                "canView": true,
+                "canView": false,
                 "canUpdate": false,
             },
             "flows": {
