@@ -16,6 +16,8 @@ use http::HeaderMap;
 use http_common::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
+use kamu_datasets::{DatasetChangedMessage, MESSAGE_PRODUCER_KAMU_HTTP_INGEST};
+use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
@@ -185,7 +187,17 @@ pub async fn dataset_ingest_handler(
                     )
                     .await
                     .int_err()?;
+
+                let outbox = catalog.get_one::<dyn Outbox>().unwrap();
+                outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
+                        DatasetChangedMessage::updated(target.get_id(), Some(&old_head), &new_head),
+                    )
+                    .await
+                    .int_err()?;
             }
+
             Ok(())
         }
         Err(PushIngestError::ReadError(e)) => Err(ApiError::bad_request(e)),

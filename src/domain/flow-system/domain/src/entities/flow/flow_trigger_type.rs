@@ -40,7 +40,7 @@ impl FlowTriggerType {
         }
     }
 
-    pub fn push_source_name(&self) -> Option<String> {
+    pub fn push_source_name(&self) -> Option<FlowTriggerPushSource> {
         if let Self::Push(trigger_push) = self {
             trigger_push.source_name.clone()
         } else {
@@ -99,9 +99,27 @@ pub struct FlowTriggerAutoPolling {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerPush {
-    // TODO: source (HTTP, MQTT, CMD, ...)
     pub trigger_time: DateTime<Utc>,
-    pub source_name: Option<String>,
+    pub source_name: Option<FlowTriggerPushSource>,
+    pub dataset_id: odf::DatasetID,
+    pub result: DatasetPushResult,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FlowTriggerPushSource {
+    HTTP,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DatasetPushResult {
+    Updated(DatasetPushResultUpdated),
+    UpToDate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetPushResultUpdated {
+    pub old_head_maybe: Option<odf::Multihash>,
+    pub new_head: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,7 +160,9 @@ mod tests {
         });
         static ref PUSH_SOURCE_TRIGGER: FlowTriggerType = FlowTriggerType::Push(FlowTriggerPush {
             trigger_time: Utc::now(),
-            source_name: None
+            source_name: None,
+            dataset_id: TEST_DATASET_ID.clone(),
+            result: DatasetPushResult::UpToDate,
         });
         static ref INPUT_DATASET_TRIGGER: FlowTriggerType =
             FlowTriggerType::InputDatasetFlow(FlowTriggerInputDatasetFlow {
@@ -203,7 +223,9 @@ mod tests {
         assert!(
             PUSH_SOURCE_TRIGGER.is_unique_vs(&[FlowTriggerType::Push(FlowTriggerPush {
                 trigger_time: Utc::now(),
-                source_name: Some("different".to_string())
+                source_name: Some(FlowTriggerPushSource::HTTP),
+                dataset_id: TEST_DATASET_ID.clone(),
+                result: DatasetPushResult::UpToDate,
             })])
         );
 

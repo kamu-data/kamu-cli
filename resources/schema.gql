@@ -1464,7 +1464,7 @@ type FlowDescriptionDatasetPollingIngest {
 
 type FlowDescriptionDatasetPushIngest {
 	datasetId: DatasetID!
-	sourceName: String
+	sourceName: FlowDescriptionTriggerPushSource
 	inputRecordsCount: Int!
 	ingestResult: FlowDescriptionUpdateResult
 }
@@ -1491,6 +1491,10 @@ type FlowDescriptionResetResult {
 
 type FlowDescriptionSystemGC {
 	dummy: Boolean!
+}
+
+enum FlowDescriptionTriggerPushSource {
+	HTTP
 }
 
 union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess | FlowDescriptionUpdateResultUnknown

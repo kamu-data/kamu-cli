@@ -18,7 +18,12 @@ use dill::*;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
-use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
+use kamu_datasets::{
+    DatasetChangedMessage,
+    DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+    MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
+};
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use messaging_outbox::{
@@ -57,6 +62,7 @@ pub struct FlowAgentImpl {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[interface(dyn MessageConsumerT<DatasetChangedMessage>)]
 #[interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
@@ -64,6 +70,7 @@ pub struct FlowAgentImpl {
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+        MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
 })]
@@ -567,9 +574,26 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                             match flow.flow_key.get_type().success_followup_method() {
                                 FlowSuccessFollowupMethod::Ignore => {}
                                 FlowSuccessFollowupMethod::TriggerDependent => {
-                                    scheduling_helper
-                                        .schedule_dependent_flows(finish_time, &flow, flow_result)
-                                        .await?;
+                                    if let FlowKey::Dataset(fk_dataset) = &flow.flow_key {
+                                        let trigger_type = FlowTriggerType::InputDatasetFlow(
+                                            FlowTriggerInputDatasetFlow {
+                                                trigger_time: finish_time,
+                                                dataset_id: fk_dataset.dataset_id.clone(),
+                                                flow_type: fk_dataset.flow_type,
+                                                flow_id: flow.flow_id,
+                                                flow_result: flow_result.clone(),
+                                            },
+                                        );
+
+                                        scheduling_helper
+                                            .schedule_dependent_flows(
+                                                &fk_dataset.dataset_id,
+                                                fk_dataset.flow_type,
+                                                trigger_type,
+                                                flow.config_snapshot.clone(),
+                                            )
+                                            .await?;
+                                    }
                                 }
                             }
                         }
@@ -719,6 +743,50 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
 
             DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
                 // No action required
+            }
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<DatasetChangedMessage> for FlowAgentImpl {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "FlowAgentImpl[DatasetChangedMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        target_catalog: &Catalog,
+        message: &DatasetChangedMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received dataset changed message");
+
+        let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();
+
+        match message {
+            DatasetChangedMessage::Updated(update_message) => {
+                scheduling_helper
+                    .schedule_dependent_flows(
+                        &update_message.dataset_id,
+                        DatasetFlowType::Ingest,
+                        FlowTriggerType::Push(FlowTriggerPush {
+                            trigger_time: time_source.now(),
+                            source_name: Some(FlowTriggerPushSource::HTTP),
+                            dataset_id: update_message.dataset_id.clone(),
+                            result: DatasetPushResult::Updated(DatasetPushResultUpdated {
+                                old_head_maybe: update_message.maybe_prev_block_hash.clone(),
+                                new_head: update_message.new_block_hash.clone(),
+                            }),
+                        }),
+                        None,
+                    )
+                    .await?;
             }
         }
 
