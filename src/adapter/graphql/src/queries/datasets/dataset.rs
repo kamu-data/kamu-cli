@@ -134,9 +134,8 @@ impl Dataset {
     }
 
     /// Access to the environment variable of this dataset
-    #[expect(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
-        DatasetEnvVars::new(ctx, &self.dataset_request_state)
+        DatasetEnvVars::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to the flow configurations of this dataset
