@@ -76,7 +76,7 @@ impl RebacIndexer {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn index_dataset_entries(
         &self,
         visibility_map: PredefinedAccountIdDatasetVisibilityMapping,
@@ -107,7 +107,7 @@ impl RebacIndexer {
         Ok(())
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn index_accounts(
         &self,
     ) -> Result<PredefinedAccountIdDatasetVisibilityMapping, InternalError> {

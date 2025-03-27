@@ -60,6 +60,7 @@ impl DependencyGraphIndexer {
             .int_err()
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn index_dependencies_from_storage(&self) -> Result<(), InternalError> {
         use tokio_stream::StreamExt;
         use tracing::Instrument;

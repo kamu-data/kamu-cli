@@ -52,7 +52,7 @@ impl DatasetStatisticsIndexer {
     }
 
     #[tracing::instrument(
-        level = "debug",
+        level = "info",
         skip_all,
         name = "DatasetStatisticsIndexer::index_dataset_statistics"
     )]

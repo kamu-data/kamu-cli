@@ -70,11 +70,7 @@ impl DatasetEntryIndexer {
         Ok(stored_dataset_entries_count > 0)
     }
 
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "DatasetEntryIndexer::index_datasets"
-    )]
+    #[tracing::instrument(level = "info", skip_all, name = "DatasetEntryIndexer::index_datasets")]
     async fn index_datasets(&self) -> Result<(), InternalError> {
         use futures::TryStreamExt;
 
