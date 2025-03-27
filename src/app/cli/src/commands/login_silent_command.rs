@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
-use kamu::UrlExt;
 use kamu_adapter_oauth::PROVIDER_GITHUB;
 use url::Url;
 
@@ -192,6 +191,8 @@ impl LoginSilentCommand {
         repo_name: &odf::RepoName,
         odf_server_backend_url: &Url,
     ) -> Result<(), CLIError> {
+        use kamu::UrlExt;
+
         match self.remote_repo_reg.add_repository(
             repo_name,
             odf_server_backend_url
