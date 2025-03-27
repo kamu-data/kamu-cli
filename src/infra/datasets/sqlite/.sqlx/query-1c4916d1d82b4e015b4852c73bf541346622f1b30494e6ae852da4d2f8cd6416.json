@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT dataset_id   as \"id: _\",\n                    owner_id     as \"owner_id: _\",\n                    dataset_name as name,\n                    created_at   as \"created_at: _\"\n                FROM dataset_entries\n                WHERE owner_id = $1\n                LIMIT $2 OFFSET $3\n                ",
+  "query": "\n            SELECT dataset_id   as \"id: _\",\n                   owner_id     as \"owner_id: _\",\n                   dataset_name as name,\n                   created_at   as \"created_at: _\",\n                   kind         as \"kind: _\"\n            FROM dataset_entries\n            WHERE dataset_id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -22,17 +22,23 @@
         "name": "created_at: _",
         "ordinal": 3,
         "type_info": "Null"
+      },
+      {
+        "name": "kind: _",
+        "ordinal": 4,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 1
     },
     "nullable": [
+      false,
       false,
       false,
       false,
       false
     ]
   },
-  "hash": "b7aa1b2d72f9ec6955f8370e0dc3113608f5ea1bdcf8319aa8e00a97e55269ed"
+  "hash": "1c4916d1d82b4e015b4852c73bf541346622f1b30494e6ae852da4d2f8cd6416"
 }

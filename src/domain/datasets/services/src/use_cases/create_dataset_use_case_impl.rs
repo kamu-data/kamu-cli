@@ -56,6 +56,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
                 &seed_block.event.dataset_id,
                 &logged_account_id,
                 &canonical_alias,
+                seed_block.event.dataset_kind,
             )
             .await?;
 

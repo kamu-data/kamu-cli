@@ -36,6 +36,7 @@ impl DatasetEntryWriter for FakeConnectingDatasetEntryWriter {
         _dataset_id: &odf::DatasetID,
         _owner_account_id: &odf::AccountID,
         _dataset_name: &odf::DatasetName,
+        _dataset_kind: odf::DatasetKind,
     ) -> Result<(), CreateDatasetEntryError> {
         Ok(())
     }

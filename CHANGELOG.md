@@ -11,6 +11,15 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- `DatasetSummary` files replaced with `DatasetStatistics` stored in the database
+     and updated synchronously with the HEAD reference updates
+- Statistics is automatically pre-computed for all existing datasets on first use
+- `DatasetHandle` and `DatasetEntry` now contain dataset kind marker
+- Provenance service and pull request planner fetch dependencies from the graph
+- Implemented caching layer for `DatasetEntry` within the currently open transaction
+
 ## [0.230.0] - 2025-03-25
 ### Added
 - Private Datasets, access sharing:

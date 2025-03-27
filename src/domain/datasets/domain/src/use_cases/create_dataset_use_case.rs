@@ -56,7 +56,7 @@ impl CreateDatasetResult {
 
     pub fn from_stored(stored: odf::dataset::StoreDatasetResult, alias: odf::DatasetAlias) -> Self {
         Self {
-            dataset_handle: odf::DatasetHandle::new(stored.dataset_id, alias),
+            dataset_handle: odf::DatasetHandle::new(stored.dataset_id, alias, stored.dataset_kind),
             dataset: stored.dataset,
             head: stored.seed,
         }

@@ -88,6 +88,7 @@ impl FlowAgentImpl {
     }
 
     #[transactional_method]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn recover_initial_flows_state(
         &self,
         start_time: DateTime<Utc>,

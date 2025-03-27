@@ -33,24 +33,16 @@ impl<'a> DatasetData<'a> {
     /// Total number of records in this dataset
     #[tracing::instrument(level = "info", name = DatasetData_num_records_total, skip_all)]
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let summary = resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?;
-        Ok(summary.num_records)
+        let dataset_statistics = self.dataset_request_state.dataset_statistics(ctx).await?;
+        Ok(dataset_statistics.num_records)
     }
 
     /// An estimated size of data on disk not accounting for replication or
     /// caching
     #[tracing::instrument(level = "info", name = DatasetData_estimated_size, skip_all)]
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let summary = resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?;
-        Ok(summary.data_size)
+        let dataset_statistics = self.dataset_request_state.dataset_statistics(ctx).await?;
+        Ok(dataset_statistics.data_size)
     }
 
     /// Returns the specified number of the latest records in the dataset

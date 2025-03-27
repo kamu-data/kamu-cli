@@ -40,6 +40,7 @@ impl ResolvedDataset {
             handle: odf::DatasetHandle::new(
                 store_dataset_result.dataset_id.clone(),
                 dataset_alias.clone(),
+                store_dataset_result.dataset_kind,
             ),
         }
     }
@@ -52,6 +53,11 @@ impl ResolvedDataset {
     #[inline]
     pub fn get_id(&self) -> &odf::DatasetID {
         &self.handle.id
+    }
+
+    #[inline]
+    pub fn get_kind(&self) -> odf::DatasetKind {
+        self.handle.kind
     }
 
     #[inline]

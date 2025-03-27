@@ -21,6 +21,7 @@ pub trait DatasetEntryWriter: Send + Sync {
         dataset_id: &odf::DatasetID,
         owner_account_id: &odf::AccountID,
         dataset_name: &odf::DatasetName,
+        dataset_kind: odf::DatasetKind,
     ) -> Result<(), CreateDatasetEntryError>;
 
     async fn rename_entry(

@@ -95,7 +95,8 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
                 let dataset_alias = self
                     .tenancy_config
                     .make_alias(account.account_name.clone(), dataset_entry.name);
-                let dataset_handle = odf::DatasetHandle::new(dataset_entry.id, dataset_alias);
+                let dataset_handle =
+                    odf::DatasetHandle::new(dataset_entry.id, dataset_alias, dataset_entry.kind);
 
                 downstream_dependencies.push(DatasetDependency::resolved(
                     dataset_handle,

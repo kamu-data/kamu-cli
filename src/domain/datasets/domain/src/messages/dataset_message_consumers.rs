@@ -24,4 +24,7 @@ pub const MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE: &str =
 pub const MESSAGE_CONSUMER_KAMU_DATASET_ALIAS_UPDATE_HANDLER: &str =
     "dev.kamu.domain.datasets.DatasetAliasUpdateHandler";
 
+pub const MESSAGE_CONSUMER_KAMU_DATASET_STATISTICS_UPDATE_HANDLER: &str =
+    "dev.kamu.domain.datasets.DatasetStatisticsUpdateHandler";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

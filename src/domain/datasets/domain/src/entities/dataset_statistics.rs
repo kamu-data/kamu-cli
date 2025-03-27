@@ -8,30 +8,28 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use odf_metadata::serde::yaml::*;
-use odf_metadata::{DatasetID, DatasetKind, Multihash};
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, skip_serializing_none};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Summary should carry pointers to all refs
-// and specify values that change between refs per each "branch"
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct DatasetSummary {
-    pub id: DatasetID,
-    #[serde_as(as = "DatasetKindDef")]
-    pub kind: DatasetKind,
-    pub last_block_hash: Multihash,
-    pub dependencies: Vec<DatasetID>,
-    #[serde(default, with = "datetime_rfc3339_opt")]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DatasetStatistics {
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,
     pub data_size: u64,
     pub checkpoints_size: u64,
+}
+
+impl std::ops::Add for DatasetStatistics {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            last_pulled: other.last_pulled.or(self.last_pulled),
+            num_records: self.num_records + other.num_records,
+            data_size: self.data_size + other.data_size,
+            checkpoints_size: self.checkpoints_size + other.checkpoints_size,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -62,6 +62,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetViaRepoRefScenario<TS
         let server_dataset_layout = server_harness.dataset_layout(&odf::DatasetHandle::new(
             client_create_result.dataset_handle.id.clone(),
             odf::DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
+            odf::DatasetKind::Root,
         ));
 
         let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");

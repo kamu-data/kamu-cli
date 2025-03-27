@@ -22,7 +22,7 @@ use crate::queries::*;
 pub(crate) struct DatasetRequestState {
     dataset_handle: odf::DatasetHandle,
     resolved_dataset: OnceCell<ResolvedDataset>,
-    dataset_summary: OnceCell<odf::DatasetSummary>,
+    dataset_statistics: OnceCell<kamu_datasets::DatasetStatistics>,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
 }
 
@@ -31,8 +31,8 @@ impl DatasetRequestState {
         Self {
             dataset_handle,
             allowed_dataset_actions: OnceCell::new(),
+            dataset_statistics: OnceCell::new(),
             resolved_dataset: OnceCell::new(),
-            dataset_summary: OnceCell::new(),
         }
     }
 
@@ -74,17 +74,20 @@ impl DatasetRequestState {
             .await
     }
 
-    pub async fn dataset_summary(&self, ctx: &Context<'_>) -> Result<&odf::DatasetSummary> {
-        self.dataset_summary
+    pub async fn dataset_statistics(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<&kamu_datasets::DatasetStatistics> {
+        self.dataset_statistics
             .get_or_try_init(|| async {
-                let resolved_dataset = self.resolved_dataset(ctx).await?;
+                let dataset_statistics_service =
+                    from_catalog_n!(ctx, dyn kamu_datasets::DatasetStatisticsService);
 
-                let summary = resolved_dataset
-                    .get_summary(odf::dataset::GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
+                let statistics = dataset_statistics_service
+                    .get_statistics(self.dataset_id(), &odf::BlockRef::Head)
+                    .await?;
 
-                Ok(summary)
+                Ok(statistics)
             })
             .await
     }

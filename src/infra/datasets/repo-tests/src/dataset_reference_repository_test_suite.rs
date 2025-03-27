@@ -9,42 +9,10 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::Utc;
 use dill::Catalog;
-use kamu_accounts::{Account, AccountRepository, DEFAULT_ACCOUNT_ID};
 use kamu_datasets::*;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn init_test_account(catalog: &Catalog) -> odf::AccountID {
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-    account_repo
-        .create_account(&Account::dummy())
-        .await
-        .unwrap();
-
-    DEFAULT_ACCOUNT_ID.clone()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn init_dataset_entry(
-    catalog: &Catalog,
-    account_id: &odf::AccountID,
-    dataset_id: &odf::DatasetID,
-    dataset_name: &odf::DatasetName,
-) {
-    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
-    dataset_entry_repo
-        .save_dataset_entry(&DatasetEntry {
-            id: dataset_id.clone(),
-            owner_id: account_id.clone(),
-            name: dataset_name.clone(),
-            created_at: Utc::now(),
-        })
-        .await
-        .unwrap();
-}
+use crate::helpers::{init_dataset_entry, init_test_account};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +21,14 @@ pub async fn test_set_initial_reference(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"some-id");
     let dataset_name = odf::DatasetName::new_unchecked("foo");
-    init_dataset_entry(catalog, &test_account_id, &dataset_id, &dataset_name).await;
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
 
     let dataset_ref_repo = catalog.get_one::<dyn DatasetReferenceRepository>().unwrap();
 
@@ -104,7 +79,14 @@ pub async fn test_update_reference_without_cas_violation(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"some-id");
     let dataset_name = odf::DatasetName::new_unchecked("foo");
-    init_dataset_entry(catalog, &test_account_id, &dataset_id, &dataset_name).await;
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
 
     let dataset_ref_repo = catalog.get_one::<dyn DatasetReferenceRepository>().unwrap();
 
@@ -150,7 +132,14 @@ pub async fn test_update_reference_provoke_cas_violation(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"some-id");
     let dataset_name = odf::DatasetName::new_unchecked("foo");
-    init_dataset_entry(catalog, &test_account_id, &dataset_id, &dataset_name).await;
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
 
     let dataset_ref_repo = catalog.get_one::<dyn DatasetReferenceRepository>().unwrap();
 
@@ -198,7 +187,14 @@ pub async fn test_set_and_remove_reference(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"some-id");
     let dataset_name = odf::DatasetName::new_unchecked("foo");
-    init_dataset_entry(catalog, &test_account_id, &dataset_id, &dataset_name).await;
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
 
     let dataset_ref_repo = catalog.get_one::<dyn DatasetReferenceRepository>().unwrap();
 
@@ -255,11 +251,25 @@ pub async fn test_multiple_datasets(catalog: &Catalog) {
 
     let dataset_1_id = odf::DatasetID::new_seeded_ed25519(b"some-id-1");
     let dataset_1_name = odf::DatasetName::new_unchecked("foo");
-    init_dataset_entry(catalog, &test_account_id, &dataset_1_id, &dataset_1_name).await;
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_1_id,
+        &dataset_1_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
 
     let dataset_2_id = odf::DatasetID::new_seeded_ed25519(b"some-id-2");
     let dataset_2_name = odf::DatasetName::new_unchecked("bar");
-    init_dataset_entry(catalog, &test_account_id, &dataset_2_id, &dataset_2_name).await;
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_2_id,
+        &dataset_2_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
 
     let dataset_ref_repo = catalog.get_one::<dyn DatasetReferenceRepository>().unwrap();
 
@@ -336,11 +346,25 @@ pub async fn test_reacts_to_dataset_removals(catalog: &Catalog) {
 
     let dataset_1_id = odf::DatasetID::new_seeded_ed25519(b"some-id-1");
     let dataset_1_name = odf::DatasetName::new_unchecked("foo");
-    init_dataset_entry(catalog, &test_account_id, &dataset_1_id, &dataset_1_name).await;
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_1_id,
+        &dataset_1_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
 
     let dataset_2_id = odf::DatasetID::new_seeded_ed25519(b"some-id-2");
     let dataset_2_name = odf::DatasetName::new_unchecked("bar");
-    init_dataset_entry(catalog, &test_account_id, &dataset_2_id, &dataset_2_name).await;
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_2_id,
+        &dataset_2_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
 
     let dataset_ref_repo = catalog.get_one::<dyn DatasetReferenceRepository>().unwrap();
 

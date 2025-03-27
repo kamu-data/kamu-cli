@@ -6527,6 +6527,7 @@ dependencies = [
  "serde",
  "serde_with",
  "sqlx",
+ "strum 0.26.3",
  "thiserror 2.0.12",
  "tokio-stream",
  "uuid",
@@ -6641,6 +6642,7 @@ version = "0.230.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "chrono",
  "database-common",
  "database-common-macros",
  "dill",

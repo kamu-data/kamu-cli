@@ -136,12 +136,6 @@ async fn init_v0_workspace(workspace_path: &Path) {
         .await
         .unwrap();
 
-    // Summary
-    dataset
-        .get_summary(odf::dataset::GetSummaryOpts::default())
-        .await
-        .unwrap();
-
     // Ingest cache directory
     let ingest_cache_dir = dataset_dir.join("cache");
     std::fs::create_dir(&ingest_cache_dir).unwrap();

@@ -42,12 +42,12 @@ async fn test_all_downstream_dependencies_are_accessible() {
 
     use odf::metadata::testing::handle;
 
-    let alice_root_1_dataset_handle = handle(&alice, &"root-1");
-    let alice_root_2_dataset_handle = handle(&alice, &"root-2");
-    let bob_root_3_dataset_handle = handle(&bob, &"root-3");
-    let alice_derived_4_dataset_handle = handle(&alice, &"derived-4");
-    let alice_derived_5_dataset_handle = handle(&alice, &"derived-5");
-    let bob_derived_6_dataset_handle = handle(&bob, &"derived-6");
+    let alice_root_1_dataset_handle = handle(&alice, &"root-1", odf::DatasetKind::Root);
+    let alice_root_2_dataset_handle = handle(&alice, &"root-2", odf::DatasetKind::Root);
+    let bob_root_3_dataset_handle = handle(&bob, &"root-3", odf::DatasetKind::Root);
+    let alice_derived_4_dataset_handle = handle(&alice, &"derived-4", odf::DatasetKind::Derivative);
+    let alice_derived_5_dataset_handle = handle(&alice, &"derived-5", odf::DatasetKind::Derivative);
+    let bob_derived_6_dataset_handle = handle(&bob, &"derived-6", odf::DatasetKind::Derivative);
     //   ┌──────────────┐
     //   │ alice/root-1 │
     //   └──────────────┘
@@ -150,12 +150,15 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
 
     use odf::metadata::testing::handle;
 
-    let alice_root_1_dataset_handle = handle(&alice, &"root-1");
-    let alice_root_2_dataset_handle = handle(&alice, &"root-2");
-    let bob_root_3_dataset_handle = handle(&bob, &"root-3");
-    let alice_public_derived_4_dataset_handle = handle(&alice, &"public-derived-4");
-    let alice_private_derived_5_dataset_handle = handle(&alice, &"private-derived-5");
-    let bob_private_derived_6_dataset_handle = handle(&bob, &"private-derived-6");
+    let alice_root_1_dataset_handle = handle(&alice, &"root-1", odf::DatasetKind::Root);
+    let alice_root_2_dataset_handle = handle(&alice, &"root-2", odf::DatasetKind::Root);
+    let bob_root_3_dataset_handle = handle(&bob, &"root-3", odf::DatasetKind::Root);
+    let alice_public_derived_4_dataset_handle =
+        handle(&alice, &"public-derived-4", odf::DatasetKind::Derivative);
+    let alice_private_derived_5_dataset_handle =
+        handle(&alice, &"private-derived-5", odf::DatasetKind::Derivative);
+    let bob_private_derived_6_dataset_handle =
+        handle(&bob, &"private-derived-6", odf::DatasetKind::Derivative);
     //   ┌──────────────┐
     //   │ alice/root-1 │
     //   └──────────────┘
@@ -328,6 +331,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
             id: dataset_handle.id.clone(),
             owner_id: owner_id.clone(),
             name: dataset_handle.alias.dataset_name.clone(),
+            kind: odf::DatasetKind::Root,
         });
 
         self.outbox
@@ -361,6 +365,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
             id: dataset_handle.id.clone(),
             owner_id: owner_id.clone(),
             name: dataset_handle.alias.dataset_name.clone(),
+            kind: odf::DatasetKind::Derivative,
         });
 
         self.outbox

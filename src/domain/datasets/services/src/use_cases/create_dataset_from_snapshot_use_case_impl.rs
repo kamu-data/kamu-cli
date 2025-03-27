@@ -75,6 +75,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 &seed_block.event.dataset_id,
                 &logged_account_id,
                 &canonical_alias,
+                snapshot.kind,
             )
             .await?;
 
@@ -115,7 +116,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         Ok(CreateDatasetResult {
             head: append_result.proposed_head,
             dataset: store_result.dataset,
-            dataset_handle: odf::DatasetHandle::new(store_result.dataset_id, canonical_alias),
+            dataset_handle: odf::DatasetHandle::new(
+                store_result.dataset_id,
+                canonical_alias,
+                store_result.dataset_kind,
+            ),
         })
     }
 }

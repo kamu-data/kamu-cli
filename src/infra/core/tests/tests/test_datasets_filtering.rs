@@ -36,6 +36,7 @@ fn test_matches_local_ref_pattern() {
             account_name: None,
             dataset_name: odf::DatasetName::new_unchecked(dataset_name),
         },
+        kind: odf::DatasetKind::Root,
     };
 
     assert!(!matches_local_ref_pattern(&pattern, &dataset_handle));
@@ -47,6 +48,7 @@ fn test_matches_local_ref_pattern() {
             account_name: None,
             dataset_name: odf::DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: odf::DatasetKind::Root,
     };
 
     assert!(matches_local_ref_pattern(&pattern, &dataset_handle));
@@ -59,6 +61,7 @@ fn test_matches_local_ref_pattern() {
             account_name: Some(odf::AccountName::from_str(dataset_account).unwrap()),
             dataset_name: odf::DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: odf::DatasetKind::Root,
     };
 
     assert!(matches_local_ref_pattern(&pattern, &dataset_handle));
@@ -75,6 +78,7 @@ fn test_matches_local_ref_pattern() {
             account_name: Some(odf::AccountName::from_str(dataset_account).unwrap()),
             dataset_name: odf::DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: odf::DatasetKind::Root,
     };
 
     assert!(matches_local_ref_pattern(&pattern, &dataset_handle));
@@ -86,6 +90,7 @@ fn test_matches_local_ref_pattern() {
             account_name: Some(odf::AccountName::from_str(dataset_account).unwrap()),
             dataset_name: odf::DatasetName::from_str(dataset_name).unwrap(),
         },
+        kind: odf::DatasetKind::Root,
     };
 
     assert!(!matches_local_ref_pattern(&pattern, &dataset_handle));

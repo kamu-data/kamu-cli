@@ -99,9 +99,8 @@ impl Dataset {
     /// Returns the kind of dataset (Root or Derivative)
     #[tracing::instrument(level = "info", name = Dataset_kind, skip_all)]
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let summary = self.dataset_request_state.dataset_summary(ctx).await?;
-
-        Ok(summary.kind.into())
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        Ok(resolved_dataset.get_kind().into())
     }
 
     /// Returns the visibility of dataset

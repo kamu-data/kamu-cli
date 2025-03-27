@@ -1525,6 +1525,7 @@ fn mock_dataset_handle() -> odf::DatasetHandle {
     odf::DatasetHandle {
         id: odf::DatasetID::new_seeded_ed25519(b"foo"),
         alias: "foo".try_into().unwrap(),
+        kind: odf::DatasetKind::Root,
     }
 }
 

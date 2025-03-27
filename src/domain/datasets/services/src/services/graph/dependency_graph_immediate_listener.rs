@@ -30,11 +30,9 @@ use kamu_datasets::{
 };
 use messaging_outbox::*;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+use crate::{extract_modified_dependencies_in_interval, DependencyChange};
 
-pub struct DependencyGraphImmediateListener {
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
@@ -46,29 +44,26 @@ pub struct DependencyGraphImmediateListener {
     ],
     delivery: MessageDeliveryMechanism::Immediate,
 })]
-#[scope(Singleton)]
-impl DependencyGraphImmediateListener {
-    pub fn new(dependency_graph_service: Arc<dyn DependencyGraphService>) -> Self {
-        Self {
-            dependency_graph_service,
-        }
-    }
+pub struct DependencyGraphImmediateListener {
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dependency_graph_repo: Arc<dyn DatasetDependencyRepository>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    outbox: Arc<dyn Outbox>,
+}
 
+impl DependencyGraphImmediateListener {
     async fn handle_derived_dependency_updates(
         &self,
-        dependency_graph_repo: &dyn DatasetDependencyRepository,
-        outbox: &dyn Outbox,
         target: ResolvedDataset,
         message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
         // Compute if there are modified dependencies
-        let dependency_change = self
-            .extract_modified_dependencies_in_interval(
-                (*target).as_ref(),
-                &message.new_block_hash,
-                message.maybe_prev_block_hash.as_ref(),
-            )
-            .await?;
+        let dependency_change = extract_modified_dependencies_in_interval(
+            target.as_metadata_chain(),
+            &message.new_block_hash,
+            message.maybe_prev_block_hash.as_ref(),
+        )
+        .await?;
 
         // What's the situation now?
         let new_upstream_ids = match dependency_change {
@@ -110,19 +105,19 @@ impl DependencyGraphImmediateListener {
             .collect();
 
         // Update database dependencies
-        dependency_graph_repo
+        self.dependency_graph_repo
             .remove_upstream_dependencies(&message.dataset_id, &removed_dependencies)
             .await
             .int_err()?;
 
-        dependency_graph_repo
+        self.dependency_graph_repo
             .add_upstream_dependencies(&message.dataset_id, &added_dependencies)
             .await
             .int_err()?;
 
         // Send outbox message, so that in-memory graph version is synchronized
         // once the main transaction completes successfully
-        outbox
+        self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
                 DatasetDependenciesMessage::updated(
@@ -134,49 +129,6 @@ impl DependencyGraphImmediateListener {
             .await?;
 
         Ok(())
-    }
-
-    async fn extract_modified_dependencies_in_interval(
-        &self,
-        dataset: &dyn odf::Dataset,
-        head: &odf::Multihash,
-        maybe_tail: Option<&odf::Multihash>,
-    ) -> Result<DependencyChange, InternalError> {
-        let mut new_upstream_ids: HashSet<odf::DatasetID> = HashSet::new();
-
-        let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new();
-        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
-
-        use odf::dataset::MetadataChainExt;
-        dataset
-            .as_metadata_chain()
-            .accept_by_interval(
-                &mut [&mut set_transform_visitor, &mut seed_visitor],
-                Some(head),
-                maybe_tail,
-            )
-            .await
-            .int_err()?;
-
-        if let Some(event) = set_transform_visitor.into_event() {
-            for new_input in &event.inputs {
-                if let Some(id) = new_input.dataset_ref.id() {
-                    new_upstream_ids.insert(id.clone());
-                }
-            }
-        }
-
-        // 3 cases:
-        //  - we see `SetTransform` event that is relevant now (changed)
-        //  - we don't see it and stop where asked (unchanged)
-        //  - we don't see it and reach seed (dropped)
-        if !new_upstream_ids.is_empty() {
-            Ok(DependencyChange::Changed(new_upstream_ids))
-        } else if seed_visitor.into_event().is_some() {
-            Ok(DependencyChange::Dropped)
-        } else {
-            Ok(DependencyChange::Unchanged)
-        }
     }
 }
 
@@ -195,7 +147,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
     )]
     async fn consume_message(
         &self,
-        transaction_catalog: &Catalog,
+        _: &Catalog,
         message: &DatasetReferenceMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset reference message");
@@ -208,51 +160,25 @@ impl MessageConsumerT<DatasetReferenceMessage> for DependencyGraphImmediateListe
                 }
 
                 // Resolve dataset
-                let dataset_registry = transaction_catalog
-                    .get_one::<dyn DatasetRegistry>()
-                    .unwrap();
-                let target = dataset_registry
+                let target = self
+                    .dataset_registry
                     .get_dataset_by_id(&updated_message.dataset_id)
                     .await
                     .int_err()?;
 
                 // Skip non-derived datasets
-                let summary = target
-                    .get_summary(odf::dataset::GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-                if summary.kind != odf::DatasetKind::Derivative {
+                if target.get_kind() != odf::DatasetKind::Derivative {
                     return Ok(());
                 }
 
                 // Deal with potential upstream changes
-                self.handle_derived_dependency_updates(
-                    transaction_catalog
-                        .get_one::<dyn DatasetDependencyRepository>()
-                        .unwrap()
-                        .as_ref(),
-                    transaction_catalog
-                        .get_one::<dyn Outbox>()
-                        .unwrap()
-                        .as_ref(),
-                    target,
-                    updated_message,
-                )
-                .await?;
+                self.handle_derived_dependency_updates(target, updated_message)
+                    .await?;
             }
         }
 
         Ok(())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-enum DependencyChange {
-    Unchanged,
-    Dropped,
-    Changed(HashSet<odf::DatasetID>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
