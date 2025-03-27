@@ -19,7 +19,9 @@ use kamu_cli_e2e_common::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_ingest_dataset_trigger_dependent_datasets_update(mut kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_ingest_dataset_trigger_dependent_datasets_update(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse {
@@ -53,7 +55,7 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(mut kamu_api_
                                                     every: 0, unit: MINUTES
                                                 },
                                                 minRecordsToAwait: 0
-                                            } 
+                                            }
                                         }
                                     ) {
                                         __typename,
@@ -74,12 +76,9 @@ pub async fn test_ingest_dataset_trigger_dependent_datasets_update(mut kamu_api_
                 }
                 "#
             )
-                .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
-                .replace(
-                    "$datasetId",
-                    &format!("\"{derivative_dataset_id}\""),
-                )
-                .as_str(),
+            .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
+            .replace("$datasetId", &format!("\"{derivative_dataset_id}\""))
+            .as_str(),
             Ok(indoc::indoc!(
                 r#"
                 {

@@ -5960,7 +5960,6 @@ dependencies = [
 name = "kamu-adapter-http"
 version = "0.229.0"
 dependencies = [
- "async-graphql",
  "async-trait",
  "aws-sdk-s3",
  "axum 0.8.1",
@@ -5990,7 +5989,6 @@ dependencies = [
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
- "kamu-adapter-graphql",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",

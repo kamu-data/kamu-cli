@@ -14,8 +14,8 @@ use chrono::DateTime;
 use kamu_cli_e2e_common::*;
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
-use test_utils::LocalS3Server;
 use serde_json::json;
+use test_utils::LocalS3Server;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -115,11 +115,15 @@ test_smart_transfer_protocol_permutations!(test_smart_push_pull_with_registered_
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_trigger_dependent_dataset_update_st(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_trigger_dependent_dataset_update_st(
+    kamu_api_server_client: KamuApiServerClient,
+) {
     test_smart_push_trigger_dependent_dataset_update(kamu_api_server_client, false).await;
 }
 
-pub async fn test_smart_push_trigger_dependent_dataset_update_mt(kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_smart_push_trigger_dependent_dataset_update_mt(
+    kamu_api_server_client: KamuApiServerClient,
+) {
     test_smart_push_trigger_dependent_dataset_update(kamu_api_server_client, true).await;
 }
 
@@ -1743,13 +1747,17 @@ async fn test_smart_push_trigger_dependent_dataset_update(
 
         //2.3 Enable batching trigger for derivative dataset
         let datasets = kamu_in_push_workspace.list_datasets().await;
-        let derivative_dataset_id = datasets.iter().find(|dataset| {
-            dataset.name == derivative_dataset_alias.dataset_name
-        }).unwrap().id.clone();
+        let derivative_dataset_id = datasets
+            .iter()
+            .find(|dataset| dataset.name == derivative_dataset_alias.dataset_name)
+            .unwrap()
+            .id
+            .clone();
 
-        kamu_api_server_client.graphql_api_call_assert(
-            indoc::indoc!(
-                r#"
+        kamu_api_server_client
+            .graphql_api_call_assert(
+                indoc::indoc!(
+                    r#"
                 mutation {
                     datasets {
                         byId (datasetId: $datasetId) {
@@ -1764,7 +1772,7 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                                                     every: 1, unit: MINUTES
                                                 },
                                                 minRecordsToAwait: 1
-                                            } 
+                                            }
                                         }
                                     ) {
                                         __typename,
@@ -1784,15 +1792,12 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                     }
                 }
                 "#
-            )
-                .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
-                .replace(
-                    "$datasetId",
-                    &format!("\"{derivative_dataset_id}\""),
                 )
+                .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
+                .replace("$datasetId", &format!("\"{derivative_dataset_id}\""))
                 .as_str(),
-            Ok(indoc::indoc!(
-                r#"
+                Ok(indoc::indoc!(
+                    r#"
                 {
                   "datasets": {
                     "byId": {
@@ -1814,9 +1819,9 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                   }
                 }
                 "#
-            )),
-        )
-        .await;
+                )),
+            )
+            .await;
 
         kamu_api_server_client
             .flow()
@@ -1855,7 +1860,7 @@ async fn test_smart_push_trigger_dependent_dataset_update(
             .odf_query()
             .tail(&derivative_dataset_alias)
             .await;
-        
+
         if let Some(data) = tail_result.get_mut("data") {
             for entry in data.as_array_mut().unwrap() {
                 entry.as_object_mut().unwrap().remove("system_time");
