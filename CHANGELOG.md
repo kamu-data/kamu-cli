@@ -23,6 +23,8 @@ Recommendation: for ease of reading, use the following order:
   - HTTP: Return 403 if the user does not have write permission while having read permission
   - GQL: `DatasetsMut::by_id()`: Return access error 
       if the user does not have write permission while having read permission
+  - GQL: Operations on dataset environment variables require at least a maintainer role
+  - `kamu search`: Private accessible datasets are included in the search results
 
 ## [0.230.0] - 2025-03-25
 ### Added
