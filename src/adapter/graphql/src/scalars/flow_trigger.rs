@@ -158,6 +158,13 @@ impl From<chrono::Duration> for TimeDelta {
             "Positive or zero interval expected, but received [{value}]"
         );
 
+        if value.is_zero() {
+            return Self {
+                every: 0,
+                unit: TimeUnit::Minutes,
+            };
+        }
+
         let num_weeks = value.num_weeks();
         if (value - chrono::Duration::try_weeks(num_weeks).unwrap()).is_zero() {
             return Self {
