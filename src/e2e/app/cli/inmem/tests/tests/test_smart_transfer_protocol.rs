@@ -385,7 +385,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
+    extra_test_groups = "engine, ingest, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -397,6 +397,29 @@ kamu_cli_run_api_server_e2e_test!(
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = inmem,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_trigger_dependent_dataset_update_mt,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(indoc::indoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+              flowSystem:
+                flowAgent:
+                  awaitingStepSecs: 1
+                  mandatoryThrottlingPeriodSecs: 1
+                taskAgent:
+                  taskCheckingIntervalSecs: 1
+            "#
+        )),
+    extra_test_groups = "engine, ingest, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

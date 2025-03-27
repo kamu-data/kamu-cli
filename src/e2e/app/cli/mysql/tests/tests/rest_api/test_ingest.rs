@@ -12,7 +12,7 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = sqlite,
+    storage = mysql,
     fixture =
         kamu_cli_e2e_repo_tests::rest_api::test_ingest_dataset_trigger_dependent_datasets_update,
     options = Options::default().with_kamu_config(indoc::indoc!(
@@ -27,7 +27,7 @@ kamu_cli_run_api_server_e2e_test!(
             taskAgent:
               taskCheckingIntervalSecs: 1
         "#
-    )),
+    ))
     extra_test_groups = "engine, ingest, transform, datafusion"
 );
 
