@@ -15,6 +15,7 @@ use kamu_cli_e2e_common::*;
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
 use test_utils::LocalS3Server;
+use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -111,6 +112,16 @@ pub async fn test_simple_push_to_s3_smart_pull_mt_mt(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 test_smart_transfer_protocol_permutations!(test_smart_push_pull_with_registered_repo_smart_pull);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_smart_push_trigger_dependent_dataset_update_st(kamu_api_server_client: KamuApiServerClient) {
+    test_smart_push_trigger_dependent_dataset_update(kamu_api_server_client, false).await;
+}
+
+pub async fn test_smart_push_trigger_dependent_dataset_update_mt(kamu_api_server_client: KamuApiServerClient) {
+    test_smart_push_trigger_dependent_dataset_update(kamu_api_server_client, true).await;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
@@ -1646,6 +1657,237 @@ async fn test_smart_push_pull_with_registered_repo_smart_pull(
                     .collect::<Vec<_>>()
             );
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_push_trigger_dependent_dataset_update(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_push_workspace_multi_tenant: bool,
+) {
+    let root_dataset_alias = odf::DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
+    );
+    let derivative_dataset_alias = odf::DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
+    );
+    let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_odf_endpoint(&root_dataset_alias);
+    let kamu_api_server_derivative_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_odf_endpoint(&derivative_dataset_alias);
+
+    // 1. Grub a token
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    // 2. Pushing the dataset to the API server
+    {
+        let kamu_in_push_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
+
+        // 2.1. Add datasets
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        kamu_in_push_workspace
+            .execute_with_input(
+                ["add", "--stdin"],
+                DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+            )
+            .await
+            .success();
+
+        // 2.1. Login to the API server
+        kamu_in_push_workspace
+            .execute([
+                "login",
+                kamu_api_server_client.get_base_url().as_str(),
+                "--access-token",
+                token.as_str(),
+            ])
+            .await
+            .success();
+
+        //2.2 Push datasets one by one
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_root_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some([r#"1 dataset\(s\) pushed"#]),
+            )
+            .await;
+
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    derivative_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_derivative_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some([r#"1 dataset\(s\) pushed"#]),
+            )
+            .await;
+
+        //2.3 Enable batching trigger for derivative dataset
+        let datasets = kamu_in_push_workspace.list_datasets().await;
+        let derivative_dataset_id = datasets.iter().find(|dataset| {
+            dataset.name == derivative_dataset_alias.dataset_name
+        }).unwrap().id.clone();
+
+        kamu_api_server_client.graphql_api_call_assert(
+            indoc::indoc!(
+                r#"
+                mutation {
+                    datasets {
+                        byId (datasetId: $datasetId) {
+                            flows {
+                                triggers {
+                                    setTrigger (
+                                        datasetFlowType: $datasetFlowType,
+                                        paused: false,
+                                        triggerInput: {
+                                            batching: {
+                                                maxBatchingInterval: {
+                                                    every: 1, unit: MINUTES
+                                                },
+                                                minRecordsToAwait: 1
+                                            } 
+                                        }
+                                    ) {
+                                        __typename,
+                                        message
+                                        ... on SetFlowTriggerSuccess {
+                                            trigger {
+                                                __typename
+                                                batching {
+                                                    __typename
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            )
+                .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
+                .replace(
+                    "$datasetId",
+                    &format!("\"{derivative_dataset_id}\""),
+                )
+                .as_str(),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "datasets": {
+                    "byId": {
+                      "flows": {
+                        "triggers": {
+                          "setTrigger": {
+                            "__typename": "SetFlowTriggerSuccess",
+                            "message": "Success",
+                            "trigger": {
+                              "__typename": "FlowTrigger",
+                              "batching": {
+                                "__typename": "FlowTriggerBatchingRule"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            )),
+        )
+        .await;
+
+        kamu_api_server_client
+            .flow()
+            .wait(&derivative_dataset_id, 1)
+            .await;
+
+        // Ingest data to the root dataset
+        kamu_in_push_workspace
+            .ingest_data(
+                &root_dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            )
+            .await;
+
+        // Push root dataset
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    root_dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_root_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some([r#"1 dataset\(s\) pushed"#]),
+            )
+            .await;
+
+        // Check derivative dataset data was updated
+        kamu_api_server_client
+            .flow()
+            .wait(&derivative_dataset_id, 2)
+            .await;
+
+        let mut tail_result = kamu_api_server_client
+            .odf_query()
+            .tail(&derivative_dataset_alias)
+            .await;
+        
+        if let Some(data) = tail_result.get_mut("data") {
+            for entry in data.as_array_mut().unwrap() {
+                entry.as_object_mut().unwrap().remove("system_time");
+            }
+        }
+
+        pretty_assertions::assert_eq!(
+            json!({
+                "data": [
+                    {
+                        "match_id": 1,
+                        "match_time": "2000-01-01T00:00:00Z",
+                        "offset": 0,
+                        "op": 0,
+                        "player_id": "Alice",
+                        "score": 100,
+                        "place": 1,
+                    },
+                    {
+                        "match_id": 1,
+                        "match_time": "2000-01-01T00:00:00Z",
+                        "offset": 1,
+                        "op": 0,
+                        "player_id": "Bob",
+                        "score": 80,
+                        "place": 2,
+                    }
+                ],
+                "dataFormat": "JsonAoS"
+            }),
+            tail_result
+        );
     }
 }
 

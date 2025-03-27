@@ -1112,7 +1112,7 @@ impl FlowApi<'_> {
         }
     }
 
-    pub async fn wait(&self, dataset_id: &odf::DatasetID) {
+    pub async fn wait(&self, dataset_id: &odf::DatasetID, expected_flow_count: usize) {
         let retry_strategy = FixedInterval::from_millis(5_000).take(18); // 1m 30s
 
         Retry::spawn(retry_strategy, || async {
@@ -1149,6 +1149,9 @@ impl FlowApi<'_> {
             let edges = response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["edges"]
                 .as_array()
                 .unwrap();
+            if edges.len() < expected_flow_count {
+                return Err(());
+            }
             let all_finished = edges.iter().all(|edge| {
                 let status = edge["node"]["status"].as_str().unwrap();
 

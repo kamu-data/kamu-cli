@@ -19,12 +19,11 @@ use kamu_adapter_http::{
     UploadTokenBase64Json,
 };
 use kamu_datasets::CreateDatasetResult;
-use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 use url::Url;
 use uuid::Uuid;
 
-use crate::harness::{self, *};
+use crate::harness::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -595,99 +594,6 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_ingest_root_trigger_dependent_flows() {
-    let harness = DataIngestHarness::new().await;
-    let create_result = harness.create_population_dataset(true).await;
-    let create_derived_result = harness.create_city_millions_dataset().await;
-    let dataset_url = harness.dataset_http_url(&create_result.dataset_handle.alias);
-
-    let client = async move {
-        let cl = reqwest::Client::new();
-        let root_dataset_helper = DatasetDataHelper::new(create_result.dataset.clone());
-        let derived_dataset_helper = DatasetDataHelper::new(create_result.dataset.clone());
-        let ingest_url = format!("{dataset_url}/ingest");
-        tracing::info!(%ingest_url, "Client request");
-
-        let schema = kamu_adapter_graphgl::schema_quiet();
-        let res = schema
-            .execute(
-                async_graphql::Request::new(request_code.clone())
-                    .data(harness.server_harness.base_catalog().clone()),
-            )
-            .await;
-
-        let res = cl
-            .execute(
-                cl.post(&ingest_url)
-                    .json(&json!(
-                        [
-                            {
-                                "event_time": "2020-01-01T00:00:00",
-                                "city": "A",
-                                "population": 10000,
-                            },
-                            {
-                                "event_time": "2020-01-02T00:00:00",
-                                "city": "B",
-                                "population": 20000000,
-                            },
-                            {
-                                "event_time": "2020-01-03T00:00:00",
-                                "city": "C",
-                                "population": 1040000,
-                            },
-                            {
-                                "event_time": "2020-01-04T00:00:00",
-                                "city": "D",
-                                "population": 104000,
-                            }
-                        ]
-                    ))
-                    .build()
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        pretty_assertions::assert_eq!(http::StatusCode::OK, res.status());
-
-        root_dataset_helper
-            .assert_last_data_eq(
-                indoc!(
-                    r#"
-                    message arrow_schema {
-                      REQUIRED INT64 offset;
-                      REQUIRED INT32 op;
-                      REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL BYTE_ARRAY city (STRING);
-                      OPTIONAL INT64 population;
-                    }
-                   "#
-                ),
-                indoc!(
-                    r#"
-                    +--------+----+----------------------+----------------------+------+------------+
-                    | offset | op | system_time          | event_time           | city | population |
-                    +--------+----+----------------------+----------------------+------+------------+
-                    | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 10000      |
-                    | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-02T00:00:00Z | B    | 20000000   |
-                    | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 1040000    |
-                    | 3      | 0  | 2050-01-01T12:00:00Z | 2020-01-04T00:00:00Z | D    | 104000     |
-                    +--------+----+----------------------+----------------------+------+------------+
-                    "#
-                ),
-            )
-            .await;
-    };
-
-    await_client_server_flow!(harness.server_harness.api_server_run(), client);
-    // let flow_query
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct DataIngestHarness {
     pub server_harness: ServerSideLocalFsHarness,
     pub system_time: DateTime<Utc>,
@@ -757,41 +663,6 @@ impl DataIngestHarness {
                     } else {
                         vec![]
                     },
-                },
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
-
-    async fn create_city_millions_dataset(&self) -> CreateDatasetResult {
-        self.server_harness
-            .cli_create_dataset_from_snapshot_use_case()
-            .execute(
-                odf::DatasetSnapshot {
-                    name: odf::DatasetAlias::new(
-                        self.server_harness.operating_account_name(),
-                        odf::DatasetName::new_unchecked("city-millions"),
-                    ),
-                    kind: odf::DatasetKind::Derivative,
-                    metadata: vec![MetadataFactory::set_transform()
-                        .inputs_from_refs(["population"])
-                        .transform(
-                            MetadataFactory::transform()
-                                .engine("datafusion")
-                                .query(
-                                    "SELECT
-                                        op,
-                                        event_time,
-                                        city,
-                                        population
-                                    FROM population
-                                    WHERE population > 1000000",
-                                )
-                                .build(),
-                        )
-                        .build()
-                        .into()],
                 },
                 Default::default(),
             )
