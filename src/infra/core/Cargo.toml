@@ -105,6 +105,7 @@ dashmap = { version = "6", default-features = false }
 dill = "0.12"
 futures = "0.3"
 glob = "0.3" # Used for glob fetch
+indoc = { version = "2" }
 itertools = "0.14"
 rand = "0.8"
 regex = "1"

@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use s3_utils::{S3Context, S3Metrics};
@@ -18,24 +17,17 @@ use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn SearchServiceRemote)]
 pub struct SearchServiceRemoteImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+    odf_server_access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
+
+    #[dill::component(explicit)]
     maybe_s3_metrics: Option<Arc<S3Metrics>>,
 }
 
-#[component(pub)]
-#[interface(dyn SearchServiceRemote)]
 impl SearchServiceRemoteImpl {
-    pub fn new(
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        maybe_s3_metrics: Option<Arc<S3Metrics>>,
-    ) -> Self {
-        Self {
-            remote_repo_reg,
-            maybe_s3_metrics,
-        }
-    }
-
     fn search_in_repo_localfs(
         &self,
         url: &Url,
@@ -114,11 +106,12 @@ impl SearchServiceRemoteImpl {
     // TODO: This is a quick and dirty implementation that will soon be replaced
     async fn search_in_repo_odf(
         &self,
-        url: &Url,
+        odf_url: &Url,
         query: Option<&str>,
         repo_name: &odf::RepoName,
     ) -> Result<Vec<SearchRemoteResultDataset>, SearchRemoteError> {
-        let gql_query = r#"
+        let gql_query = indoc::indoc!(
+            r#"
             {
               search {
                 query(query: "{query}", perPage: 100) {
@@ -147,21 +140,35 @@ impl SearchServiceRemoteImpl {
               }
             }
             "#
+        )
         .replace("{query}", query.unwrap_or_default());
 
-        let mut gql_url = Url::parse(url.as_str().strip_prefix("odf+").unwrap()).unwrap();
-        gql_url.path_segments_mut().unwrap().push("graphql");
+        let response = {
+            let url = Url::parse(odf_url.as_str().strip_prefix("odf+").unwrap()).unwrap();
 
-        // TODO: Include auth token if we have one in store
-        let cl = reqwest::Client::new();
-        let response = cl
-            .post(gql_url)
-            .json(&json!({"query": gql_query}))
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?;
+            let maybe_access_token = self
+                .odf_server_access_token_resolver
+                .resolve_odf_dataset_access_token(&url);
+
+            let mut gql_url = url;
+            gql_url.path_segments_mut().unwrap().push("graphql");
+
+            let client = reqwest::Client::new();
+            let mut request_builder = client.post(gql_url);
+
+            // TODO: Signaling of an expired token
+            if let Some(access_token) = maybe_access_token {
+                request_builder = request_builder.bearer_auth(access_token);
+            }
+
+            request_builder
+                .json(&json!({"query": gql_query}))
+                .send()
+                .await
+                .int_err()?
+                .error_for_status()
+                .int_err()?
+        };
 
         let gql_response: serde_json::Value = response.json().await.int_err()?;
 
