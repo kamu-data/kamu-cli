@@ -269,8 +269,8 @@ impl From<GqlError> for async_graphql::Error {
             GqlError::Access(err) => {
                 let code = match &err {
                     odf::AccessError::ReadOnly(_) => "READ_ONLY",
+                    odf::AccessError::Unauthenticated(_) => "UNAUTHENTICATED",
                     odf::AccessError::Unauthorized(_) => "UNAUTHORIZED",
-                    odf::AccessError::Forbidden(_) => "FORBIDDEN",
                 };
                 async_graphql::Error::new_with_source(err).extend_with(|_, ex| ex.set("code", code))
             }
