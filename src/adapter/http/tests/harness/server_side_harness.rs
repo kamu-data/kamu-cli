@@ -7,16 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
-use kamu::domain::auth::{
-    AlwaysHappyDatasetActionAuthorizer,
-    DatasetAction,
-    DatasetActionAuthorizer,
-};
+use kamu::domain::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{
     Account,
@@ -26,7 +23,6 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME,
     PROVIDER_PASSWORD,
 };
-use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
     CommitDatasetEventUseCase,
@@ -154,17 +150,8 @@ pub(crate) fn create_web_user_catalog(
     } else {
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
-            .expect_check_action_allowed()
-            .returning(|dataset_id, action| {
-                if action == DatasetAction::Write {
-                    Err(DatasetActionUnauthorizedError::not_enough_permissions(
-                        dataset_id.as_local_ref(),
-                        action,
-                    ))
-                } else {
-                    Ok(())
-                }
-            });
+            .expect_get_allowed_actions()
+            .returning(|_dataset_id| Ok(HashSet::new()));
         web_catalog_builder
             .add_value(mock_dataset_action_authorizer)
             .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();

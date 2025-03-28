@@ -29,6 +29,8 @@ use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use odf::metadata::testing::MetadataFactory;
 
+use crate::utils::make_logged_clients;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
@@ -184,14 +186,16 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
     )
     .await;
 
-    // Unauthorized attempts to change visibility
+    // Unauthorized attempts to change visibility from public to private
     {
-        use SetDatasetVisibilityError::{Access, DatasetNotFound};
+        use SetDatasetVisibilityError::Access;
 
+        // Roughly speaking, the public dataset grants the Reader role to everyone,
+        // so we don't get the DatasetNotFound error
         for (tag, client, expected_error) in [
-            ("anonymous", &anonymous, DatasetNotFound),
-            ("not_owner", &not_owner, DatasetNotFound),
-            ("reader", &reader, DatasetNotFound),
+            ("anonymous", &anonymous, Access),
+            ("not_owner", &not_owner, Access),
+            ("reader", &reader, Access),
             ("editor", &editor, Access),
             // ("maintainer", &maintainer),
             // ("owner", &owner),
@@ -249,6 +253,31 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
                     "Set tag: {}; Get tag: {}",
                     set_tag,
                     get_tag,
+                );
+            }
+        }
+
+        // Unauthorized attempts to change visibility from private to public
+        {
+            use SetDatasetVisibilityError::{Access, DatasetNotFound};
+
+            for (tag, client, expected_error) in [
+                ("anonymous", &anonymous, DatasetNotFound),
+                ("not_owner", &not_owner, DatasetNotFound),
+                ("reader", &reader, Access),
+                ("editor", &editor, Access),
+                // ("maintainer", &maintainer),
+                // ("owner", &owner),
+                // ("admin", &admin),
+            ] {
+                pretty_assertions::assert_eq!(
+                    Err(expected_error),
+                    client
+                        .dataset()
+                        .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
+                        .await,
+                    "Tag: {}",
+                    tag,
                 );
             }
         }
@@ -1606,37 +1635,6 @@ pub async fn test_granted_role_is_correctly_revoked(anonymous: KamuApiServerClie
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn make_logged_client(
-    anonymous: &KamuApiServerClient,
-    account_name: &str,
-) -> KamuApiServerClient {
-    let mut new_client = anonymous.clone();
-    let password_same_as_account_name = account_name;
-
-    new_client
-        .auth()
-        .login_with_password(account_name, password_same_as_account_name)
-        .await;
-
-    new_client
-}
-
-async fn make_logged_clients<const N: usize>(
-    anonymous: &KamuApiServerClient,
-    account_names: [&str; N],
-) -> [KamuApiServerClient; N] {
-    use std::mem::MaybeUninit;
-
-    let mut logged_clients: [MaybeUninit<KamuApiServerClient>; N] = MaybeUninit::uninit_array();
-
-    for (i, account_name) in account_names.iter().enumerate() {
-        let logged_client = make_logged_client(anonymous, account_name).await;
-        logged_clients[i].write(logged_client);
-    }
-
-    unsafe { logged_clients.map(|item| item.assume_init()) }
-}
 
 async fn authorize_users_by_roles(
     owner: &KamuApiServerClient,

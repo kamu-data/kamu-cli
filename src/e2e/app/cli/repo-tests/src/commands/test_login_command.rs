@@ -15,6 +15,7 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoRecord};
 use kamu_cli_puppet::KamuCliPuppet;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_login_logout_password
@@ -56,6 +57,34 @@ pub async fn test_login_add_repo_st(kamu: KamuCliPuppet) {
 
 pub async fn test_login_add_repo_mt(kamu: KamuCliPuppet) {
     test_login_add_repo(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_login_password_add_repo
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_password_add_repo_st(kamu_node_api_client: KamuApiServerClient) {
+    test_login_password_add_repo(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_password_add_repo_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_login_password_add_repo(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_login_oauth_add_repo
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_oauth_add_repo_st(kamu_node_api_client: KamuApiServerClient) {
+    test_login_oauth_add_repo(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_oauth_add_repo_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_login_oauth_add_repo(kamu_node_api_client, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -266,6 +295,195 @@ async fn test_login_add_repo(kamu: KamuCliPuppet) {
     ];
 
     pretty_assertions::assert_eq!(expected_repo_list, repo_list);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_login_password_add_repo(
+    kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
+    let kamu_node_url = kamu_node_api_client.get_base_url().as_str();
+
+    let expected_node_url = Url::parse(&format!(
+        "odf+http://127.0.0.1:{}/",
+        kamu_node_api_client.get_base_url().port().unwrap()
+    ))
+    .unwrap();
+
+    {
+        kamu.assert_success_command_execution(
+            [
+                "login",
+                "--skip-add-repo",
+                "password",
+                "kamu",
+                "kamu",
+                kamu_node_url,
+            ],
+            None,
+            Some([format!("Login successful: {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        pretty_assertions::assert_eq!([] as [RepoRecord; 0], *kamu.get_list_of_repos().await);
+    }
+    {
+        kamu.assert_success_command_execution(
+            ["logout", kamu_node_url],
+            None,
+            Some([format!("Logged out of {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        kamu.assert_success_command_execution(
+            ["login", "password", "kamu", "kamu", kamu_node_url],
+            None,
+            Some([format!("Login successful: {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        pretty_assertions::assert_eq!(
+            [RepoRecord {
+                name: odf::RepoName::new_unchecked("127.0.0.1"),
+                url: expected_node_url.clone()
+            }],
+            *kamu.get_list_of_repos().await
+        );
+    }
+    {
+        kamu.assert_success_command_execution(
+            ["logout", kamu_node_url],
+            None,
+            Some([format!("Logged out of {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        kamu.assert_success_command_execution(
+            [
+                "login",
+                "--repo-name",
+                "kamu-node",
+                "password",
+                "kamu",
+                "kamu",
+                kamu_node_url,
+            ],
+            None,
+            Some([format!("Login successful: {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        pretty_assertions::assert_eq!(
+            [
+                RepoRecord {
+                    name: odf::RepoName::new_unchecked("127.0.0.1"),
+                    url: expected_node_url.clone()
+                },
+                RepoRecord {
+                    name: odf::RepoName::new_unchecked("kamu-node"),
+                    url: expected_node_url
+                }
+            ],
+            *kamu.get_list_of_repos().await
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_login_oauth_add_repo(
+    mut kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
+    let oauth_token = kamu_node_api_client.auth().login_as_e2e_user().await;
+    let kamu_node_url = kamu_node_api_client.get_base_url().as_str();
+
+    let expected_node_url = Url::parse(&format!(
+        "odf+http://127.0.0.1:{}/",
+        kamu_node_api_client.get_base_url().port().unwrap()
+    ))
+    .unwrap();
+
+    {
+        kamu.assert_success_command_execution(
+            [
+                "login",
+                "--skip-add-repo",
+                "oauth",
+                "github",
+                &oauth_token,
+                kamu_node_url,
+            ],
+            None,
+            Some([format!("Login successful: {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        pretty_assertions::assert_eq!([] as [RepoRecord; 0], *kamu.get_list_of_repos().await);
+    }
+    {
+        kamu.assert_success_command_execution(
+            ["logout", kamu_node_url],
+            None,
+            Some([format!("Logged out of {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        kamu.assert_success_command_execution(
+            ["login", "oauth", "github", &oauth_token, kamu_node_url],
+            None,
+            Some([format!("Login successful: {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        pretty_assertions::assert_eq!(
+            [RepoRecord {
+                name: odf::RepoName::new_unchecked("127.0.0.1"),
+                url: expected_node_url.clone()
+            }],
+            *kamu.get_list_of_repos().await
+        );
+    }
+    {
+        kamu.assert_success_command_execution(
+            ["logout", kamu_node_url],
+            None,
+            Some([format!("Logged out of {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        kamu.assert_success_command_execution(
+            [
+                "login",
+                "--repo-name",
+                "kamu-node",
+                "oauth",
+                "github",
+                &oauth_token,
+                kamu_node_url,
+            ],
+            None,
+            Some([format!("Login successful: {kamu_node_url}").as_str()]),
+        )
+        .await;
+
+        pretty_assertions::assert_eq!(
+            [
+                RepoRecord {
+                    name: odf::RepoName::new_unchecked("127.0.0.1"),
+                    url: expected_node_url.clone()
+                },
+                RepoRecord {
+                    name: odf::RepoName::new_unchecked("kamu-node"),
+                    url: expected_node_url
+                }
+            ],
+            *kamu.get_list_of_repos().await
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
