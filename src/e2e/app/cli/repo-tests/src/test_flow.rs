@@ -585,7 +585,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
 
     kamu_api_server_client
         .flow()
-        .wait(&derivative_dataset_id)
+        .wait(&derivative_dataset_id, 1)
         .await;
 
     kamu_api_server_client
@@ -828,7 +828,10 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
         FlowTriggerResponse::Success(_)
     );
 
-    kamu_api_server_client.flow().wait(&root_dataset_id).await;
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 1)
+        .await;
 
     assert_matches!(
         kamu_api_server_client.odf_query().query(QUERY).await,
@@ -869,7 +872,10 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
         FlowTriggerResponse::Success(_)
     );
 
-    kamu_api_server_client.flow().wait(&root_dataset_id).await;
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 2)
+        .await;
 
     assert_matches!(
         kamu_api_server_client.odf_query().query(QUERY).await,
@@ -957,7 +963,7 @@ pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: Kam
 
     kamu_api_server_client
         .flow()
-        .wait(&derivative_dataset_id)
+        .wait(&derivative_dataset_id, 1)
         .await;
 
     pretty_assertions::assert_eq!(
@@ -1086,7 +1092,10 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
         FlowTriggerResponse::Success(_)
     );
 
-    kamu_api_server_client.flow().wait(&root_dataset_id).await;
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 1)
+        .await;
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1163,7 +1172,10 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
         FlowTriggerResponse::Success(_)
     );
 
-    kamu_api_server_client.flow().wait(&root_dataset_id).await;
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 1)
+        .await;
 
     pretty_assertions::assert_eq!(
         vec![(0, odf::metadata::MetadataEventTypeFlags::SEED)],
@@ -1243,7 +1255,7 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
         FlowTriggerResponse::Success(_)
     );
 
-    kamu_api_server_client.flow().wait(&dataset_id).await;
+    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
 
     kamu_api_server_client
         .graphql_api_call_assert(

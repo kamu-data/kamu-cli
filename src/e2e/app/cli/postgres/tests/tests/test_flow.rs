@@ -46,7 +46,21 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest,
-    options = Options::default().with_frozen_system_time(),
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(indoc::indoc!(
+            r#"
+        kind: CLIConfig
+        version: 1
+        content:
+          flowSystem:
+            flowAgent:
+              awaitingStepSecs: 1
+              mandatoryThrottlingPeriodSecs: 1
+            taskAgent:
+              taskCheckingIntervalSecs: 1
+        "#
+        )),
     extra_test_groups = "containerized, engine, datafusion"
 );
 
