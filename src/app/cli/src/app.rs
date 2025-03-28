@@ -45,6 +45,7 @@ use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
 use crate::{
+    build_db_connection_settings,
     cli,
     cli_commands,
     config,
@@ -55,7 +56,6 @@ use crate::{
     move_initial_database_to_workspace_if_needed,
     odf_server,
     spawn_password_refreshing_job,
-    try_build_db_connection_settings,
     ConfirmDeleteService,
     GcService,
     WorkspaceLayout,
@@ -124,9 +124,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     let app_database_config = get_app_database_config(&workspace_layout, &config, workspace_status);
     let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
-    let maybe_db_connection_settings = database_config
-        .as_ref()
-        .and_then(try_build_db_connection_settings);
+    let maybe_db_connection_settings = database_config.as_ref().map(build_db_connection_settings);
 
     // Configure application
     let (guards, base_catalog, cli_catalog, maybe_server_catalog, output_config) = {

@@ -9,6 +9,9 @@
 
 #![feature(iter_intersperse)]
 
+// Re-exports
+pub use sqlx::sqlite::SqlitePoolOptions;
+
 mod db_connection_settings;
 mod db_credentials;
 mod db_error;

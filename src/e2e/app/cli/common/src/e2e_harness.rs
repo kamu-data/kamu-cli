@@ -12,8 +12,7 @@ use std::future::Future;
 use chrono::{DateTime, NaiveTime, TimeZone, Utc};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
-use regex::Regex;
-use sqlx::{MySqlPool, PgPool, SqlitePool};
+use sqlx::{MySqlPool, PgPool};
 
 use crate::{api_server_e2e_test, KamuApiServerClient};
 
@@ -92,10 +91,6 @@ pub struct KamuCliApiServerHarness {
 }
 
 impl KamuCliApiServerHarness {
-    pub fn inmem(options: KamuCliApiServerHarnessOptions) -> Self {
-        Self::new(options, None)
-    }
-
     pub fn postgres(pg_pool: &PgPool, options: KamuCliApiServerHarnessOptions) -> Self {
         let db = pg_pool.connect_options();
         let kamu_config = indoc::formatdoc!(
@@ -148,36 +143,10 @@ impl KamuCliApiServerHarness {
         Self::new(options, Some(kamu_config))
     }
 
-    pub fn sqlite(sqlite_pool: &SqlitePool, options: KamuCliApiServerHarnessOptions) -> Self {
-        // Ugly way to get the path as the settings have a not-so-good signature:
-        // SqliteConnectOptions::get_filename(self) -> Cow<'static, Path>
-        //                                    ^^^^
-        // Arc<T> + consuming = bad combo
-        let database_path = {
-            let re = Regex::new(r#"filename: "(.*)""#).unwrap();
-            let connect_options = format!("{:#?}", sqlite_pool.connect_options());
-            let re_groups = re.captures(connect_options.as_str()).unwrap();
-            let relative_path = re_groups[1].to_string();
-
-            std::fs::canonicalize(relative_path)
-                .unwrap()
-                .display()
-                .to_string()
-        };
-
-        let kamu_config = indoc::formatdoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-                database:
-                    provider: sqlite
-                    databasePath: {path}
-            "#,
-            path = database_path
-        );
-
-        Self::new(options, Some(kamu_config))
+    pub fn sqlite(options: KamuCliApiServerHarnessOptions) -> Self {
+        // We don't need to provide a config and specify sqlite database in it,
+        // because kamu-cli will create the database on its own
+        Self::new(options, None)
     }
 
     fn new(
