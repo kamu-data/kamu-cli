@@ -14,6 +14,7 @@ use std::time::Duration;
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::AuthenticationService;
 use kamu_core::{CorruptedSourceError, DatasetRegistry};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
@@ -527,23 +528,38 @@ impl AxumServerPushProtocolInstance {
         if !force_update_if_diverged {
             tracing::debug!("Push client sent a complete request. Send outbox message");
 
+            let maybe_bearer_header = self.maybe_bearer_header.clone();
             // Have separate transaction just for sending outbox message may be not a good
             // idea, but it will allow us to separate push flow and outbox messaging.
             // Ideally we may consider some kind of transactional_with_n method to be able
             // use more than 2 different services in one transaction
             DatabaseTransactionRunner::new(self.catalog.clone())
-                .transactional_with(|outbox: Arc<dyn Outbox>| async move {
-                    outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
-                            DatasetExternallyChangedMessage::updated(
-                                &dataset_id,
-                                old_head_maybe.as_ref(),
-                                &new_head,
-                            ),
-                        )
-                        .await
-                })
+                .transactional_with2(
+                    |outbox: Arc<dyn Outbox>,
+                     authentication_service: Arc<dyn AuthenticationService>| async move {
+                        let account_name = if let Some(bearer_header) = &maybe_bearer_header {
+                            let account = authentication_service
+                                .account_by_token(bearer_header.token().to_owned())
+                                .await
+                                .int_err()?;
+                            Some(account.account_name)
+                        } else {
+                            None
+                        };
+
+                        outbox
+                            .post_message(
+                                MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
+                                DatasetExternallyChangedMessage::smart_transfer_protocol_sync(
+                                    &dataset_id,
+                                    old_head_maybe.as_ref(),
+                                    &new_head,
+                                    account_name,
+                                ),
+                            )
+                            .await
+                    },
+                )
                 .instrument(tracing::debug_span!(
                     "AxumServerPushProtocolInstance::try_handle_push_complete send outbox message"
                 ))

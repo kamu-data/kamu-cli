@@ -18,7 +18,7 @@ use kamu_core::{
     MetadataQueryService,
     PollingSourceBlockInfo,
 };
-use kamu_flow_system::{self as fs, FlowResultDatasetUpdate, FlowTriggerPushSource};
+use kamu_flow_system::{self as fs, FlowResultDatasetUpdate};
 
 use crate::prelude::*;
 
@@ -60,22 +60,10 @@ pub(crate) struct FlowDescriptionDatasetPollingIngest {
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPushIngest {
     dataset_id: DatasetID<'static>,
-    source_name: Option<FlowDescriptionTriggerPushSource>,
+    source_name: Option<String>,
     input_records_count: u64,
     ingest_result: Option<FlowDescriptionUpdateResult>,
-}
-
-impl From<FlowTriggerPushSource> for FlowDescriptionTriggerPushSource {
-    fn from(value: FlowTriggerPushSource) -> Self {
-        match value {
-            FlowTriggerPushSource::HTTP => Self::Http,
-        }
-    }
-}
-
-#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
-pub enum FlowDescriptionTriggerPushSource {
-    Http,
+    message: String,
 }
 
 #[derive(SimpleObject)]
@@ -350,11 +338,16 @@ impl FlowDescriptionBuilder {
                     })
                 } else {
                     let source_name = flow_state.primary_trigger().push_source_name();
+                    let trigger_description = flow_state
+                        .primary_trigger()
+                        .trigger_source_description()
+                        .unwrap();
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
                         dataset_id: dataset_key.dataset_id.clone().into(),
-                        source_name: source_name.map(Into::into),
+                        source_name,
                         input_records_count: 0, // TODO
                         ingest_result,
+                        message: trigger_description,
                     })
                 }
             }

@@ -770,26 +770,36 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
         let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();
 
-        match message {
-            DatasetExternallyChangedMessage::Updated(update_message) => {
-                scheduling_helper
-                    .schedule_dependent_flows(
-                        &update_message.dataset_id,
-                        DatasetFlowType::Ingest,
-                        FlowTriggerType::Push(FlowTriggerPush {
-                            trigger_time: time_source.now(),
-                            source_name: Some(FlowTriggerPushSource::HTTP),
-                            dataset_id: update_message.dataset_id.clone(),
-                            result: DatasetPushResult::Updated(DatasetPushResultUpdated {
-                                old_head_maybe: update_message.maybe_prev_block_hash.clone(),
-                                new_head: update_message.new_block_hash.clone(),
-                            }),
-                        }),
-                        None,
-                    )
-                    .await?;
-            }
-        }
+        let (trigger_type, dataset_id) = match message {
+            DatasetExternallyChangedMessage::HttpIngest(update_message) => (
+                FlowTriggerType::Push(FlowTriggerPush {
+                    trigger_time: time_source.now(),
+                    source_name: None,
+                    dataset_id: update_message.dataset_id.clone(),
+                    result: DatasetPushResult::HttpIngest(DatasetPushHttpIngestResult {
+                        old_head_maybe: update_message.maybe_prev_block_hash.clone(),
+                        new_head: update_message.new_block_hash.clone(),
+                    }),
+                }),
+                &update_message.dataset_id,
+            ),
+            DatasetExternallyChangedMessage::SmartTransferProtocolSync(update_message) => (
+                FlowTriggerType::Push(FlowTriggerPush {
+                    trigger_time: time_source.now(),
+                    source_name: None,
+                    dataset_id: update_message.dataset_id.clone(),
+                    result: DatasetPushResult::SmtpSync(DatasetPushSmtpSyncResult {
+                        old_head_maybe: update_message.maybe_prev_block_hash.clone(),
+                        new_head: update_message.new_block_hash.clone(),
+                        account_name_maybe: update_message.account_name.clone(),
+                    }),
+                }),
+                &update_message.dataset_id,
+            ),
+        };
+        scheduling_helper
+            .schedule_dependent_flows(dataset_id, DatasetFlowType::Ingest, trigger_type, None)
+            .await?;
 
         Ok(())
     }

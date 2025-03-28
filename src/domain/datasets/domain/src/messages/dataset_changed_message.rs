@@ -19,19 +19,34 @@ const DATASET_CHANGED_OUTBOX_VERSION: u32 = 1;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetExternallyChangedMessage {
     /// Message indicating that a dataset has been updated.
-    Updated(DatasetExternallyChangedMessageUpdated),
+    HttpIngest(DatasetExternallyChangedMessageHttpIngest),
+    SmartTransferProtocolSync(DatasetExternallyChangedMessageSmtpSync),
 }
 
 impl DatasetExternallyChangedMessage {
-    pub fn updated(
+    pub fn ingest_http(
         dataset_id: &odf::DatasetID,
         maybe_prev_block_hash: Option<&odf::Multihash>,
         new_block_hash: &odf::Multihash,
     ) -> Self {
-        Self::Updated(DatasetExternallyChangedMessageUpdated {
+        Self::HttpIngest(DatasetExternallyChangedMessageHttpIngest {
             dataset_id: dataset_id.clone(),
             maybe_prev_block_hash: maybe_prev_block_hash.cloned(),
             new_block_hash: new_block_hash.clone(),
+        })
+    }
+
+    pub fn smart_transfer_protocol_sync(
+        dataset_id: &odf::DatasetID,
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+        new_block_hash: &odf::Multihash,
+        account_name: Option<odf::AccountName>,
+    ) -> Self {
+        Self::SmartTransferProtocolSync(DatasetExternallyChangedMessageSmtpSync {
+            dataset_id: dataset_id.clone(),
+            maybe_prev_block_hash: maybe_prev_block_hash.cloned(),
+            new_block_hash: new_block_hash.clone(),
+            account_name,
         })
     }
 }
@@ -46,7 +61,7 @@ impl Message for DatasetExternallyChangedMessage {
 
 /// Contains details about an updated dataset.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetExternallyChangedMessageUpdated {
+pub struct DatasetExternallyChangedMessageHttpIngest {
     /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 
@@ -58,7 +73,7 @@ pub struct DatasetExternallyChangedMessageUpdated {
     pub new_block_hash: odf::Multihash,
 }
 
-impl DatasetExternallyChangedMessageUpdated {
+impl DatasetExternallyChangedMessageHttpIngest {
     pub fn new(
         dataset_id: odf::DatasetID,
         maybe_prev_block_hash: Option<odf::Multihash>,
@@ -68,6 +83,41 @@ impl DatasetExternallyChangedMessageUpdated {
             dataset_id,
             maybe_prev_block_hash,
             new_block_hash,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Contains details about an updated dataset.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetExternallyChangedMessageSmtpSync {
+    /// The unique identifier of the dataset.
+    pub dataset_id: odf::DatasetID,
+
+    /// The previous block hash: this value will only be None
+    /// for datasets that were just created.
+    pub maybe_prev_block_hash: Option<odf::Multihash>,
+
+    /// The new block hash after the update.
+    pub new_block_hash: odf::Multihash,
+
+    // Account of sync actor
+    pub account_name: Option<odf::AccountName>,
+}
+
+impl DatasetExternallyChangedMessageSmtpSync {
+    pub fn new(
+        dataset_id: odf::DatasetID,
+        maybe_prev_block_hash: Option<odf::Multihash>,
+        new_block_hash: odf::Multihash,
+        account_name: Option<odf::AccountName>,
+    ) -> Self {
+        Self {
+            dataset_id,
+            maybe_prev_block_hash,
+            new_block_hash,
+            account_name,
         }
     }
 }

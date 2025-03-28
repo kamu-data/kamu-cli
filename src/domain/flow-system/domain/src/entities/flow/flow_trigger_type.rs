@@ -40,11 +40,37 @@ impl FlowTriggerType {
         }
     }
 
-    pub fn push_source_name(&self) -> Option<FlowTriggerPushSource> {
+    pub fn push_source_name(&self) -> Option<String> {
         if let Self::Push(trigger_push) = self {
             trigger_push.source_name.clone()
         } else {
             None
+        }
+    }
+
+    pub fn trigger_source_description(&self) -> Option<String> {
+        match self {
+            Self::Manual(_) => Some("Flow triggered manually".to_string()),
+            Self::AutoPolling(_) => Some("Flow triggered automatically".to_string()),
+            Self::Push(trigger_push) => match &trigger_push.result {
+                DatasetPushResult::HttpIngest(_) => {
+                    Some("Flow triggered by root dataset ingest via http endpoint".to_string())
+                }
+                DatasetPushResult::SmtpSync(sync_result) => {
+                    if let Some(account_name) = sync_result.account_name_maybe.as_ref() {
+                        Some(format!(
+                            "Flow triggered by root dataset ingest via SMTP sync by account: \
+                             {account_name}",
+                        ))
+                    } else {
+                        Some(
+                            "Flow triggered by root dataset ingest via SMTP sync anonymously"
+                                .to_string(),
+                        )
+                    }
+                }
+            },
+            Self::InputDatasetFlow(_) => Some("Flow triggered by completed root flow".to_string()),
         }
     }
 
@@ -100,26 +126,28 @@ pub struct FlowTriggerAutoPolling {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerPush {
     pub trigger_time: DateTime<Utc>,
-    pub source_name: Option<FlowTriggerPushSource>,
+    pub source_name: Option<String>,
     pub dataset_id: odf::DatasetID,
     pub result: DatasetPushResult,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FlowTriggerPushSource {
-    HTTP,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetPushResult {
-    Updated(DatasetPushResultUpdated),
-    UpToDate,
+    HttpIngest(DatasetPushHttpIngestResult),
+    SmtpSync(DatasetPushSmtpSyncResult),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetPushResultUpdated {
+pub struct DatasetPushHttpIngestResult {
     pub old_head_maybe: Option<odf::Multihash>,
     pub new_head: odf::Multihash,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetPushSmtpSyncResult {
+    pub old_head_maybe: Option<odf::Multihash>,
+    pub new_head: odf::Multihash,
+    pub account_name_maybe: Option<odf::AccountName>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,7 +190,10 @@ mod tests {
             trigger_time: Utc::now(),
             source_name: None,
             dataset_id: TEST_DATASET_ID.clone(),
-            result: DatasetPushResult::UpToDate,
+            result: DatasetPushResult::HttpIngest(DatasetPushHttpIngestResult {
+                old_head_maybe: None,
+                new_head: odf::Multihash::from_digest_sha3_256(b"some-slice")
+            }),
         });
         static ref INPUT_DATASET_TRIGGER: FlowTriggerType =
             FlowTriggerType::InputDatasetFlow(FlowTriggerInputDatasetFlow {
@@ -223,9 +254,12 @@ mod tests {
         assert!(
             PUSH_SOURCE_TRIGGER.is_unique_vs(&[FlowTriggerType::Push(FlowTriggerPush {
                 trigger_time: Utc::now(),
-                source_name: Some(FlowTriggerPushSource::HTTP),
+                source_name: Some("some-source".to_string()),
                 dataset_id: TEST_DATASET_ID.clone(),
-                result: DatasetPushResult::UpToDate,
+                result: DatasetPushResult::HttpIngest(DatasetPushHttpIngestResult {
+                    old_head_maybe: None,
+                    new_head: odf::Multihash::from_digest_sha3_256(b"some-slice")
+                }),
             })])
         );
 

@@ -190,7 +190,7 @@ pub async fn dataset_ingest_handler(
                 outbox
                     .post_message(
                         MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
-                        DatasetExternallyChangedMessage::updated(
+                        DatasetExternallyChangedMessage::ingest_http(
                             target.get_id(),
                             Some(&old_head),
                             &new_head,

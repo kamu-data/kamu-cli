@@ -555,19 +555,23 @@ impl FlowSchedulingHelper {
                     }
                 }
                 FlowTriggerType::Push(ref trigger_type) => {
-                    if let DatasetPushResult::Updated(update_result) = &trigger_type.result {
-                        let increment = self
-                            .dataset_changes_service
-                            .get_increment_since(
-                                &trigger_type.dataset_id,
-                                update_result.old_head_maybe.as_ref(),
-                            )
-                            .await
-                            .int_err()?;
+                    let old_head_maybe = match trigger_type.result {
+                        DatasetPushResult::HttpIngest(ref update_result) => {
+                            update_result.old_head_maybe.as_ref()
+                        }
+                        DatasetPushResult::SmtpSync(ref update_result) => {
+                            update_result.old_head_maybe.as_ref()
+                        }
+                    };
 
-                        accumulated_records_count += increment.num_records;
-                        accumulated_something = true;
-                    }
+                    let increment = self
+                        .dataset_changes_service
+                        .get_increment_since(&trigger_type.dataset_id, old_head_maybe)
+                        .await
+                        .int_err()?;
+
+                    accumulated_records_count += increment.num_records;
+                    accumulated_something = true;
                 }
                 _ => {}
             }
