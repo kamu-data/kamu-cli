@@ -30,7 +30,7 @@ async fn test_get_account_info_with_wrong_token() {
         pretty_assertions::assert_eq!(401, res.status());
         pretty_assertions::assert_eq!(
             json!({
-                "message": "Unauthorized"
+                "message": "Unauthenticated"
             }),
             res.json::<serde_json::Value>().await.unwrap()
         );

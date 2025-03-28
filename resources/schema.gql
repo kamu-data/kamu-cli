@@ -532,8 +532,6 @@ type DataQueryResultError {
 
 enum DataQueryResultErrorKind {
 	INVALID_SQL
-	UNAUTHORIZED
-	INTERNAL_ERROR
 }
 
 type DataQueryResultSuccess {

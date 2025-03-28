@@ -81,7 +81,7 @@ impl ApiError {
     }
 
     pub fn new_unauthorized() -> Self {
-        odf::AccessError::Unauthorized("Unauthorized access".into()).api_err()
+        odf::AccessError::Unauthenticated("Unauthorized access".into()).api_err()
     }
 
     pub fn new_unauthorized_from(source: impl std::error::Error + Send + Sync + 'static) -> Self {
@@ -89,7 +89,7 @@ impl ApiError {
     }
 
     pub fn new_forbidden() -> Self {
-        odf::AccessError::Forbidden("Forbidden access".into()).api_err()
+        odf::AccessError::Unauthorized("Forbidden access".into()).api_err()
     }
 
     pub fn bad_request(source: impl std::error::Error + Send + Sync + 'static) -> Self {
@@ -220,11 +220,11 @@ where
 {
     fn api_err(self) -> ApiError {
         match self.categorize() {
-            ApiErrorCategory::Access(odf::AccessError::Unauthorized(_)) => {
+            ApiErrorCategory::Access(odf::AccessError::Unauthenticated(_)) => {
                 ApiError::new(self, http::StatusCode::UNAUTHORIZED)
             }
             ApiErrorCategory::Access(
-                odf::AccessError::Forbidden(_) | odf::AccessError::ReadOnly(_),
+                odf::AccessError::Unauthorized(_) | odf::AccessError::ReadOnly(_),
             ) => ApiError::new(self, http::StatusCode::FORBIDDEN),
             ApiErrorCategory::Internal(_e) => {
                 ApiError::new(self, http::StatusCode::INTERNAL_SERVER_ERROR)

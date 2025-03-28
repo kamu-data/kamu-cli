@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{self as domain, QueryError};
+use kamu_core as domain;
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
@@ -84,23 +84,23 @@ impl<'a> DatasetData<'a> {
                 limit,
             )
             .await;
+
         let df = match tail_result {
             Ok(r) => r,
+            Err(domain::QueryError::DatasetSchemaNotAvailable(_)) => {
+                return Ok(DataQueryResult::no_schema_yet(data_format, limit));
+            }
             Err(err) => {
-                return if let QueryError::DatasetSchemaNotAvailable(_) = err {
-                    Ok(DataQueryResult::no_schema_yet(data_format, limit))
-                } else {
-                    tracing::debug!(?err, "Query error");
-                    Ok(err.into())
-                }
+                return DataQueryResult::from_query_error(err);
             }
         };
 
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
         let record_batches = match df.collect().await {
             Ok(rb) => rb,
-            Err(e) => return Ok(e.into()),
+            Err(err) => return DataQueryResult::from_query_error(err.into()),
         };
+
         let data = DataBatch::from_records(&record_batches, data_format)?;
 
         Ok(DataQueryResult::success(Some(schema), data, None, limit))

@@ -61,7 +61,7 @@ async fn test_smart_push_new_dataset_unauthenticated() {
             Ok(_) => panic!(),
             Err(e) => assert_matches!(
                 e,
-                PushError::SyncError(SyncError::Access(odf::AccessError::Unauthorized(_))),
+                PushError::SyncError(SyncError::Access(odf::AccessError::Unauthenticated(_))),
             ),
         }
     };
@@ -113,7 +113,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
             Ok(_) => panic!(),
             Err(e) => assert_matches!(
                 e,
-                PushError::SyncError(SyncError::Access(odf::AccessError::Forbidden(_)))
+                PushError::SyncError(SyncError::Access(odf::AccessError::Unauthorized(_)))
             ),
         }
     };

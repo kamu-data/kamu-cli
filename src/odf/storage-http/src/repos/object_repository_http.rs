@@ -73,10 +73,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
             Ok(_) => Ok(true),
             Err(e) if e.status() == Some(http::StatusCode::NOT_FOUND) => Ok(false),
             Err(e) if e.status() == Some(http::StatusCode::UNAUTHORIZED) => {
-                Err(AccessError::Unauthorized(e.into()).into())
+                Err(AccessError::Unauthenticated(e.into()).into())
             }
             Err(e) if e.status() == Some(http::StatusCode::FORBIDDEN) => {
-                Err(AccessError::Forbidden(e.into()).into())
+                Err(AccessError::Unauthorized(e.into()).into())
             }
             Err(e) => Err(e.int_err().into()),
         }
@@ -111,10 +111,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
                 }))
             }
             Err(e) if e.status() == Some(http::StatusCode::UNAUTHORIZED) => {
-                Err(AccessError::Unauthorized(e.into()).into())
+                Err(AccessError::Unauthenticated(e.into()).into())
             }
             Err(e) if e.status() == Some(http::StatusCode::FORBIDDEN) => {
-                Err(AccessError::Forbidden(e.into()).into())
+                Err(AccessError::Unauthorized(e.into()).into())
             }
             Err(e) => Err(e.int_err().into()),
         }?;
@@ -149,10 +149,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
                 }))
             }
             Err(e) if e.status() == Some(http::StatusCode::UNAUTHORIZED) => {
-                Err(AccessError::Unauthorized(e.into()).into())
+                Err(AccessError::Unauthenticated(e.into()).into())
             }
             Err(e) if e.status() == Some(http::StatusCode::FORBIDDEN) => {
-                Err(AccessError::Forbidden(e.into()).into())
+                Err(AccessError::Unauthorized(e.into()).into())
             }
             Err(e) => Err(e.int_err().into()),
         }?;

@@ -963,7 +963,7 @@ impl SyncListener for PrettySyncProgress {
 
 fn sanitize_pull_error(original_pull_error: PullError) -> PullError {
     // Tricky way...
-    if let PullError::Access(odf::AccessError::Forbidden(forbidden_error)) = &original_pull_error
+    if let PullError::Access(odf::AccessError::Unauthorized(forbidden_error)) = &original_pull_error
         && let Some(permissions_error) =
             forbidden_error.downcast_ref::<DatasetActionNotEnoughPermissionsError>()
     {
