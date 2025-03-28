@@ -26,15 +26,10 @@ doctest = false
 
 
 [dev-dependencies]
-database-common = { workspace = true, default-features = false, features = ["testing"] }
 kamu-cli-e2e-common = { workspace = true }
-kamu-cli-e2e-repo-tests = { workspace = true, default-features = false, features = ["build-kamu-cli"] }
+kamu-cli-e2e-repo-tests = { workspace = true, default-features = false }
 
 indoc = "2"
-sqlx = { version = "0.8", default-features = false, features = [
-    "macros",
-    "sqlite",
-] }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }

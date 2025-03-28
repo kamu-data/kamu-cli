@@ -6380,7 +6380,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tokio",
 ]
 
 [[package]]
@@ -6396,7 +6395,6 @@ dependencies = [
  "kamu-accounts",
  "kamu-adapter-http",
  "kamu-auth-rebac",
- "kamu-cli",
  "kamu-cli-e2e-common",
  "kamu-cli-puppet",
  "kamu-flow-system",
@@ -6415,11 +6413,9 @@ dependencies = [
 name = "kamu-cli-e2e-sqlite"
 version = "0.230.0"
 dependencies = [
- "database-common",
  "indoc 2.0.6",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
- "sqlx",
  "test-group",
  "test-log",
  "tokio",
