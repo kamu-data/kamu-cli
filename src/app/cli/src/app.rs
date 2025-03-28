@@ -241,7 +241,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     }
 
     if command_result.is_ok() {
-        let is_transactional = cli_commands::command_needs_transaction(&args);
+        let is_transactional = maybe_db_connection_settings.is_some()
+            && cli_commands::command_needs_transaction(&args);
         let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
         command_result = maybe_transactional(
