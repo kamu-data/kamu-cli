@@ -1769,9 +1769,9 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                                         triggerInput: {
                                             batching: {
                                                 maxBatchingInterval: {
-                                                    every: 1, unit: MINUTES
+                                                    every: 0, unit: MINUTES
                                                 },
-                                                minRecordsToAwait: 1
+                                                minRecordsToAwait: 0
                                             }
                                         }
                                     ) {

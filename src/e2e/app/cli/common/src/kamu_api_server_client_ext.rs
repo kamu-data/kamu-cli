@@ -1455,6 +1455,13 @@ impl FlowApi<'_> {
         }
     }
 
+    // Method to wait for a flow to finish
+    // Args:
+    // - dataset_id: The ID of the dataset to check
+    // - expected_flow_count: The exact number of flows to wait for. Useful for
+    //   testcases
+    // where we have 2 or more flows for specific dataset which are triggered
+    // asynchronously For most cases will be used 1
     pub async fn wait(&self, dataset_id: &odf::DatasetID, expected_flow_count: usize) {
         let retry_strategy = FixedInterval::from_millis(5_000).take(18); // 1m 30s
 
