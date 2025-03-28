@@ -41,12 +41,14 @@ impl DatasetExternallyChangedMessage {
         maybe_prev_block_hash: Option<&odf::Multihash>,
         new_block_hash: &odf::Multihash,
         account_name: Option<odf::AccountName>,
+        is_force: bool,
     ) -> Self {
         Self::SmartTransferProtocolSync(DatasetExternallyChangedMessageSmtpSync {
             dataset_id: dataset_id.clone(),
             maybe_prev_block_hash: maybe_prev_block_hash.cloned(),
             new_block_hash: new_block_hash.clone(),
             account_name,
+            is_force,
         })
     }
 }
@@ -104,6 +106,8 @@ pub struct DatasetExternallyChangedMessageSmtpSync {
 
     // Account of sync actor
     pub account_name: Option<odf::AccountName>,
+
+    pub is_force: bool,
 }
 
 impl DatasetExternallyChangedMessageSmtpSync {
@@ -112,12 +116,14 @@ impl DatasetExternallyChangedMessageSmtpSync {
         maybe_prev_block_hash: Option<odf::Multihash>,
         new_block_hash: odf::Multihash,
         account_name: Option<odf::AccountName>,
+        is_force: bool,
     ) -> Self {
         Self {
             dataset_id,
             maybe_prev_block_hash,
             new_block_hash,
             account_name,
+            is_force,
         }
     }
 }

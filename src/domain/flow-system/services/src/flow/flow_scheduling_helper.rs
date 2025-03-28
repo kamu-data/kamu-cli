@@ -560,6 +560,11 @@ impl FlowSchedulingHelper {
                             update_result.old_head_maybe.as_ref()
                         }
                         DatasetPushResult::SmtpSync(ref update_result) => {
+                            if update_result.is_force {
+                                // Force sync currently does not supported as a trigger for
+                                // dependent datasets
+                                return Ok(());
+                            }
                             update_result.old_head_maybe.as_ref()
                         }
                     };

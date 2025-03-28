@@ -148,6 +148,7 @@ pub struct DatasetPushSmtpSyncResult {
     pub old_head_maybe: Option<odf::Multihash>,
     pub new_head: odf::Multihash,
     pub account_name_maybe: Option<odf::AccountName>,
+    pub is_force: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -792,6 +792,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
                         old_head_maybe: update_message.maybe_prev_block_hash.clone(),
                         new_head: update_message.new_block_hash.clone(),
                         account_name_maybe: update_message.account_name.clone(),
+                        is_force: update_message.is_force,
                     }),
                 }),
                 &update_message.dataset_id,
