@@ -16,7 +16,7 @@ use http_common::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
-use kamu_datasets::{DatasetChangedMessage, MESSAGE_PRODUCER_KAMU_HTTP_INGEST};
+use kamu_datasets::{DatasetExternallyChangedMessage, MESSAGE_PRODUCER_KAMU_HTTP_INGEST};
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
@@ -190,7 +190,11 @@ pub async fn dataset_ingest_handler(
                 outbox
                     .post_message(
                         MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
-                        DatasetChangedMessage::updated(target.get_id(), Some(&old_head), &new_head),
+                        DatasetExternallyChangedMessage::updated(
+                            target.get_id(),
+                            Some(&old_head),
+                            &new_head,
+                        ),
                     )
                     .await
                     .int_err()?;

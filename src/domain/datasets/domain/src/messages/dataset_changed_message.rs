@@ -17,18 +17,18 @@ const DATASET_CHANGED_OUTBOX_VERSION: u32 = 1;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DatasetChangedMessage {
+pub enum DatasetExternallyChangedMessage {
     /// Message indicating that a dataset has been updated.
-    Updated(DatasetUpdatedMessage),
+    Updated(DatasetExternallyChangedMessageUpdated),
 }
 
-impl DatasetChangedMessage {
+impl DatasetExternallyChangedMessage {
     pub fn updated(
         dataset_id: &odf::DatasetID,
         maybe_prev_block_hash: Option<&odf::Multihash>,
         new_block_hash: &odf::Multihash,
     ) -> Self {
-        Self::Updated(DatasetUpdatedMessage {
+        Self::Updated(DatasetExternallyChangedMessageUpdated {
             dataset_id: dataset_id.clone(),
             maybe_prev_block_hash: maybe_prev_block_hash.cloned(),
             new_block_hash: new_block_hash.clone(),
@@ -36,7 +36,7 @@ impl DatasetChangedMessage {
     }
 }
 
-impl Message for DatasetChangedMessage {
+impl Message for DatasetExternallyChangedMessage {
     fn version() -> u32 {
         DATASET_CHANGED_OUTBOX_VERSION
     }
@@ -46,7 +46,7 @@ impl Message for DatasetChangedMessage {
 
 /// Contains details about an updated dataset.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetUpdatedMessage {
+pub struct DatasetExternallyChangedMessageUpdated {
     /// The unique identifier of the dataset.
     pub dataset_id: odf::DatasetID,
 
@@ -58,7 +58,7 @@ pub struct DatasetUpdatedMessage {
     pub new_block_hash: odf::Multihash,
 }
 
-impl DatasetUpdatedMessage {
+impl DatasetExternallyChangedMessageUpdated {
     pub fn new(
         dataset_id: odf::DatasetID,
         maybe_prev_block_hash: Option<odf::Multihash>,

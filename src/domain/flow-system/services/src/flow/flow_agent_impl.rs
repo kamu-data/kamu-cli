@@ -19,7 +19,7 @@ use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_datasets::{
-    DatasetChangedMessage,
+    DatasetExternallyChangedMessage,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
@@ -62,7 +62,7 @@ pub struct FlowAgentImpl {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[interface(dyn MessageConsumerT<DatasetChangedMessage>)]
+#[interface(dyn MessageConsumerT<DatasetExternallyChangedMessage>)]
 #[interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
@@ -754,16 +754,16 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetChangedMessage> for FlowAgentImpl {
+impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "FlowAgentImpl[DatasetChangedMessage]"
+        name = "FlowAgentImpl[DatasetExternallyChangedMessage]"
     )]
     async fn consume_message(
         &self,
         target_catalog: &Catalog,
-        message: &DatasetChangedMessage,
+        message: &DatasetExternallyChangedMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset changed message");
 
@@ -771,7 +771,7 @@ impl MessageConsumerT<DatasetChangedMessage> for FlowAgentImpl {
         let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();
 
         match message {
-            DatasetChangedMessage::Updated(update_message) => {
+            DatasetExternallyChangedMessage::Updated(update_message) => {
                 scheduling_helper
                     .schedule_dependent_flows(
                         &update_message.dataset_id,

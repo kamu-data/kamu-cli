@@ -21,7 +21,7 @@ use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
-    DatasetChangedMessage,
+    DatasetExternallyChangedMessage,
     SetRefCheckRefMode,
     MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
 };
@@ -536,7 +536,7 @@ impl AxumServerPushProtocolInstance {
                     outbox
                         .post_message(
                             MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
-                            DatasetChangedMessage::updated(
+                            DatasetExternallyChangedMessage::updated(
                                 &dataset_id,
                                 old_head_maybe.as_ref(),
                                 &new_head,
