@@ -6274,6 +6274,7 @@ dependencies = [
  "num-format",
  "observability",
  "opendatafabric",
+ "paste",
  "pretty_assertions",
  "prettytable-rs",
  "prometheus",
