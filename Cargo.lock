@@ -6357,18 +6357,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-cli-e2e-inmem"
-version = "0.230.0"
-dependencies = [
- "indoc 2.0.6",
- "kamu-cli-e2e-common",
- "kamu-cli-e2e-repo-tests",
- "test-group",
- "test-log",
- "tokio",
-]
-
-[[package]]
 name = "kamu-cli-e2e-mysql"
 version = "0.230.0"
 dependencies = [
