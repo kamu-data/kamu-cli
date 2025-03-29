@@ -10,7 +10,7 @@
 use datafusion::logical_expr::SortExpr;
 use datafusion::prelude::*;
 use internal_error::*;
-use odf::utils::data::dataframe_ext::DataFrameExt;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -28,7 +28,11 @@ impl MergeStrategyAppend {
 }
 
 impl MergeStrategy for MergeStrategyAppend {
-    fn merge(&self, _prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn merge(
+        &self,
+        _prev: Option<DataFrameExt>,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, MergeError> {
         let df = new
             .with_column(
                 &self.vocab.operation_type_column,

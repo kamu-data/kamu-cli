@@ -13,6 +13,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -45,6 +46,7 @@ impl ReaderNdGeoJson {
         })
     }
 
+    #[tracing::instrument(level = "info", name = "ReaderNdGeoJson::convert_to_ndjson", skip_all)]
     fn convert_to_ndjson_blocking(in_path: &Path, out_path: &Path) -> Result<(), ReadError> {
         use std::io::prelude::*;
 
@@ -107,7 +109,8 @@ impl Reader for ReaderNdGeoJson {
         self.inner.input_schema().await
     }
 
-    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
+    #[tracing::instrument(level = "info", name = "ReaderNdGeoJson::read", skip_all)]
+    async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         // TODO: PERF: This is a temporary, highly inefficient implementation that
         // re-encodes NdGeoJson into NdJson which DataFusion can read natively
         let in_path = path.to_path_buf();

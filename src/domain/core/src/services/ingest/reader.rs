@@ -11,9 +11,9 @@ use std::backtrace::Backtrace;
 use std::path::Path;
 
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::prelude::*;
 use datafusion::sql::sqlparser::parser::ParserError;
 use internal_error::*;
+use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +31,7 @@ pub trait Reader: Send + Sync {
     /// fully read yet when function returns, so you will need to handle read
     /// errors when consuming the data. Some input data may be touched to
     /// infer the schema if one was not specified explicitly.
-    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError>;
+    async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

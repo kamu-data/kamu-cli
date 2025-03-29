@@ -12,12 +12,13 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use datafusion::arrow::array::RecordBatch;
-use datafusion::prelude::{DataFrame, SessionContext};
+use datafusion::prelude::SessionContext;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::metadata::serde::yaml::Manifest;
+use odf::utils::data::DataFrameExt;
 use random_names::get_random_name;
 use time_source::SystemTimeSource;
 
@@ -486,7 +487,7 @@ impl PollingIngestServiceImpl {
         &self,
         args: &IngestIterationArgs<'_>,
         prep_result: &PrepStepResult,
-    ) -> Result<Option<DataFrame>, PollingIngestError> {
+    ) -> Result<Option<DataFrameExt>, PollingIngestError> {
         let input_data_path = prep_result.data.path(&self.cache_dir);
 
         let temp_path = args.operation_dir.join("reader.tmp");
@@ -514,7 +515,7 @@ impl PollingIngestServiceImpl {
                     .read_batch(RecordBatch::new_empty(read_schema))
                     .int_err()?;
 
-                return Ok(Some(df));
+                return Ok(Some(df.into()));
             }
 
             tracing::info!(

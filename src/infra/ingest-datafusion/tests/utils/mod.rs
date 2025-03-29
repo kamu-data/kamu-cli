@@ -15,10 +15,11 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::DFSchema;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
+use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn assert_dfs_equal(lhs: DataFrame, rhs: DataFrame) {
+pub async fn assert_dfs_equal(lhs: DataFrameExt, rhs: DataFrameExt) {
     pretty_assertions::assert_eq!(lhs.schema(), rhs.schema());
 
     let lhs_batches = lhs.collect().await.unwrap();
@@ -48,8 +49,8 @@ pub async fn assert_dfs_equal(lhs: DataFrame, rhs: DataFrame) {
 
 // Checks for equivalence ignoring the order of rows and nullability of columns
 pub async fn assert_dfs_equivalent(
-    lhs: DataFrame,
-    rhs: DataFrame,
+    lhs: DataFrameExt,
+    rhs: DataFrameExt,
     ignore_order: bool,
     ignore_nullability: bool,
     ignore_qualifiers: bool,
@@ -255,7 +256,7 @@ async fn test_assert_dfs_equivalent_fails_column() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_input<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
+fn make_input<I, S>(ctx: &SessionContext, rows: I) -> DataFrameExt
 where
     I: IntoIterator<Item = (S, i64)>,
     S: Into<String>,
@@ -282,5 +283,5 @@ where
     )
     .unwrap();
 
-    ctx.read_batch(batch).unwrap()
+    ctx.read_batch(batch).unwrap().into()
 }

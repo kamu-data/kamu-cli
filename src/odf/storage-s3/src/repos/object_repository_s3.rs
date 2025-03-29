@@ -144,9 +144,11 @@ where
 
         // Allocate the exact sized buffer for the body
         let mut buf = Vec::with_capacity(
-            resp.content_length()
-                .ok_or_else(|| InternalError::new("S3 get_object did not return content length"))?
-                as usize,
+            usize::try_from(
+                resp.content_length()
+                    .ok_or_else(|| "S3 did not return content length".int_err())?,
+            )
+            .int_err()?,
         );
 
         let mut body = resp.body.into_async_read();

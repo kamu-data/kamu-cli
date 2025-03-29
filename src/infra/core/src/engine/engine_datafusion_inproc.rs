@@ -107,7 +107,7 @@ impl Engine for EngineDatafusionInproc {
         );
 
         Ok(RawQueryResponseExt {
-            output_data: Some(output_data),
+            output_data: Some(output_data.into()),
         })
     }
 

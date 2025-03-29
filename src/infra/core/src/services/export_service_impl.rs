@@ -11,11 +11,13 @@ use std::path::Path;
 
 use datafusion::arrow::array::{AsArray, RecordBatch};
 use datafusion::arrow::datatypes::UInt64Type;
-use datafusion::dataframe::{DataFrame, DataFrameWriteOptions};
+use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::logical_expr::Partitioning;
+use datafusion::prelude::DataFrame;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{ExportError, ExportFormat, ExportOptions, ExportService};
+use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +54,7 @@ impl ExportServiceImpl {
 impl ExportService for ExportServiceImpl {
     async fn export_to_fs(
         &self,
-        df: DataFrame,
+        df: DataFrameExt,
         path: &Path,
         options: ExportOptions,
     ) -> Result<u64, ExportError> {
@@ -78,7 +80,7 @@ impl ExportService for ExportServiceImpl {
                 .soft_max_rows_per_output_file = partition_size;
         };
 
-        let export_df = DataFrame::new(session_state, plan)
+        let export_df = DataFrameExt::from(DataFrame::new(session_state, plan))
             .repartition(Partitioning::RoundRobinBatch(1))
             .int_err()?;
 

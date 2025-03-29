@@ -14,6 +14,7 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::engine::*;
 use kamu_core::{ObjectStoreRegistry, *};
+use odf::utils::data::DataFrameExt;
 
 use crate::engine::*;
 
@@ -25,9 +26,9 @@ pub(crate) async fn preprocess(
     engine_provisioner: &dyn EngineProvisioner,
     ctx: &SessionContext,
     transform: &odf::metadata::Transform,
-    input_data: DataFrame,
+    input_data: DataFrameExt,
     maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-) -> Result<Option<DataFrame>, EngineError> {
+) -> Result<Option<DataFrameExt>, EngineError> {
     let engine = match transform.engine().to_lowercase().as_str() {
         "datafusion" => Arc::new(EngineDatafusionInproc::new()),
         engine_id => engine_provisioner
@@ -57,12 +58,12 @@ pub(crate) async fn preprocess(
 /// - Rename columns that conflict with system columns
 /// - Coerce event time column's type, if present, into a timestamp
 pub fn preprocess_default(
-    df: DataFrame,
+    df: DataFrameExt,
     read_step: &odf::metadata::ReadStep,
     merge_strategy: &odf::metadata::MergeStrategy,
     vocab: &odf::metadata::DatasetVocabulary,
     opts: &SchemaInferenceOpts,
-) -> Result<DataFrame, datafusion::error::DataFusionError> {
+) -> Result<DataFrameExt, datafusion::error::DataFusionError> {
     let df = if read_step.schema().is_none() && opts.rename_on_conflict_with_system_column {
         let mut system_cols = vec![&vocab.offset_column, &vocab.system_time_column];
 
