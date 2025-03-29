@@ -11,3 +11,5 @@ pub mod dataframe_ext;
 pub mod format;
 pub mod hash;
 pub mod local_url;
+
+pub use dataframe_ext::DataFrameExt;

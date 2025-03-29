@@ -115,7 +115,7 @@ async fn project(path: &str) {
             compare_columns: Some(vec!["cmp1".to_string(), "cmp2".to_string()]),
         },
     )
-    .project(ledger)
+    .project(ledger.into())
     .unwrap();
 
     let res = res.cache().await.unwrap();

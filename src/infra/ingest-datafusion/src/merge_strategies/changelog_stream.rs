@@ -10,6 +10,7 @@
 use datafusion::logical_expr::SortExpr;
 use datafusion::prelude::*;
 use internal_error::*;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -32,7 +33,7 @@ impl MergeStrategyChangelogStream {
         }
     }
 
-    fn validate_input(&self, new: DataFrame) -> Result<(), MergeError> {
+    fn validate_input(&self, new: DataFrameExt) -> Result<(), MergeError> {
         // Validate PK and Op columns exist
         new.select(
             self.primary_key
@@ -50,7 +51,11 @@ impl MergeStrategyChangelogStream {
 // TODO: Validate op codes and ordering
 // TODO: Compact inter-batch changes?
 impl MergeStrategy for MergeStrategyChangelogStream {
-    fn merge(&self, _prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn merge(
+        &self,
+        _prev: Option<DataFrameExt>,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, MergeError> {
         self.validate_input(new.clone())?;
         Ok(new)
     }

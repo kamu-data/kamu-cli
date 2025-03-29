@@ -13,7 +13,7 @@ use datafusion::logical_expr::{LogicalPlanBuilder, Operator, SortExpr};
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use internal_error::*;
-use odf::utils::data::dataframe_ext::DataFrameExt;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -40,7 +40,7 @@ impl MergeStrategyUpsertStream {
 
     /// Projects the changelog stream into latest values observed by PK (see
     /// full SQL example below).
-    fn latest_by_pk(&self, changelog: DataFrame) -> Result<DataFrame, MergeError> {
+    fn latest_by_pk(&self, changelog: DataFrameExt) -> Result<DataFrameExt, MergeError> {
         let rank_col = "__rank";
 
         let proj = changelog
@@ -81,8 +81,8 @@ impl MergeStrategyUpsertStream {
     /// example below).
     fn without_intermediate_updates(
         &self,
-        upserts: DataFrame,
-    ) -> Result<DataFrame, DataFusionErrorWrapped> {
+        upserts: DataFrameExt,
+    ) -> Result<DataFrameExt, DataFusionErrorWrapped> {
         let rank_col = "__rank";
 
         let with_offsets = upserts.with_column(
@@ -162,7 +162,11 @@ impl MergeStrategyUpsertStream {
 
     /// Returns a diff between the `latest_by_pk` projection and an upsert
     /// stream (see SQL below).
-    fn diff(&self, old: DataFrame, new: DataFrame) -> Result<DataFrame, DataFusionErrorWrapped> {
+    fn diff(
+        &self,
+        old: DataFrameExt,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, DataFusionErrorWrapped> {
         // TODO: Schema evolution
         let a_old = TableReference::bare("old");
         let a_new = TableReference::bare("new");
@@ -193,7 +197,7 @@ impl MergeStrategyUpsertStream {
             .filter(filter)?
             .build()?;
 
-        Ok(DataFrame::new(session_state, diff))
+        Ok(DataFrame::new(session_state, diff).into())
     }
 
     /// Converts an upsert stream into changelog stream.
@@ -341,9 +345,9 @@ impl MergeStrategyUpsertStream {
     /// +----+------+-----------+------------+
     fn upsert_to_changelog_stream(
         &self,
-        old: DataFrame,
-        new: DataFrame,
-    ) -> Result<DataFrame, DataFusionErrorWrapped> {
+        old: DataFrameExt,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, DataFusionErrorWrapped> {
         let a_old = TableReference::bare("old");
         let a_new = TableReference::bare("new");
         let old_col = |name: &str| -> Expr { Expr::Column(Column::new(Some(a_old.clone()), name)) };
@@ -414,10 +418,10 @@ impl MergeStrategyUpsertStream {
 
         // Note: Final sorting will be done by the caller using `sort_order()`
         // expression.
-        Ok(DataFrame::new(session_state, plan))
+        Ok(DataFrame::new(session_state, plan).into())
     }
 
-    fn normalize_input(&self, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn normalize_input(&self, new: DataFrameExt) -> Result<DataFrameExt, MergeError> {
         // Validate PK
         new.clone()
             .select(
@@ -443,7 +447,7 @@ impl MergeStrategyUpsertStream {
     }
 
     /// Create an empty prev dataset based on input schema
-    fn empty_prev(&self, new: &DataFrame) -> Result<DataFrame, DataFusionErrorWrapped> {
+    fn empty_prev(&self, new: &DataFrameExt) -> Result<DataFrameExt, DataFusionErrorWrapped> {
         let mut fields: Vec<FieldRef> = new.schema().fields().iter().cloned().collect();
         fields.push(Field::new(&self.vocab.offset_column, DataType::Int64, false).into());
 
@@ -457,7 +461,7 @@ impl MergeStrategyUpsertStream {
             },
         );
 
-        Ok(DataFrame::new(state, plan))
+        Ok(DataFrame::new(state, plan).into())
     }
 }
 
@@ -466,7 +470,11 @@ impl MergeStrategyUpsertStream {
 // TODO: Return BadInput error instead of internal errors
 // TODO: Configure whether to tolerate retractions for non-observed records
 impl MergeStrategy for MergeStrategyUpsertStream {
-    fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn merge(
+        &self,
+        prev: Option<DataFrameExt>,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, MergeError> {
         let new = self.normalize_input(new)?;
 
         let prev = if let Some(prev) = prev {

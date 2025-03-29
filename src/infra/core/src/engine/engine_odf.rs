@@ -337,7 +337,8 @@ impl Engine for ODFEngine {
                         },
                     )
                     .await
-                    .int_err()?,
+                    .int_err()?
+                    .into(),
             )
         };
 

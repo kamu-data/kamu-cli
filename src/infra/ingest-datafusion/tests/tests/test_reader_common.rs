@@ -10,8 +10,8 @@
 use std::future::Future;
 use std::path::PathBuf;
 
-use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
+use odf::utils::data::DataFrameExt;
 use odf::utils::testing::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ pub async fn test_reader_success_textual<R: Reader>(
 
 pub async fn test_reader_textual<R: Reader, F, Fut>(reader: R, input: &str, check_result: F)
 where
-    F: FnOnce(Result<DataFrame, ReadError>) -> Fut,
+    F: FnOnce(Result<DataFrameExt, ReadError>) -> Fut,
     Fut: Future<Output = ()>,
 {
     test_reader(
@@ -75,7 +75,7 @@ pub async fn test_reader<R: Reader, F1, Fut1, F2, Fut2>(reader: R, input: F1, ch
 where
     F1: FnOnce(PathBuf) -> Fut1,
     Fut1: Future<Output = ()>,
-    F2: FnOnce(Result<DataFrame, ReadError>) -> Fut2,
+    F2: FnOnce(Result<DataFrameExt, ReadError>) -> Fut2,
     Fut2: Future<Output = ()>,
 {
     let temp_dir = tempfile::tempdir().unwrap();

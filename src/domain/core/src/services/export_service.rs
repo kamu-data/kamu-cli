@@ -9,8 +9,8 @@
 
 use std::path::Path;
 
-use datafusion::dataframe::DataFrame;
 use internal_error::{BoxedError, InternalError};
+use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +21,7 @@ use thiserror::Error;
 pub trait ExportService: Send + Sync {
     async fn export_to_fs(
         &self,
-        df: DataFrame,
+        df: DataFrameExt,
         path: &Path,
         options: ExportOptions,
     ) -> Result<u64, ExportError>;

@@ -9,8 +9,9 @@
 
 use arrow::datatypes::Schema;
 use datafusion::common::DFSchema;
-use datafusion::prelude::*;
 use pretty_assertions::assert_eq;
+
+use crate::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +27,7 @@ pub fn assert_arrow_schema_eq(schema: &Schema, expected: serde_json::Value) {
     assert_eq!(expected, actual);
 }
 
-pub async fn assert_data_eq(df: DataFrame, expected: &str) {
+pub async fn assert_data_eq(df: DataFrameExt, expected: &str) {
     use datafusion::arrow::util::pretty;
 
     let batches = df.collect().await.unwrap();

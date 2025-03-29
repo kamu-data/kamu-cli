@@ -229,7 +229,7 @@ impl CollectionContext for ODataCollectionContext {
 
         query
             .apply(
-                df,
+                df.into_inner(),
                 &self.addr,
                 &vocab.offset_column,
                 KEY_COLUMN_ALIAS,

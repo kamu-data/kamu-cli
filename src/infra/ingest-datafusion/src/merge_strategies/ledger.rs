@@ -10,7 +10,7 @@
 use datafusion::logical_expr::SortExpr;
 use datafusion::prelude::*;
 use internal_error::*;
-use odf::utils::data::dataframe_ext::DataFrameExt;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -44,7 +44,11 @@ impl MergeStrategy for MergeStrategyLedger {
     //   - dedupe against entire prev
     //   - seen events should be a tail of the prev (less work to dedupe)
     // - input can contain duplicates
-    fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn merge(
+        &self,
+        prev: Option<DataFrameExt>,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, MergeError> {
         let new_records = if prev.is_none() {
             // Validate PK columns exist
             new.clone()

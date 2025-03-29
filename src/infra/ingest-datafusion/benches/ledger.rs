@@ -165,7 +165,7 @@ async fn merge(prev_path: &str, new_path: &str, expected_rows: usize) {
             primary_key: vec!["pk1".to_string(), "pk2".to_string()],
         },
     )
-    .merge(Some(prev), new)
+    .merge(Some(prev.into()), new.into())
     .unwrap();
 
     let res = res.cache().await.unwrap();

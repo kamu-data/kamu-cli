@@ -12,9 +12,9 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::prelude::*;
 use file_utils::OwnedFile;
 use internal_error::*;
+use odf::utils::data::DataFrameExt;
 
 use super::MergeError;
 
@@ -30,7 +30,7 @@ pub trait DataWriter {
     // the first ingest run).
     async fn write(
         &mut self,
-        new_data: Option<DataFrame>,
+        new_data: Option<DataFrameExt>,
         opts: WriteDataOpts,
     ) -> Result<WriteDataResult, WriteDataError>;
 
@@ -44,7 +44,7 @@ pub trait DataWriter {
     /// Prepares all data for commit without actually committing
     async fn stage(
         &self,
-        new_data: Option<DataFrame>,
+        new_data: Option<DataFrameExt>,
         opts: WriteDataOpts,
     ) -> Result<StageDataResult, StageDataError>;
 

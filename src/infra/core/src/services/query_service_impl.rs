@@ -24,6 +24,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{auth, *};
+use odf::utils::data::DataFrameExt;
 
 use crate::services::query::*;
 use crate::utils::docker_images;
@@ -214,7 +215,7 @@ impl QueryServiceImpl {
         &self,
         dataset_ref: &odf::DatasetRef,
         last_records_to_consider: Option<u64>,
-    ) -> Result<(ResolvedDataset, DataFrame), QueryError> {
+    ) -> Result<(ResolvedDataset, DataFrameExt), QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
         let ctx = self
@@ -238,7 +239,7 @@ impl QueryServiceImpl {
             ))
             .await?;
 
-        Ok((resolved_dataset, df))
+        Ok((resolved_dataset, df.into()))
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -333,16 +334,17 @@ impl QueryServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl QueryService for QueryServiceImpl {
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_create_session, skip_all)]
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
         Ok(self.session_context(QueryOptions::default()).await?)
     }
 
     #[tracing::instrument(
         level = "info",
-        name = "tail",
+        name = QueryServiceImpl_tail,
         skip_all,
         fields(%dataset_ref, %skip, %limit)
     )]
@@ -351,7 +353,7 @@ impl QueryService for QueryServiceImpl {
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
-    ) -> Result<DataFrame, QueryError> {
+    ) -> Result<DataFrameExt, QueryError> {
         let (resolved_dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
 
         // Our custom catalog provider resolves schemas lazily, so the dataset will be
@@ -388,7 +390,7 @@ impl QueryService for QueryServiceImpl {
         Ok(df)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_sql_statement, skip_all)]
     async fn sql_statement(
         &self,
         statement: &str,
@@ -423,10 +425,13 @@ impl QueryService for QueryServiceImpl {
         let ctx = self.session_context(options).await?;
         let df = ctx.sql(statement).await?;
 
-        Ok(QueryResponse { df, state })
+        Ok(QueryResponse {
+            df: df.into(),
+            state,
+        })
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_schema, skip_all, fields(%dataset_ref))]
     async fn get_schema(
         &self,
         dataset_ref: &odf::DatasetRef,
@@ -434,7 +439,7 @@ impl QueryService for QueryServiceImpl {
         self.get_schema_impl(dataset_ref).await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    #[tracing::instrument(level = "info", skip_all, name = QueryServiceImpl_get_schema_parquet_file, fields(%dataset_ref))]
     async fn get_schema_parquet_file(
         &self,
         dataset_ref: &odf::DatasetRef,
@@ -443,8 +448,8 @@ impl QueryService for QueryServiceImpl {
         self.get_schema_parquet_impl(&ctx, dataset_ref).await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
-    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrame, QueryError> {
+    #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(%dataset_ref))]
+    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrameExt, QueryError> {
         // TODO: PERF: Limit push-down opportunity
         let (_dataset, df) = self.single_dataset(dataset_ref, None).await?;
         Ok(df)

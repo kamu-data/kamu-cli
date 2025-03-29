@@ -15,6 +15,7 @@ use datafusion::datasource::file_format::file_compression_type::FileCompressionT
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -51,7 +52,8 @@ impl Reader for ReaderCsv {
         self.schema.clone()
     }
 
-    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
+    #[tracing::instrument(level = "info", name = "ReaderCsv::read", skip_all)]
+    async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         // TODO: Move this to reader construction phase
         let delimiter = match &self.conf.separator {
             Some(v) if !v.is_empty() => {
@@ -138,6 +140,6 @@ impl Reader for ReaderCsv {
             .await
             .int_err()?;
 
-        Ok(df)
+        Ok(df.into())
     }
 }

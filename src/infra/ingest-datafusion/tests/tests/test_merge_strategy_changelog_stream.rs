@@ -24,7 +24,7 @@ type Op = odf::metadata::OperationType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_input<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
+fn make_input<I, S>(ctx: &SessionContext, rows: I) -> DataFrameExt
 where
     I: IntoIterator<Item = (Op, i32, S, i64)>,
     S: Into<String>,
@@ -59,13 +59,13 @@ where
     )
     .unwrap();
 
-    ctx.read_batch(batch).unwrap()
+    ctx.read_batch(batch).unwrap().into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[expect(clippy::cast_possible_wrap)]
-fn make_output<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
+fn make_output<I, S>(ctx: &SessionContext, rows: I) -> DataFrameExt
 where
     I: IntoIterator<Item = (Op, i32, S, i64)>,
     S: Into<String>,
@@ -106,7 +106,7 @@ where
     )
     .unwrap();
 
-    ctx.read_batch(batch).unwrap()
+    ctx.read_batch(batch).unwrap().into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,8 +142,6 @@ where
         .without_columns(&["offset"])
         .unwrap();
     let actual = strat.merge(prev, new).unwrap();
-
-    actual.clone().show().await.unwrap();
 
     // Sort events according to the strategy
     let actual = actual.sort(strat.sort_order()).unwrap();

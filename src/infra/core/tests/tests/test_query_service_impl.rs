@@ -26,6 +26,7 @@ use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
+use odf::utils::data::DataFrameExt;
 use s3_utils::S3Context;
 use tempfile::TempDir;
 use test_utils::LocalS3Server;
@@ -724,7 +725,8 @@ async fn test_sql_statement_with_state_simple() {
                 )
                 .unwrap(),
             )
-            .unwrap(),
+            .unwrap()
+            .into(),
         ),
         tempdir.path().join(".temp-data.parquet"),
     )
@@ -798,7 +800,8 @@ async fn test_sql_statement_with_state_simple() {
                 )
                 .unwrap(),
             )
-            .unwrap(),
+            .unwrap()
+            .into(),
         ),
         tempdir.path().join(".temp-data.parquet"),
     )
@@ -934,7 +937,8 @@ async fn test_sql_statement_with_state_cte() {
                 )
                 .unwrap(),
             )
-            .unwrap(),
+            .unwrap()
+            .into(),
         ),
         tempdir.path().join(".temp-data.parquet"),
     )
@@ -972,7 +976,8 @@ async fn test_sql_statement_with_state_cte() {
                 )
                 .unwrap(),
             )
-            .unwrap(),
+            .unwrap()
+            .into(),
         ),
         tempdir.path().join(".temp-data.parquet"),
     )
@@ -1066,7 +1071,8 @@ async fn test_sql_statement_with_state_cte() {
                 )
                 .unwrap(),
             )
-            .unwrap(),
+            .unwrap()
+            .into(),
         ),
         tempdir.path().join(".temp-data.parquet"),
     )
@@ -1089,7 +1095,8 @@ async fn test_sql_statement_with_state_cte() {
                 )
                 .unwrap(),
             )
-            .unwrap(),
+            .unwrap()
+            .into(),
         ),
         tempdir.path().join(".temp-data.parquet"),
     )
@@ -1268,7 +1275,7 @@ async fn test_sql_statement_with_state_cte() {
 async fn write_data(
     target: ResolvedDataset,
     writer: &mut DataWriterDataFusion,
-    data: Option<datafusion::dataframe::DataFrame>,
+    data: Option<DataFrameExt>,
     data_staging_path: PathBuf,
 ) {
     let write_result = writer

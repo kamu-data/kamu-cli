@@ -14,6 +14,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DFSchema;
 use datafusion::prelude::*;
 use futures::TryStreamExt;
+use odf::utils::data::DataFrameExt;
 
 pub struct DatasetDataHelper {
     dataset: Arc<dyn odf::Dataset>,
@@ -97,7 +98,7 @@ impl DatasetDataHelper {
         .unwrap()
     }
 
-    pub async fn get_last_data(&self) -> DataFrame {
+    pub async fn get_last_data(&self) -> DataFrameExt {
         let part_file = self.get_last_data_file().await;
         self.ctx
             .read_parquet(
@@ -112,6 +113,7 @@ impl DatasetDataHelper {
             )
             .await
             .unwrap()
+            .into()
     }
 
     pub async fn get_latest_data_schema(&self) -> SchemaRef {

@@ -24,6 +24,7 @@ use file_utils::OwnedFile;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
+use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,7 +92,7 @@ impl DataWriterDataFusion {
         self.ctx = ctx;
     }
 
-    fn validate_input(&self, df: &DataFrame) -> Result<(), BadInputSchemaError> {
+    fn validate_input(&self, df: &DataFrameExt) -> Result<(), BadInputSchemaError> {
         let mut system_columns = vec![
             &self.meta.vocab.offset_column,
             &self.meta.vocab.system_time_column,
@@ -150,7 +151,7 @@ impl DataWriterDataFusion {
     // represented as `Timestamp(Millis, "UTC")` for compatibility with other
     // engines (e.g. Flink does not support event time with nanosecond
     // precision).
-    fn normalize_raw_result(&self, df: DataFrame) -> Result<DataFrame, InternalError> {
+    fn normalize_raw_result(&self, df: DataFrameExt) -> Result<DataFrameExt, InternalError> {
         let utc_tz: Arc<str> = Arc::from("UTC");
         let mut select: Vec<Expr> = Vec::new();
         let mut noop = true;
@@ -185,9 +186,9 @@ impl DataWriterDataFusion {
     /// Populates event time column with nulls if it does not exist
     fn ensure_event_time_column(
         &self,
-        df: DataFrame,
+        df: DataFrameExt,
         prev_schema: Option<&DFSchema>,
-    ) -> Result<DataFrame, InternalError> {
+    ) -> Result<DataFrameExt, InternalError> {
         if !df
             .schema()
             .has_column_with_unqualified_name(&self.meta.vocab.event_time_column)
@@ -220,7 +221,7 @@ impl DataWriterDataFusion {
     async fn get_all_previous_data(
         &self,
         prev_data_slices: &[odf::Multihash],
-    ) -> Result<Option<DataFrame>, InternalError> {
+    ) -> Result<Option<DataFrameExt>, InternalError> {
         if prev_data_slices.is_empty() {
             return Ok(None);
         }
@@ -252,16 +253,16 @@ impl DataWriterDataFusion {
             .await
             .int_err()?;
 
-        Ok(Some(df))
+        Ok(Some(df.into()))
     }
 
     fn with_system_columns(
         &self,
-        df: DataFrame,
+        df: DataFrameExt,
         system_time: DateTime<Utc>,
         fallback_event_time: DateTime<Utc>,
         start_offset: u64,
-    ) -> Result<DataFrame, InternalError> {
+    ) -> Result<DataFrameExt, InternalError> {
         use datafusion::scalar::ScalarValue;
 
         // Collect column names for later
@@ -505,7 +506,7 @@ impl DataWriterDataFusion {
     async fn write_output(
         &self,
         path: PathBuf,
-        df: DataFrame,
+        df: DataFrameExt,
     ) -> Result<Option<OwnedFile>, InternalError> {
         use datafusion::arrow::array::UInt64Array;
 
@@ -686,7 +687,7 @@ impl DataWriter for DataWriterDataFusion {
     #[tracing::instrument(level = "info", skip_all)]
     async fn write(
         &mut self,
-        new_data: Option<DataFrame>,
+        new_data: Option<DataFrameExt>,
         opts: WriteDataOpts,
     ) -> Result<WriteDataResult, WriteDataError> {
         let staged = self.stage(new_data, opts).await?;
@@ -729,7 +730,7 @@ impl DataWriter for DataWriterDataFusion {
     #[tracing::instrument(level = "info", skip_all)]
     async fn stage(
         &self,
-        new_data: Option<DataFrame>,
+        new_data: Option<DataFrameExt>,
         opts: WriteDataOpts,
     ) -> Result<StageDataResult, StageDataError> {
         let (add_data, new_schema, data_file) = if let Some(new_data) = new_data {
@@ -743,7 +744,7 @@ impl DataWriter for DataWriterDataFusion {
             let prev = self.get_all_previous_data(&self.meta.data_slices).await?;
 
             // Populate event time with nulls if missing, using matching type to prev data
-            let df = self.ensure_event_time_column(df, prev.as_ref().map(DataFrame::schema))?;
+            let df = self.ensure_event_time_column(df, prev.as_ref().map(DataFrameExt::schema))?;
 
             let df = self.merge_strategy.merge(prev, df)?;
 

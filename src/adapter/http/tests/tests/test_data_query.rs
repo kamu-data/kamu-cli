@@ -149,7 +149,8 @@ impl Harness {
                         )
                         .unwrap(),
                     )
-                    .unwrap(),
+                    .unwrap()
+                    .into(),
                 ),
                 WriteDataOpts {
                     system_time,

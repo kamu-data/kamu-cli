@@ -333,7 +333,7 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .await
             .unwrap();
 
-        odf::utils::testing::assert_data_eq(df.clone(), expected_data).await;
+        odf::utils::testing::assert_data_eq(df.clone().into(), expected_data).await;
         odf::utils::testing::assert_schema_eq(df.schema(), expected_schema);
     }
 

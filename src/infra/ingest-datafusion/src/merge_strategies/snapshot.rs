@@ -12,7 +12,7 @@ use datafusion::logical_expr::{LogicalPlanBuilder, Operator, SortExpr};
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use internal_error::*;
-use odf::utils::data::dataframe_ext::*;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -85,7 +85,7 @@ impl MergeStrategySnapshot {
     /// | 3      | +C | b    | 2500       | 1      |
     /// +--------+----+------+------------+--------+
     /// ```
-    pub fn project(&self, ledger: DataFrame) -> Result<DataFrame, InternalError> {
+    pub fn project(&self, ledger: DataFrameExt) -> Result<DataFrameExt, InternalError> {
         // TODO: PERF: Re-assess implementation as it may be sub-optimal
         let rank_col = "__rank";
 
@@ -250,9 +250,9 @@ impl MergeStrategySnapshot {
     /// must appear side by side, necessitating ORDER BY.
     fn cdc_diff(
         &self,
-        old: DataFrame,
-        new: DataFrame,
-    ) -> Result<DataFrame, DataFusionErrorWrapped> {
+        old: DataFrameExt,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, DataFusionErrorWrapped> {
         // TODO: Schema evolution
         let a_old = TableReference::bare("old");
         let a_new = TableReference::bare("new");
@@ -331,12 +331,16 @@ impl MergeStrategySnapshot {
 
         // Note: Final sorting will be done by the caller using `sort_order()`
         // expression.
-        Ok(DataFrame::new(session_state, plan))
+        Ok(DataFrame::new(session_state, plan).into())
     }
 }
 
 impl MergeStrategy for MergeStrategySnapshot {
-    fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn merge(
+        &self,
+        prev: Option<DataFrameExt>,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, MergeError> {
         if prev.is_none() {
             // Validate PK columns exist
             new.clone()
