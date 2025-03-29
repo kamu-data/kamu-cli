@@ -17,10 +17,11 @@ use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use bytes::Bytes;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::*;
 use odf_metadata::*;
 use odf_storage::*;
 use s3_utils::{GetObjectOptions, PutObjectOptions, S3Context};
+use tokio::io::AsyncReadExt;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,13 +127,32 @@ where
 
     #[tracing::instrument(level = "debug", name = ObjectRepositoryS3_get_bytes, skip_all, fields(%hash))]
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
-        use tokio::io::AsyncReadExt;
-        let mut stream = self.get_stream(hash).await?;
+        let key = self.get_key(hash);
 
-        let mut data: Vec<u8> = Vec::new();
-        stream.read_to_end(&mut data).await.int_err()?;
+        tracing::debug!(?key, "Reading object");
 
-        Ok(Bytes::from(data))
+        let resp = match self.s3_context.get_object(key).await {
+            Ok(resp) => Ok(resp),
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                GetObjectError::NoSuchKey(_) => Err(GetError::NotFound(ObjectNotFoundError {
+                    hash: hash.clone(),
+                })),
+                err => return Err(err.int_err().into()),
+            },
+        }?;
+
+        // Allocate the exact sized buffer for the body
+        let mut buf = Vec::with_capacity(
+            resp.content_length()
+                .ok_or_else(|| InternalError::new("S3 get_object did not return content length"))?
+                as usize,
+        );
+
+        let mut body = resp.body.into_async_read();
+        body.read_to_end(&mut buf).await.int_err()?;
+
+        Ok(Bytes::from(buf))
     }
 
     #[tracing::instrument(level = "debug", name = ObjectRepositoryS3_get_stream, skip_all, fields(%hash))]
