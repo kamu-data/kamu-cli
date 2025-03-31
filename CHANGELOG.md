@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.231.0] - 2025-03-31
 ### Added
 - `kamu login {password,oauth}`:
   - Saving the repository is the same as in `kamu login` 
