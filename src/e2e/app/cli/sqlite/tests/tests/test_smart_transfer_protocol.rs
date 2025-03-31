@@ -414,7 +414,7 @@ kamu_cli_run_api_server_e2e_test!(
               flowSystem:
                 flowAgent:
                   awaitingStepSecs: 1
-                  mandatoryThrottlingPeriodSecs: 20
+                  mandatoryThrottlingPeriodSecs: 1
                 taskAgent:
                   taskCheckingIntervalSecs: 1
             "#
