@@ -22,7 +22,7 @@ use kamu_datasets::{
     DatasetExternallyChangedMessage,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
+    MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
 };
 use kamu_flow_system::*;
 use kamu_task_system::*;
@@ -70,7 +70,7 @@ pub struct FlowAgentImpl {
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-        MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
+        MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
 })]
@@ -765,7 +765,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
         target_catalog: &Catalog,
         message: &DatasetExternallyChangedMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset changed message");
+        tracing::debug!(received_message = ?message, "Received dataset externally changed message");
 
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
         let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();

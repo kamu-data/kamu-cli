@@ -24,7 +24,7 @@ use kamu_datasets::{
     CreateDatasetUseCaseOptions,
     DatasetExternallyChangedMessage,
     SetRefCheckRefMode,
-    MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
+    MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
 };
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::Multihash;
@@ -546,7 +546,7 @@ impl AxumServerPushProtocolInstance {
 
                     outbox
                         .post_message(
-                            MESSAGE_PRODUCER_KAMU_HTTP_INGEST,
+                            MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
                             DatasetExternallyChangedMessage::smart_transfer_protocol_sync(
                                 &dataset_id,
                                 old_head_maybe.as_ref(),
