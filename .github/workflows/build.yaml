@@ -202,14 +202,6 @@ jobs:
       - name: Run main set of tests
         run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions-main-set-tests }} -v
 
-        # Note: SQLite does not require a container and may run on any platform
-      - name: SQLite database tests
-        env:
-          SQLX_OFFLINE: false
-          DATABASE_URL: sqlite://kamu.sqlite.db
-        # platform(target) is a workaround for Windows only issue in cargo-nextest upon proc macro crates
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'platform(target) & test(::sqlite::) ${{ matrix.nextest-exclusions-database-set-part }}'
-
       - name: Postgres database tests
         if: matrix.database
         env:
