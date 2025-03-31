@@ -14,9 +14,9 @@ use axum::body::Body;
 use axum::response::Response;
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
-use internal_error::InternalError;
-use kamu_core::auth::DatasetActionAuthorizerExt;
-use kamu_core::DatasetRegistry;
+use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_core::auth::DatasetActionAccess;
+use kamu_core::{auth, DatasetRegistry};
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;
@@ -41,14 +41,14 @@ where
 
 impl<Svc, DatasetActionQuery> Layer<Svc> for DatasetAuthorizationLayer<DatasetActionQuery>
 where
-    DatasetActionQuery: Clone,
+    DatasetActionQuery: Copy,
 {
     type Service = DatasetAuthorizationMiddleware<Svc, DatasetActionQuery>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
         DatasetAuthorizationMiddleware {
             inner,
-            dataset_action_query: self.dataset_action_query.clone(),
+            dataset_action_query: self.dataset_action_query,
         }
     }
 }
@@ -76,7 +76,7 @@ impl<Svc, DatasetActionQuery> Service<http::Request<Body>>
 where
     Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
-    DatasetActionQuery: Send + Clone + 'static,
+    DatasetActionQuery: Send + Copy + 'static,
     DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_core::auth::DatasetAction,
 {
     type Response = Svc::Response;
@@ -93,7 +93,7 @@ where
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
 
-        let dataset_action_query = self.dataset_action_query.clone();
+        let dataset_action_query = self.dataset_action_query;
 
         Box::pin(async move {
             let catalog = request
@@ -106,7 +106,7 @@ where
                 .get::<odf::DatasetRef>()
                 .expect("Dataset ref not found in http server extensions");
 
-            let action = dataset_action_query(&request);
+            let current_dataset_action = dataset_action_query(&request);
 
             enum CheckResult {
                 Proceed,
@@ -120,31 +120,42 @@ where
                             .get_one::<dyn DatasetRegistry>()
                             .unwrap();
                         let dataset_action_authorizer = transaction_catalog
-                            .get_one::<dyn kamu_core::auth::DatasetActionAuthorizer>()
+                            .get_one::<dyn auth::DatasetActionAuthorizer>()
                             .unwrap();
 
-                        match dataset_registry
-                            .resolve_dataset_handle_by_ref(dataset_ref)
-                            .await
-                        {
-                            Ok(dataset_handle) => {
-                                // For anonymous or user, the dataset does not exist if there is no
-                                // access
-                                let not_accessible = !dataset_action_authorizer
-                                    .is_action_allowed(&dataset_handle.id, action)
-                                    .await?;
+                        let dataset_handle = {
+                            use odf::DatasetRefUnresolvedError as E;
 
-                                if not_accessible {
-                                    Ok(CheckResult::ErrorResponse(not_found_response()))
-                                } else {
-                                    Ok(CheckResult::Proceed)
+                            match dataset_registry
+                                .resolve_dataset_handle_by_ref(dataset_ref)
+                                .await
+                            {
+                                Ok(dataset_handle) => dataset_handle,
+                                Err(E::NotFound(_)) => {
+                                    // In case of dataset initial pushing, the dataset does not
+                                    // exist beforehand.
+                                    return Ok(CheckResult::Proceed);
+                                }
+                                Err(e @ E::Internal(_)) => {
+                                    return Err(e.int_err());
                                 }
                             }
-                            Err(odf::DatasetRefUnresolvedError::NotFound(_)) => {
-                                Ok(CheckResult::Proceed)
+                        };
+
+                        let allowed_actions = dataset_action_authorizer
+                            .get_allowed_actions(&dataset_handle.id)
+                            .await?;
+
+                        match auth::DatasetAction::resolve_access(
+                            &allowed_actions,
+                            current_dataset_action,
+                        ) {
+                            DatasetActionAccess::Full => Ok(CheckResult::Proceed),
+                            DatasetActionAccess::Limited => {
+                                Ok(CheckResult::ErrorResponse(forbidden_access_response()))
                             }
-                            Err(odf::DatasetRefUnresolvedError::Internal(_)) => {
-                                Ok(CheckResult::ErrorResponse(internal_server_error_response()))
+                            DatasetActionAccess::Forbidden => {
+                                Ok(CheckResult::ErrorResponse(not_found_response()))
                             }
                         }
                     })

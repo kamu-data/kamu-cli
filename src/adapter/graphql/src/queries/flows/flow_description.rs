@@ -143,10 +143,10 @@ impl FlowDescriptionUpdateResult {
                                 Err(err) => {
                                     let unknown_message = match err {
                                         GetIncrementError::BlockNotFound(e) => format!(
-                                            "Failed to get increment. Block is missing: {}",
+                                            "Unable to fetch increment. Block is missing: {}",
                                             e.hash
                                         ),
-                                        _ => "Failed to get increment".to_string(),
+                                        _ => "Unable to fetch increment".to_string(),
                                     };
                                     Ok(Some(Self::Unknown(FlowDescriptionUpdateResultUnknown {
                                         message: unknown_message,

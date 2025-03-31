@@ -435,7 +435,8 @@ pub fn configure_base_catalog(
     b.add::<CompactionPlannerImpl>();
     b.add::<CompactionExecutorImpl>();
 
-    b.add::<SearchServiceRemoteImpl>();
+    b.add_builder(SearchServiceRemoteImpl::builder(None))
+        .bind::<dyn SearchServiceRemote, SearchServiceRemoteImpl>();
 
     b.add::<SyncServiceImpl>();
     b.add::<SyncRequestBuilder>();
