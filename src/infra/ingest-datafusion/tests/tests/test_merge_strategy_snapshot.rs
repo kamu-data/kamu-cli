@@ -16,7 +16,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
-use odf::utils::data::dataframe_ext::*;
+use odf::utils::data::DataFrameExt;
 
 use crate::utils::*;
 
@@ -26,7 +26,7 @@ type Op = odf::metadata::OperationType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_input<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
+fn make_input<I, S>(ctx: &SessionContext, rows: I) -> DataFrameExt
 where
     I: IntoIterator<Item = (S, i64)>,
     S: Into<String>,
@@ -57,12 +57,12 @@ where
     )
     .unwrap();
 
-    ctx.read_batch(batch).unwrap()
+    ctx.read_batch(batch).unwrap().into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_output<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
+fn make_output<I, S>(ctx: &SessionContext, rows: I) -> DataFrameExt
 where
     I: IntoIterator<Item = (odf::metadata::OperationType, Option<i32>, S, i64)>,
     S: Into<String>,
@@ -99,12 +99,12 @@ where
     )
     .unwrap();
 
-    ctx.read_batch(batch).unwrap()
+    ctx.read_batch(batch).unwrap().into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_ledger<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
+fn make_ledger<I, S>(ctx: &SessionContext, rows: I) -> DataFrameExt
 where
     I: IntoIterator<Item = (odf::metadata::OperationType, i32, S, i64)>,
     S: Into<String>,
@@ -145,7 +145,7 @@ where
     )
     .unwrap();
 
-    ctx.read_batch(batch).unwrap()
+    ctx.read_batch(batch).unwrap().into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

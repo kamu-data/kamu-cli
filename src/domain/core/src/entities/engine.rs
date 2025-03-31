@@ -12,9 +12,10 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::prelude::{DataFrame, SessionContext};
+use datafusion::prelude::SessionContext;
 use file_utils::OwnedFile;
 use internal_error::*;
+use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
 use crate::ResolvedDatasetsMap;
@@ -45,17 +46,17 @@ pub trait Engine: Send + Sync {
 pub struct RawQueryRequestExt {
     /// Randomly assigned value that identifies this specific engine operation
     pub operation_id: String,
-    /// Datafusion context to use for reading the result into a [`DataFrame`]
+    /// Datafusion context to use for reading the result into a [`DataFrameExt`]
     pub ctx: SessionContext,
     /// Data to be used in the query
-    pub input_data: DataFrame,
+    pub input_data: DataFrameExt,
     /// Defines the query to be performed
     pub transform: odf::metadata::Transform,
 }
 
 #[derive(Debug, Clone)]
 pub struct RawQueryResponseExt {
-    pub output_data: Option<DataFrame>,
+    pub output_data: Option<DataFrameExt>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

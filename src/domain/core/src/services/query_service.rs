@@ -9,11 +9,13 @@
 
 use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use datafusion::arrow;
 use datafusion::parquet::schema::types::Type;
-use datafusion::prelude::{DataFrame, SessionContext};
+use datafusion::prelude::SessionContext;
 use internal_error::*;
+use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
@@ -44,7 +46,7 @@ pub trait QueryService: Send + Sync {
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
-    ) -> Result<DataFrame, QueryError>;
+    ) -> Result<DataFrameExt, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
     /// [DataFrame] that can be used to get schema and data, and the state
@@ -73,7 +75,7 @@ pub trait QueryService: Send + Sync {
     // number of files we collect to construct the dataframe.
     //
     /// Returns a [DataFrame] representing the contents of an entire dataset
-    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrame, QueryError>;
+    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrameExt, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
@@ -121,11 +123,11 @@ pub struct DatasetQueryHints {
 
 #[derive(Debug, Clone)]
 pub struct QueryResponse {
-    /// A [`DataFrame`] that can be used to read schema and access the data.
+    /// A [`DataFrameExt`] that can be used to read schema and access the data.
     /// Note that the data frames are "lazy". They are a representation of a
     /// logical query plan. The actual query is executed only when you pull
     /// the resulting data from it.
-    pub df: DataFrame,
+    pub df: DataFrameExt,
     ///  The query state information that can be used for reproducibility.
     pub state: QueryState,
 }
@@ -234,6 +236,73 @@ pub enum QueryError {
     ),
 }
 
+impl QueryError {
+    // WARNING: Datafusion error handling is cursed
+    fn classify_shared_error(
+        top_level: &Arc<datafusion::error::DataFusionError>,
+        inner: &datafusion::error::DataFusionError,
+    ) -> Self {
+        use datafusion::error::DataFusionError as DFError;
+
+        match inner {
+            DFError::Context(_, inner) | DFError::Diagnostic(_, inner) => {
+                Self::classify_shared_error(top_level, inner.as_ref())
+            }
+            DFError::SchemaError(_, _) | DFError::SQL(_, _) | DFError::Plan(_) => Self::BadQuery(
+                BadQueryError::new(BadQueryErrorSource::Shared(top_level.clone())),
+            ),
+            DFError::Shared(inner) => Self::classify_shared_error(top_level, inner.as_ref()),
+            // TODO: Handle Shared and Collection errors
+            DFError::ArrowError(_, _)
+            | DFError::ParquetError(_)
+            | DFError::ObjectStore(_)
+            | DFError::IoError(_)
+            | DFError::NotImplemented(_)
+            | DFError::Internal(_)
+            | DFError::Configuration(_)
+            | DFError::Execution(_)
+            | DFError::ExecutionJoin(_)
+            | DFError::ResourcesExhausted(_)
+            | DFError::External(_)
+            | DFError::Substrait(_)
+            | DFError::Collection(_) => Self::Internal(top_level.clone().int_err()),
+        }
+    }
+}
+
+// WARNING: Datafusion error handling is cursed
+impl From<datafusion::error::DataFusionError> for QueryError {
+    fn from(value: datafusion::error::DataFusionError) -> Self {
+        use datafusion::error::DataFusionError as DFError;
+
+        match value {
+            DFError::Context(_, inner) | DFError::Diagnostic(_, inner) => Self::from(*inner),
+            DFError::SchemaError(_, _) | DFError::SQL(_, _) | DFError::Plan(_) => {
+                Self::BadQuery(BadQueryError::new(BadQueryErrorSource::Single(value)))
+            }
+            DFError::Shared(inner) => Self::classify_shared_error(&inner, inner.as_ref()),
+            DFError::Collection(errors) => {
+                // NOTE: Assuming that collection errors would only be returned for user input
+                // errors
+                Self::BadQuery(BadQueryError::new(BadQueryErrorSource::Collection(errors)))
+            }
+            // TODO: Handle Shared and Collection errors
+            DFError::ArrowError(_, _)
+            | DFError::ParquetError(_)
+            | DFError::ObjectStore(_)
+            | DFError::IoError(_)
+            | DFError::NotImplemented(_)
+            | DFError::Internal(_)
+            | DFError::Configuration(_)
+            | DFError::Execution(_)
+            | DFError::ExecutionJoin(_)
+            | DFError::ResourcesExhausted(_)
+            | DFError::External(_)
+            | DFError::Substrait(_) => Self::Internal(value.int_err()),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// This error returned only when the caller provides an explicit block hash to
@@ -256,48 +325,46 @@ impl DatasetBlockNotFoundError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(Debug)]
 pub struct BadQueryError {
-    // Using Arc because DF errors are not Clone, and we need to handle shared error type
-    pub source: datafusion::error::DataFusionError,
+    pub source: BadQueryErrorSource,
     pub backtrace: Backtrace,
 }
 
 impl BadQueryError {
-    pub fn new(source: datafusion::error::DataFusionError) -> Self {
+    pub fn new(source: BadQueryErrorSource) -> Self {
         Self {
             source,
             backtrace: Backtrace::capture(),
         }
     }
-}
 
-impl From<datafusion::error::DataFusionError> for QueryError {
-    fn from(value: datafusion::error::DataFusionError) -> Self {
-        // TODO: Datafusion error handling is cursed
-        match value {
-            datafusion::error::DataFusionError::Context(_, inner)
-            | datafusion::error::DataFusionError::Diagnostic(_, inner) => Self::from(*inner),
-            datafusion::error::DataFusionError::SchemaError(_, _)
-            | datafusion::error::DataFusionError::SQL(_, _)
-            | datafusion::error::DataFusionError::Plan(_) => {
-                Self::BadQuery(BadQueryError::new(value))
-            }
-            // TODO: Handle Shared and Collection errors
-            datafusion::error::DataFusionError::ArrowError(_, _)
-            | datafusion::error::DataFusionError::ParquetError(_)
-            | datafusion::error::DataFusionError::ObjectStore(_)
-            | datafusion::error::DataFusionError::IoError(_)
-            | datafusion::error::DataFusionError::NotImplemented(_)
-            | datafusion::error::DataFusionError::Internal(_)
-            | datafusion::error::DataFusionError::Configuration(_)
-            | datafusion::error::DataFusionError::Execution(_)
-            | datafusion::error::DataFusionError::ExecutionJoin(_)
-            | datafusion::error::DataFusionError::ResourcesExhausted(_)
-            | datafusion::error::DataFusionError::External(_)
-            | datafusion::error::DataFusionError::Shared(_)
-            | datafusion::error::DataFusionError::Substrait(_)
-            | datafusion::error::DataFusionError::Collection(_) => Self::Internal(value.int_err()),
+    fn fmt_df_error(
+        f: &mut std::fmt::Formatter<'_>,
+        e: &datafusion::error::DataFusionError,
+    ) -> std::fmt::Result {
+        use datafusion::error::DataFusionError as DFError;
+
+        match e {
+            DFError::SchemaError(e, _) => write!(f, "{e}"),
+            DFError::SQL(e, _) => write!(f, "{e}"),
+            DFError::Plan(msg) => write!(f, "{msg}"),
+            DFError::ArrowError(_, _)
+            | DFError::ParquetError(_)
+            | DFError::ObjectStore(_)
+            | DFError::IoError(_)
+            | DFError::NotImplemented(_)
+            | DFError::Internal(_)
+            | DFError::Configuration(_)
+            | DFError::Execution(_)
+            | DFError::ExecutionJoin(_)
+            | DFError::ResourcesExhausted(_)
+            | DFError::External(_)
+            | DFError::Context(_, _)
+            | DFError::Substrait(_)
+            | DFError::Diagnostic(_, _)
+            | DFError::Collection(_)
+            | DFError::Shared(_) => write!(f, "{e}"),
         }
     }
 }
@@ -305,27 +372,39 @@ impl From<datafusion::error::DataFusionError> for QueryError {
 impl std::fmt::Display for BadQueryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.source {
-            datafusion::error::DataFusionError::SchemaError(e, _) => write!(f, "{e}"),
-            datafusion::error::DataFusionError::SQL(e, _) => write!(f, "{e}"),
-            datafusion::error::DataFusionError::Plan(msg) => write!(f, "{msg}"),
-            datafusion::error::DataFusionError::ArrowError(_, _)
-            | datafusion::error::DataFusionError::ParquetError(_)
-            | datafusion::error::DataFusionError::ObjectStore(_)
-            | datafusion::error::DataFusionError::IoError(_)
-            | datafusion::error::DataFusionError::NotImplemented(_)
-            | datafusion::error::DataFusionError::Internal(_)
-            | datafusion::error::DataFusionError::Configuration(_)
-            | datafusion::error::DataFusionError::Execution(_)
-            | datafusion::error::DataFusionError::ExecutionJoin(_)
-            | datafusion::error::DataFusionError::ResourcesExhausted(_)
-            | datafusion::error::DataFusionError::External(_)
-            | datafusion::error::DataFusionError::Context(_, _)
-            | datafusion::error::DataFusionError::Substrait(_)
-            | datafusion::error::DataFusionError::Diagnostic(_, _)
-            | datafusion::error::DataFusionError::Collection(_)
-            | datafusion::error::DataFusionError::Shared(_) => write!(f, "{}", self.source),
+            BadQueryErrorSource::Single(e) => Self::fmt_df_error(f, e)?,
+            BadQueryErrorSource::Shared(e) => Self::fmt_df_error(f, e.as_ref())?,
+            BadQueryErrorSource::Collection(errors) => {
+                for (i, e) in errors.iter().enumerate() {
+                    if i != 0 {
+                        write!(f, "\n\n")?;
+                    }
+                    Self::fmt_df_error(f, e)?;
+                }
+            }
+        };
+
+        Ok(())
+    }
+}
+
+impl std::error::Error for BadQueryError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.source {
+            BadQueryErrorSource::Single(e) => Some(e),
+            BadQueryErrorSource::Shared(e) => Some(e.as_ref()),
+            BadQueryErrorSource::Collection(errors) => {
+                errors.first().map(|e| e as &dyn std::error::Error)
+            }
         }
     }
+}
+
+#[derive(Debug)]
+pub enum BadQueryErrorSource {
+    Single(datafusion::error::DataFusionError),
+    Shared(Arc<datafusion::error::DataFusionError>),
+    Collection(Vec<datafusion::error::DataFusionError>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
