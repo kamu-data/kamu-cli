@@ -43,10 +43,19 @@ impl async_graphql::extensions::Extension for TracingExtension {
         for err in &response.errors {
             if let Some(source) = err.source::<InternalError>() {
                 tracing::error!(
+                    error = ?source,
                     error_msg = %ErrorMessageFormatter(source),
                     error_backtrace = %ErrorBacktraceFormatter(source),
                     gql_path = ?err.path,
                     "Unhandled error",
+                );
+            } else if let Some(source) = err.source::<odf::AccessError>() {
+                tracing::error!(
+                    error = ?source,
+                    error_msg = %ErrorMessageFormatter(source),
+                    error_backtrace = %ErrorBacktraceFormatter(source),
+                    gql_path = ?err.path,
+                    "Access error",
                 );
             } else {
                 tracing::error!(

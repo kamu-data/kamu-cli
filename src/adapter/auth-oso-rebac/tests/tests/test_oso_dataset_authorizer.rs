@@ -156,7 +156,7 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
             dataset_id = public_dataset_handle.id,
         expected:
             read_result = Ok(()),
-            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
+            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions == [DatasetAction::Read].into()
     );
@@ -179,8 +179,8 @@ async fn test_guest_can_not_read_and_write_private_dataset() {
             harness,
             dataset_id = private_dataset_handle.id,
         expected:
-            read_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
-            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
+            read_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
+            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions.is_empty()
     );
@@ -206,7 +206,7 @@ async fn test_not_owner_can_read_but_not_write_public_dataset() {
             dataset_id = not_owned_public_dataset_handle.id,
         expected:
             read_result = Ok(()),
-            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
+            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions == [DatasetAction::Read].into()
     );
@@ -231,8 +231,8 @@ async fn test_not_owner_can_not_read_and_write_private_dataset() {
             harness,
             dataset_id = not_owned_private_dataset_handle.id,
         expected:
-            read_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
-            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Forbidden(_))),
+            read_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
+            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions.is_empty()
     );
@@ -359,8 +359,8 @@ async fn test_multi_datasets_matrix() {
                     - bob/public-dataset-4
 
                     unauthorized_with_errors:
-                    - bob/private-dataset-3: Forbidden
-                    - alice/private-dataset-1: Forbidden
+                    - bob/private-dataset-3: Unauthorized
+                    - alice/private-dataset-1: Unauthorized
                     "#
                 ),
                 write_classify_dataset_handles_by_allowance_result: indoc::indoc!(
@@ -368,10 +368,10 @@ async fn test_multi_datasets_matrix() {
                     authorized:
 
                     unauthorized_with_errors:
-                    - alice/public-dataset-2: Forbidden
-                    - bob/public-dataset-4: Forbidden
-                    - bob/private-dataset-3: Forbidden
-                    - alice/private-dataset-1: Forbidden
+                    - alice/public-dataset-2: Unauthorized
+                    - bob/public-dataset-4: Unauthorized
+                    - bob/private-dataset-3: Unauthorized
+                    - alice/private-dataset-1: Unauthorized
                     "#
                 ),
                 read_classify_dataset_ids_by_allowance_result: indoc::indoc!(
@@ -381,8 +381,8 @@ async fn test_multi_datasets_matrix() {
                     - bob/public-dataset-4
 
                     unauthorized_with_errors:
-                    - bob/private-dataset-3: Forbidden
-                    - alice/private-dataset-1: Forbidden
+                    - bob/private-dataset-3: Unauthorized
+                    - alice/private-dataset-1: Unauthorized
                     "#
                 ),
                 write_classify_dataset_ids_by_allowance_result: indoc::indoc!(
@@ -390,10 +390,10 @@ async fn test_multi_datasets_matrix() {
                     authorized:
 
                     unauthorized_with_errors:
-                    - alice/public-dataset-2: Forbidden
-                    - bob/public-dataset-4: Forbidden
-                    - bob/private-dataset-3: Forbidden
-                    - alice/private-dataset-1: Forbidden
+                    - alice/public-dataset-2: Unauthorized
+                    - bob/public-dataset-4: Unauthorized
+                    - bob/private-dataset-3: Unauthorized
+                    - alice/private-dataset-1: Unauthorized
                     "#
                 ),
             },
@@ -421,7 +421,7 @@ async fn test_multi_datasets_matrix() {
                     - alice/private-dataset-1
 
                     unauthorized_with_errors:
-                    - bob/private-dataset-3: Forbidden
+                    - bob/private-dataset-3: Unauthorized
                     "#
                 ),
                 write_classify_dataset_handles_by_allowance_result: indoc::indoc!(
@@ -431,8 +431,8 @@ async fn test_multi_datasets_matrix() {
                     - alice/private-dataset-1
 
                     unauthorized_with_errors:
-                    - bob/public-dataset-4: Forbidden
-                    - bob/private-dataset-3: Forbidden
+                    - bob/public-dataset-4: Unauthorized
+                    - bob/private-dataset-3: Unauthorized
                     "#
                 ),
                 read_classify_dataset_ids_by_allowance_result: indoc::indoc!(
@@ -443,7 +443,7 @@ async fn test_multi_datasets_matrix() {
                     - alice/private-dataset-1
 
                     unauthorized_with_errors:
-                    - bob/private-dataset-3: Forbidden
+                    - bob/private-dataset-3: Unauthorized
                     "#
                 ),
                 write_classify_dataset_ids_by_allowance_result: indoc::indoc!(
@@ -453,8 +453,8 @@ async fn test_multi_datasets_matrix() {
                     - alice/private-dataset-1
 
                     unauthorized_with_errors:
-                    - bob/public-dataset-4: Forbidden
-                    - bob/private-dataset-3: Forbidden
+                    - bob/public-dataset-4: Unauthorized
+                    - bob/private-dataset-3: Unauthorized
                     "#
                 ),
             },

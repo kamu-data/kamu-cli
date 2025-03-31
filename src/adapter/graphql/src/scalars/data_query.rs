@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::error::DataFusionError;
-use kamu_core::QueryError;
+use kamu_core as domain;
 
 use crate::prelude::*;
 
@@ -33,8 +32,6 @@ pub struct DataQueryResultError {
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataQueryResultErrorKind {
     InvalidSql,
-    Unauthorized,
-    InternalError,
 }
 
 #[derive(Union)]
@@ -44,6 +41,22 @@ pub enum DataQueryResult {
 }
 
 impl DataQueryResult {
+    pub fn from_query_error(err: domain::QueryError) -> Result<Self, GqlError> {
+        tracing::debug!(?err, "Query error");
+
+        match err {
+            domain::QueryError::DatasetNotFound(e) => Ok(Self::invalid_sql(e.to_string())),
+            domain::QueryError::DatasetBlockNotFound(e) => Ok(Self::invalid_sql(e.to_string())),
+            domain::QueryError::BadQuery(e) => Ok(Self::invalid_sql(e.to_string())),
+            domain::QueryError::DatasetSchemaNotAvailable(_) => {
+                // NOTE: This error must be handled on upper level to return empty collection
+                unreachable!()
+            }
+            domain::QueryError::Access(e) => Err(e.into()),
+            domain::QueryError::Internal(e) => Err(e.into()),
+        }
+    }
+
     pub fn success(
         schema: Option<DataSchema>,
         data: DataBatch,
@@ -72,39 +85,6 @@ impl DataQueryResult {
             error_message,
             error_kind: DataQueryResultErrorKind::InvalidSql,
         })
-    }
-
-    pub fn unauthorized(error_message: String) -> DataQueryResult {
-        DataQueryResult::Error(DataQueryResultError {
-            error_message,
-            error_kind: DataQueryResultErrorKind::Unauthorized,
-        })
-    }
-
-    pub fn internal(error_message: String) -> DataQueryResult {
-        DataQueryResult::Error(DataQueryResultError {
-            error_message,
-            error_kind: DataQueryResultErrorKind::InternalError,
-        })
-    }
-}
-
-impl From<QueryError> for DataQueryResult {
-    fn from(e: QueryError) -> Self {
-        match e {
-            QueryError::DatasetNotFound(e) => DataQueryResult::invalid_sql(e.to_string()),
-            QueryError::DatasetBlockNotFound(e) => DataQueryResult::internal(e.to_string()),
-            QueryError::BadQuery(e) => DataQueryResult::invalid_sql(e.to_string()),
-            QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
-            QueryError::Access(e) => DataQueryResult::unauthorized(e.to_string()),
-            QueryError::Internal(e) => DataQueryResult::internal(e.to_string()),
-        }
-    }
-}
-
-impl From<DataFusionError> for DataQueryResult {
-    fn from(e: DataFusionError) -> Self {
-        Self::from(QueryError::from(e))
     }
 }
 

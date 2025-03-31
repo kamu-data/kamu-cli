@@ -260,7 +260,7 @@ pub enum DatasetActionUnauthorizedError {
 
 impl DatasetActionUnauthorizedError {
     pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
-        Self::Access(odf::AccessError::Forbidden(
+        Self::Access(odf::AccessError::Unauthorized(
             DatasetActionNotEnoughPermissionsError {
                 action,
                 dataset_ref,

@@ -240,12 +240,19 @@ pub(crate) fn logged_account(ctx: &Context<'_>) -> bool {
 #[derive(Debug)]
 pub enum GqlError {
     Internal(InternalError),
+    Access(odf::AccessError),
     Gql(async_graphql::Error),
 }
 
 impl From<InternalError> for GqlError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
+    }
+}
+
+impl From<odf::AccessError> for GqlError {
+    fn from(value: odf::AccessError) -> Self {
+        Self::Access(value)
     }
 }
 
@@ -259,6 +266,14 @@ impl From<GqlError> for async_graphql::Error {
     fn from(val: GqlError) -> Self {
         match val {
             GqlError::Internal(err) => async_graphql::Error::new_with_source(err),
+            GqlError::Access(err) => {
+                let code = match &err {
+                    odf::AccessError::ReadOnly(_) => "READ_ONLY",
+                    odf::AccessError::Unauthenticated(_) => "UNAUTHENTICATED",
+                    odf::AccessError::Unauthorized(_) => "UNAUTHORIZED",
+                };
+                async_graphql::Error::new_with_source(err).extend_with(|_, ex| ex.set("code", code))
+            }
             GqlError::Gql(err) => err,
         }
     }
