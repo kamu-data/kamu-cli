@@ -25,23 +25,11 @@ use kamu_core::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn VerifyDatasetUseCase)]
 pub struct VerifyDatasetUseCaseImpl {
     verification_service: Arc<dyn VerificationService>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-}
-
-impl VerifyDatasetUseCaseImpl {
-    pub fn new(
-        verification_service: Arc<dyn VerificationService>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    ) -> Self {
-        Self {
-            verification_service,
-            rebac_dataset_registry_facade,
-        }
-    }
 }
 
 #[common_macros::method_names_consts]

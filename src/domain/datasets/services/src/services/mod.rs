@@ -13,6 +13,7 @@ mod env;
 mod graph;
 mod odf;
 mod refs;
+mod statistics;
 
 pub use dataset_alias_update_handler::*;
 pub use entry::*;
@@ -20,3 +21,4 @@ pub use env::*;
 pub use graph::*;
 pub use odf::*;
 pub use refs::*;
+pub use statistics::*;

@@ -37,7 +37,7 @@ use crate::SyncRequestBuilder;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn PushDatasetUseCase)]
 pub struct PushDatasetUseCaseImpl {
     push_request_planner: Arc<dyn PushRequestPlanner>,
@@ -48,22 +48,6 @@ pub struct PushDatasetUseCaseImpl {
 }
 
 impl PushDatasetUseCaseImpl {
-    pub fn new(
-        push_request_planner: Arc<dyn PushRequestPlanner>,
-        sync_request_builder: Arc<SyncRequestBuilder>,
-        sync_service: Arc<dyn SyncService>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
-    ) -> Self {
-        Self {
-            push_request_planner,
-            sync_request_builder,
-            sync_service,
-            dataset_action_authorizer,
-            remote_alias_registry,
-        }
-    }
-
     #[tracing::instrument(level = "debug", name = "PushDatasetUseCase::authorizations", skip_all, fields(?dataset_handles, ?push_target))]
     async fn make_authorization_checks(
         &self,

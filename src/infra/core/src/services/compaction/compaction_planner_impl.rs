@@ -11,7 +11,6 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
 use kamu_core::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -200,13 +199,7 @@ impl CompactionPlanner for CompactionPlannerImpl {
         options: CompactionOptions,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionPlan, CompactionPlanningError> {
-        let dataset_kind = target
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?
-            .kind;
-
-        if !options.keep_metadata_only && dataset_kind != odf::DatasetKind::Root {
+        if !options.keep_metadata_only && target.get_kind() != odf::DatasetKind::Root {
             return Err(CompactionPlanningError::InvalidDatasetKind(
                 InvalidDatasetKindError {
                     dataset_alias: target.get_alias().clone(),

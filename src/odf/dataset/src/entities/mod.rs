@@ -12,7 +12,6 @@ mod dataset;
 #[cfg(feature = "lfs")]
 mod dataset_layout;
 mod dataset_storage_unit;
-mod dataset_summary;
 mod identity_streams;
 mod metadata_chain;
 mod metadata_stream;
@@ -22,7 +21,6 @@ pub use dataset::*;
 #[cfg(feature = "lfs")]
 pub use dataset_layout::*;
 pub use dataset_storage_unit::*;
-pub use dataset_summary::*;
 pub use identity_streams::*;
 pub use metadata_chain::*;
 pub use metadata_stream::*;

@@ -18,41 +18,29 @@ use kamu_search::*;
 use super::{CLIError, Command};
 use crate::output::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SearchCommand {
     search_svc: Arc<dyn SearchServiceRemote>,
     search_local_svc: Arc<dyn SearchServiceLocal>,
     output_config: Arc<OutputConfig>,
+
+    #[dill::component(explicit)]
     query: Option<String>,
+
+    #[dill::component(explicit)]
     repository_names: Vec<odf::RepoName>,
+
+    #[dill::component(explicit)]
     local: bool,
+
+    #[dill::component(explicit)]
     max_results: usize,
 }
 
 impl SearchCommand {
-    pub fn new<S, I>(
-        search_svc: Arc<dyn SearchServiceRemote>,
-        search_local_svc: Arc<dyn SearchServiceLocal>,
-        output_config: Arc<OutputConfig>,
-        query: Option<S>,
-        repository_names: I,
-        local: bool,
-        max_results: usize,
-    ) -> Self
-    where
-        S: Into<String>,
-        I: IntoIterator<Item = odf::RepoName>,
-    {
-        Self {
-            search_svc,
-            search_local_svc,
-            output_config,
-            query: query.map(Into::into),
-            repository_names: repository_names.into_iter().collect(),
-            local,
-            max_results,
-        }
-    }
-
     fn humanize_data_size(size: u64) -> String {
         if size == 0 {
             return "-".to_owned();
@@ -69,7 +57,7 @@ impl SearchCommand {
         num.to_formatted_string(&Locale::en)
     }
 
-    async fn search_local(&mut self) -> Result<(), CLIError> {
+    async fn search_local(&self) -> Result<(), CLIError> {
         let prompt = self.query.clone().unwrap_or_default();
         if prompt.is_empty() {
             return Err(CLIError::usage_error("Please provide a search prompt"));
@@ -123,7 +111,7 @@ impl SearchCommand {
         Ok(())
     }
 
-    async fn search_remote(&mut self) -> Result<(), CLIError> {
+    async fn search_remote(&self) -> Result<(), CLIError> {
         let mut result = self
             .search_svc
             .search(
@@ -204,7 +192,7 @@ impl SearchCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SearchCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if self.local {
             self.search_local().await
         } else {
@@ -212,3 +200,5 @@ impl Command for SearchCommand {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

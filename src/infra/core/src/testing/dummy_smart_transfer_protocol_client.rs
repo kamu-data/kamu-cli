@@ -20,12 +20,6 @@ use crate::utils::smart_transfer_protocol::{SmartTransferProtocolClient, Transfe
 #[dill::interface(dyn SmartTransferProtocolClient)]
 pub struct DummySmartTransferProtocolClient {}
 
-impl DummySmartTransferProtocolClient {
-    pub fn new() -> DummySmartTransferProtocolClient {
-        Self {}
-    }
-}
-
 #[async_trait::async_trait]
 impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
     async fn pull_protocol_client_flow(

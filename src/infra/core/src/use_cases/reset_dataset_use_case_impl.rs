@@ -16,26 +16,12 @@ use kamu_core::{auth, ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlann
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn ResetDatasetUseCase)]
 pub struct ResetDatasetUseCaseImpl {
     reset_planner: Arc<dyn ResetPlanner>,
     reset_executor: Arc<dyn ResetExecutor>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-}
-
-impl ResetDatasetUseCaseImpl {
-    pub fn new(
-        reset_planner: Arc<dyn ResetPlanner>,
-        reset_executor: Arc<dyn ResetExecutor>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    ) -> Self {
-        Self {
-            reset_planner,
-            reset_executor,
-            rebac_dataset_registry_facade,
-        }
-    }
 }
 
 #[common_macros::method_names_consts]

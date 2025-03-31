@@ -16,32 +16,24 @@ use crate::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct GenerateTokenCommand {
     auth_service: Arc<AuthenticationServiceImpl>,
-    login: Option<String>,
-    subject: Option<String>,
-    expiration_time_sec: usize,
-}
 
-impl GenerateTokenCommand {
-    pub fn new(
-        auth_service: Arc<AuthenticationServiceImpl>,
-        login: Option<String>,
-        subject: Option<String>,
-        expiration_time_sec: usize,
-    ) -> Self {
-        Self {
-            auth_service,
-            login,
-            subject,
-            expiration_time_sec,
-        }
-    }
+    #[dill::component(explicit)]
+    login: Option<String>,
+
+    #[dill::component(explicit)]
+    subject: Option<String>,
+
+    #[dill::component(explicit)]
+    expiration_time_sec: usize,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for GenerateTokenCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let subject = if let Some(subject) = &self.subject {
             odf::AccountID::from_did_str(subject).int_err()?
         } else if let Some(login) = &self.login {

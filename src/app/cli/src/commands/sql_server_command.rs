@@ -24,46 +24,34 @@ use crate::WorkspaceLayout;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct SqlServerCommand {
-    flight_sql_service_factory: Arc<FlightSqlServiceFactory>,
-    spark_livy_server_factory: Arc<SparkLivyServerFactory>,
     workspace_layout: Arc<WorkspaceLayout>,
     engine_prov_config: Arc<EngineProvisionerLocalConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
+
+    #[dill::component(explicit)]
     address: Option<IpAddr>,
+
+    #[dill::component(explicit)]
     port: Option<u16>,
+
+    #[dill::component(explicit)]
     engine: Option<SqlShellEngine>,
+
+    #[dill::component(explicit)]
     livy: bool,
+
+    // TODO: Reconsider the injection approach
+    #[dill::component(explicit)]
+    flight_sql_service_factory: Arc<FlightSqlServiceFactory>,
+    #[dill::component(explicit)]
+    spark_livy_server_factory: Arc<SparkLivyServerFactory>,
 }
 
 impl SqlServerCommand {
-    pub fn new(
-        flight_sql_service_factory: Arc<FlightSqlServiceFactory>,
-        spark_livy_server_factory: Arc<SparkLivyServerFactory>,
-        workspace_layout: Arc<WorkspaceLayout>,
-        engine_prov_config: Arc<EngineProvisionerLocalConfig>,
-        output_config: Arc<OutputConfig>,
-        container_runtime: Arc<ContainerRuntime>,
-        address: Option<IpAddr>,
-        port: Option<u16>,
-        engine: Option<SqlShellEngine>,
-        livy: bool,
-    ) -> Self {
-        Self {
-            flight_sql_service_factory,
-            spark_livy_server_factory,
-            workspace_layout,
-            engine_prov_config,
-            output_config,
-            container_runtime,
-            address,
-            port,
-            engine,
-            livy,
-        }
-    }
-
     fn startup_spinner(&self, message: &str) -> Option<indicatif::ProgressBar> {
         if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
             let s = indicatif::ProgressBar::new_spinner();
@@ -79,7 +67,7 @@ impl SqlServerCommand {
         }
     }
 
-    async fn run_datafusion_flight_sql(&mut self) -> Result<(), CLIError> {
+    async fn run_datafusion_flight_sql(&self) -> Result<(), CLIError> {
         let flight_sql_svc = self
             .flight_sql_service_factory
             .start(self.address, self.port)
@@ -101,7 +89,7 @@ impl SqlServerCommand {
         Ok(())
     }
 
-    async fn run_spark_jdbc(&mut self) -> Result<(), CLIError> {
+    async fn run_spark_jdbc(&self) -> Result<(), CLIError> {
         let sql_shell = SqlShellImpl::new(
             self.container_runtime.clone(),
             self.engine_prov_config.spark_image.clone(),
@@ -156,7 +144,7 @@ impl SqlServerCommand {
         Ok(())
     }
 
-    async fn run_spark_livy(&mut self) -> Result<(), CLIError> {
+    async fn run_spark_livy(&self) -> Result<(), CLIError> {
         let pull_progress = PullImageProgress::new(self.output_config.clone(), "engine");
         self.spark_livy_server_factory
             .ensure_image(Some(&pull_progress))
@@ -211,7 +199,7 @@ impl SqlServerCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for SqlServerCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let engine = self.engine.unwrap_or(if !self.livy {
             SqlShellEngine::Datafusion
         } else {

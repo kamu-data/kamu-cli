@@ -32,7 +32,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn UploadService)]
 pub struct UploadServiceLocal {
     server_url_config: Arc<ServerUrlConfig>,
@@ -42,20 +42,6 @@ pub struct UploadServiceLocal {
 }
 
 impl UploadServiceLocal {
-    pub fn new(
-        server_url_config: Arc<ServerUrlConfig>,
-        uploads_config: Arc<FileUploadLimitConfig>,
-        maybe_access_token: Option<Arc<AccessToken>>,
-        cache_dir: Arc<CacheDir>,
-    ) -> Self {
-        Self {
-            server_url_config,
-            uploads_config,
-            maybe_access_token,
-            cache_dir,
-        }
-    }
-
     fn make_account_folder_path(&self, account_id_str: &str) -> PathBuf {
         self.cache_dir.join("uploads").join(account_id_str)
     }

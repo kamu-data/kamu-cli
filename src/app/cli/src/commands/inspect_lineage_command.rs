@@ -31,40 +31,25 @@ pub enum LineageOutputFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct InspectLineageCommand {
+    output_config: Arc<OutputConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
+
+    #[dill::component(explicit)]
     dataset_refs: Vec<odf::DatasetRef>,
+
+    #[dill::component(explicit)]
     browse: bool,
+
+    #[dill::component(explicit)]
     output_format: Option<LineageOutputFormat>,
-    output_config: Arc<OutputConfig>,
 }
 
 impl InspectLineageCommand {
-    pub fn new<I>(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        provenance_svc: Arc<dyn ProvenanceService>,
-        workspace_layout: Arc<WorkspaceLayout>,
-        dataset_refs: I,
-        browse: bool,
-        output_format: Option<LineageOutputFormat>,
-        output_config: Arc<OutputConfig>,
-    ) -> Self
-    where
-        I: IntoIterator<Item = odf::DatasetRef>,
-    {
-        Self {
-            dataset_registry,
-            provenance_svc,
-            workspace_layout,
-            dataset_refs: dataset_refs.into_iter().collect(),
-            browse,
-            output_format,
-            output_config,
-        }
-    }
-
     fn get_visitor(&self) -> Box<dyn LineageVisitor> {
         match self.output_format {
             None => {
@@ -95,7 +80,7 @@ impl InspectLineageCommand {
 // TODO: Support temporality and evolution
 #[async_trait::async_trait(?Send)]
 impl Command for InspectLineageCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         use futures::{StreamExt, TryStreamExt};
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
             self.dataset_registry

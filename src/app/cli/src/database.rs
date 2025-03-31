@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use database_common::*;
-use dill::{Catalog, CatalogBuilder, Component};
+use dill::{Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use secrecy::SecretString;
 use tempfile::TempDir;
@@ -114,6 +114,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_postgres::PostgresDatasetEntryRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetDependencyRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetReferenceRepository>();
+            b.add::<kamu_datasets_postgres::PostgresDatasetStatisticsRepository>();
 
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowTriggerEventStore>();
@@ -139,6 +140,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetDependencyRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
+            b.add::<kamu_datasets_inmem::InMemoryDatasetStatisticsRepository>();
 
             b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
@@ -161,6 +163,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_sqlite::SqliteDatasetEntryRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetDependencyRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetReferenceRepository>();
+            b.add::<kamu_datasets_sqlite::SqliteDatasetStatisticsRepository>();
 
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowTriggerEventStore>();
@@ -200,6 +203,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetDependencyRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
+    b.add::<kamu_datasets_inmem::InMemoryDatasetStatisticsRepository>();
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
@@ -208,9 +212,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn try_build_db_connection_settings(
-    raw_db_config: &DatabaseConfig,
-) -> Option<DatabaseConnectionSettings> {
+pub fn build_db_connection_settings(raw_db_config: &DatabaseConfig) -> DatabaseConnectionSettings {
     fn convert(c: &RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConnectionSettings {
         DatabaseConnectionSettings::new(
             provider,
@@ -226,12 +228,11 @@ pub fn try_build_db_connection_settings(
     match raw_db_config {
         DatabaseConfig::Sqlite(c) => {
             let path = Path::new(&c.database_path);
-            Some(DatabaseConnectionSettings::sqlite_from(path))
+            DatabaseConnectionSettings::sqlite_from(path)
         }
-        DatabaseConfig::Postgres(config) => Some(convert(config, DatabaseProvider::Postgres)),
-        DatabaseConfig::MySql(config) => Some(convert(config, DatabaseProvider::MySql)),
-        DatabaseConfig::MariaDB(config) => Some(convert(config, DatabaseProvider::MariaDB)),
-        DatabaseConfig::InMemory => None,
+        DatabaseConfig::Postgres(config) => convert(config, DatabaseProvider::Postgres),
+        DatabaseConfig::MySql(config) => convert(config, DatabaseProvider::MySql),
+        DatabaseConfig::MariaDB(config) => convert(config, DatabaseProvider::MariaDB),
     }
 }
 
@@ -274,7 +275,7 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
 
 pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: &Catalog) {
     let credentials_policy_config = match db_config {
-        DatabaseConfig::Sqlite(_) | DatabaseConfig::InMemory => None,
+        DatabaseConfig::Sqlite(_) => None,
         DatabaseConfig::Postgres(config)
         | DatabaseConfig::MySql(config)
         | DatabaseConfig::MariaDB(config) => Some(config.credentials_policy.clone()),
@@ -306,7 +307,6 @@ pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: 
 
 fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &DatabaseConfig) {
     match raw_db_config {
-        DatabaseConfig::InMemory => unreachable!(),
         DatabaseConfig::Sqlite(_) => {
             b.add::<DatabaseNoPasswordProvider>();
         }
@@ -314,29 +314,22 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
         | DatabaseConfig::Postgres(config)
         | DatabaseConfig::MariaDB(config) => match &config.credentials_policy.source {
             DatabaseCredentialSourceConfig::RawPassword(raw_password_config) => {
-                b.add_builder(
-                    DatabaseFixedPasswordProvider::builder()
-                        .with_db_user_name(SecretString::from(
-                            raw_password_config.user_name.clone(),
-                        ))
-                        .with_fixed_password(SecretString::from(
-                            raw_password_config.raw_password.clone(),
-                        )),
-                );
+                b.add_builder(DatabaseFixedPasswordProvider::builder(
+                    SecretString::from(raw_password_config.user_name.clone()),
+                    SecretString::from(raw_password_config.raw_password.clone()),
+                ));
                 b.bind::<dyn DatabasePasswordProvider, DatabaseFixedPasswordProvider>();
             }
             DatabaseCredentialSourceConfig::AwsSecret(aws_secret_config) => {
-                b.add_builder(
-                    DatabaseAwsSecretPasswordProvider::builder()
-                        .with_secret_name(aws_secret_config.secret_name.clone()),
-                );
+                b.add_builder(DatabaseAwsSecretPasswordProvider::builder(
+                    aws_secret_config.secret_name.clone(),
+                ));
                 b.bind::<dyn DatabasePasswordProvider, DatabaseAwsSecretPasswordProvider>();
             }
             DatabaseCredentialSourceConfig::AwsIamToken(aws_iam_config) => {
-                b.add_builder(
-                    DatabaseAwsIamTokenProvider::builder()
-                        .with_db_user_name(SecretString::from(aws_iam_config.user_name.clone())),
-                );
+                b.add_builder(DatabaseAwsIamTokenProvider::builder(SecretString::from(
+                    aws_iam_config.user_name.clone(),
+                )));
                 b.bind::<dyn DatabasePasswordProvider, DatabaseAwsIamTokenProvider>();
             }
         },

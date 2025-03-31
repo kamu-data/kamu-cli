@@ -17,22 +17,14 @@ use kamu::domain::*;
 use super::{CLIError, Command};
 use crate::output::*;
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct RepositoryListCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     output_config: Arc<OutputConfig>,
 }
 
 impl RepositoryListCommand {
-    pub fn new(
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        output_config: Arc<OutputConfig>,
-    ) -> Self {
-        Self {
-            remote_repo_reg,
-            output_config,
-        }
-    }
-
     fn record_batch(&self) -> Result<RecordBatch, InternalError> {
         let mut col_name = Vec::new();
         let mut col_url = Vec::new();
@@ -54,7 +46,7 @@ impl RepositoryListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryListCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let mut writer = self
             .output_config
             .get_records_writer(&self.schema(), self.records_format());

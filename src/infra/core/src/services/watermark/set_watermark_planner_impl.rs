@@ -59,12 +59,7 @@ impl SetWatermarkPlanner for SetWatermarkPlannerImpl {
             return Err(SetWatermarkPlanningError::IsRemote);
         }
 
-        let summary = target
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?;
-
-        if summary.kind != odf::DatasetKind::Root {
+        if target.get_kind() != odf::DatasetKind::Root {
             return Err(SetWatermarkPlanningError::IsDerivative);
         }
 

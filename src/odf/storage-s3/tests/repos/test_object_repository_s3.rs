@@ -43,7 +43,7 @@ async fn test_unauthorized() {
 
     assert_matches!(
         repo.insert_bytes(b"foo", InsertOpts::default()).await,
-        Err(InsertError::Access(AccessError::Unauthorized(_)))
+        Err(InsertError::Access(AccessError::Unauthenticated(_)))
     );
 }
 

@@ -20,59 +20,33 @@ use super::{CLIError, Command, SqlShellEngine};
 use crate::explore::{FlightSqlServiceFactory, NotebookServerFactory, SparkLivyServerFactory};
 use crate::output::OutputConfig;
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct NotebookCommand {
-    flight_sql_service_factory: Arc<FlightSqlServiceFactory>,
-    spark_livy_server_factory: Arc<SparkLivyServerFactory>,
     notebook_server_factory: Arc<NotebookServerFactory>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
+
+    #[dill::component(explicit)]
     address: Option<IpAddr>,
+
+    #[dill::component(explicit)]
     port: Option<u16>,
+
+    #[dill::component(explicit)]
     engine: Option<SqlShellEngine>,
+
+    #[dill::component(explicit)]
     env_vars: Vec<(String, Option<String>)>,
+
+    // TODO: Reconsider the injection approach
+    #[dill::component(explicit)]
+    flight_sql_service_factory: Arc<FlightSqlServiceFactory>,
+    #[dill::component(explicit)]
+    spark_livy_server_factory: Arc<SparkLivyServerFactory>,
 }
 
 impl NotebookCommand {
-    pub fn new<Iter, Str>(
-        flight_sql_service_factory: Arc<FlightSqlServiceFactory>,
-        spark_livy_server_factory: Arc<SparkLivyServerFactory>,
-        notebook_server_factory: Arc<NotebookServerFactory>,
-        output_config: Arc<OutputConfig>,
-        container_runtime: Arc<ContainerRuntime>,
-        address: Option<IpAddr>,
-        port: Option<u16>,
-        engine: Option<SqlShellEngine>,
-        env_vars: Iter,
-    ) -> Self
-    where
-        Iter: IntoIterator<Item = Str>,
-        Str: AsRef<str>,
-    {
-        Self {
-            flight_sql_service_factory,
-            spark_livy_server_factory,
-            notebook_server_factory,
-            output_config,
-            container_runtime,
-            address,
-            port,
-            engine,
-            env_vars: env_vars
-                .into_iter()
-                .map(|elem| {
-                    let s = elem.as_ref();
-                    match s.find('=') {
-                        None => (s.to_owned(), None),
-                        Some(pos) => {
-                            let (name, value) = s.split_at(pos);
-                            (name.to_owned(), Some(value[1..].to_owned()))
-                        }
-                    }
-                })
-                .collect(),
-        }
-    }
-
     fn collect_env_vars(&self) -> Result<Vec<(String, String)>, CLIError> {
         self.env_vars
             .iter()
@@ -103,7 +77,7 @@ impl NotebookCommand {
         }
     }
 
-    async fn run_datafusion(&mut self) -> Result<(), CLIError> {
+    async fn run_datafusion(&self) -> Result<(), CLIError> {
         let environment_vars = self.collect_env_vars()?;
 
         let pull_progress = PullImageProgress::new(self.output_config.clone(), "Jupyter");
@@ -173,7 +147,7 @@ impl NotebookCommand {
         Ok(())
     }
 
-    async fn run_spark(&mut self) -> Result<(), CLIError> {
+    async fn run_spark(&self) -> Result<(), CLIError> {
         let environment_vars = self.collect_env_vars()?;
 
         // Pull images
@@ -261,7 +235,7 @@ impl NotebookCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for NotebookCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let engine = self.engine.unwrap_or(SqlShellEngine::Datafusion);
 
         match engine {

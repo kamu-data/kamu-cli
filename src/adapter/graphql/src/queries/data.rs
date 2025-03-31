@@ -55,13 +55,22 @@ impl DataQueries {
                 let sql_result = query_svc
                     .sql_statement(&query, domain::QueryOptions::default())
                     .await;
+
                 match sql_result {
                     Ok(r) => r,
-                    Err(e) => return Ok(e.into()),
+                    Err(domain::QueryError::DatasetSchemaNotAvailable(_)) => {
+                        return Ok(DataQueryResult::no_schema_yet(data_format, limit));
+                    }
+                    Err(err) => return DataQueryResult::from_query_error(err),
                 }
             }
-            _ => unimplemented!(),
+            _ => {
+                return Ok(DataQueryResult::invalid_sql(format!(
+                    "Dialect {query_dialect:?} is not yet supported"
+                )))
+            }
         };
+
         let df = query_result
             .df
             // TODO: Sanity limits
@@ -72,10 +81,12 @@ impl DataQueries {
             .int_err()?;
 
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
+
         let record_batches = match df.collect().await {
             Ok(rb) => rb,
-            Err(e) => return Ok(e.into()),
+            Err(err) => return DataQueryResult::from_query_error(err.into()),
         };
+
         let data = DataBatch::from_records(&record_batches, data_format)?;
         let datasets = DatasetState::from_query_state(query_result.state);
 

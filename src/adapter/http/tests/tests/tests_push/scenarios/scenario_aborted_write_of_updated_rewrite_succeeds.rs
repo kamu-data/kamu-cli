@@ -69,6 +69,7 @@ impl<TServerHarness: ServerSideHarness>
         let server_dataset_layout = server_harness.dataset_layout(&odf::DatasetHandle::new(
             client_create_result.dataset_handle.id.clone(),
             odf::DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
+            odf::DatasetKind::Root,
         ));
 
         // Hard folder synchronization
@@ -86,6 +87,7 @@ impl<TServerHarness: ServerSideHarness>
                 &client_create_result.dataset_handle.id,
                 &server_harness.server_account_id(),
                 &client_create_result.dataset_handle.alias.dataset_name,
+                odf::DatasetKind::Root,
             )
             .await
             .unwrap();

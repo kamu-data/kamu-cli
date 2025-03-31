@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
 use kamu_adapter_oauth::PROVIDER_GITHUB;
 use url::Url;
 
@@ -16,19 +17,19 @@ use crate::{odf_server, CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LoginSilentMode {
     OAuth(LoginSilentModeOAuth),
     Password(LoginSilentModePassword),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoginSilentModeOAuth {
     pub provider: String,
     pub access_token: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoginSilentModePassword {
     pub login: String,
     pub password: String,
@@ -36,31 +37,30 @@ pub struct LoginSilentModePassword {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct LoginSilentCommand {
     login_service: Arc<odf_server::LoginService>,
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+
+    #[dill::component(explicit)]
     scope: odf_server::AccessTokenStoreScope,
+
+    #[dill::component(explicit)]
     server: Option<Url>,
+
+    #[dill::component(explicit)]
     mode: LoginSilentMode,
+
+    #[dill::component(explicit)]
+    repo_name: Option<odf::RepoName>,
+
+    #[dill::component(explicit)]
+    skip_add_repo: bool,
 }
 
 impl LoginSilentCommand {
-    pub fn new(
-        login_service: Arc<odf_server::LoginService>,
-        access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
-        scope: odf_server::AccessTokenStoreScope,
-        server: Option<Url>,
-        mode: LoginSilentMode,
-    ) -> Self {
-        Self {
-            login_service,
-            access_token_registry_service,
-            scope,
-            server,
-            mode,
-        }
-    }
-
     fn get_server_url(&self) -> Url {
         self.server
             .clone()
@@ -68,6 +68,23 @@ impl LoginSilentCommand {
     }
 
     async fn new_login(&self, odf_server_backend_url: Url) -> Result<(), CLIError> {
+        let maybe_repo_name = if self.skip_add_repo {
+            None
+        } else {
+            let repo_name = if let Some(repo_name) = self.repo_name.as_ref() {
+                repo_name.clone()
+            } else {
+                let host = odf_server_backend_url.host_str().ok_or_else(|| {
+                    CLIError::usage_error(format!(
+                        "Server URL does not contain the host part: {}",
+                        odf_server_backend_url.as_str()
+                    ))
+                })?;
+                odf::RepoName::try_from(host).map_err(CLIError::failure)?
+            };
+            Some(repo_name)
+        };
+
         // Execute login method depending on the input mode
         let login_response = match &self.mode {
             LoginSilentMode::OAuth(github_mode) => {
@@ -114,6 +131,10 @@ impl LoginSilentCommand {
             &odf_server_backend_url,
             login_response.access_token,
         )?;
+
+        if let Some(repo_name) = maybe_repo_name {
+            self.add_repository(&repo_name, &odf_server_backend_url)?;
+        }
 
         eprintln!(
             "{}: {}",
@@ -164,11 +185,29 @@ impl LoginSilentCommand {
 
         Err(CLIError::failure(e))
     }
+
+    fn add_repository(
+        &self,
+        repo_name: &odf::RepoName,
+        odf_server_backend_url: &Url,
+    ) -> Result<(), CLIError> {
+        use kamu::UrlExt;
+
+        match self.remote_repo_reg.add_repository(
+            repo_name,
+            odf_server_backend_url
+                .as_odf_protocol()
+                .map_err(CLIError::failure)?,
+        ) {
+            Ok(_) | Err(AddRepoError::AlreadyExists(_)) => Ok(()),
+            Err(e) => Err(CLIError::failure(e)),
+        }
+    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for LoginSilentCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let odf_server_backend_url = self.get_server_url();
 
         // Validate token and trigger browser login flow if needed

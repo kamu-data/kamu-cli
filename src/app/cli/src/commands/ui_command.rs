@@ -27,53 +27,38 @@ use crate::OutputConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct UICommand {
-    server_catalog: Catalog,
     tenancy_config: TenancyConfig,
-    current_account_name: odf::AccountName,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
-    output_config: Arc<OutputConfig>,
     dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
-    address: Option<IpAddr>,
-    port: Option<u16>,
-    get_token: bool,
-}
+    output_config: Arc<OutputConfig>,
 
-impl UICommand {
-    pub fn new(
-        server_catalog: Catalog,
-        tenancy_config: TenancyConfig,
-        current_account_name: odf::AccountName,
-        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-        file_upload_limit_config: Arc<FileUploadLimitConfig>,
-        output_config: Arc<OutputConfig>,
-        dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
-        address: Option<IpAddr>,
-        port: Option<u16>,
-        get_token: bool,
-    ) -> Self {
-        Self {
-            server_catalog,
-            tenancy_config,
-            current_account_name,
-            predefined_accounts_config,
-            file_upload_limit_config,
-            output_config,
-            dataset_env_vars_config,
-            address,
-            port,
-            get_token,
-        }
-    }
+    #[dill::component(explicit)]
+    current_account_name: odf::AccountName,
+
+    #[dill::component(explicit)]
+    address: Option<IpAddr>,
+
+    #[dill::component(explicit)]
+    port: Option<u16>,
+
+    #[dill::component(explicit)]
+    get_token: bool,
+
+    // TODO: Reconsider the injection approach
+    #[dill::component(explicit)]
+    base_catalog: Catalog,
 }
 
 #[cfg(feature = "web-ui")]
 #[async_trait::async_trait(?Send)]
 impl Command for UICommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let web_server = crate::explore::WebUIServer::new(
-            self.server_catalog.clone(),
+            self.base_catalog.clone(),
             self.tenancy_config,
             self.current_account_name.clone(),
             self.predefined_accounts_config.clone(),
@@ -127,7 +112,7 @@ impl Command for UICommand {
 #[cfg(not(feature = "web-ui"))]
 #[async_trait::async_trait(?Send)]
 impl Command for UICommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         Err(CLIError::usage_error(
             "This version of kamu was compiled without the embedded Web UI",
         ))

@@ -100,25 +100,15 @@ async fn check_dataset_access(
     dataset_request_state: &DatasetRequestState,
     action: auth::DatasetAction,
 ) -> Result<(), GqlError> {
-    if is_action_allowed(ctx, dataset_request_state, action).await? {
+    let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
+
+    if allowed_actions.contains(&action) {
         Ok(())
     } else {
         Err(make_dataset_access_error(
             dataset_request_state.dataset_handle(),
         ))
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn is_action_allowed(
-    ctx: &Context<'_>,
-    dataset_request_state: &DatasetRequestState,
-    action: auth::DatasetAction,
-) -> Result<bool, GqlError> {
-    let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
-
-    Ok(allowed_actions.contains(&action))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -250,12 +240,19 @@ pub(crate) fn logged_account(ctx: &Context<'_>) -> bool {
 #[derive(Debug)]
 pub enum GqlError {
     Internal(InternalError),
+    Access(odf::AccessError),
     Gql(async_graphql::Error),
 }
 
 impl From<InternalError> for GqlError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
+    }
+}
+
+impl From<odf::AccessError> for GqlError {
+    fn from(value: odf::AccessError) -> Self {
+        Self::Access(value)
     }
 }
 
@@ -269,6 +266,14 @@ impl From<GqlError> for async_graphql::Error {
     fn from(val: GqlError) -> Self {
         match val {
             GqlError::Internal(err) => async_graphql::Error::new_with_source(err),
+            GqlError::Access(err) => {
+                let code = match &err {
+                    odf::AccessError::ReadOnly(_) => "READ_ONLY",
+                    odf::AccessError::Unauthenticated(_) => "UNAUTHENTICATED",
+                    odf::AccessError::Unauthorized(_) => "UNAUTHORIZED",
+                };
+                async_graphql::Error::new_with_source(err).extend_with(|_, ex| ex.set("code", code))
+            }
             GqlError::Gql(err) => err,
         }
     }

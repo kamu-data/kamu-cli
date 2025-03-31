@@ -109,7 +109,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                     dataset_id   as "id: _",
                     owner_id     as "owner_id: _",
                     dataset_name as name,
-                    created_at   as "created_at: _"
+                    created_at   as "created_at: _",
+                    kind         as "kind: _"
                 FROM dataset_entries
                 ORDER BY dataset_name ASC
                 LIMIT $1 OFFSET $2
@@ -144,7 +145,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
                    dataset_name as name,
-                   created_at   as "created_at: _"
+                   created_at   as "created_at: _",
+                   kind         as "kind: _"
             FROM dataset_entries
             WHERE dataset_id = $1
             "#,
@@ -174,7 +176,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             SELECT dataset_id as id,
                    owner_id,
                    dataset_name as name,
-                   created_at
+                   created_at,
+                   kind
             FROM dataset_entries
             WHERE dataset_id IN ({})
             ORDER BY created_at
@@ -194,12 +197,14 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let resolved_entries: Vec<_> = dataset_rows
             .into_iter()
             .map(|row| {
-                DatasetEntry::new(
-                    row.get(0),
-                    row.get(1),
-                    odf::DatasetName::new_unchecked(row.get::<&str, _>(2)),
-                    row.get(3),
-                )
+                let entry_row = DatasetEntryRowModel {
+                    id: row.get(0),
+                    owner_id: row.get(1),
+                    name: row.get(2),
+                    created_at: row.get(3),
+                    kind: row.get(4),
+                };
+                DatasetEntry::from(entry_row)
             })
             .collect();
 
@@ -240,7 +245,8 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
                    dataset_name as name,
-                   created_at   as "created_at: _"
+                   created_at   as "created_at: _",
+                   kind         as "kind: _"
             FROM dataset_entries
             WHERE owner_id = $1
               AND dataset_name = $2
@@ -279,10 +285,12 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             let mut query_stream = sqlx::query_as!(
                 DatasetEntryRowModel,
                 r#"
-                SELECT dataset_id   as "id: _",
+                SELECT
+                    dataset_id   as "id: _",
                     owner_id     as "owner_id: _",
                     dataset_name as name,
-                    created_at   as "created_at: _"
+                    created_at   as "created_at: _",
+                    kind         as "kind: _"
                 FROM dataset_entries
                 WHERE owner_id = $1
                 LIMIT $2 OFFSET $3
@@ -314,15 +322,19 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let owner_id_as_str = stack_owner_id.as_str();
         let dataset_name_as_str = dataset_entry.name.as_str();
 
+        let dataset_entry_kind: DatasetEntryKindRowModel = dataset_entry.kind.into();
+        let dataset_entry_kind_str = dataset_entry_kind.to_string();
+
         sqlx::query!(
             r#"
-            INSERT INTO dataset_entries(dataset_id, owner_id, dataset_name, created_at)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO dataset_entries(dataset_id, owner_id, dataset_name, created_at, kind)
+                VALUES ($1, $2, $3, $4, $5)
             "#,
             dataset_id_as_str,
             owner_id_as_str,
             dataset_name_as_str,
             dataset_entry.created_at,
+            dataset_entry_kind_str,
         )
         .execute(connection_mut)
         .await

@@ -19,27 +19,17 @@ use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct InspectQueryCommand {
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    dataset_ref: odf::DatasetRef,
     output_config: Arc<OutputConfig>,
+    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
 }
 
 impl InspectQueryCommand {
-    pub fn new(
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-        dataset_ref: odf::DatasetRef,
-        output_config: Arc<OutputConfig>,
-    ) -> Self {
-        Self {
-            rebac_dataset_registry_facade,
-            dataset_ref,
-            output_config,
-        }
-    }
-
     async fn render(
         &self,
         output: &mut impl Write,
@@ -174,7 +164,7 @@ impl InspectQueryCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for InspectQueryCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
             .resolve_dataset_by_ref(&self.dataset_ref, auth::DatasetAction::Read)

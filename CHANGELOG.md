@@ -11,6 +11,32 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- `kamu login {password,oauth}`:
+  - Saving the repository is the same as in `kamu login` 
+  - Add `--repo-name` & `--skip-add-repo` arguments to control the save settings of the remote repository
+### Changed
+- `DatasetSummary` files replaced with `DatasetStatistics` stored in the database
+     and updated synchronously with the HEAD reference updates
+- Statistics is automatically pre-computed for all existing datasets on first use
+- `DatasetHandle` and `DatasetEntry` now contain dataset kind marker
+- Provenance service and pull request planner fetch dependencies from the graph
+- Implemented caching layer for `DatasetEntry` within the currently open transaction
+- Private Datasets:
+  - HTTP: Return 403 if the user does not have write permission while having read permission
+  - GQL: `DatasetsMut::by_id()`: Return access error 
+      if the user does not have write permission while having read permission
+  - GQL: Operations on dataset environment variables require at least a maintainer role
+  - `kamu search`: Private accessible datasets are included in the search results
+- E2E: Removed `inmem` tests that almost duplicated `sqlite` tests
+- E2E, `kamu-cli-e2e-repo-tests`: remove a `kamu-cli` dependency that did not cause the `kamu-cli` binary to be rebuilt
+- Tests, DI: Check also for sqlite dependencies
+### Fixed
+- Flow GQL Api: 
+  - Correctly returns batching rule with `0` value
+  - Improved message for unknown description message
+
 ## [0.230.0] - 2025-03-25
 ### Added
 - Private Datasets, access sharing:

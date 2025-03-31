@@ -58,6 +58,170 @@ pub enum DatasetAction {
     Own,
 }
 
+impl DatasetAction {
+    pub fn resolve_access(set: &HashSet<Self>, action: Self) -> DatasetActionAccess {
+        if set.contains(&action) {
+            DatasetActionAccess::Full
+        } else if set.contains(&Self::Read) {
+            DatasetActionAccess::Limited
+        } else {
+            DatasetActionAccess::Forbidden
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum DatasetActionAccess {
+    Forbidden,
+    Limited,
+    Full,
+}
+
+#[test]
+fn test_dataset_action_resolve_access() {
+    use {DatasetAction as Action, DatasetActionAccess as Access};
+
+    struct FixtureSubTest {
+        current_action: Action,
+        expected_access: Access,
+    }
+
+    struct Fixture<'a> {
+        allowed_actions: &'a HashSet<Action>,
+        sub_tests: &'a [FixtureSubTest],
+    }
+
+    for (
+        fixture_index,
+        Fixture {
+            allowed_actions,
+            sub_tests,
+        },
+    ) in [
+        Fixture {
+            allowed_actions: &HashSet::from([]),
+            sub_tests: &[
+                FixtureSubTest {
+                    current_action: DatasetAction::Read,
+                    expected_access: DatasetActionAccess::Forbidden,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Write,
+                    expected_access: DatasetActionAccess::Forbidden,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Maintain,
+                    expected_access: DatasetActionAccess::Forbidden,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Own,
+                    expected_access: DatasetActionAccess::Forbidden,
+                },
+            ],
+        },
+        Fixture {
+            allowed_actions: &HashSet::from([Action::Read]),
+            sub_tests: &[
+                FixtureSubTest {
+                    current_action: DatasetAction::Read,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Write,
+                    expected_access: DatasetActionAccess::Limited,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Maintain,
+                    expected_access: DatasetActionAccess::Limited,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Own,
+                    expected_access: DatasetActionAccess::Limited,
+                },
+            ],
+        },
+        Fixture {
+            allowed_actions: &HashSet::from([Action::Read, Action::Write]),
+            sub_tests: &[
+                FixtureSubTest {
+                    current_action: DatasetAction::Read,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Write,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Maintain,
+                    expected_access: DatasetActionAccess::Limited,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Own,
+                    expected_access: DatasetActionAccess::Limited,
+                },
+            ],
+        },
+        Fixture {
+            allowed_actions: &HashSet::from([Action::Read, Action::Write, Action::Maintain]),
+            sub_tests: &[
+                FixtureSubTest {
+                    current_action: DatasetAction::Read,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Write,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Maintain,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Own,
+                    expected_access: DatasetActionAccess::Limited,
+                },
+            ],
+        },
+        Fixture {
+            allowed_actions: &HashSet::from([
+                Action::Read,
+                Action::Write,
+                Action::Maintain,
+                Action::Own,
+            ]),
+            sub_tests: &[
+                FixtureSubTest {
+                    current_action: DatasetAction::Read,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Write,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Maintain,
+                    expected_access: DatasetActionAccess::Full,
+                },
+                FixtureSubTest {
+                    current_action: DatasetAction::Own,
+                    expected_access: DatasetActionAccess::Full,
+                },
+            ],
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        for (sub_test_index, sub_test) in sub_tests.iter().enumerate() {
+            assert_eq!(
+                sub_test.expected_access,
+                DatasetAction::resolve_access(allowed_actions, sub_test.current_action),
+                "Fixture index: {fixture_index}; Sub-test index: {sub_test_index}",
+            );
+        }
+    }
+}
+
 #[cfg(feature = "oso")]
 impl oso::FromPolar for DatasetAction {
     fn from_polar(polar_value: oso::PolarValue) -> oso::Result<Self> {
@@ -96,7 +260,7 @@ pub enum DatasetActionUnauthorizedError {
 
 impl DatasetActionUnauthorizedError {
     pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
-        Self::Access(odf::AccessError::Forbidden(
+        Self::Access(odf::AccessError::Unauthorized(
             DatasetActionNotEnoughPermissionsError {
                 action,
                 dataset_ref,
@@ -216,15 +380,9 @@ impl From<ClassifyByAllowanceResponse> for ClassifyByAllowanceIdsResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn DatasetActionAuthorizer)]
 pub struct AlwaysHappyDatasetActionAuthorizer {}
-
-impl AlwaysHappyDatasetActionAuthorizer {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 
 #[async_trait::async_trait]
 impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {

@@ -20,39 +20,22 @@ use crate::ConfirmDeleteService;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct DeleteCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
-    dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     confirm_delete_service: Arc<ConfirmDeleteService>,
-    all: bool,
-    recursive: bool,
-}
 
-impl DeleteCommand {
-    pub fn new<I>(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        delete_dataset: Arc<dyn DeleteDatasetUseCase>,
-        dataset_ref_patterns: I,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        confirm_delete_service: Arc<ConfirmDeleteService>,
-        all: bool,
-        recursive: bool,
-    ) -> Self
-    where
-        I: IntoIterator<Item = odf::DatasetRefPattern>,
-    {
-        Self {
-            dataset_registry,
-            delete_dataset,
-            dataset_ref_patterns: dataset_ref_patterns.into_iter().collect(),
-            dependency_graph_service,
-            confirm_delete_service,
-            all,
-            recursive,
-        }
-    }
+    #[dill::component(explicit)]
+    dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
+
+    #[dill::component(explicit)]
+    all: bool,
+
+    #[dill::component(explicit)]
+    recursive: bool,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -68,7 +51,7 @@ impl Command for DeleteCommand {
         }
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let dataset_handles: Vec<odf::DatasetHandle> = if self.all {
             self.dataset_registry
                 .all_dataset_handles()

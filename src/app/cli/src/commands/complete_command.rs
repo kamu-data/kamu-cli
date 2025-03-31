@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::{fs, path};
 
 use chrono::prelude::*;
+use clap::CommandFactory as _;
 use futures::TryStreamExt;
 use glob;
 use internal_error::ResultIntoInternal;
@@ -20,42 +21,24 @@ use kamu::domain::*;
 use super::{CLIError, Command};
 use crate::config::ConfigService;
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct CompleteCommand {
     dataset_registry: Option<Arc<dyn DatasetRegistry>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
-    cli: clap::Command,
+
+    #[dill::component(explicit)]
     input: String,
+
+    #[dill::component(explicit)]
     current: usize,
 }
 
 // TODO: This is an extremely hacky way to implement the completion
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
-    pub fn new<S>(
-        dataset_registry: Option<Arc<dyn DatasetRegistry>>,
-        remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
-        remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
-        config_service: Arc<ConfigService>,
-        cli: clap::Command,
-        input: S,
-        current: usize,
-    ) -> Self
-    where
-        S: Into<String>,
-    {
-        Self {
-            dataset_registry,
-            remote_repo_reg,
-            remote_alias_reg,
-            config_service,
-            cli,
-            input: input.into(),
-            current,
-        }
-    }
-
     fn complete_timestamp(&self, output: &mut impl Write) {
         writeln!(
             output,
@@ -162,14 +145,16 @@ impl CompleteCommand {
         }
     }
 
-    pub async fn complete(&mut self, output: &mut impl Write) -> Result<(), CLIError> {
+    pub async fn complete(&self, output: &mut impl Write) -> Result<(), CLIError> {
         let Some(mut args) = shlex::split(&self.input) else {
             return Ok(());
         };
 
+        let cli = crate::cli::Cli::command();
+
         args.truncate(self.current + 1);
 
-        let mut last_cmd = &self.cli;
+        let mut last_cmd = &cli;
 
         // Establish command context
         for arg in &args[1..] {
@@ -252,7 +237,7 @@ impl CompleteCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for CompleteCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         self.complete(&mut std::io::stdout()).await
     }
 }

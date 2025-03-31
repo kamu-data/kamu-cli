@@ -16,6 +16,8 @@ use kamu_core::DatasetRegistry;
 use kamu_datasets::DatasetDependencyRepository;
 
 use crate::{
+    extract_modified_dependencies_in_interval,
+    DependencyChange,
     DependencyGraphServiceImpl,
     JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
     JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER,
@@ -58,6 +60,7 @@ impl DependencyGraphIndexer {
             .int_err()
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn index_dependencies_from_storage(&self) -> Result<(), InternalError> {
         use tokio_stream::StreamExt;
         use tracing::Instrument;
@@ -68,21 +71,33 @@ impl DependencyGraphIndexer {
             let span =
                 tracing::debug_span!("Scanning dataset dependencies", dataset = %dataset_handle);
 
-            let summary = self
+            let dataset = self
                 .dataset_registry
                 .get_dataset_by_handle(&dataset_handle)
-                .await
-                .get_summary(odf::dataset::GetSummaryOpts::default())
                 .instrument(span)
+                .await;
+
+            // Important: read from storage, not from database cache!
+            let head = dataset
+                .as_metadata_chain()
+                .as_uncached_ref_repo()
+                .get(odf::BlockRef::Head.as_str())
                 .await
                 .int_err()?;
 
-            let upstream_dependencies: Vec<_> = summary.dependencies.iter().collect();
-
-            self.dataset_dependency_repo
-                .add_upstream_dependencies(&dataset_handle.id, &upstream_dependencies)
-                .await
-                .int_err()?;
+            // Compute if there are some dependencies
+            if let DependencyChange::Changed(upstream_ids) =
+                extract_modified_dependencies_in_interval(dataset.as_metadata_chain(), &head, None)
+                    .await?
+            {
+                self.dataset_dependency_repo
+                    .add_upstream_dependencies(
+                        &dataset_handle.id,
+                        &(upstream_ids.iter().collect::<Vec<_>>()),
+                    )
+                    .await
+                    .int_err()?;
+            }
         }
 
         Ok(())

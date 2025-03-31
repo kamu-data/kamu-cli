@@ -212,10 +212,12 @@ fn test_dataset_refs_conversions() {
     takes_ref_local(DatasetHandle {
         id: DatasetID::new_seeded_ed25519(b"key"),
         alias: DatasetAlias::try_from("bar").unwrap(),
+        kind: DatasetKind::Root,
     });
     takes_ref_local(&DatasetHandle {
         id: DatasetID::new_seeded_ed25519(b"key"),
         alias: DatasetAlias::try_from("bar").unwrap(),
+        kind: DatasetKind::Root,
     });
 
     takes_ref_remote(DatasetID::new_seeded_ed25519(b"key"));
@@ -230,10 +232,12 @@ fn test_dataset_refs_conversions() {
     takes_ref_any(DatasetHandle {
         id: DatasetID::new_seeded_ed25519(b"key"),
         alias: DatasetAlias::try_from("bar").unwrap(),
+        kind: DatasetKind::Root,
     });
     takes_ref_any(&DatasetHandle {
         id: DatasetID::new_seeded_ed25519(b"key"),
         alias: DatasetAlias::try_from("bar").unwrap(),
+        kind: DatasetKind::Root,
     });
 }
 

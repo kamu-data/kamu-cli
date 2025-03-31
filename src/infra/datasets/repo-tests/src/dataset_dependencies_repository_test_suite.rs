@@ -26,8 +26,8 @@ pub async fn test_crud_single_dependency(catalog: &Catalog) {
         .unwrap();
 
     let account = new_account(&account_repo).await;
-    let entry_foo = new_dataset_entry_with(&account, "foo");
-    let entry_bar = new_dataset_entry_with(&account, "bar");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
+    let entry_bar = new_dataset_entry_with(&account, "bar", odf::DatasetKind::Derivative);
 
     for entry in [&entry_foo, &entry_bar] {
         dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
@@ -74,11 +74,11 @@ pub async fn test_several_unrelated_dependencies(catalog: &Catalog) {
         .unwrap();
 
     let account = new_account(&account_repo).await;
-    let entry_alpha = new_dataset_entry_with(&account, "alpha");
-    let entry_beta = new_dataset_entry_with(&account, "beta");
+    let entry_alpha = new_dataset_entry_with(&account, "alpha", odf::DatasetKind::Root);
+    let entry_beta = new_dataset_entry_with(&account, "beta", odf::DatasetKind::Derivative);
 
-    let entry_phi = new_dataset_entry_with(&account, "phi");
-    let entry_ksi = new_dataset_entry_with(&account, "ksi");
+    let entry_phi = new_dataset_entry_with(&account, "phi", odf::DatasetKind::Root);
+    let entry_ksi = new_dataset_entry_with(&account, "ksi", odf::DatasetKind::Derivative);
 
     for entry in [&entry_alpha, &entry_beta, &entry_phi, &entry_ksi] {
         dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
@@ -126,9 +126,9 @@ pub async fn test_dependency_chain(catalog: &Catalog) {
         .unwrap();
 
     let account = new_account(&account_repo).await;
-    let entry_foo = new_dataset_entry_with(&account, "foo");
-    let entry_bar = new_dataset_entry_with(&account, "bar");
-    let entry_baz = new_dataset_entry_with(&account, "baz");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
+    let entry_bar = new_dataset_entry_with(&account, "bar", odf::DatasetKind::Derivative);
+    let entry_baz = new_dataset_entry_with(&account, "baz", odf::DatasetKind::Derivative);
 
     for entry in [&entry_foo, &entry_bar, &entry_baz] {
         dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
@@ -177,14 +177,14 @@ pub async fn test_dependency_fanins(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let entry_a = new_dataset_entry_with(&account, "a");
-    let entry_b = new_dataset_entry_with(&account, "b");
-    let entry_c = new_dataset_entry_with(&account, "c");
-    let entry_d = new_dataset_entry_with(&account, "d");
-    let entry_e = new_dataset_entry_with(&account, "e");
-    let entry_abc = new_dataset_entry_with(&account, "abc");
-    let entry_de = new_dataset_entry_with(&account, "de");
-    let entry_abc_de = new_dataset_entry_with(&account, "abc-de");
+    let entry_a = new_dataset_entry_with(&account, "a", odf::DatasetKind::Root);
+    let entry_b = new_dataset_entry_with(&account, "b", odf::DatasetKind::Root);
+    let entry_c = new_dataset_entry_with(&account, "c", odf::DatasetKind::Root);
+    let entry_d = new_dataset_entry_with(&account, "d", odf::DatasetKind::Root);
+    let entry_e = new_dataset_entry_with(&account, "e", odf::DatasetKind::Root);
+    let entry_abc = new_dataset_entry_with(&account, "abc", odf::DatasetKind::Derivative);
+    let entry_de = new_dataset_entry_with(&account, "de", odf::DatasetKind::Derivative);
+    let entry_abc_de = new_dataset_entry_with(&account, "abc-de", odf::DatasetKind::Derivative);
 
     for entry in [
         &entry_a,
@@ -251,13 +251,13 @@ pub async fn test_dependency_fanouts(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let entry_a = new_dataset_entry_with(&account, "a");
-    let entry_a1 = new_dataset_entry_with(&account, "a1");
-    let entry_a2 = new_dataset_entry_with(&account, "a2");
-    let entry_a1_1 = new_dataset_entry_with(&account, "a1_1");
-    let entry_a1_2 = new_dataset_entry_with(&account, "a1_2");
-    let entry_a2_1 = new_dataset_entry_with(&account, "a2_1");
-    let entry_a2_2 = new_dataset_entry_with(&account, "a2_2");
+    let entry_a = new_dataset_entry_with(&account, "a", odf::DatasetKind::Root);
+    let entry_a1 = new_dataset_entry_with(&account, "a1", odf::DatasetKind::Derivative);
+    let entry_a2 = new_dataset_entry_with(&account, "a2", odf::DatasetKind::Derivative);
+    let entry_a1_1 = new_dataset_entry_with(&account, "a1_1", odf::DatasetKind::Derivative);
+    let entry_a1_2 = new_dataset_entry_with(&account, "a1_2", odf::DatasetKind::Derivative);
+    let entry_a2_1 = new_dataset_entry_with(&account, "a2_1", odf::DatasetKind::Derivative);
+    let entry_a2_2 = new_dataset_entry_with(&account, "a2_2", odf::DatasetKind::Derivative);
 
     for entry in [
         &entry_a,
@@ -350,8 +350,8 @@ pub async fn test_add_duplicate_dependency(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let entry_foo = new_dataset_entry_with(&account, "foo");
-    let entry_bar = new_dataset_entry_with(&account, "bar");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
+    let entry_bar = new_dataset_entry_with(&account, "bar", odf::DatasetKind::Derivative);
 
     for entry in [&entry_foo, &entry_bar] {
         dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
@@ -386,9 +386,9 @@ pub async fn test_remove_dependency(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let entry_foo = new_dataset_entry_with(&account, "foo");
-    let entry_bar = new_dataset_entry_with(&account, "bar");
-    let entry_baz = new_dataset_entry_with(&account, "baz");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
+    let entry_bar = new_dataset_entry_with(&account, "bar", odf::DatasetKind::Root);
+    let entry_baz = new_dataset_entry_with(&account, "baz", odf::DatasetKind::Derivative);
 
     for entry in [&entry_foo, &entry_bar, &entry_baz] {
         dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
@@ -459,9 +459,9 @@ pub async fn test_remove_missing_dependency(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let entry_foo = new_dataset_entry_with(&account, "foo");
-    let entry_bar = new_dataset_entry_with(&account, "bar");
-    let entry_baz = new_dataset_entry_with(&account, "baz");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
+    let entry_bar = new_dataset_entry_with(&account, "bar", odf::DatasetKind::Derivative);
+    let entry_baz = new_dataset_entry_with(&account, "baz", odf::DatasetKind::Derivative);
 
     for entry in [&entry_foo, &entry_bar, &entry_baz] {
         dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
@@ -491,9 +491,9 @@ pub async fn test_remove_all_dataset_dependencies(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let entry_foo = new_dataset_entry_with(&account, "foo");
-    let entry_bar = new_dataset_entry_with(&account, "bar");
-    let entry_baz = new_dataset_entry_with(&account, "baz");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
+    let entry_bar = new_dataset_entry_with(&account, "bar", odf::DatasetKind::Derivative);
+    let entry_baz = new_dataset_entry_with(&account, "baz", odf::DatasetKind::Derivative);
 
     for entry in [&entry_foo, &entry_bar, &entry_baz] {
         dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
@@ -575,7 +575,7 @@ pub async fn test_remove_orphan_dependencies(catalog: &Catalog) {
 
     let account = new_account(&account_repo).await;
 
-    let entry_foo = new_dataset_entry_with(&account, "foo");
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
     dataset_entry_repo
         .save_dataset_entry(&entry_foo)
         .await

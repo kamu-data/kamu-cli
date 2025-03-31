@@ -22,6 +22,7 @@ use kamu_core::*;
 pub struct ProvenanceServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
 #[component(pub)]
@@ -30,10 +31,12 @@ impl ProvenanceServiceImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
         Self {
             dataset_registry,
             rebac_dataset_registry_facade,
+            dependency_graph_service,
         }
     }
 
@@ -43,7 +46,7 @@ impl ProvenanceServiceImpl {
         dataset_handle: &odf::DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
-        let resolved_dataset = self
+        let target = self
             .rebac_dataset_registry_facade
             .resolve_dataset_by_handle(dataset_handle, auth::DatasetAction::Read)
             .await
@@ -54,13 +57,17 @@ impl ProvenanceServiceImpl {
                 }
             })?;
 
-        let summary = resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
+        use tokio_stream::StreamExt;
+        let upstream_dependencies = self
+            .dependency_graph_service
+            .get_upstream_dependencies(target.get_id())
             .await
-            .int_err()?;
+            .int_err()?
+            .collect::<Vec<_>>()
+            .await;
 
         let mut resolved_inputs = Vec::new();
-        for input_id in &summary.dependencies {
+        for input_id in upstream_dependencies {
             // TODO: Private Datasets: check inputs
             //       Private Datasets: Checking dataset accessibility in `kamu` subcommands
             //       (multi-tenant workspace)
@@ -78,9 +85,9 @@ impl ProvenanceServiceImpl {
         }
 
         let dataset_info = NodeInfo::Local {
-            id: summary.id.clone(),
+            id: dataset_handle.id.clone(),
             alias: dataset_handle.alias.clone(),
-            kind: summary.kind,
+            kind: target.get_kind(),
             dependencies: &resolved_inputs,
         };
 

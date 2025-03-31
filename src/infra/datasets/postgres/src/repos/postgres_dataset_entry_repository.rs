@@ -101,7 +101,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                     dataset_id   as "id: _",
                     owner_id     as "owner_id: _",
                     dataset_name as name,
-                    created_at   as "created_at: _"
+                    created_at   as "created_at: _",
+                    kind         as "kind: _"
                 FROM dataset_entries
                 ORDER BY dataset_name ASC
                 LIMIT $1 OFFSET $2
@@ -135,7 +136,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
                    dataset_name as name,
-                   created_at   as "created_at: _"
+                   created_at   as "created_at: _",
+                   kind         as "kind: _"
             FROM dataset_entries
             WHERE dataset_id = $1
             "#,
@@ -171,7 +173,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
                    dataset_name as name,
-                   created_at   as "created_at: _"
+                   created_at   as "created_at: _",
+                   kind         as "kind: _"
             FROM dataset_entries
             WHERE dataset_id = ANY($1)
             ORDER BY created_at
@@ -218,7 +221,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
                    dataset_name as name,
-                   created_at   as "created_at: _"
+                   created_at   as "created_at: _",
+                   kind         as "kind: _"
             FROM dataset_entries
             WHERE owner_id = $1
                   AND dataset_name = $2
@@ -255,7 +259,8 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 SELECT dataset_id   as "id: _",
                     owner_id     as "owner_id: _",
                     dataset_name as name,
-                    created_at   as "created_at: _"
+                    created_at   as "created_at: _",
+                    kind         as "kind: _"
                 FROM dataset_entries
                 WHERE owner_id = $1
                 LIMIT $2 OFFSET $3
@@ -305,17 +310,20 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             }
         }
 
+        let dataset_entry_kind: DatasetEntryKindRowModel = dataset_entry.kind.into();
+
         let connection_mut = tr.connection_mut().await?;
 
         sqlx::query!(
             r#"
-            INSERT INTO dataset_entries(dataset_id, owner_id, dataset_name, created_at)
-                VALUES ($1, $2, $3, $4)
+            INSERT INTO dataset_entries(dataset_id, owner_id, dataset_name, created_at, kind)
+                VALUES ($1, $2, $3, $4, ($5::text)::dataset_kind)
             "#,
             stack_dataset_id.as_str(),
             stack_owner_id.as_str(),
             dataset_entry.name.as_str(),
             dataset_entry.created_at,
+            dataset_entry_kind.to_string(),
         )
         .execute(connection_mut)
         .await

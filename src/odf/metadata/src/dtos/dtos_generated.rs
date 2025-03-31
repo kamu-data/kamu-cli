@@ -157,7 +157,7 @@ pub struct DataSlice {
 /// Represents type of the dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum DatasetKind {
     Root,
     Derivative,

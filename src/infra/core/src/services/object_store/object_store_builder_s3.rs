@@ -22,19 +22,13 @@ use super::object_store_with_tracing::ObjectStoreWithTracing;
 // ObjectStoreBuilderS3
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 pub struct ObjectStoreBuilderS3 {
+    #[component(explicit)]
     s3_context: S3Context,
-    allow_http: bool,
-}
 
-impl ObjectStoreBuilderS3 {
-    pub fn new(s3_context: S3Context, allow_http: bool) -> Self {
-        Self {
-            s3_context,
-            allow_http,
-        }
-    }
+    #[component(explicit)]
+    allow_http: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

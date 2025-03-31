@@ -16,10 +16,10 @@ use thiserror::Error;
 pub enum AccessError {
     #[error("Resource is read-only")]
     ReadOnly(#[source] Option<BoxedError>),
+    #[error("Unauthenticated")]
+    Unauthenticated(#[source] BoxedError),
     #[error("Unauthorized")]
     Unauthorized(#[source] BoxedError),
-    #[error("Forbidden")]
-    Forbidden(#[source] BoxedError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

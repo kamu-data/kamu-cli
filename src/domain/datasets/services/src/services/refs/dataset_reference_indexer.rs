@@ -48,7 +48,7 @@ impl DatasetReferenceIndexer {
     }
 
     #[tracing::instrument(
-        level = "debug",
+        level = "info",
         skip_all,
         name = "DatasetReferenceIndexer::index_dataset_references"
     )]

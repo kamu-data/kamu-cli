@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
@@ -20,14 +21,12 @@ use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::AccountServiceImpl;
-use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::CreateDatasetUseCase;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
-use mockall::predicate::{eq, function};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 use url::Url;
@@ -36,13 +35,22 @@ use crate::harness::await_client_server_flow;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_http_methods(
-    methods: &[http::Method],
-    test_url_path: &str,
+struct TestHttpMethodsOptions<'a> {
+    methods: &'a [http::Method],
+    test_url_path: &'a str,
     logged_in: bool,
-    expected_action: DatasetAction,
-    should_authorize: bool,
+    allowed_actions: &'a [DatasetAction],
     expected_status: http::StatusCode,
+}
+
+async fn test_http_methods(
+    TestHttpMethodsOptions {
+        methods,
+        test_url_path,
+        logged_in,
+        allowed_actions,
+        expected_status,
+    }: TestHttpMethodsOptions<'_>,
 ) {
     let server_harness = ServerHarness::new(
         if logged_in {
@@ -50,7 +58,7 @@ async fn test_http_methods(
         } else {
             CurrentAccountSubject::Anonymous(AnonymousAccountReason::NoAuthenticationProvided)
         },
-        ServerHarness::mock_dataset_action_authorizer(expected_action, should_authorize),
+        ServerHarness::mock_dataset_action_authorizer(allowed_actions.iter().copied().collect()),
     )
     .await;
 
@@ -70,15 +78,28 @@ async fn test_http_methods(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_access_unsafe_methods_anonymous() {
-    test_http_methods(
-        &UNSAFE_METHODS,
-        "foo",
-        false,
-        DatasetAction::Write,
-        false,
-        http::StatusCode::NOT_FOUND,
-    )
+async fn test_dataset_access_unsafe_methods_anonymous_and_unauthorized() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &UNSAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: false,
+        allowed_actions: &[],
+        expected_status: http::StatusCode::NOT_FOUND,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_unsafe_methods_anonymous_and_authorized() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &UNSAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: false,
+        allowed_actions: &[DatasetAction::Read],
+        expected_status: http::StatusCode::FORBIDDEN,
+    })
     .await;
 }
 
@@ -86,74 +107,169 @@ async fn test_dataset_access_unsafe_methods_anonymous() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_access_unsafe_methods_logged_but_unauthorized() {
-    test_http_methods(
-        &UNSAFE_METHODS,
-        "foo",
-        true,
-        DatasetAction::Write,
-        false,
-        http::StatusCode::NOT_FOUND,
-    )
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &UNSAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: true,
+        allowed_actions: &[],
+        expected_status: http::StatusCode::NOT_FOUND,
+    })
     .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_access_unsafe_methods_logged_authorized() {
-    test_http_methods(
-        &UNSAFE_METHODS,
-        "foo",
-        true,
-        DatasetAction::Write,
-        true,
-        http::StatusCode::OK,
-    )
+async fn test_dataset_access_unsafe_methods_logged_and_authorized_for_reading() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &UNSAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: true,
+        allowed_actions: &[DatasetAction::Read],
+        expected_status: http::StatusCode::FORBIDDEN,
+    })
     .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_access_safe_methods_anonymous() {
-    test_http_methods(
-        &SAFE_METHODS,
-        "foo",
-        false,
-        DatasetAction::Read,
-        true,
-        http::StatusCode::OK,
-    )
+async fn test_dataset_access_unsafe_methods_logged_and_authorized_for_writing() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &UNSAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: true,
+        allowed_actions: &[DatasetAction::Read, DatasetAction::Write],
+        expected_status: http::StatusCode::OK,
+    })
     .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_access_safe_methods_logged_in() {
-    test_http_methods(
-        &SAFE_METHODS,
-        "foo",
-        true,
-        DatasetAction::Read,
-        true,
-        http::StatusCode::OK,
-    )
+async fn test_dataset_access_safe_methods_anonymous_and_unauthorized() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: false,
+        allowed_actions: &[],
+        expected_status: http::StatusCode::NOT_FOUND,
+    })
     .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_access_safe_method_but_potential_write_anonymous() {
-    test_http_methods(
-        &SAFE_METHODS,
-        "bar", // potential write
-        false,
-        DatasetAction::Write,
-        false,
-        http::StatusCode::NOT_FOUND,
-    )
+async fn test_dataset_access_safe_methods_anonymous_and_authorized_for_reading() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: false,
+        allowed_actions: &[DatasetAction::Read],
+        expected_status: http::StatusCode::OK,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_safe_methods_anonymous_and_authorized_for_writing() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: false,
+        allowed_actions: &[DatasetAction::Read, DatasetAction::Write],
+        expected_status: http::StatusCode::OK,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_safe_methods_logged_but_unauthorized() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: true,
+        allowed_actions: &[],
+        expected_status: http::StatusCode::NOT_FOUND,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_safe_methods_logged_and_authorized_for_reading() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: true,
+        allowed_actions: &[DatasetAction::Read],
+        expected_status: http::StatusCode::OK,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_safe_methods_logged_and_authorized_for_writing() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "foo",
+        logged_in: true,
+        allowed_actions: &[DatasetAction::Read, DatasetAction::Write],
+        expected_status: http::StatusCode::OK,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_safe_method_but_potential_write_anonymous_and_unauthorized() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "bar", // potential write
+        logged_in: false,
+        allowed_actions: &[],
+        expected_status: http::StatusCode::NOT_FOUND,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_safe_method_but_potential_write_anonymous_and_authorized_for_reading()
+{
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "bar", // potential write
+        logged_in: false,
+        allowed_actions: &[DatasetAction::Read],
+        expected_status: http::StatusCode::FORBIDDEN,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_safe_method_but_potential_write_anonymous_and_authorized_for_writing()
+{
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "bar", // potential write
+        logged_in: false,
+        allowed_actions: &[DatasetAction::Read, DatasetAction::Write],
+        expected_status: http::StatusCode::OK,
+    })
     .await;
 }
 
@@ -161,29 +277,41 @@ async fn test_dataset_access_safe_method_but_potential_write_anonymous() {
 
 #[test_log::test(tokio::test)]
 async fn test_dataset_access_safe_method_but_potential_write_logged_but_unauthorized() {
-    test_http_methods(
-        &SAFE_METHODS,
-        "bar", // potential write
-        true,
-        DatasetAction::Write,
-        false,
-        http::StatusCode::NOT_FOUND,
-    )
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "bar", // potential write
+        logged_in: true,
+        allowed_actions: &[],
+        expected_status: http::StatusCode::NOT_FOUND,
+    })
     .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_access_safe_method_but_potential_write_logged_authorized() {
-    test_http_methods(
-        &SAFE_METHODS,
-        "bar", // potential write
-        true,
-        DatasetAction::Write,
-        true,
-        http::StatusCode::OK,
-    )
+async fn test_dataset_access_safe_method_but_potential_write_logged_authorized_for_reading() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "bar", // potential write
+        logged_in: true,
+        allowed_actions: &[DatasetAction::Read],
+        expected_status: http::StatusCode::FORBIDDEN,
+    })
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_access_safe_method_but_potential_write_logged_authorized_for_writing() {
+    test_http_methods(TestHttpMethodsOptions {
+        methods: &SAFE_METHODS,
+        test_url_path: "bar", // potential write
+        logged_in: true,
+        allowed_actions: &[DatasetAction::Read, DatasetAction::Write],
+        expected_status: http::StatusCode::OK,
+    })
     .await;
 }
 
@@ -293,13 +421,13 @@ impl ServerHarness {
         let app = axum::Router::new()
             .route(
                 "/foo",
-                axum::routing::get(ServerHarness::foo_handler)
-                    .put(ServerHarness::foo_handler)
-                    .delete(ServerHarness::foo_handler)
-                    .patch(ServerHarness::foo_handler)
-                    .post(ServerHarness::foo_handler),
+                axum::routing::get(Self::foo_handler)
+                    .put(Self::foo_handler)
+                    .delete(Self::foo_handler)
+                    .patch(Self::foo_handler)
+                    .post(Self::foo_handler),
             )
-            .route("/bar", axum::routing::get(ServerHarness::bar_handler))
+            .route("/bar", axum::routing::get(Self::bar_handler))
             .layer(
                 tower::ServiceBuilder::new()
                     .layer(axum::Extension(catalog_test))
@@ -307,9 +435,9 @@ impl ServerHarness {
                     .layer(kamu_adapter_http::DatasetAuthorizationLayer::new(
                         |request| {
                             if !request.method().is_safe() || request.uri().path() == "/bar" {
-                                kamu::domain::auth::DatasetAction::Write
+                                DatasetAction::Write
                             } else {
-                                kamu::domain::auth::DatasetAction::Read
+                                DatasetAction::Read
                             }
                         },
                     )),
@@ -329,26 +457,17 @@ impl ServerHarness {
     }
 
     pub fn mock_dataset_action_authorizer(
-        action: DatasetAction,
-        should_authorize: bool,
+        allowed_actions: HashSet<DatasetAction>,
     ) -> MockDatasetActionAuthorizer {
+        use mockall::predicate::function;
+
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
-            .expect_check_action_allowed()
-            .with(
-                function(|dataset_id: &odf::DatasetID| *dataset_id == ServerHarness::dataset_id()),
-                eq(action),
-            )
-            .returning(move |dataset_id, action| {
-                if should_authorize {
-                    Ok(())
-                } else {
-                    Err(DatasetActionUnauthorizedError::not_enough_permissions(
-                        dataset_id.as_local_ref(),
-                        action,
-                    ))
-                }
-            });
+            .expect_get_allowed_actions()
+            .with(function(|dataset_id: &odf::DatasetID| {
+                *dataset_id == Self::dataset_id()
+            }))
+            .returning(move |_dataset_id| Ok(allowed_actions.clone()));
 
         mock_dataset_action_authorizer
     }

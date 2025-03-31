@@ -101,7 +101,6 @@ members = [
     "src/e2e/app/cli/common",
     "src/e2e/app/cli/common-macros",
     "src/e2e/app/cli/repo-tests",
-    "src/e2e/app/cli/inmem",
     "src/e2e/app/cli/postgres",
     "src/e2e/app/cli/mysql",
     "src/e2e/app/cli/sqlite",
@@ -254,6 +253,7 @@ fn_params_excessive_bools = "allow"
 if_not_else = "allow"
 ignored_unit_patterns = "allow"
 items_after_statements = "allow"
+map_unwrap_or = "allow"
 match_wildcard_for_single_variants = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"

@@ -15,35 +15,23 @@ use super::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct RenameCommand {
     rename_dataset: Arc<dyn RenameDatasetUseCase>,
-    dataset_ref: odf::DatasetRef,
-    new_name: odf::DatasetName,
-}
 
-impl RenameCommand {
-    pub fn new<N>(
-        rename_dataset: Arc<dyn RenameDatasetUseCase>,
-        dataset_ref: odf::DatasetRef,
-        new_name: N,
-    ) -> Self
-    where
-        N: TryInto<odf::DatasetName>,
-        <N as TryInto<odf::DatasetName>>::Error: std::fmt::Debug,
-    {
-        Self {
-            rename_dataset,
-            dataset_ref,
-            new_name: new_name.try_into().unwrap(),
-        }
-    }
+    #[dill::component(explicit)]
+    dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
+    new_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
 impl Command for RenameCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match self
             .rename_dataset
             .execute(&self.dataset_ref, &self.new_name)

@@ -23,7 +23,7 @@ use kamu_datasets::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn GetDatasetUpstreamDependenciesUseCase)]
 pub struct GetDatasetUpstreamDependenciesUseCaseImpl {
     tenancy_config: Arc<TenancyConfig>,
@@ -31,24 +31,6 @@ pub struct GetDatasetUpstreamDependenciesUseCaseImpl {
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     account_service: Arc<dyn AccountService>,
-}
-
-impl GetDatasetUpstreamDependenciesUseCaseImpl {
-    pub fn new(
-        tenancy_config: Arc<TenancyConfig>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        dataset_entry_service: Arc<dyn DatasetEntryService>,
-        account_service: Arc<dyn AccountService>,
-    ) -> Self {
-        Self {
-            tenancy_config,
-            dependency_graph_service,
-            dataset_action_authorizer,
-            dataset_entry_service,
-            account_service,
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -118,7 +100,8 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
                 let dataset_alias = self
                     .tenancy_config
                     .make_alias(account.account_name.clone(), dataset_entry.name);
-                let dataset_handle = odf::DatasetHandle::new(dataset_entry.id, dataset_alias);
+                let dataset_handle =
+                    odf::DatasetHandle::new(dataset_entry.id, dataset_alias, dataset_entry.kind);
 
                 upstream_dependencies.push(DatasetDependency::resolved(
                     dataset_handle,

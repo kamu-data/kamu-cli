@@ -99,9 +99,8 @@ impl Dataset {
     /// Returns the kind of dataset (Root or Derivative)
     #[tracing::instrument(level = "info", name = Dataset_kind, skip_all)]
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let summary = self.dataset_request_state.dataset_summary(ctx).await?;
-
-        Ok(summary.kind.into())
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        Ok(resolved_dataset.get_kind().into())
     }
 
     /// Returns the visibility of dataset
@@ -135,9 +134,8 @@ impl Dataset {
     }
 
     /// Access to the environment variable of this dataset
-    #[expect(clippy::unused_async)]
     async fn env_vars(&self, ctx: &Context<'_>) -> Result<DatasetEnvVars> {
-        DatasetEnvVars::new(ctx, &self.dataset_request_state)
+        DatasetEnvVars::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Access to the flow configurations of this dataset
@@ -195,7 +193,7 @@ impl Dataset {
                 can_update: can_maintain,
             },
             env_vars: DatasetEnvVarsPermissions {
-                can_view: logged && can_read,
+                can_view: can_maintain,
                 can_update: can_maintain,
             },
             flows: DatasetFlowsPermissions {

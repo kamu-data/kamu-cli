@@ -22,7 +22,7 @@ use kamu_core::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn PullDatasetUseCase)]
 pub struct PullDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -37,30 +37,6 @@ pub struct PullDatasetUseCaseImpl {
 }
 
 impl PullDatasetUseCaseImpl {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        pull_request_planner: Arc<dyn PullRequestPlanner>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
-        polling_ingest_svc: Arc<dyn PollingIngestService>,
-        transform_elaboration_svc: Arc<dyn TransformElaborationService>,
-        transform_executor: Arc<dyn TransformExecutor>,
-        sync_svc: Arc<dyn SyncService>,
-        tenancy_config: Arc<TenancyConfig>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            pull_request_planner,
-            dataset_action_authorizer,
-            remote_alias_registry,
-            polling_ingest_svc,
-            transform_elaboration_svc,
-            transform_executor,
-            sync_svc,
-            tenancy_config,
-        }
-    }
-
     #[tracing::instrument(level = "info", skip_all)]
     async fn pull_by_plan(
         &self,

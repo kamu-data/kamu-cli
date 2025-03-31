@@ -22,15 +22,9 @@ pub trait OdfServerAccessTokenResolver: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn OdfServerAccessTokenResolver)]
 pub struct DummyOdfServerAccessTokenResolver {}
-
-impl DummyOdfServerAccessTokenResolver {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 
 #[async_trait::async_trait]
 impl OdfServerAccessTokenResolver for DummyOdfServerAccessTokenResolver {

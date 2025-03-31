@@ -16,23 +16,18 @@ use crate::{CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct DebugTokenCommand {
     auth_service: Arc<AuthenticationServiceImpl>,
-    access_token: String,
-}
 
-impl DebugTokenCommand {
-    pub fn new(auth_service: Arc<AuthenticationServiceImpl>, access_token: String) -> Self {
-        Self {
-            auth_service,
-            access_token,
-        }
-    }
+    #[dill::component(explicit)]
+    access_token: String,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for DebugTokenCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let token = self
             .auth_service
             .decode_access_token(&self.access_token)

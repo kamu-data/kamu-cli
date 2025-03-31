@@ -954,10 +954,10 @@ fn map_tungstenite_error(error: TungsteniteError, dataset_endpoint: &Url) -> Syn
     if let TungsteniteError::Http(response) = &error {
         match response.status() {
             StatusCode::FORBIDDEN => {
-                return SyncError::Access(odf::AccessError::Forbidden(Box::new(error)));
+                return SyncError::Access(odf::AccessError::Unauthorized(Box::new(error)));
             }
             StatusCode::UNAUTHORIZED => {
-                return SyncError::Access(odf::AccessError::Unauthorized(Box::new(error)))
+                return SyncError::Access(odf::AccessError::Unauthenticated(Box::new(error)))
             }
             StatusCode::NOT_FOUND => {
                 return DatasetAnyRefUnresolvedError::new(dataset_endpoint).into();

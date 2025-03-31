@@ -208,6 +208,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
 
         // It's okay to create a new dataset by this point
         let dataset_id = seed_block.event.dataset_id.clone();
+        let dataset_kind = seed_block.event.dataset_kind;
         let dataset = self.get_dataset_impl(&dataset_id);
 
         // Write seed block.
@@ -248,6 +249,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
 
         Ok(StoreDatasetResult {
             dataset_id,
+            dataset_kind,
             dataset,
             seed,
         })

@@ -22,14 +22,22 @@ type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct VerifyCommand {
     verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
+
+    #[dill::component(explicit)]
     refs: Vec<odf::DatasetRefPattern>,
+
+    #[dill::component(explicit)]
     recursive: bool,
+
+    #[dill::component(explicit)]
     integrity: bool,
 }
 
@@ -39,31 +47,6 @@ struct RemoteRefDependency {
 }
 
 impl VerifyCommand {
-    pub fn new<I>(
-        verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        output_config: Arc<OutputConfig>,
-        refs: I,
-        recursive: bool,
-        integrity: bool,
-    ) -> Self
-    where
-        I: Iterator<Item = odf::DatasetRefPattern>,
-    {
-        Self {
-            verify_dataset_use_case,
-            dataset_registry,
-            dependency_graph_service,
-            remote_alias_reg,
-            output_config,
-            refs: refs.collect(),
-            recursive,
-            integrity,
-        }
-    }
-
     async fn verify_with_progress(
         &self,
         options: VerificationOptions,
@@ -197,18 +180,20 @@ impl VerifyCommand {
                 continue;
             }
 
-            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
-            let summary = resolved_dataset
-                .get_summary(odf::dataset::GetSummaryOpts::default())
+            let upstream_dependencies: Vec<odf::DatasetID> = self
+                .dependency_graph_service
+                .get_upstream_dependencies(&hdl.id)
                 .await
-                .unwrap();
+                .unwrap()
+                .collect()
+                .await;
 
             let mut current_missed_dependencies = vec![];
 
-            for dependency in summary.dependencies {
+            for dependency in upstream_dependencies {
                 if self
                     .dataset_registry
-                    .resolve_dataset_handle_by_ref(&odf::DatasetRef::ID(dependency.clone()))
+                    .resolve_dataset_handle_by_ref(&dependency.as_local_ref())
                     .await
                     .is_err()
                 {
@@ -231,7 +216,7 @@ impl VerifyCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for VerifyCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         if self.refs.len() != 1 {
             return Err(CLIError::usage_error(
                 "Verifying multiple datasets at once is not yet supported",

@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 
 use super::{CLIError, Command};
@@ -22,59 +21,39 @@ use crate::OutputConfig;
 // Command
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct IngestCommand {
+    output_config: Arc<OutputConfig>,
     data_format_reg: Arc<dyn DataFormatRegistry>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
-    output_config: Arc<OutputConfig>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+
+    #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
+
+    #[dill::component(explicit)]
     files_refs: Vec<String>,
+
+    #[dill::component(explicit)]
     source_name: Option<String>,
+
+    #[dill::component(explicit)]
     event_time: Option<String>,
+
+    #[dill::component(explicit)]
     stdin: bool,
+
+    #[dill::component(explicit)]
     recursive: bool,
+
+    #[dill::component(explicit)]
     input_format: Option<String>,
 }
 
 impl IngestCommand {
-    pub fn new<I, S>(
-        data_format_reg: Arc<dyn DataFormatRegistry>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        push_ingest_planner: Arc<dyn PushIngestPlanner>,
-        push_ingest_executor: Arc<dyn PushIngestExecutor>,
-        output_config: Arc<OutputConfig>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset_ref: odf::DatasetRef,
-        files_refs: I,
-        source_name: Option<impl Into<String>>,
-        event_time: Option<impl Into<String>>,
-        stdin: bool,
-        recursive: bool,
-        input_format: Option<impl Into<String>>,
-    ) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
-    {
-        Self {
-            data_format_reg,
-            dataset_registry,
-            push_ingest_planner,
-            push_ingest_executor,
-            output_config,
-            remote_alias_reg,
-            dataset_ref,
-            files_refs: files_refs.into_iter().map(Into::into).collect(),
-            source_name: source_name.map(Into::into),
-            event_time: event_time.map(Into::into),
-            stdin,
-            recursive,
-            input_format: input_format.map(Into::into),
-        }
-    }
-
     fn path_to_url(path: &str) -> Result<url::Url, CLIError> {
         let p = PathBuf::from(path)
             .canonicalize()
@@ -108,12 +87,8 @@ impl IngestCommand {
             .dataset_registry
             .get_dataset_by_handle(dataset_handle)
             .await;
-        let dataset_kind = resolved_dataset
-            .get_summary(odf::dataset::GetSummaryOpts::default())
-            .await
-            .int_err()?
-            .kind;
-        if dataset_kind != odf::DatasetKind::Root {
+
+        if resolved_dataset.get_kind() != odf::DatasetKind::Root {
             return Err(CLIError::usage_error(
                 "Ingesting data available for root datasets only",
             ));
@@ -142,7 +117,7 @@ impl IngestCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for IngestCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         match (self.stdin, !self.files_refs.is_empty()) {
             (false, false) | (true, true) => Err(CLIError::usage_error(
                 "Specify a list of files or pass --stdin",
@@ -200,6 +175,7 @@ impl Command for IngestCommand {
                 .dataset_registry
                 .get_dataset_by_handle(&dataset_handle)
                 .await;
+
             let plan = self
                 .push_ingest_planner
                 .plan_ingest(

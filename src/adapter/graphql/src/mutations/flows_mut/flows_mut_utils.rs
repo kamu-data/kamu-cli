@@ -80,8 +80,8 @@ pub(crate) async fn ensure_expected_dataset_kind(
     let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
     match dataset_flow_type.dataset_kind_restriction() {
         Some(expected_kind) => {
-            let dataset_summary = dataset_request_state.dataset_summary(ctx).await?;
-            let dataset_kind = dataset_summary.kind;
+            let resolved_dataset = dataset_request_state.resolved_dataset(ctx).await?;
+            let dataset_kind = resolved_dataset.get_kind();
 
             if dataset_kind != expected_kind {
                 Ok(Some(FlowIncompatibleDatasetKind {

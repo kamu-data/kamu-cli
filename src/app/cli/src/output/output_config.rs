@@ -50,7 +50,7 @@ impl OutputConfig {
         &self,
         schema: &Schema,
         fmt: RecordsFormat,
-    ) -> Box<dyn RecordsWriter> {
+    ) -> Box<dyn RecordsWriter + Send> {
         match self.format {
             OutputFormat::Csv => Box::new(CsvWriter::new(
                 std::io::stdout(),

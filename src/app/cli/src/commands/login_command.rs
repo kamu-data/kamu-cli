@@ -18,46 +18,34 @@ use crate::{odf_server, CLIError, Command, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct LoginCommand {
     login_service: Arc<odf_server::LoginService>,
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     output_config: Arc<OutputConfig>,
+
+    #[dill::component(explicit)]
     scope: odf_server::AccessTokenStoreScope,
+
+    #[dill::component(explicit)]
     server: Option<Url>,
+
+    #[dill::component(explicit)]
     access_token: Option<String>,
+
+    #[dill::component(explicit)]
     check: bool,
+
+    #[dill::component(explicit)]
     repo_name: Option<odf::RepoName>,
+
+    #[dill::component(explicit)]
     skip_add_repo: bool,
 }
 
 impl LoginCommand {
-    pub fn new(
-        login_service: Arc<odf_server::LoginService>,
-        access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        output_config: Arc<OutputConfig>,
-        scope: odf_server::AccessTokenStoreScope,
-        server: Option<Url>,
-        access_token: Option<String>,
-        check: bool,
-        repo_name: Option<odf::RepoName>,
-        skip_add_repo: bool,
-    ) -> Self {
-        Self {
-            login_service,
-            access_token_registry_service,
-            remote_repo_reg,
-            output_config,
-            scope,
-            server,
-            access_token,
-            check,
-            repo_name,
-            skip_add_repo,
-        }
-    }
-
     fn get_server_url(&self) -> Url {
         self.server
             .clone()
@@ -199,13 +187,13 @@ impl LoginCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for LoginCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let odf_server_url = self.get_server_url();
 
         // Check token and exit
         // Note: try the URL as both backend or frontend
         if self.check {
-            return if let Some(token_find_report) = self
+            if let Some(token_find_report) = self
                 .access_token_registry_service
                 .find_by_frontend_or_backend_url(&odf_server_url)
             {
@@ -232,7 +220,8 @@ impl Command for LoginCommand {
                 Err(CLIError::usage_error(format!(
                     "No access token found for: {odf_server_url}",
                 )))
-            };
+            }?;
+            return Ok(());
         }
 
         // Login with existing token

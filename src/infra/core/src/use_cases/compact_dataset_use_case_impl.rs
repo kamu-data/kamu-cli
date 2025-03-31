@@ -28,26 +28,12 @@ use kamu_core::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[component]
 #[interface(dyn CompactDatasetUseCase)]
 pub struct CompactDatasetUseCaseImpl {
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-}
-
-impl CompactDatasetUseCaseImpl {
-    pub fn new(
-        compaction_planner: Arc<dyn CompactionPlanner>,
-        compaction_executor: Arc<dyn CompactionExecutor>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    ) -> Self {
-        Self {
-            compaction_planner,
-            compaction_executor,
-            rebac_dataset_registry_facade,
-        }
-    }
 }
 
 #[common_macros::method_names_consts]

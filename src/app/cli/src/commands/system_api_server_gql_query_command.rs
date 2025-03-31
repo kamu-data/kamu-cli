@@ -11,25 +11,22 @@ use dill::Catalog;
 
 use super::{CLIError, Command};
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct APIServerGqlQueryCommand {
+    #[dill::component(explicit)]
     base_catalog: Catalog,
-    query: String,
-    full: bool,
-}
 
-impl APIServerGqlQueryCommand {
-    pub fn new<S: Into<String>>(base_catalog: Catalog, query: S, full: bool) -> Self {
-        Self {
-            base_catalog,
-            query: query.into(),
-            full,
-        }
-    }
+    #[dill::component(explicit)]
+    query: String,
+
+    #[dill::component(explicit)]
+    full: bool,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerGqlQueryCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         // TODO: Access token? Not every GraphQL can run unauthorized
         let gql_schema = kamu_adapter_graphql::schema();
         let response = gql_schema

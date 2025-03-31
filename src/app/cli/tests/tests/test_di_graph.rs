@@ -7,45 +7,69 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+
+use database_common::{DatabaseConnectionSettings, SqlitePoolOptions, TransactionRef};
+use dill::CatalogBuilder;
 use kamu::domain::{ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
 use kamu_adapter_http::AccessToken;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
+use kamu_cli::services::config::DatabaseConfig;
 use kamu_cli::{self, Interact, OutputConfig, WorkspaceLayout, WorkspaceStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_di_cli_graph_validates_st() {
-    test_di_cli_graph_validates(TenancyConfig::SingleTenant);
-}
+macro_rules! test_di_permutations {
+    ($test_name: expr) => {
+        paste::paste! {
+            #[test_log::test(tokio::test)]
+            pub async fn [<$test_name "_st_inmem">]() {
+                $test_name(TenancyConfig::SingleTenant, RepositoriesConfig::InMemory);
+            }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            #[test_log::test(tokio::test)]
+            pub async fn [<$test_name "_st_sqlite">]() {
+                $test_name(TenancyConfig::SingleTenant, RepositoriesConfig::Sqlite);
+            }
 
-#[test_log::test(tokio::test)]
-async fn test_di_cli_graph_validates_mt() {
-    test_di_cli_graph_validates(TenancyConfig::MultiTenant);
-}
+            #[test_log::test(tokio::test)]
+            pub async fn [<$test_name "_mt_inmem">]() {
+                $test_name(TenancyConfig::MultiTenant, RepositoriesConfig::InMemory);
+            }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_di_server_graph_validates_st() {
-    test_di_server_graph_validates(TenancyConfig::SingleTenant);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_di_server_graph_validates_mt() {
-    test_di_server_graph_validates(TenancyConfig::MultiTenant);
+            #[test_log::test(tokio::test)]
+            pub async fn [<$test_name "_mt_sqlite">]() {
+                $test_name(TenancyConfig::MultiTenant, RepositoriesConfig::Sqlite);
+            }
+        }
+    };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn test_di_cli_graph_validates(tenancy_config: TenancyConfig) {
+test_di_permutations!(test_di_cli_graph_validates);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_di_permutations!(test_di_server_graph_validates);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub enum RepositoriesConfig {
+    InMemory,
+    Sqlite,
+}
+
+fn test_di_cli_graph_validates(
+    tenancy_config: TenancyConfig,
+    repositories_config: RepositoriesConfig,
+) {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(temp_dir.path());
     let mut base_catalog_builder = kamu_cli::configure_base_catalog(
@@ -55,7 +79,9 @@ fn test_di_cli_graph_validates(tenancy_config: TenancyConfig) {
         None,
         false,
     );
-    kamu_cli::configure_in_memory_components(&mut base_catalog_builder);
+
+    register_repositories(&mut base_catalog_builder, repositories_config);
+
     base_catalog_builder.add_value(OutputConfig::default());
 
     kamu_cli::register_config_in_catalog(
@@ -86,7 +112,10 @@ fn test_di_cli_graph_validates(tenancy_config: TenancyConfig) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn test_di_server_graph_validates(tenancy_config: TenancyConfig) {
+fn test_di_server_graph_validates(
+    tenancy_config: TenancyConfig,
+    repositories_config: RepositoriesConfig,
+) {
     let temp_dir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(temp_dir.path());
     let mut base_catalog_builder = kamu_cli::configure_base_catalog(
@@ -96,7 +125,9 @@ fn test_di_server_graph_validates(tenancy_config: TenancyConfig) {
         None,
         false,
     );
-    kamu_cli::configure_in_memory_components(&mut base_catalog_builder);
+
+    register_repositories(&mut base_catalog_builder, repositories_config);
+
     base_catalog_builder.add_value(OutputConfig::default());
 
     let config = kamu_cli::config::CLIConfig::default();
@@ -128,6 +159,35 @@ fn test_di_server_graph_validates(tenancy_config: TenancyConfig) {
         "{}",
         validate_result.err().unwrap()
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn register_repositories(b: &mut CatalogBuilder, repositories_config: RepositoriesConfig) {
+    match repositories_config {
+        RepositoriesConfig::InMemory => {
+            kamu_cli::configure_in_memory_components(b);
+        }
+        RepositoriesConfig::Sqlite => {
+            let fake_path = Path::new("will-not-be-created.db.sqlite");
+            let database_config = DatabaseConfig::sqlite(fake_path);
+            let db_connection_settings = DatabaseConnectionSettings::sqlite_from(fake_path);
+
+            kamu_cli::configure_database_components(b, &database_config, db_connection_settings);
+
+            let pool = SqlitePoolOptions::default()
+                .connect_lazy("sqlite::memory:")
+                .unwrap();
+
+            b.add_value(pool.clone());
+
+            let transaction_ref = TransactionRef::new(pool);
+
+            b.add_value(transaction_ref);
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,25 +16,21 @@ use crate::config::{ConfigScope, ConfigService};
 // List
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct ConfigListCommand {
     config_svc: Arc<ConfigService>,
-    user: bool,
-    with_defaults: bool,
-}
 
-impl ConfigListCommand {
-    pub fn new(config_svc: Arc<ConfigService>, user: bool, with_defaults: bool) -> Self {
-        Self {
-            config_svc,
-            user,
-            with_defaults,
-        }
-    }
+    #[dill::component(explicit)]
+    user: bool,
+
+    #[dill::component(explicit)]
+    with_defaults: bool,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigListCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let result = self.config_svc.list(
             if self.user {
                 ConfigScope::User
@@ -54,32 +50,24 @@ impl Command for ConfigListCommand {
 // Get
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct ConfigGetCommand {
     config_svc: Arc<ConfigService>,
-    user: bool,
-    with_defaults: bool,
-    key: String,
-}
 
-impl ConfigGetCommand {
-    pub fn new(
-        config_svc: Arc<ConfigService>,
-        user: bool,
-        with_defaults: bool,
-        key: String,
-    ) -> Self {
-        Self {
-            config_svc,
-            user,
-            with_defaults,
-            key,
-        }
-    }
+    #[dill::component(explicit)]
+    user: bool,
+
+    #[dill::component(explicit)]
+    with_defaults: bool,
+
+    #[dill::component(explicit)]
+    key: String,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigGetCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let scope = if self.user {
             ConfigScope::User
         } else {
@@ -100,32 +88,24 @@ impl Command for ConfigGetCommand {
 // Set
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct ConfigSetCommand {
     config_svc: Arc<ConfigService>,
-    user: bool,
-    key: String,
-    value: Option<String>,
-}
 
-impl ConfigSetCommand {
-    pub fn new(
-        config_svc: Arc<ConfigService>,
-        user: bool,
-        key: String,
-        value: Option<String>,
-    ) -> Self {
-        Self {
-            config_svc,
-            user,
-            key,
-            value,
-        }
-    }
+    #[dill::component(explicit)]
+    user: bool,
+
+    #[dill::component(explicit)]
+    key: String,
+
+    #[dill::component(explicit)]
+    value: Option<String>,
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigSetCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let scope = if self.user {
             ConfigScope::User
         } else {
@@ -160,3 +140,5 @@ impl Command for ConfigSetCommand {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

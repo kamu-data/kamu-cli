@@ -22,52 +22,39 @@ use crate::output::OutputConfig;
 // Command
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct PushCommand {
-    push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    refs: Vec<odf::DatasetRefPattern>,
-    all: bool,
-    recursive: bool,
-    add_aliases: bool,
-    force: bool,
-    to: Option<odf::DatasetPushTarget>,
-    new_dataset_visibility: Option<odf::DatasetVisibility>,
-    output_config: Arc<OutputConfig>,
     tenancy_config: TenancyConfig,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
+
+    #[dill::component(explicit)]
+    refs: Vec<odf::DatasetRefPattern>,
+
+    #[dill::component(explicit)]
+    all: bool,
+
+    #[dill::component(explicit)]
+    recursive: bool,
+
+    #[dill::component(explicit)]
+    add_aliases: bool,
+
+    #[dill::component(explicit)]
+    force: bool,
+
+    #[dill::component(explicit)]
+    to: Option<odf::DatasetPushTarget>,
+
+    #[dill::component(explicit)]
+    new_dataset_visibility: Option<odf::DatasetVisibility>,
+
+    #[dill::component(explicit)]
+    output_config: Arc<OutputConfig>,
 }
 
 impl PushCommand {
-    pub fn new<I>(
-        push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        refs: I,
-        all: bool,
-        recursive: bool,
-        add_aliases: bool,
-        force: bool,
-        to: Option<odf::DatasetPushTarget>,
-        new_dataset_visibility: Option<odf::DatasetVisibility>,
-        output_config: Arc<OutputConfig>,
-        tenancy_config: TenancyConfig,
-    ) -> Self
-    where
-        I: IntoIterator<Item = odf::DatasetRefPattern>,
-    {
-        Self {
-            push_dataset_use_case,
-            dataset_registry,
-            refs: refs.into_iter().collect(),
-            all,
-            recursive,
-            add_aliases,
-            force,
-            to,
-            new_dataset_visibility,
-            output_config,
-            tenancy_config,
-        }
-    }
-
     async fn do_push(
         &self,
         listener: Option<Arc<dyn SyncMultiListener>>,
@@ -155,7 +142,7 @@ impl Command for PushCommand {
         Ok(())
     }
 
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let push_results = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet

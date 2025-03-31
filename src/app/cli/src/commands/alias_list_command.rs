@@ -18,28 +18,18 @@ use kamu::domain::*;
 use super::{CLIError, Command};
 use crate::output::*;
 
+#[dill::component]
+#[dill::interface(dyn Command)]
 pub struct AliasListCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
+
+    #[dill::component(explicit)]
     maybe_dataset_ref: Option<odf::DatasetRef>,
 }
 
 impl AliasListCommand {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        output_config: Arc<OutputConfig>,
-        maybe_dataset_ref: Option<odf::DatasetRef>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            remote_alias_reg,
-            output_config,
-            maybe_dataset_ref,
-        }
-    }
-
     async fn record_batch(
         &self,
         datasets: &Vec<odf::DatasetHandle>,
@@ -91,7 +81,7 @@ impl AliasListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AliasListCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&self) -> Result<(), CLIError> {
         let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.maybe_dataset_ref {
             let hdl = self
                 .dataset_registry
