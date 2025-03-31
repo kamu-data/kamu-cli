@@ -32,6 +32,10 @@ Recommendation: for ease of reading, use the following order:
 - E2E: Removed `inmem` tests that almost duplicated `sqlite` tests
 - E2E, `kamu-cli-e2e-repo-tests`: remove a `kamu-cli` dependency that did not cause the `kamu-cli` binary to be rebuilt
 - Tests, DI: Check also for sqlite dependencies
+### Fixed
+- Flow GQL Api: 
+  - Correctly returns batching rule with `0` value
+  - Improved message for unknown description message
 
 ## [0.230.0] - 2025-03-25
 ### Added
