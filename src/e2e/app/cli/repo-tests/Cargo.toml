@@ -23,18 +23,9 @@ doctest = false
 
 [features]
 default = []
-build-kamu-cli = [
-    # We add a dependency to ensure kamu-cli is up to date before calling tests
-    "dep:kamu-cli",
-]
-
-
-[package.metadata.cargo-udeps.ignore]
-normal = ["kamu-cli"]
 
 
 [dependencies]
-# No features
 http-common = { workspace = true }
 database-common = { workspace = true, default-features = false }
 kamu = { workspace = true, features = ["testing"] }
@@ -49,10 +40,6 @@ kamu-flow-system = { workspace = true }
 odf = { workspace = true }
 regex = { version = "1", default-features = false }
 test-utils = { workspace = true }
-
-# Feature: extensions
-kamu-cli = { optional = true, workspace = true }
-
 
 chrono = { version = "0.4", default-features = false }
 indoc = "2"

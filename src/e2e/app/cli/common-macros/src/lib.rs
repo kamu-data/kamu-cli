@@ -53,15 +53,6 @@ fn kamu_cli_e2e_test_impl(harness_method: &Ident, input: TokenStream) -> TokenSt
     };
 
     let output = match storage.to_string().as_str() {
-        "inmem" => quote! {
-           #[test_group::group(e2e, #extra_test_groups)]
-           #[test_log::test(tokio::test)]
-           async fn #test_function_name () {
-               KamuCliApiServerHarness::inmem ( #options )
-                   . #harness_method ( #fixture )
-                   .await;
-           }
-        },
         "postgres" => quote! {
             #[test_group::group(e2e, database, postgres, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrator = "database_common::POSTGRES_MIGRATOR"))]
@@ -81,18 +72,19 @@ fn kamu_cli_e2e_test_impl(harness_method: &Ident, input: TokenStream) -> TokenSt
             }
         },
         "sqlite" => quote! {
-            #[test_group::group(e2e, database, sqlite, #extra_test_groups)]
-            #[test_log::test(sqlx::test(migrator = "database_common::SQLITE_MIGRATOR"))]
-            async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
-                KamuCliApiServerHarness::sqlite(&sqlite_pool, #options )
-                    . #harness_method ( #fixture )
-                    .await;
-            }
+           // kamu-cli will create sqlite database by itself and apply migrations to it
+           #[test_group::group(e2e, #extra_test_groups)]
+           #[test_log::test(tokio::test)]
+           async fn #test_function_name () {
+               KamuCliApiServerHarness::sqlite ( #options )
+                   . #harness_method ( #fixture )
+                   .await;
+           }
         },
         unexpected => {
             panic!(
-                "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
-                 \"postgres\", \"mysql\", and \"sqlite\"."
+                "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"postgres\", \
+                 \"mysql\", and \"sqlite\"."
             );
         }
     };

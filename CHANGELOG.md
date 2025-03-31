@@ -29,11 +29,13 @@ Recommendation: for ease of reading, use the following order:
       if the user does not have write permission while having read permission
   - GQL: Operations on dataset environment variables require at least a maintainer role
   - `kamu search`: Private accessible datasets are included in the search results
+- E2E: Removed `inmem` tests that almost duplicated `sqlite` tests
+- E2E, `kamu-cli-e2e-repo-tests`: remove a `kamu-cli` dependency that did not cause the `kamu-cli` binary to be rebuilt
+- Tests, DI: Check also for sqlite dependencies
 ### Fixed
 - Flow GQL Api: 
   - Correctly returns batching rule with `0` value
   - Improved message for unknown description message
-
 
 ## [0.230.0] - 2025-03-25
 ### Added

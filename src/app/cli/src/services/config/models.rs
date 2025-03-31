@@ -697,7 +697,6 @@ impl Default for JupyterConfig {
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "provider")]
 pub enum DatabaseConfig {
-    InMemory,
     Sqlite(SqliteDatabaseConfig),
     Postgres(RemoteDatabaseConfig),
     MySql(RemoteDatabaseConfig),

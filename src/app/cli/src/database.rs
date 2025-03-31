@@ -212,9 +212,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn try_build_db_connection_settings(
-    raw_db_config: &DatabaseConfig,
-) -> Option<DatabaseConnectionSettings> {
+pub fn build_db_connection_settings(raw_db_config: &DatabaseConfig) -> DatabaseConnectionSettings {
     fn convert(c: &RemoteDatabaseConfig, provider: DatabaseProvider) -> DatabaseConnectionSettings {
         DatabaseConnectionSettings::new(
             provider,
@@ -230,12 +228,11 @@ pub fn try_build_db_connection_settings(
     match raw_db_config {
         DatabaseConfig::Sqlite(c) => {
             let path = Path::new(&c.database_path);
-            Some(DatabaseConnectionSettings::sqlite_from(path))
+            DatabaseConnectionSettings::sqlite_from(path)
         }
-        DatabaseConfig::Postgres(config) => Some(convert(config, DatabaseProvider::Postgres)),
-        DatabaseConfig::MySql(config) => Some(convert(config, DatabaseProvider::MySql)),
-        DatabaseConfig::MariaDB(config) => Some(convert(config, DatabaseProvider::MariaDB)),
-        DatabaseConfig::InMemory => None,
+        DatabaseConfig::Postgres(config) => convert(config, DatabaseProvider::Postgres),
+        DatabaseConfig::MySql(config) => convert(config, DatabaseProvider::MySql),
+        DatabaseConfig::MariaDB(config) => convert(config, DatabaseProvider::MariaDB),
     }
 }
 
@@ -278,7 +275,7 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
 
 pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: &Catalog) {
     let credentials_policy_config = match db_config {
-        DatabaseConfig::Sqlite(_) | DatabaseConfig::InMemory => None,
+        DatabaseConfig::Sqlite(_) => None,
         DatabaseConfig::Postgres(config)
         | DatabaseConfig::MySql(config)
         | DatabaseConfig::MariaDB(config) => Some(config.credentials_policy.clone()),
@@ -310,7 +307,6 @@ pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: 
 
 fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &DatabaseConfig) {
     match raw_db_config {
-        DatabaseConfig::InMemory => unreachable!(),
         DatabaseConfig::Sqlite(_) => {
             b.add::<DatabaseNoPasswordProvider>();
         }

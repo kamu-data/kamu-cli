@@ -12,23 +12,18 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::rest_api::test_accounts_me_kamu_user,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_openapi_st,
+    extra_test_groups = "resourcegen",
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::rest_api::test_accounts_me_e2e_user,
-    options = Options::default().with_multi_tenant()
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_run_api_server_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::rest_api::test_accounts_me_unauthorized,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_openapi_mt,
+    options = Options::default().with_multi_tenant(),
+    extra_test_groups = "resourcegen",
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
