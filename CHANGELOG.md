@@ -16,6 +16,7 @@ Recommendation: for ease of reading, use the following order:
 - `kamu login {password,oauth}`:
   - Saving the repository is the same as in `kamu login` 
   - Add `--repo-name` & `--skip-add-repo` arguments to control the save settings of the remote repository
+  - Trigger dependent dataset flows on Http `/ingest` and on smart transfer protocol dataset push
 ### Changed
 - `DatasetSummary` files replaced with `DatasetStatistics` stored in the database
      and updated synchronously with the HEAD reference updates

@@ -17,4 +17,6 @@ pub const MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE: &str =
 pub const MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE: &str =
     "dev.kamu.domain.datasets.DependencyGraphService";
 
+pub const MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER: &str = "dev.kamu.adapter.http.HttpAdapter";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

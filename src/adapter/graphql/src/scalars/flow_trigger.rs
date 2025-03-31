@@ -197,10 +197,7 @@ impl From<chrono::Duration> for TimeDelta {
             };
         }
 
-        panic!(
-            "Expecting intervals not smaller than 1 minute that are clearly dividable by unit, \
-             but received [{value}]"
-        );
+        panic!("Expecting intervals that are clearly dividable by unit, but received [{value}]");
     }
 }
 

@@ -128,43 +128,38 @@ impl FlowSchedulingHelper {
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?flow.flow_key, %flow.flow_id))]
+    #[tracing::instrument(level = "trace", skip_all, fields(?dataset_id, ?trigger_type))]
     pub(crate) async fn schedule_dependent_flows(
         &self,
-        input_success_time: DateTime<Utc>,
-        flow: &Flow,
-        flow_result: &FlowResult,
+        dataset_id: &odf::DatasetID,
+        flow_type: DatasetFlowType,
+        trigger_type: FlowTriggerType,
+        config_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
-        if let FlowKey::Dataset(fk_dataset) = &flow.flow_key {
-            let dependent_dataset_flow_plans = self
-                .make_downstream_dependencies_flow_plans(fk_dataset, flow.config_snapshot.as_ref())
-                .await?;
-            if dependent_dataset_flow_plans.is_empty() {
-                return Ok(());
-            }
-            let trigger_type = FlowTriggerType::InputDatasetFlow(FlowTriggerInputDatasetFlow {
-                trigger_time: input_success_time,
-                dataset_id: fk_dataset.dataset_id.clone(),
-                flow_type: fk_dataset.flow_type,
-                flow_id: flow.flow_id,
-                flow_result: flow_result.clone(),
-            });
-            // For each, trigger needed flow
-            for dependent_dataset_flow_plan in dependent_dataset_flow_plans {
-                // #ToDo handle dependencies flow
-                self.trigger_flow_common(
-                    &dependent_dataset_flow_plan.flow_key,
-                    dependent_dataset_flow_plan.flow_trigger_rule,
-                    trigger_type.clone(),
-                    dependent_dataset_flow_plan.maybe_config_snapshot,
-                )
-                .await?;
-            }
-
-            Ok(())
-        } else {
-            unreachable!("Not expecting other types of flow keys than dataset");
+        let fk_dataset = FlowKeyDataset {
+            dataset_id: dataset_id.clone(),
+            flow_type,
+        };
+        let dependent_dataset_flow_plans = self
+            .make_downstream_dependencies_flow_plans(&fk_dataset, config_snapshot_maybe.as_ref())
+            .await?;
+        if dependent_dataset_flow_plans.is_empty() {
+            return Ok(());
         }
+
+        // For each, trigger needed flow
+        for dependent_dataset_flow_plan in dependent_dataset_flow_plans {
+            // #ToDo handle dependencies flow
+            self.trigger_flow_common(
+                &dependent_dataset_flow_plan.flow_key,
+                dependent_dataset_flow_plan.flow_trigger_rule,
+                trigger_type.clone(),
+                dependent_dataset_flow_plan.maybe_config_snapshot,
+            )
+            .await?;
+        }
+
+        Ok(())
     }
 
     async fn make_downstream_dependencies_flow_plans(
@@ -532,31 +527,58 @@ impl FlowSchedulingHelper {
 
         // Scan each accumulated trigger to decide
         for trigger in &flow.triggers {
-            if let FlowTriggerType::InputDatasetFlow(ref trigger_type) = trigger {
-                match &trigger_type.flow_result {
-                    FlowResult::Empty | FlowResult::DatasetReset(_) => {}
-                    FlowResult::DatasetCompact(_) => {
-                        is_compacted = true;
-                    }
-                    FlowResult::DatasetUpdate(update) => {
-                        // Compute increment since the first trigger by this dataset.
-                        // Note: there might have been multiple updates since that time.
-                        // We are only recording the first trigger of particular dataset.
-                        if let FlowResultDatasetUpdate::Changed(update_result) = update {
-                            let increment = self
-                                .dataset_changes_service
-                                .get_increment_since(
-                                    &trigger_type.dataset_id,
-                                    update_result.old_head.as_ref(),
-                                )
-                                .await
-                                .int_err()?;
+            match trigger {
+                FlowTriggerType::InputDatasetFlow(ref trigger_type) => {
+                    match &trigger_type.flow_result {
+                        FlowResult::Empty | FlowResult::DatasetReset(_) => {}
+                        FlowResult::DatasetCompact(_) => {
+                            is_compacted = true;
+                        }
+                        FlowResult::DatasetUpdate(update) => {
+                            // Compute increment since the first trigger by this dataset.
+                            // Note: there might have been multiple updates since that time.
+                            // We are only recording the first trigger of particular dataset.
+                            if let FlowResultDatasetUpdate::Changed(update_result) = update {
+                                let increment = self
+                                    .dataset_changes_service
+                                    .get_increment_since(
+                                        &trigger_type.dataset_id,
+                                        update_result.old_head.as_ref(),
+                                    )
+                                    .await
+                                    .int_err()?;
 
-                            accumulated_records_count += increment.num_records;
-                            accumulated_something = true;
+                                accumulated_records_count += increment.num_records;
+                                accumulated_something = true;
+                            }
                         }
                     }
                 }
+                FlowTriggerType::Push(ref trigger_type) => {
+                    let old_head_maybe = match trigger_type.result {
+                        DatasetPushResult::HttpIngest(ref update_result) => {
+                            update_result.old_head_maybe.as_ref()
+                        }
+                        DatasetPushResult::SmtpSync(ref update_result) => {
+                            if update_result.is_force {
+                                // Force sync currently does not supported as a trigger for
+                                // dependent datasets
+                                return Ok(());
+                            }
+                            update_result.old_head_maybe.as_ref()
+                        }
+                    };
+
+                    let increment = self
+                        .dataset_changes_service
+                        .get_increment_since(&trigger_type.dataset_id, old_head_maybe)
+                        .await
+                        .int_err()?;
+
+                    accumulated_records_count += increment.num_records;
+                    accumulated_something = true;
+                }
+                _ => {}
             }
         }
 

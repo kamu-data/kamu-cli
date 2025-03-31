@@ -13,7 +13,8 @@ use std::time::Duration;
 
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::AuthenticationService;
 use kamu_core::{CorruptedSourceError, DatasetRegistry};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
@@ -21,8 +22,12 @@ use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
+    DatasetExternallyChangedMessage,
     SetRefCheckRefMode,
+    MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
 };
+use messaging_outbox::{Outbox, OutboxExt};
+use odf::Multihash;
 use tracing::Instrument;
 use url::Url;
 
@@ -189,6 +194,7 @@ impl AxumServerPushProtocolInstance {
         let push_request = self.handle_push_request_initiation().await?;
         let force_update_if_diverged = push_request.force_update_if_diverged;
         let visibility_for_created_dataset = push_request.visibility_for_created_dataset;
+        let old_head_maybe = push_request.current_head.clone();
 
         let mut new_blocks = self.try_handle_push_metadata_request(push_request).await?;
         if !new_blocks.is_empty() {
@@ -266,7 +272,7 @@ impl AxumServerPushProtocolInstance {
             }
         }
 
-        self.try_handle_push_complete(new_blocks, force_update_if_diverged)
+        self.try_handle_push_complete(new_blocks, force_update_if_diverged, old_head_maybe)
             .await?;
 
         Ok(())
@@ -481,6 +487,7 @@ impl AxumServerPushProtocolInstance {
         &mut self,
         new_blocks: VecDeque<odf::dataset::HashedMetadataBlock>,
         force_update_if_diverged: bool,
+        old_head_maybe: Option<Multihash>,
     ) -> Result<(), PushServerError> {
         axum_read_payload::<DatasetPushComplete>(&mut self.socket)
             .await
@@ -491,19 +498,69 @@ impl AxumServerPushProtocolInstance {
         tracing::debug!("Push client sent a complete request. Committing the dataset");
 
         let dataset_handle = self.maybe_dataset_handle.clone().unwrap();
-        DatabaseTransactionRunner::new(self.catalog.clone())
+        let (dataset_id, new_head) = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with2(
                 |dataset_registry: Arc<dyn DatasetRegistry>, append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
                     let resolved_dataset = dataset_registry.get_dataset_by_handle(&dataset_handle).await;
+
                     append_dataset_metadata_batch
                         .execute(resolved_dataset.as_ref(), Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
                             set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged)),
                             ..Default::default()
                         })
+                        .await.int_err()?;
+
+                    let new_head = resolved_dataset
+                        .as_metadata_chain()
+                        .resolve_ref(&odf::BlockRef::Head)
                         .await
+                        .int_err()?;
+
+                    Ok::<(odf::DatasetID, Multihash), InternalError>((resolved_dataset.get_id().clone(), new_head))
                 },
             )
             .instrument(tracing::debug_span!("AxumServerPushProtocolInstance::try_handle_push_complete"))
+            .await
+            .protocol_int_err(PushPhase::CompleteRequest)?;
+
+        tracing::debug!("Push client sent a complete request. Send outbox message");
+
+        let maybe_bearer_header = self.maybe_bearer_header.clone();
+        // Have separate transaction just for sending outbox message may be not a good
+        // idea, but it will allow us to separate push flow and outbox messaging.
+        // Ideally we may consider some kind of transactional_with_n method to be able
+        // use more than 2 different services in one transaction
+        DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with2(
+                |outbox: Arc<dyn Outbox>,
+                 authentication_service: Arc<dyn AuthenticationService>| async move {
+                    let account_name = if let Some(bearer_header) = &maybe_bearer_header {
+                        let account = authentication_service
+                            .account_by_token(bearer_header.token().to_owned())
+                            .await
+                            .int_err()?;
+                        Some(account.account_name)
+                    } else {
+                        None
+                    };
+
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+                            DatasetExternallyChangedMessage::smart_transfer_protocol_sync(
+                                &dataset_id,
+                                old_head_maybe.as_ref(),
+                                &new_head,
+                                account_name,
+                                force_update_if_diverged,
+                            ),
+                        )
+                        .await
+                },
+            )
+            .instrument(tracing::debug_span!(
+                "AxumServerPushProtocolInstance::try_handle_push_complete send outbox message"
+            ))
             .await
             .protocol_int_err(PushPhase::CompleteRequest)?;
 

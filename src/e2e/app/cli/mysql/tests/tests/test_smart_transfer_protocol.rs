@@ -400,3 +400,27 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = mysql,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_trigger_dependent_dataset_update_st,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(indoc::indoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+              flowSystem:
+                flowAgent:
+                  awaitingStepSecs: 1
+                  mandatoryThrottlingPeriodSecs: 5
+                taskAgent:
+                  taskCheckingIntervalSecs: 1
+            "#
+        )),
+    extra_test_groups = "containerized, engine, ingest, transform,
+datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -24,7 +24,7 @@ doctest = false
 [features]
 default = []
 
-e2e = ["dep:messaging-outbox", "dep:http-body-util"]
+e2e = ["dep:http-body-util"]
 
 
 [dependencies]
@@ -39,6 +39,7 @@ kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
+messaging-outbox = { workspace = true }
 odf = { workspace = true, features = ["http", "lfs", "s3", "utoipa"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
@@ -99,9 +100,6 @@ url = { version = "2", features = ["serde"] }
 utoipa = { version = "5", default-features = false, features = [] }
 utoipa-axum = { version = "0.2", default-features = false, features = [] }
 uuid = { version = "1", default-features = false, features = ["v4"] }
-
-# Optional
-messaging-outbox = { optional = true, workspace = true }
 
 http-body-util = { optional = true, version = "0.1" }
 
