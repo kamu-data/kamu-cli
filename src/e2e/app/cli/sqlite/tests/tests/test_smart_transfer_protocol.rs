@@ -403,7 +403,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_trigger_dependent_dataset_update_mt,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_trigger_dependent_dataset_update_st,
     options = Options::default()
         .with_multi_tenant()
         .with_kamu_config(indoc::indoc!(
