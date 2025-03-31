@@ -317,6 +317,9 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
         let downstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
 
+            println!("@@@@@@@@@@ state: {:?}", state.dataset_node_indices);
+            println!("@@@@@@@@@@ state: {:?}", state.datasets_graph);
+
             let node_index = state
                 .get_dataset_node(dataset_id)
                 .map_err(GetDependenciesError::DatasetNotFound)?;
