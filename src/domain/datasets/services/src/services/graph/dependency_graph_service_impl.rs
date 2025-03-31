@@ -417,6 +417,8 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
             DatasetLifecycleMessage::Created(created) => {
                 let mut state = self.state.write().await;
 
+                println!("@@@@@@@created : {:?}", created);
+
                 state.get_or_create_dataset_node(&created.dataset_id);
 
                 Ok(())
