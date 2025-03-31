@@ -121,12 +121,6 @@ pub async fn test_smart_push_trigger_dependent_dataset_update_st(
     test_smart_push_trigger_dependent_dataset_update(kamu_api_server_client, false).await;
 }
 
-pub async fn test_smart_push_trigger_dependent_dataset_update_mt(
-    kamu_api_server_client: KamuApiServerClient,
-) {
-    test_smart_push_trigger_dependent_dataset_update(kamu_api_server_client, true).await;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

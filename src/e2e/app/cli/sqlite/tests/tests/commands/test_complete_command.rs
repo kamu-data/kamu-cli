@@ -12,25 +12,24 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_compact_hard
-    extra_test_groups = "engine, ingest, datafusion"
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_subcommand,
+    options = Options::default().with_no_workspace()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_compact_keep_metadata_only
-    extra_test_groups = "engine, ingest, datafusion"
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_config,
+    options = Options::default().with_no_workspace()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_compact_verify
-    extra_test_groups = "engine, ingest, datafusion"
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_dataset_name
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

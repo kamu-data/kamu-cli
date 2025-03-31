@@ -14,4 +14,6 @@ mod test_gql_query;
 mod test_ingest;
 mod test_odf_core;
 mod test_odf_query;
+mod test_openapi;
+mod test_swagger;
 mod test_upload;

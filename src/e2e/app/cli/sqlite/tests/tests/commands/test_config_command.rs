@@ -12,24 +12,42 @@ use kamu_cli_e2e_common::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_inspect_lineage,
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_config_set_value
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_inspect_query,
-    options = Options::default().with_frozen_system_time()
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_config_reset_key
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
-    storage = inmem,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_inspect_schema,
-    extra_test_groups = "engine, ingest, datafusion"
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_config_get_with_default
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_config_get_from_config
+    options = Options::default().with_kamu_config(
+        indoc::indoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+                engine:
+                  runtime: podman
+                uploads:
+                  maxFileSizeInMb: 42
+            "#
+        )
+    )
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
