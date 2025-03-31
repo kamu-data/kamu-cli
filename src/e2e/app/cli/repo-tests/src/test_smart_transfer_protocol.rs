@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::str::FromStr;
 
 use chrono::DateTime;
+use kamu_adapter_http::general::DatasetInfoResponse;
 use kamu_cli_e2e_common::*;
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
@@ -1718,6 +1719,18 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                 Some([r#"1 dataset\(s\) pushed"#]),
             )
             .await;
+
+        let datasets = kamu_in_push_workspace.list_datasets().await;
+        pretty_assertions::assert_eq!(1, datasets.len());
+        let root_dataset_id = datasets.get(0).unwrap().id.clone();
+
+        assert_matches!(
+            kamu_api_server_client
+                .dataset()
+                .by_id(&root_dataset_id)
+                .await,
+            Ok(_)
+        );
 
         let derivative_dataset = kamu_api_server_client.dataset().create_leaderboard().await;
 
