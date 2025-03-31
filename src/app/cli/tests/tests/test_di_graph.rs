@@ -90,7 +90,8 @@ fn test_di_cli_graph_validates(
         WorkspaceStatus::Created(tenancy_config),
         None,
         false,
-    );
+    )
+    .unwrap();
     base_catalog_builder.add_value(Interact::new(false, false));
     let base_catalog = base_catalog_builder.build();
 
@@ -138,7 +139,8 @@ fn test_di_server_graph_validates(
         WorkspaceStatus::Created(tenancy_config),
         None,
         false,
-    );
+    )
+    .unwrap();
     let base_catalog = base_catalog_builder.build();
 
     let mut cli_catalog_builder = kamu_cli::configure_server_catalog(&base_catalog);

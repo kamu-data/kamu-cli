@@ -1221,8 +1221,6 @@ impl CompactTestHarness {
             .add_value(CurrentAccountSubject::new_test())
             .build();
 
-        let ctx = new_session_context(catalog.get_one().unwrap());
-
         let transform_helper = TransformTestHelper::from_catalog(&catalog);
 
         Self {
@@ -1237,7 +1235,7 @@ impl CompactTestHarness {
             transform_helper,
             verification_svc: catalog.get_one().unwrap(),
             current_date_time,
-            ctx,
+            ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
 

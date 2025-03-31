@@ -17,7 +17,9 @@ use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::execution::SessionState;
 use datafusion::logical_expr::{LogicalPlan, SortExpr};
+use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
+use tracing::Instrument as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,13 +44,28 @@ impl DataFrameExt {
     }
 
     #[tracing::instrument(level = "info", name = "DataFrame::collect", skip_all)]
-    pub async fn collect(self) -> Result<Vec<arrow::array::RecordBatch>, DataFusionError> {
-        self.0.collect().await
+    pub async fn collect(self) -> Result<Vec<RecordBatch>, DataFusionError> {
+        let task_ctx = Arc::new(self.0.task_ctx());
+
+        let plan = self
+            .0
+            .create_physical_plan()
+            .instrument(tracing::debug_span!("DataFrame::create_physical_plan").or_current())
+            .await?;
+
+        datafusion::physical_plan::collect(plan, task_ctx)
+            .instrument(tracing::debug_span!("PhysicalPlan::collect").or_current())
+            .await
     }
 
     #[tracing::instrument(level = "info", name = "DataFrame::count", skip_all)]
     pub async fn count(self) -> Result<usize, DataFusionError> {
         self.0.count().await
+    }
+
+    #[tracing::instrument(level = "info", name = "DataFrame::create_physical_plan", skip_all)]
+    pub async fn create_physical_plan(self) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
+        self.0.create_physical_plan().await
     }
 
     pub fn filter(self, predicate: Expr) -> Result<Self, DataFusionError> {

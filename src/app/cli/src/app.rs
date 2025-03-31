@@ -171,7 +171,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             workspace_status,
             args.password_hashing_mode,
             is_e2e_testing,
-        );
+        )?;
 
         let base_catalog = base_catalog_builder.build();
 
@@ -636,7 +636,7 @@ pub fn register_config_in_catalog(
     workspace_status: WorkspaceStatus,
     password_hashing_mode: Option<cli::PasswordHashingMode>,
     is_e2e_testing: bool,
-) {
+) -> Result<(), CLIError> {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
     // Register JupyterConfig used by some commands
@@ -649,64 +649,27 @@ pub fn register_config_in_catalog(
     });
     //
 
-    // Engine provisioner configuration
-    catalog_builder.add_value(EngineProvisionerLocalConfig {
-        max_concurrency: config.engine.as_ref().unwrap().max_concurrency,
-        start_timeout: config
-            .engine
-            .as_ref()
-            .unwrap()
-            .start_timeout
-            .unwrap()
-            .into(),
-        shutdown_timeout: config
-            .engine
-            .as_ref()
-            .unwrap()
-            .shutdown_timeout
-            .unwrap()
-            .into(),
-        spark_image: config
-            .engine
-            .as_ref()
-            .unwrap()
-            .images
-            .as_ref()
-            .unwrap()
-            .spark
-            .clone()
-            .unwrap(),
-        flink_image: config
-            .engine
-            .as_ref()
-            .unwrap()
-            .images
-            .as_ref()
-            .unwrap()
-            .flink
-            .clone()
-            .unwrap(),
-        datafusion_image: config
-            .engine
-            .as_ref()
-            .unwrap()
-            .images
-            .as_ref()
-            .unwrap()
-            .datafusion
-            .clone()
-            .unwrap(),
-        risingwave_image: config
-            .engine
-            .as_ref()
-            .unwrap()
-            .images
-            .as_ref()
-            .unwrap()
-            .risingwave
-            .clone()
-            .unwrap(),
-    });
+    // Engine configuration
+    {
+        let engine_config = config.engine.clone().unwrap();
+        let images_config = engine_config.images.unwrap();
+
+        catalog_builder.add_value(EngineProvisionerLocalConfig {
+            max_concurrency: engine_config.max_concurrency,
+            start_timeout: engine_config.start_timeout.unwrap().into(),
+            shutdown_timeout: engine_config.shutdown_timeout.unwrap().into(),
+            spark_image: images_config.spark.clone().unwrap(),
+            flink_image: images_config.flink.clone().unwrap(),
+            datafusion_image: images_config.datafusion.clone().unwrap(),
+            risingwave_image: images_config.risingwave.clone().unwrap(),
+        });
+
+        let (ingest_config, batch_query_config, compaction_config) =
+            engine_config.datafusion_embedded.unwrap().into_system()?;
+        catalog_builder.add_value(ingest_config);
+        catalog_builder.add_value(batch_query_config);
+        catalog_builder.add_value(compaction_config);
+    }
     //
 
     catalog_builder.add_value(config.source.as_ref().unwrap().to_infra_cfg());
@@ -957,6 +920,8 @@ pub fn register_config_in_catalog(
         }
     }
     //
+
+    Ok(())
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

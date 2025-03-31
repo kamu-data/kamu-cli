@@ -19,7 +19,6 @@ use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
-use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::auth::DatasetActionAuthorizer;
@@ -28,49 +27,26 @@ use odf::utils::data::DataFrameExt;
 
 use crate::services::query::*;
 use crate::utils::docker_images;
+use crate::EngineConfigDatafusionEmbeddedBatchQuery;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn QueryService)]
 pub struct QueryServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    datafusion_engine_config: Arc<EngineConfigDatafusionEmbeddedBatchQuery>,
 }
 
-#[component(pub)]
-#[interface(dyn QueryService)]
 impl QueryServiceImpl {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        object_store_registry: Arc<dyn ObjectStoreRegistry>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            object_store_registry,
-            dataset_action_authorizer,
-            rebac_dataset_registry_facade,
-        }
-    }
-
     async fn session_context(
         &self,
         options: QueryOptions,
     ) -> Result<SessionContext, InternalError> {
-        let mut cfg = SessionConfig::new()
-            .with_information_schema(true)
-            .with_default_catalog_and_schema("kamu", "kamu");
-
-        // Forcing case-sensitive identifiers in case-insensitive language seems to
-        // be a lesser evil than following DataFusion's default behavior of forcing
-        // identifiers to lowercase instead of case-insensitive matching.
-        //
-        // See: https://github.com/apache/datafusion/issues/7460
-        // TODO: Consider externalizing this config (e.g. by allowing custom engine
-        // options in transform DTOs)
-        cfg.options_mut().sql_parser.enable_ident_normalization = false;
+        let config = self.datafusion_engine_config.0.clone();
 
         let runtime = Arc::new(
             RuntimeEnvBuilder::new()
@@ -80,18 +56,27 @@ impl QueryServiceImpl {
                 .build()
                 .unwrap(),
         );
-        let session_context = SessionContext::new_with_config_rt(cfg, runtime);
+
+        #[allow(unused_mut)]
+        let mut ctx = SessionContext::new_with_config_rt(config, runtime);
 
         let schema = KamuSchema::prepare(
-            &session_context,
+            &ctx,
             self.dataset_registry.clone(),
             self.dataset_action_authorizer.clone(),
             options,
         )
         .await?;
 
-        session_context.register_catalog("kamu", Arc::new(KamuCatalog::new(Arc::new(schema))));
-        Ok(session_context)
+        ctx.register_catalog("kamu", Arc::new(KamuCatalog::new(Arc::new(schema))));
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "query-extensions-json")] {
+                datafusion_functions_json::register_all(&mut ctx).unwrap();
+            }
+        }
+
+        Ok(ctx)
     }
 
     /// Unless state is already provided in the options this will attempt to

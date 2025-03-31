@@ -69,6 +69,7 @@ async fn test_engine_io_common<
         engine_provisioner.clone(),
         object_store_registry.clone(),
         Arc::new(DataFormatRegistryImpl::new()),
+        Arc::new(EngineConfigDatafusionEmbeddedIngest::default()),
         run_info_dir.clone(),
         cache_dir,
         time_source.clone(),
@@ -86,6 +87,7 @@ async fn test_engine_io_common<
             object_store_registry.clone(),
             time_source.clone(),
             run_info_dir.clone(),
+            Arc::new(EngineConfigDatafusionEmbeddedCompaction::default()),
         )),
         engine_provisioner.clone(),
     );
