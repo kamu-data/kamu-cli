@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT MAX(sequence_number)\n                FROM dataset_key_blocks\n                WHERE dataset_id = $1 AND block_ref_name = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "max",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b26303c6fd30c6b3560965ad20849e5333be9bc306518451cb96d1ac9144bba3"
+}

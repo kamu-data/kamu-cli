@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM dataset_key_blocks WHERE dataset_id = ? AND block_ref_name = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "a5f7b6ddf38e6f752047b7ada3af1db1c1d6ea61d0ba4a69c73ba217e4634e5d"
+}

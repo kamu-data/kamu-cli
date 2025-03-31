@@ -32,11 +32,13 @@ async-trait = { version = "0.1", default-features = false }
 chrono =  { version = "0.4"}
 dill = "0.12"
 futures = "0.3"
+serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio-rustls",
     "macros",
     "sqlite",
     "chrono",
+    "json"
 ] }
 tracing = "0.1"
 uuid = "1"
