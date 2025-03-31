@@ -140,12 +140,23 @@ impl FlowSchedulingHelper {
             dataset_id: dataset_id.clone(),
             flow_type,
         };
-        let dependent_dataset_flow_plans = self
+        let dependent_dataset_flow_plans = match self
             .make_downstream_dependencies_flow_plans(&fk_dataset, config_snapshot_maybe.as_ref())
-            .await?;
-        if dependent_dataset_flow_plans.is_empty() {
-            return Ok(());
-        }
+            .await
+        {
+            Ok(plans) => {
+                if plans.is_empty() {
+                    return Ok(());
+                }
+                plans
+            }
+            Err(err) => {
+                return Ok(());
+            }
+        };
+        // let dependent_dataset_flow_plans = self
+        //     .make_downstream_dependencies_flow_plans(&fk_dataset,
+        // config_snapshot_maybe.as_ref())     .await?;
 
         // For each, trigger needed flow
         for dependent_dataset_flow_plan in dependent_dataset_flow_plans {

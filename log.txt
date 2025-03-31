@@ -1,0 +1,30 @@
+warning: unused import: `kamu_adapter_http::general::DatasetInfoResponse`
+  --> src/e2e/app/cli/repo-tests/src/test_smart_transfer_protocol.rs:14:5
+   |
+14 | use kamu_adapter_http::general::DatasetInfoResponse;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: if this is a test module, consider adding a `#[cfg(test)]` to the containing module
+  --> src/e2e/app/cli/repo-tests/src/lib.rs:18:1
+   |
+18 | mod test_smart_transfer_protocol;
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `kamu_adapter_http::general::DatasetInfoResponse`
+  --> src/e2e/app/cli/repo-tests/src/test_smart_transfer_protocol.rs:14:5
+   |
+14 | use kamu_adapter_http::general::DatasetInfoResponse;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: `kamu-cli-e2e-repo-tests` (lib) generated 1 warning (run `cargo fix --lib -p kamu-cli-e2e-repo-tests` to apply 1 suggestion)
+warning: `kamu-cli-e2e-repo-tests` (lib test) generated 1 warning (run `cargo fix --lib -p kamu-cli-e2e-repo-tests --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.45s
+    Starting 3 tests across 144 binaries (1803 skipped; run ID: a2e703af-e156-409b-b98f-3e62881583ef, nextest profile: default)
+        PASS [  12.598s] kamu-cli-e2e-sqlite::mod tests::test_smart_transfer_protocol::g0d6f::e2e::containerized::engine::ingest::transform::datafusion::test_smart_push_trigger_dependent_dataset_update_st
+        PASS [  13.086s] kamu-cli-e2e-postgres::mod tests::test_smart_transfer_protocol::gf320::e2e::database::postgres::containerized::engine::ingest::transform::datafusion::test_smart_push_trigger_dependent_dataset_update_st
+        PASS [  13.229s] kamu-cli-e2e-mysql::mod tests::test_smart_transfer_protocol::g5975::e2e::database::mysql::containerized::engine::ingest::transform::datafusion::test_smart_push_trigger_dependent_dataset_update_st
+------------
+     Summary [  13.231s] 3 tests run: 3 passed, 1803 skipped

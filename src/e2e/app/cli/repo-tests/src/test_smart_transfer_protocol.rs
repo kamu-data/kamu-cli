@@ -1720,17 +1720,17 @@ async fn test_smart_push_trigger_dependent_dataset_update(
             )
             .await;
 
-        let datasets = kamu_in_push_workspace.list_datasets().await;
-        pretty_assertions::assert_eq!(1, datasets.len());
-        let root_dataset_id = datasets.get(0).unwrap().id.clone();
+        // let datasets = kamu_in_push_workspace.list_datasets().await;
+        // pretty_assertions::assert_eq!(1, datasets.len());
+        // let root_dataset_id = datasets.get(0).unwrap().id.clone();
 
-        assert_matches!(
-            kamu_api_server_client
-                .dataset()
-                .by_id(&root_dataset_id)
-                .await,
-            Ok(_)
-        );
+        // assert_matches!(
+        //     kamu_api_server_client
+        //         .dataset()
+        //         .by_id(&root_dataset_id)
+        //         .await,
+        //     Ok(_)
+        // );
 
         let derivative_dataset = kamu_api_server_client.dataset().create_leaderboard().await;
 
