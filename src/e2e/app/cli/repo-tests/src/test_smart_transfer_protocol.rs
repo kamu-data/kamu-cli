@@ -1668,16 +1668,9 @@ async fn test_smart_push_trigger_dependent_dataset_update(
         Some(E2E_USER_ACCOUNT_NAME.clone()),
         DATASET_ROOT_PLAYER_NAME.clone(),
     );
-    let derivative_dataset_alias = odf::DatasetAlias::new(
-        Some(E2E_USER_ACCOUNT_NAME.clone()),
-        DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
-    );
     let kamu_api_server_root_dataset_endpoint = kamu_api_server_client
         .dataset()
         .get_odf_endpoint(&root_dataset_alias);
-    let kamu_api_server_derivative_dataset_endpoint = kamu_api_server_client
-        .dataset()
-        .get_odf_endpoint(&derivative_dataset_alias);
 
     // 1. Grub a token
     let token = kamu_api_server_client.auth().login_as_e2e_user().await;
@@ -1690,14 +1683,6 @@ async fn test_smart_push_trigger_dependent_dataset_update(
         // 2.1. Add datasets
         kamu_in_push_workspace
             .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-            .await
-            .success();
-
-        kamu_in_push_workspace
-            .execute_with_input(
-                ["add", "--stdin"],
-                DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-            )
             .await
             .success();
 
@@ -1728,30 +1713,9 @@ async fn test_smart_push_trigger_dependent_dataset_update(
             )
             .await;
 
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    derivative_dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_derivative_dataset_endpoint.as_str(),
-                    "--visibility",
-                    "public",
-                ],
-                None,
-                Some([r#"1 dataset\(s\) pushed"#]),
-            )
-            .await;
+        let derivative_dataset = kamu_api_server_client.dataset().create_leaderboard().await;
 
         //2.3 Enable batching trigger for derivative dataset
-        let datasets = kamu_in_push_workspace.list_datasets().await;
-        let derivative_dataset_id = datasets
-            .iter()
-            .find(|dataset| dataset.name == derivative_dataset_alias.dataset_name)
-            .unwrap()
-            .id
-            .clone();
-
         kamu_api_server_client
             .graphql_api_call_assert(
                 indoc::indoc!(
@@ -1792,7 +1756,10 @@ async fn test_smart_push_trigger_dependent_dataset_update(
                 "#
                 )
                 .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
-                .replace("$datasetId", &format!("\"{derivative_dataset_id}\""))
+                .replace(
+                    "$datasetId",
+                    &format!("\"{}\"", derivative_dataset.dataset_id),
+                )
                 .as_str(),
                 Ok(indoc::indoc!(
                     r#"
@@ -1823,7 +1790,7 @@ async fn test_smart_push_trigger_dependent_dataset_update(
 
         kamu_api_server_client
             .flow()
-            .wait(&derivative_dataset_id, 1)
+            .wait(&derivative_dataset.dataset_id, 1)
             .await;
 
         // Ingest data to the root dataset
@@ -1851,12 +1818,12 @@ async fn test_smart_push_trigger_dependent_dataset_update(
         // Check derivative dataset data was updated
         kamu_api_server_client
             .flow()
-            .wait(&derivative_dataset_id, 2)
+            .wait(&derivative_dataset.dataset_id, 2)
             .await;
 
         let mut tail_result = kamu_api_server_client
             .odf_query()
-            .tail(&derivative_dataset_alias)
+            .tail(&derivative_dataset.dataset_alias)
             .await;
 
         if let Some(data) = tail_result.get_mut("data") {
