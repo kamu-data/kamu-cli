@@ -6519,6 +6519,7 @@ dependencies = [
  "opendatafabric",
  "secrecy",
  "serde",
+ "serde_json",
  "serde_with",
  "sqlx",
  "strum 0.26.3",
@@ -6563,6 +6564,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",
@@ -6584,6 +6586,7 @@ dependencies = [
  "kamu-datasets",
  "opendatafabric",
  "secrecy",
+ "serde_json",
  "uuid",
 ]
 
@@ -6647,6 +6650,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
+ "serde_json",
  "sqlx",
  "test-group",
  "test-log",

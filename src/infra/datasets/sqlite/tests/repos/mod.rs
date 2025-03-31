@@ -10,5 +10,6 @@
 mod test_sqlite_dataset_dependency_repository;
 mod test_sqlite_dataset_entry_repository;
 mod test_sqlite_dataset_env_var_repository;
+mod test_sqlite_dataset_key_blocks_repository;
 mod test_sqlite_dataset_reference_repository;
 mod test_sqlite_dataset_statistics_repository;
