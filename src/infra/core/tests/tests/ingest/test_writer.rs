@@ -18,6 +18,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
 use odf::metadata::testing::MetadataFactory;
+use odf::utils::data::DataFrameExt;
 use odf::utils::testing::{assert_arrow_schema_eq, assert_data_eq, assert_schema_eq};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -1432,7 +1433,7 @@ impl Harness {
         .unwrap()
     }
 
-    async fn get_last_data(&self) -> DataFrame {
+    async fn get_last_data(&self) -> DataFrameExt {
         let part_file = self.get_last_data_file().await;
         self.ctx
             .read_parquet(
@@ -1447,5 +1448,6 @@ impl Harness {
             )
             .await
             .unwrap()
+            .into()
     }
 }

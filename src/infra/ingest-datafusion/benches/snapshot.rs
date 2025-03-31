@@ -182,7 +182,7 @@ async fn merge_snapshot(prev_path: &str, new_path: &str, expected_rows: usize) {
             compare_columns: Some(vec!["cmp1".to_string(), "cmp2".to_string()]),
         },
     )
-    .merge(Some(prev), new)
+    .merge(Some(prev.into()), new.into())
     .unwrap();
 
     let res = res.cache().await.unwrap();

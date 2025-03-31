@@ -15,6 +15,7 @@ use datafusion::datasource::file_format::file_compression_type::FileCompressionT
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -51,7 +52,8 @@ impl Reader for ReaderNdJson {
         self.schema.clone()
     }
 
-    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
+    #[tracing::instrument(level = "info", name = "ReaderNdJson::read", skip_all)]
+    async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         // TODO: Move this to reader construction phase
         match self.conf.encoding.as_deref() {
             None | Some("utf8") => Ok(()),
@@ -85,6 +87,6 @@ impl Reader for ReaderNdJson {
             .await
             .int_err()?;
 
-        Ok(df)
+        Ok(df.into())
     }
 }

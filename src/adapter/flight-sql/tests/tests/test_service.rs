@@ -19,6 +19,7 @@ use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{Account, AuthenticationService, GetAccountInfoError};
 use kamu_adapter_flight_sql::*;
 use kamu_core::{MockQueryService, QueryService};
+use odf::utils::data::DataFrameExt;
 use tokio::net::TcpListener;
 use tonic::service::interceptor;
 use tonic::transport::{Channel, Server};
@@ -171,7 +172,10 @@ async fn test_statement_anonymous() {
     assert_eq!(record_batches.len(), 1);
 
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(record_batches.pop().unwrap()).unwrap();
+    let df: DataFrameExt = ctx
+        .read_batch(record_batches.pop().unwrap())
+        .unwrap()
+        .into();
 
     odf::utils::testing::assert_schema_eq(
         df.schema(),
@@ -225,7 +229,10 @@ async fn test_statement_bearer() {
     assert_eq!(record_batches.len(), 1);
 
     let ctx = SessionContext::new();
-    let df = ctx.read_batch(record_batches.pop().unwrap()).unwrap();
+    let df: DataFrameExt = ctx
+        .read_batch(record_batches.pop().unwrap())
+        .unwrap()
+        .into();
 
     odf::utils::testing::assert_schema_eq(
         df.schema(),

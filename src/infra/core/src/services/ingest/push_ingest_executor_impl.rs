@@ -11,11 +11,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use datafusion::arrow::array::RecordBatch;
-use datafusion::prelude::{DataFrame, SessionContext};
+use datafusion::prelude::SessionContext;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_ingest_datafusion::*;
+use odf::utils::data::DataFrameExt;
 use tokio::io::AsyncRead;
 
 use super::ingest_common;
@@ -231,7 +232,7 @@ impl PushIngestExecutorImpl {
         input_data_path: &Path,
         ctx: &SessionContext,
         args: &PushIngestArgs,
-    ) -> Result<Option<DataFrame>, PushIngestError> {
+    ) -> Result<Option<DataFrameExt>, PushIngestError> {
         let conf = if let Some(media_type) = &args.opts.media_type {
             let conf = self
                 .data_format_registry
@@ -263,7 +264,7 @@ impl PushIngestExecutorImpl {
                     .read_batch(RecordBatch::new_empty(read_schema))
                     .int_err()?;
 
-                return Ok(Some(df));
+                return Ok(Some(df.into()));
             }
 
             tracing::info!(

@@ -14,6 +14,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -46,7 +47,8 @@ impl Reader for ReaderParquet {
         self.schema.clone()
     }
 
-    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
+    #[tracing::instrument(level = "info", name = "ReaderParquet::read", skip_all)]
+    async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         let options = ParquetReadOptions {
             schema: self.schema.as_deref(),
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
@@ -62,6 +64,6 @@ impl Reader for ReaderParquet {
             .await
             .int_err()?;
 
-        Ok(df)
+        Ok(df.into())
     }
 }

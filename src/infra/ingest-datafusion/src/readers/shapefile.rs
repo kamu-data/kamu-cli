@@ -13,6 +13,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
+use odf::utils::data::DataFrameExt;
 
 use crate::*;
 
@@ -47,6 +48,11 @@ impl ReaderEsriShapefile {
         })
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = "ReaderEsriShapefile::convert_to_ndjson",
+        skip_all
+    )]
     fn convert_to_ndjson_blocking(
         in_path: &Path,
         tmp_path: &Path,
@@ -225,7 +231,8 @@ impl Reader for ReaderEsriShapefile {
         self.inner.input_schema().await
     }
 
-    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
+    #[tracing::instrument(level = "info", name = "ReaderEsriShapefile::read", skip_all)]
+    async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         // TODO: PERF: This is a temporary, highly inefficient implementation that
         // decodes Shapefile into NdJson which DataFusion can read natively
         let in_path = path.to_path_buf();

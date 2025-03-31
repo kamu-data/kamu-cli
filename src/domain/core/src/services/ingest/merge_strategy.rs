@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use datafusion::logical_expr::SortExpr;
-use datafusion::prelude::DataFrame;
 use internal_error::InternalError;
+use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +35,11 @@ use internal_error::InternalError;
 pub trait MergeStrategy: Send + Sync {
     /// Reduces newly seen data `new` to a minimal update to previously
     /// ledgerized `prev` data.
-    fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError>;
+    fn merge(
+        &self,
+        prev: Option<DataFrameExt>,
+        new: DataFrameExt,
+    ) -> Result<DataFrameExt, MergeError>;
 
     /// Returns the sort expression best suited for the output of this strategy
     /// to perform before writing the final result.

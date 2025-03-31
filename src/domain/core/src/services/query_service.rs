@@ -13,8 +13,9 @@ use std::sync::Arc;
 
 use datafusion::arrow;
 use datafusion::parquet::schema::types::Type;
-use datafusion::prelude::{DataFrame, SessionContext};
+use datafusion::prelude::SessionContext;
 use internal_error::*;
+use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
@@ -45,7 +46,7 @@ pub trait QueryService: Send + Sync {
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
-    ) -> Result<DataFrame, QueryError>;
+    ) -> Result<DataFrameExt, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
     /// [DataFrame] that can be used to get schema and data, and the state
@@ -74,7 +75,7 @@ pub trait QueryService: Send + Sync {
     // number of files we collect to construct the dataframe.
     //
     /// Returns a [DataFrame] representing the contents of an entire dataset
-    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrame, QueryError>;
+    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrameExt, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
@@ -122,11 +123,11 @@ pub struct DatasetQueryHints {
 
 #[derive(Debug, Clone)]
 pub struct QueryResponse {
-    /// A [`DataFrame`] that can be used to read schema and access the data.
+    /// A [`DataFrameExt`] that can be used to read schema and access the data.
     /// Note that the data frames are "lazy". They are a representation of a
     /// logical query plan. The actual query is executed only when you pull
     /// the resulting data from it.
-    pub df: DataFrame,
+    pub df: DataFrameExt,
     ///  The query state information that can be used for reproducibility.
     pub state: QueryState,
 }
