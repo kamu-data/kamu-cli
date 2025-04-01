@@ -288,7 +288,12 @@ impl KamuTable {
         }
     }
 
-    #[tracing::instrument(level="info", skip_all, fields(dataset = ?self.resolved_dataset))]
+    #[tracing::instrument(
+        level = "info",
+        name = "KamuTable::init_table_schema",
+        skip_all,
+        fields(dataset = ?self.resolved_dataset),
+    )]
     async fn init_table_schema(&self) -> Result<SchemaRef, InternalError> {
         use odf::dataset::MetadataChainExt;
         let maybe_set_data_schema = self
@@ -325,7 +330,12 @@ impl KamuTable {
 
     // TODO: A lot of duplication from `SessionContext::read_parquet` - code is
     // copied as we need table provider and not the `DataFrame`
-    #[tracing::instrument(level="info", skip_all, fields(dataset = ?self.resolved_dataset))]
+    #[tracing::instrument(
+        level = "info",
+        name = "KamuTable::init_table_provider",
+        skip_all,
+        fields(dataset = ?self.resolved_dataset),
+    )]
     async fn init_table_provider(
         &self,
         schema: SchemaRef,
