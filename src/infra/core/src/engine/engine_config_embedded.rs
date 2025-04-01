@@ -101,7 +101,12 @@ impl Default for EngineConfigDatafusionEmbeddedBatchQuery {
 pub struct EngineConfigDatafusionEmbeddedCompaction(pub SessionConfig);
 
 impl EngineConfigDatafusionEmbeddedCompaction {
-    pub const DEFAULT_OVERRIDES: &[(&str, &str)] = &[];
+    pub const DEFAULT_OVERRIDES: &[(&str, &str)] = &[
+        // TODO: This is a legacy option as compaction service used to inherit its config from
+        // ingest. We should validate that compactions work correctly with multiple
+        // partitions and remove it eventually.
+        ("datafusion.execution.target_partitions", "1"),
+    ];
 }
 
 impl Default for EngineConfigDatafusionEmbeddedCompaction {

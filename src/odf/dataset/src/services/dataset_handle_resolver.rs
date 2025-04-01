@@ -54,6 +54,12 @@ pub struct DatasetNotFoundError {
     pub dataset_ref: odf_metadata::DatasetRef,
 }
 
+impl DatasetNotFoundError {
+    pub fn new(dataset_ref: odf_metadata::DatasetRef) -> Self {
+        Self { dataset_ref }
+    }
+}
+
 impl From<DatasetUnresolvedIdError> for DatasetNotFoundError {
     fn from(value: DatasetUnresolvedIdError) -> Self {
         Self {

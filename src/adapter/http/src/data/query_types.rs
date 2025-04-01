@@ -138,24 +138,23 @@ impl QueryRequest {
     }
 
     pub fn to_options(&self) -> domain::QueryOptions {
-        let empty = Vec::new();
-        let datasets = self.datasets.as_ref().unwrap_or(&empty);
-
         domain::QueryOptions {
-            input_datasets: datasets
-                .iter()
-                .cloned()
-                .map(|i| {
-                    (
-                        i.id,
-                        domain::QueryOptionsDataset {
-                            alias: i.alias,
-                            block_hash: i.block_hash,
-                            hints: None,
-                        },
-                    )
-                })
-                .collect(),
+            input_datasets: self.datasets.as_ref().map(|datasets| {
+                datasets
+                    .iter()
+                    .cloned()
+                    .map(|i| {
+                        (
+                            i.id,
+                            domain::QueryOptionsDataset {
+                                alias: i.alias,
+                                block_hash: i.block_hash,
+                                hints: domain::DatasetQueryHints::default(),
+                            },
+                        )
+                    })
+                    .collect()
+            }),
         }
     }
 

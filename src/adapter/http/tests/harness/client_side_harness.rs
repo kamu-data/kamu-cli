@@ -144,6 +144,7 @@ impl ClientSideHarness {
 
         b.add::<FetchService>();
 
+        b.add_value(EngineConfigDatafusionEmbeddedIngest::default());
         b.add::<PollingIngestServiceImpl>();
 
         b.add::<DatasetFactoryImpl>();
@@ -158,6 +159,7 @@ impl ClientSideHarness {
         b.add::<TransformElaborationServiceImpl>();
         b.add::<TransformExecutorImpl>();
 
+        b.add_value(EngineConfigDatafusionEmbeddedCompaction::default());
         b.add::<CompactionPlannerImpl>();
         b.add::<CompactionExecutorImpl>();
 

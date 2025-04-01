@@ -85,13 +85,12 @@ pub trait QueryService: Send + Sync {
 
 #[derive(Debug, Clone, Default)]
 pub struct QueryOptions {
-    /// Options for datasets used as query inputs. If options for at least one
-    /// dataset are specified the name resolution will be disabled, so you
-    /// should either provide them for all datasets or none. If no options are
-    /// provided the table names in the query will be treated as dataset
-    /// references and resolved as normally in the context of the calling
-    /// user.
-    pub input_datasets: BTreeMap<odf::DatasetID, QueryOptionsDataset>,
+    /// Options for datasets used as query inputs. If not `None` - the name
+    /// resolution will be disabled, so you should either provide options for
+    /// all datasets or none. If no options are provided the table names in
+    /// the query will be treated as dataset references and resolved as
+    /// normally in the context of the calling user.
+    pub input_datasets: Option<BTreeMap<odf::DatasetID, QueryOptionsDataset>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -108,17 +107,24 @@ pub struct QueryOptionsDataset {
     /// careful that your hints don't influence the actual result of the
     /// query, as they are not inlcuded in the [`QueryState`] and thus can
     /// ruin reproducibility if misused.
-    pub hints: Option<DatasetQueryHints>,
+    pub hints: DatasetQueryHints,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct DatasetQueryHints {
+    /// Pre-resolved dataset handle
+    pub handle: Option<odf::DatasetHandle>,
+
     /// Number of records that will be considered for this dataset (starting
     /// from latest entries) Setting this value allows engine to limit the
     /// number of part files examined, e.g. if limit is 100 and last data part
     /// file contains 150 records - only this file will be considered for the
     /// query and the rest of data will be completely ignored.
     pub last_records_to_consider: Option<u64>,
+
+    /// Usually used for queries like `show schema` where actual schema is not
+    /// needed, allowing table provider to satisfy request much faster.
+    pub does_not_need_schema: bool,
 }
 
 #[derive(Debug, Clone)]

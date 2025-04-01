@@ -61,6 +61,7 @@ async fn create_catalog_with_local_workspace(
 
         b.add_value(current_account_subject)
             .add_value(predefined_accounts_config)
+            .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<QueryServiceImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()

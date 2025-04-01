@@ -51,6 +51,7 @@ impl Harness {
             .add_value(RunInfoDir::new(run_info_dir.path()))
             .add_value(identity_config)
             .add::<DataFormatRegistryImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<QueryServiceImpl>()
             .add::<EngineProvisionerNull>()
             .build();

@@ -1275,6 +1275,7 @@ impl IngestTestHarness {
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<DataFormatRegistryImpl>()
             .add::<FetchService>()
+            .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PollingIngestServiceImpl>()
             .add::<DatasetKeyValueServiceSysEnv>()
             .build();
