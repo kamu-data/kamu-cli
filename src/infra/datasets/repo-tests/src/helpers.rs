@@ -107,3 +107,13 @@ pub(crate) async fn init_dataset_entry(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn remove_dataset_entry(catalog: &Catalog, dataset_id: &odf::DatasetID) {
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    dataset_entry_repo
+        .delete_dataset_entry(dataset_id)
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

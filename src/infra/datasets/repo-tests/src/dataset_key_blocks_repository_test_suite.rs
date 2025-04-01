@@ -15,7 +15,7 @@ use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::to_value as to_json;
 
-use crate::helpers::{init_dataset_entry, init_test_account};
+use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -327,3 +327,46 @@ pub async fn test_delete_blocks(catalog: &Catalog) {
         .await
         .unwrap());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_remove_dataset_entry_removes_key_blocks(catalog: &Catalog) {
+    let test_account_id = init_test_account(catalog).await;
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-remove");
+    let dataset_name = odf::DatasetName::new_unchecked("remove-ds");
+
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
+
+    let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
+
+    // Add some blocks
+    for i in 0..3 {
+        repo.save_block(&dataset_id, &odf::BlockRef::Head, &make_info_block(i))
+            .await
+            .unwrap();
+    }
+
+    // Verify blocks exist
+    assert!(repo
+        .has_blocks(&dataset_id, &odf::BlockRef::Head)
+        .await
+        .unwrap());
+
+    // Remove dataset entry
+    remove_dataset_entry(catalog, &dataset_id).await;
+
+    // Verify blocks are removed
+    assert!(!repo
+        .has_blocks(&dataset_id, &odf::BlockRef::Head)
+        .await
+        .unwrap());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
