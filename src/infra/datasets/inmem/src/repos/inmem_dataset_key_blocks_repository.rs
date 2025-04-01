@@ -47,7 +47,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<bool, DatasetKeyBlockQueryError> {
+    ) -> Result<bool, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
             .key_blocks
@@ -127,8 +127,8 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         kind: MetadataEventType,
-        min_sequence: Option<i64>,
-        max_sequence: i64,
+        min_sequence: Option<u64>,
+        max_sequence: u64,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
         let guard = self.state.lock().unwrap();
         let min = min_sequence.unwrap_or(0);
@@ -154,7 +154,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Option<i64>, DatasetKeyBlockQueryError> {
+    ) -> Result<Option<u64>, DatasetKeyBlockQueryError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
             .key_blocks
@@ -166,7 +166,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-        sequence_number: i64,
+        sequence_number: u64,
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
         if let Some(blocks) = guard

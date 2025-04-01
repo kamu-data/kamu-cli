@@ -7,20 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_alias_update_handler;
-mod entry;
-mod env;
-mod graph;
-mod key_blocks;
-mod odf;
-mod refs;
-mod statistics;
+mod dataset_key_block_indexer;
+mod dataset_key_blocks_updater;
 
-pub use dataset_alias_update_handler::*;
-pub use entry::*;
-pub use env::*;
-pub use graph::*;
-pub use key_blocks::*;
-pub use odf::*;
-pub use refs::*;
-pub use statistics::*;
+pub use dataset_key_block_indexer::*;
+pub use dataset_key_blocks_updater::*;
