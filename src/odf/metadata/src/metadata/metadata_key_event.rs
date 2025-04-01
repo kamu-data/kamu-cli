@@ -7,20 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-use serde_json::Value;
-
-use crate::MetadataEventType;
+use crate::MetadataEvent;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct DatasetKeyBlock {
-    pub event_kind: MetadataEventType,
-    pub sequence_number: u64,
-    pub block_hash: odf::Multihash,
-    pub event_payload: Value,
-    pub created_at: DateTime<Utc>,
+/// Extension trait for `MetadataEvent` to classify events.
+pub trait MetadataEventExt {
+    /// Returns `true` if the event is a key event, otherwise `false`.
+    fn is_key_event(&self) -> bool;
+}
+
+impl MetadataEventExt for MetadataEvent {
+    fn is_key_event(&self) -> bool {
+        !matches!(
+            self,
+            MetadataEvent::AddData(_) | MetadataEvent::ExecuteTransform(_)
+        )
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

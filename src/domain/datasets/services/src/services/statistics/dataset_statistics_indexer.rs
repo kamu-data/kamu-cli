@@ -99,7 +99,7 @@ impl DatasetStatisticsIndexer {
 #[async_trait::async_trait]
 impl InitOnStartup for DatasetStatisticsIndexer {
     #[tracing::instrument(
-        level = "debug",
+        level = "info",
         skip_all,
         name = "DatasetStatisticsIndexer::run_initialization"
     )]

@@ -49,7 +49,7 @@ impl DatasetKeyBlockRow {
     fn into_domain(self) -> DatasetKeyBlock {
         DatasetKeyBlock {
             event_kind: MetadataEventType::from_str(&self.event_type).unwrap(),
-            sequence_number: self.sequence_number,
+            sequence_number: u64::try_from(self.sequence_number).unwrap(),
             block_hash: odf::Multihash::from_multibase(&self.block_hash).unwrap(),
             event_payload: self.event_payload,
             created_at: self.created_at,
@@ -65,7 +65,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<bool, DatasetKeyBlockQueryError> {
+    ) -> Result<bool, InternalError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
@@ -127,8 +127,8 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         kind: MetadataEventType,
-        min_sequence: Option<i64>,
-        max_sequence: i64,
+        min_sequence: Option<u64>,
+        max_sequence: u64,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
@@ -136,7 +136,10 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let dataset_id_str = dataset_id.to_string();
         let block_ref_str = block_ref.as_str();
         let event_type_str = kind.to_string();
-        let min_seq = min_sequence.unwrap_or(0);
+        let min_seq = min_sequence
+            .map(|min| i64::try_from(min).unwrap())
+            .unwrap_or(0);
+        let max_seq = i64::try_from(max_sequence).unwrap();
 
         let rows = sqlx::query_as!(
             DatasetKeyBlockRow,
@@ -156,7 +159,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             block_ref_str,
             event_type_str,
             min_seq,
-            max_sequence
+            max_seq
         )
         .fetch_all(conn)
         .await
@@ -172,7 +175,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-    ) -> Result<Option<i64>, DatasetKeyBlockQueryError> {
+    ) -> Result<Option<u64>, DatasetKeyBlockQueryError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
@@ -208,6 +211,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let block_ref_str = block_ref.as_str();
         let event_type_str = block.event_kind.to_string();
         let block_hash_str = block.block_hash.to_string();
+        let block_sequence_number = i64::try_from(block.sequence_number).unwrap();
 
         sqlx::query!(
             r#"
@@ -218,7 +222,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             dataset_id_str,
             block_ref_str,
             event_type_str,
-            block.sequence_number,
+            block_sequence_number,
             block_hash_str,
             block.event_payload
         )
@@ -266,7 +270,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             b.push_bind(dataset_id.to_string())
                 .push_bind(block_ref.as_str())
                 .push_bind(block.event_kind.to_string())
-                .push_bind(block.sequence_number)
+                .push_bind(i64::try_from(block.sequence_number).unwrap())
                 .push_bind(block.block_hash.to_string())
                 .push_bind(&block.event_payload);
         });
@@ -277,7 +281,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                     "Unique constraint violation while batch inserting key blocks: {}",
                     e.message()
                 );
-                DatasetKeyBlockSaveError::DuplicateSequenceNumber(-1) // We can't know which block caused it in batch insert
+                DatasetKeyBlockSaveError::DuplicateSequenceNumber(u64::MAX) // We can't know which block caused it in batch insert
             }
             sqlx::Error::Database(e) if e.is_foreign_key_violation() => {
                 tracing::warn!(
@@ -298,13 +302,14 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
-        sequence_number: i64,
+        sequence_number: u64,
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
         let dataset_id_str = dataset_id.to_string();
         let block_ref_str = block_ref.as_str();
+        let sequence_number = i64::try_from(sequence_number).unwrap();
 
         sqlx::query!(
             r#"

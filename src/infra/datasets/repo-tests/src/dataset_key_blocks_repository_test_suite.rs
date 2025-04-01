@@ -19,39 +19,48 @@ use crate::helpers::{init_dataset_entry, init_test_account};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_info_block(seq: i64) -> DatasetKeyBlock {
+fn make_info_block(sequence_number: u64) -> DatasetKeyBlock {
     let event = MetadataFactory::set_info()
         .description("Test dataset")
         .keyword("demo")
         .build();
+
     make_block(
-        seq,
+        sequence_number,
         &odf::MetadataEvent::SetInfo(event),
         MetadataEventType::SetInfo,
     )
 }
 
-fn make_license_block(seq: i64) -> DatasetKeyBlock {
+fn make_license_block(sequence_number: u64) -> DatasetKeyBlock {
     let event = MetadataFactory::set_license()
         .short_name("MIT")
         .name("MIT License")
         .build();
+
     make_block(
-        seq,
+        sequence_number,
         &odf::MetadataEvent::SetLicense(event),
         MetadataEventType::SetLicense,
     )
 }
 
-fn make_block(seq: i64, event: &odf::MetadataEvent, kind: MetadataEventType) -> DatasetKeyBlock {
-    let block_hash = odf::Multihash::from_digest_sha3_256(format!("block-{seq}").as_bytes());
+fn make_block(
+    sequence_number: u64,
+    event: &odf::MetadataEvent,
+    kind: MetadataEventType,
+) -> DatasetKeyBlock {
+    let block_hash =
+        odf::Multihash::from_digest_sha3_256(format!("block-{sequence_number}").as_bytes());
 
     DatasetKeyBlock {
         event_kind: kind,
-        sequence_number: seq,
+        sequence_number,
         block_hash,
         event_payload: to_json(event).unwrap(),
-        created_at: Utc.timestamp_opt(seq, 0).unwrap(),
+        created_at: Utc
+            .timestamp_opt(i64::try_from(sequence_number).unwrap(), 0)
+            .unwrap(),
     }
 }
 

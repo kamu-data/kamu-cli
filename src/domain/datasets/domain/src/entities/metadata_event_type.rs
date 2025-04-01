@@ -45,4 +45,24 @@ pub enum MetadataEventType {
     DisablePollingSource,
 }
 
+impl MetadataEventType {
+    pub fn from_metadata_event(event: &odf::MetadataEvent) -> Self {
+        match event {
+            odf::MetadataEvent::AddData(_) => Self::AddData,
+            odf::MetadataEvent::ExecuteTransform(_) => Self::ExecuteTransform,
+            odf::MetadataEvent::Seed(_) => Self::Seed,
+            odf::MetadataEvent::SetPollingSource(_) => Self::SetPollingSource,
+            odf::MetadataEvent::SetVocab(_) => Self::SetVocab,
+            odf::MetadataEvent::SetAttachments(_) => Self::SetAttachments,
+            odf::MetadataEvent::SetInfo(_) => Self::SetInfo,
+            odf::MetadataEvent::SetLicense(_) => Self::SetLicense,
+            odf::MetadataEvent::SetDataSchema(_) => Self::SetDataSchema,
+            odf::MetadataEvent::SetTransform(_) => Self::SetTransform,
+            odf::MetadataEvent::AddPushSource(_) => Self::AddPushSource,
+            odf::MetadataEvent::DisablePushSource(_) => Self::DisablePushSource,
+            odf::MetadataEvent::DisablePollingSource(_) => Self::DisablePollingSource,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

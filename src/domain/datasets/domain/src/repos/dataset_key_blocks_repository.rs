@@ -21,7 +21,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         &self,
         dataset_id: &DatasetID,
         block_ref: &BlockRef,
-    ) -> Result<bool, DatasetKeyBlockQueryError>;
+    ) -> Result<bool, InternalError>;
 
     async fn find_latest_block_of_kind(
         &self,
@@ -35,15 +35,15 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         dataset_id: &DatasetID,
         block_ref: &BlockRef,
         kind: MetadataEventType,
-        min_sequence: Option<i64>,
-        max_sequence: i64,
+        min_sequence: Option<u64>,
+        max_sequence: u64,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
 
     async fn find_max_sequence_number(
         &self,
         dataset_id: &DatasetID,
         block_ref: &BlockRef,
-    ) -> Result<Option<i64>, DatasetKeyBlockQueryError>;
+    ) -> Result<Option<u64>, DatasetKeyBlockQueryError>;
 
     async fn save_block(
         &self,
@@ -63,7 +63,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         &self,
         dataset_id: &DatasetID,
         block_ref: &BlockRef,
-        sequence_number: i64,
+        sequence_number: u64,
     ) -> Result<(), InternalError>;
 
     async fn delete_all_for_ref(
@@ -89,7 +89,7 @@ pub enum DatasetKeyBlockQueryError {
 #[derive(Debug, Error)]
 pub enum DatasetKeyBlockSaveError {
     #[error("A block already exists at sequence number {0}")]
-    DuplicateSequenceNumber(i64),
+    DuplicateSequenceNumber(u64),
 
     #[error(transparent)]
     UnmatchedDatasetEntry(DatasetUnmatchedEntryError),

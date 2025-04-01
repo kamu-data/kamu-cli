@@ -24,7 +24,7 @@ doctest = false
 default = ["lfs"]
 lfs = []
 s3 = []
-testing = ["dep:mockall", "dep:serde_json"]
+testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -51,7 +51,7 @@ petgraph = { version = "0.7", default-features = false, features = [
     "stable_graph",
 ] }
 secrecy = "0.10"
-serde_json = { optional = true, version = "1" }
+serde_json = { version = "1" }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
