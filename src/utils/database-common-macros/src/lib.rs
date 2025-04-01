@@ -426,7 +426,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
             }
         },
         "sqlite" => quote! {
-            #[test_group::group(database, sqlite, #extra_test_groups)]
+            #[test_group::group(sqlite, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
             async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
                 for table in #tables_for_cleanup {

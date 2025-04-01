@@ -26,7 +26,7 @@ database-common = { workspace = true }
 email-utils = { workspace = true }
 kamu-accounts = { workspace = true, default-features = false, features = [ "testing" ]}
 kamu-datasets = { workspace = true }
-odf = { workspace = true }
+odf = { workspace = true, default-features = false, features = [ "testing" ]}
 
 chrono = { version = "0.4", default-features = false }
 dill = "0.12"

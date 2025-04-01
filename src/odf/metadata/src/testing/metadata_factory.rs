@@ -43,6 +43,7 @@ impl MetadataFactory {
         AddPushSourceBuilder::new()
     }
 
+    #[cfg(feature = "arrow")]
     pub fn set_data_schema() -> SetDataSchemaBuilder {
         SetDataSchemaBuilder::new()
     }
@@ -465,6 +466,7 @@ pub struct SetDataSchemaBuilder {
 }
 
 impl SetDataSchemaBuilder {
+    #[cfg(feature = "arrow")]
     pub fn new() -> Self {
         use datafusion::arrow::datatypes::*;
         let schema = Schema::new(vec![
@@ -476,6 +478,7 @@ impl SetDataSchemaBuilder {
         }
     }
 
+    #[cfg(feature = "arrow")]
     pub fn schema(mut self, schema: &datafusion::arrow::datatypes::Schema) -> Self {
         self.v = SetDataSchema::new(schema);
         self

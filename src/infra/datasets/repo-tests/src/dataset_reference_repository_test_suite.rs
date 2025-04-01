@@ -12,7 +12,7 @@ use std::assert_matches::assert_matches;
 use dill::Catalog;
 use kamu_datasets::*;
 
-use crate::helpers::{init_dataset_entry, init_test_account};
+use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -385,11 +385,7 @@ pub async fn test_reacts_to_dataset_removals(catalog: &Catalog) {
 
     // -- trigger removal for dataset 1
 
-    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
-    dataset_entry_repo
-        .delete_dataset_entry(&dataset_1_id)
-        .await
-        .unwrap();
+    remove_dataset_entry(catalog, &dataset_1_id).await;
 
     // -- observe we only see dataset 2 refs now
 
