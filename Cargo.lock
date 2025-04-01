@@ -6598,6 +6598,7 @@ dependencies = [
  "chrono",
  "common-macros",
  "database-common",
+ "database-common-macros",
  "dill",
  "futures",
  "indoc 2.0.6",
