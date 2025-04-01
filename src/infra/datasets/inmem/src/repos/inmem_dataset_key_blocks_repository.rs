@@ -87,6 +87,10 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         block_ref: &odf::BlockRef,
         blocks: &[DatasetKeyBlock],
     ) -> Result<(), DatasetKeyBlockSaveError> {
+        if blocks.is_empty() {
+            return Ok(());
+        }
+
         let mut guard = self.state.lock().unwrap();
         let entry = guard
             .key_blocks

@@ -1,0 +1,152 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use dill::*;
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
+use kamu_datasets::{
+    DatasetKeyBlockRepository,
+    DatasetReferenceMessage,
+    DatasetReferenceMessageUpdated,
+    MESSAGE_CONSUMER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
+    MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+};
+use messaging_outbox::*;
+
+use super::index_dataset_key_blocks_in_range;
+use crate::{index_dataset_key_blocks_entirely, DatasetKeyBlockIndexingError};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[component(pub)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<DatasetReferenceMessage>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    ],
+    delivery: MessageDeliveryMechanism::Immediate,
+})]
+pub struct DatasetKeyBlockUpdateHandler {
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_key_block_repo: Arc<dyn DatasetKeyBlockRepository>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DatasetKeyBlockUpdateHandler {
+    async fn update_dataset_key_blocks(
+        &self,
+        target: ResolvedDataset,
+        update_message: &DatasetReferenceMessageUpdated,
+    ) -> Result<(), InternalError> {
+        // Try to index in the specified range of HEAD advancement
+        match index_dataset_key_blocks_in_range(
+            self.dataset_key_block_repo.as_ref(),
+            target.clone(),
+            &update_message.new_block_hash,
+            update_message.maybe_prev_block_hash.as_ref(),
+        )
+        .await
+        {
+            // We succeeded!
+            Ok(_) => {
+                tracing::debug!(
+                    %update_message.dataset_id,
+                    new_head = %update_message.new_block_hash,
+                    maybe_prev_head = ?update_message.maybe_prev_block_hash,
+                    "Dataset key blocks updated"
+                );
+                Ok(())
+            }
+
+            // It looks like the dataset has diverged: i.e., it was reset or force pushed
+            Err(DatasetKeyBlockIndexingError::InvalidInterval(_)) => {
+                tracing::warn!(
+                    %update_message.dataset_id,
+                    new_head = %update_message.new_block_hash,
+                    maybe_prev_head = ?update_message.maybe_prev_block_hash,
+                    "Detected the dataset has diverged. Reindexing entirely"
+                );
+
+                // Drop existing key blocks
+                self.dataset_key_block_repo
+                    .delete_all_for_ref(&update_message.dataset_id, &odf::BlockRef::Head)
+                    .await
+                    .int_err()?;
+
+                // Reindex the entire dataset
+                index_dataset_key_blocks_entirely(self.dataset_key_block_repo.as_ref(), target)
+                    .await
+                    .int_err()
+            }
+
+            // Unexpected indexing error
+            Err(DatasetKeyBlockIndexingError::Internal(e)) => {
+                tracing::error!(
+                    %update_message.dataset_id,
+                    new_head = %update_message.new_block_hash,
+                    maybe_prev_head = ?update_message.maybe_prev_block_hash,
+                    err = ?e,
+                    "Failed to index update of dataset key blocks"
+                );
+                Err(e)
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MessageConsumer for DatasetKeyBlockUpdateHandler {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<DatasetReferenceMessage> for DatasetKeyBlockUpdateHandler {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DatasetKeyBlockUpdateHandler[DatasetReferenceMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &DatasetReferenceMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received dataset reference update message");
+
+        match message {
+            DatasetReferenceMessage::Updated(update_message) => {
+                let target = match self
+                    .dataset_registry
+                    .get_dataset_by_id(&update_message.dataset_id)
+                    .await
+                {
+                    Ok(target) => Ok(target),
+                    Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
+                        tracing::error!(
+                            %update_message.dataset_id, err = ?e,
+                            "Updating dataset key blocks skipped. Dataset not found."
+                        );
+                        return Ok(());
+                    }
+                    Err(odf::DatasetRefUnresolvedError::Internal(e)) => Err(e),
+                }?;
+
+                self.update_dataset_key_blocks(target, update_message).await
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

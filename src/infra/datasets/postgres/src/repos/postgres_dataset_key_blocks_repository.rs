@@ -176,16 +176,24 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO dataset_key_blocks
-                (dataset_id, block_ref_name, event_type, sequence_number, block_hash, event_payload)
-                VALUES ($1, $2, ($3::text)::metadata_event_type, $4, $5, $6)
+            INSERT INTO dataset_key_blocks(
+                dataset_id,
+                block_ref_name,
+                event_type,
+                sequence_number,
+                block_hash,
+                event_payload,
+                created_at
+            )
+                VALUES ($1, $2, ($3::text)::metadata_event_type, $4, $5, $6, $7)
             "#,
             dataset_id.to_string(),
             block_ref.as_str(),
             block.event_kind.to_string(),
             i64::try_from(block.sequence_number).unwrap(),
             block.block_hash.to_string(),
-            block.event_payload
+            block.event_payload,
+            block.created_at,
         )
         .execute(conn)
         .await
@@ -218,6 +226,10 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         block_ref: &odf::BlockRef,
         blocks: &[DatasetKeyBlock],
     ) -> Result<(), DatasetKeyBlockSaveError> {
+        if blocks.is_empty() {
+            return Ok(());
+        }
+
         use sqlx::QueryBuilder;
 
         let mut tr = self.transaction.lock().await;
@@ -230,7 +242,8 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload
+                event_payload,
+                created_at
             )",
         );
 
@@ -242,7 +255,8 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 .push_unseparated(")::metadata_event_type")
                 .push_bind(i64::try_from(block.sequence_number).unwrap())
                 .push_bind(block.block_hash.to_string())
-                .push_bind(&block.event_payload);
+                .push_bind(&block.event_payload)
+                .push_bind(block.created_at);
         });
 
         builder.build().execute(conn).await.map_err(|e| match e {

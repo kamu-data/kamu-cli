@@ -35,12 +35,14 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add::<CreateDatasetUseCaseHelper>();
 
     b.add::<DatasetEntryServiceImpl>();
-    b.add::<DatasetAliasUpdateHandler>();
     b.add::<DependencyGraphServiceImpl>();
-    b.add::<DependencyGraphImmediateListener>();
     b.add::<DatasetReferenceServiceImpl>();
     b.add::<DatasetStatisticsServiceImpl>();
+
+    b.add::<DatasetAliasUpdateHandler>();
+    b.add::<DatasetKeyBlockUpdateHandler>();
     b.add::<DatasetStatisticsUpdateHandler>();
+    b.add::<DependencyGraphImmediateListener>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
