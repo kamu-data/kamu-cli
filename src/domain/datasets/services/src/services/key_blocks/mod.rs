@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_key_block_indexer;
-mod dataset_key_blocks_updater;
+mod dataset_key_block_indexing_job;
+mod dataset_key_block_update_handler;
 
 pub use dataset_key_block_indexer::*;
-pub use dataset_key_blocks_updater::*;
+pub(crate) use dataset_key_block_indexing_job::*;
+pub use dataset_key_block_update_handler::*;

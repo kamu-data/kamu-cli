@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO dataset_key_blocks(\n                dataset_id,\n                block_ref_name,\n                event_type,\n                sequence_number,\n                block_hash,\n                event_payload,\n                created_at\n            )\n                VALUES ($1, $2, ($3::text)::metadata_event_type, $4, $5, $6, $7)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Int8",
+        "Varchar",
+        "Jsonb",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c0495bf954f70b5e28cfdd57bc21235d990de123a3eba00d2e63a579c9177dc7"
+}
