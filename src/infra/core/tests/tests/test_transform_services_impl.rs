@@ -18,6 +18,8 @@ use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
+use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
@@ -62,6 +64,7 @@ impl TransformTestHarness {
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<odf::dataset::DatasetDefaultLfsBuilder>()
             .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
@@ -70,6 +73,9 @@ impl TransformTestHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
+            .add::<IngestDataUseCaseImpl>()
+            .add::<RebacDatasetRegistryFacadeImpl>()
+            .add::<DummyOutboxImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
             .add::<TransformRequestPlannerImpl>()

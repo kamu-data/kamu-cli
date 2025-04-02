@@ -21,7 +21,9 @@ use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
+use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth;
+use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use s3_utils::S3Context;
@@ -1154,6 +1156,9 @@ impl CompactTestHarness {
             .add::<CompactionExecutorImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
+            .add::<IngestDataUseCaseImpl>()
+            .add::<RebacDatasetRegistryFacadeImpl>()
+            .add::<DummyOutboxImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutorImpl>()
@@ -1210,6 +1215,9 @@ impl CompactTestHarness {
             .add::<VerificationServiceImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
+            .add::<IngestDataUseCaseImpl>()
+            .add::<RebacDatasetRegistryFacadeImpl>()
+            .add::<DummyOutboxImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutorImpl>()
