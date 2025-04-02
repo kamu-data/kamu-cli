@@ -9,11 +9,11 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::{TimeZone, Utc};
 use dill::Catalog;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
-use serde_json::to_value as to_json;
+use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+use odf::serde::MetadataBlockSerializer;
 
 use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
 
@@ -25,11 +25,9 @@ fn make_info_block(sequence_number: u64) -> DatasetKeyBlock {
         .keyword("demo")
         .build();
 
-    make_block(
-        sequence_number,
-        &odf::MetadataEvent::SetInfo(event),
-        MetadataEventType::SetInfo,
-    )
+    let block = MetadataFactory::metadata_block(event).build();
+
+    make_block(sequence_number, &block, MetadataEventType::SetInfo)
 }
 
 fn make_license_block(sequence_number: u64) -> DatasetKeyBlock {
@@ -38,29 +36,28 @@ fn make_license_block(sequence_number: u64) -> DatasetKeyBlock {
         .name("MIT License")
         .build();
 
-    make_block(
-        sequence_number,
-        &odf::MetadataEvent::SetLicense(event),
-        MetadataEventType::SetLicense,
-    )
+    let block = MetadataFactory::metadata_block(event).build();
+
+    make_block(sequence_number, &block, MetadataEventType::SetLicense)
 }
 
 fn make_block(
     sequence_number: u64,
-    event: &odf::MetadataEvent,
+    block: &odf::MetadataBlock,
     kind: MetadataEventType,
 ) -> DatasetKeyBlock {
     let block_hash =
         odf::Multihash::from_digest_sha3_256(format!("block-{sequence_number}").as_bytes());
 
+    let block_data = FlatbuffersMetadataBlockSerializer
+        .write_manifest(block)
+        .unwrap();
+
     DatasetKeyBlock {
         event_kind: kind,
         sequence_number,
         block_hash,
-        event_payload: to_json(event).unwrap(),
-        created_at: Utc
-            .timestamp_opt(i64::try_from(sequence_number).unwrap(), 0)
-            .unwrap(),
+        block_payload: bytes::Bytes::from(block_data.collapse_vec()),
     }
 }
 

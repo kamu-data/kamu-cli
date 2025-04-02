@@ -12,12 +12,10 @@
 use std::num::NonZeroUsize;
 use std::str::FromStr;
 
-use chrono::Utc;
 use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use serde_json::Value;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,7 +40,7 @@ struct DatasetKeyBlockRow {
     event_type: String,
     sequence_number: i64,
     block_hash: String,
-    event_payload: Value,
+    block_payload: Vec<u8>,
 }
 
 impl DatasetKeyBlockRow {
@@ -51,8 +49,7 @@ impl DatasetKeyBlockRow {
             event_kind: MetadataEventType::from_str(&self.event_type).unwrap(),
             sequence_number: u64::try_from(self.sequence_number).unwrap(),
             block_hash: odf::Multihash::from_multibase(&self.block_hash).unwrap(),
-            event_payload: self.event_payload,
-            created_at: Utc::now(), // Incorrect
+            block_payload: bytes::Bytes::from(self.block_payload),
         }
     }
 }
@@ -104,7 +101,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload
+                block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = ? AND block_ref_name = ? AND event_type = ?
             ORDER BY sequence_number DESC
@@ -147,7 +144,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload
+                block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = ? AND block_ref_name = ? AND event_type = ?
                 AND sequence_number BETWEEN ? AND ?
@@ -191,7 +188,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload
+                block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = ? AND block_ref_name = ?
                 AND sequence_number BETWEEN ? AND ?
@@ -260,6 +257,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         let event_type_str = block.event_kind.to_string();
         let block_hash_str = block.block_hash.to_string();
         let block_sequence_number = i64::try_from(block.sequence_number).unwrap();
+        let block_payload_bytes = block.block_payload.as_ref();
 
         sqlx::query!(
             r#"
@@ -269,18 +267,16 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at
+                block_payload
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             "#,
             dataset_id_str,
             block_ref_str,
             event_type_str,
             block_sequence_number,
             block_hash_str,
-            block.event_payload,
-            block.created_at
+            block_payload_bytes,
         )
         .execute(conn)
         .await
@@ -327,8 +323,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at
+                block_payload
             ) ",
         );
 
@@ -338,8 +333,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 .push_bind(block.event_kind.to_string())
                 .push_bind(i64::try_from(block.sequence_number).unwrap())
                 .push_bind(block.block_hash.to_string())
-                .push_bind(&block.event_payload)
-                .push_bind(block.created_at);
+                .push_bind(block.block_payload.as_ref());
         });
 
         builder.build().execute(conn).await.map_err(|e| match e {

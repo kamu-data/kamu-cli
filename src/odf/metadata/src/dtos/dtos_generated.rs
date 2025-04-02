@@ -20,7 +20,6 @@ use std::path::PathBuf;
 use bitflags::bitflags;
 use chrono::{DateTime, Utc};
 use enum_variants::*;
-use serde::{Deserialize, Serialize};
 
 use crate::formats::Multihash;
 use crate::identity::*;
@@ -30,7 +29,7 @@ use crate::identity::*;
 /// Indicates that data has been ingested into a root dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
     pub prev_checkpoint: Option<Multihash>,
@@ -62,7 +61,7 @@ pub struct AddData {
 /// source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AddPushSource {
     /// Identifies the source within this dataset.
     pub source_name: String,
@@ -80,7 +79,7 @@ pub struct AddPushSource {
 /// Embedded attachment item.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AttachmentEmbedded {
     /// Path to an attachment if it was materialized into a file.
     pub path: String,
@@ -93,7 +92,7 @@ pub struct AttachmentEmbedded {
 /// Defines the source of attachment files.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Attachments {
     Embedded(AttachmentsEmbedded),
 }
@@ -106,7 +105,7 @@ impl_enum_variant!(Attachments::Embedded(AttachmentsEmbedded));
 /// For attachments that are specified inline and are embedded in the metadata.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentsembedded-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AttachmentsEmbedded {
     /// List of embedded items.
     pub items: Vec<AttachmentEmbedded>,
@@ -117,7 +116,7 @@ pub struct AttachmentsEmbedded {
 /// Describes a checkpoint produced by an engine
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Checkpoint {
     /// Hash sum of the checkpoint file.
     pub physical_hash: Multihash,
@@ -130,7 +129,7 @@ pub struct Checkpoint {
 /// Defines a compression algorithm.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CompressionFormat {
     Gzip,
     Zip,
@@ -141,7 +140,7 @@ pub enum CompressionFormat {
 /// Describes a slice of data added to a dataset or produced via transformation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DataSlice {
     /// Logical hash sum of the data in this slice.
     pub logical_hash: Multihash,
@@ -158,7 +157,7 @@ pub struct DataSlice {
 /// Represents type of the dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum DatasetKind {
     Root,
     Derivative,
@@ -213,7 +212,7 @@ pub struct DatasetVocabulary {
 /// Disables the previously defined polling source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepollingsource-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DisablePollingSource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,7 +220,7 @@ pub struct DisablePollingSource {}
 /// Disables the previously defined source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepushsource-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DisablePushSource {
     /// Identifies the source to be disabled.
     pub source_name: String,
@@ -232,7 +231,7 @@ pub struct DisablePushSource {
 /// Defines an environment variable passed into some job.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EnvVar {
     /// Name of the variable.
     pub name: String,
@@ -245,7 +244,7 @@ pub struct EnvVar {
 /// Defines the external source of data.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum EventTimeSource {
     FromMetadata(EventTimeSourceFromMetadata),
     FromPath(EventTimeSourceFromPath),
@@ -264,7 +263,7 @@ impl_enum_variant!(EventTimeSource::FromSystemTime(
 /// Extracts event time from the source's metadata.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefrommetadata-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EventTimeSourceFromMetadata {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -272,7 +271,7 @@ pub struct EventTimeSourceFromMetadata {}
 /// Extracts event time from the path component of the source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefrompath-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EventTimeSourceFromPath {
     /// Regular expression where first group contains the timestamp string.
     pub pattern: String,
@@ -285,7 +284,7 @@ pub struct EventTimeSourceFromPath {
 /// Assigns event time from the system time source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesourcefromsystemtime-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EventTimeSourceFromSystemTime {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -293,7 +292,7 @@ pub struct EventTimeSourceFromSystemTime {}
 /// Indicates that derivative transformation has been performed.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransform-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteTransform {
     /// Defines inputs used in this transaction. Slices corresponding to every
     /// input dataset must be present.
@@ -323,7 +322,7 @@ pub struct ExecuteTransform {
 /// Describes a slice of the input dataset used during a transformation
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransforminput-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteTransformInput {
     /// Input dataset identifier.
     pub dataset_id: DatasetID,
@@ -356,7 +355,7 @@ pub struct ExecuteTransformInput {
 /// Defines the external source of data.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum FetchStep {
     Url(FetchStepUrl),
     FilesGlob(FetchStepFilesGlob),
@@ -377,7 +376,7 @@ impl_enum_variant!(FetchStep::EthereumLogs(FetchStepEthereumLogs));
 /// Runs the specified OCI container to fetch data from an arbitrary source.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepcontainer-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FetchStepContainer {
     /// Image name and and an optional tag.
     pub image: String,
@@ -396,7 +395,7 @@ pub struct FetchStepContainer {
 /// Connects to an Ethereum node to stream transaction logs.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepethereumlogs-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FetchStepEthereumLogs {
     /// Identifier of the chain to scan logs from. This parameter may be used
     /// for RPC endpoint lookup as well as asserting that provided `nodeUrl`
@@ -422,7 +421,7 @@ pub struct FetchStepEthereumLogs {
 /// Uses glob operator to match files on the local file system.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepfilesglob-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FetchStepFilesGlob {
     /// Path with a glob pattern.
     pub path: String,
@@ -441,7 +440,7 @@ pub struct FetchStepFilesGlob {
 /// Connects to an MQTT broker to fetch events from the specified topic.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepmqtt-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FetchStepMqtt {
     /// Hostname of the MQTT broker.
     pub host: String,
@@ -460,7 +459,7 @@ pub struct FetchStepMqtt {
 /// Pulls data from one of the supported sources by its URL.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstepurl-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FetchStepUrl {
     /// URL of the data source
     pub url: String,
@@ -478,7 +477,7 @@ pub struct FetchStepUrl {
 /// the data that already exists in the dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MergeStrategy {
     Append(MergeStrategyAppend),
     Ledger(MergeStrategyLedger),
@@ -502,7 +501,7 @@ impl_enum_variant!(MergeStrategy::UpsertStream(MergeStrategyUpsertStream));
 /// entirety, without any deduplication.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyappend-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyAppend {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -515,7 +514,7 @@ pub struct MergeStrategyAppend {}
 /// is done.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategychangelogstream-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyChangelogStream {
     /// Names of the columns that uniquely identify the record throughout its
     /// lifetime
@@ -533,7 +532,7 @@ pub struct MergeStrategyChangelogStream {
 /// were not previously seen will be appended.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyledger-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyLedger {
     /// Names of the columns that uniquely identify the record throughout its
     /// lifetime
@@ -570,7 +569,7 @@ pub struct MergeStrategyLedger {
 /// modified rows.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategysnapshot-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategySnapshot {
     /// Names of the columns that uniquely identify the record throughout its
     /// lifetime.
@@ -591,7 +590,7 @@ pub struct MergeStrategySnapshot {
 /// pair, looking up the previous values.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategyupsertstream-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyUpsertStream {
     /// Names of the columns that uniquely identify the record throughout its
     /// lifetime
@@ -621,7 +620,7 @@ pub struct MetadataBlock {
 /// Represents a transaction that occurred on a dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MetadataEvent {
     AddData(AddData),
     ExecuteTransform(ExecuteTransform),
@@ -697,7 +696,7 @@ impl From<&MetadataEvent> for MetadataEventTypeFlags {
 /// MQTT quality of service class.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqttqos-schema
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MqttQos {
     AtMostOnce,
     AtLeastOnce,
@@ -709,7 +708,7 @@ pub enum MqttQos {
 /// MQTT topic subscription parameters.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqtttopicsubscription-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MqttTopicSubscription {
     /// Name of the topic (may include patterns).
     pub path: String,
@@ -724,7 +723,7 @@ pub struct MqttTopicSubscription {
 /// Describes a range of data as a closed arithmetic interval of offsets
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OffsetInterval {
     /// Start of the closed interval [start; end].
     pub start: u64,
@@ -737,7 +736,7 @@ pub struct OffsetInterval {
 /// Defines the steps to prepare raw data for ingestion.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstep-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum PrepStep {
     Decompress(PrepStepDecompress),
     Pipe(PrepStepPipe),
@@ -752,7 +751,7 @@ impl_enum_variant!(PrepStep::Pipe(PrepStepPipe));
 /// Pulls data from one of the supported sources by its URL.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstepdecompress-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PrepStepDecompress {
     /// Name of a compression algorithm used on data.
     pub format: CompressionFormat,
@@ -766,7 +765,7 @@ pub struct PrepStepDecompress {
 /// Executes external command to process the data using piped input/output.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepsteppipe-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PrepStepPipe {
     /// Command to execute and its arguments.
     pub command: Vec<String>,
@@ -858,7 +857,7 @@ pub struct RawQueryResponseSuccess {
 /// Defines how raw data should be read into the structured form.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReadStep {
     Csv(ReadStepCsv),
     GeoJson(ReadStepGeoJson),
@@ -883,7 +882,7 @@ impl_enum_variant!(ReadStep::NdGeoJson(ReadStepNdGeoJson));
 /// Reader for comma-separated files.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepCsv {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -941,7 +940,7 @@ pub struct ReadStepCsv {
 /// Reader for ESRI Shapefile format.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepEsriShapefile {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -960,7 +959,7 @@ pub struct ReadStepEsriShapefile {
 /// own column.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepGeoJson {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -972,7 +971,7 @@ pub struct ReadStepGeoJson {
 /// Reader for JSON files that contain an array of objects within them.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepJson {
     /// Path in the form of `a.b.c` to a sub-element of the root JSON object
     /// that is an array or objects. If not specified it is assumed that the
@@ -1005,7 +1004,7 @@ pub struct ReadStepJson {
 /// every individual feature object to appear on its own line.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepNdGeoJson {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1018,7 +1017,7 @@ pub struct ReadStepNdGeoJson {
 /// same schema.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepNdJson {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1045,7 +1044,7 @@ pub struct ReadStepNdJson {
 /// Reader for Apache Parquet format.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepParquet {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
@@ -1057,7 +1056,7 @@ pub struct ReadStepParquet {
 /// Defines a header (e.g. HTTP) to be passed into some request.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#requestheader-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RequestHeader {
     /// Name of the header.
     pub name: String,
@@ -1071,7 +1070,7 @@ pub struct RequestHeader {
 /// the chain.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#seed-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Seed {
     /// Unique identity of the dataset.
     pub dataset_id: DatasetID,
@@ -1084,7 +1083,7 @@ pub struct Seed {
 /// Associates a set of files with this dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setattachments-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetAttachments {
     /// One of the supported attachment sources.
     pub attachments: Attachments,
@@ -1096,7 +1095,7 @@ pub struct SetAttachments {
 /// this event.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetDataSchema {
     /// Apache Arrow schema encoded in its native flatbuffers representation.
     pub schema: Vec<u8>,
@@ -1107,7 +1106,7 @@ pub struct SetDataSchema {
 /// Provides basic human-readable information about a dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetInfo {
     /// Brief single-sentence summary of a dataset.
     pub description: Option<String>,
@@ -1120,7 +1119,7 @@ pub struct SetInfo {
 /// Defines a license that applies to this dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setlicense-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetLicense {
     /// Abbreviated name of the license.
     pub short_name: String,
@@ -1138,7 +1137,7 @@ pub struct SetLicense {
 /// root dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetPollingSource {
     /// Determines where data is sourced from.
     pub fetch: FetchStep,
@@ -1158,7 +1157,7 @@ pub struct SetPollingSource {
 /// Defines a transformation that produces data in a derivative dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetTransform {
     /// Datasets that will be used as sources.
     pub inputs: Vec<TransformInput>,
@@ -1171,7 +1170,7 @@ pub struct SetTransform {
 /// Lets you manipulate names of the system columns to avoid conflicts.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetVocab {
     /// Name of the offset column.
     pub offset_column: Option<String>,
@@ -1188,7 +1187,7 @@ pub struct SetVocab {
 /// Defines how external data should be cached.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecaching-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SourceCaching {
     Forever(SourceCachingForever),
 }
@@ -1201,7 +1200,7 @@ impl_enum_variant!(SourceCaching::Forever(SourceCachingForever));
 /// After source was processed once it will never be ingested again.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecachingforever-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SourceCachingForever {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1209,7 +1208,7 @@ pub struct SourceCachingForever {}
 /// Specifies how input files should be ordered before ingestion.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourceordering-schema
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SourceOrdering {
     ByEventTime,
     ByName,
@@ -1220,7 +1219,7 @@ pub enum SourceOrdering {
 /// The state of the source the data was added from to allow fast resuming.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcestate-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SourceState {
     /// Identifies the source that the state corresponds to.
     pub source_name: String,
@@ -1236,7 +1235,7 @@ pub struct SourceState {
 /// Defines a query in a multi-step SQL transformation.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SqlQueryStep {
     /// Name of the temporary view that will be created from result of the
     /// query. Step without this alias will be treated as an output of the
@@ -1252,7 +1251,7 @@ pub struct SqlQueryStep {
 /// streams.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TemporalTable {
     /// Name of the dataset to be converted into a temporal table.
     pub name: String,
@@ -1265,7 +1264,7 @@ pub struct TemporalTable {
 /// Engine-specific processing queries that shape the resulting data.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Transform {
     Sql(TransformSql),
 }
@@ -1278,7 +1277,7 @@ impl_enum_variant!(Transform::Sql(TransformSql));
 /// Transform using one of the SQL dialects.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformsql-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformSql {
     /// Identifier of the engine used for this transformation.
     pub engine: String,
@@ -1303,7 +1302,7 @@ pub struct TransformSql {
 /// Describes a derivative transformation input
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformInput {
     /// A local or remote dataset reference. When block is accepted this MUST be
     /// in the form of a DatasetId to guarantee reproducibility, as aliases can

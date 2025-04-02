@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO dataset_key_blocks(\n                dataset_id,\n                block_ref_name,\n                event_type,\n                sequence_number,\n                block_hash,\n                block_payload\n            )\n            VALUES (?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "ea1e37005dcf9567281fa3e159749e95767f3dffc7aa5aa2ece6a83b5798011a"
+}

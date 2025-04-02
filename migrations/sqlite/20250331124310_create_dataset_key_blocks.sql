@@ -21,9 +21,7 @@ CREATE TABLE dataset_key_blocks (
     ),
     sequence_number INTEGER NOT NULL,
     block_hash VARCHAR(70) NOT NULL,
-    event_payload TEXT NOT NULL,  -- Store as JSON string; SQLite has no JSONB
-    created_at TIMESTAMPTZ NOT NULL,
-
+    block_payload BLOB NOT NULL,
     PRIMARY KEY (dataset_id, block_ref_name, sequence_number)
 );
 

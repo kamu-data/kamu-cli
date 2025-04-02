@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                event_type as \"event_type: MetadataEventType\",\n                sequence_number,\n                block_hash,\n                event_payload,\n                created_at\n            FROM dataset_key_blocks\n                WHERE dataset_id = $1 AND block_ref_name = $2 AND event_type = ($3::text)::metadata_event_type\n                ORDER BY sequence_number DESC\n                LIMIT 1\n            ",
+  "query": "\n            SELECT\n                event_type as \"event_type: MetadataEventType\",\n                sequence_number,\n                block_hash,\n                block_payload\n            FROM dataset_key_blocks\n            WHERE dataset_id = $1 AND block_ref_name = $2 AND event_type = ANY(($3::text[])::metadata_event_type[])\n                AND sequence_number BETWEEN $4 AND $5\n            ORDER BY sequence_number\n            ",
   "describe": {
     "columns": [
       {
@@ -41,29 +41,25 @@
       },
       {
         "ordinal": 3,
-        "name": "event_payload",
-        "type_info": "Jsonb"
-      },
-      {
-        "ordinal": 4,
-        "name": "created_at",
-        "type_info": "Timestamptz"
+        "name": "block_payload",
+        "type_info": "Bytea"
       }
     ],
     "parameters": {
       "Left": [
         "Text",
         "Text",
-        "Text"
+        "TextArray",
+        "Int8",
+        "Int8"
       ]
     },
     "nullable": [
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "78853e1a3ec7645f20585594efd32adf2867b49b2367ce52ce9e44308d6450b8"
+  "hash": "f56385f12bb53da8343990b60101a78067d66974d1d6aa21dee8ca26432182bd"
 }
