@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- New `IngestDataUseCase` and used in in Http `/ingest` handler and `ingest_command`
+
 ## [0.231.0] - 2025-03-31
 ### Added
 - `kamu login {password,oauth}`:
