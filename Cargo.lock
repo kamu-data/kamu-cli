@@ -5671,7 +5671,6 @@ dependencies = [
  "time-source",
  "tokio",
  "tokio-stream",
- "tokio-util",
  "tracing",
  "url",
  "zip",

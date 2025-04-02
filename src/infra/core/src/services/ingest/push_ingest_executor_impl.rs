@@ -312,8 +312,7 @@ impl PushIngestExecutorImpl {
 
 #[async_trait::async_trait]
 impl PushIngestExecutor for PushIngestExecutorImpl {
-    // ToDo trace source
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), %data_source))]
     async fn execute_ingest(
         &self,
         target: ResolvedDataset,

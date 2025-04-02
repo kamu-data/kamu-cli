@@ -10,13 +10,10 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use futures::stream::{self, TryStreamExt};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
 use kamu_core::*;
 use messaging_outbox::{register_message_dispatcher, DummyOutboxImpl};
-use tokio::io::AsyncRead;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +26,7 @@ async fn test_ingest_data_non_existing_dataset() {
         MockDidGenerator::predefined_dataset_ids(vec![]),
     );
 
-    let data_stream = json_into_async_read("{}");
+    let data_stream = std::io::Cursor::new("{}");
 
     assert_matches!(
         harness
@@ -62,7 +59,7 @@ async fn test_ingest_data_source_not_found() {
 
     harness.create_root_dataset(&alias_foo).await;
 
-    let data_stream = json_into_async_read("{}");
+    let data_stream = std::io::Cursor::new("{}");
 
     assert_matches!(
         harness
@@ -100,7 +97,7 @@ async fn test_ingest_data_from_json() {
         .create_root_dataset_with_push_source(&alias_foo)
         .await;
 
-    let data_stream = json_into_async_read("{\"city\":\"foo\", \"population\":100}");
+    let data_stream = std::io::Cursor::new("{\"city\":\"foo\", \"population\":100}");
 
     assert_matches!(
         harness
@@ -222,10 +219,3 @@ impl IngestDataUseCaseHarness {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn json_into_async_read(json: &str) -> impl AsyncRead {
-    let data = json.to_owned().into_bytes();
-    let stream = stream::iter(vec![Ok::<_, std::io::Error>(data)]);
-
-    stream.into_async_read().compat()
-}
