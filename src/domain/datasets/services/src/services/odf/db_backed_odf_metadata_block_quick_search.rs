@@ -69,8 +69,12 @@ impl odf::dataset::MetadataChainBlockQuickSearch for DatabaseBackedOdfMetadataBl
         // Form a list of metadata event types to search for
         // Exclude non-key event types from flags
         let key_flags = flags
-            & !(odf::metadata::MetadataEventTypeFlags::ADD_DATA
-                | odf::metadata::MetadataEventTypeFlags::EXECUTE_TRANSFORM);
+            & !(
+                odf::metadata::MetadataEventTypeFlags::ADD_DATA
+                    | odf::metadata::MetadataEventTypeFlags::EXECUTE_TRANSFORM
+                    | odf::metadata::MetadataEventTypeFlags::ADD_PUSH_SOURCE
+                // TODO: remove ADD_PUSH_SOURCE, it's a workaround
+            );
         let kinds = MetadataEventType::multiple_from_metadata_event_flags(key_flags);
 
         // Request key blocks from the repository
@@ -88,16 +92,13 @@ impl odf::dataset::MetadataChainBlockQuickSearch for DatabaseBackedOdfMetadataBl
         // Map the key blocks to the result format
         let mut result = Vec::with_capacity(key_blocks.len());
         for key_block in key_blocks {
-            let block_ref = (
-                key_block.block_hash,
-                odf::MetadataBlock {
-                    system_time: key_block.created_at,
-                    prev_block_hash: None, // TODO
-                    event: serde_json::from_value(key_block.event_payload).int_err()?,
-                    sequence_number: key_block.sequence_number,
-                },
-            );
-            result.push(block_ref);
+            let block = odf::storage::deserialize_metadata_block(
+                &key_block.block_hash,
+                &key_block.block_payload,
+            )
+            .int_err()?;
+
+            result.push((key_block.block_hash, block));
         }
 
         // Success

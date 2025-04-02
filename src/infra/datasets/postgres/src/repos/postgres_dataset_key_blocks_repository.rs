@@ -67,8 +67,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 event_type as "event_type: MetadataEventType",
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at
+                block_payload
             FROM dataset_key_blocks
                 WHERE dataset_id = $1 AND block_ref_name = $2 AND event_type = ($3::text)::metadata_event_type
                 ORDER BY sequence_number DESC
@@ -86,8 +85,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             event_kind: r.event_type,
             sequence_number: u64::try_from(r.sequence_number).unwrap(),
             block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
-            event_payload: r.event_payload,
-            created_at: r.created_at,
+            block_payload: bytes::Bytes::from(r.block_payload),
         }))
     }
 
@@ -112,8 +110,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 event_type as "event_type: MetadataEventType",
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at
+                block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = $1 AND block_ref_name = $2 AND event_type = ($3::text)::metadata_event_type
                 AND sequence_number BETWEEN $4 AND $5
@@ -135,8 +132,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 event_kind: r.event_type,
                 sequence_number: u64::try_from(r.sequence_number).unwrap(),
                 block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
-                event_payload: r.event_payload,
-                created_at: r.created_at,
+                block_payload: bytes::Bytes::from(r.block_payload),
             })
             .collect())
     }
@@ -164,8 +160,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 event_type as "event_type: MetadataEventType",
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at
+                block_payload
             FROM dataset_key_blocks
             WHERE dataset_id = $1 AND block_ref_name = $2 AND event_type = ANY(($3::text[])::metadata_event_type[])
                 AND sequence_number BETWEEN $4 AND $5
@@ -187,8 +182,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 event_kind: r.event_type,
                 sequence_number: u64::try_from(r.sequence_number).unwrap(),
                 block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
-                event_payload: r.event_payload,
-                created_at: r.created_at,
+                block_payload: bytes::Bytes::from(r.block_payload),
             })
             .collect())
     }
@@ -234,18 +228,16 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at
+                block_payload
             )
-                VALUES ($1, $2, ($3::text)::metadata_event_type, $4, $5, $6, $7)
+                VALUES ($1, $2, ($3::text)::metadata_event_type, $4, $5, $6)
             "#,
             dataset_id.to_string(),
             block_ref.as_str(),
             block.event_kind.to_string(),
             i64::try_from(block.sequence_number).unwrap(),
             block.block_hash.to_string(),
-            block.event_payload,
-            block.created_at,
+            block.block_payload.as_ref(),
         )
         .execute(conn)
         .await
@@ -294,8 +286,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at
+                block_payload
             )",
         );
 
@@ -307,8 +298,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                 .push_unseparated(")::metadata_event_type")
                 .push_bind(i64::try_from(block.sequence_number).unwrap())
                 .push_bind(block.block_hash.to_string())
-                .push_bind(&block.event_payload)
-                .push_bind(block.created_at);
+                .push_bind(block.block_payload.as_ref());
         });
 
         builder.build().execute(conn).await.map_err(|e| match e {

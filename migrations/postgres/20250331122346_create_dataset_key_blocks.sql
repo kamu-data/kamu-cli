@@ -22,8 +22,7 @@ CREATE TABLE dataset_key_blocks (
     ),
     sequence_number    BIGINT NOT NULL,
     block_hash         VARCHAR(70) NOT NULL,
-    event_payload      JSONB NOT NULL,
-    created_at         TIMESTAMPTZ NOT NULL,
+    block_payload      BYTEA NOT NULL,
     PRIMARY KEY (dataset_id, block_ref_name, sequence_number)
 );
 

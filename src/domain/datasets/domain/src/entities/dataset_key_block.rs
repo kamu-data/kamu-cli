@@ -7,9 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-use serde_json::Value;
-
 use crate::MetadataEventType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,8 +16,7 @@ pub struct DatasetKeyBlock {
     pub event_kind: MetadataEventType,
     pub sequence_number: u64,
     pub block_hash: odf::Multihash,
-    pub event_payload: Value,
-    pub created_at: DateTime<Utc>,
+    pub block_payload: bytes::Bytes,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

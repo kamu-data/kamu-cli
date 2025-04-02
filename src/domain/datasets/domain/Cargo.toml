@@ -35,13 +35,13 @@ odf = { workspace = true }
 
 aes-gcm = { version = "0.10.3" }
 async-trait = { version = "0.1", default-features = false }
+bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
 itertools = "0.14"
 merge = "0.1"
 secrecy = "0.10"
 serde = "1"
-serde_json = "1"
 serde_with = { version = "3", default-features = false }
 strum = { version = "0.26", default-features = false, features = ["derive"] }
 thiserror = { version = "2", default-features = false }

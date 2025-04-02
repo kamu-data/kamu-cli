@@ -97,12 +97,18 @@ pub(crate) async fn index_dataset_key_blocks_in_range(
         // Ignore non-key events, such as `AddData` and `ExecuteTransform`
         if block.event.is_key_event() {
             // Serialize the event and form a key block value
+            use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+            use odf::serde::MetadataBlockSerializer;
+
+            let block_data = FlatbuffersMetadataBlockSerializer
+                .write_manifest(&block)
+                .unwrap();
+
             current_chunk.push(DatasetKeyBlock {
                 event_kind: MetadataEventType::from_metadata_event(&block.event),
                 sequence_number: block.sequence_number,
                 block_hash,
-                event_payload: serde_json::to_value(&block.event).int_err()?,
-                created_at: block.system_time,
+                block_payload: bytes::Bytes::from(block_data.collapse_vec()),
             });
 
             total_blocks += 1;

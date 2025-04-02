@@ -6508,6 +6508,7 @@ version = "0.232.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
+ "bytes",
  "chrono",
  "database-common",
  "futures",
@@ -6519,7 +6520,6 @@ dependencies = [
  "opendatafabric",
  "secrecy",
  "serde",
- "serde_json",
  "serde_with",
  "sqlx",
  "strum 0.26.3",
@@ -6555,6 +6555,7 @@ version = "0.232.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bytes",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6564,7 +6565,6 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
- "serde_json",
  "sqlx",
  "test-group",
  "test-log",
@@ -6576,6 +6576,7 @@ dependencies = [
 name = "kamu-datasets-repo-tests"
 version = "0.232.0"
 dependencies = [
+ "bytes",
  "chrono",
  "database-common",
  "dill",
@@ -6586,7 +6587,6 @@ dependencies = [
  "kamu-datasets",
  "opendatafabric",
  "secrecy",
- "serde_json",
  "uuid",
 ]
 
@@ -6642,6 +6642,7 @@ version = "0.232.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bytes",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -6652,7 +6653,6 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
- "serde_json",
  "sqlx",
  "test-group",
  "test-log",
