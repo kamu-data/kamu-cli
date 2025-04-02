@@ -1,0 +1,71 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                event_type as \"event_type: MetadataEventType\",\n                sequence_number,\n                block_hash,\n                event_payload,\n                created_at\n            FROM dataset_key_blocks\n            WHERE dataset_id = $1 AND block_ref_name = $2 AND event_type = ANY(($3::text[])::metadata_event_type[])\n                AND sequence_number BETWEEN $4 AND $5\n            ORDER BY sequence_number\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_type: MetadataEventType",
+        "type_info": {
+          "Custom": {
+            "name": "metadata_event_type",
+            "kind": {
+              "Enum": [
+                "AddData",
+                "ExecuteTransform",
+                "Seed",
+                "SetPollingSource",
+                "SetTransform",
+                "SetVocab",
+                "SetAttachments",
+                "SetInfo",
+                "SetLicense",
+                "SetDataSchema",
+                "AddPushSource",
+                "DisablePushSource",
+                "DisablePollingSource"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sequence_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "block_hash",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "event_payload",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "TextArray",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cf3fbeea418e1d20a50b08fc9545645be8925fb8337147eb250401ebc9112945"
+}

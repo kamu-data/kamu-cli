@@ -217,3 +217,46 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DecisionsSatisfaction {
+    pub awaited_flags: MetadataEventTypeFlags,
+    pub num_satisfied_visitors: usize,
+    pub num_unsatisfied_visitors: usize,
+}
+
+impl DecisionsSatisfaction {
+    pub fn has_unsatisfied_visitors(&self) -> bool {
+        self.num_unsatisfied_visitors > 0
+    }
+}
+
+pub fn determine_decisions_satisfaction(
+    decisions: &[MetadataVisitorDecision],
+) -> DecisionsSatisfaction {
+    let mut awaited_flags = MetadataEventTypeFlags::empty();
+    let mut num_satisfied_visitors = 0;
+    let mut num_unsatisfied_visitors = 0;
+
+    for decision in decisions {
+        match decision {
+            MetadataVisitorDecision::Stop => {
+                num_satisfied_visitors += 1;
+            }
+            MetadataVisitorDecision::NextOfType(flags) => {
+                awaited_flags |= *flags;
+                num_unsatisfied_visitors += 1;
+            }
+            MetadataVisitorDecision::Next | MetadataVisitorDecision::NextWithHash(_) => {
+                num_unsatisfied_visitors += 1;
+            }
+        }
+    }
+
+    DecisionsSatisfaction {
+        awaited_flags,
+        num_satisfied_visitors,
+        num_unsatisfied_visitors,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -92,6 +92,7 @@ impl SimpleTransferProtocol {
             MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
                 NamedObjectRepositoryInMemory::new(),
             )),
+            odf::dataset::MetadataChainBlockQuickSearchNull {},
         );
 
         let src_chain = src.as_metadata_chain();

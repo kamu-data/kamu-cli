@@ -228,6 +228,7 @@ impl VerificationServiceImpl {
             MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
                 NamedObjectRepositoryInMemory::new(),
             )),
+            odf::dataset::MetadataChainBlockQuickSearchNull {},
         );
 
         for (block_hash, block) in blocks.into_iter().rev() {

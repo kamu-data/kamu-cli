@@ -6586,6 +6586,7 @@ name = "kamu-datasets-services"
 version = "0.231.0"
 dependencies = [
  "async-trait",
+ "bytes",
  "chrono",
  "common-macros",
  "database-common",
@@ -8094,6 +8095,7 @@ dependencies = [
  "strum 0.26.3",
  "thiserror 2.0.12",
  "tokio-stream",
+ "tracing",
  "url",
 ]
 

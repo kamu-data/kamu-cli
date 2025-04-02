@@ -34,7 +34,11 @@ fn init_chain(root: &Path) -> impl MetadataChain {
         NamedObjectRepositoryLocalFS::new(refs_dir),
     ));
 
-    MetadataChainImpl::new(meta_block_repo, meta_ref_repo)
+    MetadataChainImpl::new(
+        meta_block_repo,
+        meta_ref_repo,
+        odf::dataset::MetadataChainBlockQuickSearchNull {},
+    )
 }
 
 #[tokio::test]

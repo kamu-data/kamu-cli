@@ -440,6 +440,10 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         self.chain.get_block(hash).await
     }
 
+    fn get_quick_block_search(&self) -> &dyn odf::dataset::MetadataChainBlockQuickSearch {
+        self.chain.get_quick_block_search()
+    }
+
     async fn set_ref<'b>(
         &'b self,
         r: &odf::BlockRef,
