@@ -876,7 +876,7 @@ impl IngestTestHarness {
 
         let ingest_result = self
             .push_ingest_executor
-            .ingest_from_stream(target.clone(), ingest_plan, data, None)
+            .execute_ingest(target.clone(), ingest_plan, DataSource::Stream(data), None)
             .await
             .unwrap();
 
@@ -914,7 +914,7 @@ impl IngestTestHarness {
 
         let ingest_result = self
             .push_ingest_executor
-            .ingest_from_url(target.clone(), ingest_plan, url, None)
+            .execute_ingest(target.clone(), ingest_plan, DataSource::Url(url), None)
             .await
             .unwrap();
 

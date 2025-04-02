@@ -1113,8 +1113,7 @@ struct CompactTestHarness {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
-    push_ingest_planner: Arc<dyn PushIngestPlanner>,
-    push_ingest_executor: Arc<dyn PushIngestExecutor>,
+    ingest_data_use_case: Arc<dyn IngestDataUseCase>,
     transform_helper: TransformTestHelper,
     verification_svc: Arc<dyn VerificationService>,
     current_date_time: DateTime<Utc>,
@@ -1174,8 +1173,7 @@ impl CompactTestHarness {
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
-            push_ingest_planner: catalog.get_one().unwrap(),
-            push_ingest_executor: catalog.get_one().unwrap(),
+            ingest_data_use_case: catalog.get_one().unwrap(),
             verification_svc: catalog.get_one().unwrap(),
             transform_helper,
             current_date_time,
@@ -1232,8 +1230,7 @@ impl CompactTestHarness {
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
-            push_ingest_planner: catalog.get_one().unwrap(),
-            push_ingest_executor: catalog.get_one().unwrap(),
+            ingest_data_use_case: catalog.get_one().unwrap(),
             transform_helper,
             verification_svc: catalog.get_one().unwrap(),
             current_date_time,
@@ -1403,35 +1400,20 @@ impl CompactTestHarness {
     async fn ingest_data(&self, data_str: String, target: ResolvedDataset) {
         let data = std::io::Cursor::new(data_str);
 
-        let ingest_plan = self
-            .push_ingest_planner
-            .plan_ingest(target.clone(), None, PushIngestOpts::default())
+        self.ingest_data_use_case
+            .execute(
+                &target.get_handle().as_local_ref(),
+                DataSource::Stream(Box::new(data)),
+                IngestDataUseCaseOptions {
+                    source_name: None,
+                    source_event_time: None,
+                    is_ingest_from_upload: false,
+                    media_type: None,
+                },
+                None,
+            )
             .await
             .unwrap();
-
-        let ingest_result = self
-            .push_ingest_executor
-            .ingest_from_stream(target.clone(), ingest_plan, Box::new(data), None)
-            .await
-            .unwrap();
-
-        if let PushIngestResult::Updated {
-            old_head, new_head, ..
-        } = &ingest_result
-        {
-            target
-                .as_metadata_chain()
-                .set_ref(
-                    &odf::BlockRef::Head,
-                    new_head,
-                    odf::dataset::SetRefOpts {
-                        validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
-                    },
-                )
-                .await
-                .unwrap();
-        }
     }
 
     async fn commit_set_licence_block(&self, dataset_ref: &odf::DatasetRef, head: &odf::Multihash) {

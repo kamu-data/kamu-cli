@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_compact_dataset_use_case;
+mod test_ingest_data_use_case;
 mod test_pull_dataset_use_case;
 mod test_push_dataset_use_case;
 mod test_reset_dataset_use_case;
