@@ -13,7 +13,10 @@ use dill::{component, interface, Catalog};
 use odf::Dataset;
 use url::Url;
 
-use crate::DatabaseBackedOdfMetadataChainRefRepositoryImpl;
+use crate::{
+    DatabaseBackedOdfMetadataBlockQuickSearch,
+    DatabaseBackedOdfMetadataChainRefRepositoryImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,6 +47,10 @@ impl odf::dataset::DatasetLfsBuilder for DatabaseBackedOdfDatasetLfsBuilderImpl 
                     self.catalog.get_one().unwrap(),
                     DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
                     dataset_id.clone(),
+                ),
+                DatabaseBackedOdfMetadataBlockQuickSearch::new(
+                    dataset_id.clone(),
+                    self.catalog.get_one().unwrap(),
                 ),
             ),
             DatasetDefaultLfsBuilder::build_data_repo(layout.data_dir),

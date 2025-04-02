@@ -13,7 +13,10 @@ use std::sync::Arc;
 use dill::*;
 use s3_utils::S3Context;
 
-use crate::DatabaseBackedOdfMetadataChainRefRepositoryImpl;
+use crate::{
+    DatabaseBackedOdfMetadataBlockQuickSearch,
+    DatabaseBackedOdfMetadataChainRefRepositoryImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,6 +60,10 @@ impl odf::dataset::DatasetS3Builder for DatabaseBackedOdfDatasetS3BuilderImpl {
                         DatasetDefaultS3Builder::build_refs_repo(&s3_context),
                         dataset_id.clone(),
                     ),
+                    DatabaseBackedOdfMetadataBlockQuickSearch::new(
+                        dataset_id.clone(),
+                        self.catalog.get_one().unwrap(),
+                    ),
                 ),
                 DatasetDefaultS3Builder::build_data_repo(&s3_context),
                 DatasetDefaultS3Builder::build_checkpoint_repo(&s3_context),
@@ -73,6 +80,10 @@ impl odf::dataset::DatasetS3Builder for DatabaseBackedOdfDatasetS3BuilderImpl {
                         self.catalog.get_one().unwrap(),
                         DatasetDefaultS3Builder::build_refs_repo(&s3_context),
                         dataset_id.clone(),
+                    ),
+                    DatabaseBackedOdfMetadataBlockQuickSearch::new(
+                        dataset_id.clone(),
+                        self.catalog.get_one().unwrap(),
                     ),
                 ),
                 DatasetDefaultS3Builder::build_data_repo(&s3_context),

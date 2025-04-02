@@ -17,7 +17,12 @@ use odf_storage_lfs::ObjectRepositoryCachingLocalFs;
 use odf_storage_s3::*;
 use s3_utils::S3Context;
 
-use crate::{DatasetImpl, MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
+use crate::{
+    DatasetImpl,
+    MetadataChainBlockQuickSearchNull,
+    MetadataChainImpl,
+    MetadataChainReferenceRepositoryImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,6 +96,7 @@ impl DatasetS3Builder for DatasetDefaultS3Builder {
                         metadata_cache_local_fs_path.clone(),
                     )),
                     Self::build_meta_ref_repo(Self::build_refs_repo(&s3_context)),
+                    MetadataChainBlockQuickSearchNull {},
                 ),
                 Self::build_data_repo(&s3_context),
                 Self::build_checkpoint_repo(&s3_context),
@@ -102,6 +108,7 @@ impl DatasetS3Builder for DatasetDefaultS3Builder {
                 MetadataChainImpl::new(
                     Self::build_meta_block_repo(Self::build_base_block_repo(&s3_context)),
                     Self::build_meta_ref_repo(Self::build_refs_repo(&s3_context)),
+                    MetadataChainBlockQuickSearchNull {},
                 ),
                 Self::build_data_repo(&s3_context),
                 Self::build_checkpoint_repo(&s3_context),

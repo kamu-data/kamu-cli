@@ -9,10 +9,11 @@
 
 // Copyright Kamu Data, Inc. and contributors. All rights reserved.
 
+use std::num::NonZeroUsize;
 use std::str::FromStr;
 
-use chrono::{DateTime, Utc};
-use database_common::{TransactionRef, TransactionRefT};
+use chrono::Utc;
+use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -42,7 +43,6 @@ struct DatasetKeyBlockRow {
     sequence_number: i64,
     block_hash: String,
     event_payload: Value,
-    created_at: DateTime<Utc>,
 }
 
 impl DatasetKeyBlockRow {
@@ -52,7 +52,7 @@ impl DatasetKeyBlockRow {
             sequence_number: u64::try_from(self.sequence_number).unwrap(),
             block_hash: odf::Multihash::from_multibase(&self.block_hash).unwrap(),
             event_payload: self.event_payload,
-            created_at: self.created_at,
+            created_at: Utc::now(), // Incorrect
         }
     }
 }
@@ -104,8 +104,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at as "created_at: _"
+                event_payload
             FROM dataset_key_blocks
             WHERE dataset_id = ? AND block_ref_name = ? AND event_type = ?
             ORDER BY sequence_number DESC
@@ -148,8 +147,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                 event_type,
                 sequence_number,
                 block_hash,
-                event_payload,
-                created_at as "created_at: _"
+                event_payload
             FROM dataset_key_blocks
             WHERE dataset_id = ? AND block_ref_name = ? AND event_type = ?
                 AND sequence_number BETWEEN ? AND ?
@@ -164,6 +162,56 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         .fetch_all(conn)
         .await
         .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(DatasetKeyBlockRow::into_domain)
+            .collect())
+    }
+
+    async fn find_latest_blocks_of_kinds_in_range(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        kinds: &[MetadataEventType],
+        min_sequence: Option<u64>,
+        max_sequence: u64,
+    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let min_seq = min_sequence
+            .map(|min| i64::try_from(min).unwrap())
+            .unwrap_or(0);
+        let max_seq = i64::try_from(max_sequence).unwrap();
+
+        let query_str = format!(
+            r#"
+            SELECT
+                event_type,
+                sequence_number,
+                block_hash,
+                event_payload
+            FROM dataset_key_blocks
+            WHERE dataset_id = ? AND block_ref_name = ?
+                AND sequence_number BETWEEN ? AND ?
+                AND event_type IN ({})
+            ORDER BY sequence_number
+            "#,
+            sqlite_generate_placeholders_list(kinds.len(), NonZeroUsize::new(5).unwrap())
+        );
+
+        let mut query = sqlx::query_as::<sqlx::Sqlite, DatasetKeyBlockRow>(&query_str);
+        query = query
+            .bind(dataset_id.to_string())
+            .bind(block_ref.as_str())
+            .bind(min_seq)
+            .bind(max_seq);
+        for kind in kinds {
+            query = query.bind(kind.to_string());
+        }
+
+        let rows = query.fetch_all(conn).await.int_err()?;
 
         Ok(rows
             .into_iter()

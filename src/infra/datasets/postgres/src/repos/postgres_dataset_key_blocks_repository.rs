@@ -141,6 +141,58 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             .collect())
     }
 
+    async fn find_latest_blocks_of_kinds_in_range(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        kinds: &[MetadataEventType],
+        min_sequence: Option<u64>,
+        max_sequence: u64,
+    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let min = min_sequence
+            .map(|min| i64::try_from(min).unwrap())
+            .unwrap_or(0);
+
+        let event_kinds_search = kinds.iter().map(ToString::to_string).collect::<Vec<_>>();
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                event_type as "event_type: MetadataEventType",
+                sequence_number,
+                block_hash,
+                event_payload,
+                created_at
+            FROM dataset_key_blocks
+            WHERE dataset_id = $1 AND block_ref_name = $2 AND event_type = ANY(($3::text[])::metadata_event_type[])
+                AND sequence_number BETWEEN $4 AND $5
+            ORDER BY sequence_number
+            "#,
+            dataset_id.to_string(),
+            block_ref.as_str(),
+            &event_kinds_search,
+            min,
+            i64::try_from(max_sequence).unwrap(),
+        )
+        .fetch_all(conn)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| DatasetKeyBlock {
+                event_kind: r.event_type,
+                sequence_number: u64::try_from(r.sequence_number).unwrap(),
+                block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                event_payload: r.event_payload,
+                created_at: r.created_at,
+            })
+            .collect())
+    }
+
     async fn find_max_sequence_number(
         &self,
         dataset_id: &odf::DatasetID,

@@ -16,7 +16,12 @@ use odf_storage::*;
 use odf_storage_lfs::*;
 use url::Url;
 
-use crate::{DatasetImpl, MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
+use crate::{
+    DatasetImpl,
+    MetadataChainBlockQuickSearchNull,
+    MetadataChainImpl,
+    MetadataChainReferenceRepositoryImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,6 +73,7 @@ impl DatasetLfsBuilder for DatasetDefaultLfsBuilder {
             MetadataChainImpl::new(
                 Self::build_meta_block_repo(layout.blocks_dir),
                 Self::build_meta_ref_repo(Self::build_refs_repo(layout.refs_dir)),
+                MetadataChainBlockQuickSearchNull {},
             ),
             Self::build_data_repo(layout.data_dir),
             Self::build_checkpoint_repo(layout.checkpoints_dir),

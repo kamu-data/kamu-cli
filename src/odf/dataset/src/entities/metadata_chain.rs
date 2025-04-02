@@ -39,6 +39,9 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
+    /// Returns the quick block search utility
+    fn get_quick_block_search(&self) -> &dyn MetadataChainBlockQuickSearch;
+
     /// Appends the block to the chain
     async fn append<'a>(
         &'a self,
@@ -262,30 +265,84 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + Send,
     {
+        let quick_search = self.get_quick_block_search();
+
         let mut decisions: Vec<_> = visitors
             .iter()
             .map(|visitor| visitor.initial_decision())
             .collect();
-        let mut all_visitors_finished = false;
+
+        let mut satisfaction = determine_decisions_satisfaction(&decisions);
+
         let mut current_hash = head_hash.cloned();
+
+        // Load tail block, if it's required
+        let maybe_tail_block = if let Some(tail_hash) = tail_hash {
+            Some(
+                self.get_block(tail_hash)
+                    .await
+                    .map_err(IterBlocksError::from)?,
+            )
+        } else {
+            None
+        };
 
         // TODO: PERF: Add traversal optimizations such as skip-lists
         while let Some(hash) = current_hash
-            && !all_visitors_finished
+            && satisfaction.has_unsatisfied_visitors()
             && tail_hash != Some(&hash)
         {
+            // Load next block of the chain
             let block = self.get_block(&hash).await.map_err(IterBlocksError::from)?;
+
+            // Idea: we could also stop iterating, if quick blocks cannot be satisfied at
+            // all. We can't tell that for data blocks yet, but if lookup of key
+            // blocks is not satisfying, these are dead searches we could abort early
+
+            // If we still await for particular flags, try quick search option
+            if !satisfaction.awaited_flags.is_empty() {
+                // Execute quick search of requested block types
+                let found_blocks = quick_search
+                    .quick_search_of_blocks(
+                        satisfaction.awaited_flags,
+                        &block,
+                        maybe_tail_block.as_ref(),
+                    )
+                    .await
+                    .map_err(|e| AcceptVisitorError::Traversal(IterBlocksError::Internal(e)))?;
+
+                // If we found blocks, we can update the NextOfType decisions
+                for (block_hash, block) in found_blocks {
+                    for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
+                        match decision {
+                            // Check if this decision could be satisifed with the quick search block
+                            MetadataVisitorDecision::NextOfType(type_flags) => {
+                                let block_flag = MetadataEventTypeFlags::from(&block.event);
+                                if type_flags.contains(block_flag) {
+                                    // Yes, a progress has been made
+                                    *decision = visitor
+                                        .visit((&block_hash, &block))
+                                        .map_err(AcceptVisitorError::Visitor)?;
+                                }
+                            }
+
+                            // These will have to wait for linear traversal
+                            MetadataVisitorDecision::Stop
+                            | MetadataVisitorDecision::Next
+                            | MetadataVisitorDecision::NextWithHash(_) => {}
+                        }
+                    }
+                }
+            }
+
+            // Falling back to linear traversal
             let hashed_block_ref = (&hash, &block);
 
-            let mut stopped_visitors = 0;
-
+            // Try to satisfy the visitors with this block
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
                 match decision {
-                    MetadataVisitorDecision::Stop => {
-                        stopped_visitors += 1;
-                    }
+                    MetadataVisitorDecision::Stop => {}
                     MetadataVisitorDecision::NextOfType(type_flags) if type_flags.is_empty() => {
-                        stopped_visitors += 1;
                         *decision = MetadataVisitorDecision::Stop;
                     }
                     MetadataVisitorDecision::Next => {
@@ -312,10 +369,14 @@ pub trait MetadataChainExt: MetadataChain {
                 }
             }
 
-            all_visitors_finished = visitors.len() == stopped_visitors;
+            // Measure the progress of satisfaction after this iteration
+            satisfaction = determine_decisions_satisfaction(&decisions);
+
+            // Proceed to the previous block in the chain
             current_hash = block.prev_block_hash;
         }
 
+        // Report visitor errors, if any
         for visitor in visitors {
             visitor.finish().map_err(AcceptVisitorError::Visitor)?;
         }
@@ -462,6 +523,24 @@ pub trait MetadataChainExt: MetadataChain {
 }
 
 impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait MetadataChainBlockQuickSearch: Send + Sync {
+    /// Detaches this metadata chain from any transaction references
+    fn detach_from_transaction(&self) {
+        // Nothing to do by default
+    }
+
+    /// Quick search of blocks of the specified type in the given range
+    async fn quick_search_of_blocks(
+        &self,
+        flags: MetadataEventTypeFlags,
+        head_block: &MetadataBlock,
+        maybe_tail_block: Option<&MetadataBlock>,
+    ) -> Result<Vec<(Multihash, MetadataBlock)>, InternalError>;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

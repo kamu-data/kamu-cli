@@ -28,6 +28,7 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
+    InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -181,6 +182,8 @@ impl ClientSideHarness {
         b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();
         b.add::<InMemoryDatasetEntryRepository>();
+        b.add::<InMemoryDatasetKeyBlockRepository>();
+
         b.add::<AccountServiceImpl>();
         b.add::<InMemoryAccountRepository>();
         b.add::<LoginPasswordAuthProvider>();

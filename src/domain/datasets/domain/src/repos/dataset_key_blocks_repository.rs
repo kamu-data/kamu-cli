@@ -39,6 +39,15 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         max_sequence: u64,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
 
+    async fn find_latest_blocks_of_kinds_in_range(
+        &self,
+        dataset_id: &DatasetID,
+        block_ref: &BlockRef,
+        kinds: &[MetadataEventType],
+        min_sequence: Option<u64>,
+        max_sequence: u64,
+    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
+
     async fn find_max_sequence_number(
         &self,
         dataset_id: &DatasetID,
