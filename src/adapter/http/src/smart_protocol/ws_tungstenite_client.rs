@@ -535,6 +535,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         http_src_url: &Url,
         dst: Option<Arc<dyn odf::Dataset>>,
         dst_alias: Option<&odf::DatasetAlias>,
+        dst_handle: Option<&odf::DatasetHandle>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError> {
@@ -628,19 +629,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             let dst = if let Some(dst) = dst {
                 // Check is incoming seed is different from existing
                 if transfer_options.force_update_if_diverged
-                    && let Some(dataset_alias) = dst_alias
+                    && let Some(dataset_handle) = dst_handle
                     && let Some((_, first_incoming_block)) = new_blocks.front()
                     && let odf::MetadataEvent::Seed(seed_event) = &first_incoming_block.event
+                    && seed_event.dataset_id != dataset_handle.id
                 {
-                    let dataset_registry = self.catalog.get_one::<dyn DatasetRegistry>().unwrap();
-                    let existing_dataset_id = dataset_registry
-                        .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
-                        .await
-                        .int_err()?
-                        .id;
-                    if seed_event.dataset_id != existing_dataset_id {
-                        InternalError::bail("Rewriting seed block is restricted")?;
-                    }
+                    InternalError::bail("Rewriting seed block is restricted")?;
                 }
                 dst
             } else {

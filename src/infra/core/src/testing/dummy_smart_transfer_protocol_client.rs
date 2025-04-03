@@ -27,6 +27,7 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
         _http_src_url: &Url,
         _dst: Option<Arc<dyn odf::Dataset>>,
         _dst_alias: Option<&odf::DatasetAlias>,
+        _dst_handle: Option<&odf::DatasetHandle>,
         _listener: Arc<dyn SyncListener>,
         _transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError> {

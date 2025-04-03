@@ -47,6 +47,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         http_src_url: &Url,
         dst: Option<Arc<dyn odf::Dataset>>,
         dst_alias: Option<&odf::DatasetAlias>,
+        dst_handle: Option<&odf::DatasetHandle>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError>;
