@@ -55,32 +55,6 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .is_some_and(|v| !v.is_empty()))
     }
 
-    async fn save_block(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        block: &DatasetKeyBlock,
-    ) -> Result<(), DatasetKeyBlockSaveError> {
-        let mut guard = self.state.lock().unwrap();
-        let entry = guard
-            .key_blocks
-            .entry((dataset_id.clone(), block_ref.clone()))
-            .or_default();
-
-        if entry
-            .iter()
-            .any(|b| b.sequence_number == block.sequence_number)
-        {
-            return Err(DatasetKeyBlockSaveError::DuplicateSequenceNumber(
-                block.sequence_number,
-            ));
-        }
-
-        entry.push(block.clone());
-        entry.sort_by_key(|b| b.sequence_number);
-        Ok(())
-    }
-
     async fn save_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
@@ -103,9 +77,9 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .iter()
             .find(|b| existing.contains(&b.sequence_number))
         {
-            return Err(DatasetKeyBlockSaveError::DuplicateSequenceNumber(
+            return Err(DatasetKeyBlockSaveError::DuplicateSequenceNumber(vec![
                 dup.sequence_number,
-            ));
+            ]));
         }
 
         entry.extend_from_slice(blocks);
