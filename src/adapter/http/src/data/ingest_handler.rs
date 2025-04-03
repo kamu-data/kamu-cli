@@ -14,6 +14,7 @@ use dill::Catalog;
 use http::HeaderMap;
 use http_common::*;
 use internal_error::ErrorIntoInternal;
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
@@ -109,10 +110,25 @@ pub async fn dataset_ingest_handler(
                 Some(time_source.now())
             });
 
+    // Resolve dataset
+    let rebac_dataset_registry_facade =
+        catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
+
+    let target_dataset = rebac_dataset_registry_facade
+        .resolve_dataset_by_ref(&dataset_ref, auth::DatasetAction::Write)
+        .await
+        .map_err(|e| {
+            use RebacDatasetRefUnresolvedError as E;
+            match e {
+                E::NotFound(_) | E::Access(_) => ApiError::not_found_without_reason(),
+                e @ E::Internal(_) => e.int_err().api_err(),
+            }
+        })?;
+
     let push_ingest_data_use_case = catalog.get_one::<dyn PushIngestDataUseCase>().unwrap();
     push_ingest_data_use_case
         .execute(
-            &dataset_ref,
+            &target_dataset,
             DataSource::Stream(data_stream),
             PushIngestDataUseCaseOptions {
                 source_name: params.source_name,
@@ -124,9 +140,6 @@ pub async fn dataset_ingest_handler(
         )
         .await
         .map_err(|err| match err {
-            PushIngestDataError::NotFound(_) | PushIngestDataError::Access(_) => {
-                ApiError::not_found_without_reason()
-            }
             PushIngestDataError::Planning(PushIngestPlanningError::SourceNotFound(e)) => {
                 ApiError::bad_request(e)
             }

@@ -21,7 +21,6 @@ use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -1157,7 +1156,6 @@ impl CompactTestHarness {
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<DummyOutboxImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
@@ -1216,7 +1214,6 @@ impl CompactTestHarness {
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<DummyOutboxImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
@@ -1410,7 +1407,7 @@ impl CompactTestHarness {
 
         self.ingest_data_use_case
             .execute(
-                &target.get_handle().as_local_ref(),
+                &target,
                 DataSource::Stream(Box::new(data)),
                 PushIngestDataUseCaseOptions {
                     source_name: None,

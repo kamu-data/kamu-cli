@@ -21,6 +21,7 @@ use crate::{
     PushIngestListener,
     PushIngestPlanningError,
     PushIngestResult,
+    ResolvedDataset,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +30,7 @@ use crate::{
 pub trait PushIngestDataUseCase: Send + Sync {
     async fn execute(
         &self,
-        dataset_ref: &odf::DatasetRef,
+        resolved_dataset: &ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
@@ -56,16 +57,6 @@ pub enum PushIngestDataUseCaseDataSource {
 
 #[derive(Debug, Error)]
 pub enum PushIngestDataError {
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
-
-    #[error(transparent)]
-    NotFound(#[from] odf::DatasetNotFoundError),
-
     #[error(transparent)]
     Planning(
         #[from]

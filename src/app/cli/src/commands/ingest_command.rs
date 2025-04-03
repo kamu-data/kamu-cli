@@ -64,7 +64,7 @@ impl IngestCommand {
     async fn ensure_valid_push_target(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), CLIError> {
+    ) -> Result<ResolvedDataset, CLIError> {
         let aliases = self
             .remote_alias_reg
             .get_remote_aliases(dataset_handle)
@@ -92,7 +92,7 @@ impl IngestCommand {
                 "Ingesting data available for root datasets only",
             ));
         }
-        Ok(())
+        Ok(resolved_dataset)
     }
 
     fn get_media_type(&self) -> Result<Option<MediaType>, CLIError> {
@@ -136,7 +136,7 @@ impl Command for IngestCommand {
             .await
             .map_err(CLIError::failure)?;
 
-        self.ensure_valid_push_target(&dataset_handle).await?;
+        let target_dataset = self.ensure_valid_push_target(&dataset_handle).await?;
 
         let urls = if self.stdin {
             vec![url::Url::parse("file:///dev/fd/0").unwrap()]
@@ -173,7 +173,7 @@ impl Command for IngestCommand {
             let ingest_result = self
                 .push_ingest_data_use_case
                 .execute(
-                    &dataset_handle.as_local_ref(),
+                    &target_dataset,
                     DataSource::Url(url),
                     PushIngestDataUseCaseOptions {
                         source_name: self.source_name.clone(),

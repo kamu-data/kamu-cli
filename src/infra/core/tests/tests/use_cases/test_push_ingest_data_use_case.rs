@@ -18,36 +18,6 @@ use messaging_outbox::{register_message_dispatcher, DummyOutboxImpl};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_push_ingest_data_non_existing_dataset() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
-    let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
-        MockDidGenerator::predefined_dataset_ids(vec![]),
-    );
-
-    let data_stream = std::io::Cursor::new("{}");
-
-    assert_matches!(
-        harness
-            .ingest_data(
-                &odf::DatasetRef::Alias(alias_foo),
-                DataSource::Stream(Box::new(data_stream)),
-                PushIngestDataUseCaseOptions {
-                    source_name: None,
-                    source_event_time: None,
-                    is_ingest_from_upload: false,
-                    media_type: None
-                }
-            )
-            .await,
-        Err(PushIngestDataError::NotFound(_))
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_push_ingest_data_source_not_found() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
@@ -57,14 +27,14 @@ async fn test_push_ingest_data_source_not_found() {
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
-    harness.create_root_dataset(&alias_foo).await;
+    let create_dataset_result = harness.create_root_dataset(&alias_foo).await;
 
     let data_stream = std::io::Cursor::new("{}");
 
     assert_matches!(
         harness
             .ingest_data(
-                &odf::DatasetRef::Alias(alias_foo),
+                &ResolvedDataset::from_created(&create_dataset_result),
                 DataSource::Stream(Box::new(data_stream)),
                 PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -93,7 +63,7 @@ async fn test_push_ingest_data_from_json() {
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
-    harness
+    let create_dataset_result = harness
         .create_root_dataset_with_push_source(&alias_foo)
         .await;
 
@@ -102,7 +72,7 @@ async fn test_push_ingest_data_from_json() {
     assert_matches!(
         harness
             .ingest_data(
-                &odf::DatasetRef::Alias(alias_foo),
+                &ResolvedDataset::from_created(&create_dataset_result),
                 DataSource::Stream(Box::new(data_stream)),
                 PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -129,7 +99,7 @@ async fn test_push_ingest_data_from_file() {
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
-    harness
+    let create_dataset_result = harness
         .create_root_dataset_with_push_source(&alias_foo)
         .await;
 
@@ -146,7 +116,7 @@ async fn test_push_ingest_data_from_file() {
     assert_matches!(
         harness
             .ingest_data(
-                &odf::DatasetRef::Alias(alias_foo),
+                &ResolvedDataset::from_created(&create_dataset_result),
                 DataSource::Stream(data_stream),
                 PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -208,7 +178,7 @@ impl PushIngestDataUseCaseHarness {
 
     async fn ingest_data(
         &self,
-        target: &odf::DatasetRef,
+        target: &ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
     ) -> Result<PushIngestResult, PushIngestDataError> {

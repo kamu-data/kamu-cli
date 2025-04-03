@@ -10,8 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_datasets::{DatasetExternallyChangedMessage, MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER};
 use messaging_outbox::{Outbox, OutboxExt};
@@ -21,7 +20,6 @@ use messaging_outbox::{Outbox, OutboxExt};
 #[component]
 #[interface(dyn PushIngestDataUseCase)]
 pub struct PushIngestDataUseCaseImpl {
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     outbox: Arc<dyn Outbox>,
@@ -32,25 +30,15 @@ pub struct PushIngestDataUseCaseImpl {
 impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
     async fn execute(
         &self,
-        dataset_ref: &odf::DatasetRef,
+        target_dataset: &ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestDataError> {
-        let target = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Write)
-            .await
-            .map_err(|e| match e {
-                RebacDatasetRefUnresolvedError::NotFound(err) => PushIngestDataError::NotFound(err),
-                RebacDatasetRefUnresolvedError::Access(err) => PushIngestDataError::Access(err),
-                _ => PushIngestDataError::Internal(e.int_err()),
-            })?;
-
         let ingest_plan = self
             .push_ingest_planner
             .plan_ingest(
-                target.clone(),
+                target_dataset.clone(),
                 options.source_name.as_deref(),
                 PushIngestOpts {
                     media_type: options.media_type,
@@ -63,14 +51,19 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
 
         let push_execute_result = self
             .push_ingest_executor
-            .execute_ingest(target.clone(), ingest_plan, data_source, listener_maybe)
+            .execute_ingest(
+                target_dataset.clone(),
+                ingest_plan,
+                data_source,
+                listener_maybe,
+            )
             .await?;
 
         if let PushIngestResult::Updated {
             old_head, new_head, ..
         } = &push_execute_result
         {
-            target
+            target_dataset
                 .as_metadata_chain()
                 .set_ref(
                     &odf::BlockRef::Head,
@@ -87,7 +80,7 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
                 .post_message(
                     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
                     DatasetExternallyChangedMessage::ingest_http(
-                        target.get_id(),
+                        target_dataset.get_id(),
                         Some(old_head),
                         new_head,
                     ),

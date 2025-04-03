@@ -18,7 +18,6 @@ use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -74,7 +73,6 @@ impl TransformTestHarness {
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
@@ -224,7 +222,7 @@ impl TransformTestHarness {
 
         self.ingest_data_use_case
             .execute(
-                &target.get_handle().as_local_ref(),
+                &target,
                 DataSource::Stream(Box::new(data)),
                 PushIngestDataUseCaseOptions {
                     source_name: None,
