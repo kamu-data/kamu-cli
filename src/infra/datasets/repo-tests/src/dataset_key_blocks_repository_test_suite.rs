@@ -150,10 +150,10 @@ pub async fn test_save_blocks_batch(catalog: &Catalog) {
         .unwrap();
 
     let all = repo
-        .find_blocks_of_kind_in_range(
+        .find_blocks_of_kinds_in_range(
             &dataset_id,
             &odf::BlockRef::Head,
-            MetadataEventType::SetInfo,
+            &[MetadataEventType::SetInfo],
             None,
             100,
         )
@@ -201,7 +201,7 @@ pub async fn test_find_latest_block_of_kind(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_find_blocks_of_kind_in_range(catalog: &Catalog) {
+pub async fn test_find_blocks_of_kinds_in_range(catalog: &Catalog) {
     let test_account_id = init_test_account(catalog).await;
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-range");
     let dataset_name = odf::DatasetName::new_unchecked("range-ds");
@@ -223,10 +223,10 @@ pub async fn test_find_blocks_of_kind_in_range(catalog: &Catalog) {
     }
 
     let filtered = repo
-        .find_blocks_of_kind_in_range(
+        .find_blocks_of_kinds_in_range(
             &dataset_id,
             &odf::BlockRef::Head,
-            MetadataEventType::SetInfo,
+            &[MetadataEventType::SetInfo],
             Some(2),
             4,
         )
@@ -304,10 +304,10 @@ pub async fn test_delete_blocks(catalog: &Catalog) {
         .unwrap();
 
     let remaining = repo
-        .find_blocks_of_kind_in_range(
+        .find_blocks_of_kinds_in_range(
             &dataset_id,
             &odf::BlockRef::Head,
-            MetadataEventType::SetInfo,
+            &[MetadataEventType::SetInfo],
             None,
             10,
         )

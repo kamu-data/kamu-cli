@@ -23,6 +23,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         block_ref: &BlockRef,
     ) -> Result<bool, InternalError>;
 
+    // TODO: looks nice, but not used yet
     async fn find_latest_block_of_kind(
         &self,
         dataset_id: &DatasetID,
@@ -30,16 +31,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         kind: MetadataEventType,
     ) -> Result<Option<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
 
-    async fn find_blocks_of_kind_in_range(
-        &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
-        kind: MetadataEventType,
-        min_sequence: Option<u64>,
-        max_sequence: u64,
-    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
-
-    async fn find_latest_blocks_of_kinds_in_range(
+    async fn find_blocks_of_kinds_in_range(
         &self,
         dataset_id: &DatasetID,
         block_ref: &BlockRef,
@@ -48,12 +40,14 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         max_sequence: u64,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
 
+    // TODO: looks nice, but not used yet
     async fn find_max_sequence_number(
         &self,
         dataset_id: &DatasetID,
         block_ref: &BlockRef,
     ) -> Result<Option<u64>, DatasetKeyBlockQueryError>;
 
+    // TODO: consider removal, batch version solves it
     async fn save_block(
         &self,
         dataset_id: &DatasetID,
@@ -68,6 +62,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         blocks: &[DatasetKeyBlock],
     ) -> Result<(), DatasetKeyBlockSaveError>;
 
+    // TODO: looks nice, but not used yet
     async fn delete_blocks_after(
         &self,
         dataset_id: &DatasetID,

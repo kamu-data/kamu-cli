@@ -126,35 +126,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .and_then(|blocks| blocks.iter().rev().find(|b| b.event_kind == kind).cloned()))
     }
 
-    async fn find_blocks_of_kind_in_range(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        kind: MetadataEventType,
-        min_sequence: Option<u64>,
-        max_sequence: u64,
-    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
-        let guard = self.state.lock().unwrap();
-        let min = min_sequence.unwrap_or(0);
-
-        Ok(guard
-            .key_blocks
-            .get(&(dataset_id.clone(), block_ref.clone()))
-            .map(|blocks| {
-                blocks
-                    .iter()
-                    .filter(|b| {
-                        b.event_kind == kind
-                            && b.sequence_number >= min
-                            && b.sequence_number <= max_sequence
-                    })
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
-
-    async fn find_latest_blocks_of_kinds_in_range(
+    async fn find_blocks_of_kinds_in_range(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,

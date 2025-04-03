@@ -79,7 +79,7 @@ impl odf::dataset::MetadataChainBlockQuickSearch for DatabaseBackedOdfMetadataBl
 
         // Request key blocks from the repository
         let key_blocks = dataset_key_blocks_repo
-            .find_latest_blocks_of_kinds_in_range(
+            .find_blocks_of_kinds_in_range(
                 &self.dataset_id,
                 &odf::BlockRef::Head,
                 &kinds,

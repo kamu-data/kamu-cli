@@ -49,7 +49,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = dataset_key_blocks_repo::test_find_blocks_of_kind_in_range,
+    fixture = dataset_key_blocks_repo::test_find_blocks_of_kinds_in_range,
     harness = InMemoryDatasetKeyBlockRepositoryHarness
 );
 

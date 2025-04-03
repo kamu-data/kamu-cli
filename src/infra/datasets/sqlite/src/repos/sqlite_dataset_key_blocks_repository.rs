@@ -118,55 +118,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(row.map(DatasetKeyBlockRow::into_domain))
     }
 
-    async fn find_blocks_of_kind_in_range(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        kind: MetadataEventType,
-        min_sequence: Option<u64>,
-        max_sequence: u64,
-    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        let dataset_id_str = dataset_id.to_string();
-        let block_ref_str = block_ref.as_str();
-        let event_type_str = kind.to_string();
-        let min_seq = min_sequence
-            .map(|min| i64::try_from(min).unwrap())
-            .unwrap_or(0);
-        let max_seq = i64::try_from(max_sequence).unwrap();
-
-        let rows = sqlx::query_as!(
-            DatasetKeyBlockRow,
-            r#"
-            SELECT
-                event_type,
-                sequence_number,
-                block_hash,
-                block_payload
-            FROM dataset_key_blocks
-            WHERE dataset_id = ? AND block_ref_name = ? AND event_type = ?
-                AND sequence_number BETWEEN ? AND ?
-            ORDER BY sequence_number
-            "#,
-            dataset_id_str,
-            block_ref_str,
-            event_type_str,
-            min_seq,
-            max_seq
-        )
-        .fetch_all(conn)
-        .await
-        .int_err()?;
-
-        Ok(rows
-            .into_iter()
-            .map(DatasetKeyBlockRow::into_domain)
-            .collect())
-    }
-
-    async fn find_latest_blocks_of_kinds_in_range(
+    async fn find_blocks_of_kinds_in_range(
         &self,
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
