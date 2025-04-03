@@ -109,12 +109,12 @@ pub async fn dataset_ingest_handler(
                 Some(time_source.now())
             });
 
-    let ingest_data_use_case = catalog.get_one::<dyn IngestDataUseCase>().unwrap();
-    ingest_data_use_case
+    let push_ingest_data_use_case = catalog.get_one::<dyn PushIngestDataUseCase>().unwrap();
+    push_ingest_data_use_case
         .execute(
             &dataset_ref,
             DataSource::Stream(data_stream),
-            IngestDataUseCaseOptions {
+            PushIngestDataUseCaseOptions {
                 source_name: params.source_name,
                 source_event_time,
                 is_ingest_from_upload,
@@ -124,17 +124,19 @@ pub async fn dataset_ingest_handler(
         )
         .await
         .map_err(|err| match err {
-            IngestDataError::NotFound(_) | IngestDataError::Access(_) => {
+            PushIngestDataError::NotFound(_) | PushIngestDataError::Access(_) => {
                 ApiError::not_found_without_reason()
             }
-            IngestDataError::Planning(PushIngestPlanningError::SourceNotFound(e)) => {
+            PushIngestDataError::Planning(PushIngestPlanningError::SourceNotFound(e)) => {
                 ApiError::bad_request(e)
             }
-            IngestDataError::Planning(PushIngestPlanningError::UnsupportedMediaType(_))
-            | IngestDataError::Execution(PushIngestError::UnsupportedMediaType(_)) => {
+            PushIngestDataError::Planning(PushIngestPlanningError::UnsupportedMediaType(_))
+            | PushIngestDataError::Execution(PushIngestError::UnsupportedMediaType(_)) => {
                 ApiError::new_unsupported_media_type()
             }
-            IngestDataError::Execution(PushIngestError::ReadError(e)) => ApiError::bad_request(e),
+            PushIngestDataError::Execution(PushIngestError::ReadError(e)) => {
+                ApiError::bad_request(e)
+            }
             e => e.int_err().api_err(),
         })?;
 

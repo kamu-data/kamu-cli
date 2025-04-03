@@ -28,7 +28,7 @@ pub struct IngestCommand {
     data_format_reg: Arc<dyn DataFormatRegistry>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    ingest_data_use_case: Arc<dyn IngestDataUseCase>,
+    push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -171,11 +171,11 @@ impl Command for IngestCommand {
         let mut updated = 0;
         for url in urls {
             let ingest_result = self
-                .ingest_data_use_case
+                .push_ingest_data_use_case
                 .execute(
                     &dataset_handle.as_local_ref(),
                     DataSource::Url(url),
-                    IngestDataUseCaseOptions {
+                    PushIngestDataUseCaseOptions {
                         source_name: self.source_name.clone(),
                         source_event_time,
                         is_ingest_from_upload: false,

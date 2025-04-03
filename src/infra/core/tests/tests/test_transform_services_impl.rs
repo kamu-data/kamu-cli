@@ -40,7 +40,7 @@ struct TransformTestHarness {
     transform_executor: Arc<dyn TransformExecutor>,
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
-    ingest_data_use_case: Arc<dyn IngestDataUseCase>,
+    ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
 }
 
 impl TransformTestHarness {
@@ -73,7 +73,7 @@ impl TransformTestHarness {
             .add::<DataFormatRegistryImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
-            .add::<IngestDataUseCaseImpl>()
+            .add::<PushIngestDataUseCaseImpl>()
             .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(engine_provisioner)
@@ -226,7 +226,7 @@ impl TransformTestHarness {
             .execute(
                 &target.get_handle().as_local_ref(),
                 DataSource::Stream(Box::new(data)),
-                IngestDataUseCaseOptions {
+                PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,

@@ -467,7 +467,7 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
     b.add::<CompactDatasetUseCaseImpl>();
-    b.add::<IngestDataUseCaseImpl>();
+    b.add::<PushIngestDataUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
     b.add::<PushDatasetUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();

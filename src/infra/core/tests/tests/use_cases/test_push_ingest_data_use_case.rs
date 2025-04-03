@@ -18,10 +18,10 @@ use messaging_outbox::{register_message_dispatcher, DummyOutboxImpl};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_ingest_data_non_existing_dataset() {
+async fn test_push_ingest_data_non_existing_dataset() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let harness = IngestDataUseCaseHarness::new(
+    let harness = PushIngestDataUseCaseHarness::new(
         MockDatasetActionAuthorizer::new(),
         MockDidGenerator::predefined_dataset_ids(vec![]),
     );
@@ -33,7 +33,7 @@ async fn test_ingest_data_non_existing_dataset() {
             .ingest_data(
                 &odf::DatasetRef::Alias(alias_foo),
                 DataSource::Stream(Box::new(data_stream)),
-                IngestDataUseCaseOptions {
+                PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,
@@ -41,18 +41,18 @@ async fn test_ingest_data_non_existing_dataset() {
                 }
             )
             .await,
-        Err(IngestDataError::NotFound(_))
+        Err(PushIngestDataError::NotFound(_))
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_ingest_data_source_not_found() {
+async fn test_push_ingest_data_source_not_found() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let harness = IngestDataUseCaseHarness::new(
+    let harness = PushIngestDataUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
@@ -66,7 +66,7 @@ async fn test_ingest_data_source_not_found() {
             .ingest_data(
                 &odf::DatasetRef::Alias(alias_foo),
                 DataSource::Stream(Box::new(data_stream)),
-                IngestDataUseCaseOptions {
+                PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,
@@ -74,7 +74,7 @@ async fn test_ingest_data_source_not_found() {
                 }
             )
             .await,
-        Err(IngestDataError::Planning(
+        Err(PushIngestDataError::Planning(
             PushIngestPlanningError::SourceNotFound(_)
         ))
     );
@@ -84,11 +84,11 @@ async fn test_ingest_data_source_not_found() {
 
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
-async fn test_ingest_data_from_json() {
+async fn test_push_ingest_data_from_json() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let harness = IngestDataUseCaseHarness::new(
+    let harness = PushIngestDataUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
@@ -104,7 +104,7 @@ async fn test_ingest_data_from_json() {
             .ingest_data(
                 &odf::DatasetRef::Alias(alias_foo),
                 DataSource::Stream(Box::new(data_stream)),
-                IngestDataUseCaseOptions {
+                PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,
@@ -120,11 +120,11 @@ async fn test_ingest_data_from_json() {
 
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
-async fn test_ingest_data_from_file() {
+async fn test_push_ingest_data_from_file() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let harness = IngestDataUseCaseHarness::new(
+    let harness = PushIngestDataUseCaseHarness::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
@@ -148,7 +148,7 @@ async fn test_ingest_data_from_file() {
             .ingest_data(
                 &odf::DatasetRef::Alias(alias_foo),
                 DataSource::Stream(data_stream),
-                IngestDataUseCaseOptions {
+                PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: true,
@@ -163,12 +163,12 @@ async fn test_ingest_data_from_file() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
-struct IngestDataUseCaseHarness {
+struct PushIngestDataUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
-    use_case: Arc<dyn IngestDataUseCase>,
+    use_case: Arc<dyn PushIngestDataUseCase>,
 }
 
-impl IngestDataUseCaseHarness {
+impl PushIngestDataUseCaseHarness {
     fn new(
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_did_generator: MockDidGenerator,
@@ -182,7 +182,7 @@ impl IngestDataUseCaseHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
 
-        b.add::<IngestDataUseCaseImpl>()
+        b.add::<PushIngestDataUseCaseImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
@@ -198,7 +198,7 @@ impl IngestDataUseCaseHarness {
 
         let catalog = b.build();
 
-        let use_case = catalog.get_one::<dyn IngestDataUseCase>().unwrap();
+        let use_case = catalog.get_one::<dyn PushIngestDataUseCase>().unwrap();
 
         Self {
             base_use_case_harness,
@@ -210,8 +210,8 @@ impl IngestDataUseCaseHarness {
         &self,
         target: &odf::DatasetRef,
         data_source: DataSource,
-        options: IngestDataUseCaseOptions,
-    ) -> Result<PushIngestResult, IngestDataError> {
+        options: PushIngestDataUseCaseOptions,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
         self.use_case
             .execute(target, data_source, options, None)
             .await

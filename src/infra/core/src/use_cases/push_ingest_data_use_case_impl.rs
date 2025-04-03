@@ -19,8 +19,8 @@ use messaging_outbox::{Outbox, OutboxExt};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
-#[interface(dyn IngestDataUseCase)]
-pub struct IngestDataUseCaseImpl {
+#[interface(dyn PushIngestDataUseCase)]
+pub struct PushIngestDataUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
@@ -29,22 +29,22 @@ pub struct IngestDataUseCaseImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl IngestDataUseCase for IngestDataUseCaseImpl {
+impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
     async fn execute(
         &self,
         dataset_ref: &odf::DatasetRef,
         data_source: DataSource,
-        options: IngestDataUseCaseOptions,
+        options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
-    ) -> Result<PushIngestResult, IngestDataError> {
+    ) -> Result<PushIngestResult, PushIngestDataError> {
         let target = self
             .rebac_dataset_registry_facade
             .resolve_dataset_by_ref(dataset_ref, auth::DatasetAction::Write)
             .await
             .map_err(|e| match e {
-                RebacDatasetRefUnresolvedError::NotFound(err) => IngestDataError::NotFound(err),
-                RebacDatasetRefUnresolvedError::Access(err) => IngestDataError::Access(err),
-                _ => IngestDataError::Internal(e.int_err()),
+                RebacDatasetRefUnresolvedError::NotFound(err) => PushIngestDataError::NotFound(err),
+                RebacDatasetRefUnresolvedError::Access(err) => PushIngestDataError::Access(err),
+                _ => PushIngestDataError::Internal(e.int_err()),
             })?;
 
         let ingest_plan = self

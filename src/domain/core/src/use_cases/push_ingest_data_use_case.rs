@@ -26,19 +26,19 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait IngestDataUseCase: Send + Sync {
+pub trait PushIngestDataUseCase: Send + Sync {
     async fn execute(
         &self,
         dataset_ref: &odf::DatasetRef,
         data_source: DataSource,
-        options: IngestDataUseCaseOptions,
+        options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
-    ) -> Result<PushIngestResult, IngestDataError>;
+    ) -> Result<PushIngestResult, PushIngestDataError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct IngestDataUseCaseOptions {
+pub struct PushIngestDataUseCaseOptions {
     pub source_name: Option<String>,
     pub source_event_time: Option<DateTime<Utc>>,
     pub is_ingest_from_upload: bool,
@@ -47,7 +47,7 @@ pub struct IngestDataUseCaseOptions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub enum IngestDataUseCaseDataSource {
+pub enum PushIngestDataUseCaseDataSource {
     Stream(Box<dyn AsyncRead + Send + Unpin>),
     Url(url::Url),
 }
@@ -55,7 +55,7 @@ pub enum IngestDataUseCaseDataSource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum IngestDataError {
+pub enum PushIngestDataError {
     #[error(transparent)]
     Access(
         #[from]
