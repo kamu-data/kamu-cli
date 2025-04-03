@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
-- New `IngestDataUseCase` and used in in Http `/ingest` handler and `ingest_command`
+- New `PushIngestDataUseCase` and used in in Http `/ingest` handler and `ingest_command`
 
 ## [0.231.0] - 2025-03-31
 ### Added
