@@ -24,7 +24,6 @@ use kamu_datasets::{
     NameCollisionError,
     SetRefCheckRefMode,
 };
-use odf::dataset::MetadataChainExt;
 use odf::metadata::AsTypedBlock as _;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -629,16 +628,20 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             let dst = if let Some(dst) = dst {
                 // Check is incoming seed is different from existing
                 if transfer_options.force_update_if_diverged
-                    && let Some((incoming_first_block_hash, _)) = new_blocks.front()
-                    && let Ok(seed_block) = dst
-                        .as_metadata_chain()
-                        .accept_one(odf::dataset::SearchSeedVisitor::new())
-                        .await
-                    && let Some((existing_seed_hash, _)) = seed_block.into_hashed_block()
-                    && incoming_first_block_hash != &existing_seed_hash
+                    && let Some(dataset_alias) = dst_alias
+                    && let Some((_, first_incoming_block)) = new_blocks.front()
+                    && let odf::MetadataEvent::Seed(seed_event) = &first_incoming_block.event
                 {
-                    InternalError::bail("Rewriting seed block is restricted")?;
-                };
+                    let dataset_registry = self.catalog.get_one::<dyn DatasetRegistry>().unwrap();
+                    let existing_dataset_id = dataset_registry
+                        .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
+                        .await
+                        .int_err()?
+                        .id;
+                    if seed_event.dataset_id != existing_dataset_id {
+                        InternalError::bail("Rewriting seed block is restricted")?;
+                    }
+                }
                 dst
             } else {
                 let (first_hash, first_block) = new_blocks.pop_front().unwrap();
