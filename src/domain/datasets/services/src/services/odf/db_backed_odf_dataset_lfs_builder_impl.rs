@@ -13,10 +13,7 @@ use dill::{component, interface, Catalog};
 use odf::Dataset;
 use url::Url;
 
-use crate::{
-    DatabaseBackedOdfMetadataBlockQuickSearch,
-    DatabaseBackedOdfMetadataChainRefRepositoryImpl,
-};
+use crate::{DatabaseBackedOdfMetadataChainImpl, DatabaseBackedOdfMetadataChainRefRepositoryImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,16 +38,16 @@ impl odf::dataset::DatasetLfsBuilder for DatabaseBackedOdfDatasetLfsBuilderImpl 
         use odf::dataset::*;
 
         Arc::new(DatasetImpl::new(
-            MetadataChainImpl::new(
-                DatasetDefaultLfsBuilder::build_meta_block_repo(layout.blocks_dir),
-                DatabaseBackedOdfMetadataChainRefRepositoryImpl::new(
-                    self.catalog.get_one().unwrap(),
-                    DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
-                    dataset_id.clone(),
-                ),
-                DatabaseBackedOdfMetadataBlockQuickSearch::new(
-                    dataset_id.clone(),
-                    self.catalog.get_one().unwrap(),
+            DatabaseBackedOdfMetadataChainImpl::new(
+                dataset_id.clone(),
+                self.catalog.get_one().unwrap(),
+                MetadataChainImpl::new(
+                    DatasetDefaultLfsBuilder::build_meta_block_repo(layout.blocks_dir),
+                    DatabaseBackedOdfMetadataChainRefRepositoryImpl::new(
+                        self.catalog.get_one().unwrap(),
+                        DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
+                        dataset_id.clone(),
+                    ),
                 ),
             ),
             DatasetDefaultLfsBuilder::build_data_repo(layout.data_dir),

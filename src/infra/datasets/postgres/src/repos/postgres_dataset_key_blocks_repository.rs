@@ -52,6 +52,43 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         Ok(result.is_some())
     }
 
+    async fn get_all_key_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                event_type as "event_type: MetadataEventType",
+                sequence_number,
+                block_hash,
+                block_payload
+            FROM dataset_key_blocks
+            WHERE dataset_id = $1 AND block_ref_name = $2
+            ORDER BY sequence_number ASC
+            "#,
+            dataset_id.to_string(),
+            block_ref.as_str()
+        )
+        .fetch_all(conn)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| DatasetKeyBlock {
+                event_kind: r.event_type,
+                sequence_number: u64::try_from(r.sequence_number).unwrap(),
+                block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                block_payload: bytes::Bytes::from(r.block_payload),
+            })
+            .collect())
+    }
+
     async fn find_latest_block_of_kind(
         &self,
         dataset_id: &odf::DatasetID,
@@ -274,5 +311,4 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         Ok(())
     }
 }
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

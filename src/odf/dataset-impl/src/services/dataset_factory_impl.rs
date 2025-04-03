@@ -30,8 +30,6 @@ use s3_utils::{S3Context, S3Metrics};
 use url::Url;
 
 #[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
-use crate::MetadataChainBlockQuickSearchNull;
-#[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
 use crate::MetadataChainReferenceRepositoryImpl;
 #[cfg(any(feature = "http", feature = "lfs", feature = "s3"))]
 use crate::{DatasetImpl, MetadataChainImpl};
@@ -57,7 +55,6 @@ type DatasetImplLocalFS = DatasetImpl<
             MetadataBlockRepositoryImpl<ObjectRepositoryLocalFSSha3>,
         >,
         MetadataChainReferenceRepositoryImpl<ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>>,
-        MetadataChainBlockQuickSearchNull,
     >,
     ObjectRepositoryLocalFSSha3,
     ObjectRepositoryLocalFSSha3,
@@ -117,7 +114,6 @@ impl DatasetFactoryImpl {
                 MetadataChainReferenceRepositoryImpl::new(
                     DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
                 ),
-                MetadataChainBlockQuickSearchNull {},
             ),
             DatasetDefaultLfsBuilder::build_data_repo(layout.data_dir),
             DatasetDefaultLfsBuilder::build_checkpoint_repo(layout.checkpoints_dir),
@@ -152,7 +148,6 @@ impl DatasetFactoryImpl {
                         header_map.clone(),
                     ),
                 )),
-                MetadataChainBlockQuickSearchNull {},
             ),
             ObjectRepositoryHttp::new(
                 client.clone(),
@@ -200,7 +195,6 @@ impl DatasetFactoryImpl {
                 MetadataChainReferenceRepositoryImpl::new(
                     DatasetDefaultS3Builder::build_refs_repo(&s3_context),
                 ),
-                MetadataChainBlockQuickSearchNull {},
             ),
             DatasetDefaultS3Builder::build_data_repo(&s3_context),
             DatasetDefaultS3Builder::build_checkpoint_repo(&s3_context),
@@ -279,7 +273,6 @@ impl DatasetFactoryImpl {
                         dataset_url.join("refs/").unwrap(),
                     ),
                 )),
-                MetadataChainBlockQuickSearchNull {},
             ),
             ObjectRepositoryHttp::new(
                 client.clone(),

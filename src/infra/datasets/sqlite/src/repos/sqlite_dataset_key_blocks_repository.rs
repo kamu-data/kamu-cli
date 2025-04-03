@@ -81,6 +81,42 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(result.is_some())
     }
 
+    async fn get_all_key_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let dataset_id_str = dataset_id.to_string();
+        let block_ref_str = block_ref.as_str();
+
+        let rows = sqlx::query_as!(
+            DatasetKeyBlockRow,
+            r#"
+            SELECT
+                event_type,
+                sequence_number,
+                block_hash,
+                block_payload
+            FROM dataset_key_blocks
+            WHERE dataset_id = ? AND block_ref_name = ?
+            ORDER BY sequence_number ASC
+            "#,
+            dataset_id_str,
+            block_ref_str,
+        )
+        .fetch_all(conn)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(DatasetKeyBlockRow::into_domain)
+            .collect())
+    }
+
     async fn find_latest_block_of_kind(
         &self,
         dataset_id: &odf::DatasetID,
@@ -306,5 +342,4 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(())
     }
 }
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -23,6 +23,12 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         block_ref: &BlockRef,
     ) -> Result<bool, InternalError>;
 
+    async fn get_all_key_blocks(
+        &self,
+        dataset_id: &DatasetID,
+        block_ref: &BlockRef,
+    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
+
     // TODO: looks nice, but not used yet
     async fn find_latest_block_of_kind(
         &self,

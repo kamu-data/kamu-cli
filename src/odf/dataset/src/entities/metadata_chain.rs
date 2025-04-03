@@ -39,8 +39,15 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-    /// Returns the quick block search utility
-    fn get_quick_block_search(&self) -> &dyn MetadataChainBlockQuickSearch;
+    /// Returns the previous block relatively to the specified block,
+    /// attempting to use the hint flags as a quick skipping guideance.
+    /// In worst case, returns the nearest previous block.
+    async fn try_get_prev_block(
+        &self,
+        block: &MetadataBlock,
+        tail_sequence_number: u64,
+        hint_flags: MetadataEventTypeFlags,
+    ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError>;
 
     /// Appends the block to the chain
     async fn append<'a>(
@@ -265,80 +272,51 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + Send,
     {
-        let quick_search = self.get_quick_block_search();
+        // println!("Start of acceptance session");
 
+        // Collect initial decisions of visitors
         let mut decisions: Vec<_> = visitors
             .iter()
             .map(|visitor| visitor.initial_decision())
             .collect();
 
+        // Summarize their initial satisfaction state
         let mut satisfaction = determine_decisions_satisfaction(&decisions);
 
-        let mut current_hash = head_hash.cloned();
-
-        // Load tail block, if it's required
-        let maybe_tail_block = if let Some(tail_hash) = tail_hash {
-            Some(
-                self.get_block(tail_hash)
-                    .await
-                    .map_err(IterBlocksError::from)?,
-            )
+        // Read the starting block unconditionally
+        let mut current_hashed_block = if let Some(head_hash) = head_hash {
+            let head_block = self
+                .get_block(head_hash)
+                .await
+                .map_err(IterBlocksError::from)?;
+            Some((head_hash.clone(), head_block))
         } else {
+            // No starting block
             None
         };
 
-        // TODO: PERF: Add traversal optimizations such as skip-lists
-        while let Some(hash) = current_hash
+        // Determine the sequence number of tail block
+        let tail_sequence_number = if let Some(tail_hash) = tail_hash {
+            // Read from the tail block
+            self.get_block(tail_hash)
+                .await
+                .map_err(IterBlocksError::from)?
+                .sequence_number
+        } else {
+            // Tail is the seed block
+            0
+        };
+
+        // Iterate over blocks until we sasisfy all visitors or reach the tail
+        while let Some((hash, block)) = current_hashed_block
             && satisfaction.has_unsatisfied_visitors()
             && tail_hash != Some(&hash)
         {
-            // Load next block of the chain
-            let block = self.get_block(&hash).await.map_err(IterBlocksError::from)?;
+            // println!("Visiting block: {hash}, {block:?}. Satisfaction state:
+            // {satisfaction:?}");
 
-            // Idea: we could also stop iterating, if quick blocks cannot be satisfied at
-            // all. We can't tell that for data blocks yet, but if lookup of key
-            // blocks is not satisfying, these are dead searches we could abort early
-
-            // If we still await for particular flags, try quick search option
-            if !satisfaction.awaited_flags.is_empty() {
-                // Execute quick search of requested block types
-                let found_blocks = quick_search
-                    .quick_search_of_blocks(
-                        satisfaction.awaited_flags,
-                        &block,
-                        maybe_tail_block.as_ref(),
-                    )
-                    .await
-                    .map_err(|e| AcceptVisitorError::Traversal(IterBlocksError::Internal(e)))?;
-
-                // If we found blocks, we can update the NextOfType decisions
-                for (block_hash, block) in found_blocks {
-                    for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
-                        match decision {
-                            // Check if this decision could be satisifed with the quick search block
-                            MetadataVisitorDecision::NextOfType(type_flags) => {
-                                let block_flag = MetadataEventTypeFlags::from(&block.event);
-                                if type_flags.contains(block_flag) {
-                                    // Yes, a progress has been made
-                                    *decision = visitor
-                                        .visit((&block_hash, &block))
-                                        .map_err(AcceptVisitorError::Visitor)?;
-                                }
-                            }
-
-                            // These will have to wait for linear traversal
-                            MetadataVisitorDecision::Stop
-                            | MetadataVisitorDecision::Next
-                            | MetadataVisitorDecision::NextWithHash(_) => {}
-                        }
-                    }
-                }
-            }
-
-            // Falling back to linear traversal
+            // Feed each visitor with the currently loaded block
             let hashed_block_ref = (&hash, &block);
-
-            // Try to satisfy the visitors with this block
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
                 match decision {
                     MetadataVisitorDecision::Stop => {}
@@ -371,15 +349,24 @@ pub trait MetadataChainExt: MetadataChain {
 
             // Measure the progress of satisfaction after this iteration
             satisfaction = determine_decisions_satisfaction(&decisions);
+            // println!("New satisfaction state: {satisfaction:?}");
 
-            // Proceed to the previous block in the chain
-            current_hash = block.prev_block_hash;
+            if !satisfaction.has_unsatisfied_visitors() {
+                break;
+            }
+
+            // Try to jump to the previous block with satisfaction hints taken into account
+            current_hashed_block = self
+                .try_get_prev_block(&block, tail_sequence_number, satisfaction.awaited_flags)
+                .await
+                .map_err(IterBlocksError::from)?;
         }
 
-        // Report visitor errors, if any
         for visitor in visitors {
             visitor.finish().map_err(AcceptVisitorError::Visitor)?;
         }
+
+        // println!("End of acceptance session");
 
         Ok(())
     }
@@ -523,24 +510,6 @@ pub trait MetadataChainExt: MetadataChain {
 }
 
 impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-pub trait MetadataChainBlockQuickSearch: Send + Sync {
-    /// Detaches this metadata chain from any transaction references
-    fn detach_from_transaction(&self) {
-        // Nothing to do by default
-    }
-
-    /// Quick search of blocks of the specified type in the given range
-    async fn quick_search_of_blocks(
-        &self,
-        flags: MetadataEventTypeFlags,
-        head_block: &MetadataBlock,
-        maybe_tail_block: Option<&MetadataBlock>,
-    ) -> Result<Vec<(Multihash, MetadataBlock)>, InternalError>;
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

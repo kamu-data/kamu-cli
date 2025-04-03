@@ -23,11 +23,7 @@ fn init_chain() -> impl odf::MetadataChain {
         NamedObjectRepositoryInMemory::new(),
     ));
 
-    MetadataChainImpl::new(
-        meta_block_repo,
-        meta_ref_repo,
-        odf::dataset::MetadataChainBlockQuickSearchNull {},
-    )
+    MetadataChainImpl::new(meta_block_repo, meta_ref_repo)
 }
 
 async fn push_block(chain: &dyn odf::MetadataChain, block: odf::MetadataBlock) -> odf::Multihash {

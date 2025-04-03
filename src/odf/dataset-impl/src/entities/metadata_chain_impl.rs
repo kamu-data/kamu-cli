@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::ErrorIntoInternal;
 use odf_dataset::*;
 use odf_metadata::*;
 use odf_storage::*;
@@ -29,30 +29,22 @@ pub(crate) use invalid_event;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChainImpl<MetaBlockRepo, MetaRefRepo, MetaBlockQuickSearch> {
+pub struct MetadataChainImpl<MetaBlockRepo, MetaRefRepo> {
     meta_block_repo: MetaBlockRepo,
     meta_ref_repo: MetaRefRepo,
-    meta_block_quick_search: MetaBlockQuickSearch,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<MetaBlockRepo, MetaRefRepo, MetaBlockQuickSearch>
-    MetadataChainImpl<MetaBlockRepo, MetaRefRepo, MetaBlockQuickSearch>
+impl<MetaBlockRepo, MetaRefRepo> MetadataChainImpl<MetaBlockRepo, MetaRefRepo>
 where
     MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     MetaRefRepo: MetadataChainReferenceRepository + Sync + Send,
-    MetaBlockQuickSearch: MetadataChainBlockQuickSearch,
 {
-    pub fn new(
-        meta_block_repo: MetaBlockRepo,
-        meta_ref_repo: MetaRefRepo,
-        meta_block_quick_search: MetaBlockQuickSearch,
-    ) -> Self {
+    pub fn new(meta_block_repo: MetaBlockRepo, meta_ref_repo: MetaRefRepo) -> Self {
         Self {
             meta_block_repo,
             meta_ref_repo,
-            meta_block_quick_search,
         }
     }
 }
@@ -60,16 +52,13 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl<MetaBlockRepo, MetaRefRepo, MetaBlockQuickSearch> MetadataChain
-    for MetadataChainImpl<MetaBlockRepo, MetaRefRepo, MetaBlockQuickSearch>
+impl<MetaBlockRepo, MetaRefRepo> MetadataChain for MetadataChainImpl<MetaBlockRepo, MetaRefRepo>
 where
     MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     MetaRefRepo: MetadataChainReferenceRepository + Sync + Send,
-    MetaBlockQuickSearch: MetadataChainBlockQuickSearch + Sync + Send,
 {
     fn detach_from_transaction(&self) {
         self.meta_ref_repo.detach_from_transaction();
-        self.meta_block_quick_search.detach_from_transaction();
     }
 
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
@@ -91,9 +80,28 @@ where
             .map_err(Into::into)
     }
 
-    /// Returns the quick block search utility, if available
-    fn get_quick_block_search(&self) -> &dyn MetadataChainBlockQuickSearch {
-        &self.meta_block_quick_search
+    async fn try_get_prev_block(
+        &self,
+        block: &MetadataBlock,
+        tail_sequence_number: u64,
+        _hint_flags: MetadataEventTypeFlags,
+    ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError> {
+        // Have we reached the tail? (if specified the boundary)
+        if tail_sequence_number >= block.sequence_number {
+            // We are at the tail, no need to go further
+            return Ok(None);
+        }
+
+        // No hints are supported in default chain implementation
+        // Simply take the previous block, unless we reached the seed
+        if let Some(prev_block_hash) = &block.prev_block_hash {
+            // Got previous block
+            let prev_block = self.get_block(prev_block_hash).await?;
+            Ok(Some((prev_block_hash.clone(), prev_block)))
+        } else {
+            // Reached the seed block
+            Ok(None)
+        }
     }
 
     async fn append<'a>(
@@ -219,23 +227,6 @@ where
 
     fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository {
         self.meta_ref_repo.as_uncached_ref_repo()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct MetadataChainBlockQuickSearchNull {}
-
-#[async_trait::async_trait]
-impl MetadataChainBlockQuickSearch for MetadataChainBlockQuickSearchNull {
-    async fn quick_search_of_blocks(
-        &self,
-        _flags: MetadataEventTypeFlags,
-        _head_block: &MetadataBlock,
-        _maybe_tail_block: Option<&MetadataBlock>,
-    ) -> Result<Vec<(Multihash, MetadataBlock)>, InternalError> {
-        // Not supported
-        Ok(vec![])
     }
 }
 

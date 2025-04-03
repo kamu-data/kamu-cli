@@ -218,6 +218,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct DecisionsSatisfaction {
     pub awaited_flags: MetadataEventTypeFlags,
     pub num_satisfied_visitors: usize,
@@ -247,6 +248,7 @@ pub fn determine_decisions_satisfaction(
                 num_unsatisfied_visitors += 1;
             }
             MetadataVisitorDecision::Next | MetadataVisitorDecision::NextWithHash(_) => {
+                awaited_flags = MetadataEventTypeFlags::all();
                 num_unsatisfied_visitors += 1;
             }
         }
