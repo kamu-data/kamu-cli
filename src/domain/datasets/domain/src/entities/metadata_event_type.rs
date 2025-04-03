@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use odf::metadata::MetadataEventTypeFlags;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,81 +62,6 @@ impl MetadataEventType {
             odf::MetadataEvent::DisablePushSource(_) => Self::DisablePushSource,
             odf::MetadataEvent::DisablePollingSource(_) => Self::DisablePollingSource,
         }
-    }
-
-    pub fn multiple_from_metadata_event_flags(
-        mut flags: odf::metadata::MetadataEventTypeFlags,
-    ) -> Vec<Self> {
-        let mut event_types = Vec::new();
-
-        if flags.contains(MetadataEventTypeFlags::ADD_DATA) {
-            event_types.push(Self::AddData);
-            flags -= MetadataEventTypeFlags::ADD_DATA;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::EXECUTE_TRANSFORM) {
-            event_types.push(Self::ExecuteTransform);
-            flags -= MetadataEventTypeFlags::EXECUTE_TRANSFORM;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::SEED) {
-            event_types.push(Self::Seed);
-            flags -= MetadataEventTypeFlags::SEED;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::SET_POLLING_SOURCE) {
-            event_types.push(Self::SetPollingSource);
-            flags -= MetadataEventTypeFlags::SET_POLLING_SOURCE;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::SET_VOCAB) {
-            event_types.push(Self::SetVocab);
-            flags -= MetadataEventTypeFlags::SET_VOCAB;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::SET_ATTACHMENTS) {
-            event_types.push(Self::SetAttachments);
-            flags -= MetadataEventTypeFlags::SET_ATTACHMENTS;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::SET_INFO) {
-            event_types.push(Self::SetInfo);
-            flags -= MetadataEventTypeFlags::SET_INFO;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::SET_LICENSE) {
-            event_types.push(Self::SetLicense);
-            flags -= MetadataEventTypeFlags::SET_LICENSE;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::SET_DATA_SCHEMA) {
-            event_types.push(Self::SetDataSchema);
-            flags -= MetadataEventTypeFlags::SET_DATA_SCHEMA;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::SET_TRANSFORM) {
-            event_types.push(Self::SetTransform);
-            flags -= MetadataEventTypeFlags::SET_TRANSFORM;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::ADD_PUSH_SOURCE) {
-            event_types.push(Self::AddPushSource);
-            flags -= MetadataEventTypeFlags::ADD_PUSH_SOURCE;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::DISABLE_PUSH_SOURCE) {
-            event_types.push(Self::DisablePushSource);
-            flags -= MetadataEventTypeFlags::DISABLE_PUSH_SOURCE;
-        }
-
-        if flags.contains(MetadataEventTypeFlags::DISABLE_POLLING_SOURCE) {
-            event_types.push(Self::DisablePollingSource);
-            flags -= MetadataEventTypeFlags::DISABLE_POLLING_SOURCE;
-        }
-
-        assert!(flags.is_empty(), "Unrecognized flags: {flags:?}");
-
-        event_types
     }
 }
 

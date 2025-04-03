@@ -87,6 +87,19 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         Ok(())
     }
 
+    async fn get_all_key_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
+        let guard = self.state.lock().unwrap();
+        Ok(guard
+            .key_blocks
+            .get(&(dataset_id.clone(), block_ref.clone()))
+            .cloned()
+            .unwrap_or_default())
+    }
+
     async fn find_latest_block_of_kind(
         &self,
         dataset_id: &odf::DatasetID,
