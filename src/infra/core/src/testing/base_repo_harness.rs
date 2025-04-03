@@ -156,6 +156,29 @@ impl BaseRepoHarness {
         CreateDatasetResult::from_stored(store_result, alias.clone())
     }
 
+    pub async fn create_root_dataset_with_push_source(
+        &self,
+        alias: &odf::DatasetAlias,
+    ) -> CreateDatasetResult {
+        let snapshot = MetadataFactory::dataset_snapshot()
+            .name(alias.clone())
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::add_push_source().build())
+            .build();
+
+        let store_result = create_test_dataset_from_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            snapshot,
+            self.did_generator.generate_dataset_id().0,
+            self.system_time_source.now(),
+        )
+        .await
+        .unwrap();
+
+        CreateDatasetResult::from_stored(store_result, alias.clone())
+    }
+
     pub async fn create_derived_dataset(
         &self,
         alias: &odf::DatasetAlias,

@@ -344,7 +344,7 @@ impl TestHarness {
     ) -> PushIngestResult {
         let ingest_result = self
             .push_ingest_executor
-            .ingest_from_stream(target.clone(), ingest_plan, data, None)
+            .execute_ingest(target.clone(), ingest_plan, DataSource::Stream(data), None)
             .await
             .unwrap();
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
 
 use internal_error::InternalError;
@@ -25,23 +26,11 @@ pub trait PushIngestExecutor: Send + Sync {
     /// specified source.
     ///
     /// See also [MediaType].
-    async fn ingest_from_url(
+    async fn execute_ingest(
         &self,
         target: ResolvedDataset,
         plan: PushIngestPlan,
-        url: url::Url,
-        listener: Option<Arc<dyn PushIngestListener>>,
-    ) -> Result<PushIngestResult, PushIngestError>;
-
-    /// Uses push source definition in metadata to ingest data possessed
-    /// in-band as a file stream.
-    ///
-    /// See also [MediaType].
-    async fn ingest_from_stream(
-        &self,
-        target: ResolvedDataset,
-        plan: PushIngestPlan,
-        data: Box<dyn AsyncRead + Send + Unpin>,
+        data_source: DataSource,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 }
@@ -162,3 +151,17 @@ pub enum PushIngestError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum DataSource {
+    Url(url::Url),
+    Stream(Box<dyn AsyncRead + Send + Unpin>),
+}
+
+impl Display for DataSource {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            DataSource::Url(url) => write!(f, "{url}"),
+            DataSource::Stream(_) => write!(f, "Stream data source"),
+        }
+    }
+}

@@ -13,11 +13,9 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http::HeaderMap;
 use http_common::*;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
-use kamu_datasets::{DatasetExternallyChangedMessage, MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER};
-use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
@@ -34,11 +32,6 @@ pub struct IngestParams {
 
     #[param(value_type = Option<String>)]
     upload_token: Option<UploadTokenBase64Json>,
-}
-
-struct IngestTaskArguments {
-    data_stream: Box<dyn AsyncRead + Send + Unpin>,
-    media_type: Option<MediaType>,
 }
 
 // TODO: SEC: Enforce a size limit on payload
@@ -72,7 +65,7 @@ pub async fn dataset_ingest_handler(
 ) -> Result<(), ApiError> {
     let is_ingest_from_upload = params.upload_token.is_some();
 
-    let arguments = if let Some(upload_token) = params.upload_token {
+    let (data_stream, media_type) = if let Some(upload_token) = params.upload_token {
         let account_id = ensure_authenticated_account(&catalog).api_err()?;
         if account_id.as_multibase().to_stack_string().as_str()
             != upload_token.0.owner_account_id.as_str()
@@ -96,21 +89,16 @@ pub async fn dataset_ingest_handler(
             .content_type
             .or_else(|| media_type_from_file_extension(&catalog, &upload_token.0.file_name));
 
-        IngestTaskArguments {
-            data_stream,
-            media_type,
-        }
+        (data_stream, media_type)
     } else {
         let media_type = headers
             .get(http::header::CONTENT_TYPE)
             .map(|h| MediaType(h.to_str().unwrap().to_string()));
 
-        let data = Box::new(crate::axum_utils::body_into_async_read(body));
+        let data: Box<dyn AsyncRead + Send + Unpin> =
+            Box::new(crate::axum_utils::body_into_async_read(body));
 
-        IngestTaskArguments {
-            data_stream: data,
-            media_type,
-        }
+        (data, media_type)
     };
 
     // TODO: Settle on the header name and document it
@@ -126,7 +114,7 @@ pub async fn dataset_ingest_handler(
     let rebac_dataset_registry_facade =
         catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
 
-    let target = rebac_dataset_registry_facade
+    let target_dataset = rebac_dataset_registry_facade
         .resolve_dataset_by_ref(&dataset_ref, auth::DatasetAction::Write)
         .await
         .map_err(|e| {
@@ -137,77 +125,35 @@ pub async fn dataset_ingest_handler(
             }
         })?;
 
-    // Plan and run ingestion
-    let push_ingest_planner = catalog.get_one::<dyn PushIngestPlanner>().unwrap();
-    let ingest_plan = push_ingest_planner
-        .plan_ingest(
-            target.clone(),
-            params.source_name.as_deref(),
-            PushIngestOpts {
-                media_type: arguments.media_type,
+    let push_ingest_data_use_case = catalog.get_one::<dyn PushIngestDataUseCase>().unwrap();
+    push_ingest_data_use_case
+        .execute(
+            &target_dataset,
+            DataSource::Stream(data_stream),
+            PushIngestDataUseCaseOptions {
+                source_name: params.source_name,
                 source_event_time,
-                auto_create_push_source: is_ingest_from_upload,
-                schema_inference: SchemaInferenceOpts::default(),
+                is_ingest_from_upload,
+                media_type,
             },
+            None,
         )
         .await
-        .map_err(|e| match e {
-            PushIngestPlanningError::SourceNotFound(e) => ApiError::bad_request(e),
-            PushIngestPlanningError::UnsupportedMediaType(_) => {
+        .map_err(|err| match err {
+            PushIngestDataError::Planning(PushIngestPlanningError::SourceNotFound(e)) => {
+                ApiError::bad_request(e)
+            }
+            PushIngestDataError::Planning(PushIngestPlanningError::UnsupportedMediaType(_))
+            | PushIngestDataError::Execution(PushIngestError::UnsupportedMediaType(_)) => {
                 ApiError::new_unsupported_media_type()
             }
-            PushIngestPlanningError::CommitError(e) => e.int_err().api_err(),
-            PushIngestPlanningError::Internal(e) => e.api_err(),
+            PushIngestDataError::Execution(PushIngestError::ReadError(e)) => {
+                ApiError::bad_request(e)
+            }
+            e => e.int_err().api_err(),
         })?;
 
-    // TODO: push ingest use case
-    let push_ingest_executor = catalog.get_one::<dyn PushIngestExecutor>().unwrap();
-    match push_ingest_executor
-        .ingest_from_stream(target.clone(), ingest_plan, arguments.data_stream, None)
-        .await
-    {
-        // Per note above, we're not including any extra information about the result
-        // of the ingest operation at this point to accommodate async execution
-        Ok(ingest_result) => {
-            if let PushIngestResult::Updated {
-                old_head, new_head, ..
-            } = ingest_result
-            {
-                target
-                    .as_metadata_chain()
-                    .set_ref(
-                        &odf::BlockRef::Head,
-                        &new_head,
-                        odf::dataset::SetRefOpts {
-                            validate_block_present: true,
-                            check_ref_is: Some(Some(&old_head)),
-                        },
-                    )
-                    .await
-                    .int_err()?;
-
-                let outbox = catalog.get_one::<dyn Outbox>().unwrap();
-                outbox
-                    .post_message(
-                        MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
-                        DatasetExternallyChangedMessage::ingest_http(
-                            target.get_id(),
-                            Some(&old_head),
-                            &new_head,
-                        ),
-                    )
-                    .await
-                    .int_err()?;
-            }
-
-            Ok(())
-        }
-        Err(PushIngestError::ReadError(e)) => Err(ApiError::bad_request(e)),
-        Err(PushIngestError::UnsupportedMediaType(_)) => {
-            Err(ApiError::new_unsupported_media_type())
-        }
-        Err(e) => Err(e.api_err()),
-    }
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

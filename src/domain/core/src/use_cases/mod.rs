@@ -11,6 +11,7 @@ mod compact_dataset_use_case;
 
 mod pull_dataset_use_case;
 mod push_dataset_use_case;
+mod push_ingest_data_use_case;
 mod reset_dataset_use_case;
 mod set_watermark_use_case;
 mod verify_dataset_use_case;
@@ -18,6 +19,7 @@ mod verify_dataset_use_case;
 pub use compact_dataset_use_case::*;
 pub use pull_dataset_use_case::*;
 pub use push_dataset_use_case::*;
+pub use push_ingest_data_use_case::*;
 pub use reset_dataset_use_case::*;
 pub use set_watermark_use_case::*;
 pub use verify_dataset_use_case::*;

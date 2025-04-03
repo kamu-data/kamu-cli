@@ -608,6 +608,7 @@ impl DataIngestHarness {
             .add::<PushIngestPlannerImpl>()
             .add::<EngineProvisionerNull>()
             .add::<UploadServiceLocal>()
+            .add::<PushIngestDataUseCaseImpl>()
             .add_value(FileUploadLimitConfig::new_in_bytes(1000))
             .build();
 

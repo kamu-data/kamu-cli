@@ -27,9 +27,8 @@ pub struct IngestCommand {
     output_config: Arc<OutputConfig>,
     data_format_reg: Arc<dyn DataFormatRegistry>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    push_ingest_planner: Arc<dyn PushIngestPlanner>,
-    push_ingest_executor: Arc<dyn PushIngestExecutor>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -65,7 +64,7 @@ impl IngestCommand {
     async fn ensure_valid_push_target(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), CLIError> {
+    ) -> Result<ResolvedDataset, CLIError> {
         let aliases = self
             .remote_alias_reg
             .get_remote_aliases(dataset_handle)
@@ -93,7 +92,7 @@ impl IngestCommand {
                 "Ingesting data available for root datasets only",
             ));
         }
-        Ok(())
+        Ok(resolved_dataset)
     }
 
     fn get_media_type(&self) -> Result<Option<MediaType>, CLIError> {
@@ -137,7 +136,7 @@ impl Command for IngestCommand {
             .await
             .map_err(CLIError::failure)?;
 
-        self.ensure_valid_push_target(&dataset_handle).await?;
+        let target_dataset = self.ensure_valid_push_target(&dataset_handle).await?;
 
         let urls = if self.stdin {
             vec![url::Url::parse("file:///dev/fd/0").unwrap()]
@@ -171,49 +170,21 @@ impl Command for IngestCommand {
 
         let mut updated = 0;
         for url in urls {
-            let target = self
-                .dataset_registry
-                .get_dataset_by_handle(&dataset_handle)
-                .await;
-
-            let plan = self
-                .push_ingest_planner
-                .plan_ingest(
-                    target.clone(),
-                    self.source_name.as_deref(),
-                    PushIngestOpts {
-                        media_type: self.get_media_type()?,
+            let ingest_result = self
+                .push_ingest_data_use_case
+                .execute(
+                    &target_dataset,
+                    DataSource::Url(url),
+                    PushIngestDataUseCaseOptions {
+                        source_name: self.source_name.clone(),
                         source_event_time,
-                        auto_create_push_source: false,
-                        schema_inference: SchemaInferenceOpts::default(),
+                        is_ingest_from_upload: false,
+                        media_type: self.get_media_type()?,
                     },
+                    listener.clone(),
                 )
                 .await
                 .map_err(CLIError::failure)?;
-
-            let ingest_result = self
-                .push_ingest_executor
-                .ingest_from_url(target.clone(), plan, url, listener.clone())
-                .await
-                .map_err(CLIError::failure)?;
-
-            if let PushIngestResult::Updated {
-                old_head, new_head, ..
-            } = &ingest_result
-            {
-                target
-                    .as_metadata_chain()
-                    .set_ref(
-                        &odf::BlockRef::Head,
-                        new_head,
-                        odf::dataset::SetRefOpts {
-                            validate_block_present: true,
-                            check_ref_is: Some(Some(old_head)),
-                        },
-                    )
-                    .await
-                    .unwrap();
-            }
 
             match ingest_result {
                 PushIngestResult::UpToDate { .. } => (),
