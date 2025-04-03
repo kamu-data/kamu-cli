@@ -46,7 +46,7 @@ pub trait MetadataChain: Send + Sync {
         &self,
         block: &MetadataBlock,
         tail_sequence_number: u64,
-        hint_flags: MetadataEventTypeFlags,
+        hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError>;
 
     /// Appends the block to the chain
@@ -277,13 +277,16 @@ pub trait MetadataChainExt: MetadataChain {
             .iter()
             .map(|visitor| visitor.initial_decision())
             .collect();
-        // println!("Start of acceptance session, initial_decisions: {decisions:?}");
 
-        // Summarize their initial satisfaction state
-        let mut satisfaction = determine_decisions_satisfaction(&decisions);
+        // Merge initial decisions
+        let mut merged_decision = merge_decisions(&decisions);
 
-        // Read the starting block unconditionally
-        let mut current_hashed_block = if let Some(head_hash) = head_hash {
+        // Determine starting block
+        let mut current_hashed_block = if merged_decision == MetadataVisitorDecision::Stop {
+            // All visitors are already satisfied, no need to load any blocks
+            None
+        } else if let Some(head_hash) = head_hash {
+            // Load head block
             let head_block = self
                 .get_block(head_hash)
                 .await
@@ -295,7 +298,10 @@ pub trait MetadataChainExt: MetadataChain {
         };
 
         // Determine the sequence number of tail block
-        let tail_sequence_number = if let Some(tail_hash) = tail_hash {
+        let tail_sequence_number = if merged_decision == MetadataVisitorDecision::Stop {
+            // No need to iterate
+            0
+        } else if let Some(tail_hash) = tail_hash {
             // Read from the tail block
             self.get_block(tail_hash)
                 .await
@@ -308,12 +314,9 @@ pub trait MetadataChainExt: MetadataChain {
 
         // Iterate over blocks until we sasisfy all visitors or reach the tail
         while let Some((hash, block)) = current_hashed_block
-            && satisfaction.has_unsatisfied_visitors()
+            && merged_decision != MetadataVisitorDecision::Stop
             && tail_hash != Some(&hash)
         {
-            // println!("Visiting block: {hash}, {block:?}. Satisfaction state:
-            // {satisfaction:?}");
-
             // Feed each visitor with the currently loaded block
             let hashed_block_ref = (&hash, &block);
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
@@ -327,13 +330,6 @@ pub trait MetadataChainExt: MetadataChain {
                             .visit(hashed_block_ref)
                             .map_err(AcceptVisitorError::Visitor)?;
                     }
-                    MetadataVisitorDecision::NextWithHash(requested_hash) => {
-                        if hash == *requested_hash {
-                            *decision = visitor
-                                .visit(hashed_block_ref)
-                                .map_err(AcceptVisitorError::Visitor)?;
-                        }
-                    }
                     MetadataVisitorDecision::NextOfType(requested_flags) => {
                         let block_flag = MetadataEventTypeFlags::from(&block.event);
 
@@ -346,27 +342,24 @@ pub trait MetadataChainExt: MetadataChain {
                 }
             }
 
-            // Measure the progress of satisfaction after this iteration
-            satisfaction = determine_decisions_satisfaction(&decisions);
-            // println!("New satisfaction state: {satisfaction:?}, decisions:
-            // {decisions:?}");
-
-            if !satisfaction.has_unsatisfied_visitors() {
+            // Measure the progress after this iteration
+            merged_decision = merge_decisions(&decisions);
+            if merged_decision == MetadataVisitorDecision::Stop {
+                // All visitors are satisfied, no need to load any more blocks
                 break;
             }
 
             // Try to jump to the previous block with satisfaction hints taken into account
             current_hashed_block = self
-                .try_get_prev_block(&block, tail_sequence_number, satisfaction.awaited_flags)
+                .try_get_prev_block(&block, tail_sequence_number, merged_decision)
                 .await
                 .map_err(IterBlocksError::from)?;
         }
 
+        // Finish all visitors
         for visitor in visitors {
             visitor.finish().map_err(AcceptVisitorError::Visitor)?;
         }
-
-        // println!("End of acceptance session");
 
         Ok(())
     }

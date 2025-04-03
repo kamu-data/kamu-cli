@@ -84,10 +84,10 @@ where
         &self,
         block: &MetadataBlock,
         tail_sequence_number: u64,
-        hint_flags: MetadataEventTypeFlags,
+        hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError> {
-        // Assert flags are not empty
-        assert!(hint_flags != MetadataEventTypeFlags::empty());
+        // Guard against stopped hint
+        assert!(hint != MetadataVisitorDecision::Stop);
 
         // Have we reached the tail? (if specified the boundary)
         if tail_sequence_number >= block.sequence_number {

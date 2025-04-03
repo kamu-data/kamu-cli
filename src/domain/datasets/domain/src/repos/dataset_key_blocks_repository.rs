@@ -37,6 +37,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         kind: MetadataEventType,
     ) -> Result<Option<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
 
+    // TODO: looks nice, but not used yet
     async fn find_blocks_of_kinds_in_range(
         &self,
         dataset_id: &DatasetID,
