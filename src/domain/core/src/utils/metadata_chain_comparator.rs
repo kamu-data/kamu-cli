@@ -444,11 +444,11 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         &self,
         block: &odf::MetadataBlock,
         tail_sequence_number: u64,
-        hint_flags: odf::metadata::MetadataEventTypeFlags,
+        hint: odf::dataset::MetadataVisitorDecision,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::GetBlockError> {
         (self.on_read)(1);
         self.chain
-            .try_get_prev_block(block, tail_sequence_number, hint_flags)
+            .try_get_prev_block(block, tail_sequence_number, hint)
             .await
     }
 

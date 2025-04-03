@@ -9,22 +9,19 @@
 
 use std::marker::PhantomData;
 
-use odf_metadata::{MetadataEventTypeFlags, Multihash};
+use odf_metadata::MetadataEventTypeFlags;
 
 use crate::{HashedMetadataBlockRef, Infallible};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetadataVisitorDecision {
     /// Stop Marker. A visitor who has reported the end of work will not be
     /// invited to visit again
     Stop,
     /// A request for the previous block
     Next,
-    /// A request for a specific previous block, specifying its hash.
-    /// Reserved for long jumps through the metadata chain
-    NextWithHash(Multihash),
     /// A request for previous blocks, of specific types, using flags.
     ///
     /// # Examples
@@ -218,52 +215,33 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct DecisionsSatisfaction {
-    pub awaited_flags: MetadataEventTypeFlags,
-    pub num_satisfied_visitors: usize,
-    pub num_unsatisfied_visitors: usize,
-}
-
-impl DecisionsSatisfaction {
-    pub fn has_unsatisfied_visitors(&self) -> bool {
-        self.num_unsatisfied_visitors > 0
-    }
-}
-
-pub fn determine_decisions_satisfaction(
-    decisions: &[MetadataVisitorDecision],
-) -> DecisionsSatisfaction {
-    let mut awaited_flags = MetadataEventTypeFlags::empty();
-    let mut num_satisfied_visitors = 0;
-    let mut num_unsatisfied_visitors = 0;
-
+pub fn merge_decisions(decisions: &[MetadataVisitorDecision]) -> MetadataVisitorDecision {
+    let mut merged_flags = MetadataEventTypeFlags::empty();
     for decision in decisions {
-        match decision {
-            MetadataVisitorDecision::Stop => {
-                num_satisfied_visitors += 1;
-            }
+        match *decision {
+            // Single Next is enough to dominate
+            MetadataVisitorDecision::Next => return MetadataVisitorDecision::Next,
+
+            // Stop can be ignored
+            MetadataVisitorDecision::Stop => { /* continue */ } // Next
+
+            // NextOfType should be unioned
             MetadataVisitorDecision::NextOfType(flags) => {
-                if flags.is_empty() {
-                    // No flags requested, so we are satisfied
-                    num_satisfied_visitors += 1;
-                } else {
-                    // We have a request for specific flags
-                    awaited_flags |= *flags;
-                    num_unsatisfied_visitors += 1;
-                }
+                merged_flags |= flags;
             }
-            MetadataVisitorDecision::Next | MetadataVisitorDecision::NextWithHash(_) => {
-                awaited_flags = MetadataEventTypeFlags::all();
-                num_unsatisfied_visitors += 1;
-            }
+        }
+        if *decision == MetadataVisitorDecision::Next {
+            // If any visitor requested the next block, this cannot be beaten
+            return MetadataVisitorDecision::Next;
         }
     }
 
-    DecisionsSatisfaction {
-        awaited_flags,
-        num_satisfied_visitors,
-        num_unsatisfied_visitors,
+    if merged_flags.is_empty() {
+        // No flags requested, so we are satisfied
+        MetadataVisitorDecision::Stop
+    } else {
+        // We have a request for specific set of flags
+        MetadataVisitorDecision::NextOfType(merged_flags)
     }
 }
 
