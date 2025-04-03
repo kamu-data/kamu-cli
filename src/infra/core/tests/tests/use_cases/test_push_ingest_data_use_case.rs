@@ -23,7 +23,7 @@ async fn test_push_ingest_data_source_not_found() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -59,7 +59,7 @@ async fn test_push_ingest_data_from_json() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -95,7 +95,7 @@ async fn test_push_ingest_data_from_file() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -159,6 +159,7 @@ impl PushIngestDataUseCaseHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DummyOutboxImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>();
 
         register_message_dispatcher::<kamu_datasets::DatasetExternallyChangedMessage>(
