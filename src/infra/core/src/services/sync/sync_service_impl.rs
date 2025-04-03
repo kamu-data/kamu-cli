@@ -132,13 +132,7 @@ impl SyncServiceImpl {
         };
 
         let maybe_dst_dataset = match &dst {
-            SyncRef::Local(resolved_dataset) => Some((**resolved_dataset).clone()),
-            SyncRef::LocalNew(_) => None,
-            SyncRef::Remote(src_remote) => Some(src_remote.dataset.clone()),
-        };
-
-        let maybe_dst_dataset_handle = match &dst {
-            SyncRef::Local(resolved_dataset) => Some(resolved_dataset.get_handle()),
+            SyncRef::Local(resolved_dataset) => Some(resolved_dataset),
             SyncRef::LocalNew(_) | SyncRef::Remote(_) => None,
         };
 
@@ -147,7 +141,6 @@ impl SyncServiceImpl {
                 &http_src_url,
                 maybe_dst_dataset,
                 maybe_dst_alias,
-                maybe_dst_dataset_handle,
                 listener,
                 SmartTransferOptions {
                     force_update_if_diverged: opts.force,
