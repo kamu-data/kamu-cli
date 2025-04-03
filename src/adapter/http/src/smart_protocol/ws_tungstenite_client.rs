@@ -24,6 +24,7 @@ use kamu_datasets::{
     NameCollisionError,
     SetRefCheckRefMode,
 };
+use odf::dataset::MetadataChainExt;
 use odf::metadata::AsTypedBlock as _;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -107,6 +108,9 @@ impl WsSmartTransferProtocolClient {
                     ClientInternalError::new(e.error_message.as_str(), e.phase),
                 ))))
             }
+            Err(DatasetPullRequestError::SeedBlockRewriteRestricted(_)) => Err(
+                PullClientError::ValidationError(PushValidationError::SeedBlockRewriteRestricted),
+            ),
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
                 tail,
@@ -290,10 +294,17 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Reading push metadata response");
 
-        let dataset_metadata_push_response = read_payload::<DatasetPushMetadataAccepted>(socket)
+        let dataset_metadata_push_response = read_payload::<DatasetPushMetadataResponse>(socket)
             .await
             .map_err(|e| {
                 PushClientError::ReadFailed(PushReadError::new(e, PushPhase::MetadataRequest))
+            })?
+            .map_err(|e| match e {
+                DatasetPushMetadataError::SeedBlockRewriteRestricted(_) => {
+                    PushClientError::ValidationError(
+                        PushValidationError::SeedBlockRewriteRestricted,
+                    )
+                }
             })?;
 
         Ok(dataset_metadata_push_response)
@@ -616,6 +627,18 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
             // Create destination dataset if not exists
             let dst = if let Some(dst) = dst {
+                // Check is incoming seed is different from existing
+                if transfer_options.force_update_if_diverged
+                    && let Some((incoming_first_block_hash, _)) = new_blocks.get(0)
+                    && let Ok(seed_block) = dst
+                        .as_metadata_chain()
+                        .accept_one(odf::dataset::SearchSeedVisitor::new())
+                        .await
+                    && let Some((existing_seed_hash, _)) = seed_block.into_hashed_block()
+                    && incoming_first_block_hash != &existing_seed_hash
+                {
+                    InternalError::bail("Rewriting seed block is restricted")?;
+                };
                 dst
             } else {
                 let (first_hash, first_block) = new_blocks.pop_front().unwrap();

@@ -52,8 +52,18 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
 pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload,
-) -> Result<(), WriteMessageError> {
-    let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
+) -> () {
+    let payload_as_json_string = match ws_common::payload_to_json::<TMessagePayload>(payload) {
+        Ok(payload) => payload,
+        Err(err) => {
+            tracing::error!(
+              error = ?err,
+              error_msg = %err,
+              "Failed to parse error message",
+            );
+            return ();
+        }
+    };
     let close_frame = CloseFrame {
         // Code will be mapped CloseCode::Error type on client side
         code: 1011,
@@ -62,10 +72,15 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
 
     let message = axum::extract::ws::Message::Close(Some(close_frame));
     let send_result = socket.send(message).await;
-    match send_result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
+    if let Err(err) = send_result {
+        tracing::error!(
+          error = ?err,
+          error_msg = %err,
+          "Failed to send error to client with error",
+        );
     }
+
+    ()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

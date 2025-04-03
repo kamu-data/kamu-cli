@@ -27,6 +27,7 @@ use kamu_datasets::{
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use odf::dataset::MetadataChainExt;
 use odf::Multihash;
 use tracing::Instrument;
 use url::Url;
@@ -84,15 +85,8 @@ impl AxumServerPushProtocolInstance {
                     phase: int_err.phase.clone(),
                     error_message: "Internal error".to_string(),
                 }));
-                if let Err(write_err) =
-                    axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload).await
-                {
-                    tracing::error!(
-                      error = ?write_err,
-                      error_msg = %write_err,
-                      "Failed to send error to client with error",
-                    );
-                };
+                axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload).await;
+
                 tracing::error!(
                   error = ?e,
                   error_msg = %e,
@@ -105,17 +99,26 @@ impl AxumServerPushProtocolInstance {
                         phase: TransferPhase::Push(PushPhase::InitialRequest),
                         error_message: "Incompatible version.".to_string(),
                     }));
-                    if let Err(write_err) =
-                        axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload)
-                            .await
-                    {
-                        tracing::error!(
-                          error = ?write_err,
-                          error_msg = %write_err,
-                          "Failed to send error to client with error",
-                        );
-                    };
+                    axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload)
+                        .await;
                 }
+            }
+            Err(PushServerError::ValidationError(
+                PushValidationError::SeedBlockRewriteRestricted,
+            )) => {
+                let payload = DatasetPushMetadataResponse::Err(
+                    DatasetPushMetadataError::SeedBlockRewriteRestricted(
+                        DatasetPushMetadataSeedBlockRewriteRestrictedError {},
+                    ),
+                );
+                axum_write_close_payload::<DatasetPushMetadataResponse>(&mut self.socket, payload)
+                    .await;
+
+                tracing::error!(
+                  error = ?PushValidationError::SeedBlockRewriteRestricted,
+                  error_msg = %PushValidationError::SeedBlockRewriteRestricted,
+                  "Push process aborted with error",
+                );
             }
             Err(PushServerError::RefCollision(err)) => {
                 let payload = DatasetPushObjectsTransferResponse::Err(
@@ -125,18 +128,12 @@ impl AxumServerPushProtocolInstance {
                         },
                     ),
                 );
-                if let Err(write_err) = axum_write_payload::<DatasetPushObjectsTransferResponse>(
+                axum_write_close_payload::<DatasetPushObjectsTransferResponse>(
                     &mut self.socket,
                     payload,
                 )
-                .await
-                {
-                    tracing::error!(
-                      error = ?write_err,
-                      error_msg = %write_err,
-                      "Failed to send error to client with error",
-                    );
-                };
+                .await;
+
                 tracing::error!(
                   error = ?err,
                   error_msg = %err,
@@ -151,18 +148,12 @@ impl AxumServerPushProtocolInstance {
                         },
                     ),
                 );
-                if let Err(write_err) = axum_write_payload::<DatasetPushObjectsTransferResponse>(
+                axum_write_close_payload::<DatasetPushObjectsTransferResponse>(
                     &mut self.socket,
                     payload,
                 )
-                .await
-                {
-                    tracing::error!(
-                      error = ?write_err,
-                      error_msg = %write_err,
-                      "Failed to send error to client with error",
-                    );
-                };
+                .await;
+
                 tracing::error!(
                   error = ?err,
                   error_msg = %err,
@@ -373,9 +364,47 @@ impl AxumServerPushProtocolInstance {
         let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks)
             .protocol_int_err(PushPhase::InitialRequest)?;
 
-        axum_write_payload::<DatasetPushMetadataAccepted>(
+        let first_incoming_block_maybe = new_blocks.get(0);
+
+        if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref()
+            && let Some((first_incoming_block_hash, _)) = first_incoming_block_maybe
+            && push_request.force_update_if_diverged
+        {
+            let is_seeds_matching = DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                    let resolved_dataset =
+                        dataset_registry.get_dataset_by_handle(dataset_handle).await;
+                    if let Some((existing_seed_hash, _)) = resolved_dataset
+                        .as_metadata_chain()
+                        .accept_one(odf::dataset::SearchSeedVisitor::new())
+                        .await
+                        .int_err()?
+                        .into_hashed_block()
+                        && first_incoming_block_hash != &existing_seed_hash
+                    {
+                        return Ok(first_incoming_block_hash == &existing_seed_hash);
+                    };
+
+                    // Case when incoming seed block is_some and existing seed is_none
+                    // we allow such push
+                    Ok::<bool, InternalError>(true)
+                })
+                .instrument(tracing::debug_span!(
+                    "AxumServerPushProtocolInstance::try_handle_push_metadata_request",
+                ))
+                .await
+                .protocol_int_err(PushPhase::MetadataRequest)?;
+
+            if !is_seeds_matching {
+                return Err(PushServerError::ValidationError(
+                    PushValidationError::SeedBlockRewriteRestricted,
+                ));
+            }
+        }
+
+        axum_write_payload::<DatasetPushMetadataResponse>(
             &mut self.socket,
-            DatasetPushMetadataAccepted {},
+            DatasetPushMetadataResponse::Ok(DatasetPushMetadataAccepted {}),
         )
         .await
         .map_err(|e| {
