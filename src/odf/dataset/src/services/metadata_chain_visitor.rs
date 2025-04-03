@@ -244,8 +244,14 @@ pub fn determine_decisions_satisfaction(
                 num_satisfied_visitors += 1;
             }
             MetadataVisitorDecision::NextOfType(flags) => {
-                awaited_flags |= *flags;
-                num_unsatisfied_visitors += 1;
+                if flags.is_empty() {
+                    // No flags requested, so we are satisfied
+                    num_satisfied_visitors += 1;
+                } else {
+                    // We have a request for specific flags
+                    awaited_flags |= *flags;
+                    num_unsatisfied_visitors += 1;
+                }
             }
             MetadataVisitorDecision::Next | MetadataVisitorDecision::NextWithHash(_) => {
                 awaited_flags = MetadataEventTypeFlags::all();

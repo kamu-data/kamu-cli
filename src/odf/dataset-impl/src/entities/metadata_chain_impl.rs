@@ -84,8 +84,11 @@ where
         &self,
         block: &MetadataBlock,
         tail_sequence_number: u64,
-        _hint_flags: MetadataEventTypeFlags,
+        hint_flags: MetadataEventTypeFlags,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError> {
+        // Assert flags are not empty
+        assert!(hint_flags != MetadataEventTypeFlags::empty());
+
         // Have we reached the tail? (if specified the boundary)
         if tail_sequence_number >= block.sequence_number {
             // We are at the tail, no need to go further
