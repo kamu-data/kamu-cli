@@ -47,14 +47,6 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         block_ref: &BlockRef,
     ) -> Result<Option<u64>, DatasetKeyBlockQueryError>;
 
-    // TODO: consider removal, batch version solves it
-    async fn save_block(
-        &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
-        block: &DatasetKeyBlock,
-    ) -> Result<(), DatasetKeyBlockSaveError>;
-
     async fn save_blocks_batch(
         &self,
         dataset_id: &DatasetID,
@@ -92,8 +84,8 @@ pub enum DatasetKeyBlockQueryError {
 
 #[derive(Debug, Error)]
 pub enum DatasetKeyBlockSaveError {
-    #[error("A block already exists at sequence number {0}")]
-    DuplicateSequenceNumber(u64),
+    #[error("A block already exists at one of the sequence numbers {0:?}")]
+    DuplicateSequenceNumber(Vec<u64>),
 
     #[error(transparent)]
     UnmatchedDatasetEntry(DatasetUnmatchedEntryError),

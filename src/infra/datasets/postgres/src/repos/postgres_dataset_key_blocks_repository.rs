@@ -163,59 +163,6 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         Ok(result.flatten().map(|n| u64::try_from(n).unwrap()))
     }
 
-    async fn save_block(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        block: &DatasetKeyBlock,
-    ) -> Result<(), DatasetKeyBlockSaveError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        sqlx::query!(
-            r#"
-            INSERT INTO dataset_key_blocks(
-                dataset_id,
-                block_ref_name,
-                event_type,
-                sequence_number,
-                block_hash,
-                block_payload
-            )
-                VALUES ($1, $2, ($3::text)::metadata_event_type, $4, $5, $6)
-            "#,
-            dataset_id.to_string(),
-            block_ref.as_str(),
-            block.event_kind.to_string(),
-            i64::try_from(block.sequence_number).unwrap(),
-            block.block_hash.to_string(),
-            block.block_payload.as_ref(),
-        )
-        .execute(conn)
-        .await
-        .map_err(|err| match err {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
-                tracing::warn!(
-                    "Unique constraint violation while inserting key block: {}",
-                    e.message()
-                );
-                DatasetKeyBlockSaveError::DuplicateSequenceNumber(block.sequence_number)
-            }
-            sqlx::Error::Database(e) if e.is_foreign_key_violation() => {
-                tracing::warn!(
-                    "Foreign key constraint failed while inserting key block: {}",
-                    e.message()
-                );
-                DatasetKeyBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
-                    dataset_id: dataset_id.clone(),
-                })
-            }
-            other => other.int_err().into(),
-        })?;
-
-        Ok(())
-    }
-
     async fn save_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
@@ -259,7 +206,10 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                     "Unique constraint violation while batch inserting key blocks: {}",
                     e.message()
                 );
-                DatasetKeyBlockSaveError::DuplicateSequenceNumber(u64::MAX) // We can't know which block caused it in batch insert
+                DatasetKeyBlockSaveError::DuplicateSequenceNumber(
+                    // We can't know which block caused it in batch insert
+                    blocks.iter().map(|b| b.sequence_number).collect(),
+                )
             }
             sqlx::Error::Database(e) if e.is_foreign_key_violation() => {
                 tracing::warn!(

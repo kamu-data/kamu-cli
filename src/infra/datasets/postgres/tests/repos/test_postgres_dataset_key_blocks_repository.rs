@@ -27,7 +27,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = dataset_key_blocks_repo::test_save_block_and_duplicate,
+    fixture = dataset_key_blocks_repo::test_save_blocks_batch,
     harness = PostgresDatasetKeyBlockRepositoryHarness
 );
 
@@ -35,7 +35,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = dataset_key_blocks_repo::test_save_blocks_batch,
+    fixture = dataset_key_blocks_repo::test_save_blocks_batch_duplicate_sequence_number,
     harness = PostgresDatasetKeyBlockRepositoryHarness
 );
 
@@ -51,7 +51,15 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = dataset_key_blocks_repo::test_find_blocks_of_kinds_in_range,
+    fixture = dataset_key_blocks_repo::test_find_blocks_of_single_kind_in_range,
+    harness = PostgresDatasetKeyBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = dataset_key_blocks_repo::test_find_blocks_of_multiple_kinds_in_range,
     harness = PostgresDatasetKeyBlockRepositoryHarness
 );
 

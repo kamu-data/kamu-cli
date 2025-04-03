@@ -195,66 +195,6 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(result.flatten())
     }
 
-    async fn save_block(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        block: &DatasetKeyBlock,
-    ) -> Result<(), DatasetKeyBlockSaveError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        let dataset_id_str = dataset_id.to_string();
-        let block_ref_str = block_ref.as_str();
-        let event_type_str = block.event_kind.to_string();
-        let block_hash_str = block.block_hash.to_string();
-        let block_sequence_number = i64::try_from(block.sequence_number).unwrap();
-        let block_payload_bytes = block.block_payload.as_ref();
-
-        sqlx::query!(
-            r#"
-            INSERT INTO dataset_key_blocks(
-                dataset_id,
-                block_ref_name,
-                event_type,
-                sequence_number,
-                block_hash,
-                block_payload
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            "#,
-            dataset_id_str,
-            block_ref_str,
-            event_type_str,
-            block_sequence_number,
-            block_hash_str,
-            block_payload_bytes,
-        )
-        .execute(conn)
-        .await
-        .map_err(|err| match err {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
-                tracing::warn!(
-                    "Unique constraint violation while inserting key block: {}",
-                    e.message()
-                );
-                DatasetKeyBlockSaveError::DuplicateSequenceNumber(block.sequence_number)
-            }
-            sqlx::Error::Database(e) if e.is_foreign_key_violation() => {
-                tracing::warn!(
-                    "Foreign key constraint failed while inserting key block: {}",
-                    e.message()
-                );
-                DatasetKeyBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
-                    dataset_id: dataset_id.clone(),
-                })
-            }
-            other => other.int_err().into(),
-        })?;
-
-        Ok(())
-    }
-
     async fn save_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
@@ -294,7 +234,10 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
                     "Unique constraint violation while batch inserting key blocks: {}",
                     e.message()
                 );
-                DatasetKeyBlockSaveError::DuplicateSequenceNumber(u64::MAX) // We can't know which block caused it in batch insert
+                DatasetKeyBlockSaveError::DuplicateSequenceNumber(
+                    // We can't know which block caused it in batch insert
+                    blocks.iter().map(|b| b.sequence_number).collect(),
+                )
             }
             sqlx::Error::Database(e) if e.is_foreign_key_violation() => {
                 tracing::warn!(
