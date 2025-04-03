@@ -172,6 +172,9 @@ where
         tail_sequence_number: u64,
         hint_flags: odf::metadata::MetadataEventTypeFlags,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::storage::GetBlockError> {
+        // Assert flags are not empty
+        assert!(hint_flags != odf::metadata::MetadataEventTypeFlags::empty());
+
         // Have we reached the tail? (if specified the boundary)
         if tail_sequence_number >= block.sequence_number {
             // We are at the tail, no need to go further

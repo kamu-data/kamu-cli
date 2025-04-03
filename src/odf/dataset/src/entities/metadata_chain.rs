@@ -272,13 +272,12 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + Send,
     {
-        // println!("Start of acceptance session");
-
         // Collect initial decisions of visitors
         let mut decisions: Vec<_> = visitors
             .iter()
             .map(|visitor| visitor.initial_decision())
             .collect();
+        // println!("Start of acceptance session, initial_decisions: {decisions:?}");
 
         // Summarize their initial satisfaction state
         let mut satisfaction = determine_decisions_satisfaction(&decisions);
@@ -349,7 +348,8 @@ pub trait MetadataChainExt: MetadataChain {
 
             // Measure the progress of satisfaction after this iteration
             satisfaction = determine_decisions_satisfaction(&decisions);
-            // println!("New satisfaction state: {satisfaction:?}");
+            // println!("New satisfaction state: {satisfaction:?}, decisions:
+            // {decisions:?}");
 
             if !satisfaction.has_unsatisfied_visitors() {
                 break;
