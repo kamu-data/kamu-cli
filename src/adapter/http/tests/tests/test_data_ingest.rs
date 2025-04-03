@@ -603,6 +603,7 @@ impl DataIngestHarness {
     async fn new() -> Self {
         let catalog = dill::CatalogBuilder::new()
             .add::<DataFormatRegistryImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<EngineProvisionerNull>()

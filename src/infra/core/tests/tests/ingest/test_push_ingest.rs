@@ -820,6 +820,7 @@ impl IngestTestHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .build();

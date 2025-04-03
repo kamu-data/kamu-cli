@@ -1151,8 +1151,10 @@ impl CompactTestHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
@@ -1211,6 +1213,7 @@ impl CompactTestHarness {
             .add_value(ObjectStoreBuilderS3::new(s3_context.clone(), true))
             .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
             .add::<VerificationServiceImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
@@ -1219,12 +1222,11 @@ impl CompactTestHarness {
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()
             .add_value(CurrentAccountSubject::new_test())
             .build();
-
-        let ctx = new_session_context(catalog.get_one().unwrap());
 
         let transform_helper = TransformTestHelper::from_catalog(&catalog);
 
@@ -1239,7 +1241,7 @@ impl CompactTestHarness {
             transform_helper,
             verification_svc: catalog.get_one().unwrap(),
             current_date_time,
-            ctx,
+            ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
 

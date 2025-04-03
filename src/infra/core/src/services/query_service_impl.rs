@@ -19,58 +19,46 @@ use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
-use dill::*;
+use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::auth::DatasetActionAuthorizer;
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt as _};
 use kamu_core::{auth, *};
 use odf::utils::data::DataFrameExt;
 
 use crate::services::query::*;
 use crate::utils::docker_images;
+use crate::EngineConfigDatafusionEmbeddedBatchQuery;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn QueryService)]
 pub struct QueryServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    datafusion_engine_config: Arc<EngineConfigDatafusionEmbeddedBatchQuery>,
 }
 
-#[component(pub)]
-#[interface(dyn QueryService)]
 impl QueryServiceImpl {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        object_store_registry: Arc<dyn ObjectStoreRegistry>,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            object_store_registry,
-            dataset_action_authorizer,
-            rebac_dataset_registry_facade,
-        }
-    }
-
     async fn session_context(
         &self,
         options: QueryOptions,
     ) -> Result<SessionContext, InternalError> {
-        let mut cfg = SessionConfig::new()
-            .with_information_schema(true)
-            .with_default_catalog_and_schema("kamu", "kamu");
+        assert!(
+            options.input_datasets.is_some(),
+            "QueryService should resolve all inputs"
+        );
+        for opts in options.input_datasets.as_ref().unwrap().values() {
+            assert!(
+                opts.hints.handle.is_some(),
+                "QueryService should pre-resolve handles"
+            );
+        }
 
-        // Forcing case-sensitive identifiers in case-insensitive language seems to
-        // be a lesser evil than following DataFusion's default behavior of forcing
-        // identifiers to lowercase instead of case-insensitive matching.
-        //
-        // See: https://github.com/apache/datafusion/issues/7460
-        // TODO: Consider externalizing this config (e.g. by allowing custom engine
-        // options in transform DTOs)
-        cfg.options_mut().sql_parser.enable_ident_normalization = false;
+        let config = self.datafusion_engine_config.0.clone();
 
         let runtime = Arc::new(
             RuntimeEnvBuilder::new()
@@ -80,109 +68,207 @@ impl QueryServiceImpl {
                 .build()
                 .unwrap(),
         );
-        let session_context = SessionContext::new_with_config_rt(cfg, runtime);
 
-        let schema = KamuSchema::prepare(
-            &session_context,
-            self.dataset_registry.clone(),
-            self.dataset_action_authorizer.clone(),
-            options,
-        )
-        .await?;
+        #[allow(unused_mut)]
+        let mut ctx = SessionContext::new_with_config_rt(config, runtime);
 
-        session_context.register_catalog("kamu", Arc::new(KamuCatalog::new(Arc::new(schema))));
-        Ok(session_context)
+        let schema = KamuSchema::prepare(&ctx, self.dataset_registry.clone(), options).await?;
+
+        ctx.register_catalog("kamu", Arc::new(KamuCatalog::new(Arc::new(schema))));
+
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "query-extensions-json")] {
+                datafusion_functions_json::register_all(&mut ctx).unwrap();
+            }
+        }
+
+        Ok(ctx)
     }
 
     /// Unless state is already provided in the options this will attempt to
     /// parse the SQL, extract the names of all datasets mentioned in the
     /// query and affix their states in the query options to specific blocks.
+    #[expect(clippy::single_match)]
+    #[tracing::instrument(
+        level = "info",
+        name = "QueryServiceImpl::resolve_query_state",
+        skip_all
+    )]
     async fn resolve_query_state(
         &self,
         sql: &str,
         options: QueryOptions,
-    ) -> Result<QueryState, QueryError> {
-        use datafusion::sql::parser::Statement;
+    ) -> Result<(QueryState, QueryOptions), QueryError> {
+        use datafusion::sql::parser::Statement as DfStatement;
+        use datafusion::sql::sqlparser::ast::Statement as SqlStatement;
 
-        let name_resolution_enabled = options.input_datasets.is_empty();
+        let mut new_dataset_opts = BTreeMap::new();
+        let mut input_dataset_states = BTreeMap::new();
 
-        if !name_resolution_enabled {
-            let mut input_datasets = BTreeMap::new();
+        // If input datasets options are specified we check access and resolve block
+        // hash if not already provided.
+        //
+        // Otherwise, we infer the datasets from the query itself.
+        if let Some(input_dataset_opts) = options.input_datasets {
+            // Vectorized access check
+            let by_access = self
+                .dataset_action_authorizer
+                .classify_dataset_ids_by_allowance(
+                    input_dataset_opts.keys().cloned().collect(),
+                    DatasetAction::Read,
+                )
+                .await?;
 
-            for (id, opts) in options.input_datasets {
-                // SECURITY: We expect that access permissions will be validated during
-                // the query execution and that we're not leaking information here if the
-                // user doesn't have access to this dataset.
-                let resolved_dataset = self
-                    .dataset_registry
-                    .get_dataset_by_ref(&id.as_local_ref())
-                    .await?;
+            for (id, _) in by_access.unauthorized_ids_with_errors {
+                tracing::warn!(?id, "Restricting access to unauthorized dataset");
+            }
 
-                let block_hash = if let Some(block_hash) = opts.block_hash {
+            // We skip adding inaccessible datasets to state and options and let the query
+            // fail with "not found" error
+            for id in by_access.authorized_ids {
+                let mut opts = input_dataset_opts.get(&id).unwrap().clone();
+
+                let hdl = if let Some(hdl) = &opts.hints.handle {
+                    hdl.clone()
+                } else {
+                    let hdl = self
+                        .dataset_registry
+                        .resolve_dataset_handle_by_ref(&id.as_local_ref())
+                        .await?;
+                    opts.hints.handle = Some(hdl.clone());
+                    hdl
+                };
+
+                let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
+
+                let block_hash = if let Some(block_hash) = &opts.block_hash {
                     // Validate that block the user is asking for exists
-                    // SECURITY: Are we leaking information here by doing this check before auth?
                     if !resolved_dataset
                         .as_metadata_chain()
-                        .contains_block(&block_hash)
+                        .contains_block(block_hash)
                         .await
                         .int_err()?
                     {
-                        return Err(DatasetBlockNotFoundError::new(id, block_hash).into());
+                        return Err(DatasetBlockNotFoundError::new(id, block_hash.clone()).into());
                     }
 
-                    block_hash
+                    block_hash.clone()
                 } else {
-                    resolved_dataset
+                    let block_hash = resolved_dataset
                         .as_metadata_chain()
                         .resolve_ref(&odf::BlockRef::Head)
                         .await
-                        .int_err()?
+                        .int_err()?;
+
+                    opts.block_hash = Some(block_hash.clone());
+                    block_hash
                 };
 
-                input_datasets.insert(
-                    id,
+                input_dataset_states.insert(
+                    id.clone(),
                     QueryStateDataset {
-                        alias: opts.alias,
+                        alias: opts.alias.clone(),
                         block_hash,
                     },
                 );
+
+                new_dataset_opts.insert(id, opts);
             }
-            Ok(QueryState { input_datasets })
         } else {
-            // In the name resolution mode we have to inspect SQL to
-            // understand which datasets the query is using and populate the block hashes
-            // and aliases for them
+            // We will inspect SQL to understand which datasets the query is using and
+            // populate the block hashes and aliases for them
             let mut table_refs = Vec::new();
 
+            // Some queries like `show tables` will not be affixed to a specific set of
+            // datasets and for now require populating session context with all datasets
+            // accessible to the user. We will not include such datasets in the state, but
+            // will propagate them to [`KamuSchema`] via options.
+            let mut is_restricted_set = false;
+            let mut needs_schema = false;
+
+            // TODO: Replace with "remote catalog" pattern
+            // See: https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs#L78
             let statements = datafusion::sql::parser::DFParser::parse_sql(sql)
                 .map_err(|e| DataFusionError::SQL(e, None))?;
 
             for stmt in statements {
                 match stmt {
-                    Statement::Statement(stmt) => {
-                        table_refs.append(&mut extract_table_refs(&stmt)?);
-                    }
-                    Statement::CreateExternalTable(_)
-                    | Statement::CopyTo(_)
-                    | Statement::Explain(_) => {}
+                    DfStatement::Statement(stmt) => match stmt.as_ref() {
+                        SqlStatement::Query(query) => {
+                            is_restricted_set = true;
+                            needs_schema = true;
+                            extract_table_refs_rec(query, &mut table_refs)?;
+                        }
+                        _ => {}
+                    },
+                    // TODO: SEC: Restrict the subset of supported statements
+                    _ => {}
                 }
             }
 
-            // Resolve table references into datasets.
-            // We simply ignore unresolvable, letting query to fail at the execution stage.
-            let mut input_datasets = BTreeMap::new();
+            tracing::debug!(
+                is_restricted_set,
+                needs_schema,
+                ?table_refs,
+                "Extracted table references from query statements",
+            );
 
-            for mut table in table_refs {
-                // Strip possible `kamu.kamu.` prefix
-                while table.0.len() > 1 && table.0[0].value == "kamu" {
-                    table.0.remove(0);
+            if !is_restricted_set {
+                // TODO: PERF: SEC: Scanning all datasets is not just super expensive - it may
+                // not be possible at the public node scale. We need to restrict
+                // the number of datasets that can be scanned.
+                // Options:
+                // - Fail unrestricted query (e.g. `show tables`) after it touches >N datasets
+                // - Require specifying `limit` or `like` filters if number of datasets in the
+                //   node is too large
+                //
+                // TODO: Private Datasets: PERF: find a way to narrow down the number of records
+                // to filter, e.g.:
+                // - Anonymous: get all the public
+                // - Logged: all owned datasets and datasets with relations
+                let handles: Vec<odf::DatasetHandle> = self
+                    .dataset_action_authorizer
+                    .filtered_datasets_stream(
+                        self.dataset_registry.all_dataset_handles(),
+                        DatasetAction::Read,
+                    )
+                    .try_collect()
+                    .await?;
+
+                // We don't include datasets into the state, but add them to options
+                for hdl in handles {
+                    new_dataset_opts.insert(
+                        hdl.id.clone(),
+                        QueryOptionsDataset {
+                            alias: hdl.alias.to_string(),
+                            block_hash: None,
+                            hints: DatasetQueryHints {
+                                handle: Some(hdl),
+                                last_records_to_consider: None,
+                                does_not_need_schema: !needs_schema,
+                            },
+                        },
+                    );
                 }
-                if table.0.len() == 1 {
+            } else {
+                // Resolve table references into datasets.
+                // We simply ignore unresolvable, letting query to fail at the execution stage.
+                for mut table in table_refs {
+                    // Strip possible `kamu.kamu.` prefix
+                    while table.0.len() > 1 && table.0[0].value == "kamu" {
+                        table.0.remove(0);
+                    }
+
+                    if table.0.len() != 1 {
+                        continue;
+                    }
+
                     let alias = table.0.pop().unwrap().value;
                     let Ok(dataset_ref) = odf::DatasetRef::try_from(&alias) else {
                         tracing::warn!(alias, "Ignoring table with invalid alias");
                         continue;
                     };
+
                     let Ok(hdl) = self
                         .dataset_registry
                         .resolve_dataset_handle_by_ref(&dataset_ref)
@@ -192,9 +278,16 @@ impl QueryServiceImpl {
                         continue;
                     };
 
-                    // SECURITY: We expect that access permissions will be validated during
-                    // the query execution and that we're not leaking information here if the user
-                    // doesn't have access to this dataset.
+                    if !self
+                        .dataset_action_authorizer
+                        .is_action_allowed(&hdl.id, DatasetAction::Read)
+                        .await?
+                    {
+                        // Ignore this alias and let the query fail with "not found" error
+                        tracing::warn!(?dataset_ref, "Restricting access to unauthorized dataset");
+                        continue;
+                    }
+
                     let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
                     let block_hash = resolved_dataset
@@ -203,12 +296,38 @@ impl QueryServiceImpl {
                         .await
                         .int_err()?;
 
-                    input_datasets.insert(hdl.id.clone(), QueryStateDataset { alias, block_hash });
+                    input_dataset_states.insert(
+                        hdl.id.clone(),
+                        QueryStateDataset {
+                            alias: alias.clone(),
+                            block_hash: block_hash.clone(),
+                        },
+                    );
+
+                    new_dataset_opts.insert(
+                        hdl.id.clone(),
+                        QueryOptionsDataset {
+                            alias,
+                            block_hash: Some(block_hash),
+                            hints: DatasetQueryHints {
+                                handle: Some(hdl),
+                                last_records_to_consider: None,
+                                does_not_need_schema: !needs_schema,
+                            },
+                        },
+                    );
                 }
             }
-
-            Ok(QueryState { input_datasets })
         }
+
+        Ok((
+            QueryState {
+                input_datasets: input_dataset_states,
+            },
+            QueryOptions {
+                input_datasets: Some(new_dataset_opts),
+            },
+        ))
     }
 
     async fn single_dataset(
@@ -220,16 +339,18 @@ impl QueryServiceImpl {
 
         let ctx = self
             .session_context(QueryOptions {
-                input_datasets: BTreeMap::from([(
+                input_datasets: Some(BTreeMap::from([(
                     resolved_dataset.get_id().clone(),
                     QueryOptionsDataset {
                         alias: resolved_dataset.get_alias().to_string(),
                         block_hash: None,
-                        hints: Some(DatasetQueryHints {
+                        hints: DatasetQueryHints {
+                            handle: Some(resolved_dataset.get_handle().clone()),
                             last_records_to_consider,
-                        }),
+                            does_not_need_schema: false,
+                        },
                     },
-                )]),
+                )])),
             })
             .await?;
 
@@ -266,7 +387,6 @@ impl QueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn get_schema_parquet_impl(
         &self,
-        session_context: &SessionContext,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
@@ -296,7 +416,13 @@ impl QueryServiceImpl {
                         .await,
                 );
 
-                let object_store = session_context.runtime_env().object_store(&data_url)?;
+                let ctx = self
+                    .session_context(QueryOptions {
+                        input_datasets: Some(BTreeMap::new()),
+                    })
+                    .await?;
+
+                let object_store = ctx.runtime_env().object_store(&data_url)?;
 
                 tracing::debug!("QueryService::get_schema_impl: obtained object store");
 
@@ -339,7 +465,44 @@ impl QueryServiceImpl {
 impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", name = QueryServiceImpl_create_session, skip_all)]
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
-        Ok(self.session_context(QueryOptions::default()).await?)
+        // TODO: PERF: Avoid pre-registering all datasets
+        // Use DataFusion remote catalog pattern instead:
+        // https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs
+        let handles: Vec<odf::DatasetHandle> = self
+            .dataset_action_authorizer
+            .filtered_datasets_stream(
+                self.dataset_registry.all_dataset_handles(),
+                DatasetAction::Read,
+            )
+            .try_collect()
+            .await?;
+
+        // We don't include datasets into the state, but add them to options
+        let input_datasets = handles
+            .into_iter()
+            .map(|hdl| {
+                (
+                    hdl.id.clone(),
+                    QueryOptionsDataset {
+                        alias: hdl.alias.to_string(),
+                        block_hash: None,
+                        hints: DatasetQueryHints {
+                            handle: Some(hdl),
+                            last_records_to_consider: None,
+                            does_not_need_schema: false,
+                        },
+                    },
+                )
+            })
+            .collect();
+
+        let ctx = self
+            .session_context(QueryOptions {
+                input_datasets: Some(input_datasets),
+            })
+            .await?;
+
+        Ok(ctx)
     }
 
     #[tracing::instrument(
@@ -398,31 +561,10 @@ impl QueryService for QueryServiceImpl {
     ) -> Result<QueryResponse, QueryError> {
         tracing::info!(statement, ?options, "Executing SQL query");
 
-        let state = self.resolve_query_state(statement, options.clone()).await?;
+        let (state, new_options) = self.resolve_query_state(statement, options).await?;
+        tracing::info!(?state, ?new_options, "Resolved SQL query state");
 
-        tracing::info!(?state, "Resolved SQL query state");
-
-        // Map resolved state back to options (including hints) for query planner
-        let options = QueryOptions {
-            input_datasets: state
-                .input_datasets
-                .iter()
-                .map(|(id, s)| {
-                    (
-                        id.clone(),
-                        QueryOptionsDataset {
-                            alias: s.alias.clone(),
-                            block_hash: Some(s.block_hash.clone()),
-                            hints: options
-                                .input_datasets
-                                .get(id)
-                                .and_then(|opt| opt.hints.clone()),
-                        },
-                    )
-                })
-                .collect(),
-        };
-        let ctx = self.session_context(options).await?;
+        let ctx = self.session_context(new_options).await?;
         let df = ctx.sql(statement).await?;
 
         Ok(QueryResponse {
@@ -444,8 +586,7 @@ impl QueryService for QueryServiceImpl {
         &self,
         dataset_ref: &odf::DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
-        let ctx = self.session_context(QueryOptions::default()).await?;
-        self.get_schema_parquet_impl(&ctx, dataset_ref).await
+        self.get_schema_parquet_impl(dataset_ref).await
     }
 
     #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(%dataset_ref))]
@@ -524,19 +665,6 @@ async fn read_data_slice_metadata(
 
 // TODO: This is too complex - we should explore better ways to associate a
 // query with a certain state
-fn extract_table_refs(
-    stmt: &datafusion::sql::sqlparser::ast::Statement,
-) -> Result<Vec<datafusion::sql::sqlparser::ast::ObjectName>, QueryError> {
-    use datafusion::sql::sqlparser::ast::Statement;
-
-    let mut tables = Vec::new();
-    if let Statement::Query(query) = stmt {
-        extract_table_refs_rec(query, &mut tables)?;
-    }
-
-    Ok(tables)
-}
-
 fn extract_table_refs_rec(
     query: &datafusion::sql::sqlparser::ast::Query,
     tables: &mut Vec<datafusion::sql::sqlparser::ast::ObjectName>,

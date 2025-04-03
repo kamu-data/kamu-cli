@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
@@ -19,6 +20,8 @@ use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
+
+use crate::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +40,10 @@ pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
     pub engine: Option<EngineConfig>,
 
+    /// Configuration for flow system
+    #[merge(strategy = merge_recursive)]
+    pub flow_system: Option<FlowSystemConfig>,
+
     /// Data access and visualization configuration
     #[merge(strategy = merge_recursive)]
     pub frontend: Option<FrontendConfig>,
@@ -53,9 +60,9 @@ pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
     pub protocol: Option<ProtocolConfig>,
 
-    /// Configuration for flow system
+    /// Seach configuration
     #[merge(strategy = merge_recursive)]
-    pub flow_system: Option<FlowSystemConfig>,
+    pub search: Option<SearchConfig>,
 
     /// Source configuration
     #[merge(strategy = merge_recursive)]
@@ -68,10 +75,6 @@ pub struct CLIConfig {
     /// Uploads configuration
     #[merge(strategy = merge_recursive)]
     pub uploads: Option<UploadsConfig>,
-
-    /// Seach configuration
-    #[merge(strategy = merge_recursive)]
-    pub search: Option<SearchConfig>,
 }
 
 impl CLIConfig {
@@ -80,15 +83,15 @@ impl CLIConfig {
             database: None,
             dataset_env_vars: None,
             engine: None,
+            flow_system: None,
             frontend: None,
             identity: None,
             outbox: None,
             protocol: None,
+            search: None,
             source: None,
             users: None,
             uploads: None,
-            flow_system: None,
-            search: None,
         }
     }
 
@@ -101,15 +104,15 @@ impl CLIConfig {
             database: Some(DatabaseConfig::sample()),
             dataset_env_vars: Some(DatasetEnvVarsConfig::sample()),
             engine: Some(EngineConfig::sample()),
+            flow_system: Some(FlowSystemConfig::sample()),
             frontend: Some(FrontendConfig::sample()),
             identity: Some(IdentityConfig::sample()),
             outbox: Some(OutboxConfig::sample()),
             protocol: Some(ProtocolConfig::sample()),
+            search: Some(SearchConfig::sample()),
             source: Some(SourceConfig::sample()),
             users: Some(PredefinedAccountsConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
-            flow_system: Some(FlowSystemConfig::sample()),
-            search: Some(SearchConfig::sample()),
         }
     }
 }
@@ -120,15 +123,15 @@ impl Default for CLIConfig {
             database: None,
             dataset_env_vars: Some(DatasetEnvVarsConfig::default()),
             engine: Some(EngineConfig::default()),
+            flow_system: Some(FlowSystemConfig::default()),
             frontend: Some(FrontendConfig::default()),
             identity: Some(IdentityConfig::default()),
             outbox: Some(OutboxConfig::default()),
             protocol: Some(ProtocolConfig::default()),
+            search: Some(SearchConfig::default()),
             source: Some(SourceConfig::default()),
             users: Some(PredefinedAccountsConfig::default()),
             uploads: Some(UploadsConfig::default()),
-            flow_system: Some(FlowSystemConfig::default()),
-            search: Some(SearchConfig::default()),
         }
     }
 }
@@ -155,6 +158,10 @@ pub struct EngineConfig {
     /// UNSTABLE: Default engine images
     #[merge(strategy = merge_recursive)]
     pub images: Option<EngineImagesConfig>,
+
+    /// Embedded Datafusion engine configuration
+    #[merge(strategy = merge_recursive)]
+    pub datafusion_embedded: Option<EngineConfigDatafution>,
 }
 
 impl EngineConfig {
@@ -166,6 +173,7 @@ impl EngineConfig {
             start_timeout: None,
             shutdown_timeout: None,
             images: None,
+            datafusion_embedded: None,
         }
     }
 
@@ -173,6 +181,7 @@ impl EngineConfig {
         Self {
             max_concurrency: Some(0),
             images: Some(EngineImagesConfig::sample()),
+            datafusion_embedded: Some(EngineConfigDatafution::sample()),
             ..Self::default()
         }
     }
@@ -187,6 +196,7 @@ impl Default for EngineConfig {
             start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
             shutdown_timeout: Some(DurationString::from_string("5s".to_owned()).unwrap()),
             images: Some(EngineImagesConfig::default()),
+            datafusion_embedded: Some(EngineConfigDatafution::default()),
         }
     }
 }
@@ -229,6 +239,111 @@ impl Default for EngineImagesConfig {
             flink: Some(docker_images::FLINK.to_owned()),
             datafusion: Some(docker_images::DATAFUSION.to_owned()),
             risingwave: Some(docker_images::RISINGWAVE.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct EngineConfigDatafution {
+    /// Base configuration options
+    /// See: https://datafusion.apache.org/user-guide/configs.html
+    pub base: Option<BTreeMap<String, String>>,
+
+    /// Ingest-specific overrides to the base config
+    pub ingest: Option<BTreeMap<String, String>>,
+
+    /// Batch query-specific overrides to the base config
+    pub batch_query: Option<BTreeMap<String, String>>,
+
+    /// Compaction-specific overrides to the base config
+    pub compaction: Option<BTreeMap<String, String>>,
+}
+
+impl EngineConfigDatafution {
+    pub fn sample() -> Self {
+        Self {
+            base: Some(BTreeMap::from([
+                (
+                    "datafusion.execution.target_partitions".to_string(),
+                    "0".to_string(),
+                ),
+                (
+                    "datafusion.execution.parquet.metadata_size_hint".to_string(),
+                    "NULL".to_string(),
+                ),
+                (
+                    "datafusion.execution.batch_size".to_string(),
+                    "8192".to_string(),
+                ),
+            ])),
+            ingest: Some(BTreeMap::default()),
+            batch_query: Some(BTreeMap::default()),
+            compaction: Some(BTreeMap::default()),
+        }
+    }
+
+    pub fn into_system(
+        self,
+    ) -> Result<
+        (
+            kamu::EngineConfigDatafusionEmbeddedIngest,
+            kamu::EngineConfigDatafusionEmbeddedBatchQuery,
+            kamu::EngineConfigDatafusionEmbeddedCompaction,
+        ),
+        CLIError,
+    > {
+        let base = self.base.unwrap_or_default();
+
+        let from_merged_with_base = |overrides: BTreeMap<String, String>| {
+            kamu::EngineConfigDatafusionEmbeddedBase::new_session_config(
+                base.clone().into_iter().chain(overrides),
+            )
+            .map_err(CLIError::usage_error_from)
+        };
+
+        let ingest_config = from_merged_with_base(self.ingest.unwrap_or_default())?;
+        let batch_query_config = from_merged_with_base(self.batch_query.unwrap_or_default())?;
+        let compaction_config = from_merged_with_base(self.compaction.unwrap_or_default())?;
+
+        Ok((
+            kamu::EngineConfigDatafusionEmbeddedIngest(ingest_config),
+            kamu::EngineConfigDatafusionEmbeddedBatchQuery(batch_query_config),
+            kamu::EngineConfigDatafusionEmbeddedCompaction(compaction_config),
+        ))
+    }
+}
+
+impl Default for EngineConfigDatafution {
+    fn default() -> Self {
+        Self {
+            base: Some(
+                kamu::EngineConfigDatafusionEmbeddedBase::DEFAULT_SETTINGS
+                    .iter()
+                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                    .collect(),
+            ),
+            ingest: Some(
+                kamu::EngineConfigDatafusionEmbeddedIngest::DEFAULT_OVERRIDES
+                    .iter()
+                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                    .collect(),
+            ),
+            batch_query: Some(
+                kamu::EngineConfigDatafusionEmbeddedBatchQuery::DEFAULT_OVERRIDES
+                    .iter()
+                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                    .collect(),
+            ),
+            compaction: Some(
+                kamu::EngineConfigDatafusionEmbeddedCompaction::DEFAULT_OVERRIDES
+                    .iter()
+                    .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                    .collect(),
+            ),
         }
     }
 }

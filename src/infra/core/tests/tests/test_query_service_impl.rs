@@ -160,6 +160,7 @@ fn create_catalog_with_local_workspace(
         .add::<odf::dataset::DatasetDefaultLfsBuilder>()
         .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
         .add::<DatasetRegistrySoloUnitBridge>()
+        .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
@@ -190,6 +191,7 @@ async fn create_catalog_with_s3_workspace(
         .add::<odf::dataset::DatasetDefaultS3Builder>()
         .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3Builder>()
         .add::<DatasetRegistrySoloUnitBridge>()
+        .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
@@ -409,7 +411,7 @@ async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4, true),
+        MockDatasetActionAuthorizer::allowing(),
     );
     test_dataset_tail_common(catalog, &tempdir).await;
 }
@@ -418,11 +420,8 @@ async fn test_dataset_tail_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_s3() {
     let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(
-        &s3,
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4, true),
-    )
-    .await;
+    let catalog =
+        create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::allowing()).await;
     test_dataset_tail_common(catalog, &s3.tmp_dir).await;
 }
 
@@ -433,7 +432,7 @@ async fn test_dataset_tail_empty_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2, true),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
     );
     let (_, dataset_alias) = create_empty_dataset(&catalog, "foo").await;
 
@@ -525,7 +524,7 @@ async fn test_dataset_sql_authorized_s3() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
+async fn test_dataset_sql_unauthorized_infer_common(catalog: dill::Catalog, tempdir: &TempDir) {
     let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
     let dataset_alias = target.get_alias();
 
@@ -543,20 +542,55 @@ async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_dataset_sql_unauthorized_local_fs() {
+async fn test_dataset_sql_unauthorized_infer_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
         create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
-    test_dataset_sql_unauthorized_common(catalog, &tempdir).await;
+    test_dataset_sql_unauthorized_infer_common(catalog, &tempdir).await;
 }
 
 #[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_dataset_sql_unauthorized_s3() {
+async fn test_dataset_sql_unauthorized_infer_local_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog =
         create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
-    test_dataset_sql_unauthorized_common(catalog, &s3.tmp_dir).await;
+    test_dataset_sql_unauthorized_infer_common(catalog, &s3.tmp_dir).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_dataset_sql_unauthorized_specific() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
+
+    let target = create_test_dataset(&catalog, tempdir.path(), "foo").await;
+    let dataset_alias = target.get_alias();
+
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let statement = format!("SELECT COUNT(*) FROM {dataset_alias}");
+    let result = query_svc
+        .sql_statement(
+            statement.as_str(),
+            QueryOptions {
+                input_datasets: Some(BTreeMap::from([(
+                    target.get_id().clone(),
+                    QueryOptionsDataset {
+                        alias: "foo".to_string(),
+                        ..Default::default()
+                    },
+                )])),
+            },
+        )
+        .await;
+
+    assert_matches!(
+        result,
+        Err(QueryError::BadQuery(e)) if e.to_string().contains("table 'kamu.kamu.foo' not found")
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -564,16 +598,11 @@ async fn test_dataset_sql_unauthorized_s3() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_sql_statement_not_found() {
-    let mut mock_authorizer = MockDatasetActionAuthorizer::new();
-    mock_authorizer
-        .expect_check_action_allowed()
-        .returning(|_, _| Ok(()));
-    mock_authorizer
-        .expect_filter_datasets_allowing()
-        .returning(|_, _| Ok(vec![]));
-
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), mock_authorizer);
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::allowing(),
+    );
 
     let _ = create_test_dataset(&catalog, tempdir.path(), "foo").await;
 
@@ -609,13 +638,13 @@ async fn test_sql_statement_by_alias() {
         .sql_statement(
             statement,
             QueryOptions {
-                input_datasets: BTreeMap::from([(
+                input_datasets: Some(BTreeMap::from([(
                     target.get_id().clone(),
                     QueryOptionsDataset {
                         alias: "foobar".to_string(),
                         ..Default::default()
                     },
-                )]),
+                )])),
             },
         )
         .await
@@ -659,13 +688,13 @@ async fn test_sql_statement_alias_not_found() {
         .sql_statement(
             statement.as_str(),
             QueryOptions {
-                input_datasets: BTreeMap::from([(
+                input_datasets: Some(BTreeMap::from([(
                     odf::DatasetID::new_seeded_ed25519(b"does-not-exist"),
                     QueryOptionsDataset {
                         alias: dataset_alias.to_string(),
                         ..Default::default()
                     },
-                )]),
+                )])),
             },
         )
         .await;
@@ -821,21 +850,22 @@ async fn test_sql_statement_with_state_simple() {
                 "#
             ),
             QueryOptions {
-                input_datasets: res
-                    .state
-                    .input_datasets
-                    .into_iter()
-                    .map(|(id, s)| {
-                        (
-                            id,
-                            QueryOptionsDataset {
-                                alias: s.alias,
-                                block_hash: Some(s.block_hash),
-                                ..Default::default()
-                            },
-                        )
-                    })
-                    .collect(),
+                input_datasets: Some(
+                    res.state
+                        .input_datasets
+                        .into_iter()
+                        .map(|(id, s)| {
+                            (
+                                id,
+                                QueryOptionsDataset {
+                                    alias: s.alias,
+                                    block_hash: Some(s.block_hash),
+                                    ..Default::default()
+                                },
+                            )
+                        })
+                        .collect(),
+                ),
             },
         )
         .await
@@ -1162,21 +1192,22 @@ async fn test_sql_statement_with_state_cte() {
                 "#
             ),
             QueryOptions {
-                input_datasets: res
-                    .state
-                    .input_datasets
-                    .iter()
-                    .map(|(id, s)| {
-                        (
-                            id.clone(),
-                            QueryOptionsDataset {
-                                alias: s.alias.clone(),
-                                block_hash: Some(s.block_hash.clone()),
-                                ..Default::default()
-                            },
-                        )
-                    })
-                    .collect(),
+                input_datasets: Some(
+                    res.state
+                        .input_datasets
+                        .iter()
+                        .map(|(id, s)| {
+                            (
+                                id.clone(),
+                                QueryOptionsDataset {
+                                    alias: s.alias.clone(),
+                                    block_hash: Some(s.block_hash.clone()),
+                                    ..Default::default()
+                                },
+                            )
+                        })
+                        .collect(),
+                ),
             },
         )
         .await
@@ -1216,7 +1247,7 @@ async fn test_sql_statement_with_state_cte() {
             order by 1
             "#,
             QueryOptions {
-                input_datasets: BTreeMap::from([
+                input_datasets: Some(BTreeMap::from([
                     (
                         foo_id.clone(),
                         QueryOptionsDataset {
@@ -1247,7 +1278,7 @@ async fn test_sql_statement_with_state_cte() {
                             ..Default::default()
                         },
                     ),
-                ]),
+                ])),
             },
         )
         .await

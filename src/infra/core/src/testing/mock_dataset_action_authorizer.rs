@@ -70,6 +70,44 @@ impl MockDatasetActionAuthorizer {
                 ))
             });
         mock_dataset_action_authorizer
+            .expect_classify_dataset_ids_by_allowance()
+            .returning(|ids, action| {
+                Ok(ClassifyByAllowanceIdsResponse {
+                    authorized_ids: Vec::new(),
+                    unauthorized_ids_with_errors: ids
+                        .into_iter()
+                        .map(|id| {
+                            (
+                                id.clone(),
+                                DatasetActionUnauthorizedError::not_enough_permissions(
+                                    id.as_local_ref(),
+                                    action,
+                                ),
+                            )
+                        })
+                        .collect(),
+                })
+            });
+        mock_dataset_action_authorizer
+            .expect_classify_dataset_handles_by_allowance()
+            .returning(|handles, action| {
+                Ok(ClassifyByAllowanceResponse {
+                    authorized_handles: Vec::new(),
+                    unauthorized_handles_with_errors: handles
+                        .into_iter()
+                        .map(|hdl| {
+                            (
+                                hdl.clone(),
+                                DatasetActionUnauthorizedError::not_enough_permissions(
+                                    hdl.id.as_local_ref(),
+                                    action,
+                                ),
+                            )
+                        })
+                        .collect(),
+                })
+            });
+        mock_dataset_action_authorizer
     }
 
     pub fn allowing() -> Self {
@@ -77,6 +115,22 @@ impl MockDatasetActionAuthorizer {
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
             .returning(|_, _| Ok(()));
+        mock_dataset_action_authorizer
+            .expect_classify_dataset_ids_by_allowance()
+            .returning(|ids, _| {
+                Ok(ClassifyByAllowanceIdsResponse {
+                    authorized_ids: ids,
+                    unauthorized_ids_with_errors: Vec::new(),
+                })
+            });
+        mock_dataset_action_authorizer
+            .expect_classify_dataset_handles_by_allowance()
+            .returning(|handles, _| {
+                Ok(ClassifyByAllowanceResponse {
+                    authorized_handles: handles,
+                    unauthorized_handles_with_errors: Vec::new(),
+                })
+            });
         mock_dataset_action_authorizer
     }
 
@@ -226,7 +280,10 @@ impl MockDatasetActionAuthorizer {
             .times(times)
             .returning(move |dataset_ids, action| {
                 let res = dataset_ids.into_iter().fold(
-                    ClassifyByAllowanceIdsResponse::default(),
+                    ClassifyByAllowanceIdsResponse {
+                        authorized_ids: Vec::new(),
+                        unauthorized_ids_with_errors: Vec::new(),
+                    },
                     |mut acc, dataset_id| {
                         if authorized.contains(&dataset_id) {
                             acc.authorized_ids.push(dataset_id);

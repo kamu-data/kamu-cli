@@ -11,7 +11,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use auth::DatasetAction;
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::catalog::{CatalogProvider, SchemaProvider, Session};
 use datafusion::common::{Constraints, Statistics};
@@ -27,12 +26,14 @@ use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
 use futures::stream::{self, StreamExt};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::auth::DatasetActionAuthorizerExt;
 use kamu_core::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Catalog
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Replace with "remote catalog" pattern
+// See: https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs#L78
 pub(crate) struct KamuCatalog {
     schema: Arc<KamuSchema>,
 }
@@ -78,19 +79,13 @@ impl std::fmt::Debug for KamuCatalog {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Needs to be Clone only for non-async hacks below
-#[derive(Clone)]
 pub(crate) struct KamuSchema {
-    inner: Arc<KamuSchemaImpl>,
-}
-
-struct KamuSchemaImpl {
     // Note: Never include `SessionContext` or `SessionState` into this structure.
     // Be mindful that this will cause a circular reference and thus prevent context
     // from ever being released.
     session_config: Arc<SessionConfig>,
     table_options: Arc<TableOptions>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     options: QueryOptions,
     tables: Mutex<HashMap<String, Arc<KamuTable>>>,
 }
@@ -101,18 +96,14 @@ impl KamuSchema {
     pub async fn prepare(
         session_context: &SessionContext,
         dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         options: QueryOptions,
     ) -> Result<Self, InternalError> {
         let schema = Self {
-            inner: Arc::new(KamuSchemaImpl {
-                session_config: Arc::new(session_context.copied_config()),
-                table_options: Arc::new(session_context.copied_table_options()),
-                dataset_registry,
-                dataset_action_authorizer,
-                options,
-                tables: Mutex::new(HashMap::new()),
-            }),
+            session_config: Arc::new(session_context.copied_config()),
+            table_options: Arc::new(session_context.copied_table_options()),
+            dataset_registry,
+            options,
+            tables: Mutex::new(HashMap::new()),
         };
 
         schema.init_schema_cache().await?;
@@ -120,85 +111,43 @@ impl KamuSchema {
         Ok(schema)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", name = "KamuSchema::init_schema_cache" skip_all)]
     async fn init_schema_cache(&self) -> Result<(), InternalError> {
         let mut tables = HashMap::new();
 
-        let name_resolution_enabled = self.inner.options.input_datasets.is_empty();
+        let input_datasets = self
+            .options
+            .input_datasets
+            .as_ref()
+            .expect("QueryService should resolve all inputs");
 
-        if !name_resolution_enabled {
-            for (id, opts) in &self.inner.options.input_datasets {
-                if !self
-                    .inner
-                    .dataset_action_authorizer
-                    .is_action_allowed(id, DatasetAction::Read)
-                    .await?
-                {
-                    // Ignore this alias and let the query fail with "not found" error
-                    continue;
-                }
+        for (id, opts) in input_datasets {
+            let hdl = opts
+                .hints
+                .handle
+                .clone()
+                .expect("QueryService should pre-resolve handles");
 
-                let hdl = self
-                    .inner
-                    .dataset_registry
-                    .resolve_dataset_handle_by_ref(&id.as_local_ref())
-                    .await
-                    .int_err()?;
-                let resolved_dataset = self
-                    .inner
-                    .dataset_registry
-                    .get_dataset_by_handle(&hdl)
-                    .await;
+            assert_eq!(*id, hdl.id);
 
-                tables.insert(
-                    opts.alias.clone(),
-                    Arc::new(KamuTable::new(
-                        self.inner.session_config.clone(),
-                        self.inner.table_options.clone(),
-                        resolved_dataset,
-                        opts.block_hash.clone(),
-                        opts.hints.clone(),
-                    )),
-                );
-            }
-        } else {
-            // TODO: Private Datasets: PERF: find a way to narrow down the number of records
-            //       to filter, e.g.:
-            //       - Anonymous: get all the public
-            //       - Logged: all owned datasets and datasets with relations
-            // TODO: PERF: Scanning all datasets is not just super expensive - it may not be
-            // possible at the public node scale. We need to patch DataFusion to support
-            // unbounded catalogs.
-            let mut readable_dataset_handles_stream = self
-                .inner
-                .dataset_action_authorizer
-                .filtered_datasets_stream(
-                    self.inner.dataset_registry.all_dataset_handles(),
-                    DatasetAction::Read,
-                );
+            let resolved_dataset = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
-            while let Some(Ok(hdl)) = readable_dataset_handles_stream.next().await {
-                let resolved_dataset = self
-                    .inner
-                    .dataset_registry
-                    .get_dataset_by_handle(&hdl)
-                    .await;
-
-                tables.insert(
-                    hdl.alias.to_string(),
-                    Arc::new(KamuTable::new(
-                        self.inner.session_config.clone(),
-                        self.inner.table_options.clone(),
-                        resolved_dataset,
-                        None,
-                        None,
-                    )),
-                );
-            }
+            tables.insert(
+                opts.alias.clone(),
+                Arc::new(KamuTable::new(
+                    self.session_config.clone(),
+                    self.table_options.clone(),
+                    resolved_dataset,
+                    opts.block_hash.clone(),
+                    opts.hints.clone(),
+                )),
+            );
         }
 
-        let mut guard = self.inner.tables.lock().unwrap();
-        *guard = tables;
+        {
+            let mut guard = self.tables.lock().unwrap();
+            *guard = tables;
+        }
 
         Ok(())
     }
@@ -213,18 +162,18 @@ impl SchemaProvider for KamuSchema {
     }
 
     fn table_names(&self) -> Vec<String> {
-        let guard = self.inner.tables.lock().unwrap();
+        let guard = self.tables.lock().unwrap();
         guard.keys().cloned().collect()
     }
 
     fn table_exist(&self, name: &str) -> bool {
-        let guard = self.inner.tables.lock().unwrap();
+        let guard = self.tables.lock().unwrap();
         guard.contains_key(name)
     }
 
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>, DataFusionError> {
         let table = {
-            let guard = self.inner.tables.lock().unwrap();
+            let guard = self.tables.lock().unwrap();
             guard.get(name).cloned()
         };
 
@@ -260,7 +209,7 @@ pub(crate) struct KamuTable {
     table_options: Arc<TableOptions>,
     resolved_dataset: ResolvedDataset,
     as_of: Option<odf::Multihash>,
-    hints: Option<DatasetQueryHints>,
+    hints: DatasetQueryHints,
     cache: Mutex<TableCache>,
 }
 
@@ -276,7 +225,7 @@ impl KamuTable {
         table_options: Arc<TableOptions>,
         resolved_dataset: ResolvedDataset,
         as_of: Option<odf::Multihash>,
-        hints: Option<DatasetQueryHints>,
+        hints: DatasetQueryHints,
     ) -> Self {
         Self {
             session_config,
@@ -288,9 +237,19 @@ impl KamuTable {
         }
     }
 
-    #[tracing::instrument(level="info", skip_all, fields(dataset = ?self.resolved_dataset))]
+    #[tracing::instrument(
+        level = "info",
+        name = "KamuTable::init_table_schema",
+        skip_all,
+        fields(dataset = ?self.resolved_dataset),
+    )]
     async fn init_table_schema(&self) -> Result<SchemaRef, InternalError> {
         use odf::dataset::MetadataChainExt;
+
+        if self.hints.does_not_need_schema {
+            return Ok(Arc::new(Schema::empty()));
+        }
+
         let maybe_set_data_schema = self
             .resolved_dataset
             .as_metadata_chain()
@@ -325,7 +284,12 @@ impl KamuTable {
 
     // TODO: A lot of duplication from `SessionContext::read_parquet` - code is
     // copied as we need table provider and not the `DataFrame`
-    #[tracing::instrument(level="info", skip_all, fields(dataset = ?self.resolved_dataset))]
+    #[tracing::instrument(
+        level = "info",
+        name = "KamuTable::init_table_provider",
+        skip_all,
+        fields(dataset = ?self.resolved_dataset),
+    )]
     async fn init_table_provider(
         &self,
         schema: SchemaRef,
@@ -400,7 +364,7 @@ impl KamuTable {
 
         tracing::debug!(?as_of, "Collecting data slices");
 
-        let last_records_to_consider = self.hints.as_ref().and_then(|o| o.last_records_to_consider);
+        let last_records_to_consider = self.hints.last_records_to_consider;
 
         type Flag = odf::metadata::MetadataEventTypeFlags;
         type Decision = odf::dataset::MetadataVisitorDecision;

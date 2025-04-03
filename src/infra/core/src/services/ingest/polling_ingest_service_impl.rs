@@ -23,14 +23,18 @@ use random_names::get_random_name;
 use time_source::SystemTimeSource;
 
 use super::*;
+use crate::EngineConfigDatafusionEmbeddedIngest;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn PollingIngestService)]
 pub struct PollingIngestServiceImpl {
     fetch_service: Arc<FetchService>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     data_format_registry: Arc<dyn DataFormatRegistry>,
+    engine_config: Arc<EngineConfigDatafusionEmbeddedIngest>,
     run_info_dir: Arc<RunInfoDir>,
     cache_dir: Arc<CacheDir>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -38,29 +42,7 @@ pub struct PollingIngestServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
-#[dill::interface(dyn PollingIngestService)]
 impl PollingIngestServiceImpl {
-    pub fn new(
-        fetch_service: Arc<FetchService>,
-        engine_provisioner: Arc<dyn EngineProvisioner>,
-        object_store_registry: Arc<dyn ObjectStoreRegistry>,
-        data_format_registry: Arc<dyn DataFormatRegistry>,
-        run_info_dir: Arc<RunInfoDir>,
-        cache_dir: Arc<CacheDir>,
-        time_source: Arc<dyn SystemTimeSource>,
-    ) -> Self {
-        Self {
-            fetch_service,
-            engine_provisioner,
-            object_store_registry,
-            data_format_registry,
-            run_info_dir,
-            cache_dir,
-            time_source,
-        }
-    }
-
     async fn ingest_loop(
         &self,
         target: ResolvedDataset,
@@ -68,7 +50,10 @@ impl PollingIngestServiceImpl {
         options: PollingIngestOptions,
         listener: Arc<dyn PollingIngestListener>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        let ctx = ingest_common::new_session_context(self.object_store_registry.clone());
+        let ctx = ingest_common::new_session_context(
+            &self.engine_config,
+            self.object_store_registry.clone(),
+        );
         let mut data_writer =
             DataWriterDataFusion::from_metadata_state(ctx.clone(), target.clone(), *metadata_state);
 
@@ -96,7 +81,10 @@ impl PollingIngestServiceImpl {
             let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
             std::fs::create_dir_all(&operation_dir).int_err()?;
 
-            let new_ctx = ingest_common::new_session_context(self.object_store_registry.clone());
+            let new_ctx = ingest_common::new_session_context(
+                &self.engine_config,
+                self.object_store_registry.clone(),
+            );
             data_writer.set_session_context(new_ctx.clone());
 
             // TODO: Avoid excessive cloning

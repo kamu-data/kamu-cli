@@ -68,6 +68,10 @@ impl DependencyGraphIndexer {
         let mut datasets_stream = self.dataset_registry.all_dataset_handles();
 
         while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
+            if dataset_handle.kind == odf::DatasetKind::Root {
+                continue;
+            }
+
             let span =
                 tracing::debug_span!("Scanning dataset dependencies", dataset = %dataset_handle);
 

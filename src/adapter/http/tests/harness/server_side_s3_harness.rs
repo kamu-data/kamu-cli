@@ -117,6 +117,7 @@ impl ServerSideS3Harness {
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
                 .add::<kamu_datasets_services::DatabaseBackedOdfDatasetS3BuilderImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
+                .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()
                 .add::<ObjectStoreRegistryImpl>()

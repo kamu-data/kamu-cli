@@ -20,31 +20,20 @@ use random_names::get_random_name;
 use time_source::SystemTimeSource;
 use url::Url;
 
-use crate::new_session_context;
+use crate::EngineConfigDatafusionEmbeddedCompaction;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
+#[interface(dyn CompactionExecutor)]
 pub struct CompactionExecutorImpl {
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     time_source: Arc<dyn SystemTimeSource>,
     run_info_dir: Arc<RunInfoDir>,
+    engine_config: Arc<EngineConfigDatafusionEmbeddedCompaction>,
 }
 
-#[component(pub)]
-#[interface(dyn CompactionExecutor)]
 impl CompactionExecutorImpl {
-    pub fn new(
-        object_store_registry: Arc<dyn ObjectStoreRegistry>,
-        time_source: Arc<dyn SystemTimeSource>,
-        run_info_dir: Arc<RunInfoDir>,
-    ) -> Self {
-        Self {
-            object_store_registry,
-            time_source,
-            run_info_dir,
-        }
-    }
-
     fn create_run_compaction_dir(&self) -> Result<PathBuf, CompactionExecutionError> {
         let compaction_dir_path = self
             .run_info_dir
@@ -53,12 +42,27 @@ impl CompactionExecutorImpl {
         Ok(compaction_dir_path)
     }
 
+    fn new_session_context(&self) -> datafusion::prelude::SessionContext {
+        let config = self.engine_config.0.clone();
+
+        let runtime = Arc::new(
+            datafusion::execution::runtime_env::RuntimeEnvBuilder::new()
+                .with_object_store_registry(
+                    self.object_store_registry.clone().as_datafusion_registry(),
+                )
+                .build()
+                .unwrap(),
+        );
+
+        SessionContext::new_with_config_rt(config, runtime)
+    }
+
     async fn merge_files(
         &self,
         plan: &CompactionPlan,
         compaction_dir_path: &Path,
     ) -> Result<HashMap<usize, PathBuf>, CompactionExecutionError> {
-        let ctx = new_session_context(self.object_store_registry.clone());
+        let ctx = self.new_session_context();
 
         let mut new_file_paths = HashMap::new();
 

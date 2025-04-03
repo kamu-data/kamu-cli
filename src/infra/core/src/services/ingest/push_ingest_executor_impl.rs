@@ -20,32 +20,22 @@ use odf::utils::data::DataFrameExt;
 use tokio::io::AsyncRead;
 
 use super::ingest_common;
+use crate::EngineConfigDatafusionEmbeddedIngest;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn PushIngestExecutor)]
 pub struct PushIngestExecutorImpl {
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     data_format_registry: Arc<dyn DataFormatRegistry>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
+    ingest_config_datafusion: Arc<EngineConfigDatafusionEmbeddedIngest>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
-#[dill::interface(dyn PushIngestExecutor)]
 impl PushIngestExecutorImpl {
-    pub fn new(
-        object_store_registry: Arc<dyn ObjectStoreRegistry>,
-        data_format_registry: Arc<dyn DataFormatRegistry>,
-        engine_provisioner: Arc<dyn EngineProvisioner>,
-    ) -> Self {
-        Self {
-            object_store_registry,
-            data_format_registry,
-            engine_provisioner,
-        }
-    }
-
     async fn do_ingest(
         &self,
         target: ResolvedDataset,
@@ -53,8 +43,10 @@ impl PushIngestExecutorImpl {
         source: DataSource,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
-        let ctx: SessionContext =
-            ingest_common::new_session_context(self.object_store_registry.clone());
+        let ctx: SessionContext = ingest_common::new_session_context(
+            &self.ingest_config_datafusion,
+            self.object_store_registry.clone(),
+        );
 
         let data_writer = DataWriterDataFusion::from_metadata_state(
             ctx.clone(),
