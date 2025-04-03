@@ -629,7 +629,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             let dst = if let Some(dst) = dst {
                 // Check is incoming seed is different from existing
                 if transfer_options.force_update_if_diverged
-                    && let Some((incoming_first_block_hash, _)) = new_blocks.get(0)
+                    && let Some((incoming_first_block_hash, _)) = new_blocks.front()
                     && let Ok(seed_block) = dst
                         .as_metadata_chain()
                         .accept_one(odf::dataset::SearchSeedVisitor::new())

@@ -52,7 +52,7 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
 pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload,
-) -> () {
+) {
     let payload_as_json_string = match ws_common::payload_to_json::<TMessagePayload>(payload) {
         Ok(payload) => payload,
         Err(err) => {
@@ -61,7 +61,7 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
               error_msg = %err,
               "Failed to parse error message",
             );
-            return ();
+            return;
         }
     };
     let close_frame = CloseFrame {
@@ -78,9 +78,7 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
           error_msg = %err,
           "Failed to send error to client with error",
         );
-    }
-
-    ()
+    };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

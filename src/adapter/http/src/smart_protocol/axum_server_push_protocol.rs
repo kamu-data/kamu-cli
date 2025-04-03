@@ -364,7 +364,7 @@ impl AxumServerPushProtocolInstance {
         let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks)
             .protocol_int_err(PushPhase::InitialRequest)?;
 
-        let first_incoming_block_maybe = new_blocks.get(0);
+        let first_incoming_block_maybe = new_blocks.front();
 
         if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref()
             && let Some((first_incoming_block_hash, _)) = first_incoming_block_maybe
