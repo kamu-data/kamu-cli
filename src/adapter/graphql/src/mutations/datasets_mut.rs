@@ -127,12 +127,8 @@ impl DatasetsMut {
             }
         };
 
-        self.create_from_snapshot_impl(
-            ctx,
-            snapshot,
-            dataset_visibility.map(Into::into).unwrap_or_default(),
-        )
-        .await
+        self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
+            .await
     }
 
     // TODO: Multi-tenancy
