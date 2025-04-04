@@ -30,31 +30,35 @@ pub struct CreateDatasetUseCaseImpl {
     create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(dataset_alias, ?seed_block, ?options))]
+    #[tracing::instrument(level = "info", name = CreateDatasetUseCaseImpl_execute, skip_all, fields(dataset_alias, ?seed_block, ?options))]
     async fn execute(
         &self,
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
-        // There must be a logged in user
-        let logged_account_id = match self.current_account_subject.as_ref() {
+        // There must be a logged-in user
+        let (logged_account_id, logged_account_name) = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
             }
-            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+            CurrentAccountSubject::Logged(l) => (&l.account_id, &l.account_name),
         };
 
         // Adjust alias for current tenancy configuration
-        let canonical_alias = self.create_helper.canonical_dataset_alias(dataset_alias);
+        let canonical_alias = self
+            .create_helper
+            .canonical_dataset_alias(dataset_alias, logged_account_name)
+            .map_err(Into::<CreateDatasetError>::into)?;
 
         // Dataset entry goes first, this guarantees name collision check
         self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
-                &logged_account_id,
+                logged_account_id,
                 &canonical_alias,
                 seed_block.event.dataset_kind,
             )
@@ -79,7 +83,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             .notify_dataset_created(
                 &store_result.dataset_id,
                 &canonical_alias.dataset_name,
-                &logged_account_id,
+                logged_account_id,
                 options.dataset_visibility,
             )
             .await?;

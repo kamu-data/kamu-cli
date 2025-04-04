@@ -24,7 +24,7 @@ doctest = false
 [features]
 default = []
 sqlx = ["dep:sqlx"]
-testing = ["dep:mockall"]
+testing = ["dep:mockall", "odf/testing"]
 
 
 [dependencies]

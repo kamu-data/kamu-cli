@@ -100,6 +100,14 @@ pub enum CreateDatasetError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Error)]
+#[error("Alias account name does not match the user's account name: {account_name}")]
+pub struct IncorrectAliasAccountNameError {
+    pub account_name: odf::AccountName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset with name {alias} already exists")]
 pub struct NameCollisionError {
