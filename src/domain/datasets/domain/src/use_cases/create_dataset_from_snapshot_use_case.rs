@@ -72,9 +72,6 @@ impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
     fn from(v: CreateDatasetError) -> Self {
         match v {
             CreateDatasetError::EmptyDataset => unreachable!(),
-            CreateDatasetError::IncorrectAliasAccountName(e) => {
-                Self::invalid_snapshot(e.to_string())
-            }
             CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
             CreateDatasetError::RefCollision(e) => Self::RefCollision(e),
             CreateDatasetError::CASFailed(e) => Self::CASFailed(e),

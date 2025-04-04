@@ -82,9 +82,6 @@ pub enum CreateDatasetError {
     EmptyDataset,
 
     #[error(transparent)]
-    IncorrectAliasAccountName(#[from] IncorrectAliasAccountNameError),
-
-    #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
 
     #[error(transparent)]
