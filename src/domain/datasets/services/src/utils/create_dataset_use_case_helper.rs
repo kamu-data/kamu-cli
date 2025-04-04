@@ -199,12 +199,8 @@ impl From<CanonicalDatasetAliasError> for CreateDatasetFromSnapshotError {
 }
 
 impl From<CanonicalDatasetAliasError> for CreateDatasetError {
-    fn from(v: CanonicalDatasetAliasError) -> CreateDatasetError {
-        match v {
-            CanonicalDatasetAliasError::IncorrectAliasAccountName(e) => {
-                CreateDatasetError::IncorrectAliasAccountName(e)
-            }
-        }
+    fn from(_: CanonicalDatasetAliasError) -> CreateDatasetError {
+        unreachable!()
     }
 }
 

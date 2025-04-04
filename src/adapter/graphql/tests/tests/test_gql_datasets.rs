@@ -373,6 +373,65 @@ async fn test_dataset_create_from_snapshot_malformed() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_dataset_create_from_snapshot_incorrect_alias_account_name() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let snapshot_yaml = {
+        let snapshot = MetadataFactory::dataset_snapshot()
+            .name("another-user/foo")
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build();
+
+        use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
+        use odf::metadata::serde::DatasetSnapshotSerializer;
+
+        String::from_utf8_lossy(
+            &YamlDatasetSnapshotSerializer
+                .write_manifest(&snapshot)
+                .unwrap(),
+        )
+        .to_string()
+    };
+
+    let request_code = indoc!(
+        r#"
+        mutation {
+            datasets {
+                createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML, datasetVisibility: PUBLIC) {
+                    ... on CreateDatasetResultInvalidSnapshot {
+                        __typename
+                        message
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<content>", &snapshot_yaml.escape_default().to_string());
+
+    let res = harness.execute_authorized_query(request_code).await;
+
+    assert!(res.is_ok(), "{res:?}");
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
+            "datasets": {
+                "createFromSnapshot": {
+                    "__typename": "CreateDatasetResultInvalidSnapshot",
+                    "message": "Alias account name does not match the user's account name: another-user",
+                }
+            }
+        }),
+        res.data,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_dataset_rename_success() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::SingleTenant)
