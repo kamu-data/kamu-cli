@@ -82,6 +82,9 @@ pub enum CreateDatasetError {
     EmptyDataset,
 
     #[error(transparent)]
+    IncorrectAliasAccountName(#[from] IncorrectAliasAccountNameError),
+
+    #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
 
     #[error(transparent)]
@@ -96,6 +99,14 @@ pub enum CreateDatasetError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("The account name in the alias does not match the user's account name: {account_name}")]
+pub struct IncorrectAliasAccountNameError {
+    pub account_name: odf::AccountName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
