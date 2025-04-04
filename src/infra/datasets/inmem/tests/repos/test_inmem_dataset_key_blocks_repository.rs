@@ -41,38 +41,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = dataset_key_blocks_repo::test_find_latest_block_of_kind,
-    harness = InMemoryDatasetKeyBlockRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture = dataset_key_blocks_repo::test_find_blocks_of_single_kind_in_range,
-    harness = InMemoryDatasetKeyBlockRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture = dataset_key_blocks_repo::test_find_blocks_of_multiple_kinds_in_range,
-    harness = InMemoryDatasetKeyBlockRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture = dataset_key_blocks_repo::test_find_max_sequence_number,
-    harness = InMemoryDatasetKeyBlockRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
     fixture = dataset_key_blocks_repo::test_delete_blocks,
     harness = InMemoryDatasetKeyBlockRepositoryHarness
 );

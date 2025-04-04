@@ -9,10 +9,9 @@
 
 // Copyright Kamu Data, Inc. and contributors. All rights reserved.
 
-use std::num::NonZeroUsize;
 use std::str::FromStr;
 
-use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
+use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -117,120 +116,6 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             .collect())
     }
 
-    async fn find_latest_block_of_kind(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        kind: MetadataEventType,
-    ) -> Result<Option<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        let dataset_id_str = dataset_id.to_string();
-        let block_ref_str = block_ref.as_str();
-        let event_type_str = kind.to_string();
-
-        let row = sqlx::query_as!(
-            DatasetKeyBlockRow,
-            r#"
-            SELECT
-                event_type,
-                sequence_number,
-                block_hash,
-                block_payload
-            FROM dataset_key_blocks
-            WHERE dataset_id = ? AND block_ref_name = ? AND event_type = ?
-            ORDER BY sequence_number DESC
-            LIMIT 1
-            "#,
-            dataset_id_str,
-            block_ref_str,
-            event_type_str
-        )
-        .fetch_optional(conn)
-        .await
-        .int_err()?;
-
-        Ok(row.map(DatasetKeyBlockRow::into_domain))
-    }
-
-    async fn find_blocks_of_kinds_in_range(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        kinds: &[MetadataEventType],
-        min_sequence: Option<u64>,
-        max_sequence: u64,
-    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        let min_seq = min_sequence
-            .map(|min| i64::try_from(min).unwrap())
-            .unwrap_or(0);
-        let max_seq = i64::try_from(max_sequence).unwrap();
-
-        let query_str = format!(
-            r#"
-            SELECT
-                event_type,
-                sequence_number,
-                block_hash,
-                block_payload
-            FROM dataset_key_blocks
-            WHERE dataset_id = ? AND block_ref_name = ?
-                AND sequence_number BETWEEN ? AND ?
-                AND event_type IN ({})
-            ORDER BY sequence_number
-            "#,
-            sqlite_generate_placeholders_list(kinds.len(), NonZeroUsize::new(5).unwrap())
-        );
-
-        let mut query = sqlx::query_as::<sqlx::Sqlite, DatasetKeyBlockRow>(&query_str);
-        query = query
-            .bind(dataset_id.to_string())
-            .bind(block_ref.as_str())
-            .bind(min_seq)
-            .bind(max_seq);
-        for kind in kinds {
-            query = query.bind(kind.to_string());
-        }
-
-        let rows = query.fetch_all(conn).await.int_err()?;
-
-        Ok(rows
-            .into_iter()
-            .map(DatasetKeyBlockRow::into_domain)
-            .collect())
-    }
-
-    async fn find_max_sequence_number(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-    ) -> Result<Option<u64>, DatasetKeyBlockQueryError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        let dataset_id_str = dataset_id.to_string();
-        let block_ref_str = block_ref.as_str();
-
-        let result = sqlx::query_scalar(
-            r#"
-            SELECT MAX(sequence_number)
-                FROM dataset_key_blocks
-                WHERE dataset_id = ? AND block_ref_name = ?
-            "#,
-        )
-        .bind(dataset_id_str)
-        .bind(block_ref_str)
-        .fetch_optional(conn)
-        .await
-        .int_err()?;
-
-        Ok(result.flatten())
-    }
-
     async fn save_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
@@ -286,35 +171,6 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             }
             other => other.int_err().into(),
         })?;
-
-        Ok(())
-    }
-
-    async fn delete_blocks_after(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        sequence_number: u64,
-    ) -> Result<(), InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let conn = tr.connection_mut().await?;
-
-        let dataset_id_str = dataset_id.to_string();
-        let block_ref_str = block_ref.as_str();
-        let sequence_number = i64::try_from(sequence_number).unwrap();
-
-        sqlx::query!(
-            r#"
-            DELETE FROM dataset_key_blocks
-                WHERE dataset_id = ? AND block_ref_name = ? AND sequence_number > ?
-            "#,
-            dataset_id_str,
-            block_ref_str,
-            sequence_number
-        )
-        .execute(conn)
-        .await
-        .int_err()?;
 
         Ok(())
     }

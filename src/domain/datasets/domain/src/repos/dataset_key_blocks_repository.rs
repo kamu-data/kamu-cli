@@ -11,7 +11,7 @@ use internal_error::InternalError;
 use odf::{BlockRef, DatasetID};
 use thiserror::Error;
 
-use crate::{DatasetKeyBlock, MetadataEventType};
+use crate::DatasetKeyBlock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,45 +29,12 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         block_ref: &BlockRef,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
 
-    // TODO: looks nice, but not used yet
-    async fn find_latest_block_of_kind(
-        &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
-        kind: MetadataEventType,
-    ) -> Result<Option<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
-
-    // TODO: looks nice, but not used yet
-    async fn find_blocks_of_kinds_in_range(
-        &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
-        kinds: &[MetadataEventType],
-        min_sequence: Option<u64>,
-        max_sequence: u64,
-    ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
-
-    // TODO: looks nice, but not used yet
-    async fn find_max_sequence_number(
-        &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
-    ) -> Result<Option<u64>, DatasetKeyBlockQueryError>;
-
     async fn save_blocks_batch(
         &self,
         dataset_id: &DatasetID,
         block_ref: &BlockRef,
         blocks: &[DatasetKeyBlock],
     ) -> Result<(), DatasetKeyBlockSaveError>;
-
-    // TODO: looks nice, but not used yet
-    async fn delete_blocks_after(
-        &self,
-        dataset_id: &DatasetID,
-        block_ref: &BlockRef,
-        sequence_number: u64,
-    ) -> Result<(), InternalError>;
 
     async fn delete_all_for_ref(
         &self,

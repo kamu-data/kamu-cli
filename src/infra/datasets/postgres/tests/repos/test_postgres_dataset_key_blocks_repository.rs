@@ -43,38 +43,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = dataset_key_blocks_repo::test_find_latest_block_of_kind,
-    harness = PostgresDatasetKeyBlockRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_key_blocks_repo::test_find_blocks_of_single_kind_in_range,
-    harness = PostgresDatasetKeyBlockRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_key_blocks_repo::test_find_blocks_of_multiple_kinds_in_range,
-    harness = PostgresDatasetKeyBlockRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
-    fixture = dataset_key_blocks_repo::test_find_max_sequence_number,
-    harness = PostgresDatasetKeyBlockRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
     fixture = dataset_key_blocks_repo::test_delete_blocks,
     harness = PostgresDatasetKeyBlockRepositoryHarness
 );
