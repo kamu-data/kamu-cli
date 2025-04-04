@@ -30,9 +30,10 @@ pub struct CreateDatasetUseCaseImpl {
     create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(dataset_alias, ?seed_block, ?options))]
+    #[tracing::instrument(level = "info", name = CreateDatasetUseCaseImpl_execute, skip_all, fields(dataset_alias, ?seed_block, ?options))]
     async fn execute(
         &self,
         dataset_alias: &odf::DatasetAlias,
