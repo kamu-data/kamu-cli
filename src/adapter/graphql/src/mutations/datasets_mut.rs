@@ -99,9 +99,7 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         snapshot: String,
         snapshot_format: MetadataManifestFormat,
-        // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
-        //       https://github.com/kamu-data/kamu-cli/issues/780
-        dataset_visibility: Option<DatasetVisibility>,
+        dataset_visibility: DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         use odf::metadata::serde::DatasetSnapshotDeserializer;
 
