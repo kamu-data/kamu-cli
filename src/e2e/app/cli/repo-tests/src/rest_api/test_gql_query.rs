@@ -25,7 +25,7 @@ pub async fn test_gql_query_mut_create_empty_returns_correct_alias_mt(
                 r#"
                 mutation {
                   datasets {
-                    createEmpty(datasetKind: ROOT, datasetAlias: "empty-root-dataset") {
+                    createEmpty(datasetKind: ROOT, datasetAlias: "empty-root-dataset", datasetVisibility: PUBLIC) {
                       message
                       ... on CreateDatasetResultSuccess {
                         dataset {
@@ -74,7 +74,7 @@ pub async fn test_gql_query_mut_create_empty_returns_correct_alias_st(
                 r#"
                 mutation {
                   datasets {
-                    createEmpty(datasetKind: ROOT, datasetAlias: "empty-root-dataset") {
+                    createEmpty(datasetKind: ROOT, datasetAlias: "empty-root-dataset", datasetVisibility: PUBLIC) {
                       message
                       ... on CreateDatasetResultSuccess {
                         dataset {
@@ -134,7 +134,7 @@ pub async fn test_gql_query_mut_create_from_snapshot_returns_correct_alias_mt(
         r#"
         mutation {
           datasets {
-            createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML) {
+            createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML, datasetVisibility: PUBLIC) {
               ... on CreateDatasetResultSuccess {
                 dataset {
                   name
@@ -201,7 +201,7 @@ pub async fn test_gql_query_mut_create_from_snapshot_returns_correct_alias_st(
         r#"
         mutation {
           datasets {
-            createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML) {
+            createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML, datasetVisibility: PUBLIC) {
               ... on CreateDatasetResultSuccess {
                 dataset {
                   name

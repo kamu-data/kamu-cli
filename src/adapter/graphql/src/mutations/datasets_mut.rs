@@ -66,9 +66,7 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         dataset_kind: DatasetKind,
         dataset_alias: DatasetAlias<'_>,
-        // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
-        //       https://github.com/kamu-data/kamu-cli/issues/780
-        dataset_visibility: Option<DatasetVisibility>,
+        dataset_visibility: DatasetVisibility,
     ) -> Result<CreateDatasetResult> {
         match self
             .create_from_snapshot_impl(
@@ -78,7 +76,7 @@ impl DatasetsMut {
                     kind: dataset_kind.into(),
                     metadata: Vec::new(),
                 },
-                dataset_visibility.map(Into::into).unwrap_or_default(),
+                dataset_visibility.into(),
             )
             .await?
         {
@@ -101,9 +99,7 @@ impl DatasetsMut {
         ctx: &Context<'_>,
         snapshot: String,
         snapshot_format: MetadataManifestFormat,
-        // TODO: Private Datasets: GQL: make new parameters mandatory, after frontend update
-        //       https://github.com/kamu-data/kamu-cli/issues/780
-        dataset_visibility: Option<DatasetVisibility>,
+        dataset_visibility: DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         use odf::metadata::serde::DatasetSnapshotDeserializer;
 
@@ -131,12 +127,8 @@ impl DatasetsMut {
             }
         };
 
-        self.create_from_snapshot_impl(
-            ctx,
-            snapshot,
-            dataset_visibility.map(Into::into).unwrap_or_default(),
-        )
-        .await
+        self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
+            .await
     }
 
     // TODO: Multi-tenancy

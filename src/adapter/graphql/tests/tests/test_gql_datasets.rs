@@ -25,51 +25,6 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error, BaseG
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-macro_rules! test_dataset_create_empty_without_visibility {
-    ($tenancy_config:expr) => {
-        let harness = GraphQLDatasetsHarness::builder()
-            .tenancy_config($tenancy_config)
-            .build()
-            .await;
-
-        let request_code = indoc::indoc!(
-            r#"
-            mutation {
-              datasets {
-                createEmpty(datasetKind: ROOT, datasetAlias: "foo") {
-                  ... on CreateDatasetResultSuccess {
-                    dataset {
-                      name
-                    }
-                  }
-                }
-              }
-            }
-            "#
-        );
-
-        expect_anonymous_access_error(harness.execute_anonymous_query(request_code).await);
-
-        let res = harness.execute_authorized_query(request_code).await;
-
-        assert!(res.is_ok(), "{res:?}");
-        pretty_assertions::assert_eq!(
-            async_graphql::value!({
-                "datasets": {
-                    "createEmpty": {
-                        "dataset": {
-                            "name": "foo",
-                        }
-                    }
-                }
-            }),
-            res.data,
-        );
-    };
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 macro_rules! test_dataset_create_empty_public {
     ($tenancy_config:expr) => {
         let harness = GraphQLDatasetsHarness::builder()
@@ -303,20 +258,6 @@ async fn test_dataset_by_account_id() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_create_empty_without_visibility_st() {
-    test_dataset_create_empty_without_visibility!(TenancyConfig::SingleTenant);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_dataset_create_empty_without_visibility_mt() {
-    test_dataset_create_empty_without_visibility!(TenancyConfig::MultiTenant);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_dataset_create_empty_public_st() {
     test_dataset_create_empty_public!(TenancyConfig::SingleTenant);
 }
@@ -357,7 +298,7 @@ async fn test_dataset_create_from_snapshot() {
         r#"
         mutation {
             datasets {
-                createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML) {
+                createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML, datasetVisibility: PUBLIC) {
                     ... on CreateDatasetResultSuccess {
                         dataset {
                             name
@@ -403,16 +344,16 @@ async fn test_dataset_create_from_snapshot_malformed() {
     let res = harness
         .execute_authorized_query(indoc!(
             r#"
-        mutation {
-            datasets {
-                createFromSnapshot(snapshot: "version: 1", snapshotFormat: YAML) {
-                    ... on MetadataManifestMalformed {
-                        __typename
+            mutation {
+                datasets {
+                    createFromSnapshot(snapshot: "version: 1", snapshotFormat: YAML, datasetVisibility: PUBLIC) {
+                        ... on MetadataManifestMalformed {
+                            __typename
+                        }
                     }
                 }
             }
-        }
-        "#
+            "#
         ))
         .await;
 
