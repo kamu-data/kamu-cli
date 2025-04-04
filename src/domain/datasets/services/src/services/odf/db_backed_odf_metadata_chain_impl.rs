@@ -191,12 +191,27 @@ where
                 // We should not return blocks outside of this range.
                 let requested_boundary = (tail_sequence_number, block.sequence_number);
 
+                // Trace the decision
+                tracing::debug!(
+                    dataset_id=%self.dataset_id,
+                    requested_boundary=?requested_boundary,
+                    hint_flags=?hint_flags,
+                    "Expecting key blocks only, looking for quick answer"
+                );
+
                 // First, try to read the ready answer from the cache
                 let maybe_key_block_repository = {
                     let read_guard = self.state.read().unwrap();
                     if let Some(cached_blocks_in_range) =
                         read_guard.get_cached_key_blocks_for_range(requested_boundary)
                     {
+                        // Report cache hit
+                        tracing::debug!(
+                            dataset_id=%self.dataset_id,
+                            num_blocks = cached_blocks_in_range.len(),
+                            "Found key blocks in the cache"
+                        );
+
                         // We have cached blocks in the requested range
                         // Filter them by the requested flags, starting from the last one.
                         // Note that if there is no cached block matching the hints,
@@ -237,6 +252,13 @@ where
                     // Cache the key blocks
                     let mut write_guard = self.state.write().unwrap();
                     write_guard.cached_key_blocks = key_blocks;
+
+                    // Report cache hit
+                    tracing::debug!(
+                        dataset_id=%self.dataset_id,
+                        num_blocks = write_guard.cached_key_blocks.len(),
+                        "No key blocks cached. Loaded key blocks from the repository"
+                    );
 
                     // Pick the matching slice for the requested range
                     if let Some(cached_blocks_in_range) =

@@ -263,6 +263,7 @@ pub trait MetadataChainExt: MetadataChain {
     /// which we will be making the traverse.
     ///
     /// Note: the interval is `[head, tail)` - tail is exclusive
+    #[tracing::instrument(level = "debug", skip_all, fields(?head_hash, ?tail_hash))]
     async fn accept_by_interval<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -317,6 +318,16 @@ pub trait MetadataChainExt: MetadataChain {
             && merged_decision != MetadataVisitorDecision::Stop
             && tail_hash != Some(&hash)
         {
+            // Trace the progress
+            tracing::debug!(
+                current_block_hash=%hash,
+                sequence_number=block.sequence_number,
+                tail_sequence_number,
+                event_type=?MetadataEventTypeFlags::from(&block.event),
+                visitors_decision=?merged_decision,
+                "Traversing through block",
+            );
+
             // Feed each visitor with the currently loaded block
             let hashed_block_ref = (&hash, &block);
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
@@ -344,8 +355,15 @@ pub trait MetadataChainExt: MetadataChain {
 
             // Measure the progress after this iteration
             merged_decision = merge_decisions(&decisions);
+
+            // Trace the updated decision
+            tracing::debug!(
+                updated_visitors_decision=?merged_decision,
+                "Block visiting finished",
+            );
+
+            // When all visitors are satisfied, no need to load any more blocks
             if merged_decision == MetadataVisitorDecision::Stop {
-                // All visitors are satisfied, no need to load any more blocks
                 break;
             }
 
