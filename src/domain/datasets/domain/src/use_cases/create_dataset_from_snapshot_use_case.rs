@@ -56,12 +56,21 @@ pub enum CreateDatasetFromSnapshotError {
     ),
 }
 
+impl CreateDatasetFromSnapshotError {
+    pub fn invalid_snapshot(reason: impl Into<String>) -> Self {
+        Self::InvalidSnapshot(odf::dataset::InvalidSnapshotError::new(reason))
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
     fn from(v: CreateDatasetError) -> Self {
         match v {
             CreateDatasetError::EmptyDataset => unreachable!(),
+            CreateDatasetError::IncorrectAliasAccountName(e) => {
+                Self::invalid_snapshot(e.to_string())
+            }
             CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
             CreateDatasetError::RefCollision(e) => Self::RefCollision(e),
             CreateDatasetError::CASFailed(e) => Self::CASFailed(e),

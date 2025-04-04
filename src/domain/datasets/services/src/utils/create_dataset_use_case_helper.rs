@@ -11,23 +11,25 @@ use std::sync::Arc;
 
 use dill::component;
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{ResolvedDataset, TenancyConfig};
 use kamu_datasets::{
     CreateDatasetError,
+    CreateDatasetFromSnapshotError,
     DatasetLifecycleMessage,
     DatasetReferenceCASError,
+    IncorrectAliasAccountNameError,
     NameCollisionError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use thiserror::Error;
 
 use crate::{CreateDatasetEntryError, DatasetEntryWriter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
 pub struct CreateDatasetUseCaseHelper {
-    current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
@@ -36,42 +38,36 @@ pub struct CreateDatasetUseCaseHelper {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
 impl CreateDatasetUseCaseHelper {
-    pub fn new(
-        current_account_subject: Arc<CurrentAccountSubject>,
-        tenancy_config: Arc<TenancyConfig>,
-        dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-        dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-        outbox: Arc<dyn Outbox>,
-    ) -> Self {
-        Self {
-            current_account_subject,
-            tenancy_config,
-            dataset_entry_writer,
-            dataset_storage_unit_writer,
-            outbox,
-        }
-    }
-
-    pub fn canonical_dataset_alias(&self, raw_alias: &odf::DatasetAlias) -> odf::DatasetAlias {
-        match self.tenancy_config.as_ref() {
-            TenancyConfig::SingleTenant => raw_alias.clone(),
+    pub fn canonical_dataset_alias(
+        &self,
+        raw_alias: &odf::DatasetAlias,
+        logged_account_name: &odf::AccountName,
+    ) -> Result<odf::DatasetAlias, CanonicalDatasetAliasError> {
+        let alias = match self.tenancy_config.as_ref() {
+            TenancyConfig::SingleTenant => {
+                // Ignore the account name in the alias
+                odf::DatasetAlias::new(None, raw_alias.dataset_name.clone())
+            }
             TenancyConfig::MultiTenant => {
                 let account_name = if raw_alias.is_multi_tenant() {
-                    raw_alias.account_name.as_ref().unwrap()
-                } else {
-                    match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Anonymous account misused, use multi-tenant alias");
+                    let alias_account_name = raw_alias.account_name.as_ref().unwrap();
+                    if alias_account_name != logged_account_name {
+                        return Err(IncorrectAliasAccountNameError {
+                            account_name: alias_account_name.clone(),
                         }
-                        CurrentAccountSubject::Logged(l) => &l.account_name,
+                        .into());
                     }
+                    alias_account_name
+                } else {
+                    logged_account_name
                 };
 
                 odf::DatasetAlias::new(Some(account_name.clone()), raw_alias.dataset_name.clone())
             }
-        }
+        };
+
+        Ok(alias)
     }
 
     pub async fn create_dataset_entry(
@@ -181,6 +177,34 @@ impl CreateDatasetUseCaseHelper {
                 odf::dataset::SetChainRefError::Internal(e) => CreateDatasetError::Internal(e),
                 _ => CreateDatasetError::Internal(e.int_err()),
             })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum CanonicalDatasetAliasError {
+    #[error(transparent)]
+    IncorrectAliasAccountName(#[from] IncorrectAliasAccountNameError),
+}
+
+impl From<CanonicalDatasetAliasError> for CreateDatasetFromSnapshotError {
+    fn from(v: CanonicalDatasetAliasError) -> CreateDatasetFromSnapshotError {
+        match v {
+            CanonicalDatasetAliasError::IncorrectAliasAccountName(e) => {
+                CreateDatasetFromSnapshotError::invalid_snapshot(e.to_string())
+            }
+        }
+    }
+}
+
+impl From<CanonicalDatasetAliasError> for CreateDatasetError {
+    fn from(v: CanonicalDatasetAliasError) -> CreateDatasetError {
+        match v {
+            CanonicalDatasetAliasError::IncorrectAliasAccountName(e) => {
+                CreateDatasetError::IncorrectAliasAccountName(e)
+            }
+        }
     }
 }
 

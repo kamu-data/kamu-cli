@@ -43,12 +43,12 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         mut snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
-        // There must be a logged in user
-        let logged_account_id = match self.current_account_subject.as_ref() {
+        // There must be a logged-in user
+        let (logged_account_id, logged_account_name) = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
             }
-            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+            CurrentAccountSubject::Logged(l) => (&l.account_id, &l.account_name),
         };
 
         // Validate / resolve metadata events from the snapshot
@@ -59,7 +59,10 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .await?;
 
         // Adjust alias for current tenancy configuration
-        let canonical_alias = self.create_helper.canonical_dataset_alias(&snapshot.name);
+        let canonical_alias = self
+            .create_helper
+            .canonical_dataset_alias(&snapshot.name, logged_account_name)
+            .map_err(Into::<CreateDatasetFromSnapshotError>::into)?;
 
         // Make a seed block
         let system_time = self.system_time_source.now();
@@ -73,7 +76,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
-                &logged_account_id,
+                logged_account_id,
                 &canonical_alias,
                 snapshot.kind,
             )
@@ -100,7 +103,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .notify_dataset_created(
                 &store_result.dataset_id,
                 &canonical_alias.dataset_name,
-                &logged_account_id,
+                logged_account_id,
                 options.dataset_visibility,
             )
             .await?;

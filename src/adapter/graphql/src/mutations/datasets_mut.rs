@@ -131,9 +131,6 @@ impl DatasetsMut {
             .await
     }
 
-    // TODO: Multi-tenancy
-    //       https://github.com/kamu-data/kamu-cli/issues/891
-
     // TODO: Multi-tenant resolution for derivative dataset inputs (should it only
     //       work by ID?)
     #[graphql(skip)]

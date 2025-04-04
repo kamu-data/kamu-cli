@@ -619,6 +619,7 @@ async fn test_in_dependency_order() {
 
 struct DependencyGraphHarness {
     _temp_dir: tempfile::TempDir,
+    catalog_without_subject: Catalog,
     catalog: Catalog,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -639,7 +640,6 @@ impl DependencyGraphHarness {
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<DatabaseBackedOdfDatasetLfsBuilderImpl>()
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add_value(CurrentAccountSubject::new_test())
             .add::<DidGeneratorDefault>()
             .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<SystemTimeSourceDefault>();
@@ -676,13 +676,17 @@ impl DependencyGraphHarness {
             MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
         );
 
-        let catalog = b.build();
+        let catalog_without_subject = b.build();
+        let catalog = CatalogBuilder::new_chained(&catalog_without_subject)
+            .add_value(CurrentAccountSubject::new_test())
+            .build();
 
         Self {
             _temp_dir: temp_dir,
             dataset_registry: catalog.get_one().unwrap(),
             dependency_graph_service: catalog.get_one().unwrap(),
             dataset_dependency_repo: catalog.get_one().unwrap(),
+            catalog_without_subject,
             catalog,
         }
     }
@@ -971,8 +975,9 @@ impl DependencyGraphHarness {
         account_name: Option<odf::AccountName>,
         dataset_name: &str,
     ) {
-        let create_dataset_from_snapshot = self
-            .catalog
+        let catalog = self.authorized_catalog(account_name.as_ref());
+
+        let create_dataset_from_snapshot = catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
 
@@ -998,8 +1003,9 @@ impl DependencyGraphHarness {
         dataset_name: &str,
         input_aliases: Vec<odf::DatasetAlias>,
     ) {
-        let create_dataset_from_snapshot = self
-            .catalog
+        let catalog = self.authorized_catalog(account_name.as_ref());
+
+        let create_dataset_from_snapshot = catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
 
@@ -1062,6 +1068,18 @@ impl DependencyGraphHarness {
             )
             .await
             .unwrap();
+    }
+
+    fn authorized_catalog(&self, account_name: Option<&odf::AccountName>) -> Catalog {
+        // If we have an account name, then we're in multi-tenant mode -- emulating
+        // authorization.
+        if let Some(account_name) = account_name {
+            CatalogBuilder::new_chained(&self.catalog_without_subject)
+                .add_value(CurrentAccountSubject::new_test_with(account_name))
+                .build()
+        } else {
+            self.catalog.clone()
+        }
     }
 }
 
