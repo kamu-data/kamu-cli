@@ -45,6 +45,7 @@ pub struct DatasetPullSuccessResponse {
 /// Unsuccessful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPullRequestError {
+    SeedBlockRewriteRestricted(DatasetPushMetadataSeedBlockRewriteRestrictedError),
     Internal(TransferInternalError),
     InvalidInterval(DatasetPullInvalidIntervalError),
 }
@@ -160,6 +161,26 @@ pub struct DatasetPushMetadataRequest {
 /// Push phase 1: push metadata accepted
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushMetadataAccepted {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push phase 1: unsuccessful response push metadata request
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum DatasetPushMetadataError {
+    SeedBlockRewriteRestricted(DatasetPushMetadataSeedBlockRewriteRestrictedError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Rewriting seed block is restricted
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushMetadataSeedBlockRewriteRestrictedError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push phase 2: object transfer response
+pub type DatasetPushMetadataResponse =
+    Result<DatasetPushMetadataAccepted, DatasetPushMetadataError>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -132,9 +132,8 @@ impl SyncServiceImpl {
         };
 
         let maybe_dst_dataset = match &dst {
-            SyncRef::Local(resolved_dataset) => Some((**resolved_dataset).clone()),
-            SyncRef::LocalNew(_) => None,
-            SyncRef::Remote(src_remote) => Some(src_remote.dataset.clone()),
+            SyncRef::Local(resolved_dataset) => Some(resolved_dataset),
+            SyncRef::LocalNew(_) | SyncRef::Remote(_) => None,
         };
 
         self.smart_transfer_protocol

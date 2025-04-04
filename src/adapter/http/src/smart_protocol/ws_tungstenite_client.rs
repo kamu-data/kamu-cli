@@ -107,6 +107,9 @@ impl WsSmartTransferProtocolClient {
                     ClientInternalError::new(e.error_message.as_str(), e.phase),
                 ))))
             }
+            Err(DatasetPullRequestError::SeedBlockRewriteRestricted(_)) => Err(
+                PullClientError::ValidationError(PushValidationError::SeedBlockRewriteRestricted),
+            ),
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
                 tail,
@@ -290,10 +293,17 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Reading push metadata response");
 
-        let dataset_metadata_push_response = read_payload::<DatasetPushMetadataAccepted>(socket)
+        let dataset_metadata_push_response = read_payload::<DatasetPushMetadataResponse>(socket)
             .await
             .map_err(|e| {
                 PushClientError::ReadFailed(PushReadError::new(e, PushPhase::MetadataRequest))
+            })?
+            .map_err(|e| match e {
+                DatasetPushMetadataError::SeedBlockRewriteRestricted(_) => {
+                    PushClientError::ValidationError(
+                        PushValidationError::SeedBlockRewriteRestricted,
+                    )
+                }
             })?;
 
         Ok(dataset_metadata_push_response)
@@ -523,7 +533,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: Option<Arc<dyn odf::Dataset>>,
+        dst: Option<&ResolvedDataset>,
         dst_alias: Option<&odf::DatasetAlias>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
@@ -616,7 +626,15 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
             // Create destination dataset if not exists
             let dst = if let Some(dst) = dst {
-                dst
+                // Check is incoming seed is different from existing
+                if transfer_options.force_update_if_diverged
+                    && let Some((_, first_incoming_block)) = new_blocks.front()
+                    && let odf::MetadataEvent::Seed(seed_event) = &first_incoming_block.event
+                    && &seed_event.dataset_id != dst.get_id()
+                {
+                    InternalError::bail("Rewriting seed block is restricted")?;
+                }
+                (**dst).clone()
             } else {
                 let (first_hash, first_block) = new_blocks.pop_front().unwrap();
                 let seed_block = first_block

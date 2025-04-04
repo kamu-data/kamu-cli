@@ -99,6 +99,7 @@ impl PullCommand {
                     add_aliases: self.add_aliases,
                     sync_options: SyncOptions {
                         dataset_visibility: self.new_dataset_visibility,
+                        force: self.force,
                         ..Default::default()
                     },
                     ..Default::default()
