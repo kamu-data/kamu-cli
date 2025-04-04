@@ -440,6 +440,18 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         self.chain.get_block(hash).await
     }
 
+    async fn try_get_prev_block(
+        &self,
+        block: &odf::MetadataBlock,
+        tail_sequence_number: u64,
+        hint: odf::dataset::MetadataVisitorDecision,
+    ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::GetBlockError> {
+        (self.on_read)(1);
+        self.chain
+            .try_get_prev_block(block, tail_sequence_number, hint)
+            .await
+    }
+
     async fn set_ref<'b>(
         &'b self,
         r: &odf::BlockRef,

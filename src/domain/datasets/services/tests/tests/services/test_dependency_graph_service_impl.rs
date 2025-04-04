@@ -20,6 +20,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
+    InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::testing::FakeConnectingDatasetEntryWriter;
@@ -659,7 +660,8 @@ impl DependencyGraphHarness {
         .add::<FakeConnectingDatasetEntryWriter>()
         .add::<CreateDatasetUseCaseHelper>()
         .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>();
+        .add::<InMemoryDatasetReferenceRepository>()
+        .add::<InMemoryDatasetKeyBlockRepository>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,

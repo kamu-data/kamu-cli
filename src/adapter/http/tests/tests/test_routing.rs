@@ -27,6 +27,7 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
+    InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -78,6 +79,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<InMemoryDatasetReferenceRepository>()
         .add::<DatasetEntryServiceImpl>()
         .add::<InMemoryDatasetEntryRepository>()
+        .add::<InMemoryDatasetKeyBlockRepository>()
         .add::<AccountServiceImpl>()
         .add::<InMemoryAccountRepository>()
         .add::<PredefinedAccountsRegistrator>()

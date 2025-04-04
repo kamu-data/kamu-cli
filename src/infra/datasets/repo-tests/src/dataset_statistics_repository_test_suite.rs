@@ -13,7 +13,7 @@ use chrono::{TimeZone, Utc};
 use dill::Catalog;
 use kamu_datasets::*;
 
-use crate::helpers::{init_dataset_entry, init_test_account};
+use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -179,6 +179,51 @@ pub async fn test_multiple_datasets_statistics(catalog: &Catalog) {
         .get_dataset_statistics(&dataset_2_id, &odf::BlockRef::Head)
         .await;
     assert_matches!(get_2_result, Ok(s) if s == statistics_2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_remove_dataset_entry_removes_statistics(catalog: &Catalog) {
+    let test_account_id = init_test_account(catalog).await;
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-remove-stats");
+    let dataset_name = odf::DatasetName::new_unchecked("remove-stats-ds");
+
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
+
+    let stats_repo = catalog
+        .get_one::<dyn DatasetStatisticsRepository>()
+        .unwrap();
+
+    let statistics = DatasetStatistics {
+        last_pulled: Some(Utc.timestamp_opt(1000, 0).unwrap()),
+        num_records: 10,
+        data_size: 100,
+        checkpoints_size: 200,
+    };
+
+    // Add statistics
+    stats_repo
+        .set_dataset_statistics(&dataset_id, &odf::BlockRef::Head, statistics)
+        .await
+        .unwrap();
+
+    // Verify statistics exist
+    let has_result = stats_repo.has_any_stats().await;
+    assert_matches!(has_result, Ok(true));
+
+    // Remove dataset entry
+    remove_dataset_entry(catalog, &dataset_id).await;
+
+    // Verify statistics are removed
+    let has_result = stats_repo.has_any_stats().await;
+    assert_matches!(has_result, Ok(false));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

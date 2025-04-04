@@ -13,7 +13,7 @@ use std::sync::Arc;
 use dill::*;
 use s3_utils::S3Context;
 
-use crate::DatabaseBackedOdfMetadataChainRefRepositoryImpl;
+use crate::{DatabaseBackedOdfMetadataChainImpl, DatabaseBackedOdfMetadataChainRefRepositoryImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,17 +45,21 @@ impl odf::dataset::DatasetS3Builder for DatabaseBackedOdfDatasetS3BuilderImpl {
 
         if let Some(metadata_cache_local_fs_path) = &self.metadata_cache_local_fs_path {
             Arc::new(DatasetImpl::new(
-                MetadataChainImpl::new(
-                    DatasetDefaultS3Builder::build_meta_block_repo(
-                        odf::storage::lfs::ObjectRepositoryCachingLocalFs::new(
-                            DatasetDefaultS3Builder::build_base_block_repo(&s3_context),
-                            metadata_cache_local_fs_path.clone(),
+                DatabaseBackedOdfMetadataChainImpl::new(
+                    dataset_id.clone(),
+                    self.catalog.get_one().unwrap(),
+                    MetadataChainImpl::new(
+                        DatasetDefaultS3Builder::build_meta_block_repo(
+                            odf::storage::lfs::ObjectRepositoryCachingLocalFs::new(
+                                DatasetDefaultS3Builder::build_base_block_repo(&s3_context),
+                                metadata_cache_local_fs_path.clone(),
+                            ),
                         ),
-                    ),
-                    DatabaseBackedOdfMetadataChainRefRepositoryImpl::new(
-                        self.catalog.get_one().unwrap(),
-                        DatasetDefaultS3Builder::build_refs_repo(&s3_context),
-                        dataset_id.clone(),
+                        DatabaseBackedOdfMetadataChainRefRepositoryImpl::new(
+                            self.catalog.get_one().unwrap(),
+                            DatasetDefaultS3Builder::build_refs_repo(&s3_context),
+                            dataset_id.clone(),
+                        ),
                     ),
                 ),
                 DatasetDefaultS3Builder::build_data_repo(&s3_context),
@@ -65,14 +69,18 @@ impl odf::dataset::DatasetS3Builder for DatabaseBackedOdfDatasetS3BuilderImpl {
             ))
         } else {
             Arc::new(DatasetImpl::new(
-                MetadataChainImpl::new(
-                    DatasetDefaultS3Builder::build_meta_block_repo(
-                        DatasetDefaultS3Builder::build_base_block_repo(&s3_context),
-                    ),
-                    DatabaseBackedOdfMetadataChainRefRepositoryImpl::new(
-                        self.catalog.get_one().unwrap(),
-                        DatasetDefaultS3Builder::build_refs_repo(&s3_context),
-                        dataset_id.clone(),
+                DatabaseBackedOdfMetadataChainImpl::new(
+                    dataset_id.clone(),
+                    self.catalog.get_one().unwrap(),
+                    MetadataChainImpl::new(
+                        DatasetDefaultS3Builder::build_meta_block_repo(
+                            DatasetDefaultS3Builder::build_base_block_repo(&s3_context),
+                        ),
+                        DatabaseBackedOdfMetadataChainRefRepositoryImpl::new(
+                            self.catalog.get_one().unwrap(),
+                            DatasetDefaultS3Builder::build_refs_repo(&s3_context),
+                            dataset_id.clone(),
+                        ),
                     ),
                 ),
                 DatasetDefaultS3Builder::build_data_repo(&s3_context),

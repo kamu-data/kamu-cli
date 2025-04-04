@@ -29,13 +29,14 @@ odf = { workspace = true, features = ["sqlx-postgres"] }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
+bytes = { version = "1", default-features = false }
 dill = "0.12"
 futures = "0.3"
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio-rustls",
     "macros",
     "postgres",
-    "chrono",
+    "chrono"
 ] }
 tracing = "0.1"
 uuid = "1"

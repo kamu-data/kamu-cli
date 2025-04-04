@@ -378,6 +378,7 @@ impl ServerHarness {
                 .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>();
 

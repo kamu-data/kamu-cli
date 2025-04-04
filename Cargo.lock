@@ -6499,6 +6499,7 @@ version = "0.231.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
+ "bytes",
  "chrono",
  "database-common",
  "futures",
@@ -6545,6 +6546,7 @@ version = "0.231.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bytes",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6565,6 +6567,7 @@ dependencies = [
 name = "kamu-datasets-repo-tests"
 version = "0.231.0"
 dependencies = [
+ "bytes",
  "chrono",
  "database-common",
  "dill",
@@ -6583,9 +6586,11 @@ name = "kamu-datasets-services"
 version = "0.231.0"
 dependencies = [
  "async-trait",
+ "bytes",
  "chrono",
  "common-macros",
  "database-common",
+ "database-common-macros",
  "dill",
  "futures",
  "indoc 2.0.6",
@@ -6627,6 +6632,7 @@ version = "0.231.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bytes",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -8089,6 +8095,7 @@ dependencies = [
  "strum 0.26.3",
  "thiserror 2.0.12",
  "tokio-stream",
+ "tracing",
  "url",
 ]
 

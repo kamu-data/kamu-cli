@@ -80,6 +80,33 @@ where
             .map_err(Into::into)
     }
 
+    async fn try_get_prev_block(
+        &self,
+        block: &MetadataBlock,
+        tail_sequence_number: u64,
+        hint: MetadataVisitorDecision,
+    ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError> {
+        // Guard against stopped hint
+        assert!(hint != MetadataVisitorDecision::Stop);
+
+        // Have we reached the tail? (if specified the boundary)
+        if tail_sequence_number >= block.sequence_number {
+            // We are at the tail, no need to go further
+            return Ok(None);
+        }
+
+        // No hints are supported in default chain implementation
+        // Simply take the previous block, unless we reached the seed
+        if let Some(prev_block_hash) = &block.prev_block_hash {
+            // Got previous block
+            let prev_block = self.get_block(prev_block_hash).await?;
+            Ok(Some((prev_block_hash.clone(), prev_block)))
+        } else {
+            // Reached the seed block
+            Ok(None)
+        }
+    }
+
     async fn append<'a>(
         &'a self,
         block: MetadataBlock,
