@@ -104,7 +104,7 @@ pub enum CreateDatasetError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("The account name in the alias does not match the user's account name: {account_name}")]
+#[error("Alias account name does not match the user's account name: {account_name}")]
 pub struct IncorrectAliasAccountNameError {
     pub account_name: odf::AccountName,
 }

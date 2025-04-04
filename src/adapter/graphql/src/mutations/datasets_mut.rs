@@ -84,6 +84,13 @@ impl DatasetsMut {
             CreateDatasetFromSnapshotResult::NameCollision(e) => {
                 Ok(CreateDatasetResult::NameCollision(e))
             }
+            CreateDatasetFromSnapshotResult::IncorrectAliasAccountName(e) => {
+                Ok(CreateDatasetResult::IncorrectAliasAccountName(
+                    CreateDatasetResultIncorrectAliasAccountName {
+                        account_name: e.account_name,
+                    },
+                ))
+            }
             CreateDatasetFromSnapshotResult::InvalidSnapshot(_)
             | CreateDatasetFromSnapshotResult::Malformed(_)
             | CreateDatasetFromSnapshotResult::UnsupportedVersion(_)
@@ -163,6 +170,13 @@ impl DatasetsMut {
                 })
             }
             Err(CreateDatasetFromSnapshotError::RefCollision(e)) => return Err(e.int_err().into()),
+            Err(CreateDatasetFromSnapshotError::IncorrectAliasAccountName(e)) => {
+                CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot {
+                        message: e.to_string(),
+                    },
+                )
+            }
             Err(CreateDatasetFromSnapshotError::InvalidSnapshot(e)) => {
                 CreateDatasetFromSnapshotResult::InvalidSnapshot(
                     CreateDatasetResultInvalidSnapshot { message: e.reason },
@@ -194,6 +208,7 @@ impl DatasetsMut {
 pub enum CreateDatasetResult<'a> {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision<'a>),
+    IncorrectAliasAccountName(CreateDatasetResultIncorrectAliasAccountName<'a>),
 }
 
 #[derive(Interface, Debug)]
@@ -201,6 +216,7 @@ pub enum CreateDatasetResult<'a> {
 pub enum CreateDatasetFromSnapshotResult<'a> {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision<'a>),
+    IncorrectAliasAccountName(CreateDatasetResultIncorrectAliasAccountName<'a>),
     Malformed(MetadataManifestMalformed),
     UnsupportedVersion(MetadataManifestUnsupportedVersion),
     InvalidSnapshot(CreateDatasetResultInvalidSnapshot),
@@ -237,6 +253,24 @@ pub struct CreateDatasetResultNameCollision<'a> {
 impl CreateDatasetResultNameCollision<'_> {
     async fn message(&self) -> String {
         format!("Dataset with name '{}' already exists", self.dataset_name)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct CreateDatasetResultIncorrectAliasAccountName<'a> {
+    pub account_name: AccountName<'a>,
+}
+
+#[ComplexObject]
+impl CreateDatasetResultIncorrectAliasAccountName<'_> {
+    async fn message(&self) -> String {
+        format!(
+            "Alias account name does not match the user's account name: {}",
+            self.account_name
+        )
     }
 }
 

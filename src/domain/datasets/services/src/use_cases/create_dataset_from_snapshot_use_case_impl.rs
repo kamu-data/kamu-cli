@@ -35,9 +35,10 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(?snapshot, ?options))]
+    #[tracing::instrument(level = "info", name = CreateDatasetFromSnapshotUseCaseImpl_execute, skip_all, fields(?snapshot, ?options))]
     async fn execute(
         &self,
         mut snapshot: odf::DatasetSnapshot,
