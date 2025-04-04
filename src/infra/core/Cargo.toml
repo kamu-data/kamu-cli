@@ -31,7 +31,6 @@ query-extensions-json = ["dep:datafusion-functions-json"]
 testing = [
     # Deps: kamu
     "dep:kamu-auth-rebac-services",
-    "dep:messaging-outbox",
     # Deps: 3-rd party
     "dep:bon",
     "dep:mockall",
@@ -55,6 +54,7 @@ kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
+messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = [
     "lfs",
     "s3"
@@ -120,7 +120,6 @@ tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 
 # Optional dependencies
-messaging-outbox = { optional = true, workspace = true }
 kamu-auth-rebac-services = { optional = true, workspace = true }
 
 alloy = { optional = true, version = "0.9", default-features = false, features = [
