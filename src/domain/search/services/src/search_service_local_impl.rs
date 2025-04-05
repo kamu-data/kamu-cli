@@ -76,6 +76,12 @@ impl SearchServiceLocal for SearchServiceLocalImpl {
             return Err(NatLangSearchNotEnabled.into());
         };
 
+        if prompt.trim().is_empty() {
+            return Ok(SearchLocalNatLangResult {
+                datasets: Vec::new(),
+            });
+        }
+
         // Encode prompt
         let prompt_vec = embeddings_encoder
             .encode(vec![prompt.to_string()])

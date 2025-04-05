@@ -122,7 +122,7 @@ pub struct DatasetQueryHints {
     /// query and the rest of data will be completely ignored.
     pub last_records_to_consider: Option<u64>,
 
-    /// Usually used for queries like `show schema` where actual schema is not
+    /// Usually used for queries like `show tables` where actual schema is not
     /// needed, allowing table provider to satisfy request much faster.
     pub does_not_need_schema: bool,
 }
