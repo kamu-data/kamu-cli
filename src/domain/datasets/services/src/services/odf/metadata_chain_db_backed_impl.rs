@@ -186,6 +186,7 @@ where
         let Some(prev_block_hash) = &head_block.prev_block_hash else {
             return Ok(None);
         };
+
         // Yes. If we are looking for key blocks only, we can use the cache
         if let odf::dataset::MetadataVisitorDecision::NextOfType(hint_flags) = hint
             && !hint_flags.has_data_flags()
@@ -256,7 +257,7 @@ where
                 let mut write_guard = self.state.write().unwrap();
                 write_guard.cached_key_blocks = key_blocks;
 
-                // Report cache hit
+                // Report cache miss
                 tracing::trace!(
                     dataset_id=%self.dataset_id,
                     num_blocks = write_guard.cached_key_blocks.len(),
