@@ -193,7 +193,7 @@ where
                 let requested_boundary = (tail_sequence_number, head_block.sequence_number);
 
                 // Trace the decision
-                tracing::debug!(
+                tracing::trace!(
                     dataset_id=%self.dataset_id,
                     requested_boundary=?requested_boundary,
                     hint_flags=?hint_flags,
@@ -207,7 +207,7 @@ where
                         read_guard.get_cached_key_blocks_for_range(requested_boundary)
                     {
                         // Report cache hit
-                        tracing::debug!(
+                        tracing::trace!(
                             dataset_id=%self.dataset_id,
                             num_blocks = cached_blocks_in_range.len(),
                             "Found key blocks in the cache"
@@ -255,7 +255,7 @@ where
                     write_guard.cached_key_blocks = key_blocks;
 
                     // Report cache hit
-                    tracing::debug!(
+                    tracing::trace!(
                         dataset_id=%self.dataset_id,
                         num_blocks = write_guard.cached_key_blocks.len(),
                         "No key blocks cached. Loaded key blocks from the repository"

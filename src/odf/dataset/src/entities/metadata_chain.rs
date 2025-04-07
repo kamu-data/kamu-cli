@@ -323,7 +323,7 @@ pub trait MetadataChainExt: MetadataChain {
             && tail_hash != Some(&hash)
         {
             // Trace the progress
-            tracing::debug!(
+            tracing::trace!(
                 current_block_hash=%hash,
                 sequence_number=block.sequence_number,
                 tail_sequence_number,
@@ -361,7 +361,7 @@ pub trait MetadataChainExt: MetadataChain {
             merged_decision = merge_decisions(&decisions);
 
             // Trace the updated decision
-            tracing::debug!(
+            tracing::trace!(
                 updated_visitors_decision=?merged_decision,
                 "Block visiting finished",
             );
