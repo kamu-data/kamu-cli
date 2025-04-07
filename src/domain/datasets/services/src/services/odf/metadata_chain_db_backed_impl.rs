@@ -45,19 +45,30 @@ impl State {
         &self,
         (min_boundary, max_boundary): (u64, u64),
     ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
+        // Ensure correct boundary
         assert!(min_boundary < max_boundary);
+
+        // No blocks yet?
         if self.cached_key_blocks.is_empty() {
             return None;
         }
 
+        // Find the first block that is greater than or equal to the min boundary
         let start_index = self
             .cached_key_blocks
             .binary_search_by_key(&min_boundary, |(_, block)| block.sequence_number)
             .unwrap_or_else(|x| x);
-        let end_index = self
-            .cached_key_blocks
+
+        // Use the start_index to reduce the search space for the max boundary
+        let end_index = self.cached_key_blocks[start_index..]
             .binary_search_by_key(&max_boundary, |(_, block)| block.sequence_number)
-            .unwrap_or_else(|x| x);
+            .unwrap_or_else(|x| x + start_index);
+
+        // The slice is [start_index, end_index)
+        //   [ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9 ]
+        //           min=2                  max=8
+        //             ^ start_index           |
+        //                                     ^ end_index
         Some(&self.cached_key_blocks[start_index..end_index])
     }
 }
