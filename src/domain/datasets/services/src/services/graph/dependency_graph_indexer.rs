@@ -13,14 +13,16 @@ use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::DatasetRegistry;
-use kamu_datasets::DatasetDependencyRepository;
+use kamu_datasets::{
+    DatasetDependencyRepository,
+    JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
+    JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER,
+};
 
 use crate::{
     extract_modified_dependencies_in_interval,
     DependencyChange,
     DependencyGraphServiceImpl,
-    JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
-    JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

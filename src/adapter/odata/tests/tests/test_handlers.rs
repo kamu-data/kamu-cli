@@ -394,7 +394,7 @@ impl TestHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
-                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
+                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add_value(SystemTimeSourceStub::new_set(
@@ -414,6 +414,7 @@ impl TestHarness {
                 .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
+                .add::<InMemoryDatasetKeyBlockRepository>()
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<LoginPasswordAuthProvider>()

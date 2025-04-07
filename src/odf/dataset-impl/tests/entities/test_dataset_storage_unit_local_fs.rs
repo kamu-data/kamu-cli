@@ -31,8 +31,8 @@ impl LocalFsStorageUnitHarness {
         b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>();
+            .add::<odf::dataset::DatasetLfsBuilderDefault>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>();
 
         let catalog = b.build();
 

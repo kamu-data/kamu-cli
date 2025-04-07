@@ -809,8 +809,8 @@ impl IngestTestHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
+            .add::<odf::dataset::DatasetLfsBuilderDefault>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),

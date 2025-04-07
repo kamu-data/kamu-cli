@@ -9,22 +9,19 @@
 
 use std::marker::PhantomData;
 
-use odf_metadata::{MetadataEventTypeFlags, Multihash};
+use odf_metadata::MetadataEventTypeFlags;
 
 use crate::{HashedMetadataBlockRef, Infallible};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetadataVisitorDecision {
     /// Stop Marker. A visitor who has reported the end of work will not be
     /// invited to visit again
     Stop,
     /// A request for the previous block
     Next,
-    /// A request for a specific previous block, specifying its hash.
-    /// Reserved for long jumps through the metadata chain
-    NextWithHash(Multihash),
     /// A request for previous blocks, of specific types, using flags.
     ///
     /// # Examples
@@ -39,6 +36,38 @@ pub enum MetadataVisitorDecision {
     /// return MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::SET_ATTACHMENTS | MetadataEventTypeFlags::SET_LICENSE);
     /// ```
     NextOfType(MetadataEventTypeFlags),
+}
+
+impl MetadataVisitorDecision {
+    pub fn merge_decisions(decisions: &[MetadataVisitorDecision]) -> MetadataVisitorDecision {
+        let mut merged_flags = MetadataEventTypeFlags::empty();
+        for decision in decisions {
+            match *decision {
+                // Single Next is enough to dominate
+                MetadataVisitorDecision::Next => return MetadataVisitorDecision::Next,
+
+                // Stop can be ignored
+                MetadataVisitorDecision::Stop => { /* continue */ } // Next
+
+                // NextOfType should be unioned
+                MetadataVisitorDecision::NextOfType(flags) => {
+                    merged_flags |= flags;
+                }
+            }
+            if *decision == MetadataVisitorDecision::Next {
+                // If any visitor requested the next block, this cannot be beaten
+                return MetadataVisitorDecision::Next;
+            }
+        }
+
+        if merged_flags.is_empty() {
+            // No flags requested, so we are satisfied
+            MetadataVisitorDecision::Stop
+        } else {
+            // We have a request for specific set of flags
+            MetadataVisitorDecision::NextOfType(merged_flags)
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

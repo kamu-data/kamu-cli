@@ -57,7 +57,7 @@ impl BaseGQLDatasetHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<DatabaseBackedOdfDatasetLfsBuilderImpl>()
+            .add::<DatasetLfsBuilderDatabaseBackedImpl>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
@@ -70,6 +70,7 @@ impl BaseGQLDatasetHarness {
             .add::<DatasetEntryServiceImpl>()
             .add::<InMemoryDatasetEntryRepository>()
             .add::<RebacDatasetRegistryFacadeImpl>()
+            .add::<InMemoryDatasetKeyBlockRepository>()
             .add_value(RunInfoDir::new(run_info_dir));
 
             if let Some(mock) = mock_dataset_action_authorizer {

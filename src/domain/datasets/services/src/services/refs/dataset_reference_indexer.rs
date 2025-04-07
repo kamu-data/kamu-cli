@@ -12,9 +12,11 @@ use std::sync::Arc;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::DatasetReferenceRepository;
-
-use crate::{JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER, JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER};
+use kamu_datasets::{
+    DatasetReferenceRepository,
+    JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
+    JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

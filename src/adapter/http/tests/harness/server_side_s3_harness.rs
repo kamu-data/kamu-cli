@@ -25,6 +25,7 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
+    InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -115,7 +116,7 @@ impl ServerSideS3Harness {
                 )
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
-                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetS3BuilderImpl>()
+                .add::<kamu_datasets_services::DatasetS3BuilderDatabaseBackedImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
@@ -133,6 +134,7 @@ impl ServerSideS3Harness {
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()
+                .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()

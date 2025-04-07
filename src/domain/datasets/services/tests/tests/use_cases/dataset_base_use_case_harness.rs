@@ -63,7 +63,7 @@ impl DatasetBaseUseCaseHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
-                .add::<DatabaseBackedOdfDatasetLfsBuilderImpl>()
+                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetAliasUpdateHandler>()
@@ -73,6 +73,8 @@ impl DatasetBaseUseCaseHarness {
                 .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
+                .add::<InMemoryDatasetKeyBlockRepository>()
+                .add::<DatasetKeyBlockUpdateHandler>()
                 .add::<DependencyGraphImmediateListener>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<TestDatasetOutboxListener>();

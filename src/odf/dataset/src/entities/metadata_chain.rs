@@ -39,6 +39,18 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
+    /// Returns the previous block relatively to the specified block,
+    /// attempting to use the hint flags as a quick skipping guideance.
+    /// In worst case, returns the nearest previous block.
+    /// Tail sequence number represents the minimal allowed block that can be
+    /// returned. When ommitted, the method will be iterating until the Seed
+    async fn get_preceding_block_with_hint(
+        &self,
+        head_block: &MetadataBlock,
+        tail_sequence_number: Option<u64>,
+        hint: MetadataVisitorDecision,
+    ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError>;
+
     /// Appends the block to the chain
     async fn append<'a>(
         &'a self,
@@ -253,6 +265,7 @@ pub trait MetadataChainExt: MetadataChain {
     /// which we will be making the traverse.
     ///
     /// Note: the interval is `[head, tail)` - tail is exclusive
+    #[tracing::instrument(level = "debug", skip_all, fields(?head_hash, ?tail_hash))]
     async fn accept_by_interval<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -262,43 +275,75 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + Send,
     {
+        // Collect initial decisions of visitors
         let mut decisions: Vec<_> = visitors
             .iter()
             .map(|visitor| visitor.initial_decision())
             .collect();
-        let mut all_visitors_finished = false;
-        let mut current_hash = head_hash.cloned();
 
-        // TODO: PERF: Add traversal optimizations such as skip-lists
-        while let Some(hash) = current_hash
-            && !all_visitors_finished
+        // Merge initial decisions
+        let mut merged_decision = MetadataVisitorDecision::merge_decisions(&decisions);
+
+        // Determine starting block
+        let mut current_hashed_block = if merged_decision == MetadataVisitorDecision::Stop {
+            // All visitors are already satisfied, no need to load any blocks
+            None
+        } else if let Some(head_hash) = head_hash {
+            // Load head block
+            let head_block = self
+                .get_block(head_hash)
+                .await
+                .map_err(IterBlocksError::from)?;
+            Some((head_hash.clone(), head_block))
+        } else {
+            // No starting block
+            None
+        };
+
+        // Determine the sequence number of tail block
+        let tail_sequence_number = if merged_decision == MetadataVisitorDecision::Stop {
+            // No need to iterate
+            None
+        } else if let Some(tail_hash) = tail_hash {
+            // Read from the tail block
+            Some(
+                self.get_block(tail_hash)
+                    .await
+                    .map_err(IterBlocksError::from)?
+                    .sequence_number,
+            )
+        } else {
+            // Tail is the seed block
+            None
+        };
+
+        // Iterate over blocks until we sasisfy all visitors or reach the tail
+        while let Some((hash, block)) = current_hashed_block
+            && merged_decision != MetadataVisitorDecision::Stop
             && tail_hash != Some(&hash)
         {
-            let block = self.get_block(&hash).await.map_err(IterBlocksError::from)?;
+            // Trace the progress
+            tracing::trace!(
+                current_block_hash=%hash,
+                sequence_number=block.sequence_number,
+                tail_sequence_number,
+                event_type=?MetadataEventTypeFlags::from(&block.event),
+                visitors_decision=?merged_decision,
+                "Traversing through block",
+            );
+
+            // Feed each visitor with the currently loaded block
             let hashed_block_ref = (&hash, &block);
-
-            let mut stopped_visitors = 0;
-
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
                 match decision {
-                    MetadataVisitorDecision::Stop => {
-                        stopped_visitors += 1;
-                    }
+                    MetadataVisitorDecision::Stop => {}
                     MetadataVisitorDecision::NextOfType(type_flags) if type_flags.is_empty() => {
-                        stopped_visitors += 1;
                         *decision = MetadataVisitorDecision::Stop;
                     }
                     MetadataVisitorDecision::Next => {
                         *decision = visitor
                             .visit(hashed_block_ref)
                             .map_err(AcceptVisitorError::Visitor)?;
-                    }
-                    MetadataVisitorDecision::NextWithHash(requested_hash) => {
-                        if hash == *requested_hash {
-                            *decision = visitor
-                                .visit(hashed_block_ref)
-                                .map_err(AcceptVisitorError::Visitor)?;
-                        }
                     }
                     MetadataVisitorDecision::NextOfType(requested_flags) => {
                         let block_flag = MetadataEventTypeFlags::from(&block.event);
@@ -312,10 +357,28 @@ pub trait MetadataChainExt: MetadataChain {
                 }
             }
 
-            all_visitors_finished = visitors.len() == stopped_visitors;
-            current_hash = block.prev_block_hash;
+            // Measure the progress after this iteration
+            merged_decision = MetadataVisitorDecision::merge_decisions(&decisions);
+
+            // Trace the updated decision
+            tracing::trace!(
+                updated_visitors_decision=?merged_decision,
+                "Block visiting finished",
+            );
+
+            // When all visitors are satisfied, no need to load any more blocks
+            if merged_decision == MetadataVisitorDecision::Stop {
+                break;
+            }
+
+            // Try to jump to the previous block with satisfaction hints taken into account
+            current_hashed_block = self
+                .get_preceding_block_with_hint(&block, tail_sequence_number, merged_decision)
+                .await
+                .map_err(IterBlocksError::from)?;
         }
 
+        // Finish all visitors
         for visitor in visitors {
             visitor.finish().map_err(AcceptVisitorError::Visitor)?;
         }

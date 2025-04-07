@@ -14,7 +14,7 @@ use kamu_datasets::{DatasetReferenceService, GetDatasetReferenceError, SetDatase
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatabaseBackedOdfMetadataChainRefRepositoryImpl<TStorageRefRepo>
+pub struct MetadataChainRefRepositoryDatabaseBackedImpl<TStorageRefRepo>
 where
     TStorageRefRepo: odf::storage::ReferenceRepository + Send + Sync,
 {
@@ -28,7 +28,7 @@ struct State {
     maybe_dataset_ref_service: Option<Arc<dyn DatasetReferenceService>>,
 }
 
-impl<TStorageRefRepo> DatabaseBackedOdfMetadataChainRefRepositoryImpl<TStorageRefRepo>
+impl<TStorageRefRepo> MetadataChainRefRepositoryDatabaseBackedImpl<TStorageRefRepo>
 where
     TStorageRefRepo: odf::storage::ReferenceRepository + Send + Sync,
 {
@@ -50,7 +50,7 @@ where
 
 #[async_trait::async_trait]
 impl<TStorageRefRepo> odf::dataset::MetadataChainReferenceRepository
-    for DatabaseBackedOdfMetadataChainRefRepositoryImpl<TStorageRefRepo>
+    for MetadataChainRefRepositoryDatabaseBackedImpl<TStorageRefRepo>
 where
     TStorageRefRepo: odf::storage::ReferenceRepository + Send + Sync,
 {

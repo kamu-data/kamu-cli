@@ -14,6 +14,7 @@ use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use itertools::Itertools;
 use kamu_core::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::JOB_KAMU_DATASETS_DATASET_KEY_BLOCK_INDEXER;
 use kamu_search::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +42,7 @@ pub struct SearchServiceLocalIndexerConfig {
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
     job_name: "dev.kamu.search.SearchServiceLocalIndexer",
-    depends_on: &[],
+    depends_on: &[JOB_KAMU_DATASETS_DATASET_KEY_BLOCK_INDEXER],
     requires_transaction: true,
 })]
 pub struct SearchServiceLocalIndexer {

@@ -316,7 +316,7 @@ where
     type Error = Infallible;
 
     fn initial_decision(&self) -> Decision {
-        self.initial_decision.clone()
+        self.initial_decision
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
@@ -362,7 +362,7 @@ where
     type Error = E;
 
     fn initial_decision(&self) -> Decision {
-        self.initial_decision.clone()
+        self.initial_decision
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {

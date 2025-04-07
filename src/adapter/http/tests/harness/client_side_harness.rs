@@ -28,6 +28,7 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
+    InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -128,7 +129,7 @@ impl ClientSideHarness {
         b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>();
+            .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -181,6 +182,8 @@ impl ClientSideHarness {
         b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();
         b.add::<InMemoryDatasetEntryRepository>();
+        b.add::<InMemoryDatasetKeyBlockRepository>();
+
         b.add::<AccountServiceImpl>();
         b.add::<InMemoryAccountRepository>();
         b.add::<LoginPasswordAuthProvider>();

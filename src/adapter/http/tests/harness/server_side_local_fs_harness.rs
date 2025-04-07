@@ -37,6 +37,7 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
     InMemoryDatasetEntryRepository,
+    InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -132,7 +133,7 @@ impl ServerSideLocalFsHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
-                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
+                .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
@@ -149,6 +150,7 @@ impl ServerSideLocalFsHarness {
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()
+                .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()

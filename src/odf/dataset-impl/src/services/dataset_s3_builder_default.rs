@@ -21,12 +21,12 @@ use crate::{DatasetImpl, MetadataChainImpl, MetadataChainReferenceRepositoryImpl
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetDefaultS3Builder {
+pub struct DatasetS3BuilderDefault {
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
 }
 
 #[component(pub)]
-impl DatasetDefaultS3Builder {
+impl DatasetS3BuilderDefault {
     /// # Arguments
     ///
     /// * `metadata_cache_local_fs_path` - when specified enables the local FS
@@ -75,7 +75,7 @@ impl DatasetDefaultS3Builder {
     }
 }
 
-impl DatasetS3Builder for DatasetDefaultS3Builder {
+impl DatasetS3Builder for DatasetS3BuilderDefault {
     fn build_s3_dataset(
         &self,
         _dataset_id: &odf_metadata::DatasetID,

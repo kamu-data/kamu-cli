@@ -19,11 +19,13 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
-use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
+use kamu_datasets::{
+    DatasetEntry,
+    DatasetEntryRepository,
+    JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
+};
 use messaging_outbox::JOB_MESSAGING_OUTBOX_STARTUP;
 use time_source::SystemTimeSource;
-
-use crate::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

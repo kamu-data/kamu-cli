@@ -220,8 +220,8 @@ impl DatasetEntryServiceHarness {
             b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir));
             b.bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>();
             b.bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>();
-            b.add::<odf::dataset::DatasetDefaultLfsBuilder>();
-            b.bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>();
+            b.add::<odf::dataset::DatasetLfsBuilderDefault>();
+            b.bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>();
 
             b.add::<DatasetEntryServiceImpl>();
             b.add::<DatasetEntryIndexer>();

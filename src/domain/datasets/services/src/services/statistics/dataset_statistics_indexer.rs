@@ -12,13 +12,13 @@ use std::sync::Arc;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::DatasetStatisticsRepository;
-
-use crate::{
-    compute_dataset_statistics_increment,
+use kamu_datasets::{
+    DatasetStatisticsRepository,
     JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
     JOB_KAMU_DATASETS_DATASET_STATISTICS_INDEXER,
 };
+
+use crate::compute_dataset_statistics_increment;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -99,7 +99,7 @@ impl DatasetStatisticsIndexer {
 #[async_trait::async_trait]
 impl InitOnStartup for DatasetStatisticsIndexer {
     #[tracing::instrument(
-        level = "debug",
+        level = "info",
         skip_all,
         name = "DatasetStatisticsIndexer::run_initialization"
     )]

@@ -20,6 +20,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
+    InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::testing::FakeConnectingDatasetEntryWriter;
@@ -638,7 +639,7 @@ impl DependencyGraphHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<DatabaseBackedOdfDatasetLfsBuilderImpl>()
+            .add::<DatasetLfsBuilderDatabaseBackedImpl>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<DidGeneratorDefault>()
             .add::<RebacDatasetRegistryFacadeImpl>()
@@ -659,7 +660,8 @@ impl DependencyGraphHarness {
         .add::<FakeConnectingDatasetEntryWriter>()
         .add::<CreateDatasetUseCaseHelper>()
         .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>();
+        .add::<InMemoryDatasetReferenceRepository>()
+        .add::<InMemoryDatasetKeyBlockRepository>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,

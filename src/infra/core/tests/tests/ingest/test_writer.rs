@@ -1237,8 +1237,8 @@ impl Harness {
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<odf::dataset::DatasetDefaultLfsBuilder>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
+            .add::<odf::dataset::DatasetLfsBuilderDefault>()
+            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
             .build();
 
         let storage_unit = catalog
