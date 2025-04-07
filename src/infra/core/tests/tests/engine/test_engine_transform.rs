@@ -168,7 +168,7 @@ impl DatasetHelper {
             std::fs::remove_file(self.checkpoint_path(orig_checkpoint).await).unwrap();
         }
 
-        // Rewrite last block
+        // Overwrite last block
         self.dataset
             .as_metadata_chain()
             .set_ref(

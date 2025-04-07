@@ -248,7 +248,7 @@ pub enum SyncError {
     #[error(transparent)]
     DestinationAhead(#[from] DestinationAheadError),
     #[error(transparent)]
-    RewriteSeedBlock(#[from] RewriteSeedBlockError),
+    OverwriteSeedBlock(#[from] OverwriteSeedBlockError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
     #[error("Dataset was updated concurrently")]
@@ -421,7 +421,7 @@ pub struct UnsupportedIpfsStorageTypeError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Changing dataset id or type is restricted")]
-pub struct RewriteSeedBlockError {}
+#[error("Overwriting dataset id or type is restricted")]
+pub struct OverwriteSeedBlockError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

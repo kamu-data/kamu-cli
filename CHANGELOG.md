@@ -17,6 +17,8 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - Multiple performance improvements in batch queries to avoid unnecessary metadata scanning.
 - New `PushIngestDataUseCase` and used it in Http `/ingest` handler and `ingest_command`
+### Changed
+- `kamu push/pull` command with `--force` flag now does not allow overwriting of seed block
 
 ## [0.231.0] - 2025-03-31
 ### Added

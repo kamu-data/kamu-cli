@@ -15,7 +15,7 @@ use futures::SinkExt;
 use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
-use kamu_core::{RewriteSeedBlockError, *};
+use kamu_core::{OverwriteSeedBlockError, *};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseOptions,
@@ -107,8 +107,8 @@ impl WsSmartTransferProtocolClient {
                     ClientInternalError::new(e.error_message.as_str(), e.phase),
                 ))))
             }
-            Err(DatasetPullRequestError::SeedBlockRewriteRestricted(_)) => {
-                Err(PullClientError::RewriteSeedBlock(RewriteSeedBlockError {}))
+            Err(DatasetPullRequestError::SeedBlockOverwriteRestricted(_)) => {
+                Err(PullClientError::OverwriteSeedBlock(OverwriteSeedBlockError {}))
             }
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
@@ -299,8 +299,8 @@ impl WsSmartTransferProtocolClient {
                 PushClientError::ReadFailed(PushReadError::new(e, PushPhase::MetadataRequest))
             })?
             .map_err(|e| match e {
-                DatasetPushMetadataError::SeedBlockRewriteRestricted(_) => {
-                    PushClientError::RewriteSeedBlock(RewriteSeedBlockError {})
+                DatasetPushMetadataError::SeedBlockOverwriteRestricted(_) => {
+                    PushClientError::OverwriteSeedBlock(OverwriteSeedBlockError {})
                 }
             })?;
 
@@ -628,7 +628,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 if transfer_options.force_update_if_diverged
                     && !ensure_seed_block_equals(new_blocks.front(), dst.get_handle())
                 {
-                    return Err(SyncError::RewriteSeedBlock(RewriteSeedBlockError {}));
+                    return Err(SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}));
                 }
                 (**dst).clone()
             } else {
@@ -844,7 +844,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(match e {
-                    PushClientError::RewriteSeedBlock(err) => SyncError::RewriteSeedBlock(err),
+                    PushClientError::OverwriteSeedBlock(err) => SyncError::OverwriteSeedBlock(err),
                     e => SyncError::Internal(e.int_err()),
                 });
             }

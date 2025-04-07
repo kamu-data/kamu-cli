@@ -15,7 +15,7 @@ use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::AuthenticationService;
-use kamu_core::{CorruptedSourceError, DatasetRegistry, RewriteSeedBlockError};
+use kamu_core::{CorruptedSourceError, DatasetRegistry, OverwriteSeedBlockError};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseOptions,
@@ -102,10 +102,10 @@ impl AxumServerPushProtocolInstance {
                         .await;
                 }
             }
-            Err(PushServerError::RewriteSeedBlock(err)) => {
+            Err(PushServerError::OverwriteSeedBlock(err)) => {
                 let payload = DatasetPushMetadataResponse::Err(
-                    DatasetPushMetadataError::SeedBlockRewriteRestricted(
-                        DatasetPushMetadataSeedBlockRewriteRestrictedError {},
+                    DatasetPushMetadataError::SeedBlockOverwriteRestricted(
+                        DatasetPushMetadataSeedBlockOverwriteRestrictedError {},
                     ),
                 );
                 axum_write_close_payload::<DatasetPushMetadataResponse>(&mut self.socket, payload)
@@ -365,7 +365,9 @@ impl AxumServerPushProtocolInstance {
             && push_request.force_update_if_diverged
             && !ensure_seed_block_equals(new_blocks.front(), dataset_handle)
         {
-            return Err(PushServerError::RewriteSeedBlock(RewriteSeedBlockError {}));
+            return Err(PushServerError::OverwriteSeedBlock(
+                OverwriteSeedBlockError {},
+            ));
         }
 
         axum_write_payload::<DatasetPushMetadataResponse>(
