@@ -10,6 +10,7 @@
 use std::fmt::{self, Display};
 
 use internal_error::{BoxedError, InternalError};
+use kamu_core::RewriteSeedBlockError;
 use kamu_datasets::NameCollisionError;
 use thiserror::Error;
 
@@ -142,8 +143,8 @@ pub enum PullServerError {
 
 #[derive(Error, Debug)]
 pub enum PullClientError {
-    #[error(transparent)]
-    ValidationError(PushValidationError),
+    #[error("Changing dataset id or kind is restricted")]
+    RewriteSeedBlock(RewriteSeedBlockError),
 
     #[error(transparent)]
     ReadFailed(PullReadError),
@@ -167,7 +168,7 @@ pub enum PullClientError {
 #[derive(Error, Debug)]
 pub enum PushServerError {
     #[error(transparent)]
-    ValidationError(PushValidationError),
+    RewriteSeedBlock(RewriteSeedBlockError),
 
     #[error(transparent)]
     ReadFailed(PushReadError),
@@ -190,7 +191,7 @@ pub enum PushServerError {
 #[derive(Error, Debug)]
 pub enum PushClientError {
     #[error(transparent)]
-    ValidationError(PushValidationError),
+    RewriteSeedBlock(RewriteSeedBlockError),
 
     #[error(transparent)]
     ReadFailed(PushReadError),
@@ -254,21 +255,6 @@ pub struct ObjectUploadError {
 impl fmt::Display for ObjectUploadError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ObjectUploadError: status={}", self.response.status())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum PushValidationError {
-    SeedBlockRewriteRestricted,
-}
-
-impl fmt::Display for PushValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::SeedBlockRewriteRestricted => write!(f, "Rewriting seed block is restricted"),
-        }
     }
 }
 

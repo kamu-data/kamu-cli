@@ -15,7 +15,7 @@ use futures::SinkExt;
 use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
-use kamu_core::*;
+use kamu_core::{RewriteSeedBlockError, *};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseOptions,
@@ -107,9 +107,9 @@ impl WsSmartTransferProtocolClient {
                     ClientInternalError::new(e.error_message.as_str(), e.phase),
                 ))))
             }
-            Err(DatasetPullRequestError::SeedBlockRewriteRestricted(_)) => Err(
-                PullClientError::ValidationError(PushValidationError::SeedBlockRewriteRestricted),
-            ),
+            Err(DatasetPullRequestError::SeedBlockRewriteRestricted(_)) => {
+                Err(PullClientError::RewriteSeedBlock(RewriteSeedBlockError {}))
+            }
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
                 tail,
@@ -300,9 +300,7 @@ impl WsSmartTransferProtocolClient {
             })?
             .map_err(|e| match e {
                 DatasetPushMetadataError::SeedBlockRewriteRestricted(_) => {
-                    PushClientError::ValidationError(
-                        PushValidationError::SeedBlockRewriteRestricted,
-                    )
+                    PushClientError::RewriteSeedBlock(RewriteSeedBlockError {})
                 }
             })?;
 
@@ -628,11 +626,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             let dst = if let Some(dst) = dst {
                 // Check is incoming seed is different from existing
                 if transfer_options.force_update_if_diverged
-                    && let Some((_, first_incoming_block)) = new_blocks.front()
-                    && let odf::MetadataEvent::Seed(seed_event) = &first_incoming_block.event
-                    && &seed_event.dataset_id != dst.get_id()
+                    && !ensure_seed_block_equals(new_blocks.front(), dst.get_handle())
                 {
-                    InternalError::bail("Rewriting seed block is restricted")?;
+                    return Err(SyncError::RewriteSeedBlock(RewriteSeedBlockError {}));
                 }
                 (**dst).clone()
             } else {
@@ -847,7 +843,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok(_) => {}
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
-                return Err(SyncError::Internal(e.int_err()));
+                return Err(match e {
+                    PushClientError::RewriteSeedBlock(err) => SyncError::RewriteSeedBlock(err),
+                    e => SyncError::Internal(e.int_err()),
+                });
             }
         };
 

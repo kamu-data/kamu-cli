@@ -726,3 +726,19 @@ pub async fn dataset_export_object_file(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Check if the seed block has the same `dataset_id` and `kind` as the existing
+/// dataset.
+pub(crate) fn ensure_seed_block_equals(
+    first_incoming_block_maybe: Option<&(odf::Multihash, odf::MetadataBlock)>,
+    existing_dataset_handle: &odf::DatasetHandle,
+) -> bool {
+    if let Some((_, first_incoming_block)) = first_incoming_block_maybe
+        && let odf::MetadataEvent::Seed(seed_event) = &first_incoming_block.event
+        && (seed_event.dataset_id != existing_dataset_handle.id
+            || seed_event.dataset_kind != existing_dataset_handle.kind)
+    {
+        return false;
+    }
+    true
+}

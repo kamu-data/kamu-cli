@@ -15,7 +15,7 @@ use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::AuthenticationService;
-use kamu_core::{CorruptedSourceError, DatasetRegistry};
+use kamu_core::{CorruptedSourceError, DatasetRegistry, RewriteSeedBlockError};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseOptions,
@@ -102,9 +102,7 @@ impl AxumServerPushProtocolInstance {
                         .await;
                 }
             }
-            Err(PushServerError::ValidationError(
-                PushValidationError::SeedBlockRewriteRestricted,
-            )) => {
+            Err(PushServerError::RewriteSeedBlock(err)) => {
                 let payload = DatasetPushMetadataResponse::Err(
                     DatasetPushMetadataError::SeedBlockRewriteRestricted(
                         DatasetPushMetadataSeedBlockRewriteRestrictedError {},
@@ -114,8 +112,8 @@ impl AxumServerPushProtocolInstance {
                     .await;
 
                 tracing::error!(
-                  error = ?PushValidationError::SeedBlockRewriteRestricted,
-                  error_msg = %PushValidationError::SeedBlockRewriteRestricted,
+                  error = ?err,
+                  error_msg = %err,
                   "Push process aborted with error",
                 );
             }
@@ -365,13 +363,9 @@ impl AxumServerPushProtocolInstance {
 
         if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref()
             && push_request.force_update_if_diverged
-            && let Some((_, first_incoming_block)) = new_blocks.front()
-            && let odf::MetadataEvent::Seed(seed_event) = &first_incoming_block.event
-            && seed_event.dataset_id != dataset_handle.id
+            && !ensure_seed_block_equals(new_blocks.front(), dataset_handle)
         {
-            return Err(PushServerError::ValidationError(
-                PushValidationError::SeedBlockRewriteRestricted,
-            ));
+            return Err(PushServerError::RewriteSeedBlock(RewriteSeedBlockError {}));
         }
 
         axum_write_payload::<DatasetPushMetadataResponse>(
