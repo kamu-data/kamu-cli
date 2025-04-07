@@ -282,7 +282,7 @@ pub trait MetadataChainExt: MetadataChain {
             .collect();
 
         // Merge initial decisions
-        let mut merged_decision = merge_decisions(&decisions);
+        let mut merged_decision = MetadataVisitorDecision::merge_decisions(&decisions);
 
         // Determine starting block
         let mut current_hashed_block = if merged_decision == MetadataVisitorDecision::Stop {
@@ -358,7 +358,7 @@ pub trait MetadataChainExt: MetadataChain {
             }
 
             // Measure the progress after this iteration
-            merged_decision = merge_decisions(&decisions);
+            merged_decision = MetadataVisitorDecision::merge_decisions(&decisions);
 
             // Trace the updated decision
             tracing::trace!(

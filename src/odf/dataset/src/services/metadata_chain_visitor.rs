@@ -38,6 +38,38 @@ pub enum MetadataVisitorDecision {
     NextOfType(MetadataEventTypeFlags),
 }
 
+impl MetadataVisitorDecision {
+    pub fn merge_decisions(decisions: &[MetadataVisitorDecision]) -> MetadataVisitorDecision {
+        let mut merged_flags = MetadataEventTypeFlags::empty();
+        for decision in decisions {
+            match *decision {
+                // Single Next is enough to dominate
+                MetadataVisitorDecision::Next => return MetadataVisitorDecision::Next,
+
+                // Stop can be ignored
+                MetadataVisitorDecision::Stop => { /* continue */ } // Next
+
+                // NextOfType should be unioned
+                MetadataVisitorDecision::NextOfType(flags) => {
+                    merged_flags |= flags;
+                }
+            }
+            if *decision == MetadataVisitorDecision::Next {
+                // If any visitor requested the next block, this cannot be beaten
+                return MetadataVisitorDecision::Next;
+            }
+        }
+
+        if merged_flags.is_empty() {
+            // No flags requested, so we are satisfied
+            MetadataVisitorDecision::Stop
+        } else {
+            // We have a request for specific set of flags
+            MetadataVisitorDecision::NextOfType(merged_flags)
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: PERF: MetadataChainVisitor::visit(): use Cow<HashedMetadataBlock>.
@@ -210,38 +242,6 @@ where
             Some(inner) => inner.visit(hashed_block_ref),
             None => unreachable!(),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn merge_decisions(decisions: &[MetadataVisitorDecision]) -> MetadataVisitorDecision {
-    let mut merged_flags = MetadataEventTypeFlags::empty();
-    for decision in decisions {
-        match *decision {
-            // Single Next is enough to dominate
-            MetadataVisitorDecision::Next => return MetadataVisitorDecision::Next,
-
-            // Stop can be ignored
-            MetadataVisitorDecision::Stop => { /* continue */ } // Next
-
-            // NextOfType should be unioned
-            MetadataVisitorDecision::NextOfType(flags) => {
-                merged_flags |= flags;
-            }
-        }
-        if *decision == MetadataVisitorDecision::Next {
-            // If any visitor requested the next block, this cannot be beaten
-            return MetadataVisitorDecision::Next;
-        }
-    }
-
-    if merged_flags.is_empty() {
-        // No flags requested, so we are satisfied
-        MetadataVisitorDecision::Stop
-    } else {
-        // We have a request for specific set of flags
-        MetadataVisitorDecision::NextOfType(merged_flags)
     }
 }
 
