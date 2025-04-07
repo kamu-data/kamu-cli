@@ -442,13 +442,13 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
 
     async fn get_preceding_block_with_hint(
         &self,
-        block: &odf::MetadataBlock,
+        head_block: &odf::MetadataBlock,
         tail_sequence_number: Option<u64>,
         hint: odf::dataset::MetadataVisitorDecision,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::GetBlockError> {
         (self.on_read)(1);
         self.chain
-            .get_preceding_block_with_hint(block, tail_sequence_number, hint)
+            .get_preceding_block_with_hint(head_block, tail_sequence_number, hint)
             .await
     }
 

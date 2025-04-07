@@ -46,7 +46,7 @@ pub trait MetadataChain: Send + Sync {
     /// returned. When ommitted, the method will be iterating until the Seed
     async fn get_preceding_block_with_hint(
         &self,
-        block: &MetadataBlock,
+        head_block: &MetadataBlock,
         tail_sequence_number: Option<u64>,
         hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError>;

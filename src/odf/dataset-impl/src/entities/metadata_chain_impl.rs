@@ -82,7 +82,7 @@ where
 
     async fn get_preceding_block_with_hint(
         &self,
-        block: &MetadataBlock,
+        head_block: &MetadataBlock,
         tail_sequence_number: Option<u64>,
         hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError> {
@@ -90,14 +90,14 @@ where
         assert!(hint != MetadataVisitorDecision::Stop);
 
         // Have we reached the tail? (if specified the boundary, otherwise Seed=0)
-        if tail_sequence_number.unwrap_or_default() >= block.sequence_number {
+        if tail_sequence_number.unwrap_or_default() >= head_block.sequence_number {
             // We are at the tail, no need to go further
             return Ok(None);
         }
 
         // No hints are supported in default chain implementation
         // Simply take the previous block, unless we reached the seed
-        if let Some(prev_block_hash) = &block.prev_block_hash {
+        if let Some(prev_block_hash) = &head_block.prev_block_hash {
             // Got previous block
             let prev_block = self.get_block(prev_block_hash).await?;
             Ok(Some((prev_block_hash.clone(), prev_block)))

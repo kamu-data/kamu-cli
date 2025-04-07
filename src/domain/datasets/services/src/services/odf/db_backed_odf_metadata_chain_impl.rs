@@ -168,7 +168,7 @@ where
 
     async fn get_preceding_block_with_hint(
         &self,
-        block: &odf::MetadataBlock,
+        head_block: &odf::MetadataBlock,
         tail_sequence_number: Option<u64>,
         hint: odf::dataset::MetadataVisitorDecision,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::storage::GetBlockError> {
@@ -177,20 +177,20 @@ where
 
         // Have we reached the tail? (if specified the boundary, otherwise Seed=0)
         let tail_sequence_number = tail_sequence_number.unwrap_or_default();
-        if tail_sequence_number >= block.sequence_number {
+        if tail_sequence_number >= head_block.sequence_number {
             // We are at the tail, no need to go further
             return Ok(None);
         }
 
         // Is there a previous block in general?
-        if let Some(prev_block_hash) = &block.prev_block_hash {
+        if let Some(prev_block_hash) = &head_block.prev_block_hash {
             // Yes. If we are looking for key blocks only, we can use the cache
             if let odf::dataset::MetadataVisitorDecision::NextOfType(hint_flags) = hint
                 && hint_flags.consists_of_key_blocks_only()
             {
                 // This is the working range of our iteration [min, max).
                 // We should not return blocks outside of this range.
-                let requested_boundary = (tail_sequence_number, block.sequence_number);
+                let requested_boundary = (tail_sequence_number, head_block.sequence_number);
 
                 // Trace the decision
                 tracing::debug!(
