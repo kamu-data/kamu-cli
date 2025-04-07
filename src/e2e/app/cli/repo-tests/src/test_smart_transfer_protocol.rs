@@ -47,6 +47,10 @@ test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_sequence);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_force_overwrite_seed_block);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 test_smart_transfer_protocol_permutations!(test_smart_push_force_smart_pull_force);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1876,6 +1880,170 @@ async fn test_smart_push_trigger_dependent_dataset_update(
             }),
             tail_result
         );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_smart_push_smart_pull_force_overwrite_seed_block(
+    mut kamu_api_server_client: KamuApiServerClient,
+    is_push_workspace_multi_tenant: bool,
+    is_pull_workspace_multi_tenant: bool,
+) {
+    let dataset_alias = odf::DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_ROOT_PLAYER_NAME.clone(),
+    );
+    let dataset_derivative_alias = odf::DatasetAlias::new(
+        Some(E2E_USER_ACCOUNT_NAME.clone()),
+        DATASET_DERIVATIVE_LEADERBOARD_NAME.clone(),
+    );
+
+    let kamu_api_server_dataset_endpoint = kamu_api_server_client
+        .dataset()
+        .get_odf_endpoint(&dataset_alias);
+
+    // 1. Grub a token
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    // 2. Pushing the dataset to the API server
+    {
+        let kamu_in_push_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
+
+        // 2.1. Add the dataset
+        kamu_in_push_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        kamu_in_push_workspace
+            .execute_with_input(
+                ["add", "--stdin"],
+                DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+            )
+            .await
+            .success();
+
+        // 2.1. Ingest data to the dataset
+        kamu_in_push_workspace
+            .ingest_data(
+                &dataset_alias.dataset_name,
+                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            )
+            .await;
+
+        // 2.2. Login to the API server
+        kamu_in_push_workspace
+            .execute([
+                "login",
+                kamu_api_server_client.get_base_url().as_str(),
+                "--access-token",
+                token.as_str(),
+            ])
+            .await
+            .success();
+
+        // Initial dataset push
+        kamu_in_push_workspace
+            .assert_success_command_execution(
+                [
+                    "push",
+                    dataset_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--visibility",
+                    "public",
+                ],
+                None,
+                Some([r#"1 dataset\(s\) pushed"#]),
+            )
+            .await;
+
+        // Should fail without force flag
+        kamu_in_push_workspace
+            .assert_failure_command_execution(
+                [
+                    "push",
+                    dataset_derivative_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                ],
+                None,
+                Some([r#"Failed to push 1 dataset\(s\)"#]),
+            )
+            .await;
+
+        // Should fail push with force flag
+        kamu_in_push_workspace
+            .assert_failure_command_execution(
+                [
+                    "push",
+                    dataset_derivative_alias.dataset_name.as_str(),
+                    "--to",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--force",
+                ],
+                None,
+                Some([r#"Failed to push 1 dataset\(s\)"#]),
+            )
+            .await;
+    }
+
+    // 3. Pulling the dataset from the API server
+    {
+        let kamu_in_pull_workspace =
+            KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
+
+        // 3.1. Add the dataset
+        kamu_in_pull_workspace
+            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+            .await
+            .success();
+
+        // Should fail without force flag
+        kamu_in_pull_workspace
+            .assert_failure_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--as",
+                    dataset_alias.dataset_name.as_str(),
+                ],
+                None,
+                Some([r#"Failed to update 1 dataset\(s\)"#]),
+            )
+            .await;
+
+        // Should fail with force flag
+        kamu_in_pull_workspace
+            .assert_failure_command_execution(
+                [
+                    "pull",
+                    kamu_api_server_dataset_endpoint.as_str(),
+                    "--as",
+                    dataset_alias.dataset_name.as_str(),
+                    "--force",
+                ],
+                None,
+                Some([r#"Failed to update 1 dataset\(s\)"#]),
+            )
+            .await;
+
+        if is_pull_workspace_multi_tenant {
+            pretty_assertions::assert_eq!(
+                [(
+                    dataset_alias.dataset_name,
+                    Some(odf::DatasetVisibility::Private)
+                )],
+                *kamu_in_pull_workspace
+                    .list_datasets()
+                    .await
+                    .into_iter()
+                    .map(|d| (d.name, d.visibility))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }
 

@@ -107,6 +107,9 @@ impl WsSmartTransferProtocolClient {
                     ClientInternalError::new(e.error_message.as_str(), e.phase),
                 ))))
             }
+            Err(DatasetPullRequestError::SeedBlockOverwriteRestricted(_)) => Err(
+                PullClientError::OverwriteSeedBlock(OverwriteSeedBlockError {}),
+            ),
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
                 tail,
@@ -290,10 +293,15 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Reading push metadata response");
 
-        let dataset_metadata_push_response = read_payload::<DatasetPushMetadataAccepted>(socket)
+        let dataset_metadata_push_response = read_payload::<DatasetPushMetadataResponse>(socket)
             .await
             .map_err(|e| {
                 PushClientError::ReadFailed(PushReadError::new(e, PushPhase::MetadataRequest))
+            })?
+            .map_err(|e| match e {
+                DatasetPushMetadataError::SeedBlockOverwriteRestricted(_) => {
+                    PushClientError::OverwriteSeedBlock(OverwriteSeedBlockError {})
+                }
             })?;
 
         Ok(dataset_metadata_push_response)
@@ -523,7 +531,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: Option<Arc<dyn odf::Dataset>>,
+        dst: Option<&ResolvedDataset>,
         dst_alias: Option<&odf::DatasetAlias>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
@@ -616,7 +624,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
             // Create destination dataset if not exists
             let dst = if let Some(dst) = dst {
-                dst
+                if transfer_options.force_update_if_diverged
+                    && !ensure_seed_not_in_conflict(new_blocks.front(), dst.get_handle())
+                {
+                    return Err(SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}));
+                }
+                (**dst).clone()
             } else {
                 let (first_hash, first_block) = new_blocks.pop_front().unwrap();
                 let seed_block = first_block
@@ -829,7 +842,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok(_) => {}
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
-                return Err(SyncError::Internal(e.int_err()));
+                return Err(match e {
+                    PushClientError::OverwriteSeedBlock(err) => SyncError::OverwriteSeedBlock(err),
+                    e => SyncError::Internal(e.int_err()),
+                });
             }
         };
 

@@ -18,6 +18,7 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `DatasetsMut::create_empty()` & `DatasetsMut::create_from_snapshot()`: alias validation in multi-tenant mode.
 ### Changed
 - GQL: `DatasetsMut::create_empty()` & `DatasetsMut::create_from_snapshot()`: `dataset_visibility` is now mandatory.
+- `kamu push/pull` command with `--force` flag now does not allow overwriting of seed block
 ### Fixed
 - Multiple performance improvements in batch queries to avoid unnecessary metadata scanning.
 - New `PushIngestDataUseCase` and used it in Http `/ingest` handler and `ingest_command`.

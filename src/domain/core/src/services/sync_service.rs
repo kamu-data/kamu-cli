@@ -248,6 +248,8 @@ pub enum SyncError {
     #[error(transparent)]
     DestinationAhead(#[from] DestinationAheadError),
     #[error(transparent)]
+    OverwriteSeedBlock(#[from] OverwriteSeedBlockError),
+    #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
     #[error("Dataset was updated concurrently")]
     UpdatedConcurrently(#[source] BoxedError),
@@ -415,5 +417,11 @@ impl From<IpfsAddError> for SyncError {
 pub struct UnsupportedIpfsStorageTypeError {
     pub url: Url,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Overwriting dataset id or type is restricted")]
+pub struct OverwriteSeedBlockError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

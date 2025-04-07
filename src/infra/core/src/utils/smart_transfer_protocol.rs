@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{SyncError, SyncListener, SyncResult};
+use kamu_core::{ResolvedDataset, SyncError, SyncListener, SyncResult};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +45,7 @@ pub trait SmartTransferProtocolClient: Sync + Send {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: Option<Arc<dyn odf::Dataset>>,
+        dst: Option<&ResolvedDataset>,
         dst_alias: Option<&odf::DatasetAlias>,
         listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
