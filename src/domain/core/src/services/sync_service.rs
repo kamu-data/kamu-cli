@@ -248,6 +248,8 @@ pub enum SyncError {
     #[error(transparent)]
     DestinationAhead(#[from] DestinationAheadError),
     #[error(transparent)]
+    InvalidInterval(#[from] odf::dataset::InvalidIntervalError),
+    #[error(transparent)]
     OverwriteSeedBlock(#[from] OverwriteSeedBlockError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
