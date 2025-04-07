@@ -632,6 +632,10 @@ type Dataset {
 	"""
 	permissions: DatasetPermissions!
 	"""
+	Current user's role in relation to the dataset
+	"""
+	role: DatasetAccessRole
+	"""
 	Access to the dataset collaboration data
 	"""
 	collaboration: DatasetCollaboration!

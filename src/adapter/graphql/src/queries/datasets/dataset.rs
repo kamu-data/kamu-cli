@@ -211,6 +211,27 @@ impl Dataset {
         })
     }
 
+    /// Current user's role in relation to the dataset
+    #[tracing::instrument(level = "info", name = Dataset_role, skip_all)]
+    async fn role(&self, ctx: &Context<'_>) -> Result<Option<DatasetAccessRole>> {
+        let current_account_subject = from_catalog_n!(ctx, kamu_accounts::CurrentAccountSubject);
+
+        let Some(logged_account_id) = current_account_subject.get_maybe_logged_account_id() else {
+            return Ok(None);
+        };
+
+        let authorized_accounts = self.dataset_request_state.authorized_accounts(ctx).await?;
+        let maybe_current_account_role = authorized_accounts.iter().find_map(|a| {
+            if a.account_id == *logged_account_id {
+                Some(a.role)
+            } else {
+                None
+            }
+        });
+
+        Ok(maybe_current_account_role.map(Into::into))
+    }
+
     /// Access to the dataset collaboration data
     async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaboration> {
         DatasetCollaboration::new_with_access_check(ctx, &self.dataset_request_state).await
