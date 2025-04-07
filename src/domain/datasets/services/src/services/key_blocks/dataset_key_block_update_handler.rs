@@ -21,8 +21,7 @@ use kamu_datasets::{
 };
 use messaging_outbox::*;
 
-use super::index_dataset_key_blocks_in_range;
-use crate::{index_dataset_key_blocks_entirely, DatasetKeyBlockIndexingError};
+use crate::collect_dataset_key_blocks_in_range;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,8 +49,7 @@ impl DatasetKeyBlockUpdateHandler {
         update_message: &DatasetReferenceMessageUpdated,
     ) -> Result<(), InternalError> {
         // Try to index in the specified range of HEAD advancement
-        match index_dataset_key_blocks_in_range(
-            self.dataset_key_block_repo.as_ref(),
+        match collect_dataset_key_blocks_in_range(
             target.clone(),
             &update_message.new_block_hash,
             update_message.maybe_prev_block_hash.as_ref(),
@@ -59,7 +57,35 @@ impl DatasetKeyBlockUpdateHandler {
         .await
         {
             // We succeeded!
-            Ok(_) => {
+            Ok(key_blocks_response) => {
+                // Check if the dataset has diverged: i.e., it was reset or force pushed
+                if key_blocks_response.divergence_detected {
+                    // In this case we have already collected entire list of key blocks
+                    //  from the Head to Seed events
+                    tracing::warn!(
+                        %update_message.dataset_id,
+                        new_head = %update_message.new_block_hash,
+                        maybe_prev_head = ?update_message.maybe_prev_block_hash,
+                        "Detected the dataset has diverged. Wiping the old index entirely"
+                    );
+
+                    // Drop existing key blocks, as they might conflict with the new results
+                    self.dataset_key_block_repo
+                        .delete_all_for_ref(&update_message.dataset_id, &odf::BlockRef::Head)
+                        .await
+                        .int_err()?;
+                }
+
+                // Save batch of the key blocks
+                self.dataset_key_block_repo
+                    .save_blocks_batch(
+                        &update_message.dataset_id,
+                        &odf::BlockRef::Head,
+                        &key_blocks_response.key_blocks,
+                    )
+                    .await
+                    .int_err()?;
+
                 tracing::debug!(
                     %update_message.dataset_id,
                     new_head = %update_message.new_block_hash,
@@ -69,29 +95,8 @@ impl DatasetKeyBlockUpdateHandler {
                 Ok(())
             }
 
-            // It looks like the dataset has diverged: i.e., it was reset or force pushed
-            Err(DatasetKeyBlockIndexingError::InvalidInterval(_)) => {
-                tracing::warn!(
-                    %update_message.dataset_id,
-                    new_head = %update_message.new_block_hash,
-                    maybe_prev_head = ?update_message.maybe_prev_block_hash,
-                    "Detected the dataset has diverged. Reindexing entirely"
-                );
-
-                // Drop existing key blocks
-                self.dataset_key_block_repo
-                    .delete_all_for_ref(&update_message.dataset_id, &odf::BlockRef::Head)
-                    .await
-                    .int_err()?;
-
-                // Reindex the entire dataset
-                index_dataset_key_blocks_entirely(self.dataset_key_block_repo.as_ref(), target)
-                    .await
-                    .int_err()
-            }
-
             // Unexpected indexing error
-            Err(DatasetKeyBlockIndexingError::Internal(e)) => {
+            Err(e) => {
                 tracing::error!(
                     %update_message.dataset_id,
                     new_head = %update_message.new_block_hash,
