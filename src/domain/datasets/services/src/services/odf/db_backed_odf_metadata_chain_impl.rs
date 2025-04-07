@@ -186,7 +186,7 @@ where
         if let Some(prev_block_hash) = &head_block.prev_block_hash {
             // Yes. If we are looking for key blocks only, we can use the cache
             if let odf::dataset::MetadataVisitorDecision::NextOfType(hint_flags) = hint
-                && hint_flags.consists_of_key_blocks_only()
+                && !hint_flags.has_data_flags()
             {
                 // This is the working range of our iteration [min, max).
                 // We should not return blocks outside of this range.

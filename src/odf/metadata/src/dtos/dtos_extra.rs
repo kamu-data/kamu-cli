@@ -347,8 +347,8 @@ impl MetadataEventTypeFlags {
     pub const DATA_BLOCK: Self =
         Self::from_bits_retain(Self::ADD_DATA.bits() | Self::EXECUTE_TRANSFORM.bits());
 
-    pub fn consists_of_key_blocks_only(&self) -> bool {
-        self.bits() & Self::DATA_BLOCK.bits() == 0
+    pub fn has_data_flags(&self) -> bool {
+        self.bits() & Self::DATA_BLOCK.bits() != 0
     }
 }
 

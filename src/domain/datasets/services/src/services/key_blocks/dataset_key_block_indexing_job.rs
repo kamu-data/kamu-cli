@@ -81,7 +81,6 @@ pub(crate) async fn index_dataset_key_blocks_in_range(
 ) -> Result<(), DatasetKeyBlockIndexingError> {
     use futures::stream::TryStreamExt;
     use odf::dataset::MetadataChainExt;
-    use odf::metadata::MetadataEventExt;
 
     // Collect key metadata blocks and save them in chunks.
     let mut current_chunk = Vec::new();
@@ -95,7 +94,8 @@ pub(crate) async fn index_dataset_key_blocks_in_range(
 
     while let Some((block_hash, block)) = blocks_stream.try_next().await? {
         // Ignore non-key events, such as `AddData` and `ExecuteTransform`
-        if block.event.is_key_event() {
+        let event_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
+        if !event_flags.has_data_flags() {
             // Serialize the event and form a key block value
             use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
             use odf::serde::MetadataBlockSerializer;
