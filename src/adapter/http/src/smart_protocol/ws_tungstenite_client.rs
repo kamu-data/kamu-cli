@@ -107,9 +107,9 @@ impl WsSmartTransferProtocolClient {
                     ClientInternalError::new(e.error_message.as_str(), e.phase),
                 ))))
             }
-            Err(DatasetPullRequestError::SeedBlockOverwriteRestricted(_)) => {
-                Err(PullClientError::OverwriteSeedBlock(OverwriteSeedBlockError {}))
-            }
+            Err(DatasetPullRequestError::SeedBlockOverwriteRestricted(_)) => Err(
+                PullClientError::OverwriteSeedBlock(OverwriteSeedBlockError {}),
+            ),
             Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
                 head,
                 tail,

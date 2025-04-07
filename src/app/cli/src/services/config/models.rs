@@ -60,7 +60,7 @@ pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
     pub protocol: Option<ProtocolConfig>,
 
-    /// Seach configuration
+    /// Search configuration
     #[merge(strategy = merge_recursive)]
     pub search: Option<SearchConfig>,
 
