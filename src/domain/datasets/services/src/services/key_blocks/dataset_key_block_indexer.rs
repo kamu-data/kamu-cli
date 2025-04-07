@@ -14,13 +14,13 @@ use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_core::DatasetRegistry;
-use kamu_datasets::DatasetKeyBlockRepository;
-
-use crate::{
-    DatasetKeyBlockIndexingJob,
+use kamu_datasets::{
+    DatasetKeyBlockRepository,
     JOB_KAMU_DATASETS_DATASET_KEY_BLOCK_INDEXER,
     JOB_KAMU_DATASETS_DATASET_REFERENCE_INDEXER,
 };
+
+use crate::DatasetKeyBlockIndexingJob;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

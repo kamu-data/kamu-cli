@@ -20,8 +20,7 @@ use kamu_accounts::{
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
 use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacService};
-use kamu_datasets::DatasetEntryService;
-use kamu_datasets_services::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
+use kamu_datasets::{DatasetEntryService, JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER};
 
 use crate::JOB_KAMU_REBAC_INDEXER;
 

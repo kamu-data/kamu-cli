@@ -28,7 +28,6 @@ kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
-kamu-datasets-services = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
 

@@ -15,7 +15,6 @@
 pub use kamu_datasets as domain;
 
 mod dependencies;
-mod jobs;
 mod services;
 mod use_cases;
 pub mod utils;
@@ -24,6 +23,5 @@ pub mod utils;
 pub mod testing;
 
 pub use dependencies::*;
-pub use jobs::*;
 pub use services::*;
 pub use use_cases::*;

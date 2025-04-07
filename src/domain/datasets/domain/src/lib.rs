@@ -12,12 +12,14 @@
 #![feature(let_chains)]
 
 mod entities;
+mod jobs;
 mod messages;
 mod repos;
 mod services;
 mod use_cases;
 
 pub use entities::*;
+pub use jobs::*;
 pub use messages::*;
 pub use repos::*;
 pub use services::*;
