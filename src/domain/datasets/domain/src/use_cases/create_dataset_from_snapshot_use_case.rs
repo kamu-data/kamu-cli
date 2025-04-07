@@ -34,6 +34,13 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
 #[derive(Error, Debug)]
 pub enum CreateDatasetFromSnapshotError {
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
     InvalidSnapshot(#[from] odf::dataset::InvalidSnapshotError),
 
     #[error(transparent)]
@@ -62,6 +69,7 @@ impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
     fn from(v: CreateDatasetError) -> Self {
         match v {
             CreateDatasetError::EmptyDataset => unreachable!(),
+            CreateDatasetError::Access(e) => Self::Access(e),
             CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
             CreateDatasetError::RefCollision(e) => Self::RefCollision(e),
             CreateDatasetError::CASFailed(e) => Self::CASFailed(e),

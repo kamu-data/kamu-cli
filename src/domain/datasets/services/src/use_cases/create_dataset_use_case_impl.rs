@@ -30,32 +30,39 @@ pub struct CreateDatasetUseCaseImpl {
     create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(dataset_alias, ?seed_block, ?options))]
+    #[tracing::instrument(level = "info", name = CreateDatasetUseCaseImpl_execute, skip_all, fields(dataset_alias, ?seed_block, ?options))]
     async fn execute(
         &self,
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
-        // There must be a logged in user
-        let logged_account_id = match self.current_account_subject.as_ref() {
+        // There must be a logged-in user
+        let (logged_account_id, logged_account_name) = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
             }
-            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+            CurrentAccountSubject::Logged(l) => (&l.account_id, &l.account_name),
         };
 
         // Adjust alias for current tenancy configuration
-        let canonical_alias = self.create_helper.canonical_dataset_alias(dataset_alias);
+        let canonical_alias = self
+            .create_helper
+            .canonical_dataset_alias(dataset_alias, logged_account_name);
+
+        // Verify that we can create a dataset with this alias
+        self.create_helper
+            .validate_canonical_dataset_alias_account_name(&canonical_alias, logged_account_name)?;
 
         // Dataset entry goes first, this guarantees name collision check
         self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
-                &logged_account_id,
-                &canonical_alias,
+                logged_account_id,
+                canonical_alias.as_ref(),
                 seed_block.event.dataset_kind,
             )
             .await?;
@@ -63,13 +70,13 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         // Make storage level dataset (no HEAD yet)
         let store_result = self
             .create_helper
-            .store_dataset(&canonical_alias, seed_block)
+            .store_dataset(canonical_alias.as_ref(), seed_block)
             .await?;
 
         // Set initial dataset HEAD
         self.create_helper
             .set_created_head(
-                ResolvedDataset::from_stored(&store_result, &canonical_alias),
+                ResolvedDataset::from_stored(&store_result, canonical_alias.as_ref()),
                 &store_result.seed,
             )
             .await?;
@@ -78,15 +85,15 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
-                &canonical_alias.dataset_name,
-                &logged_account_id,
+                canonical_alias.dataset_name(),
+                logged_account_id,
                 options.dataset_visibility,
             )
             .await?;
 
         Ok(CreateDatasetResult::from_stored(
             store_result,
-            canonical_alias,
+            canonical_alias.into_inner(),
         ))
     }
 }

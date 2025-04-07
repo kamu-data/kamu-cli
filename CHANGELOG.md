@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - New `engine.datafusionEmbedded` config section allows to pass custom DataFusion settings when engine is used in ingest, batch query, and compaction contexts.
 - GQL: `Datasets::role()`: returns the current user's role in relation to the dataset
+- GQL: `DatasetsMut::create_empty()` & `DatasetsMut::create_from_snapshot()`: alias validation in multi-tenant mode.
 ### Changed
 - GQL: `DatasetsMut::create_empty()` & `DatasetsMut::create_from_snapshot()`: `dataset_visibility` is now mandatory.
 ### Fixed

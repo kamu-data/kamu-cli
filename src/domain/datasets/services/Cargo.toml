@@ -46,6 +46,7 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = "0.12"
 futures = { version = "0.3", default-features = false }
+nutype = { version = "0.6", default-features = false }
 petgraph = { version = "0.7", default-features = false, features = [
     "stable_graph",
 ] }
