@@ -10,6 +10,7 @@
 use std::fmt::{self, Display};
 
 use internal_error::{BoxedError, InternalError};
+use kamu_core::OverwriteSeedBlockError;
 use kamu_datasets::NameCollisionError;
 use thiserror::Error;
 
@@ -142,6 +143,9 @@ pub enum PullServerError {
 
 #[derive(Error, Debug)]
 pub enum PullClientError {
+    #[error("Overwriting dataset id or kind is restricted")]
+    OverwriteSeedBlock(OverwriteSeedBlockError),
+
     #[error(transparent)]
     ReadFailed(PullReadError),
 
@@ -164,6 +168,9 @@ pub enum PullClientError {
 #[derive(Error, Debug)]
 pub enum PushServerError {
     #[error(transparent)]
+    OverwriteSeedBlock(OverwriteSeedBlockError),
+
+    #[error(transparent)]
     ReadFailed(PushReadError),
 
     #[error(transparent)]
@@ -183,6 +190,9 @@ pub enum PushServerError {
 
 #[derive(Error, Debug)]
 pub enum PushClientError {
+    #[error(transparent)]
+    OverwriteSeedBlock(OverwriteSeedBlockError),
+
     #[error(transparent)]
     ReadFailed(PushReadError),
 

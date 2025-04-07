@@ -131,9 +131,6 @@ impl DatasetsMut {
             .await
     }
 
-    // TODO: Multi-tenancy
-    //       https://github.com/kamu-data/kamu-cli/issues/891
-
     // TODO: Multi-tenant resolution for derivative dataset inputs (should it only
     //       work by ID?)
     #[graphql(skip)]
@@ -158,6 +155,9 @@ impl DatasetsMut {
                     &kamu_core::ResolvedDataset::from_created(&result),
                 );
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })
+            }
+            Err(CreateDatasetFromSnapshotError::Access(e)) => {
+                return Err(e.into());
             }
             Err(CreateDatasetFromSnapshotError::NameCollision(e)) => {
                 CreateDatasetFromSnapshotResult::NameCollision(CreateDatasetResultNameCollision {

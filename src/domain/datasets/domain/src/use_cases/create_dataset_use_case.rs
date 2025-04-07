@@ -82,6 +82,13 @@ pub enum CreateDatasetError {
     EmptyDataset,
 
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
 
     #[error(transparent)]

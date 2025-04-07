@@ -1633,6 +1633,65 @@ pub async fn test_granted_role_is_correctly_revoked(anonymous: KamuApiServerClie
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_dataset_role_is_correctly_displayed_for_the_current_user(
+    anonymous: KamuApiServerClient,
+) {
+    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+        &anonymous,
+        [
+            "not-owner",
+            "reader",
+            "editor",
+            "maintainer",
+            "owner",
+            "admin",
+        ],
+    )
+    .await;
+
+    let CreateDatasetResponse { dataset_id, .. } = owner
+        .dataset()
+        .create_dataset_from_snapshot_with_visibility(
+            MetadataFactory::dataset_snapshot().name("dataset").build(),
+            odf::DatasetVisibility::Public,
+        )
+        .await;
+
+    authorize_users_by_roles(
+        &owner,
+        &[&dataset_id],
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
+
+    // Roughly speaking, the public dataset grants the Reader role to everyone,
+    // so we don't get the DatasetNotFound error
+    for (tag, client, expected_role) in [
+        ("anonymous", &anonymous, None),
+        ("not_owner", &not_owner, None),
+        ("reader", &reader, Some(AccountToDatasetRelation::Reader)),
+        ("editor", &editor, Some(AccountToDatasetRelation::Editor)),
+        (
+            "maintainer",
+            &maintainer,
+            Some(AccountToDatasetRelation::Maintainer),
+        ),
+        ("owner", &owner, None),
+        ("admin", &admin, None),
+    ] {
+        pretty_assertions::assert_eq!(
+            Ok(expected_role),
+            client.dataset().get_role(&dataset_id).await,
+            "Tag: {}",
+            tag,
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

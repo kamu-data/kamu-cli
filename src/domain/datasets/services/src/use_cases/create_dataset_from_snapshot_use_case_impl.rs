@@ -35,20 +35,21 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     create_helper: Arc<CreateDatasetUseCaseHelper>,
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(?snapshot, ?options))]
+    #[tracing::instrument(level = "info", name = CreateDatasetFromSnapshotUseCaseImpl_execute, skip_all, fields(?snapshot, ?options))]
     async fn execute(
         &self,
         mut snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
-        // There must be a logged in user
-        let logged_account_id = match self.current_account_subject.as_ref() {
+        // There must be a logged-in user
+        let (logged_account_id, logged_account_name) = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
             }
-            CurrentAccountSubject::Logged(l) => l.account_id.clone(),
+            CurrentAccountSubject::Logged(l) => (&l.account_id, &l.account_name),
         };
 
         // Validate / resolve metadata events from the snapshot
@@ -59,7 +60,13 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .await?;
 
         // Adjust alias for current tenancy configuration
-        let canonical_alias = self.create_helper.canonical_dataset_alias(&snapshot.name);
+        let canonical_alias = self
+            .create_helper
+            .canonical_dataset_alias(&snapshot.name, logged_account_name);
+
+        // Verify that we can create a dataset with this alias
+        self.create_helper
+            .validate_canonical_dataset_alias_account_name(&canonical_alias, logged_account_name)?;
 
         // Make a seed block
         let system_time = self.system_time_source.now();
@@ -73,8 +80,8 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
-                &logged_account_id,
-                &canonical_alias,
+                logged_account_id,
+                canonical_alias.as_ref(),
                 snapshot.kind,
             )
             .await?;
@@ -82,7 +89,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // Make storage level dataset (no HEAD yet)
         let store_result = self
             .create_helper
-            .store_dataset(&canonical_alias, seed_block)
+            .store_dataset(canonical_alias.as_ref(), seed_block)
             .await?;
 
         // Append snapshot metadata
@@ -99,8 +106,8 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
-                &canonical_alias.dataset_name,
-                &logged_account_id,
+                canonical_alias.dataset_name(),
+                logged_account_id,
                 options.dataset_visibility,
             )
             .await?;
@@ -108,7 +115,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // Set initial dataset HEAD
         self.create_helper
             .set_created_head(
-                ResolvedDataset::from_stored(&store_result, &canonical_alias),
+                ResolvedDataset::from_stored(&store_result, canonical_alias.as_ref()),
                 &append_result.proposed_head,
             )
             .await?;
@@ -118,7 +125,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             dataset: store_result.dataset,
             dataset_handle: odf::DatasetHandle::new(
                 store_result.dataset_id,
-                canonical_alias,
+                canonical_alias.into_inner(),
                 store_result.dataset_kind,
             ),
         })

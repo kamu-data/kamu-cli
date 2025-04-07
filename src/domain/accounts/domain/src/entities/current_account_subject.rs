@@ -61,6 +61,17 @@ impl CurrentAccountSubject {
         )
     }
 
+    #[cfg(any(feature = "testing", test))]
+    pub fn new_test_with(account_name: &odf::AccountName) -> Self {
+        let is_admin = false;
+
+        Self::logged(
+            odf::metadata::testing::account_id(account_name),
+            account_name.clone(),
+            is_admin,
+        )
+    }
+
     pub fn account_id(&self) -> &odf::AccountID {
         match self {
             CurrentAccountSubject::Anonymous(_) => {

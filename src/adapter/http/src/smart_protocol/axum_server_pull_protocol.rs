@@ -58,21 +58,15 @@ impl AxumServerPullProtocolInstance {
                 tracing::debug!("Pull process success");
             }
             Err(ref e @ PullServerError::Internal(ref int_err)) => {
-                if let Err(write_err) = axum_write_close_payload::<DatasetPullResponse>(
+                axum_write_close_payload::<DatasetPullResponse>(
                     &mut self.socket,
                     Err(DatasetPullRequestError::Internal(TransferInternalError {
                         phase: int_err.phase.clone(),
                         error_message: "Internal error".to_string(),
                     })),
                 )
-                .await
-                {
-                    tracing::error!(
-                      error = ?write_err,
-                      error_msg = %write_err,
-                      "Failed to send error to client with error",
-                    );
-                };
+                .await;
+
                 tracing::error!(
                   error = ?e,
                   error_msg = %e,
@@ -81,21 +75,14 @@ impl AxumServerPullProtocolInstance {
             }
             Err(PullServerError::ReadFailed(err)) => {
                 if let ReadMessageError::IncompatibleVersion = err.read_error {
-                    if let Err(write_err) = axum_write_close_payload::<DatasetPullResponse>(
+                    axum_write_close_payload::<DatasetPullResponse>(
                         &mut self.socket,
                         Err(DatasetPullRequestError::Internal(TransferInternalError {
                             phase: TransferPhase::Pull(PullPhase::InitialRequest),
                             error_message: "Incompatible version.".to_string(),
                         })),
                     )
-                    .await
-                    {
-                        tracing::error!(
-                          error = ?write_err,
-                          error_msg = %write_err,
-                          "Failed to send error to client with error",
-                        );
-                    };
+                    .await;
                 }
             }
             Err(e) => tracing::error!(

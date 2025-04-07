@@ -98,7 +98,7 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
         let mut new_head = None;
 
         while let Some((hash, block)) = new_blocks_it.next() {
-            tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
+            tracing::debug!(sequence_number = %block.sequence_number, hash = %hash, "Appending block");
 
             let block_sequence_number = block.sequence_number;
             if let Err(append_error) = metadata_chain
