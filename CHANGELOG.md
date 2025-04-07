@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.232.0] - 2025-04-07
 ### Added
 - New `engine.datafusionEmbedded` config section allows to pass custom DataFusion settings when engine is used in ingest, batch query, and compaction contexts.
 - GQL: `Datasets::role()`: returns the current user's role in relation to the dataset
