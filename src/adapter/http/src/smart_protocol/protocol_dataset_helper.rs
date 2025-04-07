@@ -729,7 +729,7 @@ pub async fn dataset_export_object_file(
 
 /// Check if the seed block has the same `dataset_id` and `kind` as the existing
 /// dataset.
-pub(crate) fn ensure_seed_block_equals(
+pub(crate) fn ensure_seed_not_in_conflict(
     first_incoming_block_maybe: Option<&(odf::Multihash, odf::MetadataBlock)>,
     existing_dataset_handle: &odf::DatasetHandle,
 ) -> bool {

@@ -625,7 +625,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             // Create destination dataset if not exists
             let dst = if let Some(dst) = dst {
                 if transfer_options.force_update_if_diverged
-                    && !ensure_seed_block_equals(new_blocks.front(), dst.get_handle())
+                    && !ensure_seed_not_in_conflict(new_blocks.front(), dst.get_handle())
                 {
                     return Err(SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}));
                 }

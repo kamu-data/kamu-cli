@@ -363,7 +363,7 @@ impl AxumServerPushProtocolInstance {
 
         if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref()
             && push_request.force_update_if_diverged
-            && !ensure_seed_block_equals(new_blocks.front(), dataset_handle)
+            && !ensure_seed_not_in_conflict(new_blocks.front(), dataset_handle)
         {
             return Err(PushServerError::OverwriteSeedBlock(
                 OverwriteSeedBlockError {},
