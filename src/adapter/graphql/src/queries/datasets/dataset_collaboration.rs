@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::AccountService;
-use kamu_auth_rebac::RebacService;
 
 use crate::prelude::*;
 use crate::queries::{Account, DatasetRequestState};
@@ -48,13 +47,9 @@ impl<'a> DatasetCollaboration<'a> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let (rebac_service, account_service) =
-            from_catalog_n!(ctx, dyn RebacService, dyn AccountService);
+        let account_service = from_catalog_n!(ctx, dyn AccountService);
 
-        let authorized_accounts = rebac_service
-            .get_authorized_accounts(&self.dataset_request_state.dataset_handle().id)
-            .await
-            .int_err()?;
+        let authorized_accounts = self.dataset_request_state.authorized_accounts(ctx).await?;
         let authorized_account_ids = authorized_accounts
             .iter()
             .map(|a| a.account_id.clone())
@@ -65,7 +60,7 @@ impl<'a> DatasetCollaboration<'a> {
             .int_err()?;
 
         let nodes = authorized_accounts
-            .into_iter()
+            .iter()
             .map(|authorized_account| {
                 // Safety: The map guarantees the pair presence
                 let account_model = authorized_account_map

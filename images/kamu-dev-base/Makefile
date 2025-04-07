@@ -4,7 +4,7 @@ IMAGE_NAME=kamu-dev-base
 TARGET=x86_64-unknown-linux-gnu
 
 # Branch name (feature/private-dataset -> feature-private-dataset)
-BRANCH=$(shell git rev-parse --abbrev-ref HEAD | sed 's/\//-/g')
+BRANCH=$(shell git rev-parse --abbrev-ref HEAD | tr -cd '[:alnum:]_-')
 # Short commit hash (603bf0885)
 COMMIT=$(shell git rev-parse --short HEAD)
 # Example: feature-private-dataset-603bf0885

@@ -17,7 +17,7 @@ use crate::prelude::*;
 pub enum DatasetAccessRole {
     /// Role opening the possibility for read-only access
     Reader,
-    /// Role opening to modify dataset data
+    /// Role allows modifying dataset data
     Editor,
     /// Role to maintain the dataset
     Maintainer,
