@@ -761,7 +761,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             transfer_options.force_update_if_diverged,
         )
         .await
-        .int_err()?;
+        .map_err(|e| match e {
+            PrepareDatasetTransferEstimateError::InvalidInterval(e) => {
+                SyncError::InvalidInterval(e)
+            }
+            PrepareDatasetTransferEstimateError::Internal(e) => SyncError::Internal(e),
+        })?;
 
         let num_blocks = transfer_plan.num_blocks;
         if num_blocks == 0 {

@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
+use odf::dataset::InvalidIntervalError;
 use thiserror::Error;
 use url::Url;
 
@@ -247,6 +248,8 @@ pub enum SyncError {
     DatasetsDiverged(#[from] DatasetsDivergedError),
     #[error(transparent)]
     DestinationAhead(#[from] DestinationAheadError),
+    #[error(transparent)]
+    InvalidInterval(#[from] InvalidIntervalError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
     #[error("Dataset was updated concurrently")]
