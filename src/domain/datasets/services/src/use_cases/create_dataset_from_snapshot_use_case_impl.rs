@@ -62,8 +62,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // Adjust alias for current tenancy configuration
         let canonical_alias = self
             .create_helper
-            .canonical_dataset_alias(&snapshot.name, logged_account_name)
-            .map_err(Into::<CreateDatasetFromSnapshotError>::into)?;
+            .canonical_dataset_alias(&snapshot.name, logged_account_name);
+
+        // Verify that we can create a dataset with this alias
+        self.create_helper
+            .validate_canonical_dataset_alias_account_name(&canonical_alias, logged_account_name)?;
 
         // Make a seed block
         let system_time = self.system_time_source.now();
@@ -78,7 +81,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
                 logged_account_id,
-                &canonical_alias,
+                canonical_alias.as_ref(),
                 snapshot.kind,
             )
             .await?;
@@ -86,7 +89,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // Make storage level dataset (no HEAD yet)
         let store_result = self
             .create_helper
-            .store_dataset(&canonical_alias, seed_block)
+            .store_dataset(canonical_alias.as_ref(), seed_block)
             .await?;
 
         // Append snapshot metadata
@@ -103,7 +106,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
-                &canonical_alias.dataset_name,
+                canonical_alias.dataset_name(),
                 logged_account_id,
                 options.dataset_visibility,
             )
@@ -112,7 +115,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // Set initial dataset HEAD
         self.create_helper
             .set_created_head(
-                ResolvedDataset::from_stored(&store_result, &canonical_alias),
+                ResolvedDataset::from_stored(&store_result, canonical_alias.as_ref()),
                 &append_result.proposed_head,
             )
             .await?;
@@ -122,7 +125,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             dataset: store_result.dataset,
             dataset_handle: odf::DatasetHandle::new(
                 store_result.dataset_id,
-                canonical_alias,
+                canonical_alias.into_inner(),
                 store_result.dataset_kind,
             ),
         })

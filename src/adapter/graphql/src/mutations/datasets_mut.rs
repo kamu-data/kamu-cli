@@ -156,6 +156,9 @@ impl DatasetsMut {
                 );
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })
             }
+            Err(CreateDatasetFromSnapshotError::Access(e)) => {
+                return Err(e.into());
+            }
             Err(CreateDatasetFromSnapshotError::NameCollision(e)) => {
                 CreateDatasetFromSnapshotResult::NameCollision(CreateDatasetResultNameCollision {
                     account_name: e.alias.account_name.map(Into::into),
@@ -163,13 +166,6 @@ impl DatasetsMut {
                 })
             }
             Err(CreateDatasetFromSnapshotError::RefCollision(e)) => return Err(e.int_err().into()),
-            Err(CreateDatasetFromSnapshotError::IncorrectAliasAccountName(e)) => {
-                CreateDatasetFromSnapshotResult::InvalidSnapshot(
-                    CreateDatasetResultInvalidSnapshot {
-                        message: e.to_string(),
-                    },
-                )
-            }
             Err(CreateDatasetFromSnapshotError::InvalidSnapshot(e)) => {
                 CreateDatasetFromSnapshotResult::InvalidSnapshot(
                     CreateDatasetResultInvalidSnapshot { message: e.reason },

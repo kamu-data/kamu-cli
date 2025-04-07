@@ -373,7 +373,7 @@ async fn test_dataset_create_from_snapshot_malformed() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_create_from_snapshot_incorrect_alias_account_name() {
+async fn test_dataset_create_from_snapshot_unauthorized() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
         .build()
@@ -402,10 +402,7 @@ async fn test_dataset_create_from_snapshot_incorrect_alias_account_name() {
         mutation {
             datasets {
                 createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML, datasetVisibility: PUBLIC) {
-                    ... on CreateDatasetResultInvalidSnapshot {
-                        __typename
-                        message
-                    }
+                    message
                 }
             }
         }
@@ -415,17 +412,25 @@ async fn test_dataset_create_from_snapshot_incorrect_alias_account_name() {
 
     let res = harness.execute_authorized_query(request_code).await;
 
-    assert!(res.is_ok(), "{res:?}");
+    assert!(res.is_err(), "{res:?}");
     pretty_assertions::assert_eq!(
-        async_graphql::value!({
-            "datasets": {
-                "createFromSnapshot": {
-                    "__typename": "CreateDatasetResultInvalidSnapshot",
-                    "message": "Alias account name does not match the user's account name: another-user",
-                }
-            }
-        }),
-        res.data,
+        [(
+            vec![
+                "Field(\"datasets\")".to_string(),
+                "Field(\"createFromSnapshot\")".to_string()
+            ],
+            "Unauthorized".to_string()
+        )],
+        *res.errors
+            .into_iter()
+            .map(|e| (
+                e.path
+                    .into_iter()
+                    .map(|p| format!("{p:?}"))
+                    .collect::<Vec<_>>(),
+                e.message
+            ))
+            .collect::<Vec<_>>(),
     );
 }
 

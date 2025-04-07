@@ -51,15 +51,18 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         // Adjust alias for current tenancy configuration
         let canonical_alias = self
             .create_helper
-            .canonical_dataset_alias(dataset_alias, logged_account_name)
-            .map_err(Into::<CreateDatasetError>::into)?;
+            .canonical_dataset_alias(dataset_alias, logged_account_name);
+
+        // Verify that we can create a dataset with this alias
+        self.create_helper
+            .validate_canonical_dataset_alias_account_name(&canonical_alias, logged_account_name)?;
 
         // Dataset entry goes first, this guarantees name collision check
         self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
                 logged_account_id,
-                &canonical_alias,
+                canonical_alias.as_ref(),
                 seed_block.event.dataset_kind,
             )
             .await?;
@@ -67,13 +70,13 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         // Make storage level dataset (no HEAD yet)
         let store_result = self
             .create_helper
-            .store_dataset(&canonical_alias, seed_block)
+            .store_dataset(canonical_alias.as_ref(), seed_block)
             .await?;
 
         // Set initial dataset HEAD
         self.create_helper
             .set_created_head(
-                ResolvedDataset::from_stored(&store_result, &canonical_alias),
+                ResolvedDataset::from_stored(&store_result, canonical_alias.as_ref()),
                 &store_result.seed,
             )
             .await?;
@@ -82,7 +85,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
-                &canonical_alias.dataset_name,
+                canonical_alias.dataset_name(),
                 logged_account_id,
                 options.dataset_visibility,
             )
@@ -90,7 +93,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
 
         Ok(CreateDatasetResult::from_stored(
             store_result,
-            canonical_alias,
+            canonical_alias.into_inner(),
         ))
     }
 }

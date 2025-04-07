@@ -15,7 +15,6 @@ use crate::{
     CreateDatasetResult,
     CreateDatasetUseCaseOptions,
     DatasetReferenceCASError,
-    IncorrectAliasAccountNameError,
     NameCollisionError,
 };
 
@@ -35,7 +34,11 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
 #[derive(Error, Debug)]
 pub enum CreateDatasetFromSnapshotError {
     #[error(transparent)]
-    IncorrectAliasAccountName(#[from] IncorrectAliasAccountNameError),
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
 
     #[error(transparent)]
     InvalidSnapshot(#[from] odf::dataset::InvalidSnapshotError),
@@ -60,18 +63,13 @@ pub enum CreateDatasetFromSnapshotError {
     ),
 }
 
-impl CreateDatasetFromSnapshotError {
-    pub fn invalid_snapshot(reason: impl Into<String>) -> Self {
-        Self::InvalidSnapshot(odf::dataset::InvalidSnapshotError::new(reason))
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
     fn from(v: CreateDatasetError) -> Self {
         match v {
             CreateDatasetError::EmptyDataset => unreachable!(),
+            CreateDatasetError::Access(e) => Self::Access(e),
             CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
             CreateDatasetError::RefCollision(e) => Self::RefCollision(e),
             CreateDatasetError::CASFailed(e) => Self::CASFailed(e),
