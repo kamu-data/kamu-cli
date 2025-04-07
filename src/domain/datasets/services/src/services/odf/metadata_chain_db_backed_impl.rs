@@ -62,6 +62,7 @@ impl State {
         // Use the start_index to reduce the search space for the max boundary
         let end_index = self.cached_key_blocks[start_index..]
             .binary_search_by_key(&max_boundary, |(_, block)| block.sequence_number)
+            .map(|x| x + start_index)
             .unwrap_or_else(|x| x + start_index);
 
         // The slice is [start_index, end_index)
