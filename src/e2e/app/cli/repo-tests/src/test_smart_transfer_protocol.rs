@@ -47,7 +47,7 @@ test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_sequence);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_force_rewrite_seed_block);
+test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_force_overwrite_seed_block);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1885,7 +1885,7 @@ async fn test_smart_push_trigger_dependent_dataset_update(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_smart_push_smart_pull_force_rewrite_seed_block(
+async fn test_smart_push_smart_pull_force_overwrite_seed_block(
     mut kamu_api_server_client: KamuApiServerClient,
     is_push_workspace_multi_tenant: bool,
     is_pull_workspace_multi_tenant: bool,

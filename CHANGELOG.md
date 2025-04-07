@@ -22,10 +22,6 @@ Recommendation: for ease of reading, use the following order:
 - New `PushIngestDataUseCase` and used it in Http `/ingest` handler and `ingest_command`.
 - Semantic search will return empty result on empty prompt instead of error.
 
-- New `PushIngestDataUseCase` and used it in Http `/ingest` handler and `ingest_command`.
-- Semantic search will return empty result on empty prompt instead of error.
-
-
 ## [0.231.0] - 2025-03-31
 ### Added
 - `kamu login {password,oauth}`:

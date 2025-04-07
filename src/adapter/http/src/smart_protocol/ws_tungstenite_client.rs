@@ -15,7 +15,7 @@ use futures::SinkExt;
 use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
-use kamu_core::{OverwriteSeedBlockError, *};
+use kamu_core::*;
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseOptions,
@@ -624,7 +624,6 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
             // Create destination dataset if not exists
             let dst = if let Some(dst) = dst {
-                // Check is incoming seed is different from existing
                 if transfer_options.force_update_if_diverged
                     && !ensure_seed_block_equals(new_blocks.front(), dst.get_handle())
                 {
