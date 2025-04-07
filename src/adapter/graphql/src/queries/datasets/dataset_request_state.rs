@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 use std::ops::Deref;
 
+use kamu_auth_rebac::AuthorizedAccount;
 use kamu_core::{auth, DatasetRegistry, ResolvedDataset};
 use tokio::sync::OnceCell;
 
@@ -24,15 +25,17 @@ pub(crate) struct DatasetRequestState {
     resolved_dataset: OnceCell<ResolvedDataset>,
     dataset_statistics: OnceCell<kamu_datasets::DatasetStatistics>,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
+    authorized_accounts: OnceCell<Vec<AuthorizedAccount>>,
 }
 
 impl DatasetRequestState {
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
         Self {
             dataset_handle,
-            allowed_dataset_actions: OnceCell::new(),
-            dataset_statistics: OnceCell::new(),
             resolved_dataset: OnceCell::new(),
+            dataset_statistics: OnceCell::new(),
+            allowed_dataset_actions: OnceCell::new(),
+            authorized_accounts: OnceCell::new(),
         }
     }
 
@@ -88,6 +91,21 @@ impl DatasetRequestState {
                     .await?;
 
                 Ok(statistics)
+            })
+            .await
+    }
+
+    pub async fn authorized_accounts(&self, ctx: &Context<'_>) -> Result<&Vec<AuthorizedAccount>> {
+        self.authorized_accounts
+            .get_or_try_init(|| async {
+                let rebac_service = from_catalog_n!(ctx, dyn kamu_auth_rebac::RebacService);
+
+                let authorized_accounts = rebac_service
+                    .get_authorized_accounts(self.dataset_id())
+                    .await
+                    .int_err()?;
+
+                Ok(authorized_accounts)
             })
             .await
     }

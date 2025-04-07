@@ -603,6 +603,65 @@ impl DatasetApi<'_> {
             .await
     }
 
+    pub async fn get_role(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Option<AccountToDatasetRelation>, GetDatasetRoleError> {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(
+                          datasetId: "<dataset_id>"
+                        ) {
+                          role
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .as_str(),
+            )
+            .await;
+
+        match response {
+            Ok(data) => {
+                let dataset = &data["datasets"]["byId"];
+
+                if dataset.is_null() {
+                    return Err(GetDatasetRoleError::DatasetNotFound);
+                }
+
+                let role_node = &dataset["role"];
+
+                if role_node.is_null() {
+                    return Ok(None);
+                }
+
+                match role_node.as_str().unwrap() {
+                    "READER" => Ok(Some(AccountToDatasetRelation::Reader)),
+                    "EDITOR" => Ok(Some(AccountToDatasetRelation::Editor)),
+                    "MAINTAINER" => Ok(Some(AccountToDatasetRelation::Maintainer)),
+                    unexpected_role => Err(format!("Unexpected role: {unexpected_role}")
+                        .int_err()
+                        .into()),
+                }
+            }
+            Err(errors) => {
+                let first_error = errors.first().unwrap();
+                let unexpected_message = first_error.message.as_str();
+
+                Err(format!("Unexpected error message: {unexpected_message}")
+                    .int_err()
+                    .into())
+            }
+        }
+    }
+
     pub async fn get_visibility(
         &self,
         dataset_id: &odf::DatasetID,
@@ -1280,6 +1339,26 @@ impl AccountRolesResponse {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetRoleError {
+    #[error("Dataset not found")]
+    DatasetNotFound,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl PartialEq for GetDatasetRoleError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::DatasetNotFound, Self::DatasetNotFound) => true,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for GetDatasetRoleError {}
 
 #[derive(Error, Debug)]
 pub enum GetDatasetVisibilityError {

@@ -211,6 +211,27 @@ impl Dataset {
         })
     }
 
+    /// Current user's role in relation to the dataset
+    #[tracing::instrument(level = "info", name = Dataset_role, skip_all)]
+    async fn role(&self, ctx: &Context<'_>) -> Result<Option<DatasetAccessRole>> {
+        let current_account_subject = from_catalog_n!(ctx, kamu_accounts::CurrentAccountSubject);
+
+        let Some(logged_account_id) = current_account_subject.get_maybe_logged_account_id() else {
+            return Ok(None);
+        };
+
+        let authorized_accounts = self.dataset_request_state.authorized_accounts(ctx).await?;
+        let maybe_current_account_role = authorized_accounts.iter().find_map(|a| {
+            if a.account_id == *logged_account_id {
+                Some(a.role)
+            } else {
+                None
+            }
+        });
+
+        Ok(maybe_current_account_role.map(Into::into))
+    }
+
     /// Access to the dataset collaboration data
     async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaboration> {
         DatasetCollaboration::new_with_access_check(ctx, &self.dataset_request_state).await
@@ -254,47 +275,6 @@ pub struct PrivateDatasetVisibility {
 #[graphql(input_name = "PublicDatasetVisibilityInput")]
 pub struct PublicDatasetVisibility {
     pub anonymous_available: bool,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, PartialEq, Eq)]
-pub struct DatasetPermissions {
-    collaboration: DatasetCollaborationPermissions,
-    env_vars: DatasetEnvVarsPermissions,
-    flows: DatasetFlowsPermissions,
-    general: DatasetGeneralPermissions,
-    metadata: DatasetMetadataPermissions,
-}
-
-#[derive(SimpleObject, Debug, PartialEq, Eq)]
-pub struct DatasetCollaborationPermissions {
-    can_view: bool,
-    can_update: bool,
-}
-
-#[derive(SimpleObject, Debug, PartialEq, Eq)]
-pub struct DatasetEnvVarsPermissions {
-    can_view: bool,
-    can_update: bool,
-}
-
-#[derive(SimpleObject, Debug, PartialEq, Eq)]
-pub struct DatasetFlowsPermissions {
-    can_view: bool,
-    can_run: bool,
-}
-
-#[derive(SimpleObject, Debug, PartialEq, Eq)]
-pub struct DatasetGeneralPermissions {
-    can_rename: bool,
-    can_set_visibility: bool,
-    can_delete: bool,
-}
-
-#[derive(SimpleObject, Debug, PartialEq, Eq)]
-pub struct DatasetMetadataPermissions {
-    can_commit: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
