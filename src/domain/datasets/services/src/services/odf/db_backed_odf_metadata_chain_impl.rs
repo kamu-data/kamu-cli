@@ -169,13 +169,14 @@ where
     async fn get_preceding_block_with_hint(
         &self,
         block: &odf::MetadataBlock,
-        tail_sequence_number: u64,
+        tail_sequence_number: Option<u64>,
         hint: odf::dataset::MetadataVisitorDecision,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::storage::GetBlockError> {
         // Guard against stopped hint
         assert!(hint != odf::dataset::MetadataVisitorDecision::Stop);
 
-        // Have we reached the tail? (if specified the boundary)
+        // Have we reached the tail? (if specified the boundary, otherwise Seed=0)
+        let tail_sequence_number = tail_sequence_number.unwrap_or_default();
         if tail_sequence_number >= block.sequence_number {
             // We are at the tail, no need to go further
             return Ok(None);

@@ -42,10 +42,12 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the previous block relatively to the specified block,
     /// attempting to use the hint flags as a quick skipping guideance.
     /// In worst case, returns the nearest previous block.
+    /// Tail sequence number represents the minimal allowed block that can be
+    /// returned. When ommitted, the method will be iterating until the Seed
     async fn get_preceding_block_with_hint(
         &self,
         block: &MetadataBlock,
-        tail_sequence_number: u64,
+        tail_sequence_number: Option<u64>,
         hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError>;
 
@@ -301,16 +303,18 @@ pub trait MetadataChainExt: MetadataChain {
         // Determine the sequence number of tail block
         let tail_sequence_number = if merged_decision == MetadataVisitorDecision::Stop {
             // No need to iterate
-            0
+            None
         } else if let Some(tail_hash) = tail_hash {
             // Read from the tail block
-            self.get_block(tail_hash)
-                .await
-                .map_err(IterBlocksError::from)?
-                .sequence_number
+            Some(
+                self.get_block(tail_hash)
+                    .await
+                    .map_err(IterBlocksError::from)?
+                    .sequence_number,
+            )
         } else {
             // Tail is the seed block
-            0
+            None
         };
 
         // Iterate over blocks until we sasisfy all visitors or reach the tail

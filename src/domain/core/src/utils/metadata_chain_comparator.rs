@@ -443,7 +443,7 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
     async fn get_preceding_block_with_hint(
         &self,
         block: &odf::MetadataBlock,
-        tail_sequence_number: u64,
+        tail_sequence_number: Option<u64>,
         hint: odf::dataset::MetadataVisitorDecision,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::GetBlockError> {
         (self.on_read)(1);

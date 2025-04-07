@@ -83,14 +83,14 @@ where
     async fn get_preceding_block_with_hint(
         &self,
         block: &MetadataBlock,
-        tail_sequence_number: u64,
+        tail_sequence_number: Option<u64>,
         hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError> {
         // Guard against stopped hint
         assert!(hint != MetadataVisitorDecision::Stop);
 
-        // Have we reached the tail? (if specified the boundary)
-        if tail_sequence_number >= block.sequence_number {
+        // Have we reached the tail? (if specified the boundary, otherwise Seed=0)
+        if tail_sequence_number.unwrap_or_default() >= block.sequence_number {
             // We are at the tail, no need to go further
             return Ok(None);
         }
