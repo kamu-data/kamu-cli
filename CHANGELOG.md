@@ -17,7 +17,7 @@ Recommendation: for ease of reading, use the following order:
    - indexing all previously stored datasets at startup
    - indexing new changes to datasets incrementally, whenever HEAD advances
 - Metadata chain visiting algorithm can now use the key blocks cached in the database
-   to effeciently implement iteration over key blocks, when data events are not needed
+   to efficiently implement iteration over key blocks, when data events are not needed
 ### Fixed
 - SQLite repository tests were excluded from "make test-fast" mode by a mistake   
 
