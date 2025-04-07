@@ -651,7 +651,7 @@ enum DatasetAccessRole {
 	"""
 	READER
 	"""
-	Role opening to modify dataset data
+	Role allows modifying dataset data
 	"""
 	EDITOR
 	"""
