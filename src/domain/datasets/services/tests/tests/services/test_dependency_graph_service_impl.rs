@@ -639,7 +639,7 @@ impl DependencyGraphHarness {
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
             .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
             .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<DatabaseBackedOdfDatasetLfsBuilderImpl>()
+            .add::<DatasetLfsBuilderDatabaseBackedImpl>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<DidGeneratorDefault>()
             .add::<RebacDatasetRegistryFacadeImpl>()

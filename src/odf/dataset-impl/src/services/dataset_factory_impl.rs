@@ -106,18 +106,18 @@ impl DatasetFactoryImpl {
 impl DatasetFactoryImpl {
     #[cfg(feature = "lfs")]
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
-        use super::DatasetDefaultLfsBuilder;
+        use super::DatasetLfsBuilderDefault;
 
         DatasetImpl::new(
             MetadataChainImpl::new(
-                DatasetDefaultLfsBuilder::build_meta_block_repo(layout.blocks_dir),
+                DatasetLfsBuilderDefault::build_meta_block_repo(layout.blocks_dir),
                 MetadataChainReferenceRepositoryImpl::new(
-                    DatasetDefaultLfsBuilder::build_refs_repo(layout.refs_dir),
+                    DatasetLfsBuilderDefault::build_refs_repo(layout.refs_dir),
                 ),
             ),
-            DatasetDefaultLfsBuilder::build_data_repo(layout.data_dir),
-            DatasetDefaultLfsBuilder::build_checkpoint_repo(layout.checkpoints_dir),
-            DatasetDefaultLfsBuilder::build_info_repo(layout.info_dir),
+            DatasetLfsBuilderDefault::build_data_repo(layout.data_dir),
+            DatasetLfsBuilderDefault::build_checkpoint_repo(layout.checkpoints_dir),
+            DatasetLfsBuilderDefault::build_info_repo(layout.info_dir),
             Url::from_directory_path(&layout.root_dir).unwrap(),
         )
     }
@@ -181,7 +181,7 @@ impl DatasetFactoryImpl {
         //             Perhaps in future we should create a cache of S3Contexts keyed
         //             by an endpoint.
 
-        use super::DatasetDefaultS3Builder;
+        use super::DatasetS3BuilderDefault;
         let mut s3_context = S3Context::from_url(&base_url).await;
         if let Some(metrics) = maybe_s3_metrics {
             s3_context = s3_context.with_metrics(metrics);
@@ -189,16 +189,16 @@ impl DatasetFactoryImpl {
 
         DatasetImpl::new(
             MetadataChainImpl::new(
-                DatasetDefaultS3Builder::build_meta_block_repo(
-                    DatasetDefaultS3Builder::build_base_block_repo(&s3_context),
+                DatasetS3BuilderDefault::build_meta_block_repo(
+                    DatasetS3BuilderDefault::build_base_block_repo(&s3_context),
                 ),
                 MetadataChainReferenceRepositoryImpl::new(
-                    DatasetDefaultS3Builder::build_refs_repo(&s3_context),
+                    DatasetS3BuilderDefault::build_refs_repo(&s3_context),
                 ),
             ),
-            DatasetDefaultS3Builder::build_data_repo(&s3_context),
-            DatasetDefaultS3Builder::build_checkpoint_repo(&s3_context),
-            DatasetDefaultS3Builder::build_info_repo(&s3_context),
+            DatasetS3BuilderDefault::build_data_repo(&s3_context),
+            DatasetS3BuilderDefault::build_checkpoint_repo(&s3_context),
+            DatasetS3BuilderDefault::build_info_repo(&s3_context),
             base_url,
         )
     }

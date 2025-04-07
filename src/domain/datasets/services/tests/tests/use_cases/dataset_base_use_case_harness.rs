@@ -63,7 +63,7 @@ impl DatasetBaseUseCaseHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
-                .add::<DatabaseBackedOdfDatasetLfsBuilderImpl>()
+                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetAliasUpdateHandler>()

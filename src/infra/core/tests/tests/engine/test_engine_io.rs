@@ -293,8 +293,8 @@ async fn test_engine_io_local_file_mount() {
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-        .add::<odf::dataset::DatasetDefaultLfsBuilder>()
-        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetDefaultLfsBuilder>()
+        .add::<odf::dataset::DatasetLfsBuilderDefault>()
+        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
         .build();
 
     let storage_unit = catalog
@@ -342,8 +342,8 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
             odf::dataset::DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()),
         )
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
-        .add::<odf::dataset::DatasetDefaultS3Builder>()
-        .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetDefaultS3Builder>()
+        .add::<odf::dataset::DatasetS3BuilderDefault>()
+        .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetS3BuilderDefault>()
         .build();
 
     let storage_unit = catalog

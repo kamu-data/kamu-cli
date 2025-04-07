@@ -21,9 +21,9 @@ use crate::{DatasetImpl, MetadataChainImpl, MetadataChainReferenceRepositoryImpl
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-pub struct DatasetDefaultLfsBuilder {}
+pub struct DatasetLfsBuilderDefault {}
 
-impl DatasetDefaultLfsBuilder {
+impl DatasetLfsBuilderDefault {
     pub fn build_meta_block_repo(
         blocks_dir: PathBuf,
     ) -> MetadataBlockRepositoryCachingInMem<MetadataBlockRepositoryImpl<ObjectRepositoryLocalFSSha3>>
@@ -58,7 +58,7 @@ impl DatasetDefaultLfsBuilder {
     }
 }
 
-impl DatasetLfsBuilder for DatasetDefaultLfsBuilder {
+impl DatasetLfsBuilder for DatasetLfsBuilderDefault {
     fn build_lfs_dataset(
         &self,
         _dataset_id: &odf_metadata::DatasetID,

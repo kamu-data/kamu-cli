@@ -7,18 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod db_backed_odf_metadata_chain_impl;
-mod db_backed_odf_metadata_chain_ref_repo_impl;
+mod metadata_chain_db_backed_impl;
+mod metadata_chain_ref_repo_db_backed_impl;
 
 #[cfg(feature = "lfs")]
-mod db_backed_odf_dataset_lfs_builder_impl;
+mod dataset_lfs_builder_db_backed_impl;
 
 #[cfg(feature = "s3")]
-mod db_backed_odf_dataset_s3_builder_impl;
+mod dataset_s3_builder_db_backed_impl;
 
 #[cfg(feature = "lfs")]
-pub use db_backed_odf_dataset_lfs_builder_impl::*;
+pub use dataset_lfs_builder_db_backed_impl::*;
 #[cfg(feature = "s3")]
-pub use db_backed_odf_dataset_s3_builder_impl::*;
-pub use db_backed_odf_metadata_chain_impl::*;
-pub use db_backed_odf_metadata_chain_ref_repo_impl::*;
+pub use dataset_s3_builder_db_backed_impl::*;
+pub use metadata_chain_db_backed_impl::*;
+pub use metadata_chain_ref_repo_db_backed_impl::*;

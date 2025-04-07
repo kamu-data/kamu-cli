@@ -371,7 +371,7 @@ impl ServerHarness {
                 )
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
+                .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetReferenceServiceImpl>()

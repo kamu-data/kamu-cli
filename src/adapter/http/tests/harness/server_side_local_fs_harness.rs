@@ -133,7 +133,7 @@ impl ServerSideLocalFsHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
                 .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
                 )
-                .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
+                .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()

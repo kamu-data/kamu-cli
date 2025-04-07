@@ -69,7 +69,7 @@ async fn setup_repo() -> RepoFixture {
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
         .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
         .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-        .add::<kamu_datasets_services::DatabaseBackedOdfDatasetLfsBuilderImpl>()
+        .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
