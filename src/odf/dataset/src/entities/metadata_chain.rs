@@ -42,7 +42,7 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the previous block relatively to the specified block,
     /// attempting to use the hint flags as a quick skipping guideance.
     /// In worst case, returns the nearest previous block.
-    async fn try_get_prev_block(
+    async fn get_preceding_block_with_hint(
         &self,
         block: &MetadataBlock,
         tail_sequence_number: u64,
@@ -369,7 +369,7 @@ pub trait MetadataChainExt: MetadataChain {
 
             // Try to jump to the previous block with satisfaction hints taken into account
             current_hashed_block = self
-                .try_get_prev_block(&block, tail_sequence_number, merged_decision)
+                .get_preceding_block_with_hint(&block, tail_sequence_number, merged_decision)
                 .await
                 .map_err(IterBlocksError::from)?;
         }

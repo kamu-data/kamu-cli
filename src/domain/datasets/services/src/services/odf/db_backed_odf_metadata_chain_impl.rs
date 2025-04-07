@@ -166,7 +166,7 @@ where
         write_guard.maybe_dataset_key_block_repo = None;
     }
 
-    async fn try_get_prev_block(
+    async fn get_preceding_block_with_hint(
         &self,
         block: &odf::MetadataBlock,
         tail_sequence_number: u64,

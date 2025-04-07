@@ -440,7 +440,7 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
         self.chain.get_block(hash).await
     }
 
-    async fn try_get_prev_block(
+    async fn get_preceding_block_with_hint(
         &self,
         block: &odf::MetadataBlock,
         tail_sequence_number: u64,
@@ -448,7 +448,7 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::GetBlockError> {
         (self.on_read)(1);
         self.chain
-            .try_get_prev_block(block, tail_sequence_number, hint)
+            .get_preceding_block_with_hint(block, tail_sequence_number, hint)
             .await
     }
 
