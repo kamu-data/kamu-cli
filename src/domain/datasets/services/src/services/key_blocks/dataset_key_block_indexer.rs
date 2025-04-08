@@ -103,7 +103,12 @@ impl InitOnStartup for DatasetKeyBlockIndexer {
         let mut job_results = tokio::task::JoinSet::new();
         for dataset_handle in datasets_to_index {
             let job = DatasetKeyBlockIndexingJob::new(&self.catalog, dataset_handle.clone());
-            job_results.spawn(async move { (dataset_handle, job.run().await) });
+            let job_span = tracing::info_span!("DatasetKeyBlockIndexingJob", %dataset_handle);
+
+            use tracing::Instrument;
+            job_results.spawn(
+                async move { (dataset_handle, job.run().await) }.instrument(job_span.or_current()),
+            );
         }
 
         // Execute jobs in parallel

@@ -36,8 +36,9 @@ impl DatasetKeyBlockIndexingJob {
     )]
     #[tracing::instrument(
         level = "debug",
+        name = "DatasetKeyBlockIndexingJob::run",
         skip_all,
-        fields(%hdl_to_index)
+        fields(dataset_handle=%self.hdl_to_index)
     )]
     pub(crate) async fn run(self) -> Result<(), InternalError> {
         // Resolve dataset
