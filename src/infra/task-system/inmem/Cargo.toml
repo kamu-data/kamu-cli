@@ -27,7 +27,7 @@ odf = { workspace = true }
 kamu-task-system = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-dill = "0.12"
+dill = { version = "0.13", default-features = false }
 futures = "0.3"
 
 

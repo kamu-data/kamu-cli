@@ -3855,9 +3855,9 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.12.3"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2138fae3cabecfd02dfc98ee6dc48d9c3aa9c88fbf0a082159d2ca3cb536387"
+checksum = "b077f467a5f987f57527261323765362158b727676cfed691eebd77a95bedd41"
 dependencies = [
  "dill-impl",
  "multimap",
@@ -3866,9 +3866,9 @@ dependencies = [
 
 [[package]]
 name = "dill-impl"
-version = "0.12.3"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dee034ff491d0eae07ae64505b18742bd2ddea4f92002d5ebfe57079b397936f"
+checksum = "9972accc6b2aa51283d940ed474b240f727a86fe56d8787964fa981895987758"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6463,7 +6463,6 @@ dependencies = [
  "file-utils",
  "futures",
  "internal-error",
- "itertools 0.14.0",
  "kamu-datasets",
  "mockall",
  "object_store",
@@ -6702,7 +6701,6 @@ dependencies = [
  "test-group",
  "test-log",
  "tokio",
- "tokio-stream",
  "tracing",
 ]
 
@@ -6772,7 +6770,6 @@ dependencies = [
  "observability",
  "opendatafabric",
  "pretty_assertions",
- "tempfile",
  "test-log",
  "time-source",
  "tokio",
@@ -6936,10 +6933,8 @@ dependencies = [
  "async-openai",
  "async-trait",
  "dill",
- "futures",
  "internal-error",
  "kamu-search",
- "opendatafabric",
  "secrecy",
  "tokio",
  "tracing",
@@ -6952,15 +6947,12 @@ dependencies = [
  "async-trait",
  "container-runtime",
  "dill",
- "futures",
  "internal-error",
  "kamu-search",
- "opendatafabric",
  "qdrant-client",
  "rand 0.8.5",
  "serde_json",
  "tokio",
- "tonic",
  "tracing",
 ]
 
@@ -8146,7 +8138,6 @@ dependencies = [
  "pin-project",
  "s3-utils",
  "serde",
- "serde_with",
  "strum 0.26.3",
  "thiserror 2.0.12",
  "tokio-stream",
@@ -8181,7 +8172,6 @@ dependencies = [
  "regex",
  "reqwest",
  "s3-utils",
- "serde_yaml",
  "tempfile",
  "test-group",
  "test-log",
