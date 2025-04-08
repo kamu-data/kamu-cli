@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::{
@@ -22,27 +21,15 @@ use kamu_core::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component(pub)]
+#[dill::interface(dyn DatasetRegistry)]
 pub struct DatasetRegistrySoloUnitBridge {
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
     current_account_subject: Arc<CurrentAccountSubject>,
     tenancy_config: Arc<TenancyConfig>,
 }
 
-#[component(pub)]
-#[interface(dyn DatasetRegistry)]
 impl DatasetRegistrySoloUnitBridge {
-    pub fn new(
-        dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        tenancy_config: Arc<TenancyConfig>,
-    ) -> Self {
-        Self {
-            dataset_storage_unit,
-            current_account_subject,
-            tenancy_config,
-        }
-    }
-
     fn normalize_alias(&self, alias: &odf::DatasetAlias) -> odf::DatasetAlias {
         match self.tenancy_config.as_ref() {
             TenancyConfig::SingleTenant => {

@@ -57,12 +57,9 @@ impl DatasetBaseUseCaseHarness {
                         .with_consumer_filter(ConsumerFilter::AllConsumers),
                 )
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
+                .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                    datasets_dir,
+                ))
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()

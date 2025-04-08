@@ -13,7 +13,6 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use container_runtime::*;
 use datafusion::prelude::*;
-use dill::Component;
 use indoc::indoc;
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
@@ -1261,11 +1260,10 @@ impl IngestTestHarness {
             .add::<ObjectStoreBuilderLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(EngineProvisionerLocalConfig::default())
             .add::<EngineProvisionerLocal>()

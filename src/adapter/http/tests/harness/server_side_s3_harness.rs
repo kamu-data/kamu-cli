@@ -99,9 +99,9 @@ impl ServerSideS3Harness {
             let mut b = dill::CatalogBuilder::new();
 
             b.add_value(time_source.clone())
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DidGeneratorDefault>()
                 .add_value(RunInfoDir::new(run_info_dir))
-                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add_builder(
                     messaging_outbox::OutboxImmediateImpl::builder()
                         .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
@@ -110,12 +110,9 @@ impl ServerSideS3Harness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitS3::builder()
-                        .with_s3_context(s3_context.clone()),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
+                .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
+                    s3_context.clone(),
+                ))
                 .add::<kamu_datasets_services::DatasetS3BuilderDatabaseBackedImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
@@ -123,8 +120,7 @@ impl ServerSideS3Harness {
                 .add::<CompactionExecutorImpl>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
-                .add_value(ObjectStoreBuilderS3::new(s3_context, true))
-                .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
+                .add_builder(ObjectStoreBuilderS3::builder(s3_context, true))
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()

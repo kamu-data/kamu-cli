@@ -10,7 +10,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use dill::component;
 use odf_dataset::*;
 use odf_storage::*;
 use odf_storage_lfs::ObjectRepositoryCachingLocalFs;
@@ -21,23 +20,17 @@ use crate::{DatasetImpl, MetadataChainImpl, MetadataChainReferenceRepositoryImpl
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn DatasetS3Builder)]
 pub struct DatasetS3BuilderDefault {
+    /// When specified enables the local FS
+    /// cache of metadata blocks, allowing to dramatically reduce the number
+    /// of requests to S3
+    #[dill::component(explicit)]
     metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
 }
 
-#[component(pub)]
 impl DatasetS3BuilderDefault {
-    /// # Arguments
-    ///
-    /// * `metadata_cache_local_fs_path` - when specified enables the local FS
-    ///   cache of metadata blocks, allowing to dramatically reduce the number
-    ///   of requests to S3
-    pub fn new(metadata_cache_local_fs_path: Option<Arc<PathBuf>>) -> Self {
-        Self {
-            metadata_cache_local_fs_path,
-        }
-    }
-
     pub fn build_meta_block_repo<TObjectRepo: ObjectRepository>(
         base_block_repo: TObjectRepo,
     ) -> MetadataBlockRepositoryCachingInMem<MetadataBlockRepositoryImpl<TObjectRepo>> {

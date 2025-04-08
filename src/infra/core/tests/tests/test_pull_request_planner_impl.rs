@@ -161,18 +161,31 @@ async fn create_graph_remote(
     // It will have a unified id-based structure
     let tmp_registry_dir = tempfile::tempdir().unwrap();
 
-    let tmp_storage_unit = Arc::new(odf::dataset::DatasetStorageUnitLocalFs::new(
-        tmp_registry_dir.path().to_owned(),
-        Arc::new(odf::dataset::DatasetLfsBuilderDefault {}),
-    ));
+    let (tmp_dataset_registry, tmp_storage_unit) = {
+        let catalog = dill::CatalogBuilder::new()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                tmp_registry_dir.path().to_owned(),
+            ))
+            .add::<odf::dataset::DatasetLfsBuilderDefault>()
+            .add::<DatasetRegistrySoloUnitBridge>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_value(TenancyConfig::SingleTenant)
+            .build();
 
-    let tmp_dataset_registry = DatasetRegistrySoloUnitBridge::new(
-        tmp_storage_unit.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(TenancyConfig::SingleTenant),
-    );
+        (
+            catalog.get_one::<dyn DatasetRegistry>().unwrap(),
+            catalog
+                .get_one::<dyn odf::DatasetStorageUnitWriter>()
+                .unwrap(),
+        )
+    };
 
-    create_graph(&tmp_dataset_registry, tmp_storage_unit.as_ref(), datasets).await;
+    create_graph(
+        tmp_dataset_registry.as_ref(),
+        tmp_storage_unit.as_ref(),
+        datasets,
+    )
+    .await;
 
     // Now, let's organize a simple local FS remote repo by copying those datasets.
     // Unlike unified structure, this one is single-tenant and name-based.
@@ -850,8 +863,8 @@ impl PullTestHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
-        b.add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
-            .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
+        b.add::<RemoteRepositoryRegistryImpl>()
+            .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteAliasesRegistryImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()

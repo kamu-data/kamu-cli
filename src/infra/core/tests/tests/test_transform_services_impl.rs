@@ -11,7 +11,6 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use dill::Component;
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::domain::engine::*;
@@ -57,12 +56,11 @@ impl TransformTestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
             .add::<DatasetRegistrySoloUnitBridge>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<SystemTimeSourceDefault>()
             .add::<ObjectStoreRegistryImpl>()

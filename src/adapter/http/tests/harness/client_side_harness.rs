@@ -126,10 +126,10 @@ impl ClientSideHarness {
 
         b.add_value(options.tenancy_config);
 
-        b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
-            .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
+        b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            datasets_dir,
+        ));
+        b.add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
 
         b.add::<RemoteRepositoryRegistryImpl>();
 

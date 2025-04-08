@@ -11,7 +11,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use bon::bon;
-use dill::{Catalog, Component};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     DatasetRegistry,
@@ -37,7 +36,7 @@ use crate::DatasetRegistrySoloUnitBridge;
 
 pub struct BaseRepoHarness {
     temp_dir: tempfile::TempDir,
-    catalog: Catalog,
+    catalog: dill::Catalog,
     did_generator: Arc<dyn DidGenerator>,
     system_time_source: Arc<dyn SystemTimeSource>,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -66,11 +65,8 @@ impl BaseRepoHarness {
 
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(tenancy_config)
-                .add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-                .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
+                .add_builder(DatasetStorageUnitLocalFs::builder(datasets_dir))
                 .add::<odf::dataset::DatasetLfsBuilderDefault>()
-                .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
                 .add::<DatasetRegistrySoloUnitBridge>();
 
             if let Some(current_account_subject) = current_account_subject {
@@ -106,7 +102,7 @@ impl BaseRepoHarness {
         }
     }
 
-    pub fn catalog(&self) -> &Catalog {
+    pub fn catalog(&self) -> &dill::Catalog {
         &self.catalog
     }
 

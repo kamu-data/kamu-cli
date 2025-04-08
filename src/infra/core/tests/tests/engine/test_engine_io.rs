@@ -12,7 +12,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
-use dill::Component;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
@@ -291,10 +290,10 @@ async fn test_engine_io_local_file_mount() {
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            datasets_dir,
+        ))
         .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
         .build();
 
     let storage_unit = catalog
@@ -338,12 +337,10 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(
-            odf::dataset::DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()),
-        )
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
-        .add::<odf::dataset::DatasetS3BuilderDefault>()
-        .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetS3BuilderDefault>()
+        .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
+            s3_context.clone(),
+        ))
+        .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
         .build();
 
     let storage_unit = catalog

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::{component, interface, Component};
 use indoc::indoc;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::DatasetRegistrySoloUnitBridge;
@@ -70,8 +69,8 @@ async fn test_malformed_argument() {
 
 #[test_log::test(tokio::test)]
 async fn test_internal_error() {
-    #[component]
-    #[interface(dyn RebacDatasetRegistryFacade)]
+    #[dill::component]
+    #[dill::interface(dyn RebacDatasetRegistryFacade)]
     struct ErrorRebacDatasetRegistryFacadeImpl {}
 
     #[async_trait::async_trait]
@@ -119,11 +118,9 @@ async fn test_internal_error() {
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(
-            odf::dataset::DatasetStorageUnitLocalFs::builder()
-                .with_root(tempdir.path().join("datasets")),
-        )
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            tempdir.path().join("datasets"),
+        ))
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<ErrorRebacDatasetRegistryFacadeImpl>()
         .add::<AlwaysHappyDatasetActionAuthorizer>()

@@ -9,7 +9,6 @@
 
 use std::path::Path;
 
-use dill::Component;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
@@ -43,15 +42,16 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SystemTimeSourceDefault>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            datasets_dir,
+        ))
         .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .add_value(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap())
-        .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
+        .add::<RemoteRepositoryRegistryImpl>()
+        .add_value(RemoteReposDir::new_with_creation(
+            tmp_workspace_dir.join("repos"),
+        ))
         .add_value(IpfsGateway::default())
         .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
@@ -63,7 +63,6 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
         .add_builder(SearchServiceRemoteImpl::builder(None))
-        .bind::<dyn SearchServiceRemote, SearchServiceRemoteImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>()

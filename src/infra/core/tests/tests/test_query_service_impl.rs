@@ -16,7 +16,6 @@ use chrono::Utc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use dill::{Catalog, Component};
 use file_utils::OwnedFile;
 use kamu::domain::*;
 use kamu::testing::{MockDatasetActionAuthorizer, ParquetWriterHelper};
@@ -154,11 +153,10 @@ fn create_catalog_with_local_workspace(
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            datasets_dir,
+        ))
         .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
         .add::<QueryServiceImpl>()
@@ -183,20 +181,15 @@ async fn create_catalog_with_s3_workspace(
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(
-            odf::dataset::DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()),
-        )
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
-        .add::<odf::dataset::DatasetS3BuilderDefault>()
-        .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetS3BuilderDefault>()
+        .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
+            s3_context.clone(),
+        ))
+        .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
         .add::<QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
-        .add::<ObjectStoreBuilderLocalFs>()
-        .add_value(ObjectStoreBuilderS3::new(s3_context, true))
-        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
+        .add_builder(ObjectStoreBuilderS3::builder(s3_context, true))
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
@@ -206,7 +199,7 @@ async fn create_catalog_with_s3_workspace(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_dataset_parquet_schema(catalog: &Catalog, tempdir: &TempDir) {
+async fn test_dataset_parquet_schema(catalog: &dill::Catalog, tempdir: &TempDir) {
     let target = create_test_dataset(catalog, tempdir.path(), "foo").await;
     let dataset_ref = odf::DatasetRef::from(target.get_alias());
 
@@ -243,7 +236,7 @@ async fn test_dataset_parquet_schema(catalog: &Catalog, tempdir: &TempDir) {
     );
 }
 
-async fn test_dataset_arrow_schema(catalog: &Catalog, tempdir: &TempDir) {
+async fn test_dataset_arrow_schema(catalog: &dill::Catalog, tempdir: &TempDir) {
     let target = create_test_dataset(catalog, tempdir.path(), "foo").await;
     let dataset_ref = odf::DatasetRef::from(target.get_alias());
 
@@ -283,7 +276,7 @@ async fn test_dataset_arrow_schema(catalog: &Catalog, tempdir: &TempDir) {
     );
 }
 
-fn prepare_schema_test_catalog() -> (TempDir, Catalog) {
+fn prepare_schema_test_catalog() -> (TempDir, dill::Catalog) {
     let mut authorizer = MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true);
     authorizer
         .expect_filter_datasets_allowing()
@@ -294,7 +287,7 @@ fn prepare_schema_test_catalog() -> (TempDir, Catalog) {
     (tempdir, catalog)
 }
 
-async fn prepare_schema_test_s3_catalog() -> (LocalS3Server, Catalog) {
+async fn prepare_schema_test_s3_catalog() -> (LocalS3Server, dill::Catalog) {
     let mut authorizer = MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true);
     authorizer
         .expect_filter_datasets_allowing()

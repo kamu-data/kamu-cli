@@ -77,13 +77,14 @@ async fn do_test_sync(
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_foo))
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            datasets_dir_foo,
+        ))
         .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
         .add::<DatasetRegistrySoloUnitBridge>()
-        .add_value(RemoteReposDir::new(tmp_workspace_dir_foo.join("repos")))
+        .add_value(RemoteReposDir::new_with_creation(
+            tmp_workspace_dir_foo.join("repos"),
+        ))
         .add::<RemoteRepositoryRegistryImpl>()
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
@@ -132,13 +133,14 @@ async fn do_test_sync(
         .add_value(ipfs_client.clone())
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir_bar))
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            datasets_dir_bar,
+        ))
         .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
         .add::<DatasetRegistrySoloUnitBridge>()
-        .add_value(RemoteReposDir::new(tmp_workspace_dir_bar.join("repos")))
+        .add_value(RemoteReposDir::new_with_creation(
+            tmp_workspace_dir_bar.join("repos"),
+        ))
         .add::<RemoteRepositoryRegistryImpl>()
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()

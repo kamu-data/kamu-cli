@@ -306,8 +306,8 @@ impl PushTestHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
-            .add_value(RemoteRepositoryRegistryImpl::create(repos_dir).unwrap())
-            .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
+            .add::<RemoteRepositoryRegistryImpl>()
+            .add_value(RemoteReposDir::new(repos_dir))
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<PushRequestPlannerImpl>()
             .add::<RemoteAliasResolverImpl>()
