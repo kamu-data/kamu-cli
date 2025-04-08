@@ -285,7 +285,7 @@ struct State {
     last_updated: DateTime<Utc>,
 }
 
-#[dill::component]
+#[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
 impl S3RegistryCache {
     pub fn new() -> Self {
