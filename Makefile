@@ -1,5 +1,6 @@
 ODF_SPEC_DIR=../open-data-fabric
 ODF_METADATA_CRATE_DIR=./src/odf/metadata
+ODF_OPENAPI_MT_CLIENT=./src/odf/openapi-mt-client
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
@@ -340,7 +341,7 @@ codegen-openapi-mt-client:
 	@if [ "$(KAMU_CONTAINER_RUNTIME_TYPE)" = "podman" ]; then \
 		podman run --rm \
 			-v "${PWD}/resources:/input:ro,Z" \
-			-v "${PWD}/src/odf/openapi-mt-client:/output:rw,Z" \
+			-v "${PWD}/${ODF_OPENAPI_MT_CLIENT}:/output:rw,Z" \
 			openapitools/openapi-generator-cli:v7.12.0 \
 			generate \
 			-c /output/generator.config.json \
@@ -351,7 +352,7 @@ codegen-openapi-mt-client:
 		docker run --rm \
 			--user $(shell id -u):$(shell id -g) \
 			-v "${PWD}/resources:/input:ro" \
-			-v "${PWD}/src/odf/openapi-mt-client:/output:rw" \
+			-v "${PWD}/${ODF_OPENAPI_MT_CLIENT}:/output:rw" \
 			openapitools/openapi-generator-cli:v7.12.0 \
 			generate \
 			-c /output/generator.config.json \
@@ -360,5 +361,6 @@ codegen-openapi-mt-client:
 			-o /output; \
 	fi
 
-	cargo fmt -p kamu-openapi-mt-client
+	$(call insert_text_into_beginning, "#![allow(clippy::needless_return)]\n#![allow(clippy::empty_docs)]", "$(ODF_OPENAPI_MT_CLIENT)/src/lib.rs")
 
+	cargo fmt -p kamu-openapi-mt-client
