@@ -4,6 +4,7 @@ https://github.com/OpenAPITools/openapi-generator/blob/master/modules/openapi-ge
 
 Changes:
 - Most [package] parameters are inherited from workspace
+- The version format has been changed for the packages used
 }}
 [package]
 name = "{{{packageName}}}"
@@ -19,13 +20,13 @@ edition = { workspace = true }
 publish = { workspace = true }
 
 [dependencies]
-serde = { version = "^1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 {{#serdeWith}}
-serde_with = { version = "^3.8", default-features = false, features = ["base64", "std", "macros"] }
+serde_with = { version = "3", default-features = false, features = ["base64", "std", "macros"] }
 {{/serdeWith}}
-serde_json = "^1.0"
-serde_repr = "^0.1"
-url = "^2.5"
+serde_json = { version = "1", default-features = false }
+serde_repr = { version = "0.1", default-features = false }
+url = { version = "2", default-features = false }
 {{#hasUUIDs}}
 uuid = { version = "^1.8", features = ["serde", "v4"] }
 {{/hasUUIDs}}
@@ -50,26 +51,26 @@ secrecy = "0.8.0"
 {{/withAWSV4Signature}}
 {{#reqwest}}
 {{^supportAsync}}
-reqwest = { version = "^0.12", default-features = false, features = ["json", "blocking", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "multipart"] }
 {{#supportMiddleware}}
 reqwest-middleware = { version = "^0.4", features = ["json", "blocking", "multipart"] }
 {{/supportMiddleware}}
 {{/supportAsync}}
 {{#supportAsync}}
-reqwest = { version = "^0.12", default-features = false, features = ["json", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart"] }
 {{#supportMiddleware}}
 reqwest-middleware = { version = "^0.4", features = ["json", "multipart"] }
 {{/supportMiddleware}}
 {{#supportTokenSource}}
-async-trait = "^0.1"
+async-trait = { version = "0.1", default-features = false }
 # TODO: propose to Yoshidan to externalize this as non google related crate, so that it can easily be extended for other cloud providers.
 google-cloud-token = "^0.1"
 {{/supportTokenSource}}
 {{/supportAsync}}
 {{/reqwest}}
 {{#reqwestTrait}}
-async-trait = "^0.1"
-reqwest = { version = "^0.12", default-features = false, features = ["json", "multipart"] }
+async-trait = { version = "0.1", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart"] }
 {{#supportMiddleware}}
 reqwest-middleware = { version = "^0.4", features = ["json", "multipart"] }
 {{/supportMiddleware}}
@@ -78,10 +79,10 @@ reqwest-middleware = { version = "^0.4", features = ["json", "multipart"] }
 google-cloud-token = "^0.1"
 {{/supportTokenSource}}
 {{#mockall}}
-mockall = { version = "^0.13", optional = true}
+mockall = { version = "0.13", optional = true}
 {{/mockall}}
 {{#useBonBuilder}}
-bon = { version = "2.3", optional = true }
+bon = { version = "3", optional = true }
 {{/useBonBuilder}}
 [features]
 default = ["native-tls"]
