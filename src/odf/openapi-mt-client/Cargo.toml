@@ -1,5 +1,5 @@
 [package]
-name = "kamu-openapi-mt-client"
+name = "opendatafabric-openapi-mt-client"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -19,7 +19,7 @@ serde_repr = "^0.1"
 url = "^2.5"
 async-trait = "^0.1"
 reqwest = { version = "^0.12", default-features = false, features = ["json", "multipart"] }
-mockall = { version = "^0.13", optional = true}
+mockall = { version = "^0.13", optional = true }
 bon = { version = "2.3", optional = true }
 [features]
 default = ["native-tls"]

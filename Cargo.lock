@@ -6951,21 +6951,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-openapi-mt-client"
-version = "0.233.0"
-dependencies = [
- "async-trait",
- "bon 2.3.0",
- "mockall",
- "reqwest",
- "serde",
- "serde_json",
- "serde_repr",
- "serde_with",
- "url",
-]
-
-[[package]]
 name = "kamu-repo-tools"
 version = "0.233.0"
 dependencies = [
@@ -8299,6 +8284,21 @@ dependencies = [
  "tonic",
  "url",
  "utoipa",
+]
+
+[[package]]
+name = "opendatafabric-openapi-mt-client"
+version = "0.233.0"
+dependencies = [
+ "async-trait",
+ "bon 2.3.0",
+ "mockall",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "serde_with",
+ "url",
 ]
 
 [[package]]

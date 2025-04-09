@@ -365,4 +365,4 @@ codegen-openapi-mt-client:
 
 	$(foreach file,$(shell find $(ODF_OPENAPI_MT_CLIENT) -name "*.rs"),$(call add_license_header, $(file));)
 
-	cargo fmt -p kamu-openapi-mt-client
+	cargo fmt -p opendatafabric-openapi-mt-client
