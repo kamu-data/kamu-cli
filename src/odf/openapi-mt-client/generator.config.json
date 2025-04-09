@@ -3,5 +3,6 @@
     "packageName": "kamu-openapi-mt-client",
     "topLevelApiClient": true,
     "useSingleRequestParameter": true,
-    "useBonBuilder": true
+    "useBonBuilder": true,
+    "mockall": true
 }

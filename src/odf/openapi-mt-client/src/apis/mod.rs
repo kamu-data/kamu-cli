@@ -167,4 +167,44 @@ impl Api for ApiClient {
     }
 }
 
+#[cfg(feature = "mockall")]
+pub struct MockApiClient {
+    pub kamu_api_mock: kamu_api::MockKamuApi,
+    pub kamu_odata_api_mock: kamu_odata_api::MockKamuOdataApi,
+    pub odf_core_api_mock: odf_core_api::MockOdfCoreApi,
+    pub odf_query_api_mock: odf_query_api::MockOdfQueryApi,
+    pub odf_transfer_api_mock: odf_transfer_api::MockOdfTransferApi,
+}
+
+#[cfg(feature = "mockall")]
+impl MockApiClient {
+    pub fn new() -> Self {
+        Self {
+            kamu_api_mock: kamu_api::MockKamuApi::new(),
+            kamu_odata_api_mock: kamu_odata_api::MockKamuOdataApi::new(),
+            odf_core_api_mock: odf_core_api::MockOdfCoreApi::new(),
+            odf_query_api_mock: odf_query_api::MockOdfQueryApi::new(),
+            odf_transfer_api_mock: odf_transfer_api::MockOdfTransferApi::new(),
+        }
+    }
+}
+
+#[cfg(feature = "mockall")]
+impl Api for MockApiClient {
+    fn kamu_api(&self) -> &dyn kamu_api::KamuApi {
+        &self.kamu_api_mock
+    }
+    fn kamu_odata_api(&self) -> &dyn kamu_odata_api::KamuOdataApi {
+        &self.kamu_odata_api_mock
+    }
+    fn odf_core_api(&self) -> &dyn odf_core_api::OdfCoreApi {
+        &self.odf_core_api_mock
+    }
+    fn odf_query_api(&self) -> &dyn odf_query_api::OdfQueryApi {
+        &self.odf_query_api_mock
+    }
+    fn odf_transfer_api(&self) -> &dyn odf_transfer_api::OdfTransferApi {
+        &self.odf_transfer_api_mock
+    }
+}
 
