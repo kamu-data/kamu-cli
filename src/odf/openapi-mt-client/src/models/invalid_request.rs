@@ -34,7 +34,6 @@ impl Default for InvalidRequest {
         Self::InvalidRequestOneOf(Default::default())
     }
 }
-///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Kind {
     #[serde(rename = "InvalidRequest::BadSignature")]

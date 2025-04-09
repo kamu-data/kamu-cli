@@ -48,7 +48,6 @@ impl VerificationFailedOneOf {
         }
     }
 }
-///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Kind {
     #[serde(rename = "VerificationFailed::OutputMismatch")]

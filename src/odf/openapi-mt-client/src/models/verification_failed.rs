@@ -34,7 +34,6 @@ impl Default for VerificationFailed {
         Self::VerificationFailedOneOf(Default::default())
     }
 }
-///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Kind {
     #[serde(rename = "VerificationFailed::DatasetBlockNotFound")]

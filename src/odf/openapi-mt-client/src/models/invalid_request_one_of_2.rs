@@ -34,7 +34,6 @@ impl InvalidRequestOneOf2 {
         InvalidRequestOneOf2 { message, kind }
     }
 }
-///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Kind {
     #[serde(rename = "InvalidRequest::BadSignature")]

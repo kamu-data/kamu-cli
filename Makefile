@@ -364,8 +364,8 @@ codegen-openapi-mt-client:
 	$(call insert_text_into_beginning, "#![allow(clippy::needless_return)]", "$(ODF_OPENAPI_MT_CLIENT)/src/lib.rs")
 
 	# Remove empty doc lines: we need to keep fmt --check happy
-	$(foreach file,$(shell find $(ODF_OPENAPI_MT_CLIENT) -name "*.rs"), \
-		sed -i '/^[[:space:]]*\/\/\/$$/d' $(file); \
+	$(foreach file,$(shell find $(ODF_OPENAPI_MT_CLIENT)/src -name "*.rs"), \
+		sed -i '/^[[:space:]]*\/\/\/[[:space:]]*$$/d' $(file); \
 		$(call add_license_header, $(file)); \
 	)
 

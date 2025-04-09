@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::models;
 
-///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum ProofType {
     #[serde(rename = "Ed25519Signature2020")]

@@ -33,7 +33,6 @@ impl Default for ValidationError {
         Self::InvalidRequest(Default::default())
     }
 }
-///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Kind {
     #[serde(rename = "VerificationFailed::DatasetBlockNotFound")]
