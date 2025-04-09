@@ -363,4 +363,6 @@ codegen-openapi-mt-client:
 
 	$(call insert_text_into_beginning, "#![allow(clippy::needless_return)]\n#![allow(clippy::empty_docs)]", "$(ODF_OPENAPI_MT_CLIENT)/src/lib.rs")
 
+	$(foreach file,$(shell find $(ODF_OPENAPI_MT_CLIENT) -name "*.rs"),$(call add_license_header, $(file));)
+
 	cargo fmt -p kamu-openapi-mt-client
