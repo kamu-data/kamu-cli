@@ -139,6 +139,7 @@ impl LoginService {
         odf_server_frontend_url: &Url,
         web_server_started_callback: impl Fn(&String) + Send,
     ) -> Result<FrontendLoginCallbackResponse, LoginError> {
+        //
         let (response_tx, response_rx) =
             tokio::sync::mpsc::channel::<FrontendLoginCallbackResponse>(1);
 
@@ -209,6 +210,7 @@ impl LoginService {
         let login_url = odf_server_backend_url.join("platform/login").unwrap();
         tracing::info!(?login_url, "Login request");
 
+        // todo !!! extract в odf клиент
         let response = client
             .post(login_url)
             .json(&LoginRequestBody {

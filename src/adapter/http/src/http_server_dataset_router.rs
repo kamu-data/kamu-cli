@@ -88,6 +88,7 @@ pub struct LoginResponseBody {
     pub access_token: String,
 }
 
+// todo добавить platform роутер
 /// Authenticate with the node
 #[utoipa::path(
     post,
@@ -153,6 +154,7 @@ pub async fn platform_login_handler(
 #[allow(clippy::unused_async)]
 pub async fn platform_token_validate_handler(catalog: Extension<Catalog>) -> Result<(), ApiError> {
     ensure_authenticated_account(&catalog).api_err()?;
+    // NGU5OWFiNjQ5YmQwNGY3YTdmZTEyNzQ3YzQ1YSA
     Ok(())
 }
 

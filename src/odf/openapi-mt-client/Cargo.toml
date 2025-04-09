@@ -1,0 +1,19 @@
+[package]
+name = "kamu-openapi-mt-client"
+version = "0.233.0"
+authors = ["OpenAPI Generator team and contributors"]
+description = "You are currently running Kamu CLI in the API server mode. For a fully-featured server consider using [Kamu Node](https://docs.kamu.dev/node/).  ## Auth Some operation require an **API token**. Pass `--get-token` command line argument for CLI to generate a token for you.  ## Resources - [Documentation](https://docs.kamu.dev) - [Discord](https://discord.gg/nU6TXRQNXC) - [Other protocols](https://docs.kamu.dev/node/protocols/) - [Open Data Fabric specification](https://docs.kamu.dev/odf/) "
+license = "BSL"
+edition = "2021"
+
+[dependencies]
+serde = { version = "^1.0", features = ["derive"] }
+serde_with = { version = "^3.8", default-features = false, features = ["base64", "std", "macros"] }
+serde_json = "^1.0"
+serde_repr = "^0.1"
+url = "^2.5"
+async-trait = "^0.1"
+reqwest = { version = "^0.12", features = ["json", "multipart"] }
+bon = { version = "2.3", optional = true }
+[features]
+bon = ["dep:bon"]
