@@ -177,6 +177,12 @@ impl S3Context {
         let s3_config = if let Some(endpoint) = endpoint.clone() {
             aws_sdk_s3::config::Builder::from(&sdk_config)
                 .endpoint_url(endpoint)
+                // Default value is `WhenSupported` which apply checksum calculations
+                // for each request. But such as we are using workaround to put objects in s3.
+                // Remove this configuration after feature will be implemented in aws-sdk-s3.
+                .request_checksum_calculation(
+                    aws_sdk_s3::config::RequestChecksumCalculation::WhenRequired,
+                )
                 .force_path_style(true)
                 .build()
         } else {
