@@ -359,3 +359,6 @@ codegen-openapi-mt-client:
 			-g rust \
 			-o /output; \
 	fi
+
+	cargo fmt -p kamu-openapi-mt-client
+
