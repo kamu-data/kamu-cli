@@ -320,7 +320,9 @@ codegen: codegen-odf-dtos \
 	codegen-odf-serde-flatbuffers \
 	codegen-odf-serde-yaml \
 	codegen-engine-tonic \
-	codegen-graphql
+	codegen-graphql \
+	codegen-cli-reference \
+	codegen-openapi-mt-client
 
 
 .PHONY: codegen-graphql-schema
@@ -331,3 +333,29 @@ codegen-graphql-schema:
 .PHONY: codegen-cli-reference
 codegen-cli-reference:
 	cargo nextest run -p kamu-cli generate_reference_markdown
+
+
+.PHONY: codegen-openapi-mt-client
+codegen-openapi-mt-client:
+	@if [ "$(KAMU_CONTAINER_RUNTIME_TYPE)" = "podman" ]; then \
+		podman run --rm \
+			-v "${PWD}/resources:/input:ro,Z" \
+			-v "${PWD}/src/odf/openapi-mt-client:/output:rw,Z" \
+			openapitools/openapi-generator-cli:v7.12.0 \
+			generate \
+			-c /output/generator.config.json \
+			-i /input/openapi-mt.json \
+			-g rust \
+			-o /output; \
+	else \
+		docker run --rm \
+			--user $(shell id -u):$(shell id -g) \
+			-v "${PWD}/resources:/input:ro" \
+			-v "${PWD}/src/odf/openapi-mt-client:/output:rw" \
+			openapitools/openapi-generator-cli:v7.12.0 \
+			generate \
+			-c /output/generator.config.json \
+			-i /input/openapi-mt.json \
+			-g rust \
+			-o /output; \
+	fi

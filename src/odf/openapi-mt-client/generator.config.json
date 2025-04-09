@@ -1,0 +1,7 @@
+{
+    "library": "reqwest-trait",
+    "packageName": "kamu-openapi-mt-client",
+    "topLevelApiClient": true,
+    "useSingleRequestParameter": true,
+    "useBonBuilder": true
+}
