@@ -1,4 +1,4 @@
-FROM minio/minio:RELEASE.2024-02-09T21-25-16Z
+FROM minio/minio:RELEASE.2025-04-08T15-41-24Z
 
 # Minio no longer supports mounting files directly as volume so we have to copy using their client
 # See: https://stackoverflow.com/questions/72904999/create-minio-docker-image-with-content
