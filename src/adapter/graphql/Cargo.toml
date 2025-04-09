@@ -55,7 +55,7 @@ chrono = "0.4"
 datafusion = { version = "46", default-features = false, features = [
     "serde",
 ] }
-dill = "0.12"
+dill = { version = "0.13", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }

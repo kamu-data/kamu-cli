@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
 use odf_dataset::*;
 use odf_metadata::*;
@@ -23,36 +22,24 @@ use tokio::sync::Mutex;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn DatasetStorageUnit)]
+#[dill::interface(dyn DatasetStorageUnitWriter)]
 pub struct DatasetStorageUnitS3 {
-    s3_context: S3Context,
+    /// When present in the catalog enables in-memory cache
+    /// of the dataset IDs present in the repository, allowing to avoid
+    /// expensive bucket scanning
     registry_cache: Option<Arc<S3RegistryCache>>,
     system_time_source: Arc<dyn SystemTimeSource>,
     dataset_s3_builder: Arc<dyn DatasetS3Builder>,
+
+    #[dill::component(explicit)]
+    s3_context: S3Context,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
 impl DatasetStorageUnitS3 {
-    /// # Arguments
-    ///
-    /// * `registry_cache` - when present in the catalog enables in-memory cache
-    ///   of the dataset IDs present in the repository, allowing to avoid
-    ///   expensive bucket scanning
-    pub fn new(
-        s3_context: S3Context,
-        registry_cache: Option<Arc<S3RegistryCache>>,
-        system_time_source: Arc<dyn SystemTimeSource>,
-        dataset_s3_builder: Arc<dyn DatasetS3Builder>,
-    ) -> Self {
-        Self {
-            s3_context,
-            registry_cache,
-            system_time_source,
-            dataset_s3_builder,
-        }
-    }
-
     fn get_dataset_impl(&self, dataset_id: &DatasetID) -> Arc<dyn Dataset> {
         let s3_context = self
             .s3_context
@@ -298,8 +285,8 @@ struct State {
     last_updated: DateTime<Utc>,
 }
 
-#[component(pub)]
-#[dill::scope(Singleton)]
+#[dill::component(pub)]
+#[dill::scope(dill::Singleton)]
 impl S3RegistryCache {
     pub fn new() -> Self {
         Self {

@@ -388,12 +388,9 @@ impl TestHarness {
                 .add_value(dataset_action_authorizer)
                 .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
                 .add_value(TenancyConfig::SingleTenant)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
+                .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                    datasets_dir,
+                ))
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()

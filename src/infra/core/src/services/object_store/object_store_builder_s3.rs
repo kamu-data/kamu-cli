@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use object_store::aws::AmazonS3Builder;
@@ -22,12 +21,13 @@ use super::object_store_with_tracing::ObjectStoreWithTracing;
 // ObjectStoreBuilderS3
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
+#[dill::component]
+#[dill::interface(dyn ObjectStoreBuilder)]
 pub struct ObjectStoreBuilderS3 {
-    #[component(explicit)]
+    #[dill::component(explicit)]
     s3_context: S3Context,
 
-    #[component(explicit)]
+    #[dill::component(explicit)]
     allow_http: bool,
 }
 

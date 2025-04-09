@@ -13,7 +13,6 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
-use dill::Component;
 use domain::{CompactionError, CompactionOptions, CompactionResult};
 use futures::TryStreamExt;
 use indoc::indoc;
@@ -1139,11 +1138,10 @@ impl CompactTestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
@@ -1196,13 +1194,10 @@ impl CompactTestHarness {
             .add::<DidGeneratorDefault>()
             .add_builder(run_info_dir.clone())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(
-                odf::dataset::DatasetStorageUnitS3::builder().with_s3_context(s3_context.clone()),
-            )
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitS3>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitS3>()
-            .add::<odf::dataset::DatasetS3BuilderDefault>()
-            .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetS3BuilderDefault>()
+            .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
+                s3_context.clone(),
+            ))
+            .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
@@ -1210,8 +1205,7 @@ impl CompactTestHarness {
             .add::<EngineProvisionerNull>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add_value(ObjectStoreBuilderS3::new(s3_context.clone(), true))
-            .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
+            .add_builder(ObjectStoreBuilderS3::builder(s3_context, true))
             .add::<VerificationServiceImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()

@@ -22,7 +22,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadService, UploadServiceS3};
+use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadServiceS3};
 use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use s3_utils::S3Context;
@@ -66,7 +66,6 @@ impl Harness {
                 .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add_builder(UploadServiceS3::builder(s3_upload_context.clone()))
-                .bind::<dyn UploadService, UploadServiceS3>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DummyOutboxImpl>();
 

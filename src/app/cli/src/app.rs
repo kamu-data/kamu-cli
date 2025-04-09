@@ -395,12 +395,9 @@ pub fn configure_base_catalog(
 
     b.add::<DidGeneratorDefault>();
 
-    b.add_builder(
-        odf::dataset::DatasetStorageUnitLocalFs::builder()
-            .with_root(workspace_layout.datasets_dir.clone()),
-    );
-    b.bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>();
-    b.bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>();
+    b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+        workspace_layout.datasets_dir.clone(),
+    ));
     b.add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
 
     b.add::<odf::dataset::DatasetFactoryImpl>();
@@ -433,8 +430,7 @@ pub fn configure_base_catalog(
     b.add::<CompactionPlannerImpl>();
     b.add::<CompactionExecutorImpl>();
 
-    b.add_builder(SearchServiceRemoteImpl::builder(None))
-        .bind::<dyn SearchServiceRemote, SearchServiceRemoteImpl>();
+    b.add_builder(SearchServiceRemoteImpl::builder(None));
 
     b.add::<SyncServiceImpl>();
     b.add::<SyncRequestBuilder>();

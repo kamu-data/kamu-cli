@@ -127,12 +127,9 @@ impl ServerSideLocalFsHarness {
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
-                .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir),
-                )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>(
-                )
+                .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                    datasets_dir,
+                ))
                 .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())

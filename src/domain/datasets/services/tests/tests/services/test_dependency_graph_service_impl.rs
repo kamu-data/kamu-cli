@@ -636,9 +636,9 @@ impl DependencyGraphHarness {
 
         let mut b = CatalogBuilder::new();
         b.add_value(tenancy_config)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
             .add::<DatasetLfsBuilderDatabaseBackedImpl>()
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<DidGeneratorDefault>()

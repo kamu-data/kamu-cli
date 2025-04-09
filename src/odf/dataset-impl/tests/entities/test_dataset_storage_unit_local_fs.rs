@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::Component;
 use opendatafabric_dataset_impl::DatasetStorageUnitLocalFs;
 use tempfile::TempDir;
 
@@ -28,11 +27,8 @@ impl LocalFsStorageUnitHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new();
-        b.add_builder(DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitLocalFs>()
-            .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>();
+        b.add_builder(DatasetStorageUnitLocalFs::builder(datasets_dir))
+            .add::<odf::dataset::DatasetLfsBuilderDefault>();
 
         let catalog = b.build();
 

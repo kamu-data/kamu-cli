@@ -12,7 +12,6 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
-use dill::Component;
 use indoc::indoc;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
@@ -1235,10 +1234,10 @@ impl Harness {
             .add::<SystemTimeSourceDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .bind::<dyn odf::dataset::DatasetLfsBuilder, odf::dataset::DatasetLfsBuilderDefault>()
             .build();
 
         let storage_unit = catalog

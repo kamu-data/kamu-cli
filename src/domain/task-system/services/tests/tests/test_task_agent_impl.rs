@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use database_common::NoOpDatabasePlugin;
-use dill::{Catalog, CatalogBuilder, Component};
+use dill::{Catalog, CatalogBuilder};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
@@ -185,9 +185,9 @@ impl TaskAgentHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DatasetEnvVarServiceImpl>()
             .add::<InMemoryDatasetEnvVarRepository>()
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-            .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
             .add::<DatasetRegistrySoloUnitBridge>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)

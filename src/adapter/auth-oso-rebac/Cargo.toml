@@ -33,7 +33,7 @@ messaging-outbox = { workspace = true, default-features = false }
 odf = { workspace = true, default-features = false, features = ["arrow"] }
 
 async-trait = "0.1"
-dill = "0.12"
+dill = { version = "0.13", default-features = false }
 futures = { version = "0.3", default-features = false }
 oso = { version = "0.27", default-features = false, features = ["derive"] }
 thiserror = { version = "2", default-features = false }

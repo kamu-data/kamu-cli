@@ -19,26 +19,15 @@ use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[dill::component]
+#[dill::interface(dyn RemoteRepositoryRegistry)]
 pub struct RemoteRepositoryRegistryImpl {
     repos_dir: Arc<RemoteReposDir>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
-#[dill::interface(dyn RemoteRepositoryRegistry)]
 impl RemoteRepositoryRegistryImpl {
-    pub fn new(repos_dir: Arc<RemoteReposDir>) -> Self {
-        Self { repos_dir }
-    }
-
-    pub fn create(repos_dir: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
-        let repos_dir = Arc::new(RemoteReposDir::new(repos_dir));
-        std::fs::create_dir_all(repos_dir.as_path())?;
-        Ok(Self::new(repos_dir))
-    }
-
     pub fn get_repository_file_path(&self, repo_name: &odf::RepoName) -> Option<PathBuf> {
         let file_path = self.repos_dir.join(repo_name);
 
@@ -169,6 +158,14 @@ impl RemoteReposDir {
     pub fn new(inner: impl Into<PathBuf>) -> Self {
         Self(inner.into())
     }
+
+    #[cfg(any(feature = "testing", test))]
+    pub fn new_with_creation(repos_dir: impl Into<PathBuf>) -> Self {
+        let this = Self::new(repos_dir);
+        std::fs::create_dir_all(this.0.as_path()).unwrap();
+        this
+    }
+
     pub fn inner(&self) -> &PathBuf {
         &self.0
     }
@@ -191,3 +188,5 @@ impl Deref for RemoteReposDir {
         &self.0
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

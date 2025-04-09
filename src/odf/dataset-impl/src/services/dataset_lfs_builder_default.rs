@@ -10,7 +10,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use dill::component;
 use odf_dataset::*;
 use odf_storage::*;
 use odf_storage_lfs::*;
@@ -20,7 +19,8 @@ use crate::{DatasetImpl, MetadataChainImpl, MetadataChainReferenceRepositoryImpl
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
+#[dill::component]
+#[dill::interface(dyn DatasetLfsBuilder)]
 pub struct DatasetLfsBuilderDefault {}
 
 impl DatasetLfsBuilderDefault {

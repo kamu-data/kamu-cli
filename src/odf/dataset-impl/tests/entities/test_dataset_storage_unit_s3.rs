@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::Component;
 use opendatafabric_dataset_impl::{DatasetStorageUnitS3, S3RegistryCache};
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
@@ -31,11 +30,8 @@ impl S3StorageUnitHarness {
         let mut b = dill::CatalogBuilder::new();
 
         b.add::<SystemTimeSourceDefault>()
-            .add_builder(DatasetStorageUnitS3::builder().with_s3_context(s3_context))
-            .bind::<dyn odf::DatasetStorageUnit, DatasetStorageUnitS3>()
-            .bind::<dyn odf::DatasetStorageUnitWriter, DatasetStorageUnitS3>()
-            .add::<odf::dataset::DatasetS3BuilderDefault>()
-            .bind::<dyn odf::dataset::DatasetS3Builder, odf::dataset::DatasetS3BuilderDefault>();
+            .add_builder(DatasetStorageUnitS3::builder(s3_context))
+            .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None));
 
         if registry_caching {
             b.add::<S3RegistryCache>();

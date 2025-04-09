@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use dill::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use odf_dataset::*;
 use odf_metadata::*;
@@ -19,23 +18,20 @@ use odf_storage::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
+#[dill::interface(dyn DatasetStorageUnit)]
+#[dill::interface(dyn DatasetStorageUnitWriter)]
 pub struct DatasetStorageUnitLocalFs {
-    root: PathBuf,
     dataset_lfs_builder: Arc<dyn DatasetLfsBuilder>,
+
+    #[dill::component(explicit)]
+    root: PathBuf,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
 impl DatasetStorageUnitLocalFs {
-    pub fn new(root: PathBuf, dataset_lfs_builder: Arc<dyn DatasetLfsBuilder>) -> Self {
-        Self {
-            root,
-            dataset_lfs_builder,
-        }
-    }
-
-    // TODO: Public only for testing
+    #[cfg(any(feature = "testing", test))]
     pub fn get_dataset_layout(
         &self,
         dataset_id: &DatasetID,

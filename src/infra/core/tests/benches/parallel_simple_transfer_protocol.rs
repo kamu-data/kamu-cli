@@ -15,7 +15,6 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use criterion::{criterion_group, criterion_main, Criterion};
-use dill::*;
 use kamu::domain::*;
 use kamu::testing::{DatasetTestHelper, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
@@ -71,9 +70,9 @@ async fn setup_dataset(
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder().with_root(datasets_dir))
-        .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-        .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
+        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            datasets_dir,
+        ))
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(RemoteReposDir::new(repos_dir))
         .add::<RemoteRepositoryRegistryImpl>()

@@ -28,7 +28,7 @@ odf = { workspace = true }
 internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-dill = "0.12"
+dill = { version = "0.13", default-features = false }
 futures = { version = "0.3", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
@@ -42,4 +42,3 @@ kamu-datasets-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

@@ -23,13 +23,11 @@ doctest = false
 
 [dependencies]
 kamu-search = { workspace = true }
-odf = { workspace = true }
 internal-error = { workspace = true }
 
 async-openai = { version = "0.28", default-features = false }
 async-trait = { version = "0.1", default-features = false }
-dill = { version = "0.12", default-features = false }
-futures = { version = "0.3", default-features = false }
+dill = { version = "0.13", default-features = false }
 tracing = { version = "0.1", default-features = false }
 secrecy = { version = "0.10", default-features = false }
 tokio = { version = "1", default-features = false }

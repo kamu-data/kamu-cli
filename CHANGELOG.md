@@ -18,8 +18,10 @@ Recommendation: for ease of reading, use the following order:
    - indexing new changes to datasets incrementally, whenever HEAD advances
 - Metadata chain visiting algorithm can now use the key blocks cached in the database
    to efficiently implement iteration over key blocks, when data events are not needed
+### Changed
+- Upgraded to latest version of `dill=0.13`
 ### Fixed
-- SQLite repository tests were excluded from "make test-fast" mode by a mistake   
+- SQLite repository tests were excluded from "make test-fast" mode by a mistake
 
 
 ## [0.232.0] - 2025-04-07

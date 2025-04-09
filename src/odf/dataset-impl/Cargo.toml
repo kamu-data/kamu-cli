@@ -46,8 +46,8 @@ time-source = { workspace = true }
 async-stream = "0.3"
 async-trait = "0.1"
 bytes = "1"
-chrono = { version = "0.4", default-features = false}
-dill = { version = "0.12", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.13", default-features = false }
 http = { version = "1", default-features = false }
 hickory-resolver = "0.24"
 mockall = { optional = true, version = "0.13", default-features = false }
@@ -57,12 +57,11 @@ thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
-serde_yaml = "0.9"
 url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf = { workspace = true, features = ["arrow", "lfs", "s3", "testing"]}
+odf = { workspace = true, features = ["arrow", "lfs", "s3", "testing"] }
 test-utils = { workspace = true }
 
 futures = "0.3"

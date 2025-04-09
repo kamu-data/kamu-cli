@@ -13,7 +13,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use dill::{CatalogBuilder, Component};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::DatasetAction;
 use kamu::testing::MockDatasetActionAuthorizer;
@@ -366,11 +365,8 @@ impl ServerHarness {
                 .bind::<dyn kamu::domain::auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(
-                    odf::dataset::DatasetStorageUnitLocalFs::builder()
-                        .with_root(datasets_dir),
+                    odf::dataset::DatasetStorageUnitLocalFs::builder(datasets_dir)
                 )
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::DatasetStorageUnitLocalFs>()
-                .bind::<dyn odf::DatasetStorageUnitWriter, odf::dataset::DatasetStorageUnitLocalFs>()
                 .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
@@ -394,7 +390,7 @@ impl ServerHarness {
             .await
             .unwrap();
 
-        let catalog_system = CatalogBuilder::new_chained(&base_catalog)
+        let catalog_system = dill::CatalogBuilder::new_chained(&base_catalog)
             .add_value(CurrentAccountSubject::new_test())
             .build();
 
@@ -415,7 +411,7 @@ impl ServerHarness {
             .await
             .unwrap();
 
-        let catalog_test = CatalogBuilder::new_chained(&base_catalog)
+        let catalog_test = dill::CatalogBuilder::new_chained(&base_catalog)
             .add_value(current_account_subject)
             .build();
 
