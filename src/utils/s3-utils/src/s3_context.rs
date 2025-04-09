@@ -178,8 +178,10 @@ impl S3Context {
             aws_sdk_s3::config::Builder::from(&sdk_config)
                 .endpoint_url(endpoint)
                 // Default value is `WhenSupported` which apply checksum calculations
-                // for each request. But such as we are using workaround to put objects in s3.
+                // for each request. But such as we are using workaround to put objects in s3
+                // we forced to modify such configuration to use only for required requests.
                 // Remove this configuration after feature will be implemented in aws-sdk-s3.
+                // See issue link below in `put_object_stream` method.
                 .request_checksum_calculation(
                     aws_sdk_s3::config::RequestChecksumCalculation::WhenRequired,
                 )
