@@ -34,21 +34,18 @@ use crate::models;
 #[async_trait]
 pub trait KamuOdataApi: Send + Sync {
     /// GET /odata/{account_name}/{dataset_name}
-    ///
     async fn odata_collection_handler_mt(
         &self,
         params: OdataCollectionHandlerMtParams,
     ) -> Result<String, Error<OdataCollectionHandlerMtError>>;
 
     /// GET /odata/{account_name}/$metadata
-    ///
     async fn odata_metadata_handler_mt(
         &self,
         params: OdataMetadataHandlerMtParams,
     ) -> Result<String, Error<OdataMetadataHandlerMtError>>;
 
     /// GET /odata/{account_name}
-    ///
     async fn odata_service_handler_mt(
         &self,
         params: OdataServiceHandlerMtParams,

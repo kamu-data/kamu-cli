@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 #![allow(clippy::needless_return)]
-#![allow(clippy::empty_docs)]
 #![allow(unused_imports)]
 #![allow(clippy::too_many_arguments)]
 

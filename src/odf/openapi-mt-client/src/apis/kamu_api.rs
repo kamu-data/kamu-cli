@@ -34,53 +34,45 @@ use crate::models;
 #[async_trait]
 pub trait KamuApi: Send + Sync {
     /// GET /accounts/me
-    ///
     async fn account_handler(&self) -> Result<models::AccountResponse, Error<AccountHandlerError>>;
 
     /// GET /datasets/{id}
-    ///
     async fn dataset_info_handler(
         &self,
         params: DatasetInfoHandlerParams,
     ) -> Result<models::DatasetInfoResponse, Error<DatasetInfoHandlerError>>;
 
     /// POST /{account_name}/{dataset_name}/ingest
-    ///
     async fn dataset_ingest_handler(
         &self,
         params: DatasetIngestHandlerParams,
     ) -> Result<serde_json::Value, Error<DatasetIngestHandlerError>>;
 
     /// GET /platform/file/upload/{upload_token}
-    ///
     async fn platform_file_upload_get_handler(
         &self,
         params: PlatformFileUploadGetHandlerParams,
     ) -> Result<serde_json::Value, Error<PlatformFileUploadGetHandlerError>>;
 
     /// POST /platform/file/upload/{upload_token}
-    ///
     async fn platform_file_upload_post_handler(
         &self,
         params: PlatformFileUploadPostHandlerParams,
     ) -> Result<models::UploadContext, Error<PlatformFileUploadPostHandlerError>>;
 
     /// POST /platform/file/upload/prepare
-    ///
     async fn platform_file_upload_prepare_post_handler(
         &self,
         params: PlatformFileUploadPreparePostHandlerParams,
     ) -> Result<models::UploadContext, Error<PlatformFileUploadPreparePostHandlerError>>;
 
     /// POST /platform/login
-    ///
     async fn platform_login_handler(
         &self,
         params: PlatformLoginHandlerParams,
     ) -> Result<models::LoginResponseBody, Error<PlatformLoginHandlerError>>;
 
     /// GET /platform/token/validate
-    ///
     async fn platform_token_validate_handler(
         &self,
     ) -> Result<serde_json::Value, Error<PlatformTokenValidateHandlerError>>;

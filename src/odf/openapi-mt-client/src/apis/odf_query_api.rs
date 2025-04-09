@@ -34,21 +34,18 @@ use crate::models;
 #[async_trait]
 pub trait OdfQueryApi: Send + Sync {
     /// GET /{account_name}/{dataset_name}/metadata
-    ///
     async fn dataset_metadata_handler(
         &self,
         params: DatasetMetadataHandlerParams,
     ) -> Result<models::DatasetMetadataResponse, Error<DatasetMetadataHandlerError>>;
 
     /// GET /{account_name}/{dataset_name}/tail
-    ///
     async fn dataset_tail_handler(
         &self,
         params: DatasetTailHandlerParams,
     ) -> Result<models::DatasetTailResponse, Error<DatasetTailHandlerError>>;
 
     /// GET /query
-    ///
     /// Functions exactly like the [POST version](#tag/odf-query/POST/query) of
     /// the endpoint with all parameters passed in the query string instead of
     /// the body.
@@ -58,7 +55,6 @@ pub trait OdfQueryApi: Send + Sync {
     ) -> Result<models::QueryResponse, Error<QueryHandlerError>>;
 
     /// POST /query
-    ///
     /// ### Regular Queries This endpoint lets you execute arbitrary SQL that can access multiple datasets at once.  Example request body: ```json {     \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",     \"limit\": 3,     \"queryDialect\": \"SqlDataFusion\",     \"dataFormat\": \"JsonAoA\",     \"schemaFormat\": \"ArrowJson\" } ```  Example response: ```json {     \"output\": {         \"data\": [             [\"2024-09-02T21:50:00Z\", \"eth\", \"usd\", 2537.07],             [\"2024-09-02T21:51:00Z\", \"eth\", \"usd\", 2541.37],             [\"2024-09-02T21:52:00Z\", \"eth\", \"usd\", 2542.66]         ],         \"dataFormat\": \"JsonAoA\",         \"schema\": {\"fields\": [\"...\"]},         \"schemaFormat\": \"ArrowJson\"     } } ```  ### Verifiable Queries [Cryptographic proofs](https://docs.kamu.dev/node/commitments) can be also requested to hold the node **forever accountable** for the provided result.  Example request body: ```json {     \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",     \"limit\": 3,     \"queryDialect\": \"SqlDataFusion\",     \"dataFormat\": \"JsonAoA\",     \"schemaFormat\": \"ArrowJson\",     \"include\": [\"proof\"] } ```  Currently, we support verifiability by ensuring that queries are deterministic and fully reproducible and signing the original response with Node's private key. In future more types of proofs will be supported.  Example response: ```json {     \"input\": {         \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",         \"queryDialect\": \"SqlDataFusion\",         \"dataFormat\": \"JsonAoA\",         \"include\": [\"Input\", \"Proof\", \"Schema\"],         \"schemaFormat\": \"ArrowJson\",         \"datasets\": [{             \"id\": \"did:odf:fed0119d20360650afd3d412c6b11529778b784c697559c0107d37ee5da61465726c4\",             \"alias\": \"kamu/eth-to-usd\",             \"blockHash\": \"f1620708557a44c88d23c83f2b915abc10a41cc38d2a278e851e5dc6bb02b7e1f9a1a\"         }],         \"skip\": 0,         \"limit\": 3     },     \"output\": {         \"data\": [             [\"2024-09-02T21:50:00Z\", \"eth\", \"usd\", 2537.07],             [\"2024-09-02T21:51:00Z\", \"eth\", \"usd\", 2541.37],             [\"2024-09-02T21:52:00Z\", \"eth\", \"usd\", 2542.66]         ],         \"dataFormat\": \"JsonAoA\",         \"schema\": {\"fields\": [\"...\"]},         \"schemaFormat\": \"ArrowJson\"     },     \"subQueries\": [],     \"commitment\": {         \"inputHash\": \"f1620e23f7d8cdde7504eadb86f3cdf34b3b1a7d71f10fe5b54b528dd803387422efc\",         \"outputHash\": \"f1620e91f4d3fa26bc4ca0c49d681c8b630550239b64d3cbcfd7c6c2d6ff45998b088\",         \"subQueriesHash\": \"f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210\"     },     \"proof\": {         \"type\": \"Ed25519Signature2020\",         \"verificationMethod\": \"did:key:z6MkkhJQPHpA41mTPLFgBeygnjeeADUSwuGDoF9pbGQsfwZp\",         \"proofValue\": \"uJfY3_g03WbmqlQG8TL-WUxKYU8ZoJaP14MzOzbnJedNiu7jpoKnCTNnDI3TYuaXv89vKlirlGs-5AN06mBseCg\"     } } ```  A client that gets a proof in response should perform [a few basic steps](https://docs.kamu.dev/node/commitments#response-validation) to validate the proof integrity. For example making sure that the DID in `proof.verificationMethod` actually corresponds to the node you're querying data from and that the signature in `proof.proofValue` is actually valid. Only after this you can use this proof to hold the node accountable for the result.  A proof can be stored long-term and then disputed at a later point using your own node or a 3rd party node you can trust via the [`/verify`](#tag/odf-query/POST/verify) endpoint.  See [commitments documentation](https://docs.kamu.dev/node/commitments) for details.
     async fn query_handler_post(
         &self,
@@ -66,7 +62,6 @@ pub trait OdfQueryApi: Send + Sync {
     ) -> Result<models::QueryResponse, Error<QueryHandlerPostError>>;
 
     /// POST /verify
-    ///
     /// A query proof can be stored long-term and then disputed at a later point using this endpoint.  Example request: ```json {     \"input\": {         \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",         \"queryDialect\": \"SqlDataFusion\",         \"dataFormat\": \"JsonAoA\",         \"include\": [\"Input\", \"Proof\", \"Schema\"],         \"schemaFormat\": \"ArrowJson\",         \"datasets\": [{             \"id\": \"did:odf:fed0..26c4\",             \"alias\": \"kamu/eth-to-usd\",             \"blockHash\": \"f162..9a1a\"         }],         \"skip\": 0,         \"limit\": 3     },     \"subQueries\": [],     \"commitment\": {         \"inputHash\": \"f162..2efc\",         \"outputHash\": \"f162..b088\",         \"subQueriesHash\": \"f162..d210\"     },     \"proof\": {         \"type\": \"Ed25519Signature2020\",         \"verificationMethod\": \"did:key:z6Mk..fwZp\",         \"proofValue\": \"uJfY..seCg\"     } } ```  Example response: ```json {     \"ok\": false,     \"error\": {         \"kind\": \"VerificationFailed::OutputMismatch\",         \"actual_hash\": \"f162..c12a\",         \"expected_hash\": \"f162..2a2d\",         \"message\": \"Query was reproduced but resulted in output hash different from expected.                     This means that the output was either falsified, or the query                     reproducibility was not guaranteed by the system.\",     } } ```  See [commitments documentation](https://docs.kamu.dev/node/commitments) for details.
     async fn verify_handler(
         &self,

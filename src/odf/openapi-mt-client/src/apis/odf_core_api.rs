@@ -34,7 +34,6 @@ use crate::models;
 #[async_trait]
 pub trait OdfCoreApi: Send + Sync {
     /// GET /info
-    ///
     async fn node_info_handler(
         &self,
     ) -> Result<models::NodeInfoResponse, Error<NodeInfoHandlerError>>;

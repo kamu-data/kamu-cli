@@ -34,56 +34,48 @@ use crate::models;
 #[async_trait]
 pub trait OdfTransferApi: Send + Sync {
     /// GET /{account_name}/{dataset_name}/blocks/{block_hash}
-    ///
     async fn dataset_blocks_handler(
         &self,
         params: DatasetBlocksHandlerParams,
     ) -> Result<serde_json::Value, Error<DatasetBlocksHandlerError>>;
 
     /// GET /{account_name}/{dataset_name}/checkpoints/{physical_hash}
-    ///
     async fn dataset_checkpoints_get_handler(
         &self,
         params: DatasetCheckpointsGetHandlerParams,
     ) -> Result<serde_json::Value, Error<DatasetCheckpointsGetHandlerError>>;
 
     /// PUT /{account_name}/{dataset_name}/checkpoints/{physical_hash}
-    ///
     async fn dataset_checkpoints_put_handler(
         &self,
         params: DatasetCheckpointsPutHandlerParams,
     ) -> Result<serde_json::Value, Error<DatasetCheckpointsPutHandlerError>>;
 
     /// GET /{account_name}/{dataset_name}/data/{physical_hash}
-    ///
     async fn dataset_data_get_handler(
         &self,
         params: DatasetDataGetHandlerParams,
     ) -> Result<serde_json::Value, Error<DatasetDataGetHandlerError>>;
 
     /// PUT /{account_name}/{dataset_name}/data/{physical_hash}
-    ///
     async fn dataset_data_put_handler(
         &self,
         params: DatasetDataPutHandlerParams,
     ) -> Result<serde_json::Value, Error<DatasetDataPutHandlerError>>;
 
     /// GET /{account_name}/{dataset_name}/pull
-    ///
     async fn dataset_pull_ws_upgrade_handler(
         &self,
         params: DatasetPullWsUpgradeHandlerParams,
     ) -> Result<serde_json::Value, Error<DatasetPullWsUpgradeHandlerError>>;
 
     /// GET /{account_name}/{dataset_name}/push
-    ///
     async fn dataset_push_ws_upgrade_handler(
         &self,
         params: DatasetPushWsUpgradeHandlerParams,
     ) -> Result<serde_json::Value, Error<DatasetPushWsUpgradeHandlerError>>;
 
     /// GET /{account_name}/{dataset_name}/refs/{reference}
-    ///
     async fn dataset_refs_handler(
         &self,
         params: DatasetRefsHandlerParams,
