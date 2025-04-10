@@ -11,6 +11,8 @@ use axum::{Extension, Form, Json};
 use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::{ApiError, ApiErrorResponse, IntoApiError, ResultIntoApiError};
+use internal_error::ResultIntoInternal;
+use kamu_accounts::{DeviceClientId, DeviceCode};
 use kamu_core::TenancyConfig;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
@@ -158,14 +160,14 @@ pub async fn platform_token_validate_handler(catalog: Extension<Catalog>) -> Res
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// <https://www.oauth.com/oauth2-servers/device-flow/authorization-request/>
+/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.1>
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct StartDeviceFlowRequest {
     /// Reserved: not used
     pub client_id: String,
 }
 
-/// <https://www.oauth.com/oauth2-servers/device-flow/token-request/>
+/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.4>
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PollingDeviceTokenRequest {
     /// Reserved: not used
@@ -181,7 +183,7 @@ pub enum TokenDeviceRequest {
     PollingTokenDevice(PollingDeviceTokenRequest),
 }
 
-/// <https://www.oauth.com/oauth2-servers/device-flow/authorization-request/>
+/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.2>
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct StartDeviceFlowResponse {
     pub device_code: String,
@@ -195,7 +197,7 @@ pub struct StartDeviceFlowResponse {
     pub expires_in: u64,
 }
 
-/// <https://www.oauth.com/oauth2-servers/device-flow/token-request/>
+/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.5>
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct FinishDeviceFlowResponse {
     pub access_token: String,
@@ -260,30 +262,64 @@ impl IntoApiError for TokenDeviceError {
 )]
 #[expect(clippy::unused_async)]
 pub async fn platform_token_device_handler(
-    _catalog: Extension<Catalog>,
+    catalog: Extension<Catalog>,
     Form(request): Form<TokenDeviceRequest>,
 ) -> Result<Json<TokenDeviceResponse>, ApiError> {
+    let device_access_token_service = catalog
+        .get_one::<dyn kamu_accounts::DeviceAccessTokenService>()
+        .unwrap();
+
     match request {
-        TokenDeviceRequest::StartDeviceFlow(_) => {
+        TokenDeviceRequest::StartDeviceFlow(request) => {
+            let client_id = DeviceClientId::try_new(request.client_id)
+                .int_err()
+                .api_err()?;
+            let device_code = device_access_token_service
+                .create_device_code(&client_id)
+                .api_err()?;
+
             Ok(Json(TokenDeviceResponse::StartDeviceFlow(
                 StartDeviceFlowResponse {
-                    // TODO: Device Flow: generate device_code
-                    device_code: String::new(),
+                    device_code: device_code.into_inner(),
                     // Reserved
                     user_code: String::new(),
                     // Reserved
                     verification_uri: String::new(),
+                    // TODO: Device Flow: remove magic numbers
                     interval: 5,
                     expires_in: 300,
                 },
             )))
         }
-        TokenDeviceRequest::PollingTokenDevice(_request) => {
-            // TODO: Device Flow: implementation
-            Err(TokenDeviceError {
-                message: TokenDeviceErrorStatus::AccessDenied,
+        TokenDeviceRequest::PollingTokenDevice(request) => {
+            let device_code = DeviceCode::try_new(request.device_code)
+                .int_err()
+                .api_err()?;
+            let maybe_access_token = device_access_token_service
+                .find_access_token_by_device_code(&device_code)
+                .await
+                .api_err()?;
+
+            if let Some(access_token) = maybe_access_token {
+                Ok(Json(TokenDeviceResponse::FinishDeviceFlow(
+                    FinishDeviceFlowResponse {
+                        access_token: access_token.into_inner(),
+                        // Reserved
+                        refresh_token: String::new(),
+                        token_type: "Bearer".to_string(),
+                        // TODO: Device Flow: read from the found entity
+                        expires_in: 0,
+                        // Reserved
+                        score: String::new(),
+                    },
+                )))
+            } else {
+                // Token not found, deny access
+                Err(TokenDeviceError {
+                    message: TokenDeviceErrorStatus::AccessDenied,
+                }
+                .api_err())
             }
-            .api_err())
         }
     }
 }
