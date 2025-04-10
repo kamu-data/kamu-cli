@@ -274,9 +274,7 @@ pub async fn platform_token_device_handler(
             let client_id = DeviceClientId::try_new(request.client_id)
                 .int_err()
                 .api_err()?;
-            let device_code = device_access_token_service
-                .create_device_code(&client_id)
-                .api_err()?;
+            let device_code = device_access_token_service.create_device_code(&client_id);
 
             Ok(Json(TokenDeviceResponse::StartDeviceFlow(
                 StartDeviceFlowResponse {

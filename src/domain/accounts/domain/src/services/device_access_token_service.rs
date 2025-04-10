@@ -14,7 +14,7 @@ use nutype::nutype;
 
 #[async_trait::async_trait]
 pub trait DeviceAccessTokenService: Sync + Send {
-    fn create_device_code(&self, client_id: &DeviceClientId) -> Result<DeviceCode, InternalError>;
+    fn create_device_code(&self, client_id: &DeviceClientId) -> DeviceCode;
 
     async fn create_device_access_token(
         &self,
@@ -28,10 +28,7 @@ pub trait DeviceAccessTokenService: Sync + Send {
         device_code: &DeviceCode,
     ) -> Result<Option<JwtAccessToken>, InternalError>;
 
-    async fn cleanup_expired_device_codes(
-        &self,
-        device_code: &DeviceCode,
-    ) -> Result<JwtAccessToken, InternalError>;
+    async fn cleanup_expired_device_codes(&self) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
