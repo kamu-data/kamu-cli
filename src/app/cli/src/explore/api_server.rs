@@ -143,8 +143,10 @@ impl APIServer {
         ).into())
         .routes(routes!(kamu_adapter_http::platform_login_handler))
         .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
-        // TODO: Device Flow: register in all places
+        // TODO: Device Flow: register in all places -->
+        .routes(routes!(kamu_adapter_http::platform_token_device_authorization_handler))
         .routes(routes!(kamu_adapter_http::platform_token_device_handler))
+        // TODO: Device Flow: register in all places <--
         .routes(routes!(
             kamu_adapter_http::platform_file_upload_prepare_post_handler
         ))

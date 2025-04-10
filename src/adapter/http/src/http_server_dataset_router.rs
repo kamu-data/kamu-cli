@@ -162,98 +162,52 @@ pub async fn platform_token_validate_handler(catalog: Extension<Catalog>) -> Res
 
 /// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.1>
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
-pub struct StartDeviceFlowRequest {
-    /// Reserved: not used
+pub struct DeviceAuthorizationRequest {
+    /// REQUIRED if the client is not authenticating with the
+    /// authorization server as described in [Section 3.2.1. of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1).
+    /// The client identifier as described in [Section 2.2 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2).
     pub client_id: String,
-}
-
-/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.4>
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
-pub struct PollingDeviceTokenRequest {
-    /// Reserved: not used
-    pub grant_type: String,
-    /// Reserved: not used
-    pub client_id: String,
-    pub device_code: String,
-}
-
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
-pub enum TokenDeviceRequest {
-    StartDeviceFlow(StartDeviceFlowRequest),
-    PollingTokenDevice(PollingDeviceTokenRequest),
+    /// OPTIONAL.  The scope of the access request as defined by
+    /// [Section 3.3 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3).
+    pub scope: Option<String>,
 }
 
 /// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.2>
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
-pub struct StartDeviceFlowResponse {
+pub struct DeviceAuthorizationResponse {
+    /// REQUIRED.  The device verification code.
     pub device_code: String,
-    /// Reserved: not used
+    /// REQUIRED.  The end-user verification code.
     pub user_code: String,
-    /// Reserved: not used
+    /// REQUIRED.  The end-user verification URI on the authorization
+    /// server.  The URI should be short and easy to remember as end users
+    /// will be asked to manually type it into their user agent.
     pub verification_uri: String,
-    #[schema(minimum = 1, example = 5)]
-    pub interval: u64,
+    /// OPTIONAL.  A verification URI that includes the "`user_code`" (or
+    /// other information with the same function as the "`user_code`"),
+    /// which is designed for non-textual transmission.
+    pub verification_uri_complete: Option<String>,
+    /// REQUIRED.  The lifetime in seconds of the "`device_code`" and
+    /// "`user_code`".
     #[schema(minimum = 1, example = 300)]
     pub expires_in: u64,
-}
-
-/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.5>
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
-pub struct FinishDeviceFlowResponse {
-    pub access_token: String,
-    /// Reserved: not used
-    pub refresh_token: String,
-    pub token_type: String,
-    /// Reserved: not used
-    #[schema(minimum = 1, example = 3600)]
-    pub expires_in: u64,
+    /// OPTIONAL.  The minimum amount of time in seconds that the client
+    /// SHOULD wait between polling requests to the token endpoint.  If no
+    /// value is provided, clients MUST use 5 as the default.
     #[schema(minimum = 1, example = 5)]
-    /// Reserved: not used
-    pub score: String,
+    pub interval: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
-pub enum TokenDeviceResponse {
-    StartDeviceFlow(StartDeviceFlowResponse),
-    FinishDeviceFlow(FinishDeviceFlowResponse),
-}
-
-#[derive(Serialize, Deserialize, utoipa::ToSchema, strum::Display)]
-#[serde(rename_all = "snake_case")]
-#[strum(serialize_all = "snake_case")]
-pub enum TokenDeviceErrorStatus {
-    /// The device is polling too frequently
-    SlowDown,
-    /// The user has not either allowed or denied the request yet
-    AuthorizationPending,
-    /// The user denies the request
-    AccessDenied,
-    /// The device code has expired
-    ExpiredToken,
-}
-
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
-pub struct TokenDeviceError {
-    pub message: TokenDeviceErrorStatus,
-}
-
-impl IntoApiError for TokenDeviceError {
-    fn api_err(self) -> ApiError {
-        ApiError::bad_request_with_message(self.message.to_string().as_str())
-    }
-}
-
-/// Generating and receiving a token according to [OAuth 2.0 Device Authorization Grant](https://oauth.net/2/device-flow/)
+/// Authorization of a device
 #[utoipa::path(
     post,
-    path = "/platform/token/device",
+    path = "/platform/token/device/authorization",
     request_body(
-        content = TokenDeviceRequest,
+        content = DeviceAuthorizationRequest,
         content_type = "application/x-www-form-urlencoded"
     ),
     responses(
-        (status = OK, body = TokenDeviceResponse),
-        (status = BAD_REQUEST, body = TokenDeviceError)
+        (status = OK, body = DeviceAuthorizationResponse),
     ),
     tag = "kamu",
     security(
@@ -261,67 +215,199 @@ impl IntoApiError for TokenDeviceError {
     )
 )]
 #[expect(clippy::unused_async)]
-pub async fn platform_token_device_handler(
+pub async fn platform_token_device_authorization_handler(
     catalog: Extension<Catalog>,
-    Form(request): Form<TokenDeviceRequest>,
-) -> Result<Json<TokenDeviceResponse>, ApiError> {
+    Form(request): Form<DeviceAuthorizationRequest>,
+) -> Result<Json<DeviceAuthorizationResponse>, ApiError> {
     let device_access_token_service = catalog
         .get_one::<dyn kamu_accounts::DeviceAccessTokenService>()
         .unwrap();
 
-    match request {
-        TokenDeviceRequest::StartDeviceFlow(request) => {
-            let client_id = DeviceClientId::try_new(request.client_id)
-                .int_err()
-                .api_err()?;
-            let device_code = device_access_token_service.create_device_code(&client_id);
+    let client_id = DeviceClientId::try_new(request.client_id)
+        .int_err()
+        .api_err()?;
+    let device_code = device_access_token_service.create_device_code(&client_id);
 
-            Ok(Json(TokenDeviceResponse::StartDeviceFlow(
-                StartDeviceFlowResponse {
-                    device_code: device_code.into_inner(),
-                    // Reserved
-                    user_code: String::new(),
-                    // Reserved
-                    verification_uri: String::new(),
-                    // TODO: Device Flow: remove magic numbers
-                    interval: 5,
-                    expires_in: 300,
-                },
-            )))
-        }
-        TokenDeviceRequest::PollingTokenDevice(request) => {
-            let device_code = DeviceCode::try_new(request.device_code)
-                .int_err()
-                .api_err()?;
-            let maybe_access_token = device_access_token_service
-                .find_access_token_by_device_code(&device_code)
-                .await
-                .api_err()?;
+    Ok(Json(DeviceAuthorizationResponse {
+        device_code: device_code.into_inner(),
+        // Reserved
+        user_code: String::new(),
+        // Reserved
+        verification_uri: String::new(),
+        // Reserved
+        verification_uri_complete: None,
+        // Reserved
+        interval: None,
+        // TODO: Device Flow: remove magic numbers
+        expires_in: 300,
+    }))
+}
 
-            if let Some(access_token) = maybe_access_token {
-                Ok(Json(TokenDeviceResponse::FinishDeviceFlow(
-                    FinishDeviceFlowResponse {
-                        access_token: access_token.into_inner(),
-                        // Reserved
-                        refresh_token: String::new(),
-                        token_type: "Bearer".to_string(),
-                        // TODO: Device Flow: read from the found entity
-                        expires_in: 0,
-                        // Reserved
-                        score: String::new(),
-                    },
-                )))
-            } else {
-                // Token not found, deny access
-                Err(TokenDeviceError {
-                    message: TokenDeviceErrorStatus::AccessDenied,
-                }
-                .api_err())
-            }
-        }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.4>
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DeviceAccessTokenRequest {
+    /// REQUIRED.  Value MUST be set to
+    /// "urn:ietf:params:oauth:grant-type:device_code".
+    pub grant_type: String,
+    /// REQUIRED.  The device verification code, "`device_code`" from the
+    /// device authorization response, defined in [Section 3.2](https://datatracker.ietf.org/doc/html/rfc8628#section-3.2).
+    pub client_id: String,
+    /// REQUIRED if the client is not authenticating with the
+    /// authorization server as described in [Section 3.2.1. of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1).
+    /// The client identifier as described in [Section 2.2 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2).
+    pub device_code: String,
+}
+
+/// <https://datatracker.ietf.org/doc/html/rfc6749#section-5.1>
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DeviceAccessTokenResponse {
+    /// REQUIRED.  The access token issued by the authorization server.
+    pub access_token: String,
+    /// REQUIRED.  The type of the token issued as described in
+    /// [Section 7.1](https://datatracker.ietf.org/doc/html/rfc6749#section-7.1).  Value is case insensitive.
+    pub token_type: String,
+    /// RECOMMENDED.  The lifetime in seconds of the access token.  For
+    /// example, the value "3600" denotes that the access token will
+    /// expire in one hour from the time the response was generated.
+    /// If omitted, the authorization server SHOULD provide the
+    /// expiration time via other means or document the default value.
+    #[schema(minimum = 1, example = 3600)]
+    pub expires_in: u64,
+    #[schema(minimum = 1, example = 5)]
+    /// OPTIONAL.  The refresh token, which can be used to obtain new
+    /// access tokens using the same authorization grant as described
+    /// in [Section 6](https://datatracker.ietf.org/doc/html/rfc6749#section-6).
+    pub refresh_token: Option<String>,
+    /// OPTIONAL.  The scope of the access request as described by
+    /// [Section 3.3](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3).  The requested scope MUST NOT include any scope
+    /// not originally granted by the resource owner, and if omitted is
+    /// treated as equal to the scope originally granted by the
+    /// resource owner.
+    pub score: Option<String>,
+}
+
+/// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.5>
+#[derive(Serialize, Deserialize, utoipa::ToSchema, strum::Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum DeviceAccessTokenErrorStatus {
+    /*
+     * Main errors:
+     * OAuth 2.0 Device Authorization Grant
+     * https://datatracker.ietf.org/doc/html/rfc8628#section-3.5
+     */
+    /// The authorization request is still pending as the end user hasn't
+    /// yet completed the user-interaction steps (Section 3.3).  The
+    /// client SHOULD repeat the access token request to the token
+    /// endpoint (a process known as polling).  Before each new request,
+    /// the client MUST wait at least the number of seconds specified by
+    /// the "interval" parameter of the device authorization response (see
+    /// Section 3.2), or 5 seconds if none was provided, and respect any
+    /// increase in the polling interval required by the "`slow_down`"
+    /// error.
+    AuthorizationPending,
+    /// A variant of "`authorization_pending`", the authorization request is
+    /// still pending and polling should continue, but the interval MUST
+    /// be increased by 5 seconds for this and all subsequent requests.
+    SlowDown,
+    /// The authorization request was denied.
+    AccessDenied,
+    /// The "`device_code`" has expired, and the device authorization
+    /// session has concluded.  The client MAY commence a new device
+    /// authorization request but SHOULD wait for user interaction before
+    /// restarting to avoid unnecessary polling.
+    ExpiredToken,
+
+    /*
+     * Common errors:
+     * The OAuth 2.0 Authorization Framework
+     * https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
+     */
+    /// The provided authorization grant (e.g., authorization
+    /// code, resource owner credentials) or refresh token is
+    /// invalid, expired, revoked, does not match the redirection
+    /// URI used in the authorization request, or was issued to
+    /// another client.
+    InvalidGrant,
+}
+
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+pub struct DeviceAccessTokenError {
+    pub message: DeviceAccessTokenErrorStatus,
+}
+
+impl DeviceAccessTokenError {
+    pub fn new(status: DeviceAccessTokenErrorStatus) -> Self {
+        Self { message: status }
     }
 }
 
+impl IntoApiError for DeviceAccessTokenError {
+    fn api_err(self) -> ApiError {
+        ApiError::bad_request_with_message(self.message.to_string().as_str())
+    }
+}
+
+/// Polling to obtain a token for the device
+#[utoipa::path(
+    post,
+    path = "/platform/token/device",
+    request_body(
+        content = DeviceAccessTokenRequest,
+        content_type = "application/x-www-form-urlencoded"
+    ),
+    responses(
+        (status = OK, body = DeviceAccessTokenResponse),
+        (status = BAD_REQUEST, body = DeviceAccessTokenError)
+    ),
+    tag = "kamu",
+    security(
+        ("api_key" = []),
+    )
+)]
+pub async fn platform_token_device_handler(
+    catalog: Extension<Catalog>,
+    Form(request): Form<DeviceAccessTokenRequest>,
+) -> Result<Json<DeviceAccessTokenResponse>, ApiError> {
+    if request.grant_type != "urn:ietf:params:oauth:grant-type:device_code" {
+        return Err(
+            DeviceAccessTokenError::new(DeviceAccessTokenErrorStatus::InvalidGrant).api_err(),
+        );
+    }
+
+    let device_access_token_service = catalog
+        .get_one::<dyn kamu_accounts::DeviceAccessTokenService>()
+        .unwrap();
+
+    let device_code = DeviceCode::try_new(request.device_code)
+        .int_err()
+        .api_err()?;
+    let maybe_access_token = device_access_token_service
+        .find_access_token_by_device_code(&device_code)
+        .await
+        .api_err()?;
+
+    if let Some(access_token) = maybe_access_token {
+        Ok(Json(DeviceAccessTokenResponse {
+            access_token: access_token.into_inner(),
+            token_type: "Bearer".to_string(),
+            // TODO: Device Flow: read from the found entity
+            expires_in: 0,
+            // Reserved
+            refresh_token: None,
+            // Reserved
+            score: None,
+        }))
+    } else {
+        // Token not found, deny access
+        Err(DeviceAccessTokenError::new(DeviceAccessTokenErrorStatus::AccessDenied).api_err())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn is_dataset_optional_for_request(request: &http::Request<axum::body::Body>) -> bool {
