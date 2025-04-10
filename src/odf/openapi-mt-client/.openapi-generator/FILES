@@ -1,4 +1,3 @@
-.gitignore
 Cargo.toml
 README.md
 docs/AccountResponse.md
