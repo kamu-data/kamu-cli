@@ -224,8 +224,8 @@ pub async fn platform_token_device_authorization_handler(
         .unwrap();
 
     let client_id = DeviceClientId::try_new(request.client_id)
-        .int_err()
-        .api_err()?;
+        .map_err(|_| ApiError::bad_request_with_message("Invalid client_id"))?;
+
     let device_code = device_access_token_service.create_device_code(&client_id);
 
     Ok(Json(DeviceAuthorizationResponse {
@@ -236,10 +236,8 @@ pub async fn platform_token_device_authorization_handler(
         verification_uri: String::new(),
         // Reserved
         verification_uri_complete: None,
-        // Reserved
-        interval: None,
-        // TODO: Device Flow: remove magic numbers
-        expires_in: 300,
+        interval: Some(5),
+        expires_in: 3600,
     }))
 }
 
