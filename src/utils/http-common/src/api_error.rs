@@ -96,6 +96,13 @@ impl ApiError {
         Self::new(source, http::StatusCode::BAD_REQUEST)
     }
 
+    pub fn bad_request_with_message(message: &str) -> Self {
+        Self {
+            source: message.into(),
+            status_code: http::StatusCode::BAD_REQUEST,
+        }
+    }
+
     pub fn not_found(source: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::new(source, http::StatusCode::NOT_FOUND)
     }
