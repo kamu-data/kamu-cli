@@ -89,7 +89,6 @@ impl LoginCommand {
     }
 
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
-        //
         let login_callback_response = self
             .login_service
             .login_interactive(&odf_server_frontend_url, |u| {
@@ -189,7 +188,6 @@ impl LoginCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LoginCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        // !!!
         let odf_server_url = self.get_server_url();
 
         // Check token and exit
