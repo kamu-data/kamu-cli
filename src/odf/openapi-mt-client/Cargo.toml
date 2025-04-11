@@ -23,7 +23,6 @@ mockall = { version = "0.13", optional = true }
 bon = { version = "3", optional = true }
 [features]
 default = ["rustls", "bon"]
-native-tls = ["reqwest/native-tls"]
 rustls = ["reqwest/rustls-tls"]
 mockall = ["dep:mockall"]
 bon = ["dep:bon"]
