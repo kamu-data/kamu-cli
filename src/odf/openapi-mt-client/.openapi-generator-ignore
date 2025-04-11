@@ -1,3 +1,5 @@
 .travis.yml
 git_push.sh
 .gitignore
+README.md
+docs/
