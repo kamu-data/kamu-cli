@@ -12,7 +12,7 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::{ApiError, ApiErrorResponse, IntoApiError, ResultIntoApiError};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{DeviceClientId, DeviceCode};
+use kamu_accounts::{DeviceClientId, DeviceCode, OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE};
 use kamu_core::TenancyConfig;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
@@ -368,7 +368,7 @@ pub async fn platform_token_device_handler(
     catalog: Extension<Catalog>,
     Form(request): Form<DeviceAccessTokenRequest>,
 ) -> Result<Json<DeviceAccessTokenResponse>, ApiError> {
-    if request.grant_type != "urn:ietf:params:oauth:grant-type:device_code" {
+    if request.grant_type != OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE {
         return Err(
             DeviceAccessTokenError::new(DeviceAccessTokenErrorStatus::InvalidGrant).api_err(),
         );
