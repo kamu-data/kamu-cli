@@ -1,0 +1,16 @@
+{
+    "additionalProperties": {
+        "library": "reqwest-trait",
+        "packageName": "kamu-api-client-mt",
+        "topLevelApiClient": true,
+        "useSingleRequestParameter": true,
+        "useBonBuilder": true,
+        "mockall": true
+    },
+    "templateDir": "/output/.openapi-generator/templates",
+    "files": {
+        "Cargo.mustache": {
+            "destinationFilename": "Cargo.toml"
+        }
+    }
+}

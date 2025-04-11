@@ -1,5 +1,6 @@
 ODF_SPEC_DIR=../open-data-fabric
 ODF_METADATA_CRATE_DIR=./src/odf/metadata
+KAMU_API_CLIENT_MT_CRATE_DIR=./src/utils/kamu-api-client-mt
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
@@ -320,7 +321,9 @@ codegen: codegen-odf-dtos \
 	codegen-odf-serde-flatbuffers \
 	codegen-odf-serde-yaml \
 	codegen-engine-tonic \
-	codegen-graphql
+	codegen-graphql \
+	codegen-cli-reference \
+	codegen-kamu-api-client-mt
 
 
 .PHONY: codegen-graphql-schema
@@ -331,3 +334,39 @@ codegen-graphql-schema:
 .PHONY: codegen-cli-reference
 codegen-cli-reference:
 	cargo nextest run -p kamu-cli generate_reference_markdown
+
+
+.PHONY: codegen-kamu-api-client-mt
+codegen-kamu-api-client-mt:
+	@if [ "$(KAMU_CONTAINER_RUNTIME_TYPE)" = "podman" ]; then \
+		podman run --rm \
+			-v "${PWD}/resources:/input:ro,Z" \
+			-v "${PWD}/${KAMU_API_CLIENT_MT_CRATE_DIR}:/output:rw,Z" \
+			openapitools/openapi-generator-cli:v7.12.0 \
+			generate \
+			-c /output/generator.config.json \
+			-i /input/openapi-mt.json \
+			-g rust \
+			-o /output; \
+	else \
+		docker run --rm \
+			--user $(shell id -u):$(shell id -g) \
+			-v "${PWD}/resources:/input:ro" \
+			-v "${PWD}/${KAMU_API_CLIENT_MT_CRATE_DIR}:/output:rw" \
+			openapitools/openapi-generator-cli:v7.12.0 \
+			generate \
+			-c /output/generator.config.json \
+			-i /input/openapi-mt.json \
+			-g rust \
+			-o /output; \
+	fi
+
+	$(call insert_text_into_beginning, "#![allow(clippy::needless_return)]", "$(KAMU_API_CLIENT_MT_CRATE_DIR)/src/lib.rs")
+
+	# Remove empty doc lines: we need to keep fmt --check happy
+	$(foreach file,$(shell find $(KAMU_API_CLIENT_MT_CRATE_DIR)/src -name "*.rs"), \
+		sed -i '/^[[:space:]]*\/\/\/[[:space:]]*$$/d' $(file); \
+		$(call add_license_header, $(file)); \
+	)
+
+	cargo fmt -p kamu-api-client-mt
