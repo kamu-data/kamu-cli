@@ -10,6 +10,15 @@
 use internal_error::InternalError;
 use nutype::nutype;
 
+use crate::{
+    CleanupExpiredDeviceCodesError,
+    CreateDeviceCodeError,
+    DeviceToken,
+    DeviceTokenParamsPart,
+    FindDeviceTokenByDeviceCodeError,
+    UpdateDeviceCodeWithTokenParamsPartError,
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE: &str =
@@ -19,21 +28,53 @@ pub const OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE: &str =
 
 #[async_trait::async_trait]
 pub trait DeviceCodeService: Sync + Send {
-    fn create_device_code(&self, client_id: &DeviceClientId) -> DeviceCode;
-
-    async fn create_device_access_token(
+    async fn create_device_code(
         &self,
-        account_id: &odf::AccountID,
-        device_code: &DeviceCode,
-    ) -> Result<JwtAccessToken, InternalError>;
+        client_id: &DeviceClientId,
+    ) -> Result<DeviceCode, CreateDeviceCodeError>;
 
-    // TODO: Device Flow: return an entity (JwtAccessToken as its field)
-    async fn find_access_token_by_device_code(
+    async fn update_device_code_with_token_params_part(
         &self,
         device_code: &DeviceCode,
-    ) -> Result<Option<JwtAccessToken>, InternalError>;
+        token_params_part: &DeviceTokenParamsPart,
+    ) -> Result<(), UpdateDeviceCodeWithTokenParamsPartError>;
 
-    async fn cleanup_expired_device_codes(&self) -> Result<(), InternalError>;
+    async fn find_device_token_by_device_code(
+        &self,
+        device_code: &DeviceCode,
+    ) -> Result<DeviceToken, FindDeviceTokenByDeviceCodeError>;
+
+    async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait DeviceCodeServiceExt: DeviceCodeService {
+    async fn try_find_device_token_by_device_code(
+        &self,
+        device_code: &DeviceCode,
+    ) -> Result<Option<DeviceToken>, InternalError>;
+}
+
+#[async_trait::async_trait]
+impl<T> DeviceCodeServiceExt for T
+where
+    T: DeviceCodeService,
+    T: ?Sized,
+{
+    async fn try_find_device_token_by_device_code(
+        &self,
+        device_code: &DeviceCode,
+    ) -> Result<Option<DeviceToken>, InternalError> {
+        use FindDeviceTokenByDeviceCodeError as E;
+
+        match self.find_device_token_by_device_code(device_code).await {
+            Ok(device_token) => Ok(Some(device_token)),
+            Err(E::NotFound(_)) => Ok(None),
+            Err(E::Internal(e)) => Err(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,9 +84,5 @@ pub struct DeviceClientId(String);
 
 #[nutype(sanitize(trim), validate(not_empty), derive(AsRef, Debug, Display))]
 pub struct DeviceCode(String);
-
-// TODO: Device Flow: move to AuthenticationService scope
-#[nutype(sanitize(trim), validate(not_empty), derive(AsRef))]
-pub struct JwtAccessToken(String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

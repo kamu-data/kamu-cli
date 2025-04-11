@@ -41,7 +41,7 @@ use crate::queries::DatasetRequestState;
 /// );
 /// ```
 macro_rules! from_catalog_n {
-    ($gql_ctx:ident, $T:ty ) => {{
+    ($gql_ctx:ident, $T:ty) => {{
         let catalog = $gql_ctx.data::<dill::Catalog>().unwrap();
 
         catalog.get_one::<$T>().unwrap()

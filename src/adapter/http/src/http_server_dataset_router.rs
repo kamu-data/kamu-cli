@@ -12,13 +12,18 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::{ApiError, ApiErrorResponse, IntoApiError, ResultIntoApiError};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{DeviceClientId, DeviceCode, OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE};
+use kamu_accounts::{
+    DeviceClientId,
+    DeviceCode,
+    DeviceToken,
+    OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE,
+};
 use kamu_core::TenancyConfig;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use crate::axum_utils::ensure_authenticated_account;
+use crate::axum_utils::{ensure_authenticated_account, from_catalog_n};
 use crate::simple_protocol::*;
 use crate::DatasetResolverLayer;
 
@@ -116,6 +121,7 @@ pub async fn platform_login_handler(
         .login(
             payload.login_method.as_str(),
             payload.login_credentials_json,
+            None,
         )
         .await;
 
@@ -214,19 +220,19 @@ pub struct DeviceAuthorizationResponse {
         ("api_key" = []),
     )
 )]
-#[expect(clippy::unused_async)]
 pub async fn platform_token_device_authorization_handler(
     catalog: Extension<Catalog>,
     Form(request): Form<DeviceAuthorizationRequest>,
 ) -> Result<Json<DeviceAuthorizationResponse>, ApiError> {
-    let device_code_service = catalog
-        .get_one::<dyn kamu_accounts::DeviceCodeService>()
-        .unwrap();
+    let device_code_service = from_catalog_n!(catalog, dyn kamu_accounts::DeviceCodeService);
 
     let client_id = DeviceClientId::try_new(request.client_id)
         .map_err(|_| ApiError::bad_request_with_message("Invalid client_id"))?;
-
-    let device_code = device_code_service.create_device_code(&client_id);
+    let device_code = device_code_service
+        .create_device_code(&client_id)
+        .await
+        .int_err()
+        .api_err()?;
 
     Ok(Json(DeviceAuthorizationResponse {
         device_code: device_code.into_inner(),
@@ -272,7 +278,7 @@ pub struct DeviceAccessTokenResponse {
     /// If omitted, the authorization server SHOULD provide the
     /// expiration time via other means or document the default value.
     #[schema(minimum = 1, example = 3600)]
-    pub expires_in: u64,
+    pub expires_in: usize,
     /// OPTIONAL.  The refresh token, which can be used to obtain new
     /// access tokens using the same authorization grant as described
     /// in [Section 6](https://datatracker.ietf.org/doc/html/rfc6749#section-6).
@@ -374,32 +380,52 @@ pub async fn platform_token_device_handler(
         );
     }
 
-    let device_code_service = catalog
-        .get_one::<dyn kamu_accounts::DeviceCodeService>()
-        .unwrap();
+    let (device_code_service, jwt_token_issuer) = from_catalog_n!(
+        catalog,
+        dyn kamu_accounts::DeviceCodeService,
+        dyn kamu_accounts::JwtTokenIssuer
+    );
 
     let device_code = DeviceCode::try_new(request.device_code)
-        .int_err()
-        .api_err()?;
-    let maybe_access_token = device_code_service
-        .find_access_token_by_device_code(&device_code)
+        .map_err(|_| ApiError::bad_request_with_message("Invalid device_code"))?;
+
+    use kamu_accounts::DeviceCodeServiceExt;
+
+    let maybe_device_token = device_code_service
+        .try_find_device_token_by_device_code(&device_code)
         .await
         .api_err()?;
 
-    if let Some(access_token) = maybe_access_token {
-        Ok(Json(DeviceAccessTokenResponse {
-            access_token: access_token.into_inner(),
-            token_type: "Bearer".to_string(),
-            // TODO: Device Flow: read from the found entity
-            expires_in: 0,
-            // Reserved
-            refresh_token: None,
-            // Reserved
-            score: None,
-        }))
-    } else {
+    let Some(device_token) = maybe_device_token else {
         // Token not found, deny access
-        Err(DeviceAccessTokenError::new(DeviceAccessTokenErrorStatus::AccessDenied).api_err())
+        return Err(
+            DeviceAccessTokenError::new(DeviceAccessTokenErrorStatus::AccessDenied).api_err(),
+        );
+    };
+
+    match device_token {
+        DeviceToken::DeviceCodeCreated { .. } => Err(DeviceAccessTokenError::new(
+            DeviceAccessTokenErrorStatus::AuthorizationPending,
+        )
+        .api_err()),
+        DeviceToken::DeviceCodeWithIssuedToken {
+            token_params_part, ..
+        } => {
+            let expires_in = token_params_part.expires_in();
+            let access_token = jwt_token_issuer
+                .make_access_token_from_device_token_params_part(token_params_part)
+                .api_err()?;
+
+            Ok(Json(DeviceAccessTokenResponse {
+                access_token: access_token.into_inner(),
+                token_type: "Bearer".to_string(),
+                expires_in,
+                // Reserved
+                refresh_token: None,
+                // Reserved
+                score: None,
+            }))
+        }
     }
 }
 

@@ -7,37 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
+use internal_error::InternalError;
+use nutype::nutype;
 
-use crate::DeviceCode;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub enum DeviceToken {
-    DeviceCodeCreated {
-        device_code: DeviceCode,
-        created_at: DateTime<Utc>,
-    },
-    DeviceCodeWithIssuedToken {
-        device_code: DeviceCode,
-        created_at: DateTime<Utc>,
-        token_params_part: DeviceTokenParamsPart,
-        token_last_used_at: DateTime<Utc>,
-    },
-}
+use crate::DeviceTokenParamsPart;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DeviceTokenParamsPart {
-    pub iat: usize,
-    pub exp: usize,
-    pub sub: String,
+#[async_trait::async_trait]
+pub trait JwtTokenIssuer: Sync + Send {
+    fn make_access_token_from_account_id(
+        &self,
+        account_id: &odf::AccountID,
+        expiration_time_sec: usize,
+    ) -> Result<JwtAccessToken, InternalError>;
+
+    fn make_access_token_from_device_token_params_part(
+        &self,
+        device_token_params_part: DeviceTokenParamsPart,
+    ) -> Result<JwtAccessToken, InternalError>;
 }
 
-impl DeviceTokenParamsPart {
-    pub fn expires_in(&self) -> usize {
-        self.exp - self.iat
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[nutype(sanitize(trim), validate(not_empty), derive(AsRef, Display))]
+pub struct JwtAccessToken(String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,41 +7,66 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-use kamu_accounts::{DeviceClientId, DeviceCode, DeviceCodeService, JwtAccessToken};
+use std::sync::Arc;
+
+use kamu_accounts::{
+    CleanupExpiredDeviceCodesError,
+    CreateDeviceCodeError,
+    DeviceClientId,
+    DeviceCode,
+    DeviceCodeRepository,
+    DeviceCodeService,
+    DeviceToken,
+    DeviceTokenParamsPart,
+    FindDeviceTokenByDeviceCodeError,
+    UpdateDeviceCodeWithTokenParamsPartError,
+};
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn DeviceCodeService)]
-pub struct DeviceCodeServiceImpl {}
+pub struct DeviceCodeServiceImpl {
+    device_code_repo: Arc<dyn DeviceCodeRepository>,
+}
 
 #[async_trait::async_trait]
 impl DeviceCodeService for DeviceCodeServiceImpl {
-    fn create_device_code(&self, _client_id: &DeviceClientId) -> DeviceCode {
-        DeviceCode::try_new(Uuid::new_v4().to_string()).unwrap()
-    }
-
-    async fn create_device_access_token(
+    async fn create_device_code(
         &self,
-        _account_id: &odf::AccountID,
-        _device_code: &DeviceCode,
-    ) -> Result<JwtAccessToken, InternalError> {
-        todo!("TODO: Device Flow: implement")
+        _client_id: &DeviceClientId,
+    ) -> Result<DeviceCode, CreateDeviceCodeError> {
+        let device_code = DeviceCode::try_new(Uuid::new_v4().to_string()).unwrap();
+
+        self.device_code_repo
+            .create_device_code(&device_code)
+            .await?;
+
+        Ok(device_code)
     }
 
-    async fn find_access_token_by_device_code(
+    async fn update_device_code_with_token_params_part(
         &self,
-        _device_code: &DeviceCode,
-    ) -> Result<Option<JwtAccessToken>, InternalError> {
-        // TODO: Device Flow: implement
-        Ok(None)
+        device_code: &DeviceCode,
+        token_params_part: &DeviceTokenParamsPart,
+    ) -> Result<(), UpdateDeviceCodeWithTokenParamsPartError> {
+        self.device_code_repo
+            .update_device_code_with_token_params_part(device_code, token_params_part)
+            .await
     }
 
-    async fn cleanup_expired_device_codes(&self) -> Result<(), InternalError> {
-        // TODO: Device Flow: implement
-        Ok(())
+    async fn find_device_token_by_device_code(
+        &self,
+        device_code: &DeviceCode,
+    ) -> Result<DeviceToken, FindDeviceTokenByDeviceCodeError> {
+        self.device_code_repo
+            .find_device_token_by_device_code(device_code)
+            .await
+    }
+
+    async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError> {
+        self.device_code_repo.cleanup_expired_device_codes().await
     }
 }
 

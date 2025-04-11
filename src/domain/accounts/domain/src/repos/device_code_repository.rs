@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DeviceCode, DeviceCodeCreated, DeviceCodeWithIssuedToken, DeviceToken};
+use crate::{DeviceCode, DeviceToken, DeviceTokenParamsPart};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,13 +18,14 @@ use crate::{DeviceCode, DeviceCodeCreated, DeviceCodeWithIssuedToken, DeviceToke
 pub trait DeviceCodeRepository: Send + Sync {
     async fn create_device_code(
         &self,
-        device_code_created: &DeviceCodeCreated,
-    ) -> Result<(), CreateDeviceTokenError>;
+        device_code: &DeviceCode,
+    ) -> Result<(), CreateDeviceCodeError>;
 
-    async fn update_device_code_with_issued_token(
+    async fn update_device_code_with_token_params_part(
         &self,
-        device_code_with_issued_token: &DeviceCodeWithIssuedToken,
-    ) -> Result<(), UpdateDeviceCodeWithIssuedTokenError>;
+        device_code: &DeviceCode,
+        token_params_part: &DeviceTokenParamsPart,
+    ) -> Result<(), UpdateDeviceCodeWithTokenParamsPartError>;
 
     async fn find_device_token_by_device_code(
         &self,
@@ -39,13 +40,13 @@ pub trait DeviceCodeRepository: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum CreateDeviceTokenError {
+pub enum CreateDeviceCodeError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
-pub enum UpdateDeviceCodeWithIssuedTokenError {
+pub enum UpdateDeviceCodeWithTokenParamsPartError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
