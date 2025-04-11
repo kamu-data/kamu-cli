@@ -6105,6 +6105,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-api-client-mt"
+version = "0.233.0"
+dependencies = [
+ "async-trait",
+ "bon",
+ "mockall",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "serde_with",
+ "url",
+]
+
+[[package]]
 name = "kamu-auth-rebac"
 version = "0.233.0"
 dependencies = [
@@ -8213,21 +8228,6 @@ dependencies = [
  "tonic",
  "url",
  "utoipa",
-]
-
-[[package]]
-name = "opendatafabric-openapi-mt-client"
-version = "0.233.0"
-dependencies = [
- "async-trait",
- "bon",
- "mockall",
- "reqwest",
- "serde",
- "serde_json",
- "serde_repr",
- "serde_with",
- "url",
 ]
 
 [[package]]

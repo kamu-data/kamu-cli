@@ -86,7 +86,6 @@ bon = { version = "3", optional = true }
 {{/useBonBuilder}}
 [features]
 default = ["rustls", "bon"]
-native-tls = ["reqwest/native-tls"]
 rustls = ["reqwest/rustls-tls"]
 {{#mockall}}
 mockall = ["dep:mockall"]

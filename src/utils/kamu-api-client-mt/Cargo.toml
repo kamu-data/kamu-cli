@@ -1,5 +1,5 @@
 [package]
-name = "opendatafabric-openapi-mt-client"
+name = "kamu-api-client-mt"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

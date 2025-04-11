@@ -1,7 +1,7 @@
 {
     "additionalProperties": {
         "library": "reqwest-trait",
-        "packageName": "opendatafabric-openapi-mt-client",
+        "packageName": "kamu-api-client-mt",
         "topLevelApiClient": true,
         "useSingleRequestParameter": true,
         "useBonBuilder": true,
