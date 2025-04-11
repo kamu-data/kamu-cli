@@ -273,7 +273,6 @@ pub struct DeviceAccessTokenResponse {
     /// expiration time via other means or document the default value.
     #[schema(minimum = 1, example = 3600)]
     pub expires_in: u64,
-    #[schema(minimum = 1, example = 5)]
     /// OPTIONAL.  The refresh token, which can be used to obtain new
     /// access tokens using the same authorization grant as described
     /// in [Section 6](https://datatracker.ietf.org/doc/html/rfc6749#section-6).
