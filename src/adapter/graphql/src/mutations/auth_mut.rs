@@ -26,9 +26,11 @@ impl AuthMut {
         ctx: &Context<'_>,
         login_method: String,
         login_credentials_json: String,
-        // TODO: Device Flow: use the code
-        _device_code: Option<String>,
+        device_code: Option<String>,
     ) -> Result<LoginResponse> {
+        // TODO: Device Flow: use the code
+        let _ = device_code;
+
         let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
         let login_result = authentication_service
