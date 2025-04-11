@@ -41,7 +41,7 @@ pub trait DeviceAccessTokenService: Sync + Send {
 #[nutype(sanitize(trim), validate(not_empty), derive(AsRef))]
 pub struct DeviceClientId(String);
 
-#[nutype(sanitize(trim), validate(not_empty), derive(AsRef))]
+#[nutype(sanitize(trim), validate(not_empty), derive(AsRef, Debug, Display))]
 pub struct DeviceCode(String);
 
 // TODO: Device Flow: move to AuthenticationService scope
