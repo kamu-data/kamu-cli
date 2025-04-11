@@ -20,7 +20,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system_inmem::domain::{
@@ -470,8 +469,6 @@ pub fn configure_base_catalog(
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
 
-    b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
-
     // No GitHub login possible for single-tenant workspace
     if tenancy_config == TenancyConfig::MultiTenant {
         if is_e2e_testing {
@@ -481,10 +478,7 @@ pub fn configure_base_catalog(
         }
     }
 
-    b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
-    b.add::<kamu_accounts_services::AccessTokenServiceImpl>();
-    b.add::<kamu_accounts_services::AccountServiceImpl>();
-    b.add::<PredefinedAccountsRegistrator>();
+    kamu_accounts_services::register_dependencies(&mut b);
 
     // Give both CLI and server access to stored repo access tokens
     b.add::<odf_server::AccessTokenRegistryService>();

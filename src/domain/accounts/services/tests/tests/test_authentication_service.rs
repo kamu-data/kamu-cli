@@ -39,15 +39,15 @@ async fn test_login() {
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let response_a = authentication_service
-        .login("method-A", "dummy".to_string())
+        .login("method-A", "dummy".to_string(), None)
         .await;
 
     let response_b = authentication_service
-        .login("method-B", "dummy".to_string())
+        .login("method-B", "dummy".to_string(), None)
         .await;
 
     let response_bad = authentication_service
-        .login("method-bad", "dummy".to_string())
+        .login("method-bad", "dummy".to_string(), None)
         .await;
 
     assert_matches!(response_a, Ok(_));
@@ -66,7 +66,7 @@ async fn test_use_good_access_token() {
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let login_response = authentication_service
-        .login("method-A", "dummy".to_string())
+        .login("method-A", "dummy".to_string(), None)
         .await
         .unwrap();
 

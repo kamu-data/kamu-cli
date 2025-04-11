@@ -11,7 +11,7 @@ use internal_error::{BoxedError, InternalError};
 use thiserror::Error;
 
 use super::{InvalidCredentialsError, NoPrimaryEmailError, RejectedCredentialsError};
-use crate::{Account, FindAccountIdByProviderIdentityKeyError, ProviderLoginError};
+use crate::{Account, DeviceCode, FindAccountIdByProviderIdentityKeyError, ProviderLoginError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,6 +23,7 @@ pub trait AuthenticationService: Sync + Send {
         &self,
         login_method: &str,
         login_credentials_json: String,
+        device_code: Option<DeviceCode>,
     ) -> Result<LoginResponse, LoginError>;
 
     async fn account_by_token(&self, access_token: String) -> Result<Account, GetAccountInfoError>;
@@ -37,6 +38,8 @@ pub struct LoginResponse {
     pub account_name: odf::AccountName,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]

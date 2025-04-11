@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use internal_error::*;
-use kamu_accounts_services::AuthenticationServiceImpl;
 
 use crate::{CLIError, Command};
 
@@ -19,7 +18,7 @@ use crate::{CLIError, Command};
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct GenerateTokenCommand {
-    auth_service: Arc<AuthenticationServiceImpl>,
+    jwt_token_issuer: Arc<dyn kamu_accounts::JwtTokenIssuer>,
 
     #[dill::component(explicit)]
     login: Option<String>,
@@ -43,10 +42,12 @@ impl Command for GenerateTokenCommand {
         };
 
         let token = self
-            .auth_service
-            .make_access_token(&subject, self.expiration_time_sec)?;
+            .jwt_token_issuer
+            .make_access_token_from_account_id(&subject, self.expiration_time_sec)?;
 
         println!("{token}");
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

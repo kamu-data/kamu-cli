@@ -5702,6 +5702,7 @@ dependencies = [
  "merge",
  "messaging-outbox",
  "mockall",
+ "nutype",
  "opendatafabric",
  "rand 0.8.5",
  "random-names",

@@ -14,7 +14,12 @@ use database_common::NoOpDatabasePlugin;
 use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::ServerUrlConfig;
-use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
+use kamu_accounts::{
+    JwtAuthenticationConfig,
+    JwtTokenIssuer,
+    PredefinedAccountsConfig,
+    DEFAULT_ACCOUNT_ID,
+};
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
@@ -94,8 +99,9 @@ impl Harness {
 
     fn make_access_token(&self, account_id: &odf::AccountID) -> String {
         self.authentication_service
-            .make_access_token(account_id, 60)
+            .make_access_token_from_account_id(account_id, 60)
             .unwrap()
+            .into_inner()
     }
 
     fn upload_prepare_url(&self, file_name: &str, content_type: &str, file_size: usize) -> String {

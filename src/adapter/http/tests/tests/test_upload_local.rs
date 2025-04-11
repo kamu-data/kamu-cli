@@ -18,6 +18,7 @@ use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
     JwtAuthenticationConfig,
+    JwtTokenIssuer,
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
@@ -115,8 +116,9 @@ impl Harness {
 
     fn make_access_token(&self, account_id: &odf::AccountID) -> String {
         self.authentication_service
-            .make_access_token(account_id, 60)
+            .make_access_token_from_account_id(account_id, 60)
             .unwrap()
+            .into_inner()
     }
 
     fn mock_upload_token(&self) -> UploadTokenBase64Json {

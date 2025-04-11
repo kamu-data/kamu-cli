@@ -307,7 +307,7 @@ type Auth {
 }
 
 type AuthMut {
-	login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
+	login(loginMethod: String!, loginCredentialsJson: String!, deviceCode: String): LoginResponse!
 	accountDetails(accessToken: String!): Account!
 	createAccessToken(accountId: AccountID!, tokenName: String!): CreateTokenResult!
 	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!

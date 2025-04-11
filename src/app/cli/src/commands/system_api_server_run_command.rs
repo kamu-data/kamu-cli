@@ -92,6 +92,7 @@ impl APIServerRunCommand {
                         PROVIDER_PASSWORD,
                         serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
                             .map_int_err(CLIError::critical)?,
+                        None,
                     )
                     .await
                     .map_int_err(CLIError::critical)
