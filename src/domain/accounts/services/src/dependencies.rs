@@ -17,7 +17,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<AccessTokenServiceImpl>();
     catalog_builder.add::<AccountServiceImpl>();
     catalog_builder.add::<AuthenticationServiceImpl>();
-    catalog_builder.add::<DeviceAccessTokenServiceImpl>();
+    catalog_builder.add::<DeviceCodeServiceImpl>();
     catalog_builder.add::<LoginPasswordAuthProvider>();
     catalog_builder.add::<PredefinedAccountsRegistrator>();
 }

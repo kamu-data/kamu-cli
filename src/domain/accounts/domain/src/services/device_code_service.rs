@@ -18,7 +18,7 @@ pub const OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE: &str =
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DeviceAccessTokenService: Sync + Send {
+pub trait DeviceCodeService: Sync + Send {
     fn create_device_code(&self, client_id: &DeviceClientId) -> DeviceCode;
 
     async fn create_device_access_token(

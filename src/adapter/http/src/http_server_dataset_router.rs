@@ -219,14 +219,14 @@ pub async fn platform_token_device_authorization_handler(
     catalog: Extension<Catalog>,
     Form(request): Form<DeviceAuthorizationRequest>,
 ) -> Result<Json<DeviceAuthorizationResponse>, ApiError> {
-    let device_access_token_service = catalog
-        .get_one::<dyn kamu_accounts::DeviceAccessTokenService>()
+    let device_code_service = catalog
+        .get_one::<dyn kamu_accounts::DeviceCodeService>()
         .unwrap();
 
     let client_id = DeviceClientId::try_new(request.client_id)
         .map_err(|_| ApiError::bad_request_with_message("Invalid client_id"))?;
 
-    let device_code = device_access_token_service.create_device_code(&client_id);
+    let device_code = device_code_service.create_device_code(&client_id);
 
     Ok(Json(DeviceAuthorizationResponse {
         device_code: device_code.into_inner(),
@@ -374,14 +374,14 @@ pub async fn platform_token_device_handler(
         );
     }
 
-    let device_access_token_service = catalog
-        .get_one::<dyn kamu_accounts::DeviceAccessTokenService>()
+    let device_code_service = catalog
+        .get_one::<dyn kamu_accounts::DeviceCodeService>()
         .unwrap();
 
     let device_code = DeviceCode::try_new(request.device_code)
         .int_err()
         .api_err()?;
-    let maybe_access_token = device_access_token_service
+    let maybe_access_token = device_code_service
         .find_access_token_by_device_code(&device_code)
         .await
         .api_err()?;

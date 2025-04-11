@@ -8,17 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_accounts::{DeviceAccessTokenService, DeviceClientId, DeviceCode, JwtAccessToken};
+use kamu_accounts::{DeviceClientId, DeviceCode, DeviceCodeService, JwtAccessToken};
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn DeviceAccessTokenService)]
-pub struct DeviceAccessTokenServiceImpl {}
+#[dill::interface(dyn DeviceCodeService)]
+pub struct DeviceCodeServiceImpl {}
 
 #[async_trait::async_trait]
-impl DeviceAccessTokenService for DeviceAccessTokenServiceImpl {
+impl DeviceCodeService for DeviceCodeServiceImpl {
     fn create_device_code(&self, _client_id: &DeviceClientId) -> DeviceCode {
         DeviceCode::try_new(Uuid::new_v4().to_string()).unwrap()
     }

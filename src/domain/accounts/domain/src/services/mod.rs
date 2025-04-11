@@ -13,7 +13,7 @@ mod authentication_config;
 mod authentication_errors;
 mod authentication_provider;
 mod authentication_service;
-mod device_access_token_service;
+mod device_code_service;
 
 pub use access_token_service::*;
 pub use account_service::*;
@@ -21,4 +21,4 @@ pub use authentication_config::*;
 pub use authentication_errors::*;
 pub use authentication_provider::*;
 pub use authentication_service::*;
-pub use device_access_token_service::*;
+pub use device_code_service::*;
