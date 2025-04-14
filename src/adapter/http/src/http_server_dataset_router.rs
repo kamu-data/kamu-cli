@@ -220,8 +220,9 @@ pub struct DeviceAuthorizationResponse {
         ("api_key" = []),
     )
 )]
+#[transactional_handler]
 pub async fn platform_token_device_authorization_handler(
-    catalog: Extension<Catalog>,
+    Extension(catalog): Extension<Catalog>,
     Form(request): Form<DeviceAuthorizationRequest>,
 ) -> Result<Json<DeviceAuthorizationResponse>, ApiError> {
     let device_code_service = from_catalog_n!(catalog, dyn kamu_accounts::DeviceCodeService);
@@ -370,8 +371,9 @@ impl IntoApiError for DeviceAccessTokenError {
         ("api_key" = []),
     )
 )]
+#[transactional_handler]
 pub async fn platform_token_device_handler(
-    catalog: Extension<Catalog>,
+    Extension(catalog): Extension<Catalog>,
     Form(request): Form<DeviceAccessTokenRequest>,
 ) -> Result<Json<DeviceAccessTokenResponse>, ApiError> {
     if request.grant_type != OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE {

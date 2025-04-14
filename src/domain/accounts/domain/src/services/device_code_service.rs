@@ -82,7 +82,11 @@ where
 #[nutype(sanitize(trim), validate(not_empty), derive(AsRef))]
 pub struct DeviceClientId(String);
 
-#[nutype(sanitize(trim), validate(not_empty), derive(AsRef, Debug, Display))]
+#[nutype(
+    sanitize(trim),
+    validate(not_empty),
+    derive(AsRef, Debug, Display, Clone, Hash, Eq, PartialEq)
+)]
 pub struct DeviceCode(String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

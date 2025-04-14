@@ -63,7 +63,7 @@ pub enum FindDeviceTokenByDeviceCodeError {
 #[derive(Error, Debug)]
 #[error("Dataset token for device_code '{device_code}' not found")]
 pub struct DeviceTokenFoundError {
-    device_code: DeviceCode,
+    pub device_code: DeviceCode,
 }
 
 #[derive(Error, Debug)]
