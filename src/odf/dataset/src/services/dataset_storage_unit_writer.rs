@@ -23,18 +23,9 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
-        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError>;
 
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default, Debug)]
-pub struct StoreDatasetOpts {
-    /// Set HEAD reference to the block after storing
-    pub set_head: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

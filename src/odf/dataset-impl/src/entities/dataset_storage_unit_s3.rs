@@ -158,7 +158,6 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
-        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
         use DatasetStorageUnit;
@@ -216,11 +215,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
-                    update_ref: if opts.set_head {
-                        Some(&BlockRef::Head)
-                    } else {
-                        None
-                    },
+                    update_ref: None,
                     ..AppendOpts::default()
                 },
             )

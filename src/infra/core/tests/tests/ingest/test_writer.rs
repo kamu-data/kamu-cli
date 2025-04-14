@@ -1254,7 +1254,20 @@ impl Harness {
                 )
                 .system_time(system_time)
                 .build_typed(),
-                odf::dataset::StoreDatasetOpts { set_head: true },
+            )
+            .await
+            .unwrap();
+
+        foo_stored
+            .dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &foo_stored.seed,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(None),
+                },
             )
             .await
             .unwrap();
