@@ -18,7 +18,7 @@ use odf_metadata::*;
 use odf_storage::*;
 use s3_utils::S3Context;
 use time_source::SystemTimeSource;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,7 +78,7 @@ impl DatasetStorageUnitS3 {
 
     async fn list_dataset_ids_maybe_cached(&self) -> Result<HashSet<DatasetID>, InternalError> {
         if let Some(cache) = &self.registry_cache {
-            let mut cache = cache.state.lock().await;
+            let mut cache = cache.state.write().await;
 
             // Init cache
             if cache.last_updated == DateTime::UNIX_EPOCH {
@@ -104,6 +104,14 @@ impl DatasetStorageUnit for DatasetStorageUnitS3 {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<Arc<dyn Dataset>, GetStoredDatasetError> {
+        // Try cache first
+        if let Some(cache) = &self.registry_cache {
+            let cache = cache.state.read().await;
+            if cache.dataset_ids.contains(dataset_id) {
+                return Ok(self.get_dataset_impl(dataset_id));
+            }
+        }
+
         if self
             .s3_context
             .bucket_path_exists(dataset_id.as_multibase().to_stack_string().as_str())
@@ -224,7 +232,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
 
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
-            let mut cache = cache.state.lock().await;
+            let mut cache = cache.state.write().await;
             cache.dataset_ids.insert(dataset_id.clone());
         }
 
@@ -266,7 +274,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
 
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
-            let mut cache = cache.state.lock().await;
+            let mut cache = cache.state.write().await;
             cache.dataset_ids.remove(dataset_id);
         }
 
@@ -277,7 +285,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct S3RegistryCache {
-    state: Arc<Mutex<State>>,
+    state: Arc<RwLock<State>>,
 }
 
 struct State {
@@ -290,7 +298,7 @@ struct State {
 impl S3RegistryCache {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(Mutex::new(State {
+            state: Arc::new(RwLock::new(State {
                 dataset_ids: HashSet::new(),
                 last_updated: DateTime::UNIX_EPOCH,
             })),
