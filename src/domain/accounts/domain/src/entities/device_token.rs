@@ -15,32 +15,39 @@ use crate::DeviceCode;
 
 #[derive(Debug, Clone)]
 pub enum DeviceToken {
-    DeviceCodeCreated {
-        device_code: DeviceCode,
-        created_at: DateTime<Utc>,
-    },
-    DeviceCodeWithIssuedToken {
-        device_code: DeviceCode,
-        created_at: DateTime<Utc>,
-        token_params_part: DeviceTokenParamsPart,
-        token_last_used_at: Option<DateTime<Utc>>,
-    },
+    DeviceCodeCreated(DeviceTokenCreated),
+    DeviceCodeWithIssuedToken(DeviceCodeWithIssuedToken),
 }
 
 impl DeviceToken {
-    pub fn into_parts(self) -> (DeviceCode, DateTime<Utc>) {
+    pub fn with_token_params_part(self, token_params_part: DeviceTokenParamsPart) -> DeviceToken {
         match self {
-            DeviceToken::DeviceCodeWithIssuedToken {
-                device_code,
-                created_at,
-                ..
+            DeviceToken::DeviceCodeCreated(base) => {
+                DeviceToken::DeviceCodeWithIssuedToken(DeviceCodeWithIssuedToken {
+                    base,
+                    token_params_part,
+                    token_last_used_at: None,
+                })
             }
-            | DeviceToken::DeviceCodeCreated {
-                device_code,
-                created_at,
-            } => (device_code, created_at),
+            _ => panic!("Cannot add token params part to a token that already has one"),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct DeviceTokenCreated {
+    pub device_code: DeviceCode,
+    pub created_at: DateTime<Utc>,
+    pub device_code_expires_in_seconds: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeviceCodeWithIssuedToken {
+    pub base: DeviceTokenCreated,
+    pub token_params_part: DeviceTokenParamsPart,
+    pub token_last_used_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

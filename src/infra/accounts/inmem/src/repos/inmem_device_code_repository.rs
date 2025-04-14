@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Utc;
 use tokio::sync::RwLock;
 
 use crate::domain::*;
@@ -45,18 +44,15 @@ impl InMemoryDeviceCodeRepository {
 impl DeviceCodeRepository for InMemoryDeviceCodeRepository {
     async fn create_device_code(
         &self,
-        device_code: &DeviceCode,
+        device_code_created: &DeviceTokenCreated,
     ) -> Result<(), CreateDeviceCodeError> {
         let mut writable_state = self.state.write().await;
 
-        let device_token = DeviceToken::DeviceCodeCreated {
-            device_code: device_code.clone(),
-            created_at: Utc::now(),
-        };
+        let device_token = DeviceToken::DeviceCodeCreated(device_code_created.clone());
 
         writable_state
             .device_token_by_device_code
-            .insert(device_code.clone(), device_token);
+            .insert(device_code_created.device_code.clone(), device_token);
 
         Ok(())
     }
@@ -72,17 +68,11 @@ impl DeviceCodeRepository for InMemoryDeviceCodeRepository {
             .device_token_by_device_code
             .remove(device_code)
             .expect("Device code must exist");
-        let (created_device_code, created_at) = created_token.into_parts();
-        let device_token = DeviceToken::DeviceCodeWithIssuedToken {
-            device_code: created_device_code,
-            created_at,
-            token_params_part: token_params_part.clone(),
-            token_last_used_at: None,
-        };
+        let token = created_token.with_token_params_part(token_params_part.clone());
 
         writable_state
             .device_token_by_device_code
-            .insert(device_code.clone(), device_token);
+            .insert(device_code.clone(), token);
 
         Ok(())
     }

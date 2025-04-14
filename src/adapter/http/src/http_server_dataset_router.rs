@@ -179,7 +179,7 @@ pub struct DeviceAuthorizationRequest {
 }
 
 /// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.2>
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DeviceAuthorizationResponse {
     /// REQUIRED.  The device verification code.
     pub device_code: String,
@@ -225,26 +225,35 @@ pub async fn platform_token_device_authorization_handler(
     Extension(catalog): Extension<Catalog>,
     Form(request): Form<DeviceAuthorizationRequest>,
 ) -> Result<Json<DeviceAuthorizationResponse>, ApiError> {
-    let device_code_service = from_catalog_n!(catalog, dyn kamu_accounts::DeviceCodeService);
+    let (device_code_service, url_config) = from_catalog_n!(
+        catalog,
+        dyn kamu_accounts::DeviceCodeService,
+        kamu_core::ServerUrlConfig
+    );
 
     let client_id = DeviceClientId::try_new(request.client_id)
         .map_err(|_| ApiError::bad_request_with_message("Invalid client_id"))?;
-    let device_code = device_code_service
+    let device_code_created = device_code_service
         .create_device_code(&client_id)
         .await
         .int_err()
         .api_err()?;
+    let verification_uri = url_config
+        .protocols
+        .base_url_rest
+        .join("v/login")
+        .unwrap()
+        .to_string();
 
     Ok(Json(DeviceAuthorizationResponse {
-        device_code: device_code.into_inner(),
+        device_code: device_code_created.device_code.into_inner(),
         // Reserved
         user_code: String::new(),
-        // Reserved
-        verification_uri: String::new(),
+        verification_uri,
         // Reserved
         verification_uri_complete: None,
         interval: Some(5),
-        expires_in: 3600,
+        expires_in: device_code_created.device_code_expires_in_seconds,
     }))
 }
 
@@ -266,7 +275,7 @@ pub struct DeviceAccessTokenRequest {
 }
 
 /// <https://datatracker.ietf.org/doc/html/rfc6749#section-5.1>
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DeviceAccessTokenResponse {
     /// REQUIRED.  The access token issued by the authorization server.
     pub access_token: String,
@@ -293,7 +302,7 @@ pub struct DeviceAccessTokenResponse {
 }
 
 /// <https://datatracker.ietf.org/doc/html/rfc8628#section-3.5>
-#[derive(Serialize, Deserialize, utoipa::ToSchema, strum::Display)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema, strum::Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum DeviceAccessTokenErrorStatus {
@@ -337,7 +346,7 @@ pub enum DeviceAccessTokenErrorStatus {
     InvalidGrant,
 }
 
-#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct DeviceAccessTokenError {
     pub message: DeviceAccessTokenErrorStatus,
 }
@@ -406,16 +415,14 @@ pub async fn platform_token_device_handler(
     };
 
     match device_token {
-        DeviceToken::DeviceCodeCreated { .. } => Err(DeviceAccessTokenError::new(
+        DeviceToken::DeviceCodeCreated(..) => Err(DeviceAccessTokenError::new(
             DeviceAccessTokenErrorStatus::AuthorizationPending,
         )
         .api_err()),
-        DeviceToken::DeviceCodeWithIssuedToken {
-            token_params_part, ..
-        } => {
-            let expires_in = token_params_part.expires_in();
+        DeviceToken::DeviceCodeWithIssuedToken(d) => {
+            let expires_in = d.token_params_part.expires_in();
             let access_token = jwt_token_issuer
-                .make_access_token_from_device_token_params_part(token_params_part)
+                .make_access_token_from_device_token_params_part(d.token_params_part)
                 .api_err()?;
 
             Ok(Json(DeviceAccessTokenResponse {

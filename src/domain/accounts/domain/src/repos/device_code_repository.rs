@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DeviceCode, DeviceToken, DeviceTokenParamsPart};
+use crate::{DeviceCode, DeviceToken, DeviceTokenCreated, DeviceTokenParamsPart};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +18,7 @@ use crate::{DeviceCode, DeviceToken, DeviceTokenParamsPart};
 pub trait DeviceCodeRepository: Send + Sync {
     async fn create_device_code(
         &self,
-        device_code: &DeviceCode,
+        device_code_created: &DeviceTokenCreated,
     ) -> Result<(), CreateDeviceCodeError>;
 
     async fn update_device_code_with_token_params_part(

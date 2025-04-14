@@ -89,10 +89,10 @@ impl LoginCommand {
     }
 
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
-        let login_callback_response = self
+        let login_interactive_response = self
             .login_service
             .login_interactive(&odf_server_frontend_url, |u| {
-                self.report_web_server_started(u);
+                self.report_device_flow_authorization_started(u);
             })
             .await
             .map_err(|e| match e {
@@ -103,14 +103,14 @@ impl LoginCommand {
         self.access_token_registry_service.save_access_token(
             self.scope,
             Some(&odf_server_frontend_url),
-            &login_callback_response.backend_url,
-            login_callback_response.access_token,
+            &login_interactive_response.backend_url,
+            login_interactive_response.access_token,
         )?;
 
         if !self.skip_add_repo {
             self.add_repository(
                 &odf_server_frontend_url,
-                &login_callback_response.backend_url,
+                &login_interactive_response.backend_url,
             )?;
         }
 
@@ -123,23 +123,18 @@ impl LoginCommand {
         Ok(())
     }
 
-    fn report_web_server_started(&self, cli_web_server_address: &String) {
-        tracing::info!("HTTP server is listening on: {}", cli_web_server_address);
-
+    fn report_device_flow_authorization_started(&self, kamu_platform_login_url: &str) {
         if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet
         {
             eprintln!(
-                "{}\n  {}\n{}",
+                "{}\n{}\n",
                 s("Please open this URL in the browser to login:")
                     .green()
                     .bold(),
-                s(&cli_web_server_address).bold(),
-                s("This process will exit automatically after receiving the login result.")
-                    .yellow()
+                s(kamu_platform_login_url).bold(),
             );
-            eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
         }
     }
 

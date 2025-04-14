@@ -24,9 +24,9 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 email-utils = { workspace = true }
+internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 odf = { workspace = true }
-internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }

@@ -14,6 +14,7 @@ use crate::{
     CleanupExpiredDeviceCodesError,
     CreateDeviceCodeError,
     DeviceToken,
+    DeviceTokenCreated,
     DeviceTokenParamsPart,
     FindDeviceTokenByDeviceCodeError,
     UpdateDeviceCodeWithTokenParamsPartError,
@@ -31,7 +32,7 @@ pub trait DeviceCodeService: Sync + Send {
     async fn create_device_code(
         &self,
         client_id: &DeviceClientId,
-    ) -> Result<DeviceCode, CreateDeviceCodeError>;
+    ) -> Result<DeviceTokenCreated, CreateDeviceCodeError>;
 
     async fn update_device_code_with_token_params_part(
         &self,
