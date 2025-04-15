@@ -295,7 +295,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
             let device_token_params_part = DeviceTokenParamsPart {
                 iat: claims.iat,
                 exp: claims.exp,
-                sub: claims.sub,
+                account_id: account_id.clone(),
             };
 
             self.device_code_service
@@ -335,13 +335,17 @@ impl JwtTokenIssuer for AuthenticationServiceImpl {
 
     fn make_access_token_from_device_token_params_part(
         &self,
-        DeviceTokenParamsPart { iat, exp, sub }: DeviceTokenParamsPart,
+        DeviceTokenParamsPart {
+            iat,
+            exp,
+            account_id,
+        }: DeviceTokenParamsPart,
     ) -> Result<JwtAccessToken, InternalError> {
         let claims = JWTClaims {
             iat,
             exp,
             iss: String::from(KAMU_JWT_ISSUER),
-            sub,
+            sub: account_id.to_string(),
         };
 
         self.make_access_token_from_jwt_claims(&claims)

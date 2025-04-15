@@ -64,10 +64,17 @@ impl DeviceCodeRepository for InMemoryDeviceCodeRepository {
     ) -> Result<(), UpdateDeviceCodeWithTokenParamsPartError> {
         let mut writable_state = self.state.write().await;
 
-        let created_token = writable_state
+        let maybe_created_token = writable_state
             .device_token_by_device_code
-            .remove(device_code)
-            .expect("Device code must exist");
+            .remove(device_code);
+
+        let Some(created_token) = maybe_created_token else {
+            return Err(DeviceTokenFoundError {
+                device_code: device_code.clone(),
+            }
+            .into());
+        };
+
         let token = created_token.with_token_params_part(token_params_part.clone());
 
         writable_state

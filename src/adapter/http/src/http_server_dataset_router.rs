@@ -244,16 +244,20 @@ pub async fn platform_token_device_authorization_handler(
         .join("v/login")
         .unwrap()
         .to_string();
+    let expires_in = (device_code_created.expires_at - device_code_created.created_at)
+        .num_seconds()
+        .try_into()
+        .unwrap();
 
     Ok(Json(DeviceAuthorizationResponse {
-        device_code: device_code_created.device_code.into_inner(),
+        device_code: device_code_created.device_code.to_string(),
         // Reserved
         user_code: String::new(),
         verification_uri,
         // Reserved
         verification_uri_complete: None,
         interval: Some(5),
-        expires_in: device_code_created.device_code_expires_in_seconds,
+        expires_in,
     }))
 }
 
@@ -397,7 +401,7 @@ pub async fn platform_token_device_handler(
         dyn kamu_accounts::JwtTokenIssuer
     );
 
-    let device_code = DeviceCode::try_new(request.device_code)
+    let device_code = DeviceCode::try_new(&request.device_code)
         .map_err(|_| ApiError::bad_request_with_message("Invalid device_code"))?;
 
     use kamu_accounts::DeviceCodeServiceExt;

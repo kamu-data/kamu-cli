@@ -53,10 +53,14 @@ impl LoginService {
             .odf_server_backend_url(&client, odf_server_frontend_url)
             .await?;
 
+        tracing::debug!(url = %odf_server_backend_url, "ODF server backend URL");
+
         // Authorize the device before we start polling
         let device_authorization_response = self
             .device_authorization(&client, &odf_server_backend_url)
             .await?;
+
+        tracing::debug!(response = ?device_authorization_response, "Authorization response");
 
         let polling_start_time = self.time_source.now();
         let polling_interval = Duration::seconds(
@@ -83,6 +87,8 @@ impl LoginService {
                     &device_authorization_response.device_code,
                 )
                 .await?;
+
+            tracing::debug!(response = ?device_access_token_response, "Device access token response");
 
             match device_access_token_response {
                 DeviceAccessTokenResult::Success(r) => {

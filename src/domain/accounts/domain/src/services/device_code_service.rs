@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use nutype::nutype;
+use uuid::Uuid;
 
 use crate::{
     CleanupExpiredDeviceCodesError,
@@ -83,11 +84,14 @@ where
 #[nutype(sanitize(trim), validate(not_empty), derive(AsRef))]
 pub struct DeviceClientId(String);
 
-#[nutype(
-    sanitize(trim),
-    validate(not_empty),
-    derive(AsRef, Debug, Display, Clone, Hash, Eq, PartialEq)
-)]
-pub struct DeviceCode(String);
+#[nutype(derive(AsRef, Debug, Display, Clone, Hash, Eq, PartialEq))]
+pub struct DeviceCode(Uuid);
+
+impl DeviceCode {
+    pub fn try_new(raw: &str) -> Result<Self, InternalError> {
+        let uuid = Uuid::parse_str(raw).int_err()?;
+        Ok(Self::new(uuid))
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

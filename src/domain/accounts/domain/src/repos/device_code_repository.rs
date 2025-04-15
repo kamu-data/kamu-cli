@@ -48,6 +48,9 @@ pub enum CreateDeviceCodeError {
 #[derive(Error, Debug)]
 pub enum UpdateDeviceCodeWithTokenParamsPartError {
     #[error(transparent)]
+    NotFound(#[from] DeviceTokenFoundError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 

@@ -29,8 +29,7 @@ impl AuthMut {
         device_code: Option<String>,
     ) -> Result<LoginResponse> {
         let device_code = if let Some(raw_device_code) = device_code {
-            let device_code = DeviceCode::try_new(raw_device_code)
-                .map_err(|_| "Invalid device_code".int_err())?;
+            let device_code = DeviceCode::try_new(&raw_device_code).int_err()?;
             Some(device_code)
         } else {
             None

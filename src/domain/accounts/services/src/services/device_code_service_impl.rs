@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::Duration;
 use kamu_accounts::{
     CleanupExpiredDeviceCodesError,
     CreateDeviceCodeError,
@@ -27,7 +28,7 @@ use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const DEVICE_CODE_EXPIRES_IN_SECONDS: u64 = 600; /* 5 minutes */
+const DEVICE_CODE_EXPIRES_IN: Duration = Duration::minutes(5);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,11 +45,16 @@ impl DeviceCodeService for DeviceCodeServiceImpl {
         &self,
         _client_id: &DeviceClientId,
     ) -> Result<DeviceTokenCreated, CreateDeviceCodeError> {
-        let device_code = DeviceCode::try_new(Uuid::new_v4().to_string()).unwrap();
-        let device_token_created = DeviceTokenCreated {
-            device_code,
-            created_at: self.time_source.now(),
-            device_code_expires_in_seconds: DEVICE_CODE_EXPIRES_IN_SECONDS,
+        let device_token_created = {
+            let device_code = DeviceCode::new(Uuid::new_v4());
+            let created_at = self.time_source.now();
+            let expires_at = created_at + DEVICE_CODE_EXPIRES_IN;
+
+            DeviceTokenCreated {
+                device_code,
+                created_at,
+                expires_at,
+            }
         };
 
         self.device_code_repo
