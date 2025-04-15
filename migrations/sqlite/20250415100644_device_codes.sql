@@ -8,3 +8,6 @@ CREATE TABLE device_codes
     token_last_used_at     TEXT,
     account_id             VARCHAR(100) REFERENCES accounts (id)
 );
+
+CREATE INDEX idx_device_codes_device_code_expires_at
+    ON device_codes (DATETIME(device_code_expires_at) DESC);

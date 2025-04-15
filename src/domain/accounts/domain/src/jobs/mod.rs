@@ -11,5 +11,6 @@
 
 pub const JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR: &str =
     "dev.kamu.accounts.PredefinedAccountsRegistrator";
+pub const JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE: &str = "dev.kamu.accounts.DeviceCodeService";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

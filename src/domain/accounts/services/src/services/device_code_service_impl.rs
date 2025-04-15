@@ -10,6 +10,8 @@
 use std::sync::Arc;
 
 use chrono::Duration;
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     CleanupExpiredDeviceCodesError,
     CreateDeviceCodeError,
@@ -22,7 +24,10 @@ use kamu_accounts::{
     DeviceTokenParamsPart,
     FindDeviceTokenByDeviceCodeError,
     UpdateDeviceCodeWithTokenParamsPartError,
+    JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
+    JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
+use kamu_datasets::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -34,6 +39,15 @@ const DEVICE_CODE_EXPIRES_IN: Duration = Duration::minutes(5);
 
 #[dill::component]
 #[dill::interface(dyn DeviceCodeService)]
+#[dill::interface(dyn InitOnStartup)]
+#[dill::meta(InitOnStartupMeta {
+    job_name: JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
+    depends_on: &[
+        JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
+        JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER
+    ],
+    requires_transaction: true,
+})]
 pub struct DeviceCodeServiceImpl {
     device_code_repo: Arc<dyn DeviceCodeRepository>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -85,6 +99,17 @@ impl DeviceCodeService for DeviceCodeServiceImpl {
 
     async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError> {
         self.device_code_repo.cleanup_expired_device_codes().await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl InitOnStartup for DeviceCodeServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, name = DeviceCodeServiceImpl_run_initialization)]
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        self.cleanup_expired_device_codes().await.int_err()
     }
 }
 

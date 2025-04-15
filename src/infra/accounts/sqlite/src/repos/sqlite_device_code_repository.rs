@@ -141,7 +141,22 @@ impl DeviceCodeRepository for SqliteDeviceCodeRepository {
     }
 
     async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError> {
-        todo!("TODO: Device Flow: impl")
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        sqlx::query!(
+            r#"
+            DELETE
+            FROM device_codes
+            WHERE datetime(device_code_expires_at) < datetime('now')
+            "#,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
     }
 }
 
