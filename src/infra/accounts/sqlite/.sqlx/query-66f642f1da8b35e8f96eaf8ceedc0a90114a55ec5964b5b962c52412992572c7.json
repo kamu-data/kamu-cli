@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT device_code            AS \"device_code: Uuid\",\n                   device_code_created_at AS \"device_code_created_at: _\",\n                   device_code_expires_at AS \"device_code_expires_at: _\",\n                   token_iat,\n                   token_exp,\n                   token_last_used_at     AS \"token_last_used_at: _\",\n                   account_id\n            FROM device_codes\n            WHERE device_code = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "device_code: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "device_code_created_at: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "device_code_expires_at: _",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "token_iat",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "token_exp",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "token_last_used_at: _",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id",
+        "ordinal": 6,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "66f642f1da8b35e8f96eaf8ceedc0a90114a55ec5964b5b962c52412992572c7"
+}

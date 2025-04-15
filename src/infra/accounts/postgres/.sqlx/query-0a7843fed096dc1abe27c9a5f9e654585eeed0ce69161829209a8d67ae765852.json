@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE device_codes\n            SET token_iat  = $2,\n                token_exp  = $3,\n                account_id = $4\n            WHERE device_code = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8",
+        "Int8",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0a7843fed096dc1abe27c9a5f9e654585eeed0ce69161829209a8d67ae765852"
+}
