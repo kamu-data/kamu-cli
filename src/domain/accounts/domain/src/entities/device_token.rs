@@ -24,9 +24,11 @@ pub enum DeviceToken {
 impl DeviceToken {
     pub fn with_token_params_part(self, token_params_part: DeviceTokenParamsPart) -> DeviceToken {
         match self {
-            DeviceToken::DeviceCodeCreated(base) => {
+            DeviceToken::DeviceCodeCreated(d) => {
                 DeviceToken::DeviceCodeWithIssuedToken(DeviceCodeWithIssuedToken {
-                    base,
+                    device_code: d.device_code,
+                    created_at: d.created_at,
+                    expires_at: d.expires_at,
                     token_params_part,
                     token_last_used_at: None,
                 })
@@ -38,6 +40,7 @@ impl DeviceToken {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[reusable::reusable(device_token)]
 #[derive(Debug, Clone)]
 pub struct DeviceTokenCreated {
     pub device_code: DeviceCode,
@@ -45,9 +48,9 @@ pub struct DeviceTokenCreated {
     pub expires_at: DateTime<Utc>,
 }
 
+#[reusable::reuse(device_token)]
 #[derive(Debug, Clone)]
 pub struct DeviceCodeWithIssuedToken {
-    pub base: DeviceTokenCreated,
     pub token_params_part: DeviceTokenParamsPart,
     pub token_last_used_at: Option<DateTime<Utc>>,
 }
@@ -89,12 +92,9 @@ impl TryFrom<DeviceTokenRowModel> for DeviceToken {
         let res = match (v.token_iat, v.token_exp, v.account_id) {
             (Some(token_iat), Some(token_exp), Some(account_id)) => {
                 DeviceToken::DeviceCodeWithIssuedToken(DeviceCodeWithIssuedToken {
-                    // TODO: Device Flow: extract common parts
-                    base: DeviceTokenCreated {
-                        device_code: DeviceCode::new(v.device_code),
-                        created_at: v.device_code_created_at,
-                        expires_at: v.device_code_expires_at,
-                    },
+                    device_code: DeviceCode::new(v.device_code),
+                    created_at: v.device_code_created_at,
+                    expires_at: v.device_code_expires_at,
                     token_params_part: DeviceTokenParamsPart {
                         iat: token_iat.try_into().int_err()?,
                         exp: token_exp.try_into().int_err()?,
