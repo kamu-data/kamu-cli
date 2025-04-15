@@ -23,7 +23,11 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryDeviceCodeRepository,
+};
 use kamu_accounts_services::*;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{
@@ -40,6 +44,7 @@ use kamu_datasets_inmem::{
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
+use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -157,7 +162,10 @@ impl ServerSideLocalFsHarness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
-                .add_value(predefined_accounts_config);
+                .add_value(predefined_accounts_config)
+                .add::<DeviceCodeServiceImpl>()
+                .add::<InMemoryDeviceCodeRepository>()
+                .add::<DummyDatasetEntryIndexer>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

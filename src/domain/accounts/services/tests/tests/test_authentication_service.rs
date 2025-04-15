@@ -11,8 +11,16 @@ use std::assert_matches::assert_matches;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryDeviceCodeRepository,
+};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    DeviceCodeServiceImpl,
+};
 use messaging_outbox::{MockOutbox, Outbox};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -115,7 +123,9 @@ fn make_catalog(mock_outbox: MockOutbox) -> dill::Catalog {
         .add_value(JwtAuthenticationConfig::default())
         .add::<DatabaseTransactionRunner>()
         .add_value(mock_outbox)
-        .bind::<dyn Outbox, MockOutbox>();
+        .bind::<dyn Outbox, MockOutbox>()
+        .add::<DeviceCodeServiceImpl>()
+        .add::<InMemoryDeviceCodeRepository>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 

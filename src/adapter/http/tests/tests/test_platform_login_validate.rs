@@ -14,15 +14,21 @@ use chrono::{Duration, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryDeviceCodeRepository,
+};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
+    DeviceCodeServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
 use kamu_core::TenancyConfig;
+use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -74,7 +80,10 @@ impl Harness {
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
                 .add::<PredefinedAccountsRegistrator>()
-                .add::<DummyOutboxImpl>();
+                .add::<DummyOutboxImpl>()
+                .add::<DeviceCodeServiceImpl>()
+                .add::<InMemoryDeviceCodeRepository>()
+                .add::<DummyDatasetEntryIndexer>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

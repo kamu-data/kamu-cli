@@ -17,7 +17,11 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryDeviceCodeRepository,
+};
 use kamu_accounts_services::*;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
@@ -28,6 +32,7 @@ use kamu_datasets_inmem::{
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
+use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -140,7 +145,10 @@ impl ServerSideS3Harness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
-                .add_value(predefined_accounts_config);
+                .add_value(predefined_accounts_config)
+                .add::<DeviceCodeServiceImpl>()
+                .add::<InMemoryDeviceCodeRepository>()
+                .add::<DummyDatasetEntryIndexer>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

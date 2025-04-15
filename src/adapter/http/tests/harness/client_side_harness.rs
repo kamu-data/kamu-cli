@@ -20,7 +20,7 @@ use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDeviceCodeRepository};
 use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
@@ -31,6 +31,7 @@ use kamu_datasets_inmem::{
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
+use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -194,6 +195,10 @@ impl ClientSideHarness {
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
         b.add_value(IpfsGateway::default());
+
+        b.add::<DeviceCodeServiceImpl>();
+        b.add::<InMemoryDeviceCodeRepository>();
+        b.add::<DummyDatasetEntryIndexer>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

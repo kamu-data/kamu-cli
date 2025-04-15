@@ -22,10 +22,15 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryDeviceCodeRepository,
+};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
+    DeviceCodeServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
@@ -37,6 +42,7 @@ use kamu_adapter_http::{
     UploadTokenBase64Json,
 };
 use kamu_core::{MediaType, TenancyConfig};
+use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -88,7 +94,10 @@ impl Harness {
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add::<UploadServiceLocal>()
                 .add::<PredefinedAccountsRegistrator>()
-                .add::<DummyOutboxImpl>();
+                .add::<DummyOutboxImpl>()
+                .add::<DeviceCodeServiceImpl>()
+                .add::<InMemoryDeviceCodeRepository>()
+                .add::<DummyDatasetEntryIndexer>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

@@ -7,21 +7,26 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
+use internal_error::InternalError;
+use kamu_datasets::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder, needs_indexing: bool) {
-    catalog_builder.add::<AccessTokenServiceImpl>();
-    catalog_builder.add::<AccountServiceImpl>();
-    catalog_builder.add::<AuthenticationServiceImpl>();
-    catalog_builder.add::<LoginPasswordAuthProvider>();
-    catalog_builder.add::<PredefinedAccountsRegistrator>();
+// Consciously not repeating dependencies
+#[dill::component]
+#[dill::interface(dyn InitOnStartup)]
+#[dill::meta(InitOnStartupMeta{
+    job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
+    depends_on: &[],
+    requires_transaction: true,
+})]
+pub struct DummyDatasetEntryIndexer {}
 
-    if needs_indexing {
-        catalog_builder.add::<DeviceCodeServiceImpl>();
+#[async_trait::async_trait]
+impl InitOnStartup for DummyDatasetEntryIndexer {
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        Ok(())
     }
 }
 
