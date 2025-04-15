@@ -34,6 +34,10 @@ impl TestAPIServer {
             .routes(routes!(kamu_adapter_http::platform_login_handler))
             .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
             .routes(routes!(
+                kamu_adapter_http::platform_token_device_authorization_handler
+            ))
+            .routes(routes!(kamu_adapter_http::platform_token_device_handler))
+            .routes(routes!(
                 kamu_adapter_http::platform_file_upload_prepare_post_handler
             ))
             .routes(routes!(
