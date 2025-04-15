@@ -499,6 +499,12 @@ pub struct Init {
     pub multi_tenant: bool,
 }
 
+impl Init {
+    pub fn creates_workspace(&self) -> bool {
+        !self.pull_images
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Group of commands for exploring dataset metadata

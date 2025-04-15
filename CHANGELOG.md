@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `kamu init`: in case of using `--pull-images` argument, fixed unclear error with not found file.
+
 ## [0.233.0] - 2025-04-09
 ### Added
 - Automatically indexing key dataset blocks in the database for quicker navigation:
