@@ -240,7 +240,7 @@ pub async fn platform_token_device_authorization_handler(
         .api_err()?;
     let verification_uri = url_config
         .protocols
-        .base_url_rest
+        .base_url_platform
         .join("v/login")
         .unwrap()
         .to_string();

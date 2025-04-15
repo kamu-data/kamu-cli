@@ -240,6 +240,7 @@ impl WebUIServer {
                     .login(
                         &login_instructions.login_method,
                         login_instructions.login_credentials_json.clone(),
+                        None,
                     )
                     .await
                     .unwrap()

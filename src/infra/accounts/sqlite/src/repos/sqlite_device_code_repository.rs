@@ -57,7 +57,7 @@ impl DeviceCodeRepository for SqliteDeviceCodeRepository {
         Ok(())
     }
 
-    async fn update_device_code_with_token_params_part(
+    async fn update_device_token_with_token_params_part(
         &self,
         device_code: &DeviceCode,
         token_params_part: &DeviceTokenParamsPart,

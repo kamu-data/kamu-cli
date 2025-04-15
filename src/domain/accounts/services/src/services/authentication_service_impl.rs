@@ -109,7 +109,7 @@ impl AuthenticationServiceImpl {
         JWTClaims {
             iat,
             exp,
-            iss: String::from(KAMU_JWT_ISSUER),
+            iss: KAMU_JWT_ISSUER.to_string(),
             sub: account_id.to_string(),
         }
     }
@@ -299,7 +299,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
             };
 
             self.device_code_service
-                .update_device_code_with_token_params_part(&device_code, &device_token_params_part)
+                .update_device_token_with_token_params_part(&device_code, &device_token_params_part)
                 .await
                 .int_err()?;
 
@@ -344,7 +344,7 @@ impl JwtTokenIssuer for AuthenticationServiceImpl {
         let claims = JWTClaims {
             iat,
             exp,
-            iss: String::from(KAMU_JWT_ISSUER),
+            iss: KAMU_JWT_ISSUER.to_string(),
             sub: account_id.to_string(),
         };
 
