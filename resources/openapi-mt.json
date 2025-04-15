@@ -263,7 +263,6 @@
           "expires_in": {
             "description": "RECOMMENDED.  The lifetime in seconds of the access token.  For\nexample, the value \"3600\" denotes that the access token will\nexpire in one hour from the time the response was generated.\nIf omitted, the authorization server SHOULD provide the\nexpiration time via other means or document the default value.",
             "example": 3600,
-            "format": "int64",
             "minimum": 1,
             "type": "integer"
           },
