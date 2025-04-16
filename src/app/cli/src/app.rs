@@ -91,7 +91,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // workspace to be created will be multi-tenant or not right away, even before
     // the `kamu init` command itself is processed.
     let maybe_init_command = match &args.command {
-        Command::Init(c) => Some(c.clone()),
+        Command::Init(c) if c.creates_workspace() => Some(c.clone()),
         _ => None,
     };
     let init_multi_tenant_workspace = matches!(&maybe_init_command, Some(c) if c.multi_tenant);
@@ -249,13 +249,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             is_transactional,
             cli_catalog.clone(),
             |maybe_transactional_cli_catalog: Catalog| async move {
-                let command_buider = cli_commands::get_command(
+                let command_builder = cli_commands::get_command(
                     work_catalog,
                     &maybe_transactional_cli_catalog,
                     args,
                 )?;
 
-                let command = command_buider
+                let command = command_builder
                     .get(&maybe_transactional_cli_catalog)
                     .int_err()?;
 
