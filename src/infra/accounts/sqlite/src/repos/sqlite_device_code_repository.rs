@@ -31,7 +31,7 @@ impl SqliteDeviceCodeRepository {
 
 #[async_trait::async_trait]
 impl OAuthDeviceCodeRepository for SqliteDeviceCodeRepository {
-    async fn create_device_code(
+    async fn save_device_code(
         &self,
         device_code_created: &DeviceTokenCreated,
     ) -> Result<(), CreateDeviceCodeError> {

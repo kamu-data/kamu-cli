@@ -67,7 +67,7 @@ impl OAuthDeviceCodeService for OAuthDeviceCodeServiceImpl {
         };
 
         self.oauth_device_code_repo
-            .create_device_code(&device_token_created)
+            .save_device_code(&device_token_created)
             .await?;
 
         Ok(device_token_created)

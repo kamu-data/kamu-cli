@@ -16,7 +16,7 @@ use crate::{DeviceCode, DeviceToken, DeviceTokenCreated, DeviceTokenParamsPart};
 
 #[async_trait::async_trait]
 pub trait OAuthDeviceCodeRepository: Send + Sync {
-    async fn create_device_code(
+    async fn save_device_code(
         &self,
         device_code_created: &DeviceTokenCreated,
     ) -> Result<(), CreateDeviceCodeError>;

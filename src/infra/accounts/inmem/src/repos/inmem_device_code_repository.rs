@@ -42,7 +42,7 @@ impl InMemoryDeviceCodeRepository {
 
 #[async_trait::async_trait]
 impl OAuthDeviceCodeRepository for InMemoryDeviceCodeRepository {
-    async fn create_device_code(
+    async fn save_device_code(
         &self,
         device_code_created: &DeviceTokenCreated,
     ) -> Result<(), CreateDeviceCodeError> {
