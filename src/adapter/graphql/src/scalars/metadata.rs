@@ -110,6 +110,7 @@ impl From<odf::metadata::serde::UnsupportedVersionError> for MetadataManifestUns
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Need to delete all this alias update code
 impl SetTransform {
     pub async fn with_extended_aliases(
         ctx: &Context<'_>,
