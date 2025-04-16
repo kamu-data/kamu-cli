@@ -15,10 +15,15 @@ use serde::de::IntoDeserializer as _;
 use serde::Deserialize as _;
 use thiserror::Error;
 
-use super::{UploadContext, UploadTokenBase64Json, UploadTokenIntoStreamError};
-use crate::axum_utils::ensure_authenticated_account;
-use crate::{MakeUploadContextError, SaveUploadError, UploadService};
-
+use crate::axum_utils::{ensure_authenticated_account, from_catalog_n};
+use crate::platform::{
+    MakeUploadContextError,
+    SaveUploadError,
+    UploadContext,
+    UploadService,
+    UploadTokenBase64Json,
+    UploadTokenIntoStreamError,
+};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::IntoParams)]
@@ -37,7 +42,7 @@ pub struct PlatformFileUploadQuery {
 /// Prepare file upload
 #[utoipa::path(
     post,
-    path = "/platform/file/upload/prepare",
+    path = "/file/upload/prepare",
     params(PlatformFileUploadQuery),
     responses((status = OK, body = UploadContext)),
     tag = "kamu",
@@ -45,13 +50,14 @@ pub struct PlatformFileUploadQuery {
         ("api_key" = []),
     )
 )]
-pub async fn platform_file_upload_prepare_post_handler(
+pub async fn file_upload_prepare_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Query(query): axum::extract::Query<PlatformFileUploadQuery>,
 ) -> Result<axum::Json<UploadContext>, ApiError> {
     let account_id = ensure_authenticated_account(&catalog).api_err()?;
 
-    let upload_service = catalog.get_one::<dyn UploadService>().unwrap();
+    let upload_service = from_catalog_n!(catalog, dyn UploadService);
+
     match upload_service
         .make_upload_context(
             &account_id,
@@ -81,7 +87,7 @@ pub struct UploadFromPath {
 /// Upload file to temporary storage
 #[utoipa::path(
     post,
-    path = "/platform/file/upload/{upload_token}",
+    path = "/file/upload/{upload_token}",
     params(UploadFromPath),
     request_body = Vec<u8>,
     responses((status = OK, body = UploadContext)),
@@ -91,7 +97,7 @@ pub struct UploadFromPath {
     )
 )]
 #[allow(clippy::unused_async)]
-pub async fn platform_file_upload_post_handler(
+pub async fn file_upload_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
     mut multipart: axum::extract::Multipart,
@@ -108,8 +114,9 @@ pub async fn platform_file_upload_post_handler(
         Err(api_error) => return Err(api_error),
     };
 
-    let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
-    match upload_local_service
+    let upload_service = from_catalog_n!(catalog, dyn UploadService);
+
+    match upload_service
         .save_upload(&upload_param.upload_token.0, file_data.len(), file_data)
         .await
     {
@@ -128,7 +135,7 @@ pub async fn platform_file_upload_post_handler(
 /// Get file from temporary storage
 #[utoipa::path(
     get,
-    path = "/platform/file/upload/{upload_token}",
+    path = "/file/upload/{upload_token}",
     params(UploadFromPath),
     responses((status = OK, description = "file content", content_type = "application/octet-stream", body = ())),
     tag = "kamu",
@@ -138,12 +145,13 @@ pub async fn platform_file_upload_post_handler(
     )
 )]
 #[allow(clippy::unused_async)]
-pub async fn platform_file_upload_get_handler(
+pub async fn file_upload_get_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
 ) -> Result<impl axum::response::IntoResponse, ApiError> {
-    let upload_local_service = catalog.get_one::<dyn UploadService>().unwrap();
-    let stream = upload_local_service
+    let upload_service = from_catalog_n!(catalog, dyn UploadService);
+
+    let stream = upload_service
         .upload_token_into_stream(&upload_param.upload_token.0)
         .await
         .map_err(|e| match e {

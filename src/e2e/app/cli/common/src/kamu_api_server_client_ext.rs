@@ -22,7 +22,7 @@ use kamu_adapter_http::data::metadata_handler::{
 use kamu_adapter_http::data::query_types::{QueryRequest, QueryResponse};
 use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
-use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
+use kamu_adapter_http::platform::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_auth_rebac::AccountToDatasetRelation;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;

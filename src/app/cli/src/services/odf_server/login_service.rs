@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::Duration;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE, PROVIDER_PASSWORD};
-use kamu_adapter_http::{
+use kamu_adapter_http::platform::{
     DeviceAccessTokenError,
     DeviceAccessTokenErrorStatus,
     DeviceAccessTokenResponse,

@@ -34,7 +34,7 @@ use kamu_accounts_services::{
     OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::{
+use kamu_adapter_http::platform::{
     FileUploadLimitConfig,
     UploadContext,
     UploadServiceLocal,

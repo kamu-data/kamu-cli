@@ -32,7 +32,7 @@ use kamu_accounts_services::{
     OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadServiceS3};
+use kamu_adapter_http::platform::{FileUploadLimitConfig, UploadContext, UploadServiceS3};
 use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use s3_utils::S3Context;

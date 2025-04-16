@@ -26,7 +26,7 @@ use kamu_accounts_services::{
     OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
+use kamu_adapter_http::platform::{LoginRequestBody, LoginResponseBody};
 use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;

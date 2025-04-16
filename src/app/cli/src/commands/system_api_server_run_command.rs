@@ -18,7 +18,7 @@ use internal_error::ResultIntoInternal;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_http::FileUploadLimitConfig;
+use kamu_adapter_http::platform::FileUploadLimitConfig;
 use kamu_adapter_oauth::*;
 use kamu_datasets::DatasetEnvVarsConfig;
 use tracing::Instrument;

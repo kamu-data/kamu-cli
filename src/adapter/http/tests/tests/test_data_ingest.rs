@@ -12,7 +12,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
-use kamu_adapter_http::{
+use kamu_adapter_http::platform::{
     FileUploadLimitConfig,
     UploadServiceLocal,
     UploadToken,
