@@ -243,6 +243,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     if command_result.is_ok() {
         let is_transactional = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_transaction(&args);
+        let is_outbox_processing_required = maybe_db_connection_settings.is_some()
+            && cli_commands::command_needs_outbox_processing(&args);
         let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
         command_result = maybe_transactional(
@@ -276,30 +278,32 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         .instrument(tracing::debug_span!("app::run_command"))
         .await;
 
-        command_result = command_result
-            // If successful, then process the Outbox messages while they are present
-            .and_then_async(|_| async {
-                let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
-                outbox_agent
-                    .run_while_has_tasks()
-                    .await
-                    .map_err(CLIError::critical)
-            })
-            .instrument(tracing::debug_span!(
-                "Consume accumulated the Outbox messages"
-            ))
-            .await
-            // If we had a temporary directory, we move the database from it to the expected
-            // location.
-            .and_then_async(|_| async {
-                move_initial_database_to_workspace_if_needed(
-                    &workspace_layout,
-                    maybe_temp_database_path,
-                )
+        if is_outbox_processing_required {
+            command_result = command_result
+                // If successful, then process the Outbox messages while they are present
+                .and_then_async(|_| async {
+                    let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
+                    outbox_agent
+                        .run_while_has_tasks()
+                        .await
+                        .map_err(CLIError::critical)
+                })
+                .instrument(tracing::debug_span!(
+                    "Consume accumulated the Outbox messages"
+                ))
                 .await
-                .map_int_err(CLIError::critical)
-            })
-            .await;
+                // If we had a temporary directory, we move the database from it to the expected
+                // location.
+                .and_then_async(|_| async {
+                    move_initial_database_to_workspace_if_needed(
+                        &workspace_layout,
+                        maybe_temp_database_path,
+                    )
+                    .await
+                    .map_int_err(CLIError::critical)
+                })
+                .await;
+        }
     }
 
     match &command_result {
