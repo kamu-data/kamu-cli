@@ -204,6 +204,14 @@ pub struct DeviceAuthorizationResponse {
     pub interval: Option<u64>,
 }
 
+impl DeviceAuthorizationResponse {
+    pub fn interval_or_default(&self) -> u64 {
+        const RFC_DEFAULT_CLIENT_INTERVAL: u64 = 5;
+
+        self.interval.unwrap_or(RFC_DEFAULT_CLIENT_INTERVAL)
+    }
+}
+
 /// Authorization of a device
 #[utoipa::path(
     post,

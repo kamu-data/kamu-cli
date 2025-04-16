@@ -65,8 +65,7 @@ impl LoginService {
         let polling_start_time = self.time_source.now();
         let polling_interval = Duration::seconds(
             device_authorization_response
-                .interval
-                .unwrap_or(5)
+                .interval_or_default()
                 .try_into()
                 .unwrap(),
         );
