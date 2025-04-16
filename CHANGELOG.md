@@ -14,7 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - `kamu init`: in case of using `--pull-images` argument, fixed unclear error with not found file.
-- CLI commands: Trigger `outbox_agent.run_while_has_tasks()` only for commands that require it.
+- CLI commands: Trigger `outbox_agent` method only for commands that require it.
 
 ## [0.233.0] - 2025-04-09
 ### Added

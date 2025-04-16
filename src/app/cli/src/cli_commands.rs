@@ -464,7 +464,6 @@ pub fn get_command(
 
 #[allow(clippy::match_like_matches_macro)]
 pub fn command_needs_transaction(args: &cli::Cli) -> bool {
-    println!("command: {:?}", args.command);
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
             cli::SystemSubCommand::ApiServer(_) => false,
@@ -494,13 +493,8 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
         | cli::Command::New(_)
-        | cli::Command::Init(_)
-        | cli::Command::Repo(_)
-        | cli::Command::Login(_)
-        | cli::Command::Logout(_)
         | cli::Command::Sql(_)
         | cli::Command::Version(_)
-        // ?
         | cli::Command::Notebook(_) => false,
         _ => true,
     }
