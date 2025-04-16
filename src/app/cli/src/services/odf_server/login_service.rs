@@ -40,6 +40,9 @@ pub struct LoginService {
 }
 
 impl LoginService {
+    // We do not use this value, but we are required to pass it.
+    const DEVICE_FLOW_DEFAULT_CLIENT_ID_PARAM: (&'static str, &'static str) = ("client_id", "kamu");
+
     pub async fn login_interactive(
         &self,
         odf_server_frontend_url: &Url,
@@ -294,8 +297,7 @@ impl LoginService {
                     .join("platform/token/device/authorization")
                     .unwrap(),
             )
-            // We do not use this value, but we are required to pass it.
-            .form(&[("client_id", "kamu")])
+            .form(&[Self::DEVICE_FLOW_DEFAULT_CLIENT_ID_PARAM])
             .send()
             .await
             .int_err()?;
@@ -318,8 +320,7 @@ impl LoginService {
         let response = client
             .post(login_polling_url.clone())
             .form(&[
-                // We do not use this value, but we are required to pass it.
-                ("client_id", "kamu"),
+                Self::DEVICE_FLOW_DEFAULT_CLIENT_ID_PARAM,
                 ("device_code", device_code),
                 ("grant_type", OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE),
             ])
