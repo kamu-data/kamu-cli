@@ -464,12 +464,44 @@ pub fn get_command(
 
 #[allow(clippy::match_like_matches_macro)]
 pub fn command_needs_transaction(args: &cli::Cli) -> bool {
+    println!("command: {:?}", args.command);
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
             cli::SystemSubCommand::ApiServer(_) => false,
             _ => true,
         },
-        cli::Command::Ui(_) => false,
+        cli::Command::Ui(_) | cli::Command::Login(_) => false,
+        _ => true,
+    }
+}
+
+pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
+    match &args.command {
+        cli::Command::System(c) => match &c.subcommand {
+            cli::SystemSubCommand::Info(_)
+            | cli::SystemSubCommand::UpgradeWorkspace(_)
+            | cli::SystemSubCommand::DebugToken(_)
+            | cli::SystemSubCommand::Decode(_)
+            | cli::SystemSubCommand::GenerateToken(_)
+            | cli::SystemSubCommand::Gc(_) => false,
+            cli::SystemSubCommand::ApiServer(a) => match &a.subcommand {
+                None | Some(SystemApiServerSubCommand::GqlQuery(_)) => true,
+                Some(SystemApiServerSubCommand::GqlSchema(_)) => false,
+            },
+            _ => true,
+        },
+        cli::Command::Complete(_)
+        | cli::Command::Completions(_)
+        | cli::Command::Config(_)
+        | cli::Command::New(_)
+        | cli::Command::Init(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Login(_)
+        | cli::Command::Logout(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Version(_)
+        // ?
+        | cli::Command::Notebook(_) => false,
         _ => true,
     }
 }
@@ -502,6 +534,8 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
 }
 
 pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
+    // ToDo: Revisit and decide do all commands that require workspace
+    // also require startup jobs
     if command_needs_workspace(args) {
         return true;
     }
