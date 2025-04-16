@@ -41,7 +41,6 @@ use tracing::{warn, Instrument};
 use crate::accounts::AccountService;
 use crate::cli::Command;
 use crate::error::*;
-use crate::explore::TraceServer;
 use crate::output::*;
 use crate::{
     build_db_connection_settings,
@@ -51,6 +50,7 @@ use crate::{
     configure_database_components,
     configure_in_memory_components,
     connect_database_initially,
+    explore,
     get_app_database_config,
     move_initial_database_to_workspace_if_needed,
     odf_server,
@@ -331,7 +331,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     if let Some(trace_file) = &output_config.trace_file {
         // Run a web server and open the trace in the browser if the environment allows
-        let _ = TraceServer::maybe_serve_in_browser(trace_file).await;
+        let _ = explore::TraceServer::maybe_serve_in_browser(trace_file).await;
     }
 
     command_result
@@ -508,9 +508,7 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxAgent>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
 
-    b.add::<crate::explore::FlightSqlServiceFactory>();
-    b.add::<crate::explore::SparkLivyServerFactory>();
-    b.add::<crate::explore::NotebookServerFactory>();
+    explore::register_dependencies(&mut b);
 
     register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
         &mut b,
