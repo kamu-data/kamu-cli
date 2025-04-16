@@ -480,9 +480,7 @@ pub fn configure_base_catalog(
 
     kamu_accounts_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
 
-    // Give both CLI and server access to stored repo access tokens
-    b.add::<odf_server::AccessTokenRegistryService>();
-    b.add::<odf_server::CLIAccessTokenStore>();
+    odf_server::register_dependencies(&mut b);
 
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
     kamu_datasets_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());

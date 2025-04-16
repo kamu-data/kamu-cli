@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod access_token_registry_service;
+mod dependencies;
 mod login_service;
 mod models;
 
 pub use access_token_registry_service::*;
+pub use dependencies::*;
 pub use login_service::*;
 pub use models::*;
