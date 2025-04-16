@@ -44,7 +44,6 @@ use kamu_datasets_inmem::{
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
-use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -164,8 +163,7 @@ impl ServerSideLocalFsHarness {
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(predefined_accounts_config)
                 .add::<OAuthDeviceCodeServiceImpl>()
-                .add::<InMemoryDeviceCodeRepository>()
-                .add::<DummyDatasetEntryIndexer>();
+                .add::<InMemoryDeviceCodeRepository>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

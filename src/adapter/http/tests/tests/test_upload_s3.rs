@@ -34,7 +34,6 @@ use kamu_accounts_services::{
 };
 use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadServiceS3};
 use kamu_core::TenancyConfig;
-use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use messaging_outbox::DummyOutboxImpl;
 use s3_utils::S3Context;
 use serde_json::json;
@@ -80,8 +79,7 @@ impl Harness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
-                .add::<InMemoryDeviceCodeRepository>()
-                .add::<DummyDatasetEntryIndexer>();
+                .add::<InMemoryDeviceCodeRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

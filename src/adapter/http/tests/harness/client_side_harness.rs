@@ -31,7 +31,6 @@ use kamu_datasets_inmem::{
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
-use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
@@ -198,7 +197,6 @@ impl ClientSideHarness {
 
         b.add::<OAuthDeviceCodeServiceImpl>();
         b.add::<InMemoryDeviceCodeRepository>();
-        b.add::<DummyDatasetEntryIndexer>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

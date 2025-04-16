@@ -25,9 +25,7 @@ use kamu_accounts::{
     OAuthDeviceCodeService,
     UpdateDeviceCodeWithTokenParamsPartError,
     JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
-    JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
-use kamu_datasets::JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER;
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -42,10 +40,7 @@ const DEVICE_CODE_EXPIRES_IN: Duration = Duration::minutes(5);
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
     job_name: JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
-    depends_on: &[
-        JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
-        JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER
-    ],
+    depends_on: &[],
     requires_transaction: true,
 })]
 pub struct OAuthDeviceCodeServiceImpl {

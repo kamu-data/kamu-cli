@@ -5805,7 +5805,6 @@ dependencies = [
  "jsonwebtoken",
  "kamu-accounts",
  "kamu-accounts-inmem",
- "kamu-datasets",
  "messaging-outbox",
  "mockall",
  "opendatafabric",

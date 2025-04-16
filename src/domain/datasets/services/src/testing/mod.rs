@@ -8,11 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod fake_connecting_dataset_entry_writer;
-mod fake_dataset_entry_indexer;
 mod fake_dataset_entry_service;
 mod test_dataset_outbox_listener;
 
 pub use fake_connecting_dataset_entry_writer::*;
-pub use fake_dataset_entry_indexer::*;
 pub use fake_dataset_entry_service::*;
 pub use test_dataset_outbox_listener::*;

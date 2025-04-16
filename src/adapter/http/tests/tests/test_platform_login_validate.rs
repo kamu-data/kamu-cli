@@ -28,7 +28,6 @@ use kamu_accounts_services::{
 };
 use kamu_adapter_http::{LoginRequestBody, LoginResponseBody};
 use kamu_core::TenancyConfig;
-use kamu_datasets_services::testing::DummyDatasetEntryIndexer;
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -82,8 +81,7 @@ impl Harness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
-                .add::<InMemoryDeviceCodeRepository>()
-                .add::<DummyDatasetEntryIndexer>();
+                .add::<InMemoryDeviceCodeRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
