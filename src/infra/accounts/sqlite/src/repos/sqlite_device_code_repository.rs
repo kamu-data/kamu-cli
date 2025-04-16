@@ -43,7 +43,7 @@ impl DeviceCodeRepository for SqliteDeviceCodeRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO device_codes(device_code, device_code_created_at, device_code_expires_at)
+            INSERT INTO oauth_device_codes(device_code, device_code_created_at, device_code_expires_at)
             VALUES ($1, $2, $3);
             "#,
             device_code,
@@ -74,7 +74,7 @@ impl DeviceCodeRepository for SqliteDeviceCodeRepository {
 
         let update_result = sqlx::query!(
             r#"
-            UPDATE device_codes
+            UPDATE oauth_device_codes
             SET token_iat  = $2,
                 token_exp  = $3,
                 account_id = $4
@@ -119,7 +119,7 @@ impl DeviceCodeRepository for SqliteDeviceCodeRepository {
                    token_exp,
                    token_last_used_at     AS "token_last_used_at: _",
                    account_id
-            FROM device_codes
+            FROM oauth_device_codes
             WHERE device_code = $1
             "#,
             device_code_ref
@@ -148,7 +148,7 @@ impl DeviceCodeRepository for SqliteDeviceCodeRepository {
         sqlx::query!(
             r#"
             DELETE
-            FROM device_codes
+            FROM oauth_device_codes
             WHERE datetime(device_code_expires_at) < datetime('now')
             "#,
         )
