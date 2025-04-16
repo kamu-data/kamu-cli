@@ -48,7 +48,7 @@ pub enum CreateDeviceCodeError {
 #[derive(Error, Debug)]
 pub enum UpdateDeviceCodeWithTokenParamsPartError {
     #[error(transparent)]
-    NotFound(#[from] DeviceTokenFoundError),
+    NotFound(#[from] DeviceTokenNotFoundError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -57,7 +57,7 @@ pub enum UpdateDeviceCodeWithTokenParamsPartError {
 #[derive(Error, Debug)]
 pub enum FindDeviceTokenByDeviceCodeError {
     #[error(transparent)]
-    NotFound(#[from] DeviceTokenFoundError),
+    NotFound(#[from] DeviceTokenNotFoundError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -65,8 +65,14 @@ pub enum FindDeviceTokenByDeviceCodeError {
 
 #[derive(Error, Debug)]
 #[error("Dataset token for device_code '{device_code}' not found")]
-pub struct DeviceTokenFoundError {
+pub struct DeviceTokenNotFoundError {
     pub device_code: DeviceCode,
+}
+
+impl DeviceTokenNotFoundError {
+    pub fn new(device_code: DeviceCode) -> Self {
+        Self { device_code }
+    }
 }
 
 #[derive(Error, Debug)]

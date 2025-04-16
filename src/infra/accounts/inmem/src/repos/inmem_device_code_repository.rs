@@ -69,10 +69,7 @@ impl OAuthDeviceCodeRepository for InMemoryDeviceCodeRepository {
             .remove(device_code);
 
         let Some(created_token) = maybe_created_token else {
-            return Err(DeviceTokenFoundError {
-                device_code: device_code.clone(),
-            }
-            .into());
+            return Err(DeviceTokenNotFoundError::new(device_code.clone()).into());
         };
 
         let token = created_token.with_token_params_part(token_params_part.clone());
@@ -95,10 +92,7 @@ impl OAuthDeviceCodeRepository for InMemoryDeviceCodeRepository {
         if let Some(device_token) = maybe_device_token {
             Ok(device_token.clone())
         } else {
-            Err(DeviceTokenFoundError {
-                device_code: device_code.clone(),
-            }
-            .into())
+            Err(DeviceTokenNotFoundError::new(device_code.clone()).into())
         }
     }
 

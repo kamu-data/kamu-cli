@@ -85,10 +85,7 @@ impl OAuthDeviceCodeRepository for PostgresDeviceCodeRepository {
         .int_err()?;
 
         if update_result.rows_affected() == 0 {
-            return Err(DeviceTokenFoundError {
-                device_code: device_code.clone(),
-            }
-            .into());
+            return Err(DeviceTokenNotFoundError::new(device_code.clone()).into());
         }
 
         Ok(())
@@ -126,10 +123,7 @@ impl OAuthDeviceCodeRepository for PostgresDeviceCodeRepository {
 
             Ok(device_token)
         } else {
-            Err(DeviceTokenFoundError {
-                device_code: device_code.clone(),
-            }
-            .into())
+            Err(DeviceTokenNotFoundError::new(device_code.clone()).into())
         }
     }
 
