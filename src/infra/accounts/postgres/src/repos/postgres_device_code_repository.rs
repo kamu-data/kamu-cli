@@ -19,7 +19,7 @@ pub struct PostgresDeviceCodeRepository {
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn DeviceCodeRepository)]
+#[dill::interface(dyn OAuthDeviceCodeRepository)]
 impl PostgresDeviceCodeRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {

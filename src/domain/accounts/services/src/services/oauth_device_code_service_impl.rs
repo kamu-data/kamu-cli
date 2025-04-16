@@ -109,7 +109,7 @@ impl OAuthDeviceCodeService for OAuthDeviceCodeServiceImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl InitOnStartup for OAuthDeviceCodeServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, name = DeviceCodeServiceImpl_run_initialization)]
+    #[tracing::instrument(level = "debug", skip_all, name = OAuthDeviceCodeServiceImpl_run_initialization)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         self.cleanup_expired_device_codes().await.int_err()
     }

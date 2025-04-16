@@ -28,7 +28,7 @@ pub struct InMemoryDeviceCodeRepository {
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn DeviceCodeRepository)]
+#[dill::interface(dyn OAuthDeviceCodeRepository)]
 #[dill::scope(dill::Singleton)]
 impl InMemoryDeviceCodeRepository {
     pub fn new() -> Self {
