@@ -99,6 +99,7 @@ impl From<odf::metadata::serde::UnsupportedVersionError> for MetadataManifestUns
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: нужно просто удалить весь этот код обновления алиасов
 impl SetTransform {
     pub async fn with_extended_aliases(
         ctx: &Context<'_>,
