@@ -17,12 +17,12 @@ use kamu_accounts::{
     CreateDeviceCodeError,
     DeviceClientId,
     DeviceCode,
-    DeviceCodeRepository,
     DeviceCodeService,
     DeviceToken,
     DeviceTokenCreated,
     DeviceTokenParamsPart,
     FindDeviceTokenByDeviceCodeError,
+    OAuthDeviceCodeRepository,
     UpdateDeviceCodeWithTokenParamsPartError,
     JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
@@ -49,7 +49,7 @@ const DEVICE_CODE_EXPIRES_IN: Duration = Duration::minutes(5);
     requires_transaction: true,
 })]
 pub struct DeviceCodeServiceImpl {
-    device_code_repo: Arc<dyn DeviceCodeRepository>,
+    oauth_device_code_repo: Arc<dyn OAuthDeviceCodeRepository>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -71,7 +71,7 @@ impl DeviceCodeService for DeviceCodeServiceImpl {
             }
         };
 
-        self.device_code_repo
+        self.oauth_device_code_repo
             .create_device_code(&device_token_created)
             .await?;
 
@@ -83,7 +83,7 @@ impl DeviceCodeService for DeviceCodeServiceImpl {
         device_code: &DeviceCode,
         token_params_part: &DeviceTokenParamsPart,
     ) -> Result<(), UpdateDeviceCodeWithTokenParamsPartError> {
-        self.device_code_repo
+        self.oauth_device_code_repo
             .update_device_token_with_token_params_part(device_code, token_params_part)
             .await
     }
@@ -92,13 +92,15 @@ impl DeviceCodeService for DeviceCodeServiceImpl {
         &self,
         device_code: &DeviceCode,
     ) -> Result<DeviceToken, FindDeviceTokenByDeviceCodeError> {
-        self.device_code_repo
+        self.oauth_device_code_repo
             .find_device_token_by_device_code(device_code)
             .await
     }
 
     async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError> {
-        self.device_code_repo.cleanup_expired_device_codes().await
+        self.oauth_device_code_repo
+            .cleanup_expired_device_codes()
+            .await
     }
 }
 

@@ -29,7 +29,7 @@ impl PostgresDeviceCodeRepository {
 }
 
 #[async_trait::async_trait]
-impl DeviceCodeRepository for PostgresDeviceCodeRepository {
+impl OAuthDeviceCodeRepository for PostgresDeviceCodeRepository {
     async fn create_device_code(
         &self,
         device_code_created: &DeviceTokenCreated,

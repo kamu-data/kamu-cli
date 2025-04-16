@@ -9,10 +9,10 @@
 
 mod access_token_repository;
 mod account_repository;
-mod device_code_repository;
+mod oauth_device_code_repository;
 mod password_hash_repository;
 
 pub use access_token_repository::*;
 pub use account_repository::*;
-pub use device_code_repository::*;
+pub use oauth_device_code_repository::*;
 pub use password_hash_repository::*;
