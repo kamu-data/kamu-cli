@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use kamu_core::DatasetRegistry;
 
@@ -113,44 +115,48 @@ impl SetTransform {
         ctx: &Context<'_>,
         v: odf::metadata::SetTransform,
     ) -> Result<odf::metadata::SetTransform, InternalError> {
-        let input_ids_list: Vec<odf::DatasetID> = v
-            .inputs
-            .iter()
-            .map(|input| input.dataset_ref.id().unwrap().clone())
-            .collect();
         let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-        let dataset_infos = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(input_ids_list)
+
+        let original_transform = v.transform;
+        let mut input_dataset_id_to_transform_input_mapping = v
+            .inputs
+            .into_iter()
+            .map(|input| {
+                // Safety: dataset_ref is already resolved to id by this point
+                let dataset_id = input.dataset_ref.id().unwrap().clone();
+                (dataset_id, input)
+            })
+            .collect::<HashMap<_, _>>();
+
+        let input_dataset_ids = input_dataset_id_to_transform_input_mapping
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        let dataset_handles_resolution = dataset_registry
+            .resolve_multiple_dataset_handles_by_ids(input_dataset_ids)
             .await
             .int_err()?;
 
-        let mut accessible_inputs: Vec<_> = dataset_infos
-            .resolved_handles
-            .iter()
-            .map(|dataset_handle| odf::metadata::TransformInput {
-                dataset_ref: dataset_handle.id.as_local_ref(),
-                alias: Some(dataset_handle.alias.clone().to_string()),
-            })
+        for dataset_handle in dataset_handles_resolution.resolved_handles {
+            // Safety: the mapping ensures that a value is present
+            let transform_input = input_dataset_id_to_transform_input_mapping
+                .get_mut(&dataset_handle.id)
+                .unwrap();
+
+            // Overwrite only if no query alias was previously specified in the transform
+            // input
+            if transform_input.alias.is_none() {
+                transform_input.alias = Some(dataset_handle.alias.to_string());
+            }
+        }
+
+        let updated_inputs = input_dataset_id_to_transform_input_mapping
+            .into_values()
             .collect();
 
-        accessible_inputs.extend(dataset_infos.unresolved_datasets.into_iter().map(
-            |(dataset_id, _)| {
-                let original_input_info = v
-                    .inputs
-                    .iter()
-                    .find(|input| {
-                        input.dataset_ref.id().unwrap().as_local_ref() == dataset_id.as_local_ref()
-                    })
-                    .unwrap();
-                odf::metadata::TransformInput {
-                    dataset_ref: original_input_info.dataset_ref.clone(),
-                    alias: original_input_info.alias.clone(),
-                }
-            },
-        ));
         Ok(odf::metadata::SetTransform {
-            inputs: accessible_inputs,
-            transform: v.transform,
+            inputs: updated_inputs,
+            transform: original_transform,
         })
     }
 }
@@ -186,3 +192,5 @@ impl MetadataEvent {
         })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
