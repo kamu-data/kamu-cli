@@ -29,7 +29,7 @@ pub const OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE: &str =
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DeviceCodeService: Sync + Send {
+pub trait OAuthDeviceCodeService: Sync + Send {
     async fn create_device_code(
         &self,
         client_id: &DeviceClientId,
@@ -52,7 +52,7 @@ pub trait DeviceCodeService: Sync + Send {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DeviceCodeServiceExt: DeviceCodeService {
+pub trait DeviceCodeServiceExt: OAuthDeviceCodeService {
     async fn try_find_device_token_by_device_code(
         &self,
         device_code: &DeviceCode,
@@ -62,7 +62,7 @@ pub trait DeviceCodeServiceExt: DeviceCodeService {
 #[async_trait::async_trait]
 impl<T> DeviceCodeServiceExt for T
 where
-    T: DeviceCodeService,
+    T: OAuthDeviceCodeService,
     T: ?Sized,
 {
     async fn try_find_device_token_by_device_code(

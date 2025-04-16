@@ -39,7 +39,7 @@ pub struct AuthenticationServiceImpl {
     access_token_svc: Arc<dyn AccessTokenService>,
     outbox: Arc<dyn Outbox>,
     maybe_dummy_token_account: Option<Account>,
-    device_code_service: Arc<dyn DeviceCodeService>,
+    oauth_device_code_service: Arc<dyn OAuthDeviceCodeService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +56,7 @@ impl AuthenticationServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
         outbox: Arc<dyn Outbox>,
-        device_code_service: Arc<dyn DeviceCodeService>,
+        oauth_device_code_service: Arc<dyn OAuthDeviceCodeService>,
     ) -> Self {
         let mut authentication_providers_by_method = HashMap::new();
 
@@ -80,7 +80,7 @@ impl AuthenticationServiceImpl {
             account_repository,
             access_token_svc,
             outbox,
-            device_code_service,
+            oauth_device_code_service,
             maybe_dummy_token_account: config.maybe_dummy_token_account.clone(),
         }
     }
@@ -298,7 +298,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
                 account_id: account_id.clone(),
             };
 
-            self.device_code_service
+            self.oauth_device_code_service
                 .update_device_token_with_token_params_part(&device_code, &device_token_params_part)
                 .await
                 .int_err()?;

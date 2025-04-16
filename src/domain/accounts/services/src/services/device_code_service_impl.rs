@@ -17,12 +17,12 @@ use kamu_accounts::{
     CreateDeviceCodeError,
     DeviceClientId,
     DeviceCode,
-    DeviceCodeService,
     DeviceToken,
     DeviceTokenCreated,
     DeviceTokenParamsPart,
     FindDeviceTokenByDeviceCodeError,
     OAuthDeviceCodeRepository,
+    OAuthDeviceCodeService,
     UpdateDeviceCodeWithTokenParamsPartError,
     JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
@@ -38,7 +38,7 @@ const DEVICE_CODE_EXPIRES_IN: Duration = Duration::minutes(5);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn DeviceCodeService)]
+#[dill::interface(dyn OAuthDeviceCodeService)]
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
     job_name: JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
@@ -54,7 +54,7 @@ pub struct DeviceCodeServiceImpl {
 }
 
 #[async_trait::async_trait]
-impl DeviceCodeService for DeviceCodeServiceImpl {
+impl OAuthDeviceCodeService for DeviceCodeServiceImpl {
     async fn create_device_code(
         &self,
         _client_id: &DeviceClientId,

@@ -225,15 +225,15 @@ pub async fn platform_token_device_authorization_handler(
     Extension(catalog): Extension<Catalog>,
     Form(request): Form<DeviceAuthorizationRequest>,
 ) -> Result<Json<DeviceAuthorizationResponse>, ApiError> {
-    let (device_code_service, url_config) = from_catalog_n!(
+    let (oauth_device_code_service, url_config) = from_catalog_n!(
         catalog,
-        dyn kamu_accounts::DeviceCodeService,
+        dyn kamu_accounts::OAuthDeviceCodeService,
         kamu_core::ServerUrlConfig
     );
 
     let client_id = DeviceClientId::try_new(request.client_id)
         .map_err(|_| ApiError::bad_request_with_message("Invalid client_id"))?;
-    let device_code_created = device_code_service
+    let device_code_created = oauth_device_code_service
         .create_device_code(&client_id)
         .await
         .int_err()
@@ -395,9 +395,9 @@ pub async fn platform_token_device_handler(
         );
     }
 
-    let (device_code_service, jwt_token_issuer) = from_catalog_n!(
+    let (oauth_device_code_service, jwt_token_issuer) = from_catalog_n!(
         catalog,
-        dyn kamu_accounts::DeviceCodeService,
+        dyn kamu_accounts::OAuthDeviceCodeService,
         dyn kamu_accounts::JwtTokenIssuer
     );
 
@@ -406,7 +406,7 @@ pub async fn platform_token_device_handler(
 
     use kamu_accounts::DeviceCodeServiceExt;
 
-    let maybe_device_token = device_code_service
+    let maybe_device_token = oauth_device_code_service
         .try_find_device_token_by_device_code(&device_code)
         .await
         .api_err()?;
