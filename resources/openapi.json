@@ -1188,7 +1188,7 @@
     },
     "/platform/file/upload/prepare": {
       "post": {
-        "operationId": "platform_file_upload_prepare_post_handler",
+        "operationId": "file_upload_prepare_post_handler",
         "parameters": [
           {
             "in": "query",
@@ -1241,7 +1241,7 @@
     },
     "/platform/file/upload/{upload_token}": {
       "get": {
-        "operationId": "platform_file_upload_get_handler",
+        "operationId": "file_upload_get_handler",
         "parameters": [
           {
             "in": "path",
@@ -1276,7 +1276,7 @@
         ]
       },
       "post": {
-        "operationId": "platform_file_upload_post_handler",
+        "operationId": "file_upload_post_handler",
         "parameters": [
           {
             "in": "path",
@@ -1327,7 +1327,7 @@
     },
     "/platform/login": {
       "post": {
-        "operationId": "platform_login_handler",
+        "operationId": "login_handler",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1381,7 +1381,7 @@
     },
     "/platform/token/device": {
       "post": {
-        "operationId": "platform_token_device_handler",
+        "operationId": "token_device_handler",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
@@ -1427,7 +1427,7 @@
     },
     "/platform/token/device/authorization": {
       "post": {
-        "operationId": "platform_token_device_authorization_handler",
+        "operationId": "token_device_authorization_handler",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
@@ -1463,7 +1463,7 @@
     },
     "/platform/token/validate": {
       "get": {
-        "operationId": "platform_token_validate_handler",
+        "operationId": "token_validate_handler",
         "responses": {
           "200": {
             "content": {
