@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{CreateAccessTokenError, DeviceCode, RevokeTokenError};
+use kamu_accounts::{CreateAccessTokenError, RevokeTokenError};
 
 use crate::prelude::*;
 use crate::queries::{Account, CreateAccessTokenResultSuccess, CreatedAccessToken};
@@ -26,17 +26,11 @@ impl AuthMut {
         ctx: &Context<'_>,
         login_method: String,
         login_credentials_json: String,
-        device_code: Option<String>,
+        device_code: Option<DeviceCode<'_>>,
     ) -> Result<LoginResponse> {
-        let device_code = if let Some(raw_device_code) = device_code {
-            let device_code = DeviceCode::try_new(&raw_device_code).int_err()?;
-            Some(device_code)
-        } else {
-            None
-        };
-
         let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
+        let device_code = device_code.map(Into::into);
         let login_result = authentication_service
             .login(login_method.as_str(), login_credentials_json, device_code)
             .await;
