@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT device_code            AS \"device_code: Uuid\",\n                   device_code_created_at AS \"device_code_created_at: _\",\n                   device_code_expires_at AS \"device_code_expires_at: _\",\n                   token_iat,\n                   token_exp,\n                   token_last_used_at     AS \"token_last_used_at: _\",\n                   account_id\n            FROM device_codes\n            WHERE device_code = $1\n            ",
+  "query": "\n            SELECT device_code            AS \"device_code: Uuid\",\n                   device_code_created_at AS \"device_code_created_at: _\",\n                   device_code_expires_at AS \"device_code_expires_at: _\",\n                   token_iat,\n                   token_exp,\n                   token_last_used_at     AS \"token_last_used_at: _\",\n                   account_id\n            FROM oauth_device_codes\n            WHERE device_code = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -52,5 +52,5 @@
       true
     ]
   },
-  "hash": "66f642f1da8b35e8f96eaf8ceedc0a90114a55ec5964b5b962c52412992572c7"
+  "hash": "595f7ea07c29a33456f3c5275bca6b9b4603921c161f02936bb3ac3b863c7cf3"
 }

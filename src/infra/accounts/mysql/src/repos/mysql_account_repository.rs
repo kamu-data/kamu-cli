@@ -318,7 +318,7 @@ impl AccountRepository for MySqlAccountRepository {
                 provider,
                 provider_identity_key
             FROM accounts
-            WHERE lower(account_name) = lower(?)
+            WHERE account_name = ?
             "#,
             account_name.to_string()
         )
@@ -374,7 +374,7 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: AccountID"
               FROM accounts
-              WHERE lower(email) = lower(?)
+              WHERE email = ?
             "#,
             email.as_ref()
         )
@@ -398,7 +398,7 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: AccountID"
               FROM accounts
-              WHERE lower(account_name) = lower(?)
+              WHERE account_name = ?
             "#,
             account_name.to_string()
         )
@@ -574,7 +574,7 @@ impl PasswordHashRepository for MySqlAccountRepository {
             r#"
             SELECT password_hash
               FROM accounts_passwords
-              WHERE lower(account_name) = lower(?)
+              WHERE account_name = ?
             "#,
             account_name.to_string(),
         )

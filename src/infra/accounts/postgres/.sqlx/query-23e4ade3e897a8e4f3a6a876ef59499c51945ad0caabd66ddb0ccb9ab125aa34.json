@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT device_code,\n                   device_code_created_at,\n                   device_code_expires_at,\n                   token_iat,\n                   token_exp,\n                   token_last_used_at,\n                   account_id\n            FROM device_codes\n            WHERE device_code = $1\n            ",
+  "query": "\n            SELECT device_code,\n                   device_code_created_at,\n                   device_code_expires_at,\n                   token_iat,\n                   token_exp,\n                   token_last_used_at,\n                   account_id\n            FROM oauth_device_codes\n            WHERE device_code = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -54,5 +54,5 @@
       true
     ]
   },
-  "hash": "65074c9f0dc4f3d0ff1570fa686c4892bbcd497284d7d0140f4fa7f2ac561b9a"
+  "hash": "23e4ade3e897a8e4f3a6a876ef59499c51945ad0caabd66ddb0ccb9ab125aa34"
 }

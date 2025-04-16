@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT password_hash\n              FROM accounts_passwords\n              WHERE lower(account_name) = lower(?)\n            ",
+  "query": "\n            SELECT password_hash\n              FROM accounts_passwords\n              WHERE account_name = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -20,5 +20,5 @@
       false
     ]
   },
-  "hash": "38c3d56c228c0fbbdd450b98b900d9580da47336d961ac60d7aa3f016ad0cd78"
+  "hash": "2c7b9baf739d4bfc260a166186d8e07478357ebc4ceb157dd4e73911fe49d258"
 }

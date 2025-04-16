@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT id as \"id: AccountID\"\n              FROM accounts\n              WHERE lower(email) = lower(?)\n            ",
+  "query": "\n            SELECT id as \"id: AccountID\"\n              FROM accounts\n              WHERE account_name = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -20,5 +20,5 @@
       false
     ]
   },
-  "hash": "36a65d2c3c26a5f18b2bb9436f9941b50fa45c5cf731803384eedc801f5d77ad"
+  "hash": "bd5ed49221bfb2ee5e5af030e6365e51441aac68f1f428321647d6264eb15f9c"
 }

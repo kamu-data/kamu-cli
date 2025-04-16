@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM oauth_device_codes\n            WHERE datetime(device_code_expires_at) < datetime('now')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "9b43fdab8a65efd722f06ab3b0394e543eaeeef95ac33bfeea65d12a26e9cc27"
+}
