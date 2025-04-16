@@ -28,7 +28,7 @@ pub trait CreateDatasetUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, serde::Serialize)]
 pub struct CreateDatasetUseCaseOptions {
     pub dataset_visibility: odf::DatasetVisibility,
 }

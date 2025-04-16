@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
 use internal_error::InternalError;
+use odf_metadata::{DatasetAlias, DatasetHandle, DatasetRef};
 use thiserror::Error;
 
 use crate::{DatasetUnresolvedIdError, GetStoredDatasetError};
@@ -18,8 +22,66 @@ use crate::{DatasetUnresolvedIdError, GetStoredDatasetError};
 pub trait DatasetHandleResolver: Send + Sync {
     async fn resolve_dataset_handle_by_ref(
         &self,
-        dataset_ref: &odf_metadata::DatasetRef,
-    ) -> Result<odf_metadata::DatasetHandle, DatasetRefUnresolvedError>;
+        dataset_ref: &DatasetRef,
+    ) -> Result<DatasetHandle, DatasetRefUnresolvedError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Wraps another resolver while also taking a predefined mapping between
+/// dataset aliases and IDs. This is useful when e.g. resolving dependencies of
+/// a derivative dataset that depends on datasets that are being created within
+/// the same transaction.
+pub struct DatasetHandleResolverWithPredefined {
+    inner: Option<Arc<dyn DatasetHandleResolver>>,
+    predefined: BTreeMap<DatasetAlias, DatasetHandle>,
+}
+
+impl DatasetHandleResolverWithPredefined {
+    pub fn new(
+        inner: Option<Arc<dyn DatasetHandleResolver>>,
+        predefined: BTreeMap<DatasetAlias, DatasetHandle>,
+    ) -> Self {
+        Self { inner, predefined }
+    }
+}
+
+#[async_trait::async_trait]
+impl DatasetHandleResolver for DatasetHandleResolverWithPredefined {
+    async fn resolve_dataset_handle_by_ref(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<DatasetHandle, DatasetRefUnresolvedError> {
+        if let Some(res) = match dataset_ref {
+            DatasetRef::Alias(alias) => {
+                // TODO: PERF: Sanity check that we don't mix single- and multi-tenant aliases
+                for v in self.predefined.keys() {
+                    assert!(
+                        v.is_multi_tenant() == alias.is_multi_tenant(),
+                        "Mixing single- and multi-tenant aliases is not allowed"
+                    );
+                }
+                self.predefined.get(alias)
+            }
+            DatasetRef::ID(id) => {
+                // Slow case
+                self.predefined.iter().find(|v| v.1.id == *id).map(|v| v.1)
+            }
+            DatasetRef::Handle(hdl) => Some(hdl),
+        } {
+            return Ok(res.clone());
+        }
+
+        if let Some(inner) = &self.inner {
+            return inner.resolve_dataset_handle_by_ref(dataset_ref).await;
+        }
+
+        Err(DatasetRefUnresolvedError::NotFound(
+            crate::DatasetNotFoundError {
+                dataset_ref: dataset_ref.clone(),
+            },
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
