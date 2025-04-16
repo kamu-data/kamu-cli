@@ -19,7 +19,7 @@ use kamu_accounts_inmem::{
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
-    DeviceCodeServiceImpl,
+    OAuthDeviceCodeServiceImpl,
 };
 use messaging_outbox::{MockOutbox, Outbox};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -124,7 +124,7 @@ fn make_catalog(mock_outbox: MockOutbox) -> dill::Catalog {
         .add::<DatabaseTransactionRunner>()
         .add_value(mock_outbox)
         .bind::<dyn Outbox, MockOutbox>()
-        .add::<DeviceCodeServiceImpl>()
+        .add::<OAuthDeviceCodeServiceImpl>()
         .add::<InMemoryDeviceCodeRepository>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);

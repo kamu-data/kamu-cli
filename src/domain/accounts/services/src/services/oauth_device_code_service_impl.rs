@@ -48,13 +48,13 @@ const DEVICE_CODE_EXPIRES_IN: Duration = Duration::minutes(5);
     ],
     requires_transaction: true,
 })]
-pub struct DeviceCodeServiceImpl {
+pub struct OAuthDeviceCodeServiceImpl {
     oauth_device_code_repo: Arc<dyn OAuthDeviceCodeRepository>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[async_trait::async_trait]
-impl OAuthDeviceCodeService for DeviceCodeServiceImpl {
+impl OAuthDeviceCodeService for OAuthDeviceCodeServiceImpl {
     async fn create_device_code(
         &self,
         _client_id: &DeviceClientId,
@@ -108,7 +108,7 @@ impl OAuthDeviceCodeService for DeviceCodeServiceImpl {
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl InitOnStartup for DeviceCodeServiceImpl {
+impl InitOnStartup for OAuthDeviceCodeServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, name = DeviceCodeServiceImpl_run_initialization)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         self.cleanup_expired_device_codes().await.int_err()

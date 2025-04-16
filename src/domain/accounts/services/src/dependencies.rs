@@ -21,7 +21,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder, needs_indexin
     catalog_builder.add::<PredefinedAccountsRegistrator>();
 
     if needs_indexing {
-        catalog_builder.add::<DeviceCodeServiceImpl>();
+        catalog_builder.add::<OAuthDeviceCodeServiceImpl>();
     }
 }
 

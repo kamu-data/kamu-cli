@@ -196,7 +196,7 @@ impl ClientSideHarness {
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
         b.add_value(IpfsGateway::default());
 
-        b.add::<DeviceCodeServiceImpl>();
+        b.add::<OAuthDeviceCodeServiceImpl>();
         b.add::<InMemoryDeviceCodeRepository>();
         b.add::<DummyDatasetEntryIndexer>();
 

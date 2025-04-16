@@ -30,8 +30,8 @@ use kamu_accounts_inmem::{
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
-    DeviceCodeServiceImpl,
     LoginPasswordAuthProvider,
+    OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::{
@@ -95,7 +95,7 @@ impl Harness {
                 .add::<UploadServiceLocal>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DummyOutboxImpl>()
-                .add::<DeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<InMemoryDeviceCodeRepository>()
                 .add::<DummyDatasetEntryIndexer>();
 

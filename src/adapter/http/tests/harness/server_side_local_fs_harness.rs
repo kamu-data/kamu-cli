@@ -163,7 +163,7 @@ impl ServerSideLocalFsHarness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(predefined_accounts_config)
-                .add::<DeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<InMemoryDeviceCodeRepository>()
                 .add::<DummyDatasetEntryIndexer>();
 

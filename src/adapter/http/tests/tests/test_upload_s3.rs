@@ -28,8 +28,8 @@ use kamu_accounts_inmem::{
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
-    DeviceCodeServiceImpl,
     LoginPasswordAuthProvider,
+    OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadServiceS3};
@@ -79,7 +79,7 @@ impl Harness {
                 .add_builder(UploadServiceS3::builder(s3_upload_context.clone()))
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DummyOutboxImpl>()
-                .add::<DeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<InMemoryDeviceCodeRepository>()
                 .add::<DummyDatasetEntryIndexer>();
 
