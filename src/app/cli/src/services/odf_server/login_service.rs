@@ -77,7 +77,9 @@ impl LoginService {
             .unwrap();
 
         // Notify the user and open the browser
-        login_polling_started_callback(&device_authorization_response.verification_uri);
+        login_polling_started_callback(
+            &device_authorization_response.verification_uri_with_device_code(),
+        );
         let _ = webbrowser::open(&device_authorization_response.verification_uri);
 
         // Start polling

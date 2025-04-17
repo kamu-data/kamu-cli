@@ -63,6 +63,10 @@ impl DeviceAuthorizationResponse {
     pub fn interval_or_default(&self) -> u64 {
         self.interval.unwrap_or(Self::DEFAULT_INTERVAL)
     }
+
+    pub fn verification_uri_with_device_code(&self) -> String {
+        format!("{}?deviceCode={}", self.verification_uri, self.device_code)
+    }
 }
 
 /// Authorization of a device
