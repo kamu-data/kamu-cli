@@ -8,8 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use internal_error::{InternalError, ResultIntoInternal};
-use uuid::Uuid;
 
 use crate::DeviceCode;
 

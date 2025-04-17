@@ -55,7 +55,7 @@ impl OAuthDeviceCodeService for OAuthDeviceCodeServiceImpl {
         _client_id: &DeviceClientId,
     ) -> Result<DeviceTokenCreated, CreateDeviceCodeError> {
         let device_token_created = {
-            let device_code = DeviceCode::new(Uuid::new_v4());
+            let device_code = DeviceCode::new_uuid_v4();
             let created_at = self.time_source.now();
             let expires_at = created_at + DEVICE_CODE_EXPIRES_IN;
 

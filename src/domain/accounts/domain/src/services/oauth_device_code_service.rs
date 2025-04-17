@@ -88,6 +88,10 @@ pub struct DeviceClientId(String);
 pub struct DeviceCode(Uuid);
 
 impl DeviceCode {
+    pub fn new_uuid_v4() -> Self {
+        Self::new(Uuid::new_v4())
+    }
+
     pub fn try_new(raw: &str) -> Result<Self, DeviceCodeParseError> {
         raw.parse()
     }
