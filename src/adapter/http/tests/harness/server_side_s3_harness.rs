@@ -20,7 +20,7 @@ use kamu_accounts::*;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
-    InMemoryDeviceCodeRepository,
+    InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::*;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
@@ -146,7 +146,7 @@ impl ServerSideS3Harness {
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(predefined_accounts_config)
                 .add::<OAuthDeviceCodeServiceImpl>()
-                .add::<InMemoryDeviceCodeRepository>();
+                .add::<InMemoryOAuthDeviceCodeRepository>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

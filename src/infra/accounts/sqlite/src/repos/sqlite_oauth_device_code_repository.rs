@@ -15,13 +15,13 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteDeviceCodeRepository {
+pub struct SqliteOAuthDeviceCodeRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
 #[dill::component(pub)]
 #[dill::interface(dyn OAuthDeviceCodeRepository)]
-impl SqliteDeviceCodeRepository {
+impl SqliteOAuthDeviceCodeRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -30,7 +30,7 @@ impl SqliteDeviceCodeRepository {
 }
 
 #[async_trait::async_trait]
-impl OAuthDeviceCodeRepository for SqliteDeviceCodeRepository {
+impl OAuthDeviceCodeRepository for SqliteOAuthDeviceCodeRepository {
     async fn save_device_code(
         &self,
         device_code_created: &DeviceTokenCreated,

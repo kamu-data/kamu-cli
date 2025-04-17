@@ -20,7 +20,7 @@ use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDeviceCodeRepository};
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryOAuthDeviceCodeRepository};
 use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
@@ -196,7 +196,7 @@ impl ClientSideHarness {
         b.add_value(IpfsGateway::default());
 
         b.add::<OAuthDeviceCodeServiceImpl>();
-        b.add::<InMemoryDeviceCodeRepository>();
+        b.add::<InMemoryOAuthDeviceCodeRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

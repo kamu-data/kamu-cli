@@ -14,13 +14,13 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresDeviceCodeRepository {
+pub struct PostgresOAuthDeviceCodeRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 #[dill::component(pub)]
 #[dill::interface(dyn OAuthDeviceCodeRepository)]
-impl PostgresDeviceCodeRepository {
+impl PostgresOAuthDeviceCodeRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -29,7 +29,7 @@ impl PostgresDeviceCodeRepository {
 }
 
 #[async_trait::async_trait]
-impl OAuthDeviceCodeRepository for PostgresDeviceCodeRepository {
+impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
     async fn save_device_code(
         &self,
         device_code_created: &DeviceTokenCreated,

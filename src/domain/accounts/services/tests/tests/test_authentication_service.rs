@@ -14,7 +14,7 @@ use kamu_accounts::*;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
-    InMemoryDeviceCodeRepository,
+    InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
@@ -125,7 +125,7 @@ fn make_catalog(mock_outbox: MockOutbox) -> dill::Catalog {
         .add_value(mock_outbox)
         .bind::<dyn Outbox, MockOutbox>()
         .add::<OAuthDeviceCodeServiceImpl>()
-        .add::<InMemoryDeviceCodeRepository>();
+        .add::<InMemoryOAuthDeviceCodeRepository>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 

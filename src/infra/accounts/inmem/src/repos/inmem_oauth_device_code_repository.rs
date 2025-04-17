@@ -23,14 +23,14 @@ struct State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryDeviceCodeRepository {
+pub struct InMemoryOAuthDeviceCodeRepository {
     state: Arc<RwLock<State>>,
 }
 
 #[dill::component(pub)]
 #[dill::interface(dyn OAuthDeviceCodeRepository)]
 #[dill::scope(dill::Singleton)]
-impl InMemoryDeviceCodeRepository {
+impl InMemoryOAuthDeviceCodeRepository {
     pub fn new() -> Self {
         Self {
             state: Arc::new(RwLock::new(State::default())),
@@ -41,7 +41,7 @@ impl InMemoryDeviceCodeRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl OAuthDeviceCodeRepository for InMemoryDeviceCodeRepository {
+impl OAuthDeviceCodeRepository for InMemoryOAuthDeviceCodeRepository {
     async fn save_device_code(
         &self,
         device_code_created: &DeviceTokenCreated,
