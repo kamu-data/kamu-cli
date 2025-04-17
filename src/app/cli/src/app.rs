@@ -90,7 +90,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // workspace to be created will be multi-tenant or not right away, even before
     // the `kamu init` command itself is processed.
     let maybe_init_command = match &args.command {
-        Command::Init(c) => Some(c.clone()),
+        Command::Init(c) if c.creates_workspace() => Some(c.clone()),
         _ => None,
     };
     let init_multi_tenant_workspace = matches!(&maybe_init_command, Some(c) if c.multi_tenant);
@@ -242,19 +242,21 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     if command_result.is_ok() {
         let is_transactional = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_transaction(&args);
+        let is_outbox_processing_required = maybe_db_connection_settings.is_some()
+            && cli_commands::command_needs_outbox_processing(&args);
         let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
         command_result = maybe_transactional(
             is_transactional,
             cli_catalog.clone(),
             |maybe_transactional_cli_catalog: Catalog| async move {
-                let command_buider = cli_commands::get_command(
+                let command_builder = cli_commands::get_command(
                     work_catalog,
                     &maybe_transactional_cli_catalog,
                     args,
                 )?;
 
-                let command = command_buider
+                let command = command_builder
                     .get(&maybe_transactional_cli_catalog)
                     .int_err()?;
 
@@ -275,30 +277,32 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         .instrument(tracing::debug_span!("app::run_command"))
         .await;
 
-        command_result = command_result
-            // If successful, then process the Outbox messages while they are present
-            .and_then_async(|_| async {
-                let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
-                outbox_agent
-                    .run_while_has_tasks()
-                    .await
-                    .map_err(CLIError::critical)
-            })
-            .instrument(tracing::debug_span!(
-                "Consume accumulated the Outbox messages"
-            ))
-            .await
-            // If we had a temporary directory, we move the database from it to the expected
-            // location.
-            .and_then_async(|_| async {
-                move_initial_database_to_workspace_if_needed(
-                    &workspace_layout,
-                    maybe_temp_database_path,
-                )
+        if is_outbox_processing_required {
+            command_result = command_result
+                // If successful, then process the Outbox messages while they are present
+                .and_then_async(|_| async {
+                    let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
+                    outbox_agent
+                        .run_while_has_tasks()
+                        .await
+                        .map_err(CLIError::critical)
+                })
+                .instrument(tracing::debug_span!(
+                    "Consume accumulated the Outbox messages"
+                ))
                 .await
-                .map_int_err(CLIError::critical)
-            })
-            .await;
+                // If we had a temporary directory, we move the database from it to the expected
+                // location.
+                .and_then_async(|_| async {
+                    move_initial_database_to_workspace_if_needed(
+                        &workspace_layout,
+                        maybe_temp_database_path,
+                    )
+                    .await
+                    .map_int_err(CLIError::critical)
+                })
+                .await;
+        }
     }
 
     match &command_result {

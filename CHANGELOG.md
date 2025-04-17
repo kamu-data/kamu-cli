@@ -21,6 +21,9 @@ Recommendation: for ease of reading, use the following order:
   - HTTP API: Added endpoints implementing [RFC 8628: OAuth 2.0 Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628):
     - `POST platform/token/device/authorization`
     - `POST platform/token/device`
+### Fixed
+- `kamu init`: in case of using `--pull-images` argument, fixed unclear error with not found file.
+- CLI commands: Trigger `outbox_agent` method only for commands that require it.
 
 ## [0.233.0] - 2025-04-09
 ### Added
