@@ -28,13 +28,13 @@ use kamu_accounts::{
     PROVIDER_PASSWORD,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_http::{DatasetAuthorizationLayer, FileUploadLimitConfig};
+use kamu_adapter_http::platform::FileUploadLimitConfig;
+use kamu_adapter_http::DatasetAuthorizationLayer;
 use observability::axum::unknown_fallback_handler;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
 
 use super::{UIConfiguration, UIFeatureFlags};
 
@@ -157,13 +157,7 @@ impl WebUIServer {
         .route("/ui-config", axum::routing::get(ui_configuration_handler))
         .route("/graphql", axum::routing::post(graphql_handler))
         .merge(kamu_adapter_http::data::root_router())
-        .routes(routes!(
-            kamu_adapter_http::platform_file_upload_prepare_post_handler
-        ))
-        .routes(routes!(
-            kamu_adapter_http::platform_file_upload_post_handler,
-            kamu_adapter_http::platform_file_upload_get_handler
-        ))
+        .nest("/platform", kamu_adapter_http::platform::root_router())
         .nest(
             "/odata",
             match tenancy_config {
