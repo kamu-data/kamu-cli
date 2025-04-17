@@ -29,10 +29,10 @@ test_message_type!(A);
 test_message_type!(B);
 test_message_type!(C);
 
-test_message_consumer!(A, A, TEST_PRODUCER_A, Immediate);
-test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional);
-test_message_consumer!(C, CB, TEST_PRODUCER_C, Immediate);
-test_message_consumer!(C, CD, TEST_PRODUCER_C, Transactional);
+test_message_consumer!(A, A, TEST_PRODUCER_A, Immediate, All);
+test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional, All);
+test_message_consumer!(C, CB, TEST_PRODUCER_C, Immediate, All);
+test_message_consumer!(C, CD, TEST_PRODUCER_C, Transactional, All);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -94,7 +94,7 @@ async fn test_immediate_only_messages() {
 
 #[test_log::test(tokio::test)]
 async fn test_transactional_only_messages() {
-    let message_1: TestMessageB = TestMessageB {
+    let message_1 = TestMessageB {
         body: "foo".to_string(),
     };
     let message_2 = TestMessageB {

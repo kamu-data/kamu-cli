@@ -19,6 +19,7 @@ use kamu_datasets::{
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use messaging_outbox::{
+    InitialConsumerBoundary,
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
@@ -43,6 +44,7 @@ pub struct RebacDatasetLifecycleMessageConsumer {
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
+    initial_consumer_boundary: InitialConsumerBoundary::All,
 })]
 impl RebacDatasetLifecycleMessageConsumer {
     pub fn new(

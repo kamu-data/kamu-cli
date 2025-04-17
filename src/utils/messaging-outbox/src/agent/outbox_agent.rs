@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method1, transactional_method2};
+use database_common_macros::transactional_method2;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
@@ -157,7 +157,7 @@ impl OutboxAgent {
         }
     }
 
-    #[transactional_method1(outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>)]
+    #[transactional_method2(outbox_consumption_repository: Arc<dyn OutboxMessageConsumptionRepository>, outbox_message_repository: Arc<dyn OutboxMessageRepository>)]
     async fn init_consumption_records(&self) -> Result<(), InternalError> {
         // Load existing consumption records
         use futures::TryStreamExt;
@@ -165,6 +165,17 @@ impl OutboxAgent {
             .list_consumption_boundaries()
             .try_collect::<Vec<_>>()
             .await?;
+
+        let latest_message_ids_by_producer = {
+            let latest_message_ids_by_producer = outbox_message_repository
+                .get_latest_message_ids_by_producer()
+                .await?;
+
+            // Convert into map
+            latest_message_ids_by_producer
+                .into_iter()
+                .collect::<HashMap<_, _>>()
+        };
 
         // Build a set of producer-consumer pairs that already exist in the database
         let mut matched_consumptions = HashSet::new();
@@ -174,14 +185,28 @@ impl OutboxAgent {
 
         // Detect new routes, which are not associated with a consumption record yet
         for (producer_name, consumer_names) in &self.routes_static_info.consumers_by_producers {
+            let latest_produced_message_id = latest_message_ids_by_producer
+                .get(producer_name)
+                .cloned()
+                .unwrap_or_else(|| OutboxMessageID::new(0));
             for consumer_name in consumer_names {
                 if !matched_consumptions.contains(&(producer_name, consumer_name)) {
+                    let last_consumed_message_id = if let Some(consumer_metadata) =
+                        particular_consumer_metadata_for(&self.catalog, consumer_name)
+                        && consumer_metadata.initial_consumer_boundary
+                            == InitialConsumerBoundary::Latest
+                    {
+                        latest_produced_message_id
+                    } else {
+                        OutboxMessageID::new(0)
+                    };
+
                     // Create a new consumption boundary
                     outbox_consumption_repository
                         .create_consumption_boundary(OutboxMessageConsumptionBoundary {
                             consumer_name: consumer_name.clone(),
                             producer_name: producer_name.clone(),
-                            last_consumed_message_id: OutboxMessageID::new(0),
+                            last_consumed_message_id,
                         })
                         .await
                         .int_err()?;

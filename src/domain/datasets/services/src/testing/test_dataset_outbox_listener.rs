@@ -50,6 +50,7 @@ struct State {
         MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
+    initial_consumer_boundary: InitialConsumerBoundary::All,
 })]
 impl TestDatasetOutboxListener {
     pub fn new() -> Self {

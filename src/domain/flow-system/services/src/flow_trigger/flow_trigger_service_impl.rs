@@ -15,6 +15,7 @@ use dill::*;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::{FlowTriggerEventStore, *};
 use messaging_outbox::{
+    InitialConsumerBoundary,
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
@@ -47,6 +48,7 @@ pub struct FlowTriggerServiceImpl {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_TRIGGER_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_DATASET_SERVICE],
     delivery: MessageDeliveryMechanism::Transactional,
+    initial_consumer_boundary: InitialConsumerBoundary::All,
 })]
 impl FlowTriggerServiceImpl {
     pub fn new(
