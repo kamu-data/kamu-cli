@@ -185,18 +185,17 @@ impl OutboxAgent {
 
         // Detect new routes, which are not associated with a consumption record yet
         for (producer_name, consumer_names) in &self.routes_static_info.consumers_by_producers {
-            let latest_produced_message_id = latest_message_ids_by_producer
-                .get(producer_name)
-                .cloned()
-                .unwrap_or_else(|| OutboxMessageID::new(0));
+            let latest_produced_message_id_maybe =
+                latest_message_ids_by_producer.get(producer_name);
             for consumer_name in consumer_names {
                 if !matched_consumptions.contains(&(producer_name, consumer_name)) {
                     let last_consumed_message_id = if let Some(consumer_metadata) =
                         particular_consumer_metadata_for(&self.catalog, consumer_name)
                         && consumer_metadata.initial_consumer_boundary
                             == InitialConsumerBoundary::Latest
+                        && let Some(latest_produced_message_id) = latest_produced_message_id_maybe
                     {
-                        latest_produced_message_id
+                        *latest_produced_message_id
                     } else {
                         OutboxMessageID::new(0)
                     };

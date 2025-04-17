@@ -116,7 +116,7 @@ impl<'a> SpanName<'a> {
 }
 
 #[cfg(feature = "opentelemetry")]
-impl<'a> std::fmt::Display for SpanName<'a> {
+impl<'_> std::fmt::Display for SpanName<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", self.method, self.route)
     }

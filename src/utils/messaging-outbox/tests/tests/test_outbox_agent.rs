@@ -69,6 +69,7 @@ async fn test_deliver_messages_of_one_type() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -87,6 +88,7 @@ async fn test_deliver_messages_of_one_type() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 2),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -95,6 +97,7 @@ async fn test_deliver_messages_of_one_type() {
 
     harness.check_metrics_messages_processed_total(&[
         (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 2),
         (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -131,6 +134,7 @@ async fn test_deliver_messages_of_two_types() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -150,6 +154,7 @@ async fn test_deliver_messages_of_two_types() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 1),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 1),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 2),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -158,6 +163,7 @@ async fn test_deliver_messages_of_two_types() {
 
     harness.check_metrics_messages_processed_total(&[
         (TEST_PRODUCER_A, "TestMessageConsumerA", 1),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 1),
         (TEST_PRODUCER_B, "TestMessageConsumerB", 1),
         (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -194,6 +200,7 @@ async fn test_deliver_messages_multiple_consumers() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -218,6 +225,7 @@ async fn test_deliver_messages_multiple_consumers() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 2),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 2),
@@ -226,6 +234,7 @@ async fn test_deliver_messages_multiple_consumers() {
 
     harness.check_metrics_messages_processed_total(&[
         (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
         (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC1", 2),
         (TEST_PRODUCER_C, "TestMessageConsumerC2", 2),
@@ -278,6 +287,7 @@ async fn test_deliver_messages_with_partial_consumption() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 2),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 4),
@@ -310,6 +320,7 @@ async fn test_deliver_messages_with_partial_consumption() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 5),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 5),
@@ -318,6 +329,7 @@ async fn test_deliver_messages_with_partial_consumption() {
 
     harness.check_metrics_messages_processed_total(&[
         (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
         (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC1", 5 - 2),
         (TEST_PRODUCER_C, "TestMessageConsumerC2", 5 - 4),
