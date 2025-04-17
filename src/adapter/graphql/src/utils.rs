@@ -19,12 +19,9 @@ use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// `unwrap()`-free helper macro to hide the logic for extracting DI components
+/// Macro helper to hide the logic for extracting DI components
 /// from a catalog using [`async_graphql::Context`] that is present for each GQL
 /// request.
-///
-/// If one of the required DI components is not found, `.int_err()?` will be
-/// initiated.
 ///
 /// # Examples
 ///
