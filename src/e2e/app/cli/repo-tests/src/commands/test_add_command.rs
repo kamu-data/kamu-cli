@@ -192,52 +192,27 @@ pub async fn test_add_recursive(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
-    // Plain manifest
+// TODO: This behavior should be revised to return errors if one batch contains
+// duplicate names
+pub async fn test_add_with_duplicate_names(kamu: KamuCliPuppet) {
     let snapshot = MetadataFactory::dataset_snapshot().name("plain").build();
     let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
         .write_manifest_str(&snapshot)
         .unwrap();
-    std::fs::write(kamu.workspace_path().join("plain.yaml"), manifest).unwrap();
+    std::fs::write(kamu.workspace_path().join("plain-1.yaml"), manifest).unwrap();
 
-    // Manifest with lots of comments
-    let snapshot = MetadataFactory::dataset_snapshot()
-        .name("plain")
-        .kind(odf::DatasetKind::Derivative)
-        .push_event(
-            MetadataFactory::set_transform()
-                .inputs_from_refs(["plain"])
-                .build(),
-        )
-        .build();
+    let snapshot = MetadataFactory::dataset_snapshot().name("plain").build();
     let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
         .write_manifest_str(&snapshot)
         .unwrap();
-    std::fs::write(
-        kamu.workspace_path().join("commented.yaml"),
-        format!(
-            indoc::indoc! {
-                "
-
-                # Some
-
-                # Weird
-                #
-                # Comment
-                {}
-                "
-            },
-            &manifest
-        ),
-    )
-    .unwrap();
+    std::fs::write(kamu.workspace_path().join("plain-2.yaml"), manifest).unwrap();
 
     kamu.assert_success_command_execution(
-        ["-v", "add", "plain.yaml", "commented.yaml"],
+        ["-v", "add", "plain-1.yaml", "plain-2.yaml"],
         None,
         Some([
-            "Added: plain",
             "Skipped: plain: Already exists",
+            "Added: plain",
             r#"Added 1 dataset\(s\)"#,
         ]),
     )
@@ -251,6 +226,114 @@ pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
         .collect::<Vec<_>>();
 
     assert_eq!(dataset_names, ["plain"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_with_dependency_chain(kamu: KamuCliPuppet) {
+    let snapshot = MetadataFactory::dataset_snapshot().name("root").build();
+    let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+    std::fs::write(kamu.workspace_path().join("root.yaml"), manifest).unwrap();
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("deriv1")
+        .kind(odf::DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs(["root"])
+                .build(),
+        )
+        .build();
+    let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+    std::fs::write(kamu.workspace_path().join("deriv-1.yaml"), manifest).unwrap();
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("deriv2")
+        .kind(odf::DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs(["root", "deriv1"])
+                .build(),
+        )
+        .build();
+    let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+    std::fs::write(kamu.workspace_path().join("deriv-2.yaml"), manifest).unwrap();
+
+    // Note: Dataset in add results get sorted in alphabetical order
+    kamu.assert_success_command_execution(
+        ["-v", "add", "deriv-2.yaml", "deriv-1.yaml", "root.yaml"],
+        None,
+        Some([
+            "Added: deriv1",
+            "Added: deriv2",
+            "Added: root",
+            r#"Added 3 dataset\(s\)"#,
+        ]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(dataset_names, ["deriv1", "deriv2", "root"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_add_with_circular_dependency(kamu: KamuCliPuppet) {
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("deriv1")
+        .kind(odf::DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs(["deriv2"])
+                .build(),
+        )
+        .build();
+    let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+    std::fs::write(kamu.workspace_path().join("deriv-1.yaml"), manifest).unwrap();
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("deriv2")
+        .kind(odf::DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform()
+                .inputs_from_refs(["deriv1"])
+                .build(),
+        )
+        .build();
+    let manifest = odf::serde::yaml::YamlDatasetSnapshotSerializer
+        .write_manifest_str(&snapshot)
+        .unwrap();
+    std::fs::write(kamu.workspace_path().join("deriv-2.yaml"), manifest).unwrap();
+
+    kamu.assert_failure_command_execution(
+        ["-v", "add", "deriv-1.yaml", "deriv-2.yaml"],
+        None,
+        Some(["Error: Aborted on cyclic dependency"]),
+    )
+    .await;
+
+    let dataset_names = kamu
+        .list_datasets()
+        .await
+        .into_iter()
+        .map(|dataset| dataset.name)
+        .collect::<Vec<_>>();
+
+    assert!(dataset_names.is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

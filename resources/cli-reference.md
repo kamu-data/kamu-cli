@@ -12,6 +12,7 @@ To regenerate this schema from existing code, use the following command:
 **Subcommands:**
 
 * `add` — Add a new dataset or modify an existing one
+* `apply` — Add a new dataset or modify an existing one
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
 * `delete [rm]` — Delete a dataset
@@ -66,11 +67,12 @@ Add a new dataset or modify an existing one
 
 **Options:**
 
+* `--dry-run` — Show the changes to be applied without actually doing them
 * `-r`, `--recursive` — Recursively search for all manifest in the specified directory
 * `--replace` — Delete and re-add datasets that already exist
 * `--stdin` — Read manifests from standard input
 * `--name <N>` — Overrides the name in a loaded manifest
-* `--visibility <VIS>` — Changing the visibility of the added dataset
+* `--visibility <VIS>` — Visibility of the added dataset
 
   Possible values: `private`, `public`
 
@@ -96,6 +98,39 @@ Add a dataset from manifest hosted externally (e.g. on GihHub):
     kamu add https://raw.githubusercontent.com/kamu-data/kamu-contrib/master/ca.bankofcanada/ca.bankofcanada.exchange-rates.daily.yaml
 
 To add dataset from a repository see `kamu pull` command.
+
+
+
+
+## `kamu apply`
+
+Add a new dataset or modify an existing one
+
+**Usage:** `kamu apply [OPTIONS] [MANIFEST]...`
+
+**Arguments:**
+
+* `<MANIFEST>` — Dataset manifest reference(s) (path, or URL)
+
+**Options:**
+
+* `--dry-run` — Show the changes to be applied without actually doing them
+* `-r`, `--recursive` — Recursively search for all manifest in the specified directory
+* `--stdin` — Read manifests from standard input
+* `--visibility <VIS>` — Visibility of the added dataset
+
+  Possible values: `private`, `public`
+
+
+**Examples:**
+
+Compare the state of a dataset to a manifest:
+
+    kamu apply --dry-run org.example.data.yaml
+
+Synchronize all objects with the state described in manifests found in the current directory:
+
+    kamu apply --recursive .
 
 
 

@@ -41,6 +41,20 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_add_with_duplicate_names
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_add_with_dependency_chain
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_add_with_circular_dependency
 );
 

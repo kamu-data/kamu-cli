@@ -388,3 +388,17 @@ where
         &self.info_repo
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> std::fmt::Debug
+    for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DatasetImpl")
+            .field("storage_internal_url", &self.storage_internal_url)
+            .finish_non_exhaustive()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

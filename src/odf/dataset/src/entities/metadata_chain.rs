@@ -522,6 +522,173 @@ pub trait MetadataChainExt: MetadataChain {
 
         self.accept_one(visitor).await.map_err(Into::into)
     }
+
+    /// Resolves the current state of the target reference, constructs a new
+    /// block from specified event that is then linked to the end of the chain
+    async fn append_event<'a>(
+        &'a self,
+        event: MetadataEvent,
+        system_time: chrono::DateTime<chrono::Utc>,
+        opts: AppendOpts<'a>,
+    ) -> Result<Multihash, AppendError> {
+        let Some(target) = opts.update_ref else {
+            panic!("append_event requires update_ref");
+        };
+
+        let head = if let Some(head) = opts.check_ref_is {
+            head.cloned()
+        } else {
+            self.try_get_ref(target).await?
+        };
+
+        let sequence_number = if let Some(head) = &head {
+            match self.get_block(head).await {
+                Ok(b) => Ok(b.sequence_number + 1),
+                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
+                    AppendValidationError::PrevBlockNotFound(e),
+                )),
+                Err(e) => Err(AppendError::Internal(e.int_err())),
+            }
+        } else {
+            Ok(0)
+        }?;
+
+        self.append(
+            MetadataBlock {
+                system_time,
+                prev_block_hash: head,
+                sequence_number,
+                event,
+            },
+            opts,
+        )
+        .await
+    }
+
+    /// Resolves the current state of the target reference and appends events
+    /// one by one to the chain, updating the reference at the very end
+    async fn append_events<'a>(
+        &'a self,
+        events: Vec<MetadataEvent>,
+        system_time: chrono::DateTime<chrono::Utc>,
+        opts: AppendOpts<'a>,
+    ) -> Result<Multihash, AppendError> {
+        let Some(target) = opts.update_ref else {
+            panic!("append_events requires update_ref");
+        };
+
+        let current_head = if let Some(head) = opts.check_ref_is {
+            head.cloned()
+        } else {
+            self.try_get_ref(target).await?
+        };
+
+        let mut sequence_number = if let Some(current_head) = &current_head {
+            match self.get_block(current_head).await {
+                Ok(b) => Ok(b.sequence_number + 1),
+                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
+                    AppendValidationError::PrevBlockNotFound(e),
+                )),
+                Err(e) => Err(AppendError::Internal(e.int_err())),
+            }
+        } else {
+            Ok(0)
+        }?;
+
+        let mut proposed_head = current_head.clone();
+
+        for event in events {
+            let hash = self
+                .append(
+                    MetadataBlock {
+                        system_time,
+                        prev_block_hash: proposed_head,
+                        sequence_number,
+                        event,
+                    },
+                    AppendOpts {
+                        // Append without updating the referece
+                        update_ref: None,
+                        ..opts
+                    },
+                )
+                .await?;
+            proposed_head = Some(hash);
+            sequence_number += 1;
+        }
+
+        let proposed_head = proposed_head.unwrap();
+
+        // Final commit - CAS the reference
+        self.set_ref(
+            target,
+            &proposed_head,
+            SetRefOpts {
+                validate_block_present: false,
+                check_ref_is: Some(current_head.as_ref()),
+            },
+        )
+        .await?;
+
+        Ok(proposed_head)
+    }
+
+    /// Appends blocks the chain, updating the reference at the very end
+    async fn append_blocks<'a>(
+        &'a self,
+        mut blocks: Vec<MetadataBlock>,
+        opts: AppendOpts<'a>,
+    ) -> Result<Multihash, AppendError> {
+        assert!(!blocks.is_empty());
+
+        // Reverse for the performance of popping
+        blocks.reverse();
+
+        let mut new_head = None;
+
+        while let Some(block) = blocks.pop() {
+            // Extract expected hash from the next block in our list
+            let expected_hash = match blocks.last() {
+                Some(b) => b.prev_block_hash.as_ref(),
+                // Or use expected_hash in opts as the hash of the last block
+                None => opts.expected_hash,
+            };
+
+            let hash = self
+                .append(
+                    block,
+                    AppendOpts {
+                        validation: opts.validation,
+                        update_ref: None,
+                        expected_hash,
+                        check_ref_is_prev_block: false,
+                        check_ref_is: None,
+                        // Could set this for performance, but err on the side of caution
+                        precomputed_hash: None,
+                    },
+                )
+                .await?;
+
+            new_head = Some(hash);
+        }
+
+        let new_head = new_head.unwrap();
+
+        // Update reference
+        if let Some(r) = opts.update_ref {
+            self.set_ref(
+                r,
+                &new_head,
+                SetRefOpts {
+                    validate_block_present: false,
+                    check_ref_is: opts.check_ref_is,
+                },
+            )
+            .await?;
+        }
+
+        Ok(new_head)
+    }
 }
 
 impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
