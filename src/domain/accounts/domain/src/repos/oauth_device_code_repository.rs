@@ -43,6 +43,12 @@ pub trait OAuthDeviceCodeRepository: Send + Sync {
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Error, Debug, PartialEq, Eq)]
+#[error("Dataset token duplicate for device_code '{device_code}'")]
+pub struct DeviceCodeDuplicateError {
+    pub device_code: DeviceCode,
+}
+
 #[derive(Error, Debug)]
 pub enum CreateDeviceCodeError {
     #[error(transparent)]
@@ -52,11 +58,17 @@ pub enum CreateDeviceCodeError {
     Internal(#[from] InternalError),
 }
 
-#[derive(Error, Debug)]
-#[error("Dataset token duplicate for device_code '{device_code}'")]
-pub struct DeviceCodeDuplicateError {
-    pub device_code: DeviceCode,
+impl PartialEq for CreateDeviceCodeError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Duplicate(a), Self::Duplicate(b)) => a == b,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
 }
+
+impl Eq for CreateDeviceCodeError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

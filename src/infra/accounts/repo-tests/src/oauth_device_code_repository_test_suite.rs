@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::sync::Arc;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use kamu_accounts::*;
@@ -18,7 +19,7 @@ use crate::accounts_repository_test_utils::make_test_account;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_save_device_code(catalog: &dill::Catalog) {
-    let oauth_device_code_repo = catalog.get_one::<dyn OAuthDeviceCodeRepository>().unwrap();
+    let harness = OAuthDeviceCodeRepositoryTestSuiteHarness::new(catalog);
 
     let new_device_token = {
         let now = Utc::now();
@@ -31,73 +32,61 @@ pub async fn test_save_device_code(catalog: &dill::Catalog) {
     };
 
     assert_matches!(
-        oauth_device_code_repo
+        harness
+            .oauth_device_code_repo
             .save_device_code(&new_device_token)
             .await,
         Ok(_)
     );
 
-    assert_matches!(
-        oauth_device_code_repo.save_device_code(&new_device_token).await,
-        Err(CreateDeviceCodeError::Duplicate(e)) if e.device_code == new_device_token.device_code
+    pretty_assertions::assert_eq!(
+        Err(CreateDeviceCodeError::Duplicate(DeviceCodeDuplicateError {
+            device_code: new_device_token.device_code.clone()
+        })),
+        harness
+            .oauth_device_code_repo
+            .save_device_code(&new_device_token)
+            .await,
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_device_token_with_token_params_part(catalog: &dill::Catalog) {
-    let oauth_device_code_repo = catalog.get_one::<dyn OAuthDeviceCodeRepository>().unwrap();
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let harness = OAuthDeviceCodeRepositoryTestSuiteHarness::new(catalog);
 
     let not_saved_token_device_code = DeviceCode::new_uuid_v4();
-    let account_id = {
-        let account = make_test_account(
-            "test",
-            "test@example.com",
-            kamu_adapter_oauth::PROVIDER_GITHUB,
-            "test",
-        );
-
-        assert_matches!(account_repo.create_account(&account).await, Ok(_));
-
-        account.id
-    };
+    let [user] = harness.create_accounts(["user"]).await;
     let device_token_params_part = DeviceTokenParamsPart {
         iat: 100,
         exp: 500,
-        account_id,
+        account_id: user.id,
     };
 
-    assert_matches!(
-        oauth_device_code_repo
+    pretty_assertions::assert_eq!(
+        Err(UpdateDeviceCodeWithTokenParamsPartError::NotFound(
+            DeviceTokenNotFoundError {
+                device_code: not_saved_token_device_code.clone()
+            }
+        )),
+        harness
+            .oauth_device_code_repo
             .update_device_token_with_token_params_part(
                 &not_saved_token_device_code,
                 &device_token_params_part
             )
             .await,
-        Err(UpdateDeviceCodeWithTokenParamsPartError::NotFound(e)) if e.device_code == not_saved_token_device_code
     );
 
-    let new_saved_device_token = {
-        let now = Utc::now();
-        let new_token = DeviceTokenCreated {
-            device_code: not_saved_token_device_code,
-            created_at: now,
-            expires_at: now + Duration::minutes(5),
-        };
-
-        assert_matches!(
-            oauth_device_code_repo.save_device_code(&new_token).await,
-            Ok(_)
-        );
-
-        new_token
-    };
+    let [device_token] = harness
+        .make_saved_device_tokens_from_expired_time_points([Utc::now() + Duration::minutes(5)])
+        .await;
 
     assert_matches!(
-        oauth_device_code_repo
+        harness
+            .oauth_device_code_repo
             .update_device_token_with_token_params_part(
-                &new_saved_device_token.device_code,
+                device_token.device_code(),
                 &device_token_params_part
             )
             .await,
@@ -108,80 +97,40 @@ pub async fn test_update_device_token_with_token_params_part(catalog: &dill::Cat
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_find_device_token_by_device_code(catalog: &dill::Catalog) {
-    let oauth_device_code_repo = catalog.get_one::<dyn OAuthDeviceCodeRepository>().unwrap();
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let harness = OAuthDeviceCodeRepositoryTestSuiteHarness::new(catalog);
 
     let not_saved_token_device_code = DeviceCode::new_uuid_v4();
 
     assert_matches!(
-        oauth_device_code_repo
+        harness.oauth_device_code_repo
             .find_device_token_by_device_code(&not_saved_token_device_code)
             .await,
         Err(FindDeviceTokenByDeviceCodeError::NotFound(e)) if e.device_code == not_saved_token_device_code
     );
 
-    let new_device_token = {
-        let now = Utc::now();
-
-        DeviceTokenCreated {
-            device_code: not_saved_token_device_code,
-            created_at: now,
-            expires_at: now + Duration::minutes(5),
-        }
-    };
-
-    assert_matches!(
-        oauth_device_code_repo
-            .save_device_code(&new_device_token)
-            .await,
-        Ok(_)
-    );
-
-    let device_token = DeviceToken::DeviceCodeCreated(new_device_token);
+    let [device_token] = harness
+        .make_saved_device_tokens_from_expired_time_points([Utc::now() + Duration::minutes(5)])
+        .await;
 
     pretty_assertions::assert_eq!(
         Ok(&device_token),
-        oauth_device_code_repo
+        harness
+            .oauth_device_code_repo
             .find_device_token_by_device_code(device_token.device_code())
             .await
             .as_ref()
     );
 
-    let account_id = {
-        let account = make_test_account(
-            "test",
-            "test@example.com",
-            kamu_adapter_oauth::PROVIDER_GITHUB,
-            "test",
-        );
-
-        assert_matches!(account_repo.create_account(&account).await, Ok(_));
-
-        account.id
-    };
-    let device_token_params_part = DeviceTokenParamsPart {
-        iat: 100,
-        exp: 500,
-        account_id,
-    };
-
-    assert_matches!(
-        oauth_device_code_repo
-            .update_device_token_with_token_params_part(
-                device_token.device_code(),
-                &device_token_params_part
-            )
-            .await,
-        Ok(_)
-    );
-
-    let device_token_with_issued_token =
-        device_token.with_token_params_part(device_token_params_part);
+    let [user] = harness.create_accounts(["user"]).await;
+    let [device_token_with_access_token] = harness
+        .issue_access_tokens_for_device_tokens([(device_token, user)])
+        .await;
 
     pretty_assertions::assert_eq!(
-        Ok(&device_token_with_issued_token),
-        oauth_device_code_repo
-            .find_device_token_by_device_code(device_token_with_issued_token.device_code())
+        Ok(&device_token_with_access_token),
+        harness
+            .oauth_device_code_repo
+            .find_device_token_by_device_code(device_token_with_access_token.device_code())
             .await
             .as_ref()
     );
@@ -190,8 +139,7 @@ pub async fn test_find_device_token_by_device_code(catalog: &dill::Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_cleanup_expired_device_codes(catalog: &dill::Catalog) {
-    let oauth_device_code_repo = catalog.get_one::<dyn OAuthDeviceCodeRepository>().unwrap();
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let harness = OAuthDeviceCodeRepositoryTestSuiteHarness::new(catalog);
 
     let half_period = DEVICE_CODE_EXPIRES_IN_5_MINUTES / 2;
 
@@ -212,255 +160,251 @@ pub async fn test_cleanup_expired_device_codes(catalog: &dill::Catalog) {
     // Guarantee that device tokens will be exactly expired at the time of the event
     let expire_drift = Duration::seconds(5);
 
-    let [token_1_t2, token_2_t3, token_3_t3, token_4_t4] =
-        make_saved_device_tokens_from_expired_time_points(
-            oauth_device_code_repo.as_ref(),
-            [
-                t2 - expire_drift,
-                t3 - expire_drift,
-                t3 - expire_drift,
-                t4 - expire_drift,
-            ],
-        )
+    let [token_1_t2, token_2_t3, token_3_t3, token_4_t4] = harness
+        .make_saved_device_tokens_from_expired_time_points([
+            t2 - expire_drift,
+            t3 - expire_drift,
+            t3 - expire_drift,
+            t4 - expire_drift,
+        ])
         .await;
 
     pretty_assertions::assert_eq!(
         [true, true, true, true],
-        are_tokens_exist(
-            oauth_device_code_repo.as_ref(),
-            [&token_1_t2, &token_2_t3, &token_3_t3, &token_4_t4]
-        )
-        .await
+        harness
+            .are_device_tokens_exist([&token_1_t2, &token_2_t3, &token_3_t3, &token_4_t4])
+            .await
     );
 
     // t0
     {
-        cleanup_expired_device_tokens_at_time(oauth_device_code_repo.as_ref(), t0, "t0").await;
+        harness
+            .cleanup_expired_device_tokens_at_time(t0, "t0")
+            .await;
 
         pretty_assertions::assert_eq!(
             [true, true, true, true],
-            are_tokens_exist(
-                oauth_device_code_repo.as_ref(),
-                [&token_1_t2, &token_2_t3, &token_3_t3, &token_4_t4]
-            )
-            .await
+            harness
+                .are_device_tokens_exist([&token_1_t2, &token_2_t3, &token_3_t3, &token_4_t4])
+                .await
         );
     }
 
     // t1
     {
-        cleanup_expired_device_tokens_at_time(oauth_device_code_repo.as_ref(), t1, "t1").await;
+        harness
+            .cleanup_expired_device_tokens_at_time(t1, "t1")
+            .await;
 
         pretty_assertions::assert_eq!(
             [true, true, true, true],
-            are_tokens_exist(
-                oauth_device_code_repo.as_ref(),
-                [&token_1_t2, &token_2_t3, &token_3_t3, &token_4_t4]
-            )
-            .await
+            harness
+                .are_device_tokens_exist([&token_1_t2, &token_2_t3, &token_3_t3, &token_4_t4])
+                .await
         );
     }
 
-    let [user1, user2] = create_accounts(account_repo.as_ref(), ["user1", "user2"]).await;
-    let [token_3_t3_with_access_token, token_4_t4_with_access_token] =
-        issue_access_tokens_for_device_tokens(
-            oauth_device_code_repo.as_ref(),
-            [(token_3_t3, user1), (token_4_t4, user2)],
-        )
+    let [user1, user2] = harness.create_accounts(["user1", "user2"]).await;
+    let [token_3_t3_with_access_token, token_4_t4_with_access_token] = harness
+        .issue_access_tokens_for_device_tokens([(token_3_t3, user1), (token_4_t4, user2)])
         .await;
 
     // t2
     {
-        cleanup_expired_device_tokens_at_time(oauth_device_code_repo.as_ref(), t2, "t2").await;
+        harness
+            .cleanup_expired_device_tokens_at_time(t2, "t2")
+            .await;
 
         pretty_assertions::assert_eq!(
             [false, true, true, true],
-            are_tokens_exist(
-                oauth_device_code_repo.as_ref(),
-                [
+            harness
+                .are_device_tokens_exist([
                     &token_1_t2,
                     &token_2_t3,
                     &token_3_t3_with_access_token,
                     &token_4_t4_with_access_token
-                ]
-            )
-            .await
+                ])
+                .await
         );
     }
 
     // t3
     {
-        cleanup_expired_device_tokens_at_time(oauth_device_code_repo.as_ref(), t3, "t3").await;
+        harness
+            .cleanup_expired_device_tokens_at_time(t3, "t3")
+            .await;
 
         pretty_assertions::assert_eq!(
             [false, false, false, true],
-            are_tokens_exist(
-                oauth_device_code_repo.as_ref(),
-                [
+            harness
+                .are_device_tokens_exist([
                     &token_1_t2,
                     &token_2_t3,
                     &token_3_t3_with_access_token,
                     &token_4_t4_with_access_token
-                ]
-            )
-            .await
+                ])
+                .await
         );
     }
 
     // t4
     {
-        cleanup_expired_device_tokens_at_time(oauth_device_code_repo.as_ref(), t4, "t4").await;
+        harness
+            .cleanup_expired_device_tokens_at_time(t4, "t4")
+            .await;
 
         pretty_assertions::assert_eq!(
             [false, false, false, false],
-            are_tokens_exist(
-                oauth_device_code_repo.as_ref(),
-                [
+            harness
+                .are_device_tokens_exist([
                     &token_1_t2,
                     &token_2_t3,
                     &token_3_t3_with_access_token,
                     &token_4_t4_with_access_token
-                ]
-            )
-            .await
+                ])
+                .await
         );
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
+// Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn make_saved_device_tokens_from_expired_time_points<const N: usize>(
-    oauth_device_code_repo: &dyn OAuthDeviceCodeRepository,
-    expired_at: [DateTime<Utc>; N],
-) -> [DeviceToken; N] {
-    use std::mem::MaybeUninit;
+struct OAuthDeviceCodeRepositoryTestSuiteHarness {
+    pub oauth_device_code_repo: Arc<dyn OAuthDeviceCodeRepository>,
+    pub account_repo: Arc<dyn AccountRepository>,
+}
 
-    let mut device_tokens: [MaybeUninit<DeviceToken>; N] = MaybeUninit::uninit_array();
+impl OAuthDeviceCodeRepositoryTestSuiteHarness {
+    pub fn new(catalog: &dill::Catalog) -> Self {
+        Self {
+            oauth_device_code_repo: catalog.get_one().unwrap(),
+            account_repo: catalog.get_one().unwrap(),
+        }
+    }
 
-    for (i, t) in expired_at.into_iter().enumerate() {
-        let new_token = DeviceTokenCreated {
-            device_code: DeviceCode::new_uuid_v4(),
-            created_at: t - DEVICE_CODE_EXPIRES_IN_5_MINUTES,
-            expires_at: t,
-        };
+    pub async fn make_saved_device_tokens_from_expired_time_points<const N: usize>(
+        &self,
+        expired_at: [DateTime<Utc>; N],
+    ) -> [DeviceToken; N] {
+        use std::mem::MaybeUninit;
 
+        let mut device_tokens: [MaybeUninit<DeviceToken>; N] = MaybeUninit::uninit_array();
+
+        for (i, t) in expired_at.into_iter().enumerate() {
+            let new_token = DeviceTokenCreated {
+                device_code: DeviceCode::new_uuid_v4(),
+                created_at: t - DEVICE_CODE_EXPIRES_IN_5_MINUTES,
+                expires_at: t,
+            };
+
+            assert_matches!(
+                self.oauth_device_code_repo
+                    .save_device_code(&new_token)
+                    .await,
+                Ok(_),
+                "Tag: {i}",
+            );
+
+            device_tokens[i].write(new_token.into());
+        }
+
+        unsafe { device_tokens.map(|item| item.assume_init()) }
+    }
+
+    pub async fn are_device_tokens_exist<const N: usize>(
+        &self,
+        device_tokens: [&DeviceToken; N],
+    ) -> [bool; N] {
+        let mut report = [true; N];
+
+        for (i, device_token) in device_tokens.iter().enumerate() {
+            let exists = match self
+                .oauth_device_code_repo
+                .find_device_token_by_device_code(device_token.device_code())
+                .await
+            {
+                Ok(_) => true,
+                Err(FindDeviceTokenByDeviceCodeError::NotFound(_)) => false,
+                e => panic!("Unexpected error: {e:?}"),
+            };
+
+            report[i] = exists;
+        }
+
+        report
+    }
+
+    pub async fn create_accounts<const N: usize>(&self, account_names: [&str; N]) -> [Account; N] {
+        use std::mem::MaybeUninit;
+
+        let mut accounts: [MaybeUninit<Account>; N] = MaybeUninit::uninit_array();
+
+        for (i, account_name) in account_names.into_iter().enumerate() {
+            let new_account = make_test_account(
+                account_name,
+                &format!("{account_name}@example.com"),
+                kamu_adapter_oauth::PROVIDER_GITHUB,
+                account_name,
+            );
+
+            assert_matches!(
+                self.account_repo.create_account(&new_account).await,
+                Ok(_),
+                "Tag: {account_name}",
+            );
+
+            accounts[i].write(new_account);
+        }
+
+        unsafe { accounts.map(|item| item.assume_init()) }
+    }
+
+    pub async fn issue_access_tokens_for_device_tokens<const N: usize>(
+        &self,
+        device_token_and_account: [(DeviceToken, Account); N],
+    ) -> [DeviceToken; N] {
+        use std::mem::MaybeUninit;
+
+        let mut device_tokens: [MaybeUninit<DeviceToken>; N] = MaybeUninit::uninit_array();
+
+        for (i, (device_token, account)) in device_token_and_account.into_iter().enumerate() {
+            let device_token_params_part = DeviceTokenParamsPart {
+                iat: 100,
+                exp: 500,
+                account_id: account.id,
+            };
+
+            assert_matches!(
+                self.oauth_device_code_repo
+                    .update_device_token_with_token_params_part(
+                        device_token.device_code(),
+                        &device_token_params_part
+                    )
+                    .await,
+                Ok(_),
+                "Tag: {}",
+                account.account_name
+            );
+
+            let device_token = device_token.with_token_params_part(device_token_params_part);
+
+            device_tokens[i].write(device_token);
+        }
+
+        unsafe { device_tokens.map(|item| item.assume_init()) }
+    }
+
+    async fn cleanup_expired_device_tokens_at_time(&self, t: DateTime<Utc>, tag: &str) {
         assert_matches!(
-            oauth_device_code_repo.save_device_code(&new_token).await,
-            Ok(_),
-            "Tag: {i}",
-        );
-
-        device_tokens[i].write(new_token.into());
-    }
-
-    unsafe { device_tokens.map(|item| item.assume_init()) }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn are_tokens_exist<const N: usize>(
-    oauth_device_code_repo: &dyn OAuthDeviceCodeRepository,
-    device_tokens: [&DeviceToken; N],
-) -> [bool; N] {
-    let mut report = [true; N];
-
-    for (i, device_token) in device_tokens.iter().enumerate() {
-        let exists = match oauth_device_code_repo
-            .find_device_token_by_device_code(device_token.device_code())
-            .await
-        {
-            Ok(_) => true,
-            Err(FindDeviceTokenByDeviceCodeError::NotFound(_)) => false,
-            e => panic!("Unexpected error: {e:?}"),
-        };
-
-        report[i] = exists;
-    }
-
-    report
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn create_accounts<const N: usize>(
-    account_repo: &dyn AccountRepository,
-    account_names: [&str; N],
-) -> [Account; N] {
-    use std::mem::MaybeUninit;
-
-    let mut accounts: [MaybeUninit<Account>; N] = MaybeUninit::uninit_array();
-
-    for (i, account_name) in account_names.into_iter().enumerate() {
-        let new_account = make_test_account(
-            account_name,
-            &format!("{account_name}@example.com"),
-            kamu_adapter_oauth::PROVIDER_GITHUB,
-            account_name,
-        );
-
-        assert_matches!(
-            account_repo.create_account(&new_account).await,
-            Ok(_),
-            "Tag: {account_name}",
-        );
-
-        accounts[i].write(new_account);
-    }
-
-    unsafe { accounts.map(|item| item.assume_init()) }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn issue_access_tokens_for_device_tokens<const N: usize>(
-    oauth_device_code_repo: &dyn OAuthDeviceCodeRepository,
-    device_token_and_account: [(DeviceToken, Account); N],
-) -> [DeviceToken; N] {
-    use std::mem::MaybeUninit;
-
-    let mut device_tokens: [MaybeUninit<DeviceToken>; N] = MaybeUninit::uninit_array();
-
-    for (i, (device_token, account)) in device_token_and_account.into_iter().enumerate() {
-        let device_token_params_part = DeviceTokenParamsPart {
-            iat: 100,
-            exp: 500,
-            account_id: account.id,
-        };
-
-        assert_matches!(
-            oauth_device_code_repo
-                .update_device_token_with_token_params_part(
-                    device_token.device_code(),
-                    &device_token_params_part
-                )
+            self.oauth_device_code_repo
+                .cleanup_expired_device_codes(t)
                 .await,
             Ok(_),
-            "Tag: {}",
-            account.account_name
+            "Tag: {tag}",
         );
-
-        let device_token = device_token.with_token_params_part(device_token_params_part);
-
-        device_tokens[i].write(device_token);
     }
-
-    unsafe { device_tokens.map(|item| item.assume_init()) }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn cleanup_expired_device_tokens_at_time(
-    oauth_device_code_repo: &dyn OAuthDeviceCodeRepository,
-    t: DateTime<Utc>,
-    tag: &str,
-) {
-    assert_matches!(
-        oauth_device_code_repo.cleanup_expired_device_codes(t).await,
-        Ok(_),
-        "Tag: {tag}",
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
