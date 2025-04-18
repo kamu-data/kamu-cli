@@ -197,6 +197,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let cli_catalog = configure_cli_catalog(
             maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog),
             tenancy_config,
+            is_e2e_testing,
         )
         .add_value(current_account.to_current_account_subject())
         .build();
@@ -482,9 +483,11 @@ pub fn configure_base_catalog(
         }
     }
 
-    kamu_accounts_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
-
-    odf_server::register_dependencies(&mut b);
+    kamu_accounts_services::register_dependencies(
+        &mut b,
+        workspace_status.is_indexing_needed(),
+        !is_e2e_testing,
+    );
 
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
     kamu_datasets_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());

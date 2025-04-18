@@ -13,7 +13,11 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder, needs_indexing: bool) {
+pub fn register_dependencies(
+    catalog_builder: &mut CatalogBuilder,
+    needs_indexing: bool,
+    production: bool,
+) {
     catalog_builder.add::<AccessTokenServiceImpl>();
     catalog_builder.add::<AccountServiceImpl>();
     catalog_builder.add::<AuthenticationServiceImpl>();
@@ -22,6 +26,12 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder, needs_indexin
 
     if needs_indexing {
         catalog_builder.add::<OAuthDeviceCodeServiceImpl>();
+
+        if production {
+            catalog_builder.add::<OAuthDeviceCodeGeneratorDefault>();
+        } else {
+            catalog_builder.add::<PredefinedOAuthDeviceCodeGenerator>();
+        }
     }
 }
 

@@ -21,6 +21,7 @@ use kamu_accounts::{
     DeviceTokenCreated,
     DeviceTokenParamsPart,
     FindDeviceTokenByDeviceCodeError,
+    OAuthDeviceCodeGenerator,
     OAuthDeviceCodeRepository,
     OAuthDeviceCodeService,
     UpdateDeviceCodeWithTokenParamsPartError,
@@ -43,6 +44,7 @@ pub const DEVICE_CODE_EXPIRES_IN_5_MINUTES: Duration = Duration::minutes(5);
     requires_transaction: true,
 })]
 pub struct OAuthDeviceCodeServiceImpl {
+    oauth_device_code_generator: Arc<dyn OAuthDeviceCodeGenerator>,
     oauth_device_code_repo: Arc<dyn OAuthDeviceCodeRepository>,
     time_source: Arc<dyn SystemTimeSource>,
 }
@@ -51,10 +53,12 @@ pub struct OAuthDeviceCodeServiceImpl {
 impl OAuthDeviceCodeService for OAuthDeviceCodeServiceImpl {
     async fn create_device_code(
         &self,
-        _client_id: &DeviceClientId,
+        client_id: &DeviceClientId,
     ) -> Result<DeviceTokenCreated, CreateDeviceCodeError> {
         let device_token_created = {
-            let device_code = DeviceCode::new_uuid_v4();
+            let device_code = self
+                .oauth_device_code_generator
+                .generate_device_code(client_id);
             let created_at = self.time_source.now();
             let expires_at = created_at + DEVICE_CODE_EXPIRES_IN_5_MINUTES;
 
