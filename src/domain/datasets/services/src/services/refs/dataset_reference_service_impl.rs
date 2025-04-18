@@ -43,7 +43,7 @@ use messaging_outbox::{
         MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
-    initial_consumer_boundary: InitialConsumerBoundary::All,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetReferenceServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,

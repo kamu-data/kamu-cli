@@ -44,7 +44,7 @@ pub struct RebacDatasetLifecycleMessageConsumer {
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
-    initial_consumer_boundary: InitialConsumerBoundary::All,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl RebacDatasetLifecycleMessageConsumer {
     pub fn new(

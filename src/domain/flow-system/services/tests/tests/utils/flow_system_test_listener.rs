@@ -53,7 +53,7 @@ struct FlowSystemTestListenerState {
     consumer_name: "FlowSystemTestListener",
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_AGENT, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE],
     delivery: MessageDeliveryMechanism::Immediate,
-    initial_consumer_boundary: InitialConsumerBoundary::All,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl FlowSystemTestListener {
     pub(crate) fn new(

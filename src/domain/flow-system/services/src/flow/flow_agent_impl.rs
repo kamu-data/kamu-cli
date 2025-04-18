@@ -74,7 +74,7 @@ pub struct FlowAgentImpl {
         MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
-    initial_consumer_boundary: InitialConsumerBoundary::All,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {

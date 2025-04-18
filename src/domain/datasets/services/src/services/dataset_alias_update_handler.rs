@@ -31,7 +31,7 @@ use messaging_outbox::*;
     ],
     // Only write aliases after reference transaction succeeds!
     delivery: MessageDeliveryMechanism::Transactional,
-    initial_consumer_boundary: InitialConsumerBoundary::All,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetAliasUpdateHandler {
     dataset_registry: Arc<dyn DatasetRegistry>,

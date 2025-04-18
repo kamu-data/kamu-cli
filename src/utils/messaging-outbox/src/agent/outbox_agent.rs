@@ -166,6 +166,8 @@ impl OutboxAgent {
             .try_collect::<Vec<_>>()
             .await?;
 
+        // Fetch latest messages produced by each producer to use as default for new
+        // consumers with InitialConsumerBoundary::Latest property
         let latest_message_ids_by_producer = {
             let latest_message_ids_by_producer = outbox_message_repository
                 .get_latest_message_ids_by_producer()
@@ -188,6 +190,9 @@ impl OutboxAgent {
                 latest_message_ids_by_producer.get(producer_name);
             for consumer_name in consumer_names {
                 if !matched_consumptions.contains(&(producer_name, consumer_name)) {
+                    // If consumer is not yet registered, and InitialConsumerBoundary is Latest,
+                    // we set the last consumed message ID to the latest produced message ID
+                    // otherwise, we set it to 0
                     let last_consumed_message_id = if let Some(consumer_metadata) =
                         particular_consumer_metadata_for(&self.catalog, consumer_name)
                         && consumer_metadata.initial_consumer_boundary

@@ -35,7 +35,7 @@ pub(crate) struct FlowConfigTestListener {
     consumer_name: "FlowConfigTestListener",
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE],
     delivery: MessageDeliveryMechanism::Immediate,
-    initial_consumer_boundary: InitialConsumerBoundary::All,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl FlowConfigTestListener {
     pub fn new() -> Self {

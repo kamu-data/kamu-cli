@@ -48,7 +48,7 @@ pub struct FlowTriggerServiceImpl {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_TRIGGER_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_DATASET_SERVICE],
     delivery: MessageDeliveryMechanism::Transactional,
-    initial_consumer_boundary: InitialConsumerBoundary::All,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl FlowTriggerServiceImpl {
     pub fn new(
