@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- Updated `sqlx` crate to `0.8.5`
 ### Fixed
 - `kamu init`: in case of using `--pull-images` argument, fixed unclear error with not found file.
 - CLI commands: Trigger `outbox_agent` method only for commands that require it.
