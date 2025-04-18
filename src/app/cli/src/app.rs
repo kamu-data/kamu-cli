@@ -557,8 +557,6 @@ pub fn configure_cli_catalog(
     );
     b.add::<ConfirmDeleteService>();
 
-    odf_server::register_dependencies(&mut b, is_e2e_testing);
-
     b
 }
 
