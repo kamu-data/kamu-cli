@@ -14,6 +14,7 @@ use internal_error::InternalError;
 use kamu_flow_system::FlowTriggerUpdatedMessage;
 use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE;
 use messaging_outbox::{
+    InitialConsumerBoundary,
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
@@ -34,6 +35,7 @@ pub(crate) struct FlowTriggerTestListener {
     consumer_name: "FlowTriggerTestListener",
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE],
     delivery: MessageDeliveryMechanism::Immediate,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl FlowTriggerTestListener {
     pub fn new() -> Self {
