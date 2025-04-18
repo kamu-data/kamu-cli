@@ -489,14 +489,14 @@ async fn test_data_query_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620235d6ccf228130db950b89a874d53e136e316f5edb47df0dfc7f30ab5d3254bc",
+                    "inputHash": "f1620eff0958108b69c22e564b51059c199a81aa4645bad6bf316c305a4f6a7246333",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uki98T-eH_HotKUTOB0JH8YFGNFFUHXDIyQJIBZlfWa4_K4O7Hv776IlWXiShjlGmkFgmQBRxoUEP4WLNKnKCDg",
+                    "proofValue": "u-OKQSymKgKkT57ERW_rY2hTHTDWgUZpwRhSJlFVvLm5KD9pilgehNbwjuA4QvUDYsUgqiPq2f_LrGl3CpJe4CA",
                 }
             }),
             response
@@ -647,14 +647,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f162071b794eaea8fd42cefad188f7cd5aa55778f4098f3217365aae28cf2dc6221a7",
+                    "inputHash": "f16208d66ab91456e3a5872efcfcda8e695cf0ae58d4bca1be38205a30883ac5c63ca",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u78JDIFOSevVAnYY0ZgAT9SCHC_GQ9m1rpFspwDA2xdcOBvX5ptbE6Pfj8GSc30iA0U3k-nxQxCTtoU5KE6utDA",
+                    "proofValue": "u3MgIfrgWHjr89cAYXovpcJTu85OPabzsVLOJscahU8iTMi5K3hyX_-UOm9AxJ6yTpNHLszBPB1Un4WN1tt0gBw",
                 }
             }),
             response
