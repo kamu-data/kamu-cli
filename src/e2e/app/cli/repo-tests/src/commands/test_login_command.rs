@@ -104,6 +104,24 @@ pub async fn test_login_interactive_successful_mt(kamu_node_api_client: KamuApiS
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_login_interactive_device_code_expired
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_interactive_device_code_expired_st(
+    kamu_node_api_client: KamuApiServerClient,
+) {
+    test_login_interactive_device_code_expired(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_interactive_device_code_expired_mt(
+    kamu_node_api_client: KamuApiServerClient,
+) {
+    test_login_interactive_device_code_expired(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -539,6 +557,34 @@ async fn test_login_interactive_successful(
     };
 
     tokio::join!(kamu_cli_login_future, ui_login_simulation_future);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_login_interactive_device_code_expired(
+    kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
+    let kamu_node_url = kamu_node_api_client.get_base_url().to_string();
+    let e2e_output_data_path = kamu.get_e2e_output_data_path();
+
+    kamu.assert_failure_command_execution(
+        [
+            "--e2e-output-data-path",
+            e2e_output_data_path.to_str().unwrap(),
+            "login",
+            "http://example.com",
+            "--predefined-odf-backend-url",
+            kamu_node_url.as_str(),
+        ],
+        None,
+        Some([
+            "Error: Did not obtain access token. Reason: Device authorization expired after 10 \
+             seconds",
+        ]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

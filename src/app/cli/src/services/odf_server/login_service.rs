@@ -97,7 +97,7 @@ impl LoginService {
 
         // Start polling
         let expires_in_seconds = if self.is_e2e_testing {
-            30
+            10
         } else {
             device_authorization_response.expires_in
         };
