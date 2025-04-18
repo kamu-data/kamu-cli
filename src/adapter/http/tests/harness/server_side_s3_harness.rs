@@ -17,7 +17,11 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryOAuthDeviceCodeRepository,
+};
 use kamu_accounts_services::*;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
@@ -140,7 +144,10 @@ impl ServerSideS3Harness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
-                .add_value(predefined_accounts_config);
+                .add_value(predefined_accounts_config)
+                .add::<OAuthDeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeGeneratorDefault>()
+                .add::<InMemoryOAuthDeviceCodeRepository>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

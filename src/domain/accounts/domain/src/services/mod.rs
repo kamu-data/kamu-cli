@@ -13,6 +13,9 @@ mod authentication_config;
 mod authentication_errors;
 mod authentication_provider;
 mod authentication_service;
+mod jwt_token_issuer;
+mod oauth_device_code_generator;
+mod oauth_device_code_service;
 
 pub use access_token_service::*;
 pub use account_service::*;
@@ -20,3 +23,6 @@ pub use authentication_config::*;
 pub use authentication_errors::*;
 pub use authentication_provider::*;
 pub use authentication_service::*;
+pub use jwt_token_issuer::*;
+pub use oauth_device_code_generator::*;
+pub use oauth_device_code_service::*;

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO oauth_device_codes(device_code, device_code_created_at, device_code_expires_at)\n            VALUES ($1, $2, $3);\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0ac62a5e0f5c820f5678ec4cff2514b56d979a682c7107b544219372b8c8a2a2"
+}

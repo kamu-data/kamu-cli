@@ -14,15 +14,26 @@ use database_common::NoOpDatabasePlugin;
 use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::ServerUrlConfig;
-use kamu_accounts::{JwtAuthenticationConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_ID};
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts::{
+    JwtAuthenticationConfig,
+    JwtTokenIssuer,
+    PredefinedAccountsConfig,
+    DEFAULT_ACCOUNT_ID,
+};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryOAuthDeviceCodeRepository,
+};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
+    OAuthDeviceCodeGeneratorDefault,
+    OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::{FileUploadLimitConfig, UploadContext, UploadServiceS3};
+use kamu_adapter_http::platform::{FileUploadLimitConfig, UploadContext, UploadServiceS3};
 use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use s3_utils::S3Context;
@@ -67,7 +78,10 @@ impl Harness {
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add_builder(UploadServiceS3::builder(s3_upload_context.clone()))
                 .add::<PredefinedAccountsRegistrator>()
-                .add::<DummyOutboxImpl>();
+                .add::<DummyOutboxImpl>()
+                .add::<OAuthDeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeGeneratorDefault>()
+                .add::<InMemoryOAuthDeviceCodeRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -94,8 +108,9 @@ impl Harness {
 
     fn make_access_token(&self, account_id: &odf::AccountID) -> String {
         self.authentication_service
-            .make_access_token(account_id, 60)
+            .make_access_token_from_account_id(account_id, 60)
             .unwrap()
+            .into_inner()
     }
 
     fn upload_prepare_url(&self, file_name: &str, content_type: &str, file_size: usize) -> String {

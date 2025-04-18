@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE oauth_device_codes\n            SET token_iat  = $2,\n                token_exp  = $3,\n                account_id = $4\n            WHERE device_code = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "9e48ebf93d04eaeee378b44a91e40016244eb29b54e2068105517d192181c289"
+}

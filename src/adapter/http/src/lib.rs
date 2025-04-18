@@ -20,13 +20,12 @@ mod axum_utils;
 pub mod data;
 #[cfg(feature = "e2e")]
 pub mod e2e;
-mod simple_protocol;
-pub mod smart_protocol;
-mod upload;
-mod ws_common;
-pub use upload::*;
 pub mod general;
 pub mod openapi;
+pub mod platform;
+mod simple_protocol;
+pub mod smart_protocol;
+mod ws_common;
 
 pub type SmartTransferProtocolClientWs =
     smart_protocol::ws_tungstenite_client::WsSmartTransferProtocolClient;

@@ -39,7 +39,7 @@ impl Deref for OSPath {
 impl ScalarType for OSPath {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
-            let v = PathBuf::from_str(value.as_str()).unwrap();
+            let v = PathBuf::from_str(value.as_str())?;
             Ok(v.into())
         } else {
             Err(InputValueError::expected_type(value))

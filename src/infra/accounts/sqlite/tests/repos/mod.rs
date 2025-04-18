@@ -9,4 +9,5 @@
 
 mod test_sqlite_access_token_repository;
 mod test_sqlite_account_repository;
+mod test_sqlite_oauth_device_code_repository;
 mod test_sqlite_password_hash_repository;

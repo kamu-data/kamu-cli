@@ -16,6 +16,7 @@ use crate::{
     AccessTokenError,
     Account,
     AuthenticationService,
+    DeviceCode,
     GetAccountInfoError,
     LoginError,
     LoginResponse,
@@ -41,6 +42,7 @@ mockall::mock! {
             &self,
             login_method: &str,
             login_credentials_json: String,
+            device_code: Option<DeviceCode>,
         ) -> Result<LoginResponse, LoginError>;
 
         async fn account_by_token(
@@ -57,8 +59,8 @@ impl MockAuthenticationService {
         let mut mock_authentication_service = MockAuthenticationService::new();
         mock_authentication_service
             .expect_login()
-            .with(eq(DUMMY_LOGIN_METHOD), always())
-            .returning(|_, _| {
+            .with(eq(DUMMY_LOGIN_METHOD), always(), always())
+            .returning(|_, _, _| {
                 Ok(LoginResponse {
                     access_token: DUMMY_ACCESS_TOKEN.to_string(),
                     account_id: DEFAULT_ACCOUNT_ID.clone(),
@@ -76,8 +78,8 @@ impl MockAuthenticationService {
         let mut mock_authentication_service = MockAuthenticationService::new();
         mock_authentication_service
             .expect_login()
-            .with(eq(DUMMY_LOGIN_METHOD), always())
-            .returning(|_, _| {
+            .with(eq(DUMMY_LOGIN_METHOD), always(), always())
+            .returning(|_, _, _| {
                 Err(LoginError::UnsupportedMethod(UnsupportedLoginMethodError {
                     method: DUMMY_LOGIN_METHOD.to_string(),
                 }))

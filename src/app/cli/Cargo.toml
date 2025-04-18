@@ -110,7 +110,6 @@ chrono-humanize = "0.2"                                           # Human readab
 clap = "4"
 clap_complete = "4"
 console = "0.15"                                                  # Terminal colors
-ctrlc = "3"                                                       # Ctrl+C handler
 humansize = "2"                                                   # Human readable data sizes
 indicatif = "0.17"                                                # Progress bars and spinners
 minus = { version = "5", features = ["static_output", "search"] }

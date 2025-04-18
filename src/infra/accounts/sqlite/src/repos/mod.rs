@@ -9,6 +9,8 @@
 
 mod sqlite_access_token_repository;
 mod sqlite_account_repository;
+mod sqlite_oauth_device_code_repository;
 
 pub use sqlite_access_token_repository::*;
 pub use sqlite_account_repository::*;
+pub use sqlite_oauth_device_code_repository::*;

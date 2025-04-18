@@ -21,7 +21,8 @@ use http_common::ApiError;
 use internal_error::*;
 use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_adapter_http::e2e::e2e_router;
-use kamu_adapter_http::{DatasetAuthorizationLayer, FileUploadLimitConfig};
+use kamu_adapter_http::platform::FileUploadLimitConfig;
+use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_flow_system_inmem::domain::FlowAgent;
 use kamu_task_system_inmem::domain::TaskAgent;
 use messaging_outbox::OutboxAgent;
@@ -29,7 +30,6 @@ use observability::axum::unknown_fallback_handler;
 use tokio::sync::Notify;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
 
 use super::{UIConfiguration, UIFeatureFlags};
 
@@ -141,17 +141,9 @@ impl APIServer {
             "Kamu API Server".to_string(),
             format!("v{} embedded", crate::VERSION),
         ).into())
-        .routes(routes!(kamu_adapter_http::platform_login_handler))
-        .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
-        .routes(routes!(
-            kamu_adapter_http::platform_file_upload_prepare_post_handler
-        ))
-        .routes(routes!(
-            kamu_adapter_http::platform_file_upload_post_handler,
-            kamu_adapter_http::platform_file_upload_get_handler
-        ))
         .merge(kamu_adapter_http::data::root_router())
         .merge(kamu_adapter_http::general::root_router())
+        .nest("/platform", kamu_adapter_http::platform::root_router())
         .nest(
             "/odata",
             match tenancy_config {

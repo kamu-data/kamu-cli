@@ -8,7 +8,6 @@ cp -f .kamuconfig .kamu/
 (
     cd ./snapshots/alice
 
-
     kamu --account alice add --visibility public 1pub2.yaml
     kamu --account alice add --visibility private 1priv2.yaml
     kamu --account alice add --visibility public 2pub.yaml

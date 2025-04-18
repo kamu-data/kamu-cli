@@ -20,8 +20,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_services::PredefinedAccountsRegistrator;
-use kamu_adapter_http::{FileUploadLimitConfig, UploadServiceLocal};
+use kamu_adapter_http::platform::{FileUploadLimitConfig, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system_inmem::domain::{
     FlowConfigurationUpdatedMessage,
@@ -42,7 +41,6 @@ use tracing::{warn, Instrument};
 use crate::accounts::AccountService;
 use crate::cli::Command;
 use crate::error::*;
-use crate::explore::TraceServer;
 use crate::output::*;
 use crate::{
     build_db_connection_settings,
@@ -52,6 +50,7 @@ use crate::{
     configure_database_components,
     configure_in_memory_components,
     connect_database_initially,
+    explore,
     get_app_database_config,
     move_initial_database_to_workspace_if_needed,
     odf_server,
@@ -336,7 +335,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     if let Some(trace_file) = &output_config.trace_file {
         // Run a web server and open the trace in the browser if the environment allows
-        let _ = TraceServer::maybe_serve_in_browser(trace_file).await;
+        let _ = explore::TraceServer::maybe_serve_in_browser(trace_file).await;
     }
 
     command_result
@@ -474,8 +473,6 @@ pub fn configure_base_catalog(
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
 
-    b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
-
     // No GitHub login possible for single-tenant workspace
     if tenancy_config == TenancyConfig::MultiTenant {
         if is_e2e_testing {
@@ -485,14 +482,13 @@ pub fn configure_base_catalog(
         }
     }
 
-    b.add::<kamu_accounts_services::AuthenticationServiceImpl>();
-    b.add::<kamu_accounts_services::AccessTokenServiceImpl>();
-    b.add::<kamu_accounts_services::AccountServiceImpl>();
-    b.add::<PredefinedAccountsRegistrator>();
+    kamu_accounts_services::register_dependencies(
+        &mut b,
+        workspace_status.is_indexing_needed(),
+        !is_e2e_testing,
+    );
 
-    // Give both CLI and server access to stored repo access tokens
-    b.add::<odf_server::AccessTokenRegistryService>();
-    b.add::<odf_server::CLIAccessTokenStore>();
+    odf_server::register_dependencies(&mut b, is_e2e_testing);
 
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
     kamu_datasets_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
@@ -520,9 +516,7 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxAgent>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
 
-    b.add::<crate::explore::FlightSqlServiceFactory>();
-    b.add::<crate::explore::SparkLivyServerFactory>();
-    b.add::<crate::explore::NotebookServerFactory>();
+    explore::register_dependencies(&mut b);
 
     register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
         &mut b,
@@ -559,7 +553,6 @@ pub fn configure_cli_catalog(
     b.add_builder(
         WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
     );
-    b.add::<odf_server::LoginService>();
     b.add::<ConfirmDeleteService>();
 
     b

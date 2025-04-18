@@ -7,19 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::future::IntoFuture;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::pin::Pin;
 use std::sync::Arc;
 
-use dill::component;
+use chrono::Duration;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::PROVIDER_PASSWORD;
-use kamu_adapter_http::LoginRequestBody;
+use kamu_accounts::{OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE, PROVIDER_PASSWORD};
+use kamu_adapter_http::platform::{
+    DeviceAccessTokenError,
+    DeviceAccessTokenErrorStatus,
+    DeviceAccessTokenResponse,
+    DeviceAuthorizationResponse,
+    LoginRequestBody,
+};
 use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
-use tokio::sync::Notify;
+use time_source::SystemTimeSource;
 use url::Url;
 
 use crate::odf_server;
@@ -29,134 +32,129 @@ use crate::odf_server;
 pub const DEFAULT_ODF_FRONTEND_URL: &str = "https://platform.demo.kamu.dev";
 pub const DEFAULT_ODF_BACKEND_URL: &str = "https://api.demo.kamu.dev";
 
-struct WebServer {
-    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>>,
-    local_addr: SocketAddr,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LoginService {}
+#[dill::component(pub)]
+pub struct LoginService {
+    time_source: Arc<dyn SystemTimeSource>,
 
-#[component(pub)]
+    #[dill::component(explicit)]
+    is_e2e_testing: bool,
+}
+
 impl LoginService {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    #[tracing::instrument(skip_all, fields(%body))]
-    async fn post_handler(
-        axum::extract::State(response_tx): axum::extract::State<
-            tokio::sync::mpsc::Sender<FrontendLoginCallbackResponse>,
-        >,
-        body: String,
-    ) -> impl axum::response::IntoResponse {
-        let response_result = serde_json::from_str::<FrontendLoginCallbackResponse>(body.as_str());
-        match response_result {
-            Ok(response) => {
-                response_tx.send(response).await.unwrap();
-
-                axum::response::Response::builder()
-                    .status(200)
-                    .body("{}".to_string())
-                    .unwrap()
-            }
-            Err(e) => axum::response::Response::builder()
-                .status(400)
-                .body(e.to_string())
-                .unwrap(),
-        }
-    }
-
-    async fn initialize_cli_web_server(
-        &self,
-        server_frontend_url: &Url,
-        response_tx: tokio::sync::mpsc::Sender<FrontendLoginCallbackResponse>,
-    ) -> Result<WebServer, InternalError> {
-        let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
-        let listener = tokio::net::TcpListener::bind(addr).await.int_err()?;
-        let local_addr = listener.local_addr().unwrap();
-
-        let redirect_url = format!(
-            "{}?callbackUrl=http://{}/",
-            server_frontend_url.join("/v/login").unwrap(),
-            local_addr
-        );
-
-        let app = axum::Router::new()
-            .route(
-                "/",
-                axum::routing::get(|| async move {
-                    axum::response::Redirect::permanent(redirect_url.as_str())
-                })
-                .post(Self::post_handler),
-            )
-            .layer(
-                tower::ServiceBuilder::new()
-                    .layer(tower_http::trace::TraceLayer::new_for_http())
-                    .layer(
-                        tower_http::cors::CorsLayer::new()
-                            .allow_origin(tower_http::cors::Any)
-                            .allow_methods(vec![http::Method::GET, http::Method::POST])
-                            .allow_headers(tower_http::cors::Any),
-                    ),
-            )
-            .with_state(response_tx);
-
-        let server_future = Box::pin(axum::serve(listener, app.into_make_service()).into_future());
-
-        Ok(WebServer {
-            server_future,
-            local_addr,
-        })
-    }
-
-    async fn obtain_callback_response(
-        cli_web_server: WebServer,
-        mut response_rx: tokio::sync::mpsc::Receiver<FrontendLoginCallbackResponse>,
-    ) -> Result<Option<FrontendLoginCallbackResponse>, InternalError> {
-        let ctrlc_rx = ctrlc_channel().int_err()?;
-        let cli_web_server = cli_web_server.server_future;
-
-        tokio::select! {
-            maybe_login_response = response_rx.recv() => {
-                tracing::info!(?maybe_login_response, "Shutting down web server, as obtained callback response");
-                Ok(maybe_login_response)
-            }
-            _ = ctrlc_rx.notified() => {
-                tracing::info!("Shutting down web server, as Ctrl+C pressed");
-                Ok(None)
-            }
-            _ = cli_web_server => {
-                tracing::info!("Shutting down web server, as it died first");
-                Ok(None)
-            }
-        }
-    }
+    // We do not use this value, but we are required to pass it.
+    const DEVICE_FLOW_DEFAULT_CLIENT_ID_PARAM: (&'static str, &'static str) = ("client_id", "kamu");
 
     pub async fn login_interactive(
         &self,
         odf_server_frontend_url: &Url,
-        web_server_started_callback: impl Fn(&String) + Send,
-    ) -> Result<FrontendLoginCallbackResponse, LoginError> {
-        let (response_tx, response_rx) =
-            tokio::sync::mpsc::channel::<FrontendLoginCallbackResponse>(1);
+        predefined_odf_server_backend_url: Option<&Url>,
+        login_polling_started_callback: impl Fn(&str) + Send,
+    ) -> Result<LoginInteractiveResponse, LoginError> {
+        // TODO: Replace with REST API client
+        let client = reqwest::Client::new();
 
-        let cli_web_server = self
-            .initialize_cli_web_server(odf_server_frontend_url, response_tx)
+        // Getting the backend address (API)
+        let odf_server_backend_url =
+            if let Some(odf_server_backend_url) = predefined_odf_server_backend_url {
+                odf_server_backend_url.clone()
+            } else {
+                self.odf_server_backend_url(&client, odf_server_frontend_url)
+                    .await?
+            };
+
+        tracing::debug!(url = %odf_server_backend_url, "ODF server backend URL");
+
+        // Authorize the device before we start polling
+        let device_authorization_response = self
+            .device_authorization(&client, &odf_server_backend_url)
             .await?;
 
-        let cli_web_server_url = format!("http://{}", cli_web_server.local_addr);
-        web_server_started_callback(&cli_web_server_url);
-        let _ = webbrowser::open(&cli_web_server_url);
+        tracing::debug!(response = ?device_authorization_response, "Authorization response");
 
-        let maybe_callback_response =
-            Self::obtain_callback_response(cli_web_server, response_rx).await?;
-        maybe_callback_response.ok_or_else(|| {
-            LoginError::AccessFailed(LoginErrorAccessFailed {
-                reason: String::from("No response"),
-            })
-        })
+        let polling_start_time = self.time_source.now();
+        let polling_interval = Duration::seconds(
+            device_authorization_response
+                .interval_or_default()
+                .try_into()
+                .unwrap(),
+        );
+        let polling_url = odf_server_backend_url
+            .join("platform/token/device")
+            .unwrap();
+
+        // Notify the user and open the browser
+        {
+            let login_url = device_authorization_response.verification_uri_with_device_code();
+
+            login_polling_started_callback(&login_url);
+
+            if !self.is_e2e_testing {
+                let _ = webbrowser::open(&login_url);
+            }
+        }
+
+        // Start polling
+        let expires_in_seconds = if self.is_e2e_testing {
+            10
+        } else {
+            device_authorization_response.expires_in
+        };
+
+        loop {
+            let device_access_token_response = self
+                .device_access_token(
+                    &client,
+                    &polling_url,
+                    &device_authorization_response.device_code,
+                )
+                .await?;
+
+            tracing::debug!(response = ?device_access_token_response, "Device access token response");
+
+            match device_access_token_response {
+                DeviceAccessTokenResult::Success(r) => {
+                    return Ok(LoginInteractiveResponse {
+                        access_token: r.access_token,
+                        backend_url: odf_server_backend_url,
+                    })
+                }
+                DeviceAccessTokenResult::Error(r) => {
+                    use DeviceAccessTokenErrorStatus as Status;
+                    match r.message {
+                        Status::AuthorizationPending | Status::SlowDown => {
+                            // Login in progress, continue
+                        }
+                        Status::AccessDenied | Status::ExpiredToken | Status::InvalidGrant => {
+                            return Err(LoginErrorAccessFailed {
+                                reason: format!(
+                                    "Unexpected device access token error: {}",
+                                    r.message
+                                ),
+                            }
+                            .into())
+                        }
+                    }
+                }
+            }
+
+            let elapsed_time_in_seconds: u64 = (self.time_source.now() - polling_start_time)
+                .num_seconds()
+                .try_into()
+                .unwrap();
+
+            if elapsed_time_in_seconds >= expires_in_seconds {
+                return Err(LoginErrorAccessFailed {
+                    reason: format!(
+                        "Device authorization expired after {expires_in_seconds} seconds",
+                    ),
+                }
+                .into());
+            }
+
+            self.time_source.sleep(polling_interval).await;
+        }
     }
 
     pub async fn login_oauth(
@@ -204,6 +202,7 @@ impl LoginService {
         login_method: &str,
         login_credentials_json: String,
     ) -> Result<BackendLoginResponse, LoginError> {
+        // TODO: Replace with REST API client
         let client = reqwest::Client::new();
 
         let login_url = odf_server_backend_url.join("platform/login").unwrap();
@@ -236,6 +235,7 @@ impl LoginService {
         odf_server_backend_url: &Url,
         access_token: &odf_server::AccessToken,
     ) -> Result<(), ValidateAccessTokenError> {
+        // TODO: Replace with REST API client
         let client = reqwest::Client::new();
 
         let validation_url = odf_server_backend_url
@@ -263,9 +263,101 @@ impl LoginService {
                     odf_server_backend_url: odf_server_backend_url.clone(),
                 }))
             }
-            _ => panic!(
+            unexpected_status => panic!(
                 "Unexpected validation status code: {}, details: {}",
-                response.status().as_str(),
+                unexpected_status.as_u16(),
+                response.text().await.unwrap()
+            ),
+        }
+    }
+
+    async fn odf_server_backend_url(
+        &self,
+        client: &reqwest::Client,
+        odf_server_frontend_url: &Url,
+    ) -> Result<Url, InternalError> {
+        let response = client
+            .get(
+                odf_server_frontend_url
+                    .join("assets/runtime-config.json")
+                    .unwrap(),
+            )
+            .send()
+            .await
+            .int_err()?;
+
+        #[derive(Debug, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Response {
+            api_server_http_url: Url,
+        }
+
+        match response.status() {
+            http::StatusCode::OK => Ok(response
+                .json::<Response>()
+                .await
+                .int_err()?
+                .api_server_http_url),
+            unexpected_status => panic!(
+                "Unexpected runtime-config status code: {}, details: {}",
+                unexpected_status.as_u16(),
+                response.text().await.unwrap()
+            ),
+        }
+    }
+
+    async fn device_authorization(
+        &self,
+        client: &reqwest::Client,
+        odf_server_backend_url: &Url,
+    ) -> Result<DeviceAuthorizationResponse, InternalError> {
+        let response = client
+            .post(
+                odf_server_backend_url
+                    .join("platform/token/device/authorization")
+                    .unwrap(),
+            )
+            .form(&[Self::DEVICE_FLOW_DEFAULT_CLIENT_ID_PARAM])
+            .send()
+            .await
+            .int_err()?;
+
+        match response.status() {
+            http::StatusCode::OK => Ok(response.json().await.int_err()?),
+            unexpected_status => panic!(
+                "Unexpected device authorization status code: {}, details: {}",
+                unexpected_status.as_u16(),
+                response.text().await.unwrap()
+            ),
+        }
+    }
+    async fn device_access_token(
+        &self,
+        client: &reqwest::Client,
+        login_polling_url: &Url,
+        device_code: &str,
+    ) -> Result<DeviceAccessTokenResult, InternalError> {
+        let response = client
+            .post(login_polling_url.clone())
+            .form(&[
+                Self::DEVICE_FLOW_DEFAULT_CLIENT_ID_PARAM,
+                ("device_code", device_code),
+                ("grant_type", OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE),
+            ])
+            .send()
+            .await
+            .int_err()?;
+
+        match response.status() {
+            http::StatusCode::OK => Ok(DeviceAccessTokenResult::Success(
+                response.json().await.int_err()?,
+            )),
+            http::StatusCode::BAD_REQUEST => Ok(DeviceAccessTokenResult::Error(
+                response.json().await.int_err()?,
+            )),
+            unexpected_status => panic!(
+                "Unexpected device access status code: {}, details: {}",
+                unexpected_status.as_u16(),
                 response.text().await.unwrap()
             ),
         }
@@ -274,9 +366,17 @@ impl LoginService {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
+enum DeviceAccessTokenResult {
+    Success(DeviceAccessTokenResponse),
+    Error(DeviceAccessTokenError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FrontendLoginCallbackResponse {
+pub struct LoginInteractiveResponse {
     pub access_token: String,
     pub backend_url: Url,
 }
@@ -294,7 +394,7 @@ pub struct BackendLoginResponse {
 #[derive(Debug, Error)]
 pub enum LoginError {
     #[error(transparent)]
-    AccessFailed(LoginErrorAccessFailed),
+    AccessFailed(#[from] LoginErrorAccessFailed),
 
     #[error(transparent)]
     Internal(InternalError),
@@ -342,19 +442,6 @@ pub struct ExpiredTokenError {
 #[error("Access token for '{odf_server_backend_url}' ODF server are invalid.")]
 pub struct InvalidTokenError {
     odf_server_backend_url: Url,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: move to CLI general location
-fn ctrlc_channel() -> Result<Arc<Notify>, ctrlc::Error> {
-    let notify_rx = Arc::new(Notify::new());
-    let notify_tx = notify_rx.clone();
-    ctrlc::set_handler(move || {
-        notify_tx.notify_waiters();
-    })?;
-
-    Ok(notify_rx)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

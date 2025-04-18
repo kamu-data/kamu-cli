@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
 use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataParams,
     DatasetMetadataResponse,
@@ -22,7 +23,7 @@ use kamu_adapter_http::data::metadata_handler::{
 use kamu_adapter_http::data::query_types::{QueryRequest, QueryResponse};
 use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
-use kamu_adapter_http::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
+use kamu_adapter_http::platform::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_auth_rebac::AccountToDatasetRelation;
 use kamu_flow_system::{DatasetFlowType, FlowID};
 use lazy_static::lazy_static;
@@ -304,6 +305,29 @@ impl AuthApi<'_> {
             }
             "#,
         ))
+        .await
+    }
+
+    pub async fn login_as_e2e_user_with_device_code(&mut self) -> AccessToken {
+        // We are using DummyOAuthGithub, so the loginCredentialsJson can be arbitrary
+        self.login(
+            indoc::indoc!(
+                r#"
+                mutation {
+                  auth {
+                    login(loginMethod: "oauth_github", loginCredentialsJson: "", deviceCode: "<device_code>") {
+                      accessToken
+                      account {
+                        id
+                      }
+                    }
+                  }
+                }
+                "#,
+            )
+            .replace("<device_code>", &PREDEFINED_DEVICE_CODE_UUID.to_string())
+            .as_str(),
+        )
         .await
     }
 

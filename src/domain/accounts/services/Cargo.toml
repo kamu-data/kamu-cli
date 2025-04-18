@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+common-macros = { workspace = true }
 database-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }

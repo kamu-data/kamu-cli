@@ -195,6 +195,8 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        let account_id_stack = account_id.as_did_str().to_stack_string();
+
         let maybe_account_row = sqlx::query_as!(
             AccountRowModel,
             r#"
@@ -212,7 +214,7 @@ impl AccountRepository for PostgresAccountRepository {
             FROM accounts
             WHERE id = $1
             "#,
-            account_id.to_string()
+            account_id_stack.as_str()
         )
         .fetch_optional(connection_mut)
         .await

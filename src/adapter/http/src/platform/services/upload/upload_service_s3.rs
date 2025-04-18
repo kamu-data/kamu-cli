@@ -20,8 +20,8 @@ use s3_utils::{PutObjectOptions, S3Context};
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
-use super::{ContentNotFoundError, UploadToken, UploadTokenBase64Json, UploadTokenIntoStreamError};
-use crate::{
+use crate::platform::{
+    ContentNotFoundError,
     ContentTooLargeError,
     FileUploadLimitConfig,
     MakeUploadContextError,
@@ -29,6 +29,9 @@ use crate::{
     UploadContext,
     UploadNotSupportedError,
     UploadService,
+    UploadToken,
+    UploadTokenBase64Json,
+    UploadTokenIntoStreamError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

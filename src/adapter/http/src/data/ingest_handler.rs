@@ -20,7 +20,8 @@ use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
 use crate::axum_utils::ensure_authenticated_account;
-use crate::{DatasetAliasInPath, UploadService, UploadTokenBase64Json, UploadTokenIntoStreamError};
+use crate::platform::{UploadService, UploadTokenBase64Json, UploadTokenIntoStreamError};
+use crate::DatasetAliasInPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

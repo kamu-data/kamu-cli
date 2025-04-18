@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use kamu_adapter_http::PlatformFileUploadQuery;
+use kamu_adapter_http::platform::PlatformFileUploadQuery;
 use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt, UploadPrepareError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

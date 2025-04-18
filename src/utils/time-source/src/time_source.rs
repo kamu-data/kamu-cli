@@ -117,7 +117,7 @@ impl Ord for AwaitingCaller {
 }
 
 #[derive(Debug)]
-struct SystemTimeSourceStubState {
+struct FakeSystemTimeSourceState {
     t: DateTime<Utc>,
     next_caller_id: AwaitingCallerId,
     awaiting_callers: BinaryHeap<Reverse<AwaitingCaller>>,
@@ -126,12 +126,12 @@ struct SystemTimeSourceStubState {
 #[derive(Debug, Clone)]
 pub struct FakeSystemTimeSource {
     pub initial_time: DateTime<Utc>,
-    state: Arc<Mutex<SystemTimeSourceStubState>>,
+    state: Arc<Mutex<FakeSystemTimeSourceState>>,
 }
 
 impl FakeSystemTimeSource {
     pub fn new(t: DateTime<Utc>) -> Self {
-        let state = SystemTimeSourceStubState {
+        let state = FakeSystemTimeSourceState {
             t,
             next_caller_id: 1,
             awaiting_callers: BinaryHeap::new(),

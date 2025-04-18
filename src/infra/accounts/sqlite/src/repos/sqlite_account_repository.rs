@@ -46,9 +46,9 @@ impl SqliteAccountRepository {
 
         let account_field = if sqlite_error_message.contains("accounts.id") {
             AccountDuplicateField::Id
-        } else if sqlite_error_message.contains("accounts.account_name") {
+        } else if sqlite_error_message.contains("idx_accounts_name") {
             AccountDuplicateField::Name
-        } else if sqlite_error_message.contains("accounts.email") {
+        } else if sqlite_error_message.contains("idx_accounts_email") {
             AccountDuplicateField::Email
         } else if sqlite_error_message.contains("accounts.provider_identity_key") {
             AccountDuplicateField::ProviderIdentityKey

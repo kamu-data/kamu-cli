@@ -12,6 +12,18 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- `kamu-adapter-http`: Introduced the `from_catalog_n` macro for easier dependency extraction from the catalog.
+### Changed
+- Device Flow:
+  - Summary: for interactive login, replace the Loopback Redirect Flow mechanism with Device Flow Authentication, 
+      which enables operation in the most secure and restrictive browsers.
+  - If the login link cannot be opened on the current device, you may copy it to any browser 
+      and complete the interactive login on another device.
+  - HTTP API: Added endpoints implementing [RFC 8628: OAuth 2.0 Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628):
+    - `POST platform/token/device/authorization`;
+    - `POST platform/token/device`.
+- `kamu-adapter-http`: platform handlers moved to a separate folder.
 ### Fixed
 - `kamu init`: in case of using `--pull-images` argument, fixed unclear error with not found file.
 - CLI commands: Trigger `outbox_agent` method only for commands that require it.

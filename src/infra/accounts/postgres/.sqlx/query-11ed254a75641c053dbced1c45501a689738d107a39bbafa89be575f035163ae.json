@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE\n            FROM oauth_device_codes\n            WHERE device_code_expires_at <= $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "11ed254a75641c053dbced1c45501a689738d107a39bbafa89be575f035163ae"
+}

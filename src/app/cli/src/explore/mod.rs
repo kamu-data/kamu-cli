@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod api_server;
+mod dependencies;
 mod flight_sql_service_factory;
 mod notebook_server_factory;
 mod spark_livy_server_factory;
@@ -18,6 +19,7 @@ mod ui_configuration;
 mod web_ui_server;
 
 pub use api_server::*;
+pub use dependencies::*;
 pub use flight_sql_service_factory::*;
 pub use notebook_server_factory::*;
 pub use spark_livy_server_factory::*;

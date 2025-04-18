@@ -42,14 +42,18 @@ regex = { version = "1", default-features = false }
 test-utils = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
+datafusion = { version = "46", default-features = false, features = [] }
 indoc = "2"
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }
 reqwest = { version = "0.12", default-features = false }
 serde_json = { version = "1", default-features = false }
 tempfile = { version = "3" }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "time",
+] }
 url = { version = "2", default-features = false }
-datafusion = { version = "46", default-features = false, features = [] }
 
 
 [dev-dependencies]

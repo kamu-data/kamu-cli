@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin as \"is_admin: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) = lower(?)\n            ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin as \"is_admin: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE account_name = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -110,5 +110,5 @@
       false
     ]
   },
-  "hash": "1ede8b8ae8a9a60aebc3b281a27bbbab08be4b092de8585981f1c70607637ba0"
+  "hash": "689f832ebef4b97678381695af45eab74dc45e69dbeeaf1c2e101adefab74ee7"
 }
