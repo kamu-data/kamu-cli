@@ -196,6 +196,7 @@ impl ClientSideHarness {
         b.add_value(IpfsGateway::default());
 
         b.add::<OAuthDeviceCodeServiceImpl>();
+        b.add::<OAuthDeviceCodeGeneratorDefault>();
         b.add::<InMemoryOAuthDeviceCodeRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);

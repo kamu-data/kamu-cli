@@ -23,6 +23,7 @@ use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
+    OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
@@ -81,6 +82,7 @@ impl Harness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeGeneratorDefault>()
                 .add::<InMemoryOAuthDeviceCodeRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

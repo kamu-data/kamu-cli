@@ -489,6 +489,8 @@ pub fn configure_base_catalog(
         !is_e2e_testing,
     );
 
+    odf_server::register_dependencies(&mut b, is_e2e_testing);
+
     kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
     kamu_datasets_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
     kamu_auth_rebac_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());

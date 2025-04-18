@@ -146,6 +146,7 @@ impl ServerSideS3Harness {
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(predefined_accounts_config)
                 .add::<OAuthDeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeGeneratorDefault>()
                 .add::<InMemoryOAuthDeviceCodeRepository>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
