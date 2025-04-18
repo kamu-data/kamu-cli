@@ -245,6 +245,41 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         })
     }
 
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_write_dataset_reference, skip_all, fields(%dataset_id))]
+    async fn write_dataset_reference(
+        &self,
+        dataset_id: &DatasetID,
+        block_ref: &BlockRef,
+        hash: &Multihash,
+    ) -> Result<(), WriteDatasetReferenceError> {
+        // Build dataset without any checks (the HEAD might not exist yet)
+        let dataset = self.get_dataset_impl(dataset_id);
+
+        // Try checking if block exists
+        dataset
+            .as_metadata_chain()
+            .get_block_size(hash)
+            .await
+            .map_err(|e| match e {
+                GetBlockDataError::NotFound(e) => WriteDatasetReferenceError::BlockNotFound(e),
+                GetBlockDataError::Access(e) => e.int_err().into(),
+                GetBlockDataError::Internal(e) => e.into(),
+            })?;
+
+        // Try writing the reference
+        dataset
+            .as_metadata_chain()
+            .as_uncached_ref_repo()
+            .set(block_ref.as_str(), hash)
+            .await
+            .map_err(|e| match e {
+                SetRefError::Access(e) => e.int_err(),
+                SetRefError::Internal(e) => e,
+            })?;
+
+        Ok(())
+    }
+
     #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_delete_dataset, skip_all, fields(%dataset_id))]
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError> {
         // Ensure key exists in S3
