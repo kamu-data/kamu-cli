@@ -148,7 +148,7 @@ impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
             r#"
             DELETE
             FROM oauth_device_codes
-            WHERE device_code_expires_at < $1
+            WHERE device_code_expires_at <= $1
             "#,
             now
         )

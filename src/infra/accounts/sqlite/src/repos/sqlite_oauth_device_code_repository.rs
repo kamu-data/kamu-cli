@@ -155,7 +155,7 @@ impl OAuthDeviceCodeRepository for SqliteOAuthDeviceCodeRepository {
             r#"
             DELETE
             FROM oauth_device_codes
-            WHERE datetime(device_code_expires_at) < datetime($1)
+            WHERE datetime(device_code_expires_at) <= datetime($1)
             "#,
             now
         )

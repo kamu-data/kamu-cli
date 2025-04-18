@@ -8,55 +8,54 @@
 // by the Apache License, Version 2.0.
 
 use database_common_macros::*;
-use kamu_accounts_sqlite::*;
+use kamu_accounts_inmem::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = inmem,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_save_device_code,
-    harness = SqliteOAuthDeviceCodeRepositoryHarness
+    harness = InMemoryOAuthDeviceCodeRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = inmem,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_update_device_token_with_token_params_part,
-    harness = SqliteOAuthDeviceCodeRepositoryHarness
+    harness = InMemoryOAuthDeviceCodeRepositoryHarness
 );
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = inmem,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_find_device_token_by_device_code,
-    harness = SqliteOAuthDeviceCodeRepositoryHarness
+    harness = InMemoryOAuthDeviceCodeRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = inmem,
     fixture =
         kamu_accounts_repo_tests::oauth_device_code_repository::test_cleanup_expired_device_codes,
-    harness = SqliteOAuthDeviceCodeRepositoryHarness
+    harness = InMemoryOAuthDeviceCodeRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct SqliteOAuthDeviceCodeRepositoryHarness {
+struct InMemoryOAuthDeviceCodeRepositoryHarness {
     catalog: dill::Catalog,
 }
 
-impl SqliteOAuthDeviceCodeRepositoryHarness {
-    pub fn new(pool: sqlx::SqlitePool) -> Self {
+impl InMemoryOAuthDeviceCodeRepositoryHarness {
+    pub fn new() -> Self {
         let mut b = dill::CatalogBuilder::new();
-        b.add_value(pool);
-        b.add::<database_common::SqliteTransactionManager>();
-        b.add::<SqliteOAuthDeviceCodeRepository>();
-        b.add::<SqliteAccountRepository>();
+        b.add::<database_common::PostgresTransactionManager>();
+        b.add::<InMemoryOAuthDeviceCodeRepository>();
+        b.add::<InMemoryAccountRepository>();
 
         Self { catalog: b.build() }
     }

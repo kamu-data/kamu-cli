@@ -15,7 +15,7 @@ use kamu_accounts_postgres::*;
 database_transactional_test!(
     storage = postgres,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_save_device_code,
-    harness = PostgresPasswordHashRepositoryHarness
+    harness = PostgresOAuthDeviceCodeRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,14 +23,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_update_device_token_with_token_params_part,
-    harness = PostgresPasswordHashRepositoryHarness
+    harness = PostgresOAuthDeviceCodeRepositoryHarness
 );
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = postgres,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_find_device_token_by_device_code,
-    harness = PostgresPasswordHashRepositoryHarness
+    harness = PostgresOAuthDeviceCodeRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,18 +39,18 @@ database_transactional_test!(
     storage = postgres,
     fixture =
         kamu_accounts_repo_tests::oauth_device_code_repository::test_cleanup_expired_device_codes,
-    harness = PostgresPasswordHashRepositoryHarness
+    harness = PostgresOAuthDeviceCodeRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct PostgresPasswordHashRepositoryHarness {
+struct PostgresOAuthDeviceCodeRepositoryHarness {
     catalog: dill::Catalog,
 }
 
-impl PostgresPasswordHashRepositoryHarness {
+impl PostgresOAuthDeviceCodeRepositoryHarness {
     pub fn new(pool: sqlx::PgPool) -> Self {
         let mut b = dill::CatalogBuilder::new();
         b.add_value(pool);

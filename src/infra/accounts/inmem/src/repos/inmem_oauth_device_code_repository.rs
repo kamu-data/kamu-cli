@@ -49,7 +49,17 @@ impl OAuthDeviceCodeRepository for InMemoryOAuthDeviceCodeRepository {
     ) -> Result<(), CreateDeviceCodeError> {
         let mut writable_state = self.state.write().await;
 
-        let device_token = DeviceToken::DeviceCodeCreated(device_code_created.clone());
+        if writable_state
+            .device_token_by_device_code
+            .contains_key(&device_code_created.device_code)
+        {
+            return Err(DeviceCodeDuplicateError {
+                device_code: device_code_created.device_code.clone(),
+            }
+            .into());
+        }
+
+        let device_token = DeviceToken::from(device_code_created.clone());
 
         writable_state
             .device_token_by_device_code
@@ -99,9 +109,14 @@ impl OAuthDeviceCodeRepository for InMemoryOAuthDeviceCodeRepository {
 
     async fn cleanup_expired_device_codes(
         &self,
-        _now: DateTime<Utc>,
+        now: DateTime<Utc>,
     ) -> Result<(), CleanupExpiredDeviceCodesError> {
-        // A server restart is already a cleanup
+        let mut writable_state = self.state.write().await;
+
+        writable_state
+            .device_token_by_device_code
+            .retain(|_, device_token| device_token.device_code_expire_at() >= now);
+
         Ok(())
     }
 }
