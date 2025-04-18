@@ -8,55 +8,55 @@
 // by the Apache License, Version 2.0.
 
 use database_common_macros::*;
-use kamu_accounts_sqlite::*;
+use kamu_accounts_postgres::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_save_device_code,
-    harness = SqlitePasswordHashRepositoryHarness
+    harness = PostgresPasswordHashRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_update_device_token_with_token_params_part,
-    harness = SqlitePasswordHashRepositoryHarness
+    harness = PostgresPasswordHashRepositoryHarness
 );
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture = kamu_accounts_repo_tests::oauth_device_code_repository::test_find_device_token_by_device_code,
-    harness = SqlitePasswordHashRepositoryHarness
+    harness = PostgresPasswordHashRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
+    storage = postgres,
     fixture =
         kamu_accounts_repo_tests::oauth_device_code_repository::test_cleanup_expired_device_codes,
-    harness = SqlitePasswordHashRepositoryHarness
+    harness = PostgresPasswordHashRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct SqlitePasswordHashRepositoryHarness {
+struct PostgresPasswordHashRepositoryHarness {
     catalog: dill::Catalog,
 }
 
-impl SqlitePasswordHashRepositoryHarness {
-    pub fn new(pool: sqlx::SqlitePool) -> Self {
+impl PostgresPasswordHashRepositoryHarness {
+    pub fn new(pool: sqlx::PgPool) -> Self {
         let mut b = dill::CatalogBuilder::new();
         b.add_value(pool);
-        b.add::<database_common::SqliteTransactionManager>();
-        b.add::<SqliteOAuthDeviceCodeRepository>();
-        b.add::<SqliteAccountRepository>();
+        b.add::<database_common::PostgresTransactionManager>();
+        b.add::<PostgresOAuthDeviceCodeRepository>();
+        b.add::<PostgresAccountRepository>();
 
         Self { catalog: b.build() }
     }

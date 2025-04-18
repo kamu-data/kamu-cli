@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 
 use crate::domain::*;
 
@@ -50,7 +50,15 @@ impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
         )
         .execute(connection_mut)
         .await
-        .int_err()?;
+        .map_err(|e: sqlx::Error| {
+            use CreateDeviceCodeError as E;
+            match e {
+                sqlx::Error::Database(e) if e.is_unique_violation() => {
+                    E::Duplicate(DeviceCodeDuplicateError { device_code: device_code_created.device_code.clone() })
+                }
+                _ => E::Internal(e.int_err())
+            }
+        })?;
 
         Ok(())
     }
@@ -130,7 +138,7 @@ impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
 
     async fn cleanup_expired_device_codes(
         &self,
-        _now: DateTime<Utc>,
+        now: DateTime<Utc>,
     ) -> Result<(), CleanupExpiredDeviceCodesError> {
         let mut tr = self.transaction.lock().await;
 
@@ -140,8 +148,9 @@ impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
             r#"
             DELETE
             FROM oauth_device_codes
-            WHERE device_code_expires_at < NOW()
+            WHERE device_code_expires_at < $1
             "#,
+            now
         )
         .execute(connection_mut)
         .await

@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, SubsecRound, TimeZone, Utc};
 use kamu_accounts::*;
 use kamu_accounts_services::DEVICE_CODE_EXPIRES_IN_5_MINUTES;
 
@@ -101,11 +101,16 @@ pub async fn test_find_device_token_by_device_code(catalog: &dill::Catalog) {
 
     let not_saved_token_device_code = DeviceCode::new_uuid_v4();
 
-    assert_matches!(
-        harness.oauth_device_code_repo
+    pretty_assertions::assert_eq!(
+        Err(FindDeviceTokenByDeviceCodeError::NotFound(
+            DeviceTokenNotFoundError {
+                device_code: not_saved_token_device_code.clone()
+            }
+        )),
+        harness
+            .oauth_device_code_repo
             .find_device_token_by_device_code(&not_saved_token_device_code)
             .await,
-        Err(FindDeviceTokenByDeviceCodeError::NotFound(e)) if e.device_code == not_saved_token_device_code
     );
 
     let [device_token] = harness
@@ -295,8 +300,9 @@ impl OAuthDeviceCodeRepositoryTestSuiteHarness {
         for (i, t) in expired_at.into_iter().enumerate() {
             let new_token = DeviceTokenCreated {
                 device_code: DeviceCode::new_uuid_v4(),
-                created_at: t - DEVICE_CODE_EXPIRES_IN_5_MINUTES,
-                expires_at: t,
+                // Postgres stores 6 decimal places in the timestamptz type
+                created_at: (t - DEVICE_CODE_EXPIRES_IN_5_MINUTES).round_subsecs(6),
+                expires_at: t.round_subsecs(6),
             };
 
             assert_matches!(
