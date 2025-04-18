@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
 use internal_error::ResultIntoInternal;
 
@@ -127,7 +128,10 @@ impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
         }
     }
 
-    async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError> {
+    async fn cleanup_expired_device_codes(
+        &self,
+        _now: DateTime<Utc>,
+    ) -> Result<(), CleanupExpiredDeviceCodesError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;

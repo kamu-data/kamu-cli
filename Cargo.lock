@@ -5782,6 +5782,7 @@ dependencies = [
  "email-utils",
  "futures",
  "kamu-accounts",
+ "kamu-accounts-services",
  "kamu-adapter-oauth",
  "opendatafabric",
  "password-hash",

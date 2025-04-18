@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use tokio::sync::RwLock;
 
 use crate::domain::*;
@@ -96,7 +97,10 @@ impl OAuthDeviceCodeRepository for InMemoryOAuthDeviceCodeRepository {
         }
     }
 
-    async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError> {
+    async fn cleanup_expired_device_codes(
+        &self,
+        _now: DateTime<Utc>,
+    ) -> Result<(), CleanupExpiredDeviceCodesError> {
         // A server restart is already a cleanup
         Ok(())
     }

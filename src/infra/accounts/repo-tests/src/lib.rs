@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 #![feature(assert_matches)]
+#![feature(maybe_uninit_uninit_array)]
 
 mod access_token_repository_test_utils;
 mod accounts_repository_test_utils;
 
 mod access_token_repository_test_suite;
 mod accounts_repository_test_suite;
+mod oauth_device_code_repository_test_suite;
 mod password_hash_repository_test_suite;
 
 pub use access_token_repository_test_suite::*;
@@ -21,3 +23,6 @@ pub(crate) use access_token_repository_test_utils::*;
 pub use accounts_repository_test_suite::*;
 pub(crate) use accounts_repository_test_utils::*;
 pub use password_hash_repository_test_suite::*;
+pub mod oauth_device_code_repository {
+    pub use super::oauth_device_code_repository_test_suite::*;
+}

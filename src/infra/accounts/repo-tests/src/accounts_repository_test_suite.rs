@@ -18,6 +18,8 @@ use kamu_accounts::*;
 
 use crate::make_test_account;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) const GITHUB_ACCOUNT_ID_WASYA: &str = "8875907";
 pub(crate) const GITHUB_ACCOUNT_ID_PETYA: &str = "8875908";
 

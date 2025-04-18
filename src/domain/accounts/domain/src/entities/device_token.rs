@@ -13,7 +13,7 @@ use crate::DeviceCode;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeviceToken {
     DeviceCodeCreated(DeviceTokenCreated),
     DeviceCodeWithIssuedToken(DeviceCodeWithIssuedToken),
@@ -34,20 +34,40 @@ impl DeviceToken {
             _ => panic!("Cannot add token params part to a token that already has one"),
         }
     }
+
+    pub fn device_code(&self) -> &DeviceCode {
+        match self {
+            DeviceToken::DeviceCodeCreated(d) => &d.device_code,
+            DeviceToken::DeviceCodeWithIssuedToken(d) => &d.device_code,
+        }
+    }
+
+    pub fn device_code_expire_at(&self) -> DateTime<Utc> {
+        match self {
+            DeviceToken::DeviceCodeCreated(d) => d.expires_at,
+            DeviceToken::DeviceCodeWithIssuedToken(d) => d.expires_at,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[reusable::reusable(device_token)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceTokenCreated {
     pub device_code: DeviceCode,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
 }
 
+impl From<DeviceTokenCreated> for DeviceToken {
+    fn from(v: DeviceTokenCreated) -> Self {
+        DeviceToken::DeviceCodeCreated(v)
+    }
+}
+
 #[reusable::reuse(device_token)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceCodeWithIssuedToken {
     pub token_params_part: DeviceTokenParamsPart,
     pub token_last_used_at: Option<DateTime<Utc>>,
@@ -55,7 +75,7 @@ pub struct DeviceCodeWithIssuedToken {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceTokenParamsPart {
     pub iat: usize,
     pub exp: usize,
@@ -73,7 +93,7 @@ impl DeviceTokenParamsPart {
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct DeviceTokenRowModel {
-    pub device_code: Uuid,
+    pub device_code: uuid::Uuid,
     pub device_code_created_at: DateTime<Utc>,
     pub device_code_expires_at: DateTime<Utc>,
     pub token_iat: Option<i64>,
@@ -84,9 +104,11 @@ pub struct DeviceTokenRowModel {
 
 #[cfg(feature = "sqlx")]
 impl TryFrom<DeviceTokenRowModel> for DeviceToken {
-    type Error = InternalError;
+    type Error = internal_error::InternalError;
 
     fn try_from(v: DeviceTokenRowModel) -> Result<Self, Self::Error> {
+        use internal_error::ResultIntoInternal;
+
         let res = match (v.token_iat, v.token_exp, v.account_id) {
             (Some(token_iat), Some(token_exp), Some(account_id)) => {
                 DeviceToken::DeviceCodeWithIssuedToken(DeviceCodeWithIssuedToken {

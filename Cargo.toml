@@ -317,3 +317,4 @@ assert_cmd = { git = 'https://github.com/kamu-data/assert_cmd', branch = "deacti
 #       - Fix: nextest cleanup race condition by bonega
 #         https://github.com/launchbadge/sqlx/pull/3334
 sqlx = { git = 'https://github.com/kamu-data/sqlx', branch = 'nextest-race-condition' }
+# dill = { path = "../dill-rs/dill" }

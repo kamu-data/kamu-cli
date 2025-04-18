@@ -24,12 +24,13 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 email-utils = { workspace = true }
+kamu-accounts = { workspace = true }
+kamu-accounts-services = { workspace = true }
+kamu-adapter-oauth = { workspace = true }
 odf = { workspace = true, default-features = false, features = [
     "arrow",
     "testing"
 ] }
-kamu-accounts = { workspace = true }
-kamu-adapter-oauth = { workspace = true }
 
 argon2 = { version = "0.5" }
 chrono = { version = "0.4", default-features = false }

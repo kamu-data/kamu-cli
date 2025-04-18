@@ -37,7 +37,7 @@ struct SqlitePasswordHashRepositoryHarness {
 
 impl SqlitePasswordHashRepositoryHarness {
     pub fn new(sqlite_pool: SqlitePool) -> Self {
-        // Initialize catalog with predefined Postgres pool
+        // Initialize catalog with predefined Sqlite pool
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();

@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use uuid::Uuid;
 
 use crate::domain::*;
@@ -52,7 +53,15 @@ impl OAuthDeviceCodeRepository for SqliteOAuthDeviceCodeRepository {
         )
         .execute(connection_mut)
         .await
-        .int_err()?;
+        .map_err(|e: sqlx::Error| {
+            use CreateDeviceCodeError as E;
+            match e {
+                sqlx::Error::Database(e) if e.is_unique_violation() => {
+                    E::Duplicate(DeviceCodeDuplicateError { device_code: device_code_created.device_code.clone() })
+                }
+                _ => E::Internal(e.int_err())
+            }
+        })?;
 
         Ok(())
     }
@@ -134,7 +143,10 @@ impl OAuthDeviceCodeRepository for SqliteOAuthDeviceCodeRepository {
         }
     }
 
-    async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError> {
+    async fn cleanup_expired_device_codes(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<(), CleanupExpiredDeviceCodesError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -143,8 +155,9 @@ impl OAuthDeviceCodeRepository for SqliteOAuthDeviceCodeRepository {
             r#"
             DELETE
             FROM oauth_device_codes
-            WHERE datetime(device_code_expires_at) < datetime('now')
+            WHERE datetime(device_code_expires_at) < datetime($1)
             "#,
+            now
         )
         .execute(connection_mut)
         .await

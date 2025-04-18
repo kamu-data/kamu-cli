@@ -27,11 +27,10 @@ use kamu_accounts::{
     JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
 };
 use time_source::SystemTimeSource;
-use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const DEVICE_CODE_EXPIRES_IN: Duration = Duration::minutes(5);
+pub const DEVICE_CODE_EXPIRES_IN_5_MINUTES: Duration = Duration::minutes(5);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,7 +56,7 @@ impl OAuthDeviceCodeService for OAuthDeviceCodeServiceImpl {
         let device_token_created = {
             let device_code = DeviceCode::new_uuid_v4();
             let created_at = self.time_source.now();
-            let expires_at = created_at + DEVICE_CODE_EXPIRES_IN;
+            let expires_at = created_at + DEVICE_CODE_EXPIRES_IN_5_MINUTES;
 
             DeviceTokenCreated {
                 device_code,
@@ -93,8 +92,10 @@ impl OAuthDeviceCodeService for OAuthDeviceCodeServiceImpl {
     }
 
     async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError> {
+        let now = self.time_source.now();
+
         self.oauth_device_code_repo
-            .cleanup_expired_device_codes()
+            .cleanup_expired_device_codes(now)
             .await
     }
 }

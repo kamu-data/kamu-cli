@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use thiserror::Error;
 
@@ -32,7 +33,10 @@ pub trait OAuthDeviceCodeRepository: Send + Sync {
         device_code: &DeviceCode,
     ) -> Result<DeviceToken, FindDeviceTokenByDeviceCodeError>;
 
-    async fn cleanup_expired_device_codes(&self) -> Result<(), CleanupExpiredDeviceCodesError>;
+    async fn cleanup_expired_device_codes(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<(), CleanupExpiredDeviceCodesError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +46,30 @@ pub trait OAuthDeviceCodeRepository: Send + Sync {
 #[derive(Error, Debug)]
 pub enum CreateDeviceCodeError {
     #[error(transparent)]
+    Duplicate(#[from] DeviceCodeDuplicateError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+#[error("Dataset token duplicate for device_code '{device_code}'")]
+pub struct DeviceCodeDuplicateError {
+    pub device_code: DeviceCode,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug, PartialEq, Eq)]
+#[error("Dataset token for device_code '{device_code}' not found")]
+pub struct DeviceTokenNotFoundError {
+    pub device_code: DeviceCode,
+}
+
+impl DeviceTokenNotFoundError {
+    pub fn new(device_code: DeviceCode) -> Self {
+        Self { device_code }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -54,6 +81,20 @@ pub enum UpdateDeviceCodeWithTokenParamsPartError {
     Internal(#[from] InternalError),
 }
 
+impl PartialEq for UpdateDeviceCodeWithTokenParamsPartError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::NotFound(a), Self::NotFound(b)) => a == b,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+impl Eq for UpdateDeviceCodeWithTokenParamsPartError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum FindDeviceTokenByDeviceCodeError {
     #[error(transparent)]
@@ -63,17 +104,19 @@ pub enum FindDeviceTokenByDeviceCodeError {
     Internal(#[from] InternalError),
 }
 
-#[derive(Error, Debug)]
-#[error("Dataset token for device_code '{device_code}' not found")]
-pub struct DeviceTokenNotFoundError {
-    pub device_code: DeviceCode,
-}
-
-impl DeviceTokenNotFoundError {
-    pub fn new(device_code: DeviceCode) -> Self {
-        Self { device_code }
+impl PartialEq for FindDeviceTokenByDeviceCodeError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::NotFound(a), Self::NotFound(b)) => a == b,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
     }
 }
+
+impl Eq for FindDeviceTokenByDeviceCodeError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum CleanupExpiredDeviceCodesError {
