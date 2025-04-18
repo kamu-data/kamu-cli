@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::time::Duration;
+
 use kamu_cli_e2e_common::{
     KamuApiServerClient,
     KamuApiServerClientExt,
@@ -85,6 +87,20 @@ pub async fn test_login_oauth_add_repo_st(kamu_node_api_client: KamuApiServerCli
 
 pub async fn test_login_oauth_add_repo_mt(kamu_node_api_client: KamuApiServerClient) {
     test_login_oauth_add_repo(kamu_node_api_client, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_login_interactive_successful
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_interactive_successful_st(kamu_node_api_client: KamuApiServerClient) {
+    test_login_interactive_successful(kamu_node_api_client, false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_interactive_successful_mt(kamu_node_api_client: KamuApiServerClient) {
+    test_login_interactive_successful(kamu_node_api_client, true).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -484,6 +500,45 @@ async fn test_login_oauth_add_repo(
             *kamu.get_list_of_repos().await
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_login_interactive_successful(
+    mut kamu_node_api_client: KamuApiServerClient,
+    is_workspace_multi_tenant: bool,
+) {
+    let kamu = KamuCliPuppet::new_workspace_tmp(is_workspace_multi_tenant).await;
+    let kamu_node_url = kamu_node_api_client.get_base_url().to_string();
+    let e2e_output_data_path = kamu.get_e2e_output_data_path();
+
+    let kamu_cli_login_future = async {
+        kamu.assert_success_command_execution(
+            [
+                "--e2e-output-data-path",
+                e2e_output_data_path.to_str().unwrap(),
+                "login",
+                "http://example.com",
+                "--predefined-odf-backend-url",
+                kamu_node_url.as_str(),
+            ],
+            None,
+            Some(["Login successful: http://example.com"]),
+        )
+        .await;
+    };
+
+    let ui_login_simulation_future = async {
+        // Minimize potential race conditions
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        kamu_node_api_client
+            .auth()
+            .login_as_e2e_user_with_device_code()
+            .await;
+    };
+
+    tokio::join!(kamu_cli_login_future, ui_login_simulation_future);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

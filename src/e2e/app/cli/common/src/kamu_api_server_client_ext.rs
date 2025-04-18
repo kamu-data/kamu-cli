@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
 use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataParams,
     DatasetMetadataResponse,
@@ -304,6 +305,29 @@ impl AuthApi<'_> {
             }
             "#,
         ))
+        .await
+    }
+
+    pub async fn login_as_e2e_user_with_device_code(&mut self) -> AccessToken {
+        // We are using DummyOAuthGithub, so the loginCredentialsJson can be arbitrary
+        self.login(
+            indoc::indoc!(
+                r#"
+                mutation {
+                  auth {
+                    login(loginMethod: "oauth_github", loginCredentialsJson: "", deviceCode: "<device_code>") {
+                      accessToken
+                      account {
+                        id
+                      }
+                    }
+                  }
+                }
+                "#,
+            )
+            .replace("<device_code>", &PREDEFINED_DEVICE_CODE_UUID.to_string())
+            .as_str(),
+        )
         .await
     }
 

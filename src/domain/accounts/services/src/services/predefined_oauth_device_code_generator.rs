@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const STATIC_UUID: Uuid = Uuid::from_bytes(*b"kamu            ");
+pub const PREDEFINED_DEVICE_CODE_UUID: Uuid = Uuid::from_bytes(*b"kamu            ");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ pub struct PredefinedOAuthDeviceCodeGenerator;
 #[async_trait::async_trait]
 impl OAuthDeviceCodeGenerator for PredefinedOAuthDeviceCodeGenerator {
     fn generate_device_code(&self, _client_id: &DeviceClientId) -> DeviceCode {
-        DeviceCode::new(STATIC_UUID)
+        DeviceCode::new(PREDEFINED_DEVICE_CODE_UUID)
     }
 }
 

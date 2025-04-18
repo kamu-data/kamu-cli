@@ -6328,6 +6328,7 @@ dependencies = [
  "http-common",
  "indoc 2.0.6",
  "internal-error",
+ "kamu-accounts-services",
  "kamu-adapter-http",
  "kamu-auth-rebac",
  "kamu-cli-e2e-common-macros",
@@ -6336,7 +6337,6 @@ dependencies = [
  "lazy_static",
  "opendatafabric",
  "pretty_assertions",
- "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -6406,6 +6406,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "test-utils",
+ "tokio",
  "url",
 ]
 
