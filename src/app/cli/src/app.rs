@@ -197,7 +197,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let cli_catalog = configure_cli_catalog(
             maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog),
             tenancy_config,
-            is_e2e_testing,
         )
         .add_value(current_account.to_current_account_subject())
         .build();
@@ -546,7 +545,6 @@ pub fn configure_base_catalog(
 pub fn configure_cli_catalog(
     base_catalog: &Catalog,
     tenancy_config: TenancyConfig,
-    is_e2e_testing: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
