@@ -77,10 +77,12 @@ impl LoginService {
             .unwrap();
 
         // Notify the user and open the browser
-        login_polling_started_callback(
-            &device_authorization_response.verification_uri_with_device_code(),
-        );
-        let _ = webbrowser::open(&device_authorization_response.verification_uri);
+        {
+            let login_url = device_authorization_response.verification_uri_with_device_code();
+
+            login_polling_started_callback(&login_url);
+            let _ = webbrowser::open(&login_url);
+        }
 
         // Start polling
         loop {

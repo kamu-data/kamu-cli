@@ -18,6 +18,8 @@ Recommendation: for ease of reading, use the following order:
 - Device Flow:
   - Summary: for interactive login, replace the Loopback Redirect Flow mechanism with Device Flow Authentication, 
       which enables operation in the most secure and restrictive browsers.
+  - If the login link cannot be opened on the current device, you may copy it to any browser 
+      and complete the interactive login on another device.
   - HTTP API: Added endpoints implementing [RFC 8628: OAuth 2.0 Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628):
     - `POST platform/token/device/authorization`;
     - `POST platform/token/device`.
