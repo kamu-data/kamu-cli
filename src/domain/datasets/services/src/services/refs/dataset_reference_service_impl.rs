@@ -21,6 +21,7 @@ use kamu_datasets::{
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
 };
 use messaging_outbox::{
+    InitialConsumerBoundary,
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
@@ -41,6 +42,7 @@ use messaging_outbox::{
         MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetReferenceServiceImpl {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,

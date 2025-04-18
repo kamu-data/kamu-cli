@@ -33,10 +33,11 @@ test_message_type!(A);
 test_message_type!(B);
 test_message_type!(C);
 
-test_message_consumer!(A, A, TEST_PRODUCER_A, Transactional);
-test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional);
-test_message_consumer!(C, C1, TEST_PRODUCER_C, Transactional);
-test_message_consumer!(C, C2, TEST_PRODUCER_C, Transactional);
+test_message_consumer!(A, A, TEST_PRODUCER_A, Transactional, All);
+test_message_consumer!(A, A1, TEST_PRODUCER_A, Transactional, Latest);
+test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional, All);
+test_message_consumer!(C, C1, TEST_PRODUCER_C, Transactional, All);
+test_message_consumer!(C, C2, TEST_PRODUCER_C, Transactional, All);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,6 +69,7 @@ async fn test_deliver_messages_of_one_type() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -86,6 +88,7 @@ async fn test_deliver_messages_of_one_type() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 2),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -94,6 +97,7 @@ async fn test_deliver_messages_of_one_type() {
 
     harness.check_metrics_messages_processed_total(&[
         (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 2),
         (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -130,6 +134,7 @@ async fn test_deliver_messages_of_two_types() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -149,6 +154,7 @@ async fn test_deliver_messages_of_two_types() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 1),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 1),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 2),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -157,6 +163,7 @@ async fn test_deliver_messages_of_two_types() {
 
     harness.check_metrics_messages_processed_total(&[
         (TEST_PRODUCER_A, "TestMessageConsumerA", 1),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 1),
         (TEST_PRODUCER_B, "TestMessageConsumerB", 1),
         (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -193,6 +200,7 @@ async fn test_deliver_messages_multiple_consumers() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
@@ -217,6 +225,7 @@ async fn test_deliver_messages_multiple_consumers() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 2),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 2),
@@ -225,6 +234,7 @@ async fn test_deliver_messages_multiple_consumers() {
 
     harness.check_metrics_messages_processed_total(&[
         (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
         (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC1", 2),
         (TEST_PRODUCER_C, "TestMessageConsumerC2", 2),
@@ -277,6 +287,7 @@ async fn test_deliver_messages_with_partial_consumption() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 2),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 4),
@@ -309,6 +320,7 @@ async fn test_deliver_messages_with_partial_consumption() {
     harness
         .check_consumption_boundaries(&[
             (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
             (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
             (TEST_PRODUCER_C, "TestMessageConsumerC1", 5),
             (TEST_PRODUCER_C, "TestMessageConsumerC2", 5),
@@ -317,9 +329,223 @@ async fn test_deliver_messages_with_partial_consumption() {
 
     harness.check_metrics_messages_processed_total(&[
         (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
         (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
         (TEST_PRODUCER_C, "TestMessageConsumerC1", 5 - 2),
         (TEST_PRODUCER_C, "TestMessageConsumerC2", 5 - 4),
+    ]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_consumer_with_latest_messages() {
+    let message_1 = TestMessageA {
+        body: "foo".to_string(),
+    };
+    let message_2 = TestMessageA {
+        body: "bar".to_string(),
+    };
+
+    let harness = OutboxAgentHarness::new();
+    harness
+        .outbox
+        .post_message(TEST_PRODUCER_A, message_1.clone())
+        .await
+        .unwrap();
+    harness
+        .outbox
+        .post_message(TEST_PRODUCER_A, message_2.clone())
+        .await
+        .unwrap();
+
+    harness.outbox_agent.run_initialization().await.unwrap();
+
+    // Posted, but not delivered yet!
+    harness.check_delivered_messages(&[], &[], &[], &[]);
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            // For consumers with latest initial_consumer_boundary we set boundary to last produced
+            // message id
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 2),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
+
+    // Run iteration
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+
+    // Should be delivered now
+    harness.check_delivered_messages(&[message_1, message_2], &[], &[], &[]);
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 2),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
+
+    // Consumer TestMessageConsumerA should consume 2 messages
+    // Consumer TestMessageConsumerA1 should consume 0 messages
+    harness.check_metrics_messages_processed_total(&[
+        (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
+        (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+    ]);
+
+    let message_3 = TestMessageA {
+        body: "baz".to_string(),
+    };
+    harness
+        .outbox
+        .post_message(TEST_PRODUCER_A, message_3.clone())
+        .await
+        .unwrap();
+
+    // Run iteration
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+
+    // harness.check_delivered_messages(&predefined_messages, &[], &[], &[]);
+
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 3),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 3),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
+
+    // Consumer TestMessageConsumerA should consume 3 messages
+    // Consumer TestMessageConsumerA1 should consume 1 message
+    harness.check_metrics_messages_processed_total(&[
+        (TEST_PRODUCER_A, "TestMessageConsumerA", 3),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 1),
+        (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+    ]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_consumer_with_latest_messages_consume_all_messages() {
+    // Test run initialization before message posting and will force consumer with
+    // Latest initial_consumer_boundary to consume all messages
+    let message_1 = TestMessageA {
+        body: "foo".to_string(),
+    };
+    let message_2 = TestMessageA {
+        body: "bar".to_string(),
+    };
+
+    let harness = OutboxAgentHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
+    harness
+        .outbox
+        .post_message(TEST_PRODUCER_A, message_1.clone())
+        .await
+        .unwrap();
+    harness
+        .outbox
+        .post_message(TEST_PRODUCER_A, message_2.clone())
+        .await
+        .unwrap();
+
+    // Posted, but not delivered yet!
+    harness.check_delivered_messages(&[], &[], &[], &[]);
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 0),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 0),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
+
+    // Run iteration
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+
+    // Should be delivered now
+    harness.check_delivered_messages(&[message_1.clone(), message_2.clone()], &[], &[], &[]);
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 2),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
+
+    // Consumer TestMessageConsumerA should consume 2 messages
+    // Consumer TestMessageConsumerA1 should consume 2 messages
+    harness.check_metrics_messages_processed_total(&[
+        (TEST_PRODUCER_A, "TestMessageConsumerA", 2),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 2),
+        (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+    ]);
+
+    let message_3 = TestMessageA {
+        body: "baz".to_string(),
+    };
+    harness
+        .outbox
+        .post_message(TEST_PRODUCER_A, message_3.clone())
+        .await
+        .unwrap();
+
+    // Run iteration
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+
+    harness.check_delivered_messages(&[message_1, message_2, message_3], &[], &[], &[]);
+
+    harness
+        .check_consumption_boundaries(&[
+            (TEST_PRODUCER_A, "TestMessageConsumerA", 3),
+            (TEST_PRODUCER_A, "TestMessageConsumerA1", 3),
+            (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+            (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
+        ])
+        .await;
+
+    // Consumer TestMessageConsumerA should consume 3 messages
+    // Consumer TestMessageConsumerA1 should consume 3 message
+    harness.check_metrics_messages_processed_total(&[
+        (TEST_PRODUCER_A, "TestMessageConsumerA", 3),
+        (TEST_PRODUCER_A, "TestMessageConsumerA1", 3),
+        (TEST_PRODUCER_B, "TestMessageConsumerB", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC1", 0),
+        (TEST_PRODUCER_C, "TestMessageConsumerC2", 0),
     ]);
 }
 
@@ -346,6 +572,7 @@ impl OutboxAgentHarness {
         b.add::<SystemTimeSourceDefault>();
 
         b.add::<TestMessageConsumerA>();
+        b.add::<TestMessageConsumerA1>();
         b.add::<TestMessageConsumerB>();
         b.add::<TestMessageConsumerC1>();
         b.add::<TestMessageConsumerC2>();
