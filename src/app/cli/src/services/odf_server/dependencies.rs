@@ -13,9 +13,10 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
+pub fn register_dependencies(catalog_builder: &mut CatalogBuilder, is_e2e_testing: bool) {
     catalog_builder.add::<odf_server::AccessTokenRegistryService>();
     catalog_builder.add::<odf_server::CLIAccessTokenStore>();
+    catalog_builder.add_builder(odf_server::LoginService::builder(is_e2e_testing));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

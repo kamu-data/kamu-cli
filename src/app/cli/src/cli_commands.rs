@@ -201,6 +201,7 @@ pub fn get_command(
                     c.check,
                     c.repo_name,
                     c.skip_add_repo,
+                    c.predefined_odf_backend_url.map(Into::into),
                 )
                 .cast(),
             ),

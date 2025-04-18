@@ -711,6 +711,10 @@ pub struct Login {
     /// Don't automatically add a remote repository for this host
     #[arg(long)]
     pub skip_add_repo: bool,
+
+    /// Predefined ODF backend URL for E2E testing
+    #[arg(long, hide = true)]
+    pub predefined_odf_backend_url: Option<parsers::UrlHttps>,
 }
 
 #[derive(Debug, clap::Subcommand)]

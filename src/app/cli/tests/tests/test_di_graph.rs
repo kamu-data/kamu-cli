@@ -95,7 +95,8 @@ fn test_di_cli_graph_validates(
     base_catalog_builder.add_value(Interact::new(false, false));
     let base_catalog = base_catalog_builder.build();
 
-    let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog, tenancy_config);
+    let mut cli_catalog_builder =
+        kamu_cli::configure_cli_catalog(&base_catalog, tenancy_config, false);
 
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());

@@ -43,6 +43,9 @@ pub struct LoginCommand {
 
     #[dill::component(explicit)]
     skip_add_repo: bool,
+
+    #[dill::component(explicit)]
+    predefined_odf_backend_url: Option<Url>,
 }
 
 impl LoginCommand {
@@ -91,9 +94,13 @@ impl LoginCommand {
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
         let login_interactive_response = self
             .login_service
-            .login_interactive(&odf_server_frontend_url, |u| {
-                self.report_device_flow_authorization_started(u);
-            })
+            .login_interactive(
+                &odf_server_frontend_url,
+                self.predefined_odf_backend_url.as_ref(),
+                |u| {
+                    self.report_device_flow_authorization_started(u);
+                },
+            )
             .await
             .map_err(|e| match e {
                 odf_server::LoginError::AccessFailed(e) => CLIError::usage_error(e.to_string()),

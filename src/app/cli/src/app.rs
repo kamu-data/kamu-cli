@@ -541,6 +541,7 @@ pub fn configure_base_catalog(
 pub fn configure_cli_catalog(
     base_catalog: &Catalog,
     tenancy_config: TenancyConfig,
+    is_e2e_testing: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
@@ -549,8 +550,9 @@ pub fn configure_cli_catalog(
     b.add_builder(
         WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
     );
-    b.add::<odf_server::LoginService>();
     b.add::<ConfirmDeleteService>();
+
+    odf_server::register_dependencies(&mut b, is_e2e_testing);
 
     b
 }

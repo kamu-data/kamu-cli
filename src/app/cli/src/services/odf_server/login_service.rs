@@ -37,6 +37,9 @@ pub const DEFAULT_ODF_BACKEND_URL: &str = "https://api.demo.kamu.dev";
 #[dill::component(pub)]
 pub struct LoginService {
     time_source: Arc<dyn SystemTimeSource>,
+
+    #[dill::component(explicit)]
+    is_e2e_testing: bool,
 }
 
 impl LoginService {
@@ -46,15 +49,20 @@ impl LoginService {
     pub async fn login_interactive(
         &self,
         odf_server_frontend_url: &Url,
+        predefined_odf_server_backend_url: Option<&Url>,
         login_polling_started_callback: impl Fn(&str) + Send,
     ) -> Result<LoginInteractiveResponse, LoginError> {
         // TODO: Replace with REST API client
         let client = reqwest::Client::new();
 
         // Getting the backend address (API)
-        let odf_server_backend_url = self
-            .odf_server_backend_url(&client, odf_server_frontend_url)
-            .await?;
+        let odf_server_backend_url =
+            if let Some(odf_server_backend_url) = predefined_odf_server_backend_url {
+                odf_server_backend_url.clone()
+            } else {
+                self.odf_server_backend_url(&client, odf_server_frontend_url)
+                    .await?
+            };
 
         tracing::debug!(url = %odf_server_backend_url, "ODF server backend URL");
 
@@ -81,10 +89,19 @@ impl LoginService {
             let login_url = device_authorization_response.verification_uri_with_device_code();
 
             login_polling_started_callback(&login_url);
-            let _ = webbrowser::open(&login_url);
+
+            if !self.is_e2e_testing {
+                let _ = webbrowser::open(&login_url);
+            }
         }
 
         // Start polling
+        let expires_in_seconds = if self.is_e2e_testing {
+            10
+        } else {
+            device_authorization_response.expires_in
+        };
+
         loop {
             let device_access_token_response = self
                 .device_access_token(
@@ -127,11 +144,10 @@ impl LoginService {
                 .try_into()
                 .unwrap();
 
-            if elapsed_time_in_seconds >= device_authorization_response.expires_in {
+            if elapsed_time_in_seconds >= expires_in_seconds {
                 return Err(LoginErrorAccessFailed {
                     reason: format!(
-                        "Device authorization expired after {} seconds",
-                        device_authorization_response.expires_in
+                        "Device authorization expired after {expires_in_seconds} seconds",
                     ),
                 }
                 .into());
