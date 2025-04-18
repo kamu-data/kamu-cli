@@ -171,7 +171,6 @@ impl OutboxAgent {
                 .get_latest_message_ids_by_producer()
                 .await?;
 
-            // Convert into map
             latest_message_ids_by_producer
                 .into_iter()
                 .collect::<HashMap<_, _>>()
