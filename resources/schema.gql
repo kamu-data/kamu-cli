@@ -324,6 +324,22 @@ type BlockRef {
 }
 
 
+type BuildInfo {
+	appVersion: String!
+	buildTimestamp: String
+	gitDescribe: String
+	gitSha: String
+	gitCommitDate: String
+	gitBranch: String
+	rustcSemver: String
+	rustcChannel: String
+	rustcHostTriple: String
+	rustcCommitSha: String
+	cargoTargetTriple: String
+	cargoFeatures: String
+	cargoOptLevel: String
+}
+
 interface CancelScheduledTasksResult {
 	message: String!
 }
@@ -2228,6 +2244,10 @@ type Query {
 	Returns the version of the GQL API
 	"""
 	apiVersion: String!
+	"""
+	Returns server's version and build configuration information
+	"""
+	buildInfo: BuildInfo!
 	"""
 	Authentication and authorization-related functionality group
 	"""
