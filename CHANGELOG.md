@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- New GQL endpoint `buildInfo` that returns application version and build details
 ### Changed
 - Updated `sqlx` crate to `0.8.5`
 

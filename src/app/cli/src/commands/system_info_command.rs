@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use internal_error::*;
+use observability::build_info::BuildInfo;
 use serde_json::Value;
 
 use super::{CLIError, Command};
@@ -30,6 +31,7 @@ pub enum SystemInfoOutputFormat {
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct SystemInfoCommand {
+    build_info: observability::build_info::BuildInfo,
     output_config: Arc<OutputConfig>,
     workspace_svc: Arc<WorkspaceService>,
     container_runtime: Arc<ContainerRuntime>,
@@ -38,14 +40,22 @@ pub struct SystemInfoCommand {
     output_format: Option<SystemInfoOutputFormat>,
 }
 
+impl SystemInfoCommand {
+    pub async fn collect(&self) -> SystemInfo {
+        SystemInfo::collect(
+            self.build_info.clone(),
+            &self.container_runtime,
+            &self.workspace_svc,
+        )
+        .await
+    }
+}
+
 #[async_trait::async_trait(?Send)]
 impl Command for SystemInfoCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        write_output(
-            SystemInfo::collect(&self.container_runtime, &self.workspace_svc).await,
-            &self.output_config,
-            self.output_format,
-        )?;
+        let system_info = self.collect().await;
+        write_output(system_info, &self.output_config, self.output_format)?;
         Ok(())
     }
 }
@@ -55,6 +65,7 @@ impl Command for SystemInfoCommand {
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct VersionCommand {
+    build_info: BuildInfo,
     output_config: Arc<OutputConfig>,
 
     #[dill::component(explicit)]
@@ -64,11 +75,7 @@ pub struct VersionCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for VersionCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        write_output(
-            BuildInfo::collect(),
-            &self.output_config,
-            self.output_format,
-        )?;
+        write_output(&self.build_info, &self.output_config, self.output_format)?;
         Ok(())
     }
 }
@@ -112,53 +119,14 @@ pub struct SystemInfo {
 
 impl SystemInfo {
     pub async fn collect(
+        build: BuildInfo,
         container_runtime_svc: &ContainerRuntime,
         workspace_svc: &WorkspaceService,
     ) -> Self {
         Self {
-            build: BuildInfo::collect(),
+            build,
             workspace: WorkspaceInfo::collect(workspace_svc),
             container_runtime: ContainerRuntimeInfo::collect(container_runtime_svc).await,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BuildInfo {
-    pub app_version: &'static str,
-    pub build_timestamp: Option<&'static str>,
-    pub git_describe: Option<&'static str>,
-    pub git_sha: Option<&'static str>,
-    pub git_commit_date: Option<&'static str>,
-    pub git_branch: Option<&'static str>,
-    pub rustc_semver: Option<&'static str>,
-    pub rustc_channel: Option<&'static str>,
-    pub rustc_host_triple: Option<&'static str>,
-    pub rustc_commit_sha: Option<&'static str>,
-    pub cargo_target_triple: Option<&'static str>,
-    pub cargo_features: Option<&'static str>,
-    pub cargo_opt_level: Option<&'static str>,
-}
-
-impl BuildInfo {
-    pub fn collect() -> Self {
-        Self {
-            app_version: env!("CARGO_PKG_VERSION"),
-            build_timestamp: option_env!("VERGEN_BUILD_TIMESTAMP"),
-            git_describe: option_env!("VERGEN_GIT_DESCRIBE"),
-            git_sha: option_env!("VERGEN_GIT_SHA"),
-            git_commit_date: option_env!("VERGEN_GIT_COMMIT_DATE"),
-            git_branch: option_env!("VERGEN_GIT_BRANCH"),
-            rustc_semver: option_env!("VERGEN_RUSTC_SEMVER"),
-            rustc_channel: option_env!("VERGEN_RUSTC_CHANNEL"),
-            rustc_host_triple: option_env!("VERGEN_RUSTC_HOST_TRIPLE"),
-            rustc_commit_sha: option_env!("VERGEN_RUSTC_COMMIT_HASH"),
-            cargo_target_triple: option_env!("VERGEN_CARGO_TARGET_TRIPLE"),
-            cargo_features: option_env!("VERGEN_CARGO_FEATURES"),
-            cargo_opt_level: option_env!("VERGEN_CARGO_OPT_LEVEL"),
         }
     }
 }
