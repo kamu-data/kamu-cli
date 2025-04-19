@@ -80,7 +80,21 @@ async fn test_indexes_datasets_correctly() {
                         .build(),
                 )
                 .build_typed(),
-                odf::dataset::StoreDatasetOpts { set_head: true },
+            )
+            .await
+            .unwrap();
+
+        // Set initial head ref
+        stored
+            .dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &stored.seed,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(None),
+                },
             )
             .await
             .unwrap();

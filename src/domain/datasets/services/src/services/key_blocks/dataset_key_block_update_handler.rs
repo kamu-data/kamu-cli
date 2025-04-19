@@ -34,6 +34,7 @@ use crate::collect_dataset_key_blocks_in_range;
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetKeyBlockUpdateHandler {
     dataset_registry: Arc<dyn DatasetRegistry>,

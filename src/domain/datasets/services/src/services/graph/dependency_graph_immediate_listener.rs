@@ -43,6 +43,7 @@ use crate::{extract_modified_dependencies_in_interval, DependencyChange};
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Immediate,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DependencyGraphImmediateListener {
     dependency_graph_service: Arc<dyn DependencyGraphService>,

@@ -14,9 +14,14 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Changed
 - Updated `sqlx` crate to `0.8.5`
+
+## [0.233.1] - 2025-04-19
+### Changed
+- Outbox: Added new param in consumer metadata `initial_consumer_boundary` which allow new consumer to not process all messages, but start from latest one
 ### Fixed
 - `kamu init`: in case of using `--pull-images` argument, fixed unclear error with not found file.
 - CLI commands: Trigger `outbox_agent` method only for commands that require it.
+- S3 get_stored_dataset_by_id operation takes advantage of in-memory datasets listing cache
 
 ## [0.233.0] - 2025-04-09
 ### Added

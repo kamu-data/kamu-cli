@@ -29,10 +29,10 @@ test_message_type!(B);
 test_message_type!(C); // No consumers
 test_message_type!(D);
 
-test_message_consumer!(A, A, TEST_PRODUCER_A, Immediate);
-test_message_consumer!(B, B, TEST_PRODUCER_B, Immediate);
-test_message_consumer!(D, D1, TEST_PRODUCER_D, Immediate);
-test_message_consumer!(D, D2, TEST_PRODUCER_D, Immediate);
+test_message_consumer!(A, A, TEST_PRODUCER_A, Immediate, All);
+test_message_consumer!(B, B, TEST_PRODUCER_B, Immediate, All);
+test_message_consumer!(D, D1, TEST_PRODUCER_D, Immediate, All);
+test_message_consumer!(D, D2, TEST_PRODUCER_D, Immediate, All);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
