@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use odf::DatasetID;
-use odf_dataset::{SetRefOpts, StoreDatasetOpts};
+use odf_dataset::SetRefOpts;
 use odf_metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +36,7 @@ pub async fn test_store_dataset<
     );
 
     let store_result = storage_unit
-        .store_dataset(seed_block.clone(), StoreDatasetOpts::default())
+        .store_dataset(seed_block.clone())
         .await
         .unwrap();
 
@@ -64,9 +64,7 @@ pub async fn test_store_dataset<
         .unwrap();
 
     // Now test ID collision
-    let store_result = storage_unit
-        .store_dataset(seed_block, StoreDatasetOpts::default())
-        .await;
+    let store_result = storage_unit.store_dataset(seed_block).await;
 
     assert_matches!(
         store_result.err(),
@@ -89,9 +87,10 @@ pub async fn test_delete_dataset<
     )
     .build_typed();
     let store_result = storage_unit
-        .store_dataset(seed_block.clone(), StoreDatasetOpts { set_head: true })
+        .store_dataset(seed_block.clone())
         .await
         .unwrap();
+    set_initial_head(&store_result).await;
 
     // We should see the dataset
     assert!(storage_unit
@@ -138,13 +137,15 @@ pub async fn test_iterate_datasets<
     .build_typed();
 
     let store_result_1 = storage_unit
-        .store_dataset(seed_block_1.clone(), StoreDatasetOpts { set_head: true })
+        .store_dataset(seed_block_1.clone())
         .await
         .unwrap();
     let store_result_2 = storage_unit
-        .store_dataset(seed_block_2.clone(), StoreDatasetOpts { set_head: true })
+        .store_dataset(seed_block_2.clone())
         .await
         .unwrap();
+    set_initial_head(&store_result_1).await;
+    set_initial_head(&store_result_2).await;
 
     use futures::TryStreamExt;
     let mut actual_datasets: Vec<_> = storage_unit
@@ -161,6 +162,25 @@ pub async fn test_iterate_datasets<
     expected_datasets.sort_by_key(DatasetID::to_string);
 
     assert_eq!(expected_datasets, actual_datasets);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn set_initial_head(stored: &odf::dataset::StoreDatasetResult) {
+    // Set head ref
+    stored
+        .dataset
+        .as_metadata_chain()
+        .set_ref(
+            &odf::BlockRef::Head,
+            &stored.seed,
+            SetRefOpts {
+                validate_block_present: true,
+                check_ref_is: Some(None),
+            },
+        )
+        .await
+        .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

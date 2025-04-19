@@ -11,9 +11,10 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use odf_metadata::{DatasetID, DatasetKind, MetadataBlockTyped, Multihash, Seed};
+use odf_storage::BlockNotFoundError;
 use thiserror::Error;
 
-use crate::{Dataset, DatasetUnresolvedIdError, GetStoredDatasetError};
+use crate::{BlockRef, Dataset, DatasetUnresolvedIdError, GetStoredDatasetError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,18 +24,16 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
-        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError>;
 
+    async fn write_dataset_reference(
+        &self,
+        dataset_id: &DatasetID,
+        block_ref: &BlockRef,
+        hash: &Multihash,
+    ) -> Result<(), WriteDatasetReferenceError>;
+
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default, Debug)]
-pub struct StoreDatasetOpts {
-    /// Set HEAD reference to the block after storing
-    pub set_head: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,6 +68,21 @@ impl StoreDatasetResult {
 pub enum StoreDatasetError {
     #[error(transparent)]
     RefCollision(#[from] RefCollisionError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum WriteDatasetReferenceError {
+    #[error(transparent)]
+    BlockNotFound(#[from] BlockNotFoundError),
 
     #[error(transparent)]
     Internal(

@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use dill::{component, interface, meta, Catalog};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_core::{DatasetRegistry, DatasetRegistryExt};
 use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetReferenceRepository,
@@ -46,7 +45,7 @@ use messaging_outbox::{
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetReferenceServiceImpl {
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
     outbox: Arc<dyn Outbox>,
 }
@@ -128,19 +127,11 @@ impl MessageConsumerT<DatasetReferenceMessage> for DatasetReferenceServiceImpl {
 
         match message {
             DatasetReferenceMessage::Updated(updated_message) => {
-                // Resolve dataset
-                let dataset = self
-                    .dataset_registry
-                    .get_dataset_by_id(&updated_message.dataset_id)
-                    .await
-                    .int_err()?;
-
                 // Update reference at storage level
-                dataset
-                    .as_metadata_chain()
-                    .as_uncached_ref_repo() // Access storage level directly!
-                    .set(
-                        updated_message.block_ref.as_str(),
+                self.dataset_storage_unit_writer
+                    .write_dataset_reference(
+                        &updated_message.dataset_id,
+                        &updated_message.block_ref,
                         &updated_message.new_block_hash,
                     )
                     .await
