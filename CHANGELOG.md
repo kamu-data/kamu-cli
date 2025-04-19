@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- New GQL endpoint `buildInfo` that returns application version and build details
 ### Changed
 - Outbox: Added new param in consumer metadata `initial_consumer_boundary` which allow new consumer to not process all messages, but start from latest one
 ### Fixed
