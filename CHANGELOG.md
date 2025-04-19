@@ -11,9 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.233.2] - 2025-04-19
 ### Changed
 - Updated `sqlx` crate to `0.8.5`
+### Fixed
+- Revert breaking build changes
 
 ## [0.233.1] - 2025-04-19
 ### Changed
