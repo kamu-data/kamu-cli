@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.233.3] - 2025-04-21
 ### Fixed
 - Reverted `sqlx` upgrade that was breaking the release build
 
