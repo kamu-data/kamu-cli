@@ -313,4 +313,7 @@ debug = "line-tables-only"
 # datafusion-ethers = { git = "https://github.com/kamu-data/datafusion-ethers.git", tag = "42.0.0" }
 # object_store = { git = 'https://github.com/s373r/arrow-rs', branch = 'add-debug-logs', package = "object_store" }
 assert_cmd = { git = 'https://github.com/kamu-data/assert_cmd', branch = "deactivate-output-truncation" }
-
+# TODO: Delete this workaround when this PR is merged:
+#       - Fix: nextest cleanup race condition by bonega
+#         https://github.com/launchbadge/sqlx/pull/3334
+sqlx = { git = 'https://github.com/kamu-data/sqlx', branch = 'nextest-race-condition' }
