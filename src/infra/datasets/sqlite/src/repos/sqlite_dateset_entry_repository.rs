@@ -108,6 +108,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 SELECT
                     dataset_id   as "id: _",
                     owner_id     as "owner_id: _",
+                    owner_name,
                     dataset_name as name,
                     created_at   as "created_at: _",
                     kind         as "kind: _"
@@ -144,6 +145,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             r#"
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
+                   owner_name,
                    dataset_name as name,
                    created_at   as "created_at: _",
                    kind         as "kind: _"
@@ -175,6 +177,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             r#"
             SELECT dataset_id as id,
                    owner_id,
+                   owner_name,
                    dataset_name as name,
                    created_at,
                    kind
@@ -200,9 +203,10 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 let entry_row = DatasetEntryRowModel {
                     id: row.get(0),
                     owner_id: row.get(1),
-                    name: row.get(2),
-                    created_at: row.get(3),
-                    kind: row.get(4),
+                    owner_name: row.get(2),
+                    name: row.get(3),
+                    created_at: row.get(4),
+                    kind: row.get(5),
                 };
                 DatasetEntry::from(entry_row)
             })
@@ -244,6 +248,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             r#"
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
+                   owner_name,
                    dataset_name as name,
                    created_at   as "created_at: _",
                    kind         as "kind: _"
@@ -288,6 +293,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 SELECT
                     dataset_id   as "id: _",
                     owner_id     as "owner_id: _",
+                    owner_name,
                     dataset_name as name,
                     created_at   as "created_at: _",
                     kind         as "kind: _"
@@ -320,6 +326,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let dataset_id_as_str = stack_dataset_id.as_str();
         let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
         let owner_id_as_str = stack_owner_id.as_str();
+        let owner_name_as_str = dataset_entry.owner_name.as_str();
         let dataset_name_as_str = dataset_entry.name.as_str();
 
         let dataset_entry_kind: DatasetEntryKindRowModel = dataset_entry.kind.into();
@@ -327,11 +334,12 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO dataset_entries(dataset_id, owner_id, dataset_name, created_at, kind)
-                VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO dataset_entries(dataset_id, owner_id, owner_name, dataset_name, created_at, kind)
+                VALUES ($1, $2, $3, $4, $5, $6)
             "#,
             dataset_id_as_str,
             owner_id_as_str,
+            owner_name_as_str,
             dataset_name_as_str,
             dataset_entry.created_at,
             dataset_entry_kind_str,

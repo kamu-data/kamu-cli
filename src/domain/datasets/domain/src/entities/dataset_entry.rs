@@ -16,6 +16,7 @@ use chrono::{DateTime, Utc};
 pub struct DatasetEntry {
     pub id: odf::DatasetID,
     pub owner_id: odf::AccountID,
+    pub owner_name: odf::AccountName,
     pub name: odf::DatasetName,
     pub created_at: DateTime<Utc>,
     pub kind: odf::DatasetKind,
@@ -25,6 +26,7 @@ impl DatasetEntry {
     pub fn new(
         id: odf::DatasetID,
         owner_id: odf::AccountID,
+        owner_name: odf::AccountName,
         name: odf::DatasetName,
         created_at: DateTime<Utc>,
         kind: odf::DatasetKind,
@@ -32,6 +34,7 @@ impl DatasetEntry {
         Self {
             id,
             owner_id,
+            owner_name,
             name,
             created_at,
             kind,
@@ -46,6 +49,7 @@ impl DatasetEntry {
 pub struct DatasetEntryRowModel {
     pub id: odf::DatasetID,
     pub owner_id: odf::AccountID,
+    pub owner_name: String,
     pub name: String,
     pub created_at: DateTime<Utc>,
     pub kind: DatasetEntryKindRowModel,
@@ -79,6 +83,7 @@ impl From<DatasetEntryRowModel> for DatasetEntry {
         DatasetEntryRowModel {
             id,
             owner_id,
+            owner_name,
             name,
             created_at,
             kind,
@@ -87,6 +92,7 @@ impl From<DatasetEntryRowModel> for DatasetEntry {
         Self {
             id,
             owner_id,
+            owner_name: odf::AccountName::new_unchecked(&owner_name),
             name: odf::DatasetName::new_unchecked(&name),
             created_at,
             kind: match kind {

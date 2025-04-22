@@ -13,7 +13,13 @@ use std::sync::Arc;
 use chrono::{SubsecRound, Utc};
 use dill::Catalog;
 use email_utils::Email;
-use kamu_accounts::{Account, AccountRepository, AccountType, DEFAULT_ACCOUNT_ID};
+use kamu_accounts::{
+    Account,
+    AccountRepository,
+    AccountType,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
+};
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,12 +62,14 @@ pub(crate) fn new_dataset_entry_with(
 ) -> DatasetEntry {
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let owner_id = owner.id.clone();
+    let owner_name = owner.account_name.clone();
     let dataset_alias = odf::DatasetName::new_unchecked(dataset_name);
     let created_at = Utc::now().round_subsecs(6);
 
     DatasetEntry::new(
         dataset_id,
         owner_id,
+        owner_name,
         dataset_alias,
         created_at,
         dataset_kind,
@@ -74,14 +82,14 @@ pub(crate) fn new_dataset_entry(owner: &Account, dataset_kind: odf::DatasetKind)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn init_test_account(catalog: &Catalog) -> odf::AccountID {
+pub(crate) async fn init_test_account(catalog: &Catalog) -> (odf::AccountID, odf::AccountName) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     account_repo
         .create_account(&Account::dummy())
         .await
         .unwrap();
 
-    DEFAULT_ACCOUNT_ID.clone()
+    (DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,6 +97,7 @@ pub(crate) async fn init_test_account(catalog: &Catalog) -> odf::AccountID {
 pub(crate) async fn init_dataset_entry(
     catalog: &Catalog,
     account_id: &odf::AccountID,
+    account_name: &odf::AccountName,
     dataset_id: &odf::DatasetID,
     dataset_name: &odf::DatasetName,
     dataset_kind: odf::DatasetKind,
@@ -98,6 +107,7 @@ pub(crate) async fn init_dataset_entry(
         .save_dataset_entry(&DatasetEntry {
             id: dataset_id.clone(),
             owner_id: account_id.clone(),
+            owner_name: account_name.clone(),
             name: dataset_name.clone(),
             created_at: Utc::now(),
             kind: dataset_kind,

@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Denormalization: `DatasetEntry` now contains a copy of owner's account name
+   for faster dataset handle resolutions without extra round trip to database
+
 ## [0.233.4] - 2025-04-22
 ### Changed
 - Forcing warmup of dataset ids listing cache on startup

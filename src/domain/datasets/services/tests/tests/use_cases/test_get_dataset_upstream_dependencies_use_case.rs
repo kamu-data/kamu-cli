@@ -344,11 +344,16 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
             &dataset_handle.alias.account_name,
             DEFAULT_ACCOUNT_NAME_STR,
         );
+        let owner_name = odf::metadata::testing::account_name_by_maybe_name(
+            &dataset_handle.alias.account_name,
+            DEFAULT_ACCOUNT_NAME_STR,
+        );
 
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.system_time_source.now(),
             id: dataset_handle.id.clone(),
             owner_id: owner_id.clone(),
+            owner_name,
             name: dataset_handle.alias.dataset_name.clone(),
             kind: odf::DatasetKind::Root,
         });
@@ -378,11 +383,16 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
             &dataset_handle.alias.account_name,
             DEFAULT_ACCOUNT_NAME_STR,
         );
+        let owner_name = odf::metadata::testing::account_name_by_maybe_name(
+            &dataset_handle.alias.account_name,
+            DEFAULT_ACCOUNT_NAME_STR,
+        );
 
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.system_time_source.now(),
             id: dataset_handle.id.clone(),
             owner_id: owner_id.clone(),
+            owner_name,
             name: dataset_handle.alias.dataset_name.clone(),
             kind: odf::DatasetKind::Derivative,
         });

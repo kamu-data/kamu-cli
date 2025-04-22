@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::AccountService;
 use kamu_core::auth::{ClassifyByAllowanceIdsResponse, DatasetAction, DatasetActionAuthorizer};
 use kamu_core::{DependencyGraphService, TenancyConfig};
 use kamu_datasets::{
@@ -30,7 +29,6 @@ pub struct GetDatasetUpstreamDependenciesUseCaseImpl {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
-    account_service: Arc<dyn AccountService>,
 }
 
 #[async_trait::async_trait]
@@ -76,45 +74,18 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
             .await
             .int_err()?;
 
-        let owner_ids = dataset_entries_resolution
-            .resolved_entries_owner_ids()
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        upstream_dependencies.extend(
-            dataset_entries_resolution
-                .unresolved_entries
-                .into_iter()
-                .map(DatasetDependency::Unresolved),
-        );
-
-        let account_map = self
-            .account_service
-            .get_account_map(&owner_ids)
-            .await
-            .int_err()?;
-
         for dataset_entry in dataset_entries_resolution.resolved_entries {
-            let maybe_account = account_map.get(&dataset_entry.owner_id);
-            if let Some(account) = maybe_account {
-                let dataset_alias = self
-                    .tenancy_config
-                    .make_alias(account.account_name.clone(), dataset_entry.name);
-                let dataset_handle =
-                    odf::DatasetHandle::new(dataset_entry.id, dataset_alias, dataset_entry.kind);
+            let dataset_alias = self
+                .tenancy_config
+                .make_alias(dataset_entry.owner_name.clone(), dataset_entry.name);
+            let dataset_handle =
+                odf::DatasetHandle::new(dataset_entry.id, dataset_alias, dataset_entry.kind);
 
-                upstream_dependencies.push(DatasetDependency::resolved(
-                    dataset_handle,
-                    account.id.clone(),
-                    account.account_name.clone(),
-                ));
-            } else {
-                tracing::warn!(
-                    "Upstream owner's account not found for dataset: {:?}",
-                    &dataset_entry
-                );
-                upstream_dependencies.push(DatasetDependency::Unresolved(dataset_entry.id));
-            }
+            upstream_dependencies.push(DatasetDependency::resolved(
+                dataset_handle,
+                dataset_entry.owner_id,
+                dataset_entry.owner_name,
+            ));
         }
 
         Ok(upstream_dependencies)

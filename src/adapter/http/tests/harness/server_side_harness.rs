@@ -46,6 +46,8 @@ pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
 pub(crate) trait ServerSideHarness {
     fn server_account_id(&self) -> odf::AccountID;
 
+    fn server_account_name(&self) -> odf::AccountName;
+
     fn operating_account_name(&self) -> Option<odf::AccountName>;
 
     fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry>;
