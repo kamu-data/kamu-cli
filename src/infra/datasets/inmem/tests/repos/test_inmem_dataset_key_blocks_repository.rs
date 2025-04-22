@@ -41,6 +41,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = dataset_key_blocks_repo::test_filter_datasets_having_blocks,
+    harness = InMemoryDatasetKeyBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = dataset_key_blocks_repo::test_delete_blocks,
     harness = InMemoryDatasetKeyBlockRepositoryHarness
 );
