@@ -22,6 +22,7 @@
   - [Minor Dependencies Update](#minor-dependencies-update)
   - [Major Dependencies Update](#major-dependencies-update)
   - [Building Multi-platform Images](#building-multi-platform-images)
+  - [Upgrading Datafusion stack](#upgrading-datafusion-stack)
 - [Tips](#tips)
   - [IDE Configuration](#ide-configuration)
   - [Debugging](#debugging)
@@ -423,6 +424,35 @@ If in some situation you want to run an image from different architecture on Lin
 ```sh
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 ```
+
+
+### Upgrading Datafusion stack
+We embed Datafusion engine as our main data manipulation library and try to stay up to date with new versions.
+
+The usual upgrade procedure looks like this:
+1. Open [`datafusion`](https://github.com/apache/datafusion/) repo and note which versions of `arrow` and `object_store` crates it is using (in `Cargo.toml`)
+2. Upgrade [`arrow-digest`](https://github.com/kamu-data/arrow-digest/) crate to new arrow if needed and publish
+3. Upgrade [`datafusion-odata`](https://github.com/kamu-data/datafusion-odata) and [`datafusion-ethers`](https://github.com/kamu-data/datafusion-ethers) crates to new `datafusion` and publish
+4. Check 3rd party extensions we depend on have upgraded: [`datafusion-functions-json`](https://github.com/datafusion-contrib/datafusion-functions-json)
+5. Upgrade `kamu-cli` using command like:
+   ```sh
+   cargo -Z unstable-options update --breaking \
+     -p arrow \
+     -p arrow-digest \
+     -p arrow-flight \
+     -p arrow-json \
+     -p arrow-schema \
+     -p object_store \
+     -p datafusion \
+     -p datafusion-functions-json \
+     -p datafusion-odata \
+     -p datafusion-ethers \
+     -p parquet \
+     --dry-run
+   ```
+6. Ensure `Cargo.lock` does not contain duplicate versions of major crates (or run `cargo deny check --hide-inclusion-graph`)
+7. Follow the steps in `src/utils/datafusion-cli/README.md` to update the SQL shell
+8. Fix any compilation errors and warnings and ensure tests are green
 
 
 ## Tips
