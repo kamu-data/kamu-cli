@@ -1,9 +1,6 @@
 kind: CLIConfig
 version: 1
 content:
-  datasetEnvVars:
-    enabled: true
-    encryptionKey: "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC"
   users:
     predefined:
       - accountName: kamu
