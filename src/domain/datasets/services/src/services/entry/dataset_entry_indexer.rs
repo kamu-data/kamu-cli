@@ -72,6 +72,23 @@ impl DatasetEntryIndexer {
         Ok(stored_dataset_entries_count > 0)
     }
 
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        name = "DatasetEntryIndexer::warm_up_storage_units"
+    )]
+    async fn warm_up_storage_units(&self) -> Result<(), InternalError> {
+        // Warmup listing cache in storage units
+        use futures::TryStreamExt;
+        self.dataset_storage_unit
+            .stored_dataset_ids()
+            .try_next()
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
     #[tracing::instrument(level = "info", skip_all, name = "DatasetEntryIndexer::index_datasets")]
     async fn index_datasets(&self) -> Result<(), InternalError> {
         use futures::TryStreamExt;
@@ -211,6 +228,9 @@ impl InitOnStartup for DatasetEntryIndexer {
     async fn run_initialization(&self) -> Result<(), InternalError> {
         if self.has_datasets_indexed().await? {
             tracing::debug!("Skip initialization: datasets already have indexed");
+
+            // Still, let's warmup listing cache in storage units
+            self.warm_up_storage_units().await?;
 
             return Ok(());
         }

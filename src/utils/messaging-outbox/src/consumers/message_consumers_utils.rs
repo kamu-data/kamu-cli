@@ -104,6 +104,28 @@ fn particular_consumers_for<TMessage: Message + 'static>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn particular_consumer_metadata_for(
+    catalog: &Catalog,
+    consumer_name: &str,
+) -> Option<MessageConsumerMeta> {
+    catalog
+        .builders_for_with_meta::<dyn MessageConsumer, _>(|meta: &MessageConsumerMeta| {
+            meta.consumer_name == consumer_name
+        })
+        .next()
+        .and_then(|consumer_builder| {
+            let all_metadata: Vec<&MessageConsumerMeta> = consumer_builder.metadata_get_all();
+            assert!(
+                all_metadata.len() <= 1,
+                "Multiple consumer metadata records unexpected for {}",
+                consumer_builder.instance_type_name()
+            );
+            all_metadata.first().map(|meta| (**meta).clone())
+        })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn consumers_from_builders<'a, TMessage: Message + 'static>(
     catalog: &'a Catalog,
     builders: Box<dyn Iterator<Item = TypecastBuilder<'a, dyn MessageConsumerT<TMessage>>> + 'a>,

@@ -120,7 +120,6 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
-        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
         use DatasetStorageUnit;
@@ -184,11 +183,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible
                     check_ref_is: Some(None),
-                    update_ref: if opts.set_head {
-                        Some(&BlockRef::Head)
-                    } else {
-                        None
-                    },
+                    update_ref: None,
                     ..AppendOpts::default()
                 },
             )
@@ -210,6 +205,52 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             dataset,
             seed,
         })
+    }
+
+    #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_write_dataset_reference, skip_all, fields(%dataset_id))]
+    async fn write_dataset_reference(
+        &self,
+        dataset_id: &DatasetID,
+        block_ref: &BlockRef,
+        hash: &Multihash,
+    ) -> Result<(), WriteDatasetReferenceError> {
+        // A simple check: the directory exists or not
+        let dataset_path = self.get_dataset_path(dataset_id);
+        if !dataset_path.is_dir() {
+            return Err(WriteDatasetReferenceError::BlockNotFound(
+                BlockNotFoundError { hash: hash.clone() },
+            ));
+        }
+
+        // Build dataset without advanced checks, as HEAD might not exist yet
+        let layout = DatasetLayout::create(&dataset_path).int_err()?;
+        let dataset = self
+            .dataset_lfs_builder
+            .build_lfs_dataset(dataset_id, layout);
+
+        // Try checking if block exists
+        dataset
+            .as_metadata_chain()
+            .get_block_size(hash)
+            .await
+            .map_err(|e| match e {
+                GetBlockDataError::NotFound(e) => WriteDatasetReferenceError::BlockNotFound(e),
+                GetBlockDataError::Access(e) => e.int_err().into(),
+                GetBlockDataError::Internal(e) => e.into(),
+            })?;
+
+        // Try writing the reference
+        dataset
+            .as_metadata_chain()
+            .as_uncached_ref_repo()
+            .set(block_ref.as_str(), hash)
+            .await
+            .map_err(|e| match e {
+                SetRefError::Access(e) => e.int_err(),
+                SetRefError::Internal(e) => e,
+            })?;
+
+        Ok(())
     }
 
     #[tracing::instrument(level = "debug", name = DatasetStorageUnitLocalFs_delete_dataset, skip_all, fields(%dataset_id))]

@@ -20,6 +20,7 @@ use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
 };
 use messaging_outbox::{
+    InitialConsumerBoundary,
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
@@ -52,6 +53,7 @@ struct FlowSystemTestListenerState {
     consumer_name: "FlowSystemTestListener",
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_AGENT, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE],
     delivery: MessageDeliveryMechanism::Immediate,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl FlowSystemTestListener {
     pub(crate) fn new(
