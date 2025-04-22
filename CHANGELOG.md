@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.233.4] - 2025-04-22
+### Changed
+- Forcing warmup of dataset ids listing cache on startup
+
 ## [0.233.3] - 2025-04-21
 ### Fixed
 - Reverted `sqlx` upgrade that was breaking the release build

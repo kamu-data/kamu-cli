@@ -54,7 +54,6 @@ pub struct DatasetReferenceServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetReferenceService for DatasetReferenceServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(dataset_id, block_ref))]
     async fn get_reference(
         &self,
         dataset_id: &odf::DatasetID,
@@ -65,7 +64,6 @@ impl DatasetReferenceService for DatasetReferenceServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(dataset_id, block_ref))]
     async fn set_reference(
         &self,
         dataset_id: &odf::DatasetID,
