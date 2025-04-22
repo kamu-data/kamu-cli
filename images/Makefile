@@ -83,26 +83,6 @@ kamu-base-with-data-mt-push:
 		KAMU_VERSION=$(KAMU_VERSION) \
 		image-push
 
-
-################################################################################
-
-
-.PHONY: kamu-base-with-env-var-storage
-kamu-base-with-env-var-storage:
-	make -C kamu-base-with-env-var-storage/ \
-		IMAGE_REPO=$(IMAGE_REPO) \
-		KAMU_VERSION=$(KAMU_VERSION) \
-		workspace image
-
-
-.PHONY: kamu-base-with-env-var-storage-push
-kamu-base-with-env-var-storage-push:
-	make -C kamu-base-with-env-var-storage/ \
-		IMAGE_REPO=$(IMAGE_REPO) \
-		KAMU_VERSION=$(KAMU_VERSION) \
-		image-push
-
-
 ################################################################################
 
 sqlx-cli sqlx-cli-push: SQLX_CLI_IMAGE_EXISTS = $(shell \
