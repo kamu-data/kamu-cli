@@ -481,7 +481,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
-        self.get_all_flow_ids_by_datasets(HashSet::from([dataset_id.clone()]), filters, pagination)
+        self.get_all_flow_ids_by_datasets(&[dataset_id], filters, pagination)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
@@ -522,10 +522,12 @@ impl FlowEventStore for InMemoryFlowEventStore {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?pagination))]
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
+        let dataset_ids: HashSet<_> = dataset_ids.iter().copied().collect();
+
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
@@ -695,9 +697,11 @@ impl FlowEventStore for InMemoryFlowEventStore {
 
     async fn get_count_flows_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError> {
+        let dataset_ids: HashSet<_> = dataset_ids.iter().copied().collect();
+
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 

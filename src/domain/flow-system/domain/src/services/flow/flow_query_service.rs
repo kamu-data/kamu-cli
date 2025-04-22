@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use event_sourcing::LoadError;
@@ -69,7 +67,7 @@ pub trait FlowQueryService: Sync + Send {
     /// ordered by creation time from newest to oldest.
     async fn list_all_flows_by_dataset_ids(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;

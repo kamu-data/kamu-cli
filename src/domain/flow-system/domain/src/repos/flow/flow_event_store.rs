@@ -69,7 +69,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// matching filters, if specified
     async fn get_count_flows_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError>;
 
@@ -78,7 +78,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Applies filters/pagination, if specified
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream;

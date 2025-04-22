@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
 use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
@@ -756,7 +755,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
@@ -1086,7 +1085,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
     async fn get_count_flows_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
