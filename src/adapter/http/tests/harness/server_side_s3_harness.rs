@@ -194,6 +194,13 @@ impl ServerSideHarness for ServerSideS3Harness {
         }
     }
 
+    fn server_account_name(&self) -> odf::AccountName {
+        match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_NAME.clone(),
+        }
+    }
+
     fn operating_account_name(&self) -> Option<odf::AccountName> {
         match self.options.tenancy_config {
             TenancyConfig::MultiTenant => {

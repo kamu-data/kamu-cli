@@ -13,7 +13,12 @@ use std::sync::Arc;
 
 use dill::Component;
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
-use kamu_accounts::{AccountConfig, CurrentAccountSubject, PredefinedAccountsConfig};
+use kamu_accounts::{
+    AccountConfig,
+    CurrentAccountSubject,
+    PredefinedAccountsConfig,
+    DEFAULT_ACCOUNT_NAME,
+};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
@@ -724,11 +729,17 @@ impl DatasetAuthorizerHarness {
     ) {
         for dataset_handle in datasets_handles {
             let account_id = account_id(&dataset_handle.alias);
+            let account_name = dataset_handle
+                .alias
+                .account_name
+                .as_ref()
+                .unwrap_or(&DEFAULT_ACCOUNT_NAME);
 
             self.dataset_entry_writer
                 .create_entry(
                     &dataset_handle.id,
                     &account_id,
+                    account_name,
                     &dataset_handle.alias.dataset_name,
                     odf::DatasetKind::Root,
                 )

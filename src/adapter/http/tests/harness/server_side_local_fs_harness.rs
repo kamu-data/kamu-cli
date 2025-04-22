@@ -22,6 +22,7 @@ use kamu_accounts::{
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
 };
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
 use kamu_accounts_services::*;
@@ -215,6 +216,13 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
                 odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes())
             }
             TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_ID.clone(),
+        }
+    }
+
+    fn server_account_name(&self) -> odf::AccountName {
+        match self.options.tenancy_config {
+            TenancyConfig::MultiTenant => odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_NAME.clone(),
         }
     }
 

@@ -84,6 +84,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
             .create_entry(
                 &server_create_result.dataset_handle.id,
                 &client_harness.client_account_id(),
+                &client_harness.client_account_name(),
                 &server_create_result.dataset_handle.alias.dataset_name,
                 odf::DatasetKind::Root,
             )

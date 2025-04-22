@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    dataset_id   as \"id: _\",\n                    owner_id     as \"owner_id: _\",\n                    dataset_name as name,\n                    created_at   as \"created_at: _\",\n                    kind         as \"kind: _\"\n                FROM dataset_entries\n                ORDER BY dataset_name ASC\n                LIMIT $1 OFFSET $2\n                ",
+  "query": "\n            SELECT dataset_id   as \"id: _\",\n                   owner_id     as \"owner_id: _\",\n                   owner_name,\n                   dataset_name as name,\n                   created_at   as \"created_at: _\",\n                   kind         as \"kind: _\"\n            FROM dataset_entries\n            WHERE dataset_id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -15,16 +15,21 @@
       },
       {
         "ordinal": 2,
-        "name": "name",
+        "name": "owner_name",
         "type_info": "Varchar"
       },
       {
         "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
         "name": "created_at: _",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "kind: _",
         "type_info": {
           "Custom": {
@@ -41,8 +46,7 @@
     ],
     "parameters": {
       "Left": [
-        "Int8",
-        "Int8"
+        "Text"
       ]
     },
     "nullable": [
@@ -50,8 +54,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "ae541b543d55f1d932b0ddf9ab6c5db0180522644753f20442a25c6af3f4a793"
+  "hash": "38bb5b03ac2fd5f6c1090938e18861eab6013b9c9081cae878b02a65934dc8d5"
 }

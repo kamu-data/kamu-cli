@@ -100,6 +100,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 SELECT
                     dataset_id   as "id: _",
                     owner_id     as "owner_id: _",
+                    owner_name   as owner_name,
                     dataset_name as name,
                     created_at   as "created_at: _",
                     kind         as "kind: _"
@@ -135,6 +136,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             r#"
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
+                   owner_name,
                    dataset_name as name,
                    created_at   as "created_at: _",
                    kind         as "kind: _"
@@ -172,6 +174,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             r#"
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
+                   owner_name,
                    dataset_name as name,
                    created_at   as "created_at: _",
                    kind         as "kind: _"
@@ -220,6 +223,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             r#"
             SELECT dataset_id   as "id: _",
                    owner_id     as "owner_id: _",
+                   owner_name,
                    dataset_name as name,
                    created_at   as "created_at: _",
                    kind         as "kind: _"
@@ -258,6 +262,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 r#"
                 SELECT dataset_id   as "id: _",
                     owner_id     as "owner_id: _",
+                    owner_name,
                     dataset_name as name,
                     created_at   as "created_at: _",
                     kind         as "kind: _"
@@ -316,11 +321,12 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO dataset_entries(dataset_id, owner_id, dataset_name, created_at, kind)
-                VALUES ($1, $2, $3, $4, ($5::text)::dataset_kind)
+            INSERT INTO dataset_entries(dataset_id, owner_id, owner_name, dataset_name, created_at, kind)
+                VALUES ($1, $2, $3, $4, $5, ($6::text)::dataset_kind)
             "#,
             stack_dataset_id.as_str(),
             stack_owner_id.as_str(),
+            dataset_entry.owner_name.as_str(),
             dataset_entry.name.as_str(),
             dataset_entry.created_at,
             dataset_entry_kind.to_string(),
