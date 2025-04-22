@@ -46,7 +46,7 @@ pub trait QueryService: Send + Sync {
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
-    ) -> Result<DataFrameExt, QueryError>;
+    ) -> Result<GetDataResponse, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
     /// [DataFrame] that can be used to get schema and data, and the state
@@ -75,7 +75,7 @@ pub trait QueryService: Send + Sync {
     // number of files we collect to construct the dataframe.
     //
     /// Returns a [DataFrame] representing the contents of an entire dataset
-    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrameExt, QueryError>;
+    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<GetDataResponse, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
@@ -150,6 +150,23 @@ pub struct QueryStateDataset {
     pub alias: String,
     /// Last block hash that was considered during the
     /// query planning
+    pub block_hash: odf::Multihash,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct GetDataResponse {
+    /// A [`DataFrameExt`] that can be used to read schema and access the data.
+    /// Note that the data frames are "lazy". They are a representation of a
+    /// logical query plan. The actual query is executed only when you pull
+    /// the resulting data from it.
+    pub df: DataFrameExt,
+
+    /// Handle of the resolved dataset
+    pub dataset_handle: odf::DatasetHandle,
+
+    /// Last block hash that was considered during the query planning
     pub block_hash: odf::Multihash,
 }
 
@@ -416,9 +433,10 @@ pub enum BadQueryErrorSource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset schema is not yet available: {dataset_ref}")]
+#[error("Dataset schema is not yet available for {dataset_handle}")]
 pub struct DatasetSchemaNotAvailableError {
-    pub dataset_ref: odf::DatasetRef,
+    pub dataset_handle: odf::DatasetHandle,
+    pub block_hash: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

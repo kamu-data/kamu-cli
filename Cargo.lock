@@ -6160,7 +6160,9 @@ version = "0.235.0"
 dependencies = [
  "async-graphql",
  "async-trait",
+ "base64 0.22.1",
  "bon",
+ "bytes",
  "chrono",
  "common-macros",
  "database-common",
@@ -6170,6 +6172,7 @@ dependencies = [
  "event-sourcing",
  "file-utils",
  "futures",
+ "humansize",
  "indoc 2.0.6",
  "init-on-startup",
  "internal-error",

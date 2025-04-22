@@ -243,6 +243,16 @@ impl Dataset {
 
         DatasetEndpoints::new(&self.dataset_request_state, config)
     }
+
+    /// Downcast a dataset to a versioned file interface
+    async fn as_versioned_file(&self) -> VersionedFile {
+        VersionedFile::new(self.dataset_request_state.clone())
+    }
+
+    /// Downcast a dataset to a collection interface
+    async fn as_collection(&self) -> Collection {
+        Collection::new(self.dataset_request_state.clone())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

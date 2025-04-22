@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use arrow::array::RecordBatch;
+use arrow::array::{Array, ArrowPrimitiveType, AsArray, RecordBatch};
 use datafusion::catalog::TableProvider;
 use datafusion::common::DFSchema;
 use datafusion::config::{CsvOptions, JsonOptions, TableParquetOptions};
@@ -195,6 +195,38 @@ impl DataFrameExt {
             .collect();
 
         self.select(columns)
+    }
+
+    /// Given a data frame with a zero or one row and one column extracts the
+    /// typed scalar value
+    pub async fn collect_scalar<T: ArrowPrimitiveType>(self) -> Result<Option<T::Native>> {
+        let batches = self.collect().await?;
+        if batches.is_empty() {
+            return Ok(None);
+        }
+        if batches.len() > 1 || batches[0].num_rows() > 1 || batches[0].num_columns() != 1 {
+            return Err(DataFusionError::Internal(format!(
+                "collect_scalar expected 1x1 result shape but got {}x{}",
+                batches[0].num_rows(),
+                batches[0].num_columns()
+            )));
+        }
+
+        let batch = batches.into_iter().next().unwrap();
+
+        let Some(column) = batch.column(0).as_primitive_opt::<T>() else {
+            return Err(DataFusionError::Internal(format!(
+                "collect_scalar expected column type {} but got {}",
+                T::DATA_TYPE,
+                batch.column(0).data_type()
+            )));
+        };
+
+        if column.is_null(0) {
+            Ok(None)
+        } else {
+            Ok(Some(column.value(0)))
+        }
     }
 }
 

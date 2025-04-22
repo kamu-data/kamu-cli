@@ -86,7 +86,7 @@ impl<'a> DatasetData<'a> {
             .await;
 
         let df = match tail_result {
-            Ok(r) => r,
+            Ok(r) => r.df,
             Err(domain::QueryError::DatasetSchemaNotAvailable(_)) => {
                 return Ok(DataQueryResult::no_schema_yet(data_format, limit));
             }

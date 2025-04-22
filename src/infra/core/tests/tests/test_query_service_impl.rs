@@ -363,10 +363,10 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
 
     // Within last block
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let df = query_svc.tail(&dataset_ref, 1, 1).await.unwrap();
+    let res = query_svc.tail(&dataset_ref, 1, 1).await.unwrap();
 
     odf::utils::testing::assert_data_eq(
-        df,
+        res.df,
         indoc::indoc!(
             r#"
             +--------+------+
@@ -380,10 +380,10 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     .await;
 
     // Crosses block boundary
-    let df = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
+    let res = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
 
     odf::utils::testing::assert_data_eq(
-        df,
+        res.df,
         indoc::indoc!(
             r#"
             +--------+------+

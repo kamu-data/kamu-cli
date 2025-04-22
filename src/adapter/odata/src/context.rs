@@ -222,14 +222,14 @@ impl CollectionContext for ODataCollectionContext {
 
         let query_svc: Arc<dyn QueryService> = self.catalog.get_one().unwrap();
 
-        let df = query_svc
+        let res = query_svc
             .get_data(&self.resolved_dataset.get_handle().as_local_ref())
             .await
             .unwrap();
 
         query
             .apply(
-                df.into_inner(),
+                res.df.into_inner(),
                 &self.addr,
                 &vocab.offset_column,
                 KEY_COLUMN_ALIAS,

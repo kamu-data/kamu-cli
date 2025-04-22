@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod adapters_mut;
-mod dataset_collaboration_mut;
-mod dataset_mut;
+use async_graphql::SimpleObject;
 
-pub(crate) use adapters_mut::*;
-pub(crate) use dataset_collaboration_mut::*;
-pub(crate) use dataset_mut::*;
+/// Represents base64-encoded binary data using standard encoding
+#[derive(Debug, SimpleObject)]
+pub struct KeyValue {
+    key: String,
+    value: String,
+}

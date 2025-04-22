@@ -12,6 +12,7 @@ mod test_auth;
 mod test_error_handling;
 mod test_gql_account_flow_triggers;
 mod test_gql_data;
+mod test_gql_dataset_adapters;
 mod test_gql_dataset_env_vars;
 mod test_gql_dataset_flow_configs;
 mod test_gql_dataset_flow_runs;

@@ -171,7 +171,7 @@ impl DatasetProperties {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AuthorizedAccount {
     pub account_id: odf::AccountID,
     pub role: AccountToDatasetRelation,

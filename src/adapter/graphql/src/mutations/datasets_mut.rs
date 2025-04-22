@@ -11,6 +11,7 @@ use kamu_core::auth;
 use kamu_core::auth::DatasetActionAccess;
 use kamu_datasets::CreateDatasetFromSnapshotError;
 
+use super::CollectionEntryInput;
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
 use crate::queries::{Account, Dataset, DatasetRequestState};
@@ -185,6 +186,81 @@ impl DatasetsMut {
         };
 
         Ok(result)
+    }
+
+    /// Creates new versioned file dataset.
+    /// Can include schema for extra columns and dataset metadata events (e.g.
+    /// adding description and readme).
+    #[tracing::instrument(level = "info", name = DatasetsMut_create_versioned_file, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn create_versioned_file(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Dataset alias (may include target account)")] dataset_alias: DatasetAlias<
+            '_,
+        >,
+        #[graphql(desc = "Additional user-defined columns")] extra_columns: Option<
+            Vec<ColumnInput>,
+        >,
+        #[graphql(desc = "Extra metadata events (e.g. to populate readme)")] extra_events: Option<
+            Vec<String>,
+        >,
+        #[graphql(desc = "How extra events are represented")] event_events_format: Option<
+            MetadataManifestFormat,
+        >,
+        #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
+    ) -> Result<CreateDatasetFromSnapshotResult> {
+        let snapshot = odf::DatasetSnapshot {
+            name: dataset_alias.into(),
+            kind: odf::DatasetKind::Root,
+            metadata: vec![odf::MetadataEvent::AddPushSource(
+                odf::metadata::AddPushSource {
+                    source_name: "default".into(),
+                    read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
+                        schema: Some(vec![
+                            "version INT".into(),
+                            "content_hash STRING".into(),
+                            "content_type STRING".into(),
+                        ]),
+                        ..Default::default()
+                    }),
+                    preprocess: None,
+                    merge: odf::metadata::MergeStrategy::Append(
+                        odf::metadata::MergeStrategyAppend {},
+                    ),
+                },
+            )],
+        };
+
+        self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
+            .await
+    }
+
+    /// Creates a new collection dataset.
+    /// Can include schema for extra columns, dataset metadata, and initial
+    /// collection entries.
+    #[tracing::instrument(level = "info", name = DatasetsMut_create_collection, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn create_collection(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Dataset alias (may include target account)")] dataset_alias: DatasetAlias<
+            '_,
+        >,
+        #[graphql(desc = "Additional user-defined columns")] extra_columns: Option<
+            Vec<ColumnInput>,
+        >,
+        #[graphql(desc = "Extra metadata events (e.g. to populate readme)")] extra_events: Option<
+            Vec<String>,
+        >,
+        #[graphql(desc = "How extra events are represented")] event_events_format: Option<
+            MetadataManifestFormat,
+        >,
+        initial_entries: Option<Vec<CollectionEntryInput>>,
+        #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
+    ) -> Result<CreateDatasetFromSnapshotResult> {
+        dbg!(initial_entries);
+        todo!()
     }
 }
 

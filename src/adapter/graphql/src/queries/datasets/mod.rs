@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod adapters;
 mod dataset;
 mod dataset_collaboration;
 mod dataset_data;
@@ -22,6 +23,7 @@ mod dataset_request_state;
 mod datasets;
 mod metadata_chain;
 
+pub(crate) use adapters::*;
 pub(crate) use dataset::*;
 pub(crate) use dataset_collaboration::*;
 pub(crate) use dataset_data::*;

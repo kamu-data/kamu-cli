@@ -12,10 +12,12 @@ use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
 
 use crate::mutations::{
+    CollectionMut,
     DatasetCollaborationMut,
     DatasetEnvVarsMut,
     DatasetFlowsMut,
     DatasetMetadataMut,
+    VersionedFileMut,
 };
 use crate::prelude::*;
 use crate::queries::*;
@@ -203,6 +205,16 @@ impl DatasetMut {
         }
 
         Ok(SetDatasetVisibilityResultSuccess::default().into())
+    }
+
+    /// Downcast a dataset to a versioned file interface
+    async fn as_versioned_file(&self) -> Option<VersionedFileMut> {
+        Some(VersionedFileMut::new(self.dataset_request_state.clone()))
+    }
+
+    /// Downcast a dataset to a collection interface
+    async fn as_collection(&self) -> Option<CollectionMut> {
+        Some(CollectionMut::new(self.dataset_request_state.clone()))
     }
 }
 

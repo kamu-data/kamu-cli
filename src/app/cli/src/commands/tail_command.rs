@@ -37,14 +37,14 @@ pub struct TailCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for TailCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        let df = self
+        let res = self
             .query_svc
             .tail(&self.dataset_ref, self.skip, self.limit)
             .await
             .map_err(CLIError::failure)?;
 
         let mut writer = self.output_cfg.get_records_writer(
-            df.schema().as_arrow(),
+            res.df.schema().as_arrow(),
             RecordsFormat::default().with_column_formats(vec![
                 // TODO: `RecordsFormat` should allow specifying column formats by name, not
                 // only positionally
@@ -78,7 +78,7 @@ impl Command for TailCommand {
             ]),
         );
 
-        let record_batches = df.collect().await.map_err(CLIError::failure)?;
+        let record_batches = res.df.collect().await.map_err(CLIError::failure)?;
         writer.write_batches(&record_batches)?;
         writer.finish()?;
         Ok(())
