@@ -64,4 +64,15 @@ pub fn account_id_by_maybe_name(maybe_name: &Option<AccountName>, default_name: 
     }
 }
 
+pub fn account_name_by_maybe_name(
+    maybe_name: &Option<AccountName>,
+    default_name: &str,
+) -> AccountName {
+    if let Some(name) = maybe_name {
+        name.clone()
+    } else {
+        AccountName::new_unchecked(default_name)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

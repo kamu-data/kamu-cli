@@ -72,13 +72,15 @@ fn make_block(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_has_blocks(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-1");
     let dataset_name = odf::DatasetName::new_unchecked("test-ds");
 
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_id,
         &dataset_name,
         odf::DatasetKind::Root,
@@ -104,13 +106,15 @@ pub async fn test_has_blocks(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_save_blocks_batch(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-batch");
     let dataset_name = odf::DatasetName::new_unchecked("batch-ds");
 
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_id,
         &dataset_name,
         odf::DatasetKind::Root,
@@ -140,13 +144,15 @@ pub async fn test_save_blocks_batch(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_save_blocks_batch_duplicate_sequence_number(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-duplicate");
     let dataset_name = odf::DatasetName::new_unchecked("duplicate-ds");
 
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_id,
         &dataset_name,
         odf::DatasetKind::Root,
@@ -177,13 +183,15 @@ pub async fn test_save_blocks_batch_duplicate_sequence_number(catalog: &Catalog)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_blocks(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-del");
     let dataset_name = odf::DatasetName::new_unchecked("del-ds");
 
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_id,
         &dataset_name,
         odf::DatasetKind::Root,
@@ -212,13 +220,15 @@ pub async fn test_delete_blocks(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_remove_dataset_entry_removes_key_blocks(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-remove");
     let dataset_name = odf::DatasetName::new_unchecked("remove-ds");
 
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_id,
         &dataset_name,
         odf::DatasetKind::Root,

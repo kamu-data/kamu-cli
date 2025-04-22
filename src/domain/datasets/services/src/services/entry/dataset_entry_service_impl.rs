@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use database_common::{EntityPageListing, EntityPageStreamer, PaginationOpts};
@@ -16,7 +16,6 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountNotFoundByNameError,
     AccountService,
-    AccountServiceExt,
     CurrentAccountSubject,
     GetAccountByNameError,
 };
@@ -57,7 +56,6 @@ struct Cache {
 
 #[derive(Default)]
 struct AccountsCache {
-    id2names: HashMap<odf::AccountID, odf::AccountName>,
     names2ids: HashMap<odf::AccountName, odf::AccountID>,
 }
 
@@ -108,109 +106,21 @@ impl DatasetEntryServiceImpl {
         }
     }
 
-    async fn entries_as_handles(
-        &self,
-        entries: Vec<DatasetEntry>,
-    ) -> Result<Vec<odf::DatasetHandle>, ListDatasetEntriesError> {
-        // Select which accounts haven't been processed yet
-        let first_seen_account_ids = {
-            let readable_cache = &self.cache.read().unwrap();
-
-            let mut first_seen_account_ids = HashSet::new();
-            for entry in &entries {
-                if !readable_cache
-                    .accounts
-                    .id2names
-                    .contains_key(&entry.owner_id)
-                {
-                    first_seen_account_ids.insert(entry.owner_id.clone());
-                }
-            }
-
-            first_seen_account_ids
-        };
-
-        // Query first seen accounts and fill the table
-        if !first_seen_account_ids.is_empty() {
-            let account_ids = first_seen_account_ids.into_iter().collect::<Vec<_>>();
-            let num_account_ids = account_ids.len();
-
-            let accounts = self
-                .account_svc
-                .get_accounts_by_ids(&account_ids)
-                .await
-                .int_err()?;
-
-            assert!(
-                accounts.len() == num_account_ids,
-                "Number of accounts must match number of requested ids"
-            );
-
-            let mut writable_cache = self.cache.write().unwrap();
-            for account in accounts {
-                writable_cache
-                    .accounts
-                    .id2names
-                    .insert(account.id.clone(), account.account_name.clone());
-                writable_cache
-                    .accounts
-                    .names2ids
-                    .insert(account.account_name, account.id);
-            }
-        }
-
+    fn entries_as_handles(&self, entries: &[DatasetEntry]) -> Vec<odf::DatasetHandle> {
         // Convert the entries to handles
         let mut handles = Vec::new();
-        let readable_cache = self.cache.read().unwrap();
-        for entry in &entries {
-            // By now we should now the account name
-            let maybe_owner_name = readable_cache.accounts.id2names.get(&entry.owner_id);
-            if let Some(owner_name) = maybe_owner_name {
-                // Form DatasetHandle
-                handles.push(odf::DatasetHandle::new(
-                    entry.id.clone(),
-                    self.tenancy_config
-                        .make_alias(owner_name.clone(), entry.name.clone()),
-                    entry.kind,
-                ));
-            }
+        for entry in entries {
+            // Form DatasetHandle
+            handles.push(odf::DatasetHandle::new(
+                entry.id.clone(),
+                self.tenancy_config
+                    .make_alias(entry.owner_name.clone(), entry.name.clone()),
+                entry.kind,
+            ));
         }
 
         // Return converted list
-        Ok(handles)
-    }
-
-    async fn resolve_account_name_by_id(
-        &self,
-        account_id: &odf::AccountID,
-    ) -> Result<odf::AccountName, InternalError> {
-        let maybe_cached_name = {
-            let readable_cache = self.cache.read().unwrap();
-            readable_cache.accounts.id2names.get(account_id).cloned()
-        };
-
-        if let Some(name) = maybe_cached_name {
-            Ok(name)
-        } else {
-            let account = self
-                .account_svc
-                .account_by_id(account_id)
-                .await
-                .int_err()?
-                .expect("Account must exist");
-
-            let mut writable_cache = self.cache.write().unwrap();
-            writable_cache
-                .accounts
-                .id2names
-                .insert(account_id.clone(), account.account_name.clone());
-            writable_cache
-                .accounts
-                .names2ids
-                .insert(account.account_name.clone(), account_id.clone());
-
-            Ok(account.account_name)
-        }
+        handles
     }
 
     async fn resolve_account_id_by_maybe_name(
@@ -232,10 +142,6 @@ impl DatasetEntryServiceImpl {
 
             if let Some(account) = maybe_account {
                 let mut writable_cache = self.cache.write().unwrap();
-                writable_cache
-                    .accounts
-                    .id2names
-                    .insert(account.id.clone(), account_name.clone());
                 writable_cache
                     .accounts
                     .names2ids
@@ -286,10 +192,7 @@ impl DatasetEntryServiceImpl {
 
         Ok(EntityPageListing {
             total_count: dataset_entry_listing.total_count,
-            list: self
-                .entries_as_handles(dataset_entry_listing.list)
-                .await
-                .int_err()?,
+            list: self.entries_as_handles(&dataset_entry_listing.list),
         })
     }
 
@@ -331,10 +234,7 @@ impl DatasetEntryServiceImpl {
 
         Ok(EntityPageListing {
             total_count: dataset_entry_listing.total_count,
-            list: self
-                .entries_as_handles(dataset_entry_listing.list)
-                .await
-                .int_err()?,
+            list: self.entries_as_handles(&dataset_entry_listing.list),
         })
     }
 }
@@ -475,11 +375,9 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                                     TenancyConfig::SingleTenant => None,
                                     TenancyConfig::MultiTenant => Some(
                                         // We know the name, but since the search is
-                                        // case-insensitive,
-                                        // we'd like to know the stored version rather than queried
-                                        self.resolve_account_name_by_id(&owner_id)
-                                            .await
-                                            .int_err()?,
+                                        // case-insensitive, we'd like to know the stored version
+                                        // rather than queried
+                                        entry.owner_name.clone(),
                                     ),
                                 },
                                 entry.name,
@@ -498,15 +396,12 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
                 }
             }
             odf::DatasetRef::ID(id) => match self.get_entry(id).await {
-                Ok(entry) => {
-                    let owner_name = self.resolve_account_name_by_id(&entry.owner_id).await?;
-                    Ok(odf::DatasetHandle::new(
-                        entry.id.clone(),
-                        self.tenancy_config
-                            .make_alias(owner_name, entry.name.clone()),
-                        entry.kind,
-                    ))
-                }
+                Ok(entry) => Ok(odf::DatasetHandle::new(
+                    entry.id.clone(),
+                    self.tenancy_config
+                        .make_alias(entry.owner_name, entry.name.clone()),
+                    entry.kind,
+                )),
                 Err(GetDatasetEntryError::NotFound(_)) => Err(
                     odf::DatasetRefUnresolvedError::NotFound(odf::DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
@@ -573,10 +468,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
         let entries_resolution = self.get_multiple_entries(&dataset_ids).await.int_err()?;
 
-        let resolved_handles = self
-            .entries_as_handles(entries_resolution.resolved_entries)
-            .await
-            .int_err()?;
+        let resolved_handles = self.entries_as_handles(&entries_resolution.resolved_entries);
 
         let unresolved_datasets = entries_resolution
             .unresolved_entries
@@ -639,6 +531,7 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         &self,
         dataset_id: &odf::DatasetID,
         owner_account_id: &odf::AccountID,
+        owner_account_name: &odf::AccountName,
         dataset_name: &odf::DatasetName,
         dataset_kind: odf::DatasetKind,
     ) -> Result<(), CreateDatasetEntryError> {
@@ -653,6 +546,7 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         let entry = DatasetEntry::new(
             dataset_id.clone(),
             owner_account_id.clone(),
+            owner_account_name.clone(),
             dataset_name.clone(),
             self.time_source.now(),
             dataset_kind,

@@ -17,6 +17,7 @@ use kamu_accounts::{
     AccountRepository,
     GetAccountByNameError,
     DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
 use kamu_datasets::{
@@ -150,6 +151,12 @@ impl DatasetEntryIndexer {
             let dataset_entry = DatasetEntry::new(
                 dataset_handle.id,
                 owner_account_id,
+                dataset_handle
+                    .alias
+                    .account_name
+                    .as_ref()
+                    .unwrap_or(&DEFAULT_ACCOUNT_NAME)
+                    .clone(),
                 dataset_handle.alias.dataset_name,
                 self.time_source.now(),
                 dataset_handle.kind,

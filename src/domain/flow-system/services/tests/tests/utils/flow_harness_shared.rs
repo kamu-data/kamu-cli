@@ -179,11 +179,16 @@ impl FlowHarness {
             &dataset_alias.account_name,
             DEFAULT_ACCOUNT_NAME_STR,
         );
+        let owner_name = odf::metadata::testing::account_name_by_maybe_name(
+            &dataset_alias.account_name,
+            DEFAULT_ACCOUNT_NAME_STR,
+        );
 
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.fake_system_time_source.now(),
             id: dataset_id.clone(),
             owner_id: owner_id.clone(),
+            owner_name,
             name: dataset_alias.dataset_name.clone(),
             kind: odf::DatasetKind::Root,
         });
@@ -214,11 +219,16 @@ impl FlowHarness {
             &dataset_alias.account_name,
             DEFAULT_ACCOUNT_NAME_STR,
         );
+        let owner_name = odf::metadata::testing::account_name_by_maybe_name(
+            &dataset_alias.account_name,
+            DEFAULT_ACCOUNT_NAME_STR,
+        );
 
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.fake_system_time_source.now(),
             id: dataset_id.clone(),
             owner_id: owner_id.clone(),
+            owner_name,
             name: dataset_alias.dataset_name.clone(),
             kind: odf::DatasetKind::Derivative,
         });

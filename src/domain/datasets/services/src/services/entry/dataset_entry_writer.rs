@@ -20,6 +20,7 @@ pub trait DatasetEntryWriter: Send + Sync {
         &self,
         dataset_id: &odf::DatasetID,
         owner_account_id: &odf::AccountID,
+        owner_account_name: &odf::AccountName,
         dataset_name: &odf::DatasetName,
         dataset_kind: odf::DatasetKind,
     ) -> Result<(), CreateDatasetEntryError>;
