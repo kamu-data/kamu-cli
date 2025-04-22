@@ -109,6 +109,9 @@ resolver = "2"
 
 
 [workspace.dependencies]
+# TODO: Updating aws-sdk version forces to update minio image version. 
+# Update it once we will modify our tests to be compatible with latest version
+aws-sdk-s3 = "=1.68.0"
 
 # Apps
 kamu-cli = { version = "0.233.4", path = "src/app/cli", default-features = false }

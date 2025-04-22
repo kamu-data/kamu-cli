@@ -13,6 +13,9 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Changed
+- Pin version for `aws-sdk-s3` crate version, that includes breaking changes
+- Update all minor versions of other crates
+- Cleanup duplicate image
 - Denormalization: `DatasetEntry` now contains a copy of owner's account name
    for faster dataset handle resolutions without extra round trip to database
 
