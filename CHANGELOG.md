@@ -11,6 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Pin version for `aws-sdk-s3` crate version, that includes breaking changes
+- Update all minor versions of other crates
+- Cleanup duplicate image
+
 ## [0.233.4] - 2025-04-22
 ### Changed
 - Forcing warmup of dataset ids listing cache on startup
