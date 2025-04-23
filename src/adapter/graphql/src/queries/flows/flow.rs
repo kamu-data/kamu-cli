@@ -37,7 +37,9 @@ impl Flow {
         ctx: &Context<'_>,
     ) -> Result<Vec<Self>> {
         let mut result: Vec<Self> = Vec::new();
-        let mut flow_description_builder = FlowDescriptionBuilder::new();
+
+        let mut flow_description_builder =
+            FlowDescriptionBuilder::prepare(ctx, &flow_states).await?;
 
         for flow_state in flow_states {
             let flow_description = flow_description_builder.build(ctx, &flow_state).await?;

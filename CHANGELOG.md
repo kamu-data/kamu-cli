@@ -18,6 +18,7 @@ Recommendation: for ease of reading, use the following order:
 - Cleanup duplicate image
 - Denormalization: `DatasetEntry` now contains a copy of owner's account name
    for faster dataset handle resolutions without extra round trip to database
+- Speedup of account flow runs listing   
 
 ## [0.233.4] - 2025-04-22
 ### Changed

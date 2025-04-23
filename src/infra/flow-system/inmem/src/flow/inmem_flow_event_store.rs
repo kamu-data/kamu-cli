@@ -481,7 +481,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
-        self.get_all_flow_ids_by_datasets(HashSet::from([dataset_id.clone()]), filters, pagination)
+        self.get_all_flow_ids_by_datasets(&[dataset_id], filters, pagination)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
@@ -522,10 +522,12 @@ impl FlowEventStore for InMemoryFlowEventStore {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?pagination))]
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
+        let dataset_ids: HashSet<_> = dataset_ids.iter().copied().collect();
+
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
@@ -677,11 +679,8 @@ impl FlowEventStore for InMemoryFlowEventStore {
 
     fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream {
         Box::pin(async_stream::try_stream! {
-            // 32-items batching will give a performance boost,
-            // but queries for long-lived datasets should not bee too heavy.
-            // This number was chosen without any performance measurements. Subject of change.
-            let chunk_size = 32;
-            for chunk in flow_ids.chunks(chunk_size) {
+            const CHUNK_SIZE: usize = 256;
+            for chunk in flow_ids.chunks(CHUNK_SIZE) {
                 let flows = Flow::load_multi(
                     chunk.to_vec(),
                     self
@@ -695,9 +694,11 @@ impl FlowEventStore for InMemoryFlowEventStore {
 
     async fn get_count_flows_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError> {
+        let dataset_ids: HashSet<_> = dataset_ids.iter().copied().collect();
+
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 

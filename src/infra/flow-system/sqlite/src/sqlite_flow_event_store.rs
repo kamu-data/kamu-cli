@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
 use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
@@ -756,7 +755,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
     fn get_all_flow_ids_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
@@ -1068,11 +1067,8 @@ impl FlowEventStore for SqliteFlowEventStore {
 
     fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream {
         Box::pin(async_stream::try_stream! {
-            // 32-items batching will give a performance boost,
-            // but queries for long-lived datasets should not bee too heavy.
-            // This number was chosen without any performance measurements. Subject of change.
-            let chunk_size = 32;
-            for chunk in flow_ids.chunks(chunk_size) {
+            const CHUNK_SIZE: usize = 256;
+            for chunk in flow_ids.chunks(CHUNK_SIZE) {
                 let flows = Flow::load_multi(
                     chunk.to_vec(),
                     self
@@ -1086,7 +1082,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
     async fn get_count_flows_by_datasets(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;

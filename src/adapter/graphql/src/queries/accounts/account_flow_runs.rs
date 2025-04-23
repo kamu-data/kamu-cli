@@ -73,27 +73,22 @@ impl<'a> AccountFlowRuns<'a> {
                 }),
         });
 
-        let (
-            flow_query_service,
-            dataset_registry,
-            dataset_action_authorizer,
-            dataset_entry_service,
-        ) = from_catalog_n!(
-            ctx,
-            dyn fs::FlowQueryService,
-            dyn DatasetRegistry,
-            dyn auth::DatasetActionAuthorizer,
-            dyn DatasetEntryService
-        );
+        let (flow_query_service, dataset_entry_service) =
+            from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetEntryService);
 
         let dataset_ids = {
             let maybe_expected_dataset_ids = maybe_filters
                 .as_ref()
                 .map(|filters| &filters.by_dataset_ids);
+
+            // Note: consider using ReBAC to filter dataset
+            // It should be okay if any kind of relation exists explicitly to view flows,
+            //   which is wider than viewing only the ones you own
             let account_dataset_ids = dataset_entry_service
                 .get_owned_dataset_ids(&self.account.id)
                 .await
                 .int_err()?;
+
             if let Some(expected_dataset_ids) = maybe_expected_dataset_ids
                 && !expected_dataset_ids.is_empty()
             {
@@ -105,28 +100,8 @@ impl<'a> AccountFlowRuns<'a> {
                 account_dataset_ids
             }
         };
-        let readable_dataset_ids = {
-            let dataset_handles_resolution = dataset_registry
-                .resolve_multiple_dataset_handles_by_ids(dataset_ids)
-                .await
-                .int_err()?;
-            for (dataset_id, _) in dataset_handles_resolution.unresolved_datasets {
-                tracing::warn!(
-                    %dataset_id,
-                    "Ignoring point that refers to a dataset not present in the registry",
-                );
-            }
-            let readable_dataset_handles = dataset_action_authorizer
-                .filter_datasets_allowing(
-                    dataset_handles_resolution.resolved_handles,
-                    auth::DatasetAction::Read,
-                )
-                .await?;
-            readable_dataset_handles
-                .into_iter()
-                .map(|dataset_handle| dataset_handle.id)
-                .collect()
-        };
+
+        let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
 
         let dataset_flow_filters = maybe_filters
             .map(|fs| kamu_flow_system::DatasetFlowFilters {
@@ -137,7 +112,7 @@ impl<'a> AccountFlowRuns<'a> {
             .unwrap_or_default();
         let flows_state_listing = flow_query_service
             .list_all_flows_by_dataset_ids(
-                readable_dataset_ids,
+                &dataset_id_refs,
                 dataset_flow_filters,
                 PaginationOpts::from_page(page, per_page),
             )

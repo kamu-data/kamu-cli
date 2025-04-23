@@ -9,9 +9,10 @@
 
 // Copyright Kamu Data, Inc. and contributors. All rights reserved.
 
+use std::num::NonZeroUsize;
 use std::str::FromStr;
 
-use database_common::{TransactionRef, TransactionRefT};
+use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
@@ -113,6 +114,41 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         Ok(rows
             .into_iter()
             .map(DatasetKeyBlockRow::into_domain)
+            .collect())
+    }
+
+    async fn filter_datasets_having_blocks(
+        &self,
+        dataset_ids: Vec<odf::DatasetID>,
+        block_ref: &odf::BlockRef,
+        event_type: MetadataEventType,
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let conn = tr.connection_mut().await?;
+
+        let dataset_ids: Vec<String> = dataset_ids.into_iter().map(|id| id.to_string()).collect();
+
+        let query_str = format!(
+            r#"
+            SELECT DISTINCT dataset_id
+                FROM dataset_key_blocks
+                WHERE block_ref_name = $1 AND event_type = $2 AND dataset_id IN ({})
+            "#,
+            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap())
+        );
+
+        let mut query = sqlx::query(&query_str);
+        query = query.bind(block_ref.as_str()).bind(event_type.to_string());
+        for dataset_id in dataset_ids {
+            query = query.bind(dataset_id);
+        }
+
+        let raw_rows = query.fetch_all(conn).await.int_err()?;
+
+        use sqlx::Row;
+        Ok(raw_rows
+            .into_iter()
+            .map(|r| odf::DatasetID::from_did_str(r.get(0)).unwrap())
             .collect())
     }
 

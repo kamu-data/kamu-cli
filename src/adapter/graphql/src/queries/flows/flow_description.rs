@@ -7,17 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use kamu_core::{
-    DatasetChangesService,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    GetIncrementError,
-    MetadataQueryService,
-    PollingSourceBlockInfo,
-};
+use kamu_core::{DatasetChangesService, GetIncrementError};
 use kamu_flow_system::{self as fs, FlowResultDatasetUpdate};
 
 use crate::prelude::*;
@@ -252,20 +245,50 @@ impl FlowDescriptionResetResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowDescriptionBuilder {
-    // We need this HashMap to avoid multiple queries to the same dataset polling
-    // source and cover cases when dataset has no Ingest flows, so we will
-    // build flow descriptions without searching of polling sources
-    //
-    // In addition it might be useful if we will add another entity which cause
-    // duplicate requests
-    dataset_polling_sources: HashMap<odf::DatasetID, Option<PollingSourceBlockInfo>>,
+    datasets_with_polling_sources: HashSet<odf::DatasetID>,
 }
 
 impl FlowDescriptionBuilder {
-    pub fn new() -> Self {
-        Self {
-            dataset_polling_sources: HashMap::new(),
-        }
+    pub async fn prepare(
+        ctx: &Context<'_>,
+        flow_states: &[fs::FlowState],
+    ) -> Result<Self, InternalError> {
+        Ok(Self {
+            datasets_with_polling_sources: HashSet::from_iter(
+                FlowDescriptionBuilder::detect_datasets_with_polling_sources(ctx, flow_states)
+                    .await?,
+            ),
+        })
+    }
+
+    async fn detect_datasets_with_polling_sources(
+        ctx: &Context<'_>,
+        flow_states: &[fs::FlowState],
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        // Collect unique dataset IDs from flow states
+        let dataset_ids = flow_states
+            .iter()
+            .filter_map(|flow_state| {
+                if let kamu_flow_system::FlowKey::Dataset(fk_dataset) = &flow_state.flow_key {
+                    Some(fk_dataset.dataset_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        // Locate datasets with polling sources
+        let key_blocks_repository =
+            from_catalog_n!(ctx, dyn kamu_datasets::DatasetKeyBlockRepository);
+        key_blocks_repository
+            .filter_datasets_having_blocks(
+                dataset_ids,
+                &odf::BlockRef::Head,
+                kamu_datasets::MetadataEventType::SetPollingSource,
+            )
+            .await
     }
 
     pub async fn build(
@@ -300,28 +323,6 @@ impl FlowDescriptionBuilder {
     ) -> Result<FlowDescriptionDataset> {
         Ok(match dataset_key.flow_type {
             fs::DatasetFlowType::Ingest => {
-                let maybe_polling_source = if let Some(existing_polling_source) =
-                    self.dataset_polling_sources.get(&dataset_key.dataset_id)
-                {
-                    existing_polling_source.clone()
-                } else {
-                    let (dataset_registry, metadata_query_service) =
-                        from_catalog_n!(ctx, dyn DatasetRegistry, dyn MetadataQueryService);
-                    let target = dataset_registry
-                        .get_dataset_by_ref(&dataset_key.dataset_id.as_local_ref())
-                        .await
-                        .int_err()?;
-
-                    let polling_source_maybe = metadata_query_service
-                        .get_active_polling_source(&target)
-                        .await
-                        .int_err()?;
-
-                    self.dataset_polling_sources
-                        .insert(dataset_key.dataset_id.clone(), polling_source_maybe.clone());
-                    polling_source_maybe
-                };
-
                 let dataset_changes_svc = from_catalog_n!(ctx, dyn DatasetChangesService);
                 let ingest_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                     flow_state.outcome.as_ref(),
@@ -331,7 +332,10 @@ impl FlowDescriptionBuilder {
                 .await
                 .int_err()?;
 
-                if maybe_polling_source.is_some() {
+                if self
+                    .datasets_with_polling_sources
+                    .contains(&dataset_key.dataset_id)
+                {
                     FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
                         dataset_id: dataset_key.dataset_id.clone().into(),
                         ingest_result,

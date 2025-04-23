@@ -2408,8 +2408,10 @@ async fn assert_multiple_dataset_flow_expectations(
     pagination: PaginationOpts,
     expected_flow_ids: Vec<FlowID>,
 ) {
+    let dataset_id_refs: Vec<_> = dataset_ids.iter().collect();
+
     let flow_ids: Vec<_> = flow_event_store
-        .get_all_flow_ids_by_datasets(HashSet::from_iter(dataset_ids), &filters, pagination)
+        .get_all_flow_ids_by_datasets(&dataset_id_refs, &filters, pagination)
         .try_collect()
         .await
         .unwrap();

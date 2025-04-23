@@ -110,7 +110,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .int_err()
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles, %action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(datasets_count=%dataset_handles.len(), %action))]
     async fn filter_datasets_allowing(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
