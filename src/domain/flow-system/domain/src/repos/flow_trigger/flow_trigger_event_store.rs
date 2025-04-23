@@ -23,6 +23,12 @@ pub trait FlowTriggerEventStore: EventStore<FlowTriggerState> {
     ) -> Result<Vec<odf::DatasetID>, InternalError>;
 
     async fn all_dataset_ids_count(&self) -> Result<usize, InternalError>;
+
+    /// Checks if there are any active triggers for the given list of datasets
+    async fn has_active_triggers_for_datasets(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<bool, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

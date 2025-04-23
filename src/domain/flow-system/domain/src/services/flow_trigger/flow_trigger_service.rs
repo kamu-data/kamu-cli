@@ -85,11 +85,11 @@ pub trait FlowTriggerService: Sync + Send {
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError>;
 
-    /// Find all triggers by dataset ids
-    async fn find_triggers_by_datasets(
+    /// Checks if there are any active triggers for the given list of datasets
+    async fn has_active_triggers_for_datasets(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
-    ) -> FlowTriggerStateStream;
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<bool, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

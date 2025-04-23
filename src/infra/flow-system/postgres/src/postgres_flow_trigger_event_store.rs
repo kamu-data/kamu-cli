@@ -280,6 +280,50 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
 
         Ok(usize::try_from(dataset_ids_count.unwrap_or(0)).unwrap())
     }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn has_active_triggers_for_datasets(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<bool, InternalError> {
+        if dataset_ids.is_empty() {
+            return Ok(false);
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let dataset_ids = dataset_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+
+        let has_active_triggers = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM (
+                    SELECT DISTINCT ON (dataset_id, dataset_flow_type)
+                        dataset_id,
+                        event_type,
+                        event_payload
+                    FROM flow_trigger_events
+                    WHERE dataset_id = ANY($1)
+                    ORDER BY dataset_id, dataset_flow_type, event_time DESC
+                ) AS latest_events
+                WHERE event_type != 'FlowTriggerEventDatasetRemoved'
+                AND (event_payload->>'paused')::boolean = false
+            )
+            "#,
+            &dataset_ids,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(has_active_triggers.unwrap_or(false))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

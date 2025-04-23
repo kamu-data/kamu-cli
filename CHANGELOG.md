@@ -13,8 +13,9 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Changed
-- Using batch query to count datasets with flows belonging to an account (more listing speedup)
-
+More flows listing speedup:
+- Using batch query to count datasets with flows belonging to an account
+- Checking if all triggers of given list of datasets are paused via 1 SQL query
 
 ## [0.234.0] - 2025-04-23
 ### Changed

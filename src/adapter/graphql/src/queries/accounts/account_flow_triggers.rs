@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use futures::StreamExt;
 use kamu_accounts::Account as AccountEntity;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::FlowTriggerService;
@@ -39,19 +38,11 @@ impl<'a> AccountFlowTriggers<'a> {
             .await
             .int_err()?;
 
-        let mut all_triggers = flow_trigger_service
-            .find_triggers_by_datasets(owned_dataset_ids)
-            .await;
+        let has_active_triggers = flow_trigger_service
+            .has_active_triggers_for_datasets(&owned_dataset_ids)
+            .await?;
 
-        while let Some(trigger_result) = all_triggers.next().await {
-            if let Ok(trigger) = trigger_result
-                && trigger.is_active()
-            {
-                return Ok(false);
-            }
-        }
-
-        Ok(true)
+        Ok(!has_active_triggers)
     }
 }
 

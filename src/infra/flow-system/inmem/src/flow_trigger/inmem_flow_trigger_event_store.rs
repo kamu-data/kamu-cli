@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
@@ -114,6 +116,53 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
         Ok(self.inner.as_state().lock().unwrap().dataset_ids.len())
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn has_active_triggers_for_datasets(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<bool, InternalError> {
+        if dataset_ids.is_empty() {
+            return Ok(false);
+        }
+
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let dataset_ids: HashSet<&odf::DatasetID> = dataset_ids.iter().collect();
+        let mut seen_keys = HashSet::new();
+
+        for event in g.events.iter().rev() {
+            // Skip if we've already seen this key (we only want the latest event)
+            let key = event.flow_key();
+            if !seen_keys.insert(key) {
+                continue;
+            }
+
+            match key {
+                FlowKey::Dataset(fk_dataset) if dataset_ids.contains(&fk_dataset.dataset_id) => {
+                    match event {
+                        FlowTriggerEvent::Created(e) => {
+                            if !e.paused {
+                                return Ok(true);
+                            }
+                        }
+                        FlowTriggerEvent::Modified(e) => {
+                            if !e.paused {
+                                return Ok(true);
+                            }
+                        }
+                        FlowTriggerEvent::DatasetRemoved { .. } => {
+                            // permanently stopped — not active
+                        }
+                    }
+                }
+                _ => {} // skip system flows
+            }
+        }
+
+        Ok(false)
     }
 }
 
