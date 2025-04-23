@@ -51,7 +51,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_datasets_with_flow_by_account(
         &self,
         account_id: &odf::AccountID,
-    ) -> Result<FlowDatasetListing, ListFlowsByDatasetError>;
+    ) -> Result<Vec<odf::DatasetID>, ListFlowsByDatasetError>;
 
     /// Returns states of flows associated with a given account
     /// ordered by creation time from newest to oldest.
@@ -125,15 +125,6 @@ pub struct FlowInitiatorListing<'a> {
 
 pub type InitiatorsStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<odf::AccountID, InternalError>> + Send + 'a>>;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct FlowDatasetListing<'a> {
-    pub matched_stream: DatasetsStream<'a>,
-}
-
-pub type DatasetsStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<odf::DatasetID, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

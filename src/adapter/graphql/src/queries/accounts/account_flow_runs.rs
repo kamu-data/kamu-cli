@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::Account as AccountEntity;
-use kamu_core::{auth, DatasetRegistry};
+use kamu_core::DatasetRegistry;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system as fs;
 
@@ -138,20 +138,14 @@ impl<'a> AccountFlowRuns<'a> {
             return Ok(DatasetConnection::new(Vec::new(), 0, 0, 0));
         }
 
-        let (flow_query_service, dataset_registry, dataset_action_authorizer) = from_catalog_n!(
-            ctx,
-            dyn fs::FlowQueryService,
-            dyn DatasetRegistry,
-            dyn auth::DatasetActionAuthorizer
-        );
+        let (flow_query_service, dataset_registry) =
+            from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetRegistry);
 
         let dataset_ids: Vec<_> = flow_query_service
             .list_all_datasets_with_flow_by_account(&self.account.id)
             .await
-            .int_err()?
-            .matched_stream
-            .try_collect()
-            .await?;
+            .int_err()?;
+
         let dataset_handles_resolution = dataset_registry
             .resolve_multiple_dataset_handles_by_ids(dataset_ids)
             .await
@@ -164,18 +158,12 @@ impl<'a> AccountFlowRuns<'a> {
             );
         }
 
-        let readable_dataset_handles = dataset_action_authorizer
-            .filter_datasets_allowing(
-                dataset_handles_resolution.resolved_handles,
-                auth::DatasetAction::Read,
-            )
-            .await?;
-
         let account = Account::new(
             self.account.id.clone().into(),
             self.account.account_name.clone().into(),
         );
-        let readable_datasets: Vec<_> = readable_dataset_handles
+        let readable_datasets: Vec<_> = dataset_handles_resolution
+            .resolved_handles
             .into_iter()
             .map(|dataset_handle| Dataset::new_access_checked(account.clone(), dataset_handle))
             .collect();

@@ -692,7 +692,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         })
     }
 
-    async fn get_count_flows_by_datasets(
+    async fn get_count_flows_by_multiple_datasets(
         &self,
         dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
@@ -714,6 +714,27 @@ impl FlowEventStore for InMemoryFlowEventStore {
             }
         }
         Ok(count)
+    }
+
+    async fn filter_datasets_having_flows(
+        &self,
+        dataset_ids: &[&odf::DatasetID],
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        let dataset_ids: HashSet<_> = dataset_ids.iter().copied().collect();
+
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut filtered_dataset_ids = HashSet::new();
+        for flow_id in &g.all_flows {
+            let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
+            if let FlowKey::Dataset(flow_key_dataset) = flow_key {
+                if dataset_ids.contains(&flow_key_dataset.dataset_id) {
+                    filtered_dataset_ids.insert(flow_key_dataset.dataset_id.clone());
+                }
+            }
+        }
+        Ok(filtered_dataset_ids.into_iter().collect())
     }
 }
 

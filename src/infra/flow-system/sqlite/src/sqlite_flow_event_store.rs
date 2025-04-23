@@ -1080,7 +1080,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
-    async fn get_count_flows_by_datasets(
+    async fn get_count_flows_by_multiple_datasets(
         &self,
         dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
@@ -1133,6 +1133,37 @@ impl FlowEventStore for SqliteFlowEventStore {
         let flows_count: i64 = query_result.get(0);
 
         Ok(usize::try_from(flows_count).unwrap())
+    }
+
+    async fn filter_datasets_having_flows(
+        &self,
+        dataset_ids: &[&odf::DatasetID],
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
+
+        let query_str = format!(
+            r#"
+            SELECT DISTINCT(dataset_id) FROM flows
+                WHERE dataset_id IN ({})
+            "#,
+            sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(1).unwrap())
+        );
+
+        let mut query = sqlx::query(&query_str);
+
+        for dataset_id in ids {
+            query = query.bind(dataset_id);
+        }
+
+        let query_result = query.fetch_all(connection_mut).await.int_err()?;
+
+        Ok(query_result
+            .into_iter()
+            .map(|row| odf::DatasetID::from_did_str(row.get(0)).unwrap())
+            .collect())
     }
 }
 
