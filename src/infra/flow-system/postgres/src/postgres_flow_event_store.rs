@@ -941,7 +941,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
-    async fn get_count_flows_by_datasets(
+    async fn get_count_flows_by_multiple_datasets(
         &self,
         dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
@@ -979,6 +979,38 @@ impl FlowEventStore for PostgresFlowEventStore {
 
         let flows_count = query_result.flows_count.unwrap_or_default();
         Ok(usize::try_from(flows_count).unwrap())
+    }
+
+    async fn filter_datasets_having_flows(
+        &self,
+        dataset_ids: &[&odf::DatasetID],
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
+
+        let filtered_dataset_ids = sqlx::query!(
+            r#"
+            SELECT DISTINCT(dataset_id) as dataset_id
+                FROM flows
+                WHERE dataset_id = ANY($1)
+            "#,
+            &ids,
+        )
+        .map(|flow_row| {
+            odf::DatasetID::from_did_str(
+                &flow_row
+                    .dataset_id
+                    .expect("Must have a dataset id with this WHERE clause"),
+            )
+            .unwrap()
+        })
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(filtered_dataset_ids)
     }
 }
 

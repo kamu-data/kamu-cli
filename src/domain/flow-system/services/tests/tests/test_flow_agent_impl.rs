@@ -5532,10 +5532,6 @@ async fn test_list_all_datasets_with_flow() {
         .flow_query_service
         .list_all_datasets_with_flow_by_account(&foo_account_id)
         .await
-        .unwrap()
-        .matched_stream
-        .try_collect()
-        .await
         .unwrap();
 
     pretty_assertions::assert_eq!([foo_id], *all_datasets_with_flow);
@@ -5543,10 +5539,6 @@ async fn test_list_all_datasets_with_flow() {
     let all_datasets_with_flow: Vec<_> = harness
         .flow_query_service
         .list_all_datasets_with_flow_by_account(&bar_account_id)
-        .await
-        .unwrap()
-        .matched_stream
-        .try_collect()
         .await
         .unwrap();
 

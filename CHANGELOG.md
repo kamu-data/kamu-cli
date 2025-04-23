@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Using batch query to count datasets with flows belonging to an account (more listing speedup)
+
+
 ## [0.234.0] - 2025-04-23
 ### Changed
 - Pin version for `aws-sdk-s3` crate version, that includes breaking changes

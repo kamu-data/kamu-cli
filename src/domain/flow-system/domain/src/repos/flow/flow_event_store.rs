@@ -67,11 +67,17 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
     /// Returns number of flows associated with the specified datasets and
     /// matching filters, if specified
-    async fn get_count_flows_by_datasets(
+    async fn get_count_flows_by_multiple_datasets(
         &self,
         dataset_ids: &[&odf::DatasetID],
         filters: &DatasetFlowFilters,
     ) -> Result<usize, InternalError>;
+
+    /// Returns IDs of the datasets who have any flows associated with them
+    async fn filter_datasets_having_flows(
+        &self,
+        dataset_ids: &[&odf::DatasetID],
+    ) -> Result<Vec<odf::DatasetID>, InternalError>;
 
     /// Returns IDs of the flows associated with the specified
     /// dataset in reverse chronological order based on creation time.
