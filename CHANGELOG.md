@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.234.0] - 2025-04-23
 ### Changed
 - Pin version for `aws-sdk-s3` crate version, that includes breaking changes
 - Update all minor versions of other crates
