@@ -313,7 +313,10 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
                     ORDER BY dataset_id, dataset_flow_type, event_time DESC
                 ) AS latest_events
                 WHERE event_type != 'FlowTriggerEventDatasetRemoved'
-                AND (event_payload->>'paused')::boolean = false
+                AND (
+                    (event_type = 'FlowTriggerEventCreated' AND (event_payload#>>'{Created,paused}') = 'false') OR
+                    (event_type = 'FlowTriggerEventModified' AND (event_payload#>>'{Modified,paused}') = 'false')
+                )
             )
             "#,
             &dataset_ids,

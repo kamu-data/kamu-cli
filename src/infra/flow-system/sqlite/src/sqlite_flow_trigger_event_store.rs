@@ -318,7 +318,11 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                         AND e2.dataset_flow_type = e.dataset_flow_type
                 )
                 AND e.event_type != 'FlowTriggerEventDatasetRemoved'
-                AND json_extract(e.event_payload, '$.paused') = 0
+                AND (
+                    (e.event_type = 'FlowTriggerEventCreated' AND json_extract(e.event_payload, '$.Created.paused') = 0)
+                    OR
+                    (e.event_type = 'FlowTriggerEventModified' AND json_extract(e.event_payload, '$.Modified.paused') = 0)
+                )
             )
             "#,
             sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(1).unwrap())
