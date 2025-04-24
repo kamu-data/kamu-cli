@@ -18,17 +18,24 @@ use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
     JwtAuthenticationConfig,
+    JwtTokenIssuer,
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryOAuthDeviceCodeRepository,
+};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
+    OAuthDeviceCodeGeneratorDefault,
+    OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::{
+use kamu_adapter_http::platform::{
     FileUploadLimitConfig,
     UploadContext,
     UploadServiceLocal,
@@ -87,7 +94,10 @@ impl Harness {
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add::<UploadServiceLocal>()
                 .add::<PredefinedAccountsRegistrator>()
-                .add::<DummyOutboxImpl>();
+                .add::<DummyOutboxImpl>()
+                .add::<OAuthDeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeGeneratorDefault>()
+                .add::<InMemoryOAuthDeviceCodeRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -115,8 +125,9 @@ impl Harness {
 
     fn make_access_token(&self, account_id: &odf::AccountID) -> String {
         self.authentication_service
-            .make_access_token(account_id, 60)
+            .make_access_token_from_account_id(account_id, 60)
             .unwrap()
+            .into_inner()
     }
 
     fn mock_upload_token(&self) -> UploadTokenBase64Json {

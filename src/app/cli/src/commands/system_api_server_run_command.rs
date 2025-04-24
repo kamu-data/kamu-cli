@@ -18,7 +18,7 @@ use internal_error::ResultIntoInternal;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_http::FileUploadLimitConfig;
+use kamu_adapter_http::platform::FileUploadLimitConfig;
 use kamu_adapter_oauth::*;
 use kamu_datasets::DatasetEnvVarsConfig;
 use tracing::Instrument;
@@ -92,6 +92,7 @@ impl APIServerRunCommand {
                         PROVIDER_PASSWORD,
                         serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
                             .map_int_err(CLIError::critical)?,
+                        None,
                     )
                     .await
                     .map_int_err(CLIError::critical)

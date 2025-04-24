@@ -15,7 +15,6 @@ use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_core::TenancyConfig;
 use observability::axum::unknown_fallback_handler;
 use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,17 +30,9 @@ impl TestAPIServer {
         tenancy_config: TenancyConfig,
     ) -> Self {
         let (router, _api) = OpenApiRouter::new()
-            .routes(routes!(kamu_adapter_http::platform_login_handler))
-            .routes(routes!(kamu_adapter_http::platform_token_validate_handler))
-            .routes(routes!(
-                kamu_adapter_http::platform_file_upload_prepare_post_handler
-            ))
-            .routes(routes!(
-                kamu_adapter_http::platform_file_upload_post_handler,
-                kamu_adapter_http::platform_file_upload_get_handler
-            ))
             .merge(kamu_adapter_http::data::root_router())
             .merge(kamu_adapter_http::general::root_router())
+            .nest("/platform", kamu_adapter_http::platform::root_router())
             .nest(
                 match tenancy_config {
                     TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",

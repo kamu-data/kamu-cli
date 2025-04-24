@@ -11,11 +11,22 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.235.0] - 2025-04-24
+### Added
+- `kamu-adapter-http`: Introduced the `from_catalog_n` macro for easier dependency extraction from the catalog.### Changed
 ### Changed
-More flows listing speedup:
-- Using batch query to count datasets with flows belonging to an account
-- Checking if all triggers of given list of datasets are paused via 1 SQL query
+- More flows listing speedup:
+  - Using batch query to count datasets with flows belonging to an account
+  - Checking if all triggers of given list of datasets are paused via 1 SQL query
+- Device Flow:
+  - Summary: for interactive login, replace the Loopback Redirect Flow mechanism with Device Flow Authentication, 
+      which enables operation in the most secure and restrictive browsers.
+  - If the login link cannot be opened on the current device, you may copy it to any browser 
+      and complete the interactive login on another device.
+  - HTTP API: Added endpoints implementing [RFC 8628: OAuth 2.0 Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628):
+    - `POST platform/token/device/authorization`;
+    - `POST platform/token/device`.
+- `kamu-adapter-http`: platform handlers moved to a separate folder.
 
 ## [0.234.0] - 2025-04-23
 ### Changed

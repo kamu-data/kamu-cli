@@ -12,6 +12,8 @@
 // Re-exports
 pub use kamu_accounts as domain;
 
+mod dependencies;
 mod services;
 
+pub use dependencies::*;
 pub use services::*;

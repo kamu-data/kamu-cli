@@ -18,6 +18,8 @@ use kamu_accounts::*;
 
 use crate::make_test_account;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) const GITHUB_ACCOUNT_ID_WASYA: &str = "8875907";
 pub(crate) const GITHUB_ACCOUNT_ID_PETYA: &str = "8875908";
 
@@ -562,7 +564,7 @@ pub async fn test_update_email_errors(catalog: &Catalog) {
     account_repo.create_account(&account_1).await.unwrap();
     account_repo.create_account(&account_2).await.unwrap();
 
-    let updated_email: Email = Email::parse("petya@example.com").unwrap();
+    let updated_email = Email::parse("petya@example.com").unwrap();
 
     assert_matches!(
         account_repo
@@ -576,7 +578,7 @@ pub async fn test_update_email_errors(catalog: &Catalog) {
 
     assert_matches!(
         account_repo
-            .update_account_email(&account_1.id, updated_email,)
+            .update_account_email(&account_1.id, updated_email)
             .await,
         Err(UpdateAccountError::Duplicate(AccountErrorDuplicate {
             account_field: AccountDuplicateField::Email

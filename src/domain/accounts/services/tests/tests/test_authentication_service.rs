@@ -11,8 +11,17 @@ use std::assert_matches::assert_matches;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
-use kamu_accounts_services::{AccessTokenServiceImpl, AuthenticationServiceImpl};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryOAuthDeviceCodeRepository,
+};
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    OAuthDeviceCodeGeneratorDefault,
+    OAuthDeviceCodeServiceImpl,
+};
 use messaging_outbox::{MockOutbox, Outbox};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -39,15 +48,15 @@ async fn test_login() {
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let response_a = authentication_service
-        .login("method-A", "dummy".to_string())
+        .login("method-A", "dummy".to_string(), None)
         .await;
 
     let response_b = authentication_service
-        .login("method-B", "dummy".to_string())
+        .login("method-B", "dummy".to_string(), None)
         .await;
 
     let response_bad = authentication_service
-        .login("method-bad", "dummy".to_string())
+        .login("method-bad", "dummy".to_string(), None)
         .await;
 
     assert_matches!(response_a, Ok(_));
@@ -66,7 +75,7 @@ async fn test_use_good_access_token() {
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let login_response = authentication_service
-        .login("method-A", "dummy".to_string())
+        .login("method-A", "dummy".to_string(), None)
         .await
         .unwrap();
 
@@ -115,7 +124,10 @@ fn make_catalog(mock_outbox: MockOutbox) -> dill::Catalog {
         .add_value(JwtAuthenticationConfig::default())
         .add::<DatabaseTransactionRunner>()
         .add_value(mock_outbox)
-        .bind::<dyn Outbox, MockOutbox>();
+        .bind::<dyn Outbox, MockOutbox>()
+        .add::<OAuthDeviceCodeServiceImpl>()
+        .add::<OAuthDeviceCodeGeneratorDefault>()
+        .add::<InMemoryOAuthDeviceCodeRepository>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 

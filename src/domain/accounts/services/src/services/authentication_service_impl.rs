@@ -39,12 +39,14 @@ pub struct AuthenticationServiceImpl {
     access_token_svc: Arc<dyn AccessTokenService>,
     outbox: Arc<dyn Outbox>,
     maybe_dummy_token_account: Option<Account>,
+    oauth_device_code_service: Arc<dyn OAuthDeviceCodeService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn AuthenticationService)]
+#[interface(dyn JwtTokenIssuer)]
 impl AuthenticationServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
@@ -54,6 +56,7 @@ impl AuthenticationServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
         outbox: Arc<dyn Outbox>,
+        oauth_device_code_service: Arc<dyn OAuthDeviceCodeService>,
     ) -> Self {
         let mut authentication_providers_by_method = HashMap::new();
 
@@ -77,6 +80,7 @@ impl AuthenticationServiceImpl {
             account_repository,
             access_token_svc,
             outbox,
+            oauth_device_code_service,
             maybe_dummy_token_account: config.maybe_dummy_token_account.clone(),
         }
     }
@@ -93,28 +97,41 @@ impl AuthenticationServiceImpl {
         }
     }
 
-    pub fn make_access_token(
+    fn generate_jwt_claims(
         &self,
         account_id: &odf::AccountID,
         expiration_time_sec: usize,
-    ) -> Result<String, InternalError> {
+    ) -> JWTClaims {
         let current_time = self.time_source.now();
         let iat = usize::try_from(current_time.timestamp()).unwrap();
         let exp = iat + expiration_time_sec;
 
-        let claims = JWTClaims {
+        JWTClaims {
             iat,
             exp,
-            iss: String::from(KAMU_JWT_ISSUER),
+            iss: KAMU_JWT_ISSUER.to_string(),
             sub: account_id.to_string(),
-        };
+        }
+    }
 
-        encode(
-            &Header::new(KAMU_JWT_ALGORITHM),
-            &claims,
-            &self.encoding_key,
-        )
-        .int_err()
+    fn make_access_token_from_jwt_claims(
+        &self,
+        claims: &JWTClaims,
+    ) -> Result<JwtAccessToken, InternalError> {
+        let token =
+            encode(&Header::new(KAMU_JWT_ALGORITHM), claims, &self.encoding_key).int_err()?;
+
+        JwtAccessToken::try_new(token).map(Ok).unwrap()
+    }
+
+    fn make_access_token_from_account_id_impl(
+        &self,
+        account_id: &odf::AccountID,
+        expiration_time_sec: usize,
+    ) -> Result<JwtAccessToken, InternalError> {
+        let claims = self.generate_jwt_claims(account_id, expiration_time_sec);
+
+        self.make_access_token_from_jwt_claims(&claims)
     }
 
     pub fn decode_access_token(
@@ -218,6 +235,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &self,
         login_method: &str,
         login_credentials_json: String,
+        device_code: Option<DeviceCode>,
     ) -> Result<LoginResponse, LoginError> {
         // Resolve provider via specified login method
         let provider = self.resolve_authentication_provider(login_method)?;
@@ -270,9 +288,29 @@ impl AuthenticationService for AuthenticationServiceImpl {
             }
         };
 
-        // Create access token and attach basic identity properties
+        // Create access. If there is a device_code, save token parameters for it
+        let access_token = if let Some(device_code) = device_code {
+            let claims = self.generate_jwt_claims(&account_id, EXPIRATION_TIME_SEC);
+            let token = self.make_access_token_from_jwt_claims(&claims)?;
+            let device_token_params_part = DeviceTokenParamsPart {
+                iat: claims.iat,
+                exp: claims.exp,
+                account_id: account_id.clone(),
+            };
+
+            self.oauth_device_code_service
+                .update_device_token_with_token_params_part(&device_code, &device_token_params_part)
+                .await
+                .int_err()?;
+
+            token
+        } else {
+            self.make_access_token_from_account_id(&account_id, EXPIRATION_TIME_SEC)?
+        };
+
+        // Attach basic identity properties
         Ok(LoginResponse {
-            access_token: self.make_access_token(&account_id, EXPIRATION_TIME_SEC)?,
+            access_token: access_token.into_inner(),
             account_id,
             account_name: provider_response.account_name,
         })
@@ -282,3 +320,36 @@ impl AuthenticationService for AuthenticationServiceImpl {
         self.account_by_token_impl(&access_token).await
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl JwtTokenIssuer for AuthenticationServiceImpl {
+    fn make_access_token_from_account_id(
+        &self,
+        account_id: &odf::AccountID,
+        expiration_time_sec: usize,
+    ) -> Result<JwtAccessToken, InternalError> {
+        self.make_access_token_from_account_id_impl(account_id, expiration_time_sec)
+    }
+
+    fn make_access_token_from_device_token_params_part(
+        &self,
+        DeviceTokenParamsPart {
+            iat,
+            exp,
+            account_id,
+        }: DeviceTokenParamsPart,
+    ) -> Result<JwtAccessToken, InternalError> {
+        let claims = JWTClaims {
+            iat,
+            exp,
+            iss: KAMU_JWT_ISSUER.to_string(),
+            sub: account_id.to_string(),
+        };
+
+        self.make_access_token_from_jwt_claims(&claims)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

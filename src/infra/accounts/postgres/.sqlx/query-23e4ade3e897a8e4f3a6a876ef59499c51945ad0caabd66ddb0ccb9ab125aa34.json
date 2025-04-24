@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT device_code,\n                   device_code_created_at,\n                   device_code_expires_at,\n                   token_iat,\n                   token_exp,\n                   token_last_used_at,\n                   account_id\n            FROM oauth_device_codes\n            WHERE device_code = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "device_code",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "device_code_created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "device_code_expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "token_iat",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "token_exp",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "token_last_used_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "account_id",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "23e4ade3e897a8e4f3a6a876ef59499c51945ad0caabd66ddb0ccb9ab125aa34"
+}

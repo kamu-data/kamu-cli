@@ -17,6 +17,8 @@ use futures::FutureExt;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::time::timeout;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_fake_sleep_stable_order() {
     let t0 = point_in_time_in_a_parallel_universe();
@@ -48,6 +50,8 @@ async fn test_fake_sleep_stable_order() {
     assert_eq!(system_time_source.now(), t);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_fake_sleep_without_simulate_time_passage() {
     let t0 = point_in_time_in_a_parallel_universe();
@@ -59,6 +63,8 @@ async fn test_fake_sleep_without_simulate_time_passage() {
     assert_matches!(sleep_result_or_timeout, Err(_));
     assert_eq!(system_time_source.now(), t0);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_fake_sleep_with_lacking_simulate_time_passage() {
@@ -77,6 +83,8 @@ async fn test_fake_sleep_with_lacking_simulate_time_passage() {
     assert_eq!(check_futures_for_completion(&mut sleep_futures), [false]);
     assert_eq!(system_time_source.now(), t);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_fake_sleep_with_several_simulate_time_passage() {
@@ -165,6 +173,8 @@ async fn test_fake_sleep_with_several_simulate_time_passage() {
     assert_eq!(system_time_source.now(), t);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_fake_sleep_with_simulate_exceeding_passage() {
     let t0 = point_in_time_in_a_parallel_universe();
@@ -230,3 +240,5 @@ fn check_futures_for_completion(
 
     res
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

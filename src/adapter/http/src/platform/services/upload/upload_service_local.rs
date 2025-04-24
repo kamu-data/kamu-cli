@@ -18,17 +18,20 @@ use thiserror::Error;
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
-use super::{ContentNotFoundError, UploadToken, UploadTokenBase64Json, UploadTokenIntoStreamError};
-use crate::{
-    AccessToken,
+use crate::platform::{
     ContentLengthMismatchError,
+    ContentNotFoundError,
     ContentTooLargeError,
     FileUploadLimitConfig,
     MakeUploadContextError,
     SaveUploadError,
     UploadContext,
     UploadService,
+    UploadToken,
+    UploadTokenBase64Json,
+    UploadTokenIntoStreamError,
 };
+use crate::AccessToken;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

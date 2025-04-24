@@ -208,6 +208,158 @@
         ],
         "type": "object"
       },
+      "DeviceAccessTokenError": {
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/DeviceAccessTokenErrorStatus"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "DeviceAccessTokenErrorStatus": {
+        "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.5>",
+        "enum": [
+          "authorization_pending",
+          "slow_down",
+          "access_denied",
+          "expired_token",
+          "invalid_grant"
+        ],
+        "type": "string"
+      },
+      "DeviceAccessTokenRequest": {
+        "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.4>",
+        "properties": {
+          "client_id": {
+            "description": "REQUIRED.  The device verification code, \"`device_code`\" from the\ndevice authorization response, defined in [Section 3.2](https://datatracker.ietf.org/doc/html/rfc8628#section-3.2).",
+            "type": "string"
+          },
+          "device_code": {
+            "description": "REQUIRED if the client is not authenticating with the\nauthorization server as described in [Section 3.2.1. of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1).\nThe client identifier as described in [Section 2.2 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2).",
+            "type": "string"
+          },
+          "grant_type": {
+            "description": "REQUIRED.  Value MUST be set to\n\"urn:ietf:params:oauth:grant-type:device_code\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grant_type",
+          "client_id",
+          "device_code"
+        ],
+        "type": "object"
+      },
+      "DeviceAccessTokenResponse": {
+        "description": "<https://datatracker.ietf.org/doc/html/rfc6749#section-5.1>",
+        "properties": {
+          "access_token": {
+            "description": "REQUIRED.  The access token issued by the authorization server.",
+            "type": "string"
+          },
+          "expires_in": {
+            "description": "RECOMMENDED.  The lifetime in seconds of the access token.  For\nexample, the value \"3600\" denotes that the access token will\nexpire in one hour from the time the response was generated.\nIf omitted, the authorization server SHOULD provide the\nexpiration time via other means or document the default value.",
+            "example": 3600,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "refresh_token": {
+            "description": "OPTIONAL.  The refresh token, which can be used to obtain new\naccess tokens using the same authorization grant as described\nin [Section 6](https://datatracker.ietf.org/doc/html/rfc6749#section-6).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "score": {
+            "description": "OPTIONAL.  The scope of the access request as described by\n[Section 3.3](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3).  The requested scope MUST NOT include any scope\nnot originally granted by the resource owner, and if omitted is\ntreated as equal to the scope originally granted by the\nresource owner.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token_type": {
+            "description": "REQUIRED.  The type of the token issued as described in\n[Section 7.1](https://datatracker.ietf.org/doc/html/rfc6749#section-7.1).  Value is case insensitive.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ],
+        "type": "object"
+      },
+      "DeviceAuthorizationRequest": {
+        "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.1>",
+        "properties": {
+          "client_id": {
+            "description": "REQUIRED if the client is not authenticating with the\nauthorization server as described in [Section 3.2.1. of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1).\nThe client identifier as described in [Section 2.2 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2).",
+            "type": "string"
+          },
+          "scope": {
+            "description": "OPTIONAL.  The scope of the access request as defined by\n[Section 3.3 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "client_id"
+        ],
+        "type": "object"
+      },
+      "DeviceAuthorizationResponse": {
+        "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.2>",
+        "properties": {
+          "device_code": {
+            "description": "REQUIRED.  The device verification code.",
+            "type": "string"
+          },
+          "expires_in": {
+            "description": "REQUIRED.  The lifetime in seconds of the \"`device_code`\" and\n\"`user_code`\".",
+            "example": 300,
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "interval": {
+            "description": "OPTIONAL.  The minimum amount of time in seconds that the client\nSHOULD wait between polling requests to the token endpoint.  If no\nvalue is provided, clients MUST use 5 as the default.",
+            "example": 5,
+            "format": "int64",
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "user_code": {
+            "description": "REQUIRED.  The end-user verification code.",
+            "type": "string"
+          },
+          "verification_uri": {
+            "description": "REQUIRED.  The end-user verification URI on the authorization\nserver.  The URI should be short and easy to remember as end users\nwill be asked to manually type it into their user agent.",
+            "type": "string"
+          },
+          "verification_uri_complete": {
+            "description": "OPTIONAL.  A verification URI that includes the \"`user_code`\" (or\nother information with the same function as the \"`user_code`\"),\nwhich is designed for non-textual transmission.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "device_code",
+          "user_code",
+          "verification_uri",
+          "expires_in"
+        ],
+        "type": "object"
+      },
       "DidKey": {
         "examples": [
           "did:key:z6MkmgVreHBu2ABaD59Jq1J2JneXwzpsUWwEWXS4kLhjb4V4"
@@ -818,7 +970,7 @@
     },
     "termsOfService": "https://docs.kamu.dev/terms-of-service/",
     "title": "Kamu REST API",
-    "version": "0.234.0"
+    "version": "0.235.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1067,7 +1219,7 @@
     },
     "/platform/file/upload/prepare": {
       "post": {
-        "operationId": "platform_file_upload_prepare_post_handler",
+        "operationId": "file_upload_prepare_post_handler",
         "parameters": [
           {
             "in": "query",
@@ -1120,7 +1272,7 @@
     },
     "/platform/file/upload/{upload_token}": {
       "get": {
-        "operationId": "platform_file_upload_get_handler",
+        "operationId": "file_upload_get_handler",
         "parameters": [
           {
             "in": "path",
@@ -1155,7 +1307,7 @@
         ]
       },
       "post": {
-        "operationId": "platform_file_upload_post_handler",
+        "operationId": "file_upload_post_handler",
         "parameters": [
           {
             "in": "path",
@@ -1206,7 +1358,7 @@
     },
     "/platform/login": {
       "post": {
-        "operationId": "platform_login_handler",
+        "operationId": "login_handler",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1258,9 +1410,91 @@
         ]
       }
     },
+    "/platform/token/device": {
+      "post": {
+        "operationId": "token_device_handler",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAccessTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAccessTokenResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAccessTokenError"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Polling to obtain a token for the device",
+        "tags": [
+          "kamu"
+        ]
+      }
+    },
+    "/platform/token/device/authorization": {
+      "post": {
+        "operationId": "token_device_authorization_handler",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAuthorizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAuthorizationResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Authorization of a device",
+        "tags": [
+          "kamu"
+        ]
+      }
+    },
     "/platform/token/validate": {
       "get": {
-        "operationId": "platform_token_validate_handler",
+        "operationId": "token_validate_handler",
         "responses": {
           "200": {
             "content": {

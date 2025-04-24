@@ -24,7 +24,11 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryAccountRepository,
+    InMemoryOAuthDeviceCodeRepository,
+};
 use kamu_accounts_services::*;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{
@@ -158,7 +162,10 @@ impl ServerSideLocalFsHarness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
-                .add_value(predefined_accounts_config);
+                .add_value(predefined_accounts_config)
+                .add::<OAuthDeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeGeneratorDefault>()
+                .add::<InMemoryOAuthDeviceCodeRepository>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
