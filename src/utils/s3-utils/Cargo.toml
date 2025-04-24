@@ -28,7 +28,7 @@ internal-error = { workspace = true }
 observability = { workspace = true, features = ["prometheus"] }
 
 aws-config = { version = "1", default-features = false }
-aws-sdk-s3 = { version = "1", default-features = false }
+aws-sdk-s3 = { workspace = true }
 aws-smithy-types = { version = "1" }
 bon = { version = "3", default-features = false }
 dill = { version = "0.13", default-features = false }

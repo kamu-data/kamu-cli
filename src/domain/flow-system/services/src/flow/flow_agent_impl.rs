@@ -27,6 +27,7 @@ use kamu_datasets::{
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use messaging_outbox::{
+    InitialConsumerBoundary,
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
@@ -73,6 +74,7 @@ pub struct FlowAgentImpl {
         MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 #[interface(dyn InitOnStartup)]
 #[meta(InitOnStartupMeta {

@@ -230,6 +230,11 @@ impl ClientSideHarness {
         subject.account_id().clone()
     }
 
+    pub fn client_account_name(&self) -> odf::AccountName {
+        let subject = self.catalog.get_one::<CurrentAccountSubject>().unwrap();
+        subject.account_name().clone()
+    }
+
     pub fn operating_account_name(&self) -> Option<odf::AccountName> {
         if self.options.tenancy_config == TenancyConfig::MultiTenant
             && self.options.authenticated_remotely

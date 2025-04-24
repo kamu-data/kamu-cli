@@ -18,13 +18,14 @@ use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_set_and_get_statistics(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"some-id");
     let dataset_name = odf::DatasetName::new_unchecked("foo");
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_id,
         &dataset_name,
         odf::DatasetKind::Root,
@@ -69,13 +70,14 @@ pub async fn test_set_and_get_statistics(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_overwrite_statistics(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"some-id");
     let dataset_name = odf::DatasetName::new_unchecked("foo");
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_id,
         &dataset_name,
         odf::DatasetKind::Root,
@@ -119,7 +121,7 @@ pub async fn test_overwrite_statistics(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_multiple_datasets_statistics(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
 
     let dataset_1_id = odf::DatasetID::new_seeded_ed25519(b"some-id-1");
     let dataset_2_id = odf::DatasetID::new_seeded_ed25519(b"some-id-2");
@@ -127,6 +129,7 @@ pub async fn test_multiple_datasets_statistics(catalog: &Catalog) {
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_1_id,
         &odf::DatasetName::new_unchecked("foo"),
         odf::DatasetKind::Root,
@@ -136,6 +139,7 @@ pub async fn test_multiple_datasets_statistics(catalog: &Catalog) {
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_2_id,
         &odf::DatasetName::new_unchecked("bar"),
         odf::DatasetKind::Root,
@@ -184,13 +188,15 @@ pub async fn test_multiple_datasets_statistics(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_remove_dataset_entry_removes_statistics(catalog: &Catalog) {
-    let test_account_id = init_test_account(catalog).await;
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-remove-stats");
     let dataset_name = odf::DatasetName::new_unchecked("remove-stats-ds");
 
     init_dataset_entry(
         catalog,
         &test_account_id,
+        &test_account_name,
         &dataset_id,
         &dataset_name,
         odf::DatasetKind::Root,

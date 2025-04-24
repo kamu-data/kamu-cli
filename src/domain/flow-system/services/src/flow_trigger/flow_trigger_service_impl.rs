@@ -15,6 +15,7 @@ use dill::*;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::{FlowTriggerEventStore, *};
 use messaging_outbox::{
+    InitialConsumerBoundary,
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
@@ -47,6 +48,7 @@ pub struct FlowTriggerServiceImpl {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_TRIGGER_SERVICE,
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_DATASET_SERVICE],
     delivery: MessageDeliveryMechanism::Transactional,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl FlowTriggerServiceImpl {
     pub fn new(
@@ -320,25 +322,13 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
 
     /// Find all triggers by datasets
     #[tracing::instrument(level = "info", skip_all, fields(?dataset_ids))]
-    async fn find_triggers_by_datasets(
+    async fn has_active_triggers_for_datasets(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
-    ) -> FlowTriggerStateStream {
-        Box::pin(async_stream::try_stream! {
-            for dataset_flow_type in DatasetFlowType::all() {
-                for dataset_id in &dataset_ids {
-                    let maybe_flow_trigger =
-                        FlowTrigger::try_load(
-                            FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()
-                        )
-                        .await
-                        .int_err()?;
-                    if let Some(flow_trigger) = maybe_flow_trigger {
-                        yield flow_trigger.into();
-                    }
-                }
-            }
-        })
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<bool, InternalError> {
+        self.event_store
+            .has_active_triggers_for_datasets(dataset_ids)
+            .await
     }
 }
 

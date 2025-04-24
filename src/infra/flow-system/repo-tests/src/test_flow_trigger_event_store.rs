@@ -15,6 +15,18 @@ use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn dummy_schedule() -> FlowTriggerRule {
+    FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+        every: Duration::seconds(5),
+    }))
+}
+
+fn dummy_schedule_cron() -> FlowTriggerRule {
+    FlowTriggerRule::Schedule(Schedule::try_from_5component_cron_expression("0 * * * *").unwrap())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_event_store_empty(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
 
@@ -57,17 +69,13 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_key: flow_key_1.clone(),
         paused: false,
-        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: dummy_schedule(),
     };
     let event_1_2 = FlowTriggerEventModified {
         event_time: Utc::now(),
         flow_key: flow_key_1.clone(),
         paused: true,
-        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: dummy_schedule(),
     };
 
     event_store
@@ -90,9 +98,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_key: flow_key_2.clone(),
         paused: false,
-        rule: FlowTriggerRule::Schedule(
-            Schedule::try_from_5component_cron_expression("0 * * * *").unwrap(),
-        ),
+        rule: dummy_schedule_cron(),
     };
 
     event_store
@@ -109,9 +115,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_key: flow_key_3.clone(),
         paused: false,
-        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: dummy_schedule(),
     };
 
     event_store
@@ -181,25 +185,19 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
         paused: false,
-        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: dummy_schedule(),
     };
     let event_2 = FlowTriggerEventModified {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
         paused: false,
-        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: dummy_schedule(),
     };
     let event_3 = FlowTriggerEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
         paused: false,
-        rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-            every: Duration::seconds(5),
-        })),
+        rule: dummy_schedule(),
     };
 
     let latest_event_id = event_store
@@ -267,6 +265,189 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         .unwrap();
 
     assert_eq!(&events[..], [event_2.into()]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
+
+    let dataset_id_active = odf::DatasetID::new_seeded_ed25519(b"active");
+    let dataset_id_paused = odf::DatasetID::new_seeded_ed25519(b"paused");
+    let dataset_id_modified_paused = odf::DatasetID::new_seeded_ed25519(b"modified_paused");
+    let dataset_id_modified_active = odf::DatasetID::new_seeded_ed25519(b"modified_active");
+    let dataset_id_removed = odf::DatasetID::new_seeded_ed25519(b"removed");
+    let unrelated_dataset_id = odf::DatasetID::new_seeded_ed25519(b"other");
+
+    // Active trigger
+    let flow_active = FlowKey::dataset(dataset_id_active.clone(), DatasetFlowType::Ingest);
+    event_store
+        .save_events(
+            &flow_active,
+            None,
+            vec![FlowTriggerEventCreated {
+                event_time: Utc::now(),
+                flow_key: flow_active.clone(),
+                paused: false,
+                rule: dummy_schedule(),
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    // Paused trigger
+    let flow_paused = FlowKey::dataset(dataset_id_paused.clone(), DatasetFlowType::Ingest);
+    event_store
+        .save_events(
+            &flow_paused,
+            None,
+            vec![FlowTriggerEventCreated {
+                event_time: Utc::now(),
+                flow_key: flow_paused.clone(),
+                paused: true,
+                rule: dummy_schedule(),
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    // Modified trigger: first active, then paused
+    let flow_modified_paused =
+        FlowKey::dataset(dataset_id_modified_paused.clone(), DatasetFlowType::Ingest);
+    event_store
+        .save_events(
+            &flow_modified_paused,
+            None,
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now() - Duration::seconds(10),
+                    flow_key: flow_modified_paused.clone(),
+                    paused: false,
+                    rule: dummy_schedule(),
+                }
+                .into(),
+                FlowTriggerEventModified {
+                    event_time: Utc::now(),
+                    flow_key: flow_modified_paused.clone(),
+                    paused: true,
+                    rule: dummy_schedule(),
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    // Modified trigger: first paused, then active
+    let flow_modified_active =
+        FlowKey::dataset(dataset_id_modified_active.clone(), DatasetFlowType::Ingest);
+    event_store
+        .save_events(
+            &flow_modified_active,
+            None,
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now() - Duration::seconds(10),
+                    flow_key: flow_modified_active.clone(),
+                    paused: true,
+                    rule: dummy_schedule(),
+                }
+                .into(),
+                FlowTriggerEventModified {
+                    event_time: Utc::now(),
+                    flow_key: flow_modified_active.clone(),
+                    paused: false,
+                    rule: dummy_schedule(),
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    // Removed trigger
+    let flow_removed = FlowKey::dataset(dataset_id_removed.clone(), DatasetFlowType::Ingest);
+    event_store
+        .save_events(
+            &flow_removed,
+            None,
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now() - Duration::seconds(10),
+                    flow_key: flow_removed.clone(),
+                    paused: false,
+                    rule: dummy_schedule(),
+                }
+                .into(),
+                FlowTriggerEventDatasetRemoved {
+                    event_time: Utc::now(),
+                    flow_key: flow_removed.clone(),
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    // System trigger (should be ignored)
+    let flow_system = FlowKey::system(SystemFlowType::GC);
+    event_store
+        .save_events(
+            &flow_system,
+            None,
+            vec![FlowTriggerEventCreated {
+                event_time: Utc::now(),
+                flow_key: flow_system.clone(),
+                paused: false,
+                rule: dummy_schedule(),
+            }
+            .into()],
+        )
+        .await
+        .unwrap();
+
+    async fn test(store: &dyn FlowTriggerEventStore, ids: &[odf::DatasetID]) -> bool {
+        store.has_active_triggers_for_datasets(ids).await.unwrap()
+    }
+
+    assert!(test(event_store.as_ref(), &[dataset_id_active.clone()]).await);
+    assert!(!test(event_store.as_ref(), &[dataset_id_paused.clone()]).await);
+    assert!(test(event_store.as_ref(), &[dataset_id_modified_active.clone()]).await);
+    assert!(!test(event_store.as_ref(), &[dataset_id_modified_paused.clone()]).await);
+    assert!(!test(event_store.as_ref(), &[dataset_id_removed.clone()]).await);
+    assert!(!test(event_store.as_ref(), &[unrelated_dataset_id]).await);
+    assert!(
+        test(
+            event_store.as_ref(),
+            &[dataset_id_active, dataset_id_paused.clone()]
+        )
+        .await
+    );
+    assert!(
+        !test(
+            event_store.as_ref(),
+            &[
+                dataset_id_modified_paused.clone(),
+                dataset_id_paused.clone()
+            ]
+        )
+        .await
+    );
+    assert!(
+        test(
+            event_store.as_ref(),
+            &[
+                dataset_id_modified_active,
+                dataset_id_paused,
+                dataset_id_modified_paused,
+                dataset_id_removed
+            ]
+        )
+        .await
+    );
+    assert!(!test(event_store.as_ref(), &[]).await);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

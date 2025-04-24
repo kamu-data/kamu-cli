@@ -43,6 +43,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = dataset_key_blocks_repo::test_filter_datasets_having_blocks,
+    harness = PostgresDatasetKeyBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = dataset_key_blocks_repo::test_delete_blocks,
     harness = PostgresDatasetKeyBlockRepositoryHarness
 );

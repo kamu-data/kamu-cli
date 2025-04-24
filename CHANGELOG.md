@@ -13,8 +13,11 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
-- `kamu-adapter-http`: Introduced the `from_catalog_n` macro for easier dependency extraction from the catalog.
+- `kamu-adapter-http`: Introduced the `from_catalog_n` macro for easier dependency extraction from the catalog.### Changed
 ### Changed
+- More flows listing speedup:
+  - Using batch query to count datasets with flows belonging to an account
+  - Checking if all triggers of given list of datasets are paused via 1 SQL query
 - Device Flow:
   - Summary: for interactive login, replace the Loopback Redirect Flow mechanism with Device Flow Authentication, 
       which enables operation in the most secure and restrictive browsers.
@@ -24,9 +27,37 @@ Recommendation: for ease of reading, use the following order:
     - `POST platform/token/device/authorization`;
     - `POST platform/token/device`.
 - `kamu-adapter-http`: platform handlers moved to a separate folder.
+
+## [0.234.0] - 2025-04-23
+### Changed
+- Pin version for `aws-sdk-s3` crate version, that includes breaking changes
+- Update all minor versions of other crates
+- Cleanup duplicate image
+- Denormalization: `DatasetEntry` now contains a copy of owner's account name
+   for faster dataset handle resolutions without extra round trip to database
+- Speedup of account flow runs listing   
+
+## [0.233.4] - 2025-04-22
+### Changed
+- Forcing warmup of dataset ids listing cache on startup
+
+## [0.233.3] - 2025-04-21
+### Fixed
+- Reverted `sqlx` upgrade that was breaking the release build
+
+## [0.233.2] - 2025-04-19
+### Changed
+- Updated `sqlx` crate to `0.8.5`
+### Fixed
+- Revert breaking build changes
+
+## [0.233.1] - 2025-04-19
+### Changed
+- Outbox: Added new param in consumer metadata `initial_consumer_boundary` which allow new consumer to not process all messages, but start from latest one
 ### Fixed
 - `kamu init`: in case of using `--pull-images` argument, fixed unclear error with not found file.
 - CLI commands: Trigger `outbox_agent` method only for commands that require it.
+- S3 get_stored_dataset_by_id operation takes advantage of in-memory datasets listing cache
 
 ## [0.233.0] - 2025-04-09
 ### Added

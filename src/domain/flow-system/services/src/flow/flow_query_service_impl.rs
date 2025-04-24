@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -119,7 +118,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             owned_dataset_ids
         };
 
-        let account_dataset_ids = HashSet::from_iter(filtered_dataset_ids);
+        let account_dataset_id_refs = filtered_dataset_ids.iter().collect::<Vec<_>>();
 
         let dataset_flow_filters = DatasetFlowFilters {
             by_flow_status: filters.by_flow_status,
@@ -127,19 +126,23 @@ impl FlowQueryService for FlowQueryServiceImpl {
             by_initiator: filters.by_initiator,
         };
 
-        self.list_all_flows_by_dataset_ids(account_dataset_ids, dataset_flow_filters, pagination)
-            .await
+        self.list_all_flows_by_dataset_ids(
+            &account_dataset_id_refs,
+            dataset_flow_filters,
+            pagination,
+        )
+        .await
     }
 
     async fn list_all_flows_by_dataset_ids(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
         let total_count = self
             .flow_event_store
-            .get_count_flows_by_datasets(dataset_ids.clone(), &filters)
+            .get_count_flows_by_multiple_datasets(dataset_ids, &filters)
             .await?;
 
         let relevant_flow_ids: Vec<_> = self
@@ -162,27 +165,20 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn list_all_datasets_with_flow_by_account(
         &self,
         account_id: &odf::AccountID,
-    ) -> Result<FlowDatasetListing, ListFlowsByDatasetError> {
+    ) -> Result<Vec<odf::DatasetID>, ListFlowsByDatasetError> {
+        // Consider using ReBAC: not just owned, but any relation to account
         let owned_dataset_ids = self
             .dataset_entry_service
             .get_owned_dataset_ids(account_id)
             .await
             .int_err()?;
 
-        let matched_stream = Box::pin(async_stream::try_stream! {
-            for dataset_id in &owned_dataset_ids {
-                let dataset_flows_count = self
-                    .flow_event_store
-                    .get_count_flows_by_dataset(dataset_id, &Default::default())
-                    .await?;
+        let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
 
-                if dataset_flows_count > 0 {
-                    yield dataset_id.clone();
-                }
-            }
-        });
-
-        Ok(FlowDatasetListing { matched_stream })
+        Ok(self
+            .flow_event_store
+            .filter_datasets_having_flows(&owned_dataset_id_refs)
+            .await?)
     }
 
     /// Returns states of system flows

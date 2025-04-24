@@ -197,9 +197,20 @@ impl ResetTestHarness {
 
         let stored = self
             .dataset_storage_unit_writer()
-            .store_dataset(
-                seed_block,
-                odf::dataset::StoreDatasetOpts { set_head: true },
+            .store_dataset(seed_block)
+            .await
+            .unwrap();
+
+        stored
+            .dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &stored.seed,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(None),
+                },
             )
             .await
             .unwrap();

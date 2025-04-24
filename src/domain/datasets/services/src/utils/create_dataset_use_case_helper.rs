@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::component;
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::{ResolvedDataset, TenancyConfig};
 use kamu_datasets::{
     CreateDatasetError,
@@ -106,6 +107,10 @@ impl CreateDatasetUseCaseHelper {
             .create_entry(
                 dataset_id,
                 owner_account_id,
+                dataset_alias
+                    .account_name
+                    .as_ref()
+                    .unwrap_or(&DEFAULT_ACCOUNT_NAME),
                 &dataset_alias.dataset_name,
                 dataset_kind,
             )
@@ -135,10 +140,7 @@ impl CreateDatasetUseCaseHelper {
     ) -> Result<odf::dataset::StoreDatasetResult, CreateDatasetError> {
         let store_result = self
             .dataset_storage_unit_writer
-            .store_dataset(
-                seed_block,
-                odf::dataset::StoreDatasetOpts { set_head: false },
-            )
+            .store_dataset(seed_block)
             .await
             .map_err(|e| match e {
                 odf::dataset::StoreDatasetError::RefCollision(e) => {

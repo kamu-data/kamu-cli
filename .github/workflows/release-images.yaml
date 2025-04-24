@@ -23,6 +23,9 @@ jobs:
       github.event.workflow_run.conclusion == null
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Checkout the same commit that the release was built for
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -41,7 +44,6 @@ jobs:
           cd images/
           make kamu-base-with-data
           make kamu-base-with-data-mt
-          make kamu-base-with-env-var-storage
 
       - name: Build sqlx-cli image
         run: |
@@ -59,6 +61,5 @@ jobs:
           make kamu-base-push
           make kamu-base-with-data-push
           make kamu-base-with-data-mt-push
-          make kamu-base-with-env-var-storage-push
           make sqlx-cli-push
           make sqlx-cli-with-migrations-push

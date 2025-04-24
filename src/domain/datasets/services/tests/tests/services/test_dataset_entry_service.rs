@@ -80,7 +80,21 @@ async fn test_indexes_datasets_correctly() {
                         .build(),
                 )
                 .build_typed(),
-                odf::dataset::StoreDatasetOpts { set_head: true },
+            )
+            .await
+            .unwrap();
+
+        // Set initial head ref
+        stored
+            .dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &stored.seed,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(None),
+                },
             )
             .await
             .unwrap();
@@ -135,6 +149,7 @@ async fn test_indexes_datasets_correctly() {
             DatasetEntry {
                 id: dataset_id_1,
                 owner_id: owner_account_id_1.clone(),
+                owner_name: odf::AccountName::new_unchecked("user1"),
                 name: odf::DatasetName::new_unchecked(dataset_name_1),
                 created_at: frozen_time_point(),
                 kind: odf::DatasetKind::Root,
@@ -142,6 +157,7 @@ async fn test_indexes_datasets_correctly() {
             DatasetEntry {
                 id: dataset_id_2,
                 owner_id: owner_account_id_1,
+                owner_name: odf::AccountName::new_unchecked("user1"),
                 name: odf::DatasetName::new_unchecked(dataset_name_2),
                 created_at: frozen_time_point(),
                 kind: odf::DatasetKind::Root,
@@ -149,6 +165,7 @@ async fn test_indexes_datasets_correctly() {
             DatasetEntry {
                 id: dataset_id_3,
                 owner_id: owner_account_id_2,
+                owner_name: odf::AccountName::new_unchecked("user2"),
                 name: odf::DatasetName::new_unchecked(dataset_name_3),
                 created_at: frozen_time_point(),
                 kind: odf::DatasetKind::Root,

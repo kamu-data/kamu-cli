@@ -13,7 +13,6 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_accounts::AccountService;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::auth;
 use kamu_datasets::DatasetEntryService;
@@ -114,21 +113,16 @@ async fn get_dataset_by_id(
         })?;
 
     let dataset_entry_service = catalog.get_one::<dyn DatasetEntryService>().unwrap();
-    let account_service = catalog.get_one::<dyn AccountService>().unwrap();
 
     let dataset_entry = dataset_entry_service
         .get_entry(dataset_id)
         .await
         .int_err()?;
-    let owner = account_service
-        .get_account_by_id(&dataset_entry.owner_id)
-        .await
-        .int_err()?;
 
     Ok(Json(DatasetInfoResponse::into_response(
         dataset_handle,
-        owner.id,
-        owner.account_name,
+        dataset_entry.owner_id,
+        dataset_entry.owner_name,
     )))
 }
 

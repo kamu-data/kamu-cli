@@ -42,6 +42,9 @@ jobs:
       github.event.workflow_run.conclusion == null
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Checkout the same commit that the release was built for
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Read latest version
         uses: SebRollen/toml-action@v1.2.0

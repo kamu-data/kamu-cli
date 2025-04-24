@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use event_sourcing::LoadError;
@@ -53,7 +51,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_datasets_with_flow_by_account(
         &self,
         account_id: &odf::AccountID,
-    ) -> Result<FlowDatasetListing, ListFlowsByDatasetError>;
+    ) -> Result<Vec<odf::DatasetID>, ListFlowsByDatasetError>;
 
     /// Returns states of flows associated with a given account
     /// ordered by creation time from newest to oldest.
@@ -69,7 +67,7 @@ pub trait FlowQueryService: Sync + Send {
     /// ordered by creation time from newest to oldest.
     async fn list_all_flows_by_dataset_ids(
         &self,
-        dataset_ids: HashSet<odf::DatasetID>,
+        dataset_ids: &[&odf::DatasetID],
         filters: DatasetFlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
@@ -127,15 +125,6 @@ pub struct FlowInitiatorListing<'a> {
 
 pub type InitiatorsStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<odf::AccountID, InternalError>> + Send + 'a>>;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct FlowDatasetListing<'a> {
-    pub matched_stream: DatasetsStream<'a>,
-}
-
-pub type DatasetsStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<odf::DatasetID, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

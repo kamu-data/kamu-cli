@@ -84,6 +84,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushExistingEvolvedDatasetScenario<
             .create_entry(
                 &client_create_result.dataset_handle.id,
                 &server_harness.server_account_id(),
+                &server_harness.server_account_name(),
                 &client_create_result.dataset_handle.alias.dataset_name,
                 odf::DatasetKind::Root,
             )

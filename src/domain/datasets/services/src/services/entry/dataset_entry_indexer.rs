@@ -17,6 +17,7 @@ use kamu_accounts::{
     AccountRepository,
     GetAccountByNameError,
     DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
 use kamu_datasets::{
@@ -70,6 +71,23 @@ impl DatasetEntryIndexer {
             .int_err()?;
 
         Ok(stored_dataset_entries_count > 0)
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        name = "DatasetEntryIndexer::warm_up_storage_units"
+    )]
+    async fn warm_up_storage_units(&self) -> Result<(), InternalError> {
+        // Warmup listing cache in storage units
+        use futures::TryStreamExt;
+        self.dataset_storage_unit
+            .stored_dataset_ids()
+            .try_next()
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 
     #[tracing::instrument(level = "info", skip_all, name = "DatasetEntryIndexer::index_datasets")]
@@ -133,6 +151,12 @@ impl DatasetEntryIndexer {
             let dataset_entry = DatasetEntry::new(
                 dataset_handle.id,
                 owner_account_id,
+                dataset_handle
+                    .alias
+                    .account_name
+                    .as_ref()
+                    .unwrap_or(&DEFAULT_ACCOUNT_NAME)
+                    .clone(),
                 dataset_handle.alias.dataset_name,
                 self.time_source.now(),
                 dataset_handle.kind,
@@ -211,6 +235,9 @@ impl InitOnStartup for DatasetEntryIndexer {
     async fn run_initialization(&self) -> Result<(), InternalError> {
         if self.has_datasets_indexed().await? {
             tracing::debug!("Skip initialization: datasets already have indexed");
+
+            // Still, let's warmup listing cache in storage units
+            self.warm_up_storage_units().await?;
 
             return Ok(());
         }

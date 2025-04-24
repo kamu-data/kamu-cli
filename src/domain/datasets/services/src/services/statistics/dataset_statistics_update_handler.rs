@@ -37,6 +37,7 @@ use super::compute_dataset_statistics_increment;
     ],
     // Update statistics immediately with reference changes
     delivery: MessageDeliveryMechanism::Immediate,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetStatisticsUpdateHandler {
     dataset_registry: Arc<dyn DatasetRegistry>,

@@ -11,7 +11,7 @@ use internal_error::InternalError;
 use odf::{BlockRef, DatasetID};
 use thiserror::Error;
 
-use crate::DatasetKeyBlock;
+use crate::{DatasetKeyBlock, MetadataEventType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,6 +28,13 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         dataset_id: &DatasetID,
         block_ref: &BlockRef,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
+
+    async fn filter_datasets_having_blocks(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+        block_ref: &BlockRef,
+        event_type: MetadataEventType,
+    ) -> Result<Vec<DatasetID>, InternalError>;
 
     async fn save_blocks_batch(
         &self,
