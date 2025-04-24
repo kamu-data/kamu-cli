@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
+
 use chrono::Utc;
 use database_common::{
+    sqlite_generate_placeholders_list,
     EventModel,
     PaginationOpts,
     ReturningEventModel,
@@ -286,6 +289,52 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
         .int_err()?;
 
         Ok(usize::try_from(dataset_ids_count).unwrap_or(0))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn has_active_triggers_for_datasets(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<bool, InternalError> {
+        if dataset_ids.is_empty() {
+            return Ok(false);
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let query_str = format!(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM flow_trigger_events e
+                WHERE e.dataset_id IN ({})
+                AND e.event_time = (
+                    SELECT MAX(e2.event_time)
+                    FROM flow_trigger_events e2
+                    WHERE
+                        e2.dataset_id = e.dataset_id
+                        AND e2.dataset_flow_type = e.dataset_flow_type
+                )
+                AND e.event_type != 'FlowTriggerEventDatasetRemoved'
+                AND (
+                    (e.event_type = 'FlowTriggerEventCreated' AND json_extract(e.event_payload, '$.Created.paused') = 0)
+                    OR
+                    (e.event_type = 'FlowTriggerEventModified' AND json_extract(e.event_payload, '$.Modified.paused') = 0)
+                )
+            )
+            "#,
+            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(1).unwrap())
+        );
+
+        let mut query = sqlx::query_scalar(&query_str);
+        for dataset_id in dataset_ids {
+            query = query.bind(dataset_id.to_string());
+        }
+
+        let has_active_triggers: Option<bool> = query.fetch_one(connection_mut).await.int_err()?;
+        Ok(has_active_triggers.unwrap_or_default())
     }
 }
 
