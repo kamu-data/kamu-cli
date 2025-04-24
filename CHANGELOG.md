@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.235.0] - 2025-04-24
 ### Added
 - `kamu-adapter-http`: Introduced the `from_catalog_n` macro for easier dependency extraction from the catalog.### Changed
 ### Changed
