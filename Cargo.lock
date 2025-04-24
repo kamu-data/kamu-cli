@@ -3108,16 +3108,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctrlc"
-version = "3.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "697b5419f348fd5ae2478e8018cb016c00a5881c7f46c717de98ffd135a5651c"
-dependencies = [
- "nix",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "curl"
 version = "0.4.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5831,6 +5821,7 @@ dependencies = [
  "merge",
  "messaging-outbox",
  "mockall",
+ "nutype",
  "opendatafabric",
  "rand 0.8.5",
  "random-names",
@@ -5920,6 +5911,7 @@ dependencies = [
  "email-utils",
  "futures",
  "kamu-accounts",
+ "kamu-accounts-services",
  "kamu-adapter-oauth",
  "opendatafabric",
  "password-hash",
@@ -5935,6 +5927,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "chrono",
+ "common-macros",
  "database-common",
  "dill",
  "init-on-startup",
@@ -6341,7 +6334,6 @@ dependencies = [
  "clap_complete",
  "console",
  "container-runtime",
- "ctrlc",
  "database-common",
  "database-common-macros",
  "datafusion",
@@ -6465,6 +6457,7 @@ dependencies = [
  "http-common",
  "indoc 2.0.6",
  "internal-error",
+ "kamu-accounts-services",
  "kamu-adapter-http",
  "kamu-auth-rebac",
  "kamu-cli-e2e-common-macros",
@@ -6473,7 +6466,6 @@ dependencies = [
  "lazy_static",
  "opendatafabric",
  "pretty_assertions",
- "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -6543,6 +6535,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "test-utils",
+ "tokio",
  "url",
 ]
 
