@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Patched `GQL DatasetFlowTriggers::all_paused` to use similar optimization as account flow views
+
 ## [0.235.0] - 2025-04-24
 ### Added
 - `kamu-adapter-http`: Introduced the `from_catalog_n` macro for easier dependency extraction from the catalog.### Changed
