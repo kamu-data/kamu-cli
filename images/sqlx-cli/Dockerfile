@@ -1,22 +1,21 @@
 ################################################################################
 # Builder
 ################################################################################
-FROM rust:1.78-alpine AS builder
+FROM rust:1.85-alpine AS builder
 
 ARG VERSION
 
 ################################################################################
 
-# cargo-binstall: preparation
+# sqlx: preparation
 RUN apk add --no-cache \
-    curl \
-    bash
+    gcc \
+    musl-dev
 
-# cargo-binstall: install
-RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-
-# sqlx: install
-RUN cargo binstall sqlx-cli@$VERSION -y
+# sqlx: build
+RUN cargo install sqlx-cli@$VERSION  \
+    --no-default-features \
+    --features postgres,sqlite,mysql,rustls
 
 ################################################################################
 # Image

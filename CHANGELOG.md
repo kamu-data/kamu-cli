@@ -11,7 +11,9 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.235.1] - 2025-04-25
+### Changed
+- Updated `sqlx` crate to `0.8.5`, Vol. 2
 ### Fixed
 - Patched `GQL DatasetFlowTriggers::all_paused` to use similar optimization as account flow views
 
