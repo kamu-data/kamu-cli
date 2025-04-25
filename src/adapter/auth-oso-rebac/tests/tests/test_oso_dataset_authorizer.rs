@@ -91,7 +91,8 @@ async fn test_owner_can_read_and_write_owned_private_dataset() {
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner"), false)
+            .await;
     harness
         .create_private_datasets(&[&owned_private_dataset_handle])
         .await;
@@ -121,7 +122,8 @@ async fn test_owner_can_read_and_write_owned_public_dataset() {
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner"), false)
+            .await;
     harness
         .create_public_datasets(&[&owned_public_dataset_handle])
         .await;
@@ -150,7 +152,8 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
     let public_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
-    let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous(), false).await;
     harness
         .create_public_datasets(&[&public_dataset_handle])
         .await;
@@ -174,7 +177,8 @@ async fn test_guest_can_not_read_and_write_private_dataset() {
     let private_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
-    let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous(), false).await;
     harness
         .create_private_datasets(&[&private_dataset_handle])
         .await;
@@ -199,7 +203,8 @@ async fn test_not_owner_can_read_but_not_write_public_dataset() {
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner")).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner"), false)
+            .await;
 
     harness
         .create_public_datasets(&[&not_owned_public_dataset_handle])
@@ -225,7 +230,8 @@ async fn test_not_owner_can_not_read_and_write_private_dataset() {
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner")).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner"), false)
+            .await;
 
     harness
         .create_private_datasets(&[&not_owned_private_dataset_handle])
@@ -245,68 +251,65 @@ async fn test_not_owner_can_not_read_and_write_private_dataset() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Fix test with admin role
-// #[test_log::test(tokio::test)]
-// async fn test_admin_can_read_and_write_not_owned_public_dataset() {
-//     let not_owned_public_dataset_handle =
-//         odf::metadata::testing::handle(&"owner", &"public-dataset",
-// odf::DatasetKind::Root);
+#[test_log::test(tokio::test)]
+async fn test_admin_can_read_and_write_not_owned_public_dataset() {
+    let not_owned_public_dataset_handle =
+        odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
-//     let harness =
-//         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged_admin()).await;
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("admin"), true).await;
 
-//     harness
-//         .create_public_datasets(&[&not_owned_public_dataset_handle])
-//         .await;
+    harness
+        .create_public_datasets(&[&not_owned_public_dataset_handle])
+        .await;
 
-//     assert_single_dataset!(
-//         setup:
-//             harness,
-//             dataset_id = not_owned_public_dataset_handle.id,
-//         expected:
-//             read_result = Ok(()),
-//             write_result = Ok(()),
-//             allowed_actions_result = Ok(actual_actions)
-//                 if actual_actions == [
-//                     DatasetAction::Read,
-//                     DatasetAction::Write,
-//                     DatasetAction::Maintain,
-//                     DatasetAction::Own
-//                 ].into()
-//     );
-// }
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_owned_public_dataset_handle.id,
+        expected:
+            read_result = Ok(()),
+            write_result = Ok(()),
+            allowed_actions_result = Ok(actual_actions)
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
+    );
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_log::test(tokio::test)]
-// async fn test_admin_can_read_and_write_not_owned_private_dataset() {
-//     let not_owned_private_dataset_handle =
-//         odf::metadata::testing::handle(&"owner", &"private-dataset",
-// odf::DatasetKind::Root);
+#[test_log::test(tokio::test)]
+async fn test_admin_can_read_and_write_not_owned_private_dataset() {
+    let not_owned_private_dataset_handle =
+        odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
-//     let harness =
-//         DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged_admin()).await;
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("admin"), true).await;
 
-//     harness
-//         .create_private_datasets(&[&not_owned_private_dataset_handle])
-//         .await;
+    harness
+        .create_private_datasets(&[&not_owned_private_dataset_handle])
+        .await;
 
-//     assert_single_dataset!(
-//         setup:
-//             harness,
-//             dataset_id = not_owned_private_dataset_handle.id,
-//         expected:
-//             read_result = Ok(()),
-//             write_result = Ok(()),
-//             allowed_actions_result = Ok(actual_actions)
-//                 if actual_actions == [
-//                     DatasetAction::Read,
-//                     DatasetAction::Write,
-//                     DatasetAction::Maintain,
-//                     DatasetAction::Own
-//                 ].into()
-//     );
-// }
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_owned_private_dataset_handle.id,
+        expected:
+            read_result = Ok(()),
+            write_result = Ok(()),
+            allowed_actions_result = Ok(actual_actions)
+                if actual_actions == [
+                    DatasetAction::Read,
+                    DatasetAction::Write,
+                    DatasetAction::Maintain,
+                    DatasetAction::Own
+                ].into()
+    );
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -352,6 +355,7 @@ async fn test_multi_datasets_matrix() {
     let subjects_with_expected_results = [
         (
             CurrentAccountSubjectTestHelper::anonymous(),
+            false,
             ExpectedResults {
                 read_filter_datasets_allowing_result: vec![
                     // alice_private_dataset_1_handle.clone(),
@@ -408,6 +412,7 @@ async fn test_multi_datasets_matrix() {
         ),
         (
             CurrentAccountSubjectTestHelper::logged("alice"),
+            false,
             ExpectedResults {
                 read_filter_datasets_allowing_result: vec![
                     alice_private_dataset_1_handle.clone(),
@@ -467,72 +472,72 @@ async fn test_multi_datasets_matrix() {
                 ),
             },
         ),
-        // TODO: Fix test with admin role
-        // (
-        //     CurrentAccountSubjectTestHelper::logged_admin(),
-        //     ExpectedResults {
-        //         read_filter_datasets_allowing_result: vec![
-        //             alice_private_dataset_1_handle.clone(),
-        //             alice_public_dataset_2_handle.clone(),
-        //             bob_private_dataset_3_handle.clone(),
-        //             bob_public_dataset_4_handle.clone(),
-        //         ],
-        //         write_filter_datasets_allowing_result: vec![
-        //             alice_private_dataset_1_handle.clone(),
-        //             alice_public_dataset_2_handle.clone(),
-        //             bob_private_dataset_3_handle.clone(),
-        //             bob_public_dataset_4_handle.clone(),
-        //         ],
-        //         read_classify_dataset_handles_by_allowance_result: indoc::indoc!(
-        //             r#"
-        //             authorized:
-        //             - alice/public-dataset-2
-        //             - bob/public-dataset-4
-        //             - bob/private-dataset-3
-        //             - alice/private-dataset-1
+        (
+            CurrentAccountSubjectTestHelper::logged("admin"),
+            true,
+            ExpectedResults {
+                read_filter_datasets_allowing_result: vec![
+                    alice_private_dataset_1_handle.clone(),
+                    alice_public_dataset_2_handle.clone(),
+                    bob_private_dataset_3_handle.clone(),
+                    bob_public_dataset_4_handle.clone(),
+                ],
+                write_filter_datasets_allowing_result: vec![
+                    alice_private_dataset_1_handle.clone(),
+                    alice_public_dataset_2_handle.clone(),
+                    bob_private_dataset_3_handle.clone(),
+                    bob_public_dataset_4_handle.clone(),
+                ],
+                read_classify_dataset_handles_by_allowance_result: indoc::indoc!(
+                    r#"
+                    authorized:
+                    - alice/public-dataset-2
+                    - bob/public-dataset-4
+                    - bob/private-dataset-3
+                    - alice/private-dataset-1
 
-        //             unauthorized_with_errors:
-        //             "#
-        //         ),
-        //         write_classify_dataset_handles_by_allowance_result: indoc::indoc!(
-        //             r#"
-        //             authorized:
-        //             - alice/public-dataset-2
-        //             - bob/public-dataset-4
-        //             - bob/private-dataset-3
-        //             - alice/private-dataset-1
+                    unauthorized_with_errors:
+                    "#
+                ),
+                write_classify_dataset_handles_by_allowance_result: indoc::indoc!(
+                    r#"
+                    authorized:
+                    - alice/public-dataset-2
+                    - bob/public-dataset-4
+                    - bob/private-dataset-3
+                    - alice/private-dataset-1
 
-        //             unauthorized_with_errors:
-        //             "#
-        //         ),
-        //         read_classify_dataset_ids_by_allowance_result: indoc::indoc!(
-        //             r#"
-        //             authorized:
-        //             - alice/public-dataset-2
-        //             - bob/public-dataset-4
-        //             - bob/private-dataset-3
-        //             - alice/private-dataset-1
+                    unauthorized_with_errors:
+                    "#
+                ),
+                read_classify_dataset_ids_by_allowance_result: indoc::indoc!(
+                    r#"
+                    authorized:
+                    - alice/public-dataset-2
+                    - bob/public-dataset-4
+                    - bob/private-dataset-3
+                    - alice/private-dataset-1
 
-        //             unauthorized_with_errors:
-        //             "#
-        //         ),
-        //         write_classify_dataset_ids_by_allowance_result: indoc::indoc!(
-        //             r#"
-        //             authorized:
-        //             - alice/public-dataset-2
-        //             - bob/public-dataset-4
-        //             - bob/private-dataset-3
-        //             - alice/private-dataset-1
+                    unauthorized_with_errors:
+                    "#
+                ),
+                write_classify_dataset_ids_by_allowance_result: indoc::indoc!(
+                    r#"
+                    authorized:
+                    - alice/public-dataset-2
+                    - bob/public-dataset-4
+                    - bob/private-dataset-3
+                    - alice/private-dataset-1
 
-        //             unauthorized_with_errors:
-        //             "#
-        //         ),
-        //     },
-        // ),
+                    unauthorized_with_errors:
+                    "#
+                ),
+            },
+        ),
     ];
 
-    for (subject, expected_results) in subjects_with_expected_results {
-        let harness = DatasetAuthorizerHarness::new(subject).await;
+    for (subject, is_admin, expected_results) in subjects_with_expected_results {
+        let harness = DatasetAuthorizerHarness::new(subject, is_admin).await;
 
         harness
             .create_private_datasets(&[
@@ -647,12 +652,13 @@ struct DatasetAuthorizerHarness {
 }
 
 impl DatasetAuthorizerHarness {
-    pub async fn new(current_account_subject: CurrentAccountSubject) -> Self {
+    pub async fn new(current_account_subject: CurrentAccountSubject, is_admin: bool) -> Self {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
         if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
-            let account_config =
+            let mut account_config =
                 AccountConfig::test_config_from_name(logged_account.account_name.clone());
+            account_config.is_admin = is_admin;
 
             predefined_accounts_config.predefined.push(account_config);
         }
