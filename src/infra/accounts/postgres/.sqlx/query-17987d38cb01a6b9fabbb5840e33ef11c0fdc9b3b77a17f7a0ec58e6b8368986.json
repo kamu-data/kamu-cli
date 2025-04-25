@@ -1,35 +1,30 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email,\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    a.avatar_url,\n                    a.registered_at,\n                    a.is_admin,\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON a.id = account_id\n                WHERE at.id = $1 AND at.revoked_at IS null\n                ",
+  "query": "\n                SELECT id           AS \"id: _\",\n                       account_name,\n                       email,\n                       display_name,\n                       account_type AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at,\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                WHERE (account_name ILIKE '%'||$1||'%'\n                    OR display_name ILIKE '%'||$1||'%')\n                  AND id != ALL($4)\n                ORDER BY account_name\n                LIMIT $2 OFFSET $3\n                ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "token_hash",
-        "type_info": "Bytea"
-      },
-      {
-        "ordinal": 1,
         "name": "id: _",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 2,
+        "ordinal": 1,
         "name": "account_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 3,
+        "ordinal": 2,
         "name": "email",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "display_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "account_type: AccountType",
         "type_info": {
           "Custom": {
@@ -44,34 +39,32 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "avatar_url",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "registered_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 8,
-        "name": "is_admin",
-        "type_info": "Bool"
-      },
-      {
-        "ordinal": 9,
+        "ordinal": 7,
         "name": "provider",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 10,
+        "ordinal": 8,
         "name": "provider_identity_key",
         "type_info": "Varchar"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Text",
+        "Int8",
+        "Int8",
+        "TextArray"
       ]
     },
     "nullable": [
@@ -80,13 +73,11 @@
       false,
       false,
       false,
-      false,
       true,
-      false,
       false,
       false,
       false
     ]
   },
-  "hash": "ebcd0a58b3538f7c95c8b631f3105e87f92846047dec2224d4312a3ea3e669c1"
+  "hash": "17987d38cb01a6b9fabbb5840e33ef11c0fdc9b3b77a17f7a0ec58e6b8368986"
 }

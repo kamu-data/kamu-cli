@@ -100,7 +100,6 @@ impl ClientSideHarness {
                 b.add_value(CurrentAccountSubject::logged(
                     odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
                     odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
-                    false,
                 ));
 
                 let mut predefined_accounts_config = PredefinedAccountsConfig::new();

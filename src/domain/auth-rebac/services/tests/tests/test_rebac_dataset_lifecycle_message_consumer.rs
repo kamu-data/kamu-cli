@@ -190,7 +190,10 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumerHarness {
         catalog_builder
             .add::<RebacDatasetLifecycleMessageConsumer>()
             .add::<RebacServiceImpl>()
-            .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
+            .add_value(kamu_auth_rebac_services::DefaultAccountProperties {
+                is_admin: false,
+                can_provision_accounts: false,
+            })
             .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
                 allows_anonymous_read: false,
                 allows_public_read: false,

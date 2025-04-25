@@ -62,8 +62,8 @@ impl AccountRepository for PostgresAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, is_admin, provider, provider_identity_key)
-                VALUES ($1, $2, $3, $4, ($5::text)::account_type, $6, $7, $8, $9, $10)
+            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
+                VALUES ($1, $2, $3, $4, ($5::text)::account_type, $6, $7, $8, $9)
             "#,
             account.id.to_string(),
             account.account_name.to_ascii_lowercase(),
@@ -72,7 +72,6 @@ impl AccountRepository for PostgresAccountRepository {
             account.account_type as AccountType,
             account.avatar_url,
             account.registered_at,
-            account.is_admin,
             account.provider.to_string(),
             account.provider_identity_key.to_string(),
         )
@@ -106,9 +105,8 @@ impl AccountRepository for PostgresAccountRepository {
                 account_type = $5,
                 avatar_url = $6,
                 registered_at = $7,
-                is_admin = $8,
-                provider = $9,
-                provider_identity_key = $10
+                provider = $8,
+                provider_identity_key = $9
             WHERE id = $1
             "#,
             updated_account.id.to_string(),
@@ -118,7 +116,6 @@ impl AccountRepository for PostgresAccountRepository {
             updated_account.account_type as AccountType,
             updated_account.avatar_url,
             updated_account.registered_at,
-            updated_account.is_admin,
             updated_account.provider.to_string(),
             updated_account.provider_identity_key.to_string(),
         )
@@ -208,7 +205,6 @@ impl AccountRepository for PostgresAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at,
-                is_admin,
                 provider,
                 provider_identity_key
             FROM accounts
@@ -257,7 +253,6 @@ impl AccountRepository for PostgresAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at,
-                is_admin,
                 provider,
                 provider_identity_key
             FROM accounts
@@ -291,7 +286,6 @@ impl AccountRepository for PostgresAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at,
-                is_admin,
                 provider,
                 provider_identity_key
             FROM accounts
@@ -415,7 +409,6 @@ impl AccountRepository for PostgresAccountRepository {
                        account_type AS "account_type: AccountType",
                        avatar_url,
                        registered_at,
-                       is_admin,
                        provider,
                        provider_identity_key
                 FROM accounts
@@ -482,7 +475,6 @@ impl ExpensiveAccountRepository for PostgresAccountRepository {
                        account_type AS "account_type: AccountType",
                        avatar_url,
                        registered_at,
-                       is_admin,
                        provider,
                        provider_identity_key
                 FROM accounts

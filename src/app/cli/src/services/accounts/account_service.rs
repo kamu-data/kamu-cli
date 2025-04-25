@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain::TenancyConfig;
-use kamu_accounts::{PredefinedAccountsConfig, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 
 use crate::accounts::models::*;
 
@@ -34,7 +34,6 @@ impl AccountService {
     pub fn current_account_indication(
         account: Option<String>,
         tenancy_config: TenancyConfig,
-        predefined_accounts_config: &PredefinedAccountsConfig,
     ) -> CurrentAccountIndication {
         let (current_account, user_name, specified_explicitly) = {
             let default_account_name = Self::default_account_name(tenancy_config);
@@ -57,17 +56,7 @@ impl AccountService {
             }
         };
 
-        let is_admin = if tenancy_config == TenancyConfig::MultiTenant {
-            predefined_accounts_config
-                .predefined
-                .iter()
-                .find(|a| a.account_name.as_str().eq(&current_account))
-                .is_some_and(|a| a.is_admin)
-        } else {
-            true
-        };
-
-        CurrentAccountIndication::new(current_account, user_name, specified_explicitly, is_admin)
+        CurrentAccountIndication::new(current_account, user_name, specified_explicitly)
     }
 
     pub fn related_account_indication(

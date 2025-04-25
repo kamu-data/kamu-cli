@@ -41,6 +41,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
+kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-search = { workspace = true }
 

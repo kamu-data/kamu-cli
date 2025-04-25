@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT id           AS \"id: _\",\n                       account_name,\n                       email,\n                       display_name,\n                       account_type AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at,\n                       is_admin,\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                ORDER BY registered_at ASC\n                LIMIT $1 OFFSET $2\n                ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -50,24 +50,18 @@
       },
       {
         "ordinal": 7,
-        "name": "is_admin",
-        "type_info": "Bool"
-      },
-      {
-        "ordinal": 8,
         "name": "provider",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "provider_identity_key",
         "type_info": "Varchar"
       }
     ],
     "parameters": {
       "Left": [
-        "Int8",
-        "Int8"
+        "Text"
       ]
     },
     "nullable": [
@@ -79,9 +73,8 @@
       true,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "4f94a12bf580d47e4a39d59fd6afc54b6e746d5ceaa2f44a88be3cefd845744a"
+  "hash": "16ef0629a47fc8442b38cb35c3f499daf218d1bce93bf0cd0526e695a4b82435"
 }

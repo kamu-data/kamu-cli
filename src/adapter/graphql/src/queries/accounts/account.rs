@@ -184,13 +184,6 @@ impl Account {
         Ok(&full_account_info.avatar_url)
     }
 
-    /// Indicates the administrator status
-    async fn is_admin(&self, ctx: &Context<'_>) -> Result<bool> {
-        let full_account_info = self.get_full_account_info(ctx).await?;
-
-        Ok(full_account_info.is_admin)
-    }
-
     /// Access to the flow configurations of this account
     async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlows> {
         let full_account_info = self.get_full_account_info(ctx).await?;

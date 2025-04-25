@@ -106,16 +106,17 @@ impl OsoResourceServiceImpl {
                 Err(e) => return Err(e.into()),
             };
 
-            // TODO: Private Datasets: absorb the `is_admin` attribute
-            //       from the Accounts domain
-            //       https://github.com/kamu-data/kamu-cli/issues/766
-            // let account_properties = self
-            //     .rebac_service
-            //     .get_account_properties(&account.id)
-            //     .await
-            //     .int_err()?;
+            let account_properties = self
+                .rebac_service
+                .get_account_properties(&account.id)
+                .await
+                .int_err()?;
 
-            UserActor::logged(&account.id, account.is_admin)
+            UserActor::logged(
+                &account.id,
+                account_properties.is_admin,
+                account_properties.can_provision_accounts,
+            )
         };
 
         // Lastly, caching

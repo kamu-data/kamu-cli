@@ -226,7 +226,6 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                     a.account_type as "account_type: AccountType",
                     a.avatar_url,
                     a.registered_at,
-                    a.is_admin,
                     a.provider,
                     a.provider_identity_key
                 FROM access_tokens at

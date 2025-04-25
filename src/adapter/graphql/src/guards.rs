@@ -62,9 +62,21 @@ impl AdminGuard {
 impl Guard for AdminGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
         let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
+        let oso_resource_service_impl =
+            from_catalog_n!(ctx, kamu_adapter_auth_oso_rebac::OsoResourceServiceImpl);
 
         match current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(a) if a.is_admin => Ok(()),
+            CurrentAccountSubject::Logged(a) => {
+                if oso_resource_service_impl
+                    .user_actor(Some(&a.account_id))
+                    .await
+                    .int_err()?
+                    .is_admin
+                {
+                    return Ok(());
+                }
+                Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE))
+            }
             _ => Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE)),
         }
     }

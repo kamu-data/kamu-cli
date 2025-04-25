@@ -81,7 +81,6 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                 Ok(account) => Ok(CurrentAccountSubject::logged(
                     account.id,
                     account.account_name,
-                    account.is_admin,
                 )),
                 Err(GetAccountInfoError::AccessToken(e)) => match e {
                     AccessTokenError::Expired => Ok(CurrentAccountSubject::anonymous(

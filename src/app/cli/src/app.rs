@@ -113,11 +113,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     };
 
     let config = load_config(&workspace_layout);
-    let current_account = AccountService::current_account_indication(
-        args.account.clone(),
-        tenancy_config,
-        config.users.as_ref().unwrap(),
-    );
+    let current_account =
+        AccountService::current_account_indication(args.account.clone(), tenancy_config);
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
