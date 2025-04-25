@@ -54,26 +54,13 @@ impl<'a> DatasetFlowTriggers<'a> {
     #[tracing::instrument(level = "info", name = DatasetFlowTriggers_all_paused, skip_all)]
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
-        for dataset_flow_type in kamu_flow_system::DatasetFlowType::all() {
-            let maybe_flow_trigger = flow_trigger_service
-                .find_trigger(
-                    FlowKeyDataset::new(
-                        self.dataset_request_state.dataset_handle().id.clone(),
-                        *dataset_flow_type,
-                    )
-                    .into(),
-                )
-                .await
-                .int_err()?;
 
-            if let Some(flow_trigger) = maybe_flow_trigger
-                && flow_trigger.is_active()
-            {
-                return Ok(false);
-            }
-        }
+        let dataset_id = self.dataset_request_state.dataset_handle().id.clone();
+        let has_active_triggers = flow_trigger_service
+            .has_active_triggers_for_datasets(&[dataset_id])
+            .await?;
 
-        Ok(true)
+        Ok(!has_active_triggers)
     }
 }
 
