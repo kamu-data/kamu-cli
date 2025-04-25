@@ -115,6 +115,7 @@ pub trait RebacService: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct AccountProperties {
     pub is_admin: bool,
+    pub can_provision_accounts: bool,
 }
 
 impl AccountProperties {
@@ -122,6 +123,9 @@ impl AccountProperties {
         match name {
             AccountPropertyName::IsAnAdmin => {
                 self.is_admin = value == PROPERTY_VALUE_BOOLEAN_TRUE;
+            }
+            AccountPropertyName::CanProvisionAccounts => {
+                self.can_provision_accounts = value == PROPERTY_VALUE_BOOLEAN_TRUE;
             }
         };
     }

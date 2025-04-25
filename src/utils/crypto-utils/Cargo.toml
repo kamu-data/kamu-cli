@@ -1,0 +1,28 @@
+[package]
+name = "crypto-utils"
+description = "Utility for crypto methods"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+aes-gcm = { version = "0.10.3" }
+internal-error = { workspace = true }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+secrecy = "0.10"

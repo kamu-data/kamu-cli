@@ -3078,6 +3078,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-utils"
+version = "0.235.0"
+dependencies = [
+ "aes-gcm",
+ "internal-error",
+ "secrecy",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "csv"
 version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5812,6 +5822,7 @@ dependencies = [
  "base32",
  "chrono",
  "crc32fast",
+ "crypto-utils",
  "database-common",
  "email-utils",
  "futures",
@@ -5826,6 +5837,7 @@ dependencies = [
  "rand 0.8.5",
  "random-names",
  "reusable",
+ "secrecy",
  "serde",
  "serde_with",
  "sqlx",
@@ -5935,6 +5947,7 @@ dependencies = [
  "jsonwebtoken",
  "kamu-accounts",
  "kamu-accounts-inmem",
+ "kamu-auth-rebac",
  "messaging-outbox",
  "mockall",
  "opendatafabric",
@@ -6334,6 +6347,7 @@ dependencies = [
  "clap_complete",
  "console",
  "container-runtime",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "datafusion",
@@ -6626,10 +6640,10 @@ dependencies = [
 name = "kamu-datasets"
 version = "0.235.0"
 dependencies = [
- "aes-gcm",
  "async-trait",
  "bytes",
  "chrono",
+ "crypto-utils",
  "database-common",
  "futures",
  "internal-error",

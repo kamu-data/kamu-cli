@@ -4,6 +4,7 @@ members = [
     "src/utils/async-utils",
     "src/utils/common-macros",
     "src/utils/container-runtime",
+    "src/utils/crypto-utils",
     "src/utils/database-common",
     "src/utils/database-common-macros",
     "src/utils/datafusion-cli",
@@ -120,6 +121,7 @@ kamu-cli = { version = "0.235.0", path = "src/app/cli", default-features = false
 async-utils = { version = "0.235.0", path = "src/utils/async-utils", default-features = false }
 common-macros = { version = "0.235.0", path = "src/utils/common-macros", default-features = false }
 container-runtime = { version = "0.235.0", path = "src/utils/container-runtime", default-features = false }
+crypto-utils = { version = "0.235.0", path = "src/utils/crypto-utils", default-features = false }
 database-common = { version = "0.235.0", path = "src/utils/database-common", default-features = false }
 database-common-macros = { version = "0.235.0", path = "src/utils/database-common-macros", default-features = false }
 email-utils = { version = "0.235.0", path = "src/utils/email-utils", default-features = false }

@@ -14,6 +14,7 @@ use std::sync::Arc;
 use async_utils::ResultAsync;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
+use crypto_utils::AesGcmEncryptor;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -799,7 +800,7 @@ pub fn register_config_in_catalog(
                 catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
             } else {
                 assert!(
-                    kamu_datasets::DatasetEnvVar::try_asm_256_gcm_from_str(encryption_key).is_ok(),
+                    AesGcmEncryptor::try_new(encryption_key).is_ok(),
                     "Invalid dataset env var encryption key",
                 );
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();

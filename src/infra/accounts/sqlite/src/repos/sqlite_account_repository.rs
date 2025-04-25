@@ -46,9 +46,9 @@ impl SqliteAccountRepository {
 
         let account_field = if sqlite_error_message.contains("accounts.id") {
             AccountDuplicateField::Id
-        } else if sqlite_error_message.contains("idx_accounts_name") {
+        } else if sqlite_error_message.contains("accounts.account_name") {
             AccountDuplicateField::Name
-        } else if sqlite_error_message.contains("idx_accounts_email") {
+        } else if sqlite_error_message.contains("accounts.email") {
             AccountDuplicateField::Email
         } else if sqlite_error_message.contains("accounts.provider_identity_key") {
             AccountDuplicateField::ProviderIdentityKey
@@ -74,8 +74,8 @@ impl SqliteAccountRepository {
             avatar_url: account_row.get(5),
             registered_at: account_row.get(6),
             is_admin: account_row.get(7),
-            provider: account_row.get(8),
-            provider_identity_key: account_row.get(9),
+            provider: account_row.get(9),
+            provider_identity_key: account_row.get(10),
         }
     }
 }

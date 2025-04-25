@@ -29,6 +29,7 @@ testing = ["dep:mockall", "odf/testing"]
 
 [dependencies]
 database-common = { workspace = true }
+crypto-utils = { workspace = true }
 email-utils = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
@@ -47,6 +48,7 @@ mockall = { optional = true, version = "0.13" }
 nutype = { version = "0.6", default-features = false }
 rand = "0.8"
 reusable = "0.1"
+secrecy = "0.10"
 serde = "1"
 serde_with = { version = "3", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }

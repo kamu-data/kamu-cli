@@ -7,18 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use aes_gcm::aead::consts::U12;
-use aes_gcm::aead::generic_array::GenericArray;
-use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
-use aes_gcm::aes::Aes256;
-use aes_gcm::{Aes256Gcm, AesGcm, Key};
 use chrono::{DateTime, Utc};
-use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
+use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
 use merge::Merge;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use thiserror::Error;
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,21 +38,18 @@ impl DatasetEnvVar {
         dataset_env_var_value: &DatasetEnvVarValue,
         dataset_id: &odf::DatasetID,
         encryption_key: &str,
-    ) -> Result<Self, DatasetEnvVarEncryptionError> {
+    ) -> Result<Self, EncryptionError> {
         let dataset_env_var_id = Uuid::new_v4();
         let mut secret_nonce: Option<Vec<u8>> = None;
         let final_value: Vec<u8>;
 
         match dataset_env_var_value {
             DatasetEnvVarValue::Secret(secret_value) => {
-                let cipher = Self::try_asm_256_gcm_from_str(encryption_key)?;
-                let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-                secret_nonce = Some(nonce.to_vec());
-                final_value = cipher
-                    .encrypt(&nonce, secret_value.expose_secret().as_ref())
-                    .map_err(|err| DatasetEnvVarEncryptionError::InvalidCipherKeyError {
-                        source: Box::new(AesGcmError(err)),
-                    })?;
+                let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
+                let encryption_res =
+                    encryptor.encrypt_str(secret_value.expose_secret().as_ref())?;
+                secret_nonce = Some(encryption_res.1);
+                final_value = encryption_res.0;
             }
             DatasetEnvVarValue::Regular(value) => final_value = value.as_bytes().to_vec(),
         }
@@ -80,33 +71,18 @@ impl DatasetEnvVar {
         None
     }
 
-    pub fn try_asm_256_gcm_from_str(
-        encryption_key: &str,
-    ) -> Result<AesGcm<Aes256, U12>, ParseEncryptionKey> {
-        let key_bytes = encryption_key.as_bytes();
-        match std::panic::catch_unwind(|| Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key_bytes))) {
-            Ok(aes_gcm) => Ok(aes_gcm),
-            Err(_) => Err(ParseEncryptionKey::InvalidEncryptionKeyLength),
-        }
-    }
-
     pub fn get_exposed_decrypted_value(
         &self,
         encryption_key: &str,
-    ) -> Result<String, DatasetEnvVarEncryptionError> {
+    ) -> Result<String, EncryptionError> {
         if let Some(secret_nonce) = self.secret_nonce.as_ref() {
-            let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(encryption_key.as_bytes()));
-            let decrypted_value = cipher
-                .decrypt(
-                    GenericArray::from_slice(secret_nonce.as_slice()),
-                    self.value.as_ref(),
-                )
-                .map_err(|err| DatasetEnvVarEncryptionError::InvalidCipherKeyError {
-                    source: Box::new(AesGcmError(err)),
-                })?;
-            return Ok(std::str::from_utf8(decrypted_value.as_slice())
-                .map_err(|err| DatasetEnvVarEncryptionError::InternalError(err.int_err()))?
-                .to_string());
+            let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
+            let decrypted_value = encryptor.decrypt_str(
+                std::str::from_utf8(&self.value).unwrap(),
+                secret_nonce.as_slice(),
+            )?;
+
+            return Ok(decrypted_value.expose_secret().to_string());
         }
         Ok(std::str::from_utf8(&self.value).unwrap().to_string())
     }
@@ -115,24 +91,13 @@ impl DatasetEnvVar {
         &self,
         dataset_env_var_new_value: &DatasetEnvVarValue,
         encryption_key: &str,
-    ) -> Result<(Vec<u8>, Option<Vec<u8>>), DatasetEnvVarEncryptionError> {
+    ) -> Result<(Vec<u8>, Option<Vec<u8>>), EncryptionError> {
         let new_value_and_nonce = match dataset_env_var_new_value {
             DatasetEnvVarValue::Secret(secret_value) => {
-                let cipher = Self::try_asm_256_gcm_from_str(encryption_key)?;
-                let nonce = self
-                    .secret_nonce
-                    .as_ref()
-                    .map_or(Aes256Gcm::generate_nonce(&mut OsRng), |nonce_bytes| {
-                        *GenericArray::from_slice(nonce_bytes.as_slice())
-                    });
-                (
-                    cipher
-                        .encrypt(&nonce, secret_value.expose_secret().as_ref())
-                        .map_err(|err| DatasetEnvVarEncryptionError::InvalidCipherKeyError {
-                            source: Box::new(AesGcmError(err)),
-                        })?,
-                    Some(nonce.to_vec()),
-                )
+                let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
+                let encryption_res =
+                    encryptor.encrypt_str(secret_value.expose_secret().as_ref())?;
+                (encryption_res.0, Some(encryption_res.1))
             }
             DatasetEnvVarValue::Regular(value) => (value.as_bytes().to_vec(), None),
         };
@@ -188,48 +153,6 @@ impl DatasetEnvVarValue {
         }
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum DatasetEnvVarEncryptionError {
-    #[error("{source}")]
-    InvalidCipherKeyError { source: BoxedError },
-    #[error("Invalid encryption key")]
-    InvalidEncryptionKey,
-    #[error(transparent)]
-    InternalError(#[from] InternalError),
-}
-
-#[derive(Error, Debug)]
-pub enum ParseEncryptionKey {
-    #[error("Invalid encryption key length")]
-    InvalidEncryptionKeyLength,
-    #[error(transparent)]
-    InternalError(#[from] InternalError),
-}
-
-impl From<ParseEncryptionKey> for DatasetEnvVarEncryptionError {
-    fn from(value: ParseEncryptionKey) -> Self {
-        match value {
-            ParseEncryptionKey::InvalidEncryptionKeyLength => Self::InvalidEncryptionKey,
-            ParseEncryptionKey::InternalError(err) => Self::InternalError(err),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-struct AesGcmError(aes_gcm::Error);
-
-impl std::fmt::Display for AesGcmError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "AES-GCM error")
-    }
-}
-
-impl std::error::Error for AesGcmError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

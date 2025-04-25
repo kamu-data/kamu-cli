@@ -155,6 +155,7 @@ pub enum AccountPropertyName {
     // TODO: Private Datasets: absorb the `is_admin` attribute from the Accounts domain
     //       https://github.com/kamu-data/kamu-cli/issues/766
     IsAnAdmin,
+    CanProvisionAccounts,
 }
 
 impl AccountPropertyName {
@@ -162,6 +163,12 @@ impl AccountPropertyName {
         let value = boolean_property_value(yes);
 
         (AccountPropertyName::IsAnAdmin, value.into())
+    }
+
+    pub fn can_provision_accounts<'a>(yes: bool) -> (Self, PropertyValue<'a>) {
+        let value = boolean_property_value(yes);
+
+        (AccountPropertyName::CanProvisionAccounts, value.into())
     }
 }
 
