@@ -22,7 +22,12 @@ pub struct Query;
 impl Query {
     /// Returns the version of the GQL API
     async fn api_version(&self) -> String {
-        "0.1".to_string()
+        "1".to_string()
+    }
+
+    /// Returns server's version and build configuration information
+    async fn build_info(&self, ctx: &Context<'_>) -> BuildInfo {
+        BuildInfo::new(ctx)
     }
 
     /// Authentication and authorization-related functionality group

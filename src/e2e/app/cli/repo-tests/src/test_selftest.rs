@@ -18,7 +18,7 @@ pub async fn test_selftest(kamu_api_server_client: KamuApiServerClient) {
             Ok(indoc::indoc!(
                 r#"
                 {
-                  "apiVersion": "0.1"
+                  "apiVersion": "1"
                 }
                 "#,
             )),

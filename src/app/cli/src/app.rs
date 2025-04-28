@@ -375,6 +375,22 @@ pub fn configure_base_catalog(
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
+    b.add_value(observability::build_info::BuildInfo {
+        app_version: env!("CARGO_PKG_VERSION"),
+        build_timestamp: option_env!("VERGEN_BUILD_TIMESTAMP"),
+        git_describe: option_env!("VERGEN_GIT_DESCRIBE"),
+        git_sha: option_env!("VERGEN_GIT_SHA"),
+        git_commit_date: option_env!("VERGEN_GIT_COMMIT_DATE"),
+        git_branch: option_env!("VERGEN_GIT_BRANCH"),
+        rustc_semver: option_env!("VERGEN_RUSTC_SEMVER"),
+        rustc_channel: option_env!("VERGEN_RUSTC_CHANNEL"),
+        rustc_host_triple: option_env!("VERGEN_RUSTC_HOST_TRIPLE"),
+        rustc_commit_sha: option_env!("VERGEN_RUSTC_COMMIT_HASH"),
+        cargo_target_triple: option_env!("VERGEN_CARGO_TARGET_TRIPLE"),
+        cargo_features: option_env!("VERGEN_CARGO_FEATURES"),
+        cargo_opt_level: option_env!("VERGEN_CARGO_OPT_LEVEL"),
+    });
+
     b.add_value(workspace_layout.clone());
     b.add_value(RunInfoDir::new(&workspace_layout.run_info_dir));
     b.add_value(CacheDir::new(&workspace_layout.cache_dir));

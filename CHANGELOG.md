@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- New REST endpoint `/system/info` and GQL endpoint `buildInfo` that return application version and build details
 ### Fixed
 - Patched `GQL DatasetFlowTriggers::all_paused` to use similar optimization as account flow views
 
@@ -74,7 +76,6 @@ Recommendation: for ease of reading, use the following order:
 - Upgraded to latest version of `dill=0.13`
 ### Fixed
 - SQLite repository tests were excluded from "make test-fast" mode by a mistake
-
 
 ## [0.232.0] - 2025-04-07
 ### Added
