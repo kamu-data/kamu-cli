@@ -18,12 +18,12 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
-    RebacServiceImpl,
     DefaultAccountProperties,
     DefaultDatasetProperties,
+    RebacServiceImpl,
 };
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::*;

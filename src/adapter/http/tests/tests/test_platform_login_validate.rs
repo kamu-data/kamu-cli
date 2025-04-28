@@ -19,12 +19,6 @@ use kamu_accounts_inmem::{
     InMemoryAccountRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
-use kamu_auth_rebac_services::{
-    RebacServiceImpl,
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -34,6 +28,12 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::platform::{LoginRequestBody, LoginResponseBody};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;

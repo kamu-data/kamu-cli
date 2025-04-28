@@ -22,12 +22,6 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
-use kamu_auth_rebac_services::{
-    RebacServiceImpl,
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
@@ -47,6 +41,12 @@ use kamu_adapter_http::platform::{
     UploadServiceLocal,
     UploadToken,
     UploadTokenBase64Json,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
 };
 use kamu_core::{MediaType, TenancyConfig};
 use messaging_outbox::DummyOutboxImpl;

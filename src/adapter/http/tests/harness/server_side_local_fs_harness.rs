@@ -30,13 +30,13 @@ use kamu_accounts_inmem::{
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::*;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
-    RebacDatasetRegistryFacadeImpl,
-    RebacServiceImpl,
     DefaultAccountProperties,
     DefaultDatasetProperties,
+    RebacDatasetRegistryFacadeImpl,
+    RebacServiceImpl,
 };
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::{
     CompactionExecutor,
     CompactionPlanner,

@@ -86,8 +86,6 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        println!("Creating account: {account:?}");
-
         let account_id = account.id.to_string();
         let account_name = account.account_name.to_ascii_lowercase();
         let email = account.email.as_ref().to_ascii_lowercase();

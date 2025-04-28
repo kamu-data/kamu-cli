@@ -22,8 +22,13 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_adapter_http::DatasetAuthorizationLayer;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
@@ -38,11 +43,6 @@ use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 use utoipa_axum::router::OpenApiRouter;
-use kamu_auth_rebac_services::{
-    RebacServiceImpl,
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-};
 
 use crate::harness::await_client_server_flow;
 

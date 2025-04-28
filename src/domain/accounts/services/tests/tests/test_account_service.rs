@@ -17,13 +17,13 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use odf::AccountName;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
-    RebacServiceImpl,
     DefaultAccountProperties,
     DefaultDatasetProperties,
+    RebacServiceImpl,
 };
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use odf::AccountName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

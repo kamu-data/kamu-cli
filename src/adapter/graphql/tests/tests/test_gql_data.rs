@@ -17,17 +17,17 @@ use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_auth_rebac_services::{
-    RebacServiceImpl,
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
 };
 use kamu_core::*;
 use kamu_datasets::*;
