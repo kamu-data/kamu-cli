@@ -11,8 +11,6 @@ use bon::bon;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::*;
@@ -950,17 +948,7 @@ impl GraphQLDatasetsHarness {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
             b.add::<RenameDatasetUseCaseImpl>()
-                .add::<DeleteDatasetUseCaseImpl>()
-                .add::<RebacServiceImpl>()
-                .add_value(kamu_auth_rebac_services::DefaultAccountProperties {
-                    is_admin: false,
-                    can_provision_accounts: false,
-                })
-                .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
-                    allows_anonymous_read: false,
-                    allows_public_read: false,
-                })
-                .add::<InMemoryRebacRepository>();
+                .add::<DeleteDatasetUseCaseImpl>();
 
             b.build()
         };

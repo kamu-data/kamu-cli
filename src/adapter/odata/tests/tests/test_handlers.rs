@@ -23,7 +23,13 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
+use kamu_auth_rebac_services::{
+    RebacDatasetRegistryFacadeImpl,
+    RebacServiceImpl,
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -414,6 +420,16 @@ impl TestHarness {
                 .add::<InMemoryDatasetKeyBlockRepository>()
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add_value(DefaultAccountProperties {
+                    is_admin: false,
+                    can_provision_accounts: false,
+                })
+                .add_value(DefaultDatasetProperties {
+                    allows_anonymous_read: false,
+                    allows_public_read: false,
+                })
                 .add::<LoginPasswordAuthProvider>()
                 .add::<AccountServiceImpl>()
                 .add::<RebacDatasetRegistryFacadeImpl>()

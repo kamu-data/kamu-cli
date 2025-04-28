@@ -18,6 +18,12 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
+use kamu_auth_rebac_services::{
+    RebacServiceImpl,
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::DatasetAction;
 use kamu_core::*;
 use kamu_datasets::*;
@@ -273,6 +279,16 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<GetDatasetDownstreamDependenciesUseCaseImpl>()
         .add::<PredefinedAccountsRegistrator>()
+        .add::<RebacServiceImpl>()
+        .add::<InMemoryRebacRepository>()
+        .add_value(DefaultAccountProperties {
+            is_admin: false,
+            can_provision_accounts: false,
+        })
+        .add_value(DefaultDatasetProperties {
+            allows_anonymous_read: false,
+            allows_public_read: false,
+        })
         .add_value(PredefinedAccountsConfig {
             predefined: predefined_account
                 .into_iter()

@@ -22,6 +22,12 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
 };
+use kamu_auth_rebac_services::{
+    RebacServiceImpl,
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
@@ -94,6 +100,16 @@ impl Harness {
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add::<UploadServiceLocal>()
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add_value(DefaultAccountProperties {
+                    is_admin: false,
+                    can_provision_accounts: false,
+                })
+                .add_value(DefaultDatasetProperties {
+                    allows_anonymous_read: false,
+                    allows_public_read: false,
+                })
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<OAuthDeviceCodeGeneratorDefault>()

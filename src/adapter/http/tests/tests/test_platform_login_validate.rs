@@ -19,6 +19,12 @@ use kamu_accounts_inmem::{
     InMemoryAccountRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
+use kamu_auth_rebac_services::{
+    RebacServiceImpl,
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -80,6 +86,16 @@ impl Harness {
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add_value(DefaultAccountProperties {
+                    is_admin: false,
+                    can_provision_accounts: false,
+                })
+                .add_value(DefaultDatasetProperties {
+                    allows_anonymous_read: false,
+                    allows_public_read: false,
+                })
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<OAuthDeviceCodeGeneratorDefault>()

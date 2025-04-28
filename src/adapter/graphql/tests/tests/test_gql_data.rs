@@ -17,6 +17,12 @@ use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_accounts::*;
+use kamu_auth_rebac_services::{
+    RebacServiceImpl,
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
@@ -66,6 +72,16 @@ async fn create_catalog_with_local_workspace(
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<LoginPasswordAuthProvider>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties {
+                is_admin: false,
+                can_provision_accounts: false,
+            })
+            .add_value(DefaultDatasetProperties {
+                allows_anonymous_read: false,
+                allows_public_read: false,
+            })
             .add::<PredefinedAccountsRegistrator>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>();

@@ -195,7 +195,6 @@ async fn test_account_attributes() {
                             accountType
                             email
                             avatarUrl
-                            isAdmin
                         }}
                     }}
                 }}
@@ -218,7 +217,6 @@ async fn test_account_attributes() {
                     "accountType": "USER",
                     "email": DUMMY_EMAIL_ADDRESS.as_ref(),
                     "avatarUrl": None::<Option<&str>>,
-                    "isAdmin": false,
                 }
             }
         })
@@ -236,7 +234,6 @@ async fn test_account_attributes() {
                             displayName
                             accountType
                             avatarUrl
-                            isAdmin
                         }}
                     }}
                 }}
@@ -258,7 +255,6 @@ async fn test_account_attributes() {
                     "displayName": DEFAULT_ACCOUNT_NAME_STR,
                     "accountType": "USER",
                     "avatarUrl": None::<Option<&str>>,
-                    "isAdmin": false,
                 }
             }
         })

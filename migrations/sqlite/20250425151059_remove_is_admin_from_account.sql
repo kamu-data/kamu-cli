@@ -1,3 +1,5 @@
+PRAGMA foreign_keys = OFF;
+
 INSERT INTO auth_rebac_properties (entity_type, entity_id, property_name, property_value)
 SELECT 
   'account' AS entity_type,
@@ -8,8 +10,6 @@ SELECT
     ELSE 'false'
   END AS property_value
 FROM accounts;
-
-PRAGMA foreign_keys = OFF;
 
 CREATE TABLE accounts_new (
     id VARCHAR(100) NOT NULL PRIMARY KEY,
@@ -49,8 +49,8 @@ INSERT INTO accounts_new (
 DROP TABLE accounts;
 ALTER TABLE accounts_new RENAME TO accounts;
 
-CREATE UNIQUE INDEX idx_accounts_name ON accounts(account_name);
-CREATE UNIQUE INDEX idx_accounts_email ON accounts(email);
+CREATE UNIQUE INDEX idx_accounts_name ON accounts (LOWER(account_name));
+CREATE UNIQUE INDEX idx_accounts_email ON accounts (LOWER(email));
 CREATE UNIQUE INDEX idx_accounts_provider_identity_key ON accounts(provider_identity_key);
 
 PRAGMA foreign_keys = ON;

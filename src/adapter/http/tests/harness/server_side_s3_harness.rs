@@ -23,7 +23,13 @@ use kamu_accounts_inmem::{
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::*;
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
+use kamu_auth_rebac_services::{
+    RebacDatasetRegistryFacadeImpl,
+    RebacServiceImpl,
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::{DatasetRegistry, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
@@ -143,6 +149,16 @@ impl ServerSideS3Harness {
                 .add_value(jwt_authentication_config)
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add_value(DefaultAccountProperties {
+                    is_admin: false,
+                    can_provision_accounts: false,
+                })
+                .add_value(DefaultDatasetProperties {
+                    allows_anonymous_read: false,
+                    allows_public_read: false,
+                })
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(predefined_accounts_config)
                 .add::<OAuthDeviceCodeServiceImpl>()

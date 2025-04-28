@@ -18,6 +18,12 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use odf::AccountName;
+use kamu_auth_rebac_services::{
+    RebacServiceImpl,
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -114,6 +120,16 @@ async fn make_catalog() -> dill::Catalog {
         .add::<InMemoryAccountRepository>()
         .add_value(predefined_account_config)
         .add::<LoginPasswordAuthProvider>()
+        .add::<RebacServiceImpl>()
+        .add::<InMemoryRebacRepository>()
+        .add_value(DefaultAccountProperties {
+            is_admin: false,
+            can_provision_accounts: false,
+        })
+        .add_value(DefaultDatasetProperties {
+            allows_anonymous_read: false,
+            allows_public_read: false,
+        })
         .add::<PredefinedAccountsRegistrator>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
