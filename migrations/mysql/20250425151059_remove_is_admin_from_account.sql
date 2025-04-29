@@ -1,1 +1,2 @@
--- Add migration script here
+ALTER TABLE accounts
+DROP COLUMN is_admin;
