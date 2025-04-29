@@ -56,10 +56,7 @@ impl PredefinedAccountsRegistrator {
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
         // TODO: Revisit if batch property setting will be implemented
-        for (name, value) in [
-            AccountPropertyName::is_admin(account_config.is_admin),
-            AccountPropertyName::can_provision_accounts(account_config.can_provision_accounts),
-        ] {
+        for (name, value) in [AccountPropertyName::is_admin(account_config.is_admin)] {
             self.rebac_service
                 .set_account_property(account_id, name, &value)
                 .await

@@ -25,6 +25,16 @@ pub const PROPERTY_VALUE_BOOLEAN_FALSE: &str = "false";
 
 pub type PropertyValue<'a> = Cow<'a, str>;
 
+pub trait PropertyValueExt {
+    fn is_true(&self) -> bool;
+}
+
+impl<'a> PropertyValueExt for Cow<'a, str> {
+    fn is_true(&self) -> bool {
+        self == PROPERTY_VALUE_BOOLEAN_TRUE
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -153,7 +163,6 @@ impl From<DatasetPropertyName> for PropertyName {
 #[strum(serialize_all = "snake_case")]
 pub enum AccountPropertyName {
     IsAnAdmin,
-    CanProvisionAccounts,
 }
 
 impl AccountPropertyName {
@@ -161,12 +170,6 @@ impl AccountPropertyName {
         let value = boolean_property_value(yes);
 
         (AccountPropertyName::IsAnAdmin, value.into())
-    }
-
-    pub fn can_provision_accounts<'a>(yes: bool) -> (Self, PropertyValue<'a>) {
-        let value = boolean_property_value(yes);
-
-        (AccountPropertyName::CanProvisionAccounts, value.into())
     }
 }
 

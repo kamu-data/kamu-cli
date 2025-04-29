@@ -34,6 +34,7 @@ odf = { workspace = true }
 async-trait = "0.1"
 dill = { version = "0.13", default-features = false }
 futures = "0.3"
+tokio = { version = "1", default-features = false, features = [] }
 tracing = { version = "0.1", default-features = false }
 
 
@@ -42,4 +43,3 @@ kamu-auth-rebac-inmem = { workspace = true }
 
 serde_json = "1"
 test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = [] }

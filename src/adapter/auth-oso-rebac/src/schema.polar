@@ -9,7 +9,6 @@ actor UserActor {
     # │ account_id             │ String │
     # │ anonymous (reserved)   │ bool   │
     # │ is_admin               │ bool   │
-    # │ can_provision_accounts │ bool   │
     # └────────────────────────┴────────┘
 }
 

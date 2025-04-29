@@ -673,10 +673,8 @@ impl DatasetAuthorizerHarness {
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
-                .add_value(kamu_auth_rebac_services::DefaultAccountProperties {
-                    is_admin: false,
-                    can_provision_accounts: false,
-                })
+                .add::<kamu_auth_rebac_services::RebacServiceImplCacheState>()
+                .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
                 .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
                     allows_anonymous_read: false,
                     allows_public_read: false,

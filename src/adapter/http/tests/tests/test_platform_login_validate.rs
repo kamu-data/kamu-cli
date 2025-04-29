@@ -33,6 +33,7 @@ use kamu_auth_rebac_services::{
     DefaultAccountProperties,
     DefaultDatasetProperties,
     RebacServiceImpl,
+    RebacServiceImplCacheState,
 };
 use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
@@ -87,11 +88,9 @@ impl Harness {
                 .add::<InMemoryAccessTokenRepository>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
+                .add::<RebacServiceImplCacheState>()
                 .add::<InMemoryRebacRepository>()
-                .add_value(DefaultAccountProperties {
-                    is_admin: false,
-                    can_provision_accounts: false,
-                })
+                .add_value(DefaultAccountProperties { is_admin: false })
                 .add_value(DefaultDatasetProperties {
                     allows_anonymous_read: false,
                     allows_public_read: false,

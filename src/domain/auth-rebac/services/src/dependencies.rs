@@ -19,11 +19,9 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     }
     b.add::<RebacDatasetLifecycleMessageConsumer>();
     b.add::<RebacServiceImpl>();
+    b.add::<RebacServiceImplCacheState>();
     b.add::<RebacDatasetRegistryFacadeImpl>();
-    b.add_value(DefaultAccountProperties {
-        is_admin: false,
-        can_provision_accounts: false,
-    });
+    b.add_value(DefaultAccountProperties { is_admin: false });
     b.add_value(DefaultDatasetProperties {
         allows_anonymous_read: false,
         allows_public_read: false,

@@ -9,7 +9,7 @@
 
 use async_graphql::{Context, Guard, Result};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_adapter_auth_oso_rebac::OsoAccountResourceServiceImpl;
+use kamu_auth_rebac::RebacService;
 
 use crate::prelude::*;
 
@@ -62,13 +62,13 @@ impl AdminGuard {
 
 impl Guard for AdminGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let (current_account_subject, oso_resource_service) =
-            from_catalog_n!(ctx, CurrentAccountSubject, OsoAccountResourceServiceImpl);
+        let (current_account_subject, rebac_service) =
+            from_catalog_n!(ctx, CurrentAccountSubject, dyn RebacService);
 
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(a) => {
-                if oso_resource_service
-                    .user_actor(Some(&a.account_id))
+                if rebac_service
+                    .get_account_properties(&a.account_id)
                     .await
                     .int_err()?
                     .is_admin

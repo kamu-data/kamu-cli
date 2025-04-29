@@ -31,8 +31,7 @@ macro_rules! assert_forbidden {
 async fn test_owner_can_read_and_write() {
     let owner_account_id = random_account_id();
     let is_admin = false;
-    let can_provision_accounts = false;
-    let owner_user_actor = UserActor::logged(&owner_account_id, is_admin, can_provision_accounts);
+    let owner_user_actor = UserActor::logged(&owner_account_id, is_admin);
 
     let allows_public_read = false;
     let owned_dataset_resource = DatasetResource::new(&owner_account_id, allows_public_read);
@@ -59,9 +58,7 @@ async fn test_owner_can_read_and_write() {
 #[test_log::test(tokio::test)]
 async fn test_unrelated_can_read_public() {
     let is_admin = false;
-    let can_provision_accounts = false;
-    let unrelated_user_actor =
-        UserActor::logged(&random_account_id(), is_admin, can_provision_accounts);
+    let unrelated_user_actor = UserActor::logged(&random_account_id(), is_admin);
 
     let allows_public_read = true;
     let public_dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);
@@ -88,9 +85,7 @@ async fn test_unrelated_can_read_public() {
 #[test_log::test(tokio::test)]
 async fn test_unrelated_cannot_read_private() {
     let is_admin = false;
-    let can_provision_accounts = false;
-    let unrelated_user_actor =
-        UserActor::logged(&random_account_id(), is_admin, can_provision_accounts);
+    let unrelated_user_actor = UserActor::logged(&random_account_id(), is_admin);
 
     let allows_public_read = false;
     let private_dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);
@@ -118,8 +113,7 @@ async fn test_unrelated_cannot_read_private() {
 async fn test_having_explicit_read_permission_in_private_dataset() {
     let reader_account_id = random_account_id();
     let is_admin = false;
-    let can_provision_accounts = false;
-    let reader_user_actor = UserActor::logged(&reader_account_id, is_admin, can_provision_accounts);
+    let reader_user_actor = UserActor::logged(&reader_account_id, is_admin);
 
     let allows_public_read = false;
     let mut private_dataset_resource =
@@ -149,8 +143,7 @@ async fn test_having_explicit_read_permission_in_private_dataset() {
 async fn test_having_explicit_write_permission_in_private_dataset() {
     let editor_account_id = random_account_id();
     let is_admin = false;
-    let can_provision_accounts = false;
-    let editor_user_actor = UserActor::logged(&editor_account_id, is_admin, can_provision_accounts);
+    let editor_user_actor = UserActor::logged(&editor_account_id, is_admin);
 
     let allows_public_read = false;
     let mut private_dataset_resource =
@@ -179,9 +172,7 @@ async fn test_having_explicit_write_permission_in_private_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_admin_can_read_and_write_another_private_dataset() {
     let is_admin = true;
-    let can_provision_accounts = false;
-    let admin_user_actor =
-        UserActor::logged(&random_account_id(), is_admin, can_provision_accounts);
+    let admin_user_actor = UserActor::logged(&random_account_id(), is_admin);
 
     let allows_public_read = false;
     let dataset_resource = DatasetResource::new(&random_account_id(), allows_public_read);

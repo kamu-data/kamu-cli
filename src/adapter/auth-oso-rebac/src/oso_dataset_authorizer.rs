@@ -18,15 +18,14 @@ use tokio::try_join;
 
 use crate::dataset_resource::*;
 use crate::user_actor::*;
-use crate::{KamuAuthOso, OsoAccountResourceServiceImpl, OsoDatasetResourceServiceImpl};
+use crate::{KamuAuthOso, OsoResourceServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OsoDatasetAuthorizer {
     kamu_auth_oso: Arc<KamuAuthOso>,
     current_account_subject: Arc<CurrentAccountSubject>,
-    oso_dataset_resource_service: Arc<OsoDatasetResourceServiceImpl>,
-    oso_account_resource_service: Arc<OsoAccountResourceServiceImpl>,
+    oso_resource_service: Arc<OsoResourceServiceImpl>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,14 +36,12 @@ impl OsoDatasetAuthorizer {
     pub fn new(
         kamu_auth_oso: Arc<KamuAuthOso>,
         current_account_subject: Arc<CurrentAccountSubject>,
-        oso_dataset_resource_service: Arc<OsoDatasetResourceServiceImpl>,
-        oso_account_resource_service: Arc<OsoAccountResourceServiceImpl>,
+        oso_resource_service: Arc<OsoResourceServiceImpl>,
     ) -> Self {
         Self {
             kamu_auth_oso,
             current_account_subject,
-            oso_dataset_resource_service,
-            oso_account_resource_service,
+            oso_resource_service,
         }
     }
 
@@ -52,7 +49,7 @@ impl OsoDatasetAuthorizer {
         let maybe_account_id = self.current_account_subject.get_maybe_logged_account_id();
 
         let user_actor = self
-            .oso_account_resource_service
+            .oso_resource_service
             .user_actor(maybe_account_id)
             .await
             .int_err()?;
@@ -65,7 +62,7 @@ impl OsoDatasetAuthorizer {
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetResource, InternalError> {
         let dataset_resource = self
-            .oso_dataset_resource_service
+            .oso_resource_service
             .dataset_resource(dataset_id)
             .await
             .int_err()?;
@@ -127,7 +124,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .map(|hdl| hdl.id.clone())
             .collect::<Vec<_>>();
         let dataset_resources_resolution = self
-            .oso_dataset_resource_service
+            .oso_resource_service
             .get_multiple_dataset_resources(&dataset_ids)
             .await
             .int_err()?;
@@ -176,7 +173,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .map(|hdl| hdl.id.clone())
             .collect::<Vec<_>>();
         let dataset_resources_resolution = self
-            .oso_dataset_resource_service
+            .oso_resource_service
             .get_multiple_dataset_resources(&dataset_ids)
             .await
             .int_err()?;
@@ -229,7 +226,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         let mut unauthorized_ids_with_errors = Vec::new();
 
         let dataset_resources_resolution = self
-            .oso_dataset_resource_service
+            .oso_resource_service
             .get_multiple_dataset_resources(&dataset_ids)
             .await
             .int_err()?;

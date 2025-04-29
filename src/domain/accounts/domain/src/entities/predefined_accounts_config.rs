@@ -53,7 +53,6 @@ impl PredefinedAccountsConfig {
                 display_name: None,
                 avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
                 is_admin: true,
-                can_provision_accounts: false,
                 registered_at: Utc::now(),
                 provider: String::from(PROVIDER_PASSWORD),
                 email: DUMMY_EMAIL_ADDRESS.clone(),
@@ -99,8 +98,6 @@ pub struct AccountConfig {
     #[serde(default)]
     pub is_admin: bool,
     #[serde(default)]
-    pub can_provision_accounts: bool,
-    #[serde(default)]
     pub treat_datasets_as_public: bool,
 }
 
@@ -120,7 +117,6 @@ impl AccountConfig {
             avatar_url: None,
             registered_at: Self::default_registered_at(),
             is_admin: false,
-            can_provision_accounts: false,
             treat_datasets_as_public: false,
         }
     }

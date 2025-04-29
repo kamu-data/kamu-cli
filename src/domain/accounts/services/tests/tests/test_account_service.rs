@@ -22,6 +22,7 @@ use kamu_auth_rebac_services::{
     DefaultAccountProperties,
     DefaultDatasetProperties,
     RebacServiceImpl,
+    RebacServiceImplCacheState,
 };
 use odf::AccountName;
 
@@ -121,11 +122,9 @@ async fn make_catalog() -> dill::Catalog {
         .add_value(predefined_account_config)
         .add::<LoginPasswordAuthProvider>()
         .add::<RebacServiceImpl>()
+        .add::<RebacServiceImplCacheState>()
         .add::<InMemoryRebacRepository>()
-        .add_value(DefaultAccountProperties {
-            is_admin: false,
-            can_provision_accounts: false,
-        })
+        .add_value(DefaultAccountProperties { is_admin: false })
         .add_value(DefaultDatasetProperties {
             allows_anonymous_read: false,
             allows_public_read: false,
