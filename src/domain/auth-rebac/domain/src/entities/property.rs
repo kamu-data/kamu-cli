@@ -29,7 +29,7 @@ pub trait PropertyValueExt {
     fn is_true(&self) -> bool;
 }
 
-impl<'a> PropertyValueExt for Cow<'a, str> {
+impl PropertyValueExt for PropertyValue<'_> {
     fn is_true(&self) -> bool {
         self == PROPERTY_VALUE_BOOLEAN_TRUE
     }
