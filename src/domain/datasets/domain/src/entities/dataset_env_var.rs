@@ -46,10 +46,10 @@ impl DatasetEnvVar {
         match dataset_env_var_value {
             DatasetEnvVarValue::Secret(secret_value) => {
                 let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
-                let encryption_res =
+                let encryption_result =
                     encryptor.encrypt_str(secret_value.expose_secret().as_ref())?;
-                secret_nonce = Some(encryption_res.1);
-                final_value = encryption_res.0;
+                secret_nonce = Some(encryption_result.1);
+                final_value = encryption_result.0;
             }
             DatasetEnvVarValue::Regular(value) => final_value = value.as_bytes().to_vec(),
         }

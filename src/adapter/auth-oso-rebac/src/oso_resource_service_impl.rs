@@ -115,7 +115,11 @@ impl OsoResourceServiceImpl {
                 .await
                 .int_err()?;
 
-            UserActor::logged(&account.id, account.is_admin, account.c)
+            UserActor::logged(
+                &account.id,
+                account.is_admin,
+                account_properties.can_provision_accounts,
+            )
         };
 
         // Lastly, caching
