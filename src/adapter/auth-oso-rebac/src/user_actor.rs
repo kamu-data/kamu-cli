@@ -56,7 +56,7 @@ impl std::fmt::Display for UserActor {
         write!(
             f,
             "User(account_id={}, anonymous={}, is_admin={}, can_provision_accounts={})",
-            self.account_id, self.anonymous, self.is_admin, self.can_provision_accounts
+            &self.account_id, self.anonymous, self.is_admin, self.can_provision_accounts
         )
     }
 }
