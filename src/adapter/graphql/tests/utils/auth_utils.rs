@@ -47,11 +47,8 @@ pub async fn authentication_catalogs(
         .add::<RebacServiceImpl>()
         .add::<RebacServiceImplCacheState>()
         .add::<InMemoryRebacRepository>()
-        .add_value(DefaultAccountProperties { is_admin: false })
-        .add_value(DefaultDatasetProperties {
-            allows_anonymous_read: false,
-            allows_public_read: false,
-        })
+        .add_value(DefaultAccountProperties::default())
+        .add_value(DefaultDatasetProperties::default())
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
         .add_value(predefined_accounts_config)

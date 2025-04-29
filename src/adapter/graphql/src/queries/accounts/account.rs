@@ -15,7 +15,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
-use kamu_auth_rebac::RebacService;
+use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use tokio::sync::OnceCell;
 
 use super::AccountFlows;
@@ -190,10 +190,9 @@ impl Account {
         let rebac_service = from_catalog_n!(ctx, dyn RebacService);
 
         Ok(rebac_service
-            .get_account_properties(&self.account_id)
+            .is_account_admin(&self.account_id)
             .await
-            .int_err()?
-            .is_admin)
+            .int_err()?)
     }
 
     /// Access to the flow configurations of this account

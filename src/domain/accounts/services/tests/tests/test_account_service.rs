@@ -124,11 +124,8 @@ async fn make_catalog() -> dill::Catalog {
         .add::<RebacServiceImpl>()
         .add::<RebacServiceImplCacheState>()
         .add::<InMemoryRebacRepository>()
-        .add_value(DefaultAccountProperties { is_admin: false })
-        .add_value(DefaultDatasetProperties {
-            allows_anonymous_read: false,
-            allows_public_read: false,
-        })
+        .add_value(DefaultAccountProperties::default())
+        .add_value(DefaultDatasetProperties::default())
         .add::<PredefinedAccountsRegistrator>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);

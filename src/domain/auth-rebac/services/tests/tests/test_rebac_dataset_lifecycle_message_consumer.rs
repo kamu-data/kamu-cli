@@ -195,11 +195,8 @@ impl MultiTenantRebacDatasetLifecycleMessageConsumerHarness {
             .add::<RebacDatasetLifecycleMessageConsumer>()
             .add::<RebacServiceImpl>()
             .add::<RebacServiceImplCacheState>()
-            .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
-            .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
-                allows_anonymous_read: false,
-                allows_public_read: false,
-            })
+            .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
+            .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
             .add::<InMemoryRebacRepository>();
 
         let catalog = catalog_builder.build();

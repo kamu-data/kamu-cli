@@ -162,14 +162,14 @@ impl From<DatasetPropertyName> for PropertyName {
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum AccountPropertyName {
-    IsAnAdmin,
+    IsAdmin,
 }
 
 impl AccountPropertyName {
     pub fn is_admin<'a>(yes: bool) -> (Self, PropertyValue<'a>) {
         let value = boolean_property_value(yes);
 
-        (AccountPropertyName::IsAnAdmin, value.into())
+        (AccountPropertyName::IsAdmin, value.into())
     }
 }
 

@@ -93,7 +93,7 @@ impl RebacService for RebacServiceImpl {
             .get_mut(account_id.as_str())
         {
             match property_name {
-                AccountPropertyName::IsAnAdmin => {
+                AccountPropertyName::IsAdmin => {
                     account_properties_cache.is_admin = property_value.is_true();
                 }
             }
@@ -123,7 +123,7 @@ impl RebacService for RebacServiceImpl {
             .get_mut(account_id.as_str())
         {
             match property_name {
-                AccountPropertyName::IsAnAdmin => {
+                AccountPropertyName::IsAdmin => {
                     account_properties_cache.is_admin = false;
                 }
             }
