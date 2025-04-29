@@ -15,6 +15,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
+use kamu_adapter_auth_oso_rebac::OsoAccountResourceServiceImpl;
 use tokio::sync::OnceCell;
 
 use super::AccountFlows;
@@ -182,6 +183,17 @@ impl Account {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(&full_account_info.avatar_url)
+    }
+
+    /// Indicates the administrator status
+    async fn is_admin(&self, ctx: &Context<'_>) -> Result<bool> {
+        let oso_resource_service = from_catalog_n!(ctx, OsoAccountResourceServiceImpl);
+
+        Ok(oso_resource_service
+            .user_actor(Some(&self.account_id))
+            .await
+            .int_err()?
+            .is_admin)
     }
 
     /// Access to the flow configurations of this account

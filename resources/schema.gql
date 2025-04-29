@@ -53,6 +53,10 @@ type Account {
 	"""
 	avatarUrl: String
 	"""
+	Indicates the administrator status
+	"""
+	isAdmin: Boolean!
+	"""
 	Access to the flow configurations of this account
 	"""
 	flows: AccountFlows!

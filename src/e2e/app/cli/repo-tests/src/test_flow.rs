@@ -200,6 +200,7 @@ pub async fn test_gql_dataset_flows_initiators(mut kamu_api_server_client: KamuA
                   displayName
                   accountType
                   avatarUrl
+                  isAdmin
                   __typename
                 }
                 "#
@@ -460,6 +461,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                   displayName
                   accountType
                   avatarUrl
+                  isAdmin
                   __typename
                 }
 
@@ -555,7 +557,8 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                                 "accountType": "USER",
                                 "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
                                 "displayName": "kamu",
-                                "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f"
+                                "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                "isAdmin": true
                               },
                               "outcome": null,
                               "startCondition": null,
@@ -622,7 +625,8 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                                     "accountType": "USER",
                                     "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
                                     "displayName": "kamu",
-                                    "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f"
+                                    "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                    "isAdmin": true
                                   },
                                   "outcome": {
                                     "__typename": "FlowSuccessResult",
@@ -655,7 +659,8 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                                   "accountType": "USER",
                                   "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
                                   "displayName": "kamu",
-                                  "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f"
+                                  "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                  "isAdmin": true
                                 },
                                 "outcome": {
                                   "__typename": "FlowSuccessResult",
@@ -1285,7 +1290,8 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
                                     "accountType": "USER",
                                     "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
                                     "displayName": "kamu",
-                                    "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f"
+                                    "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                    "isAdmin": true
                                   },
                                   "outcome": {
                                     "__typename": "FlowFailedError",
@@ -1317,7 +1323,8 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
                                   "accountType": "USER",
                                   "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
                                   "displayName": "kamu",
-                                  "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f"
+                                  "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                  "isAdmin": true
                                 },
                                 "outcome": {
                                   "__typename": "FlowFailedError",
@@ -1733,6 +1740,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
           displayName
           accountType
           avatarUrl
+          isAdmin
           __typename
         }
 

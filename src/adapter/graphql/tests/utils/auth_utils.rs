@@ -14,6 +14,10 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
+use kamu_adapter_auth_oso_rebac::{
+    OsoAccountResourceServiceImpl,
+    OsoResourceServiceImplStateHolder,
+};
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
@@ -44,6 +48,8 @@ pub async fn authentication_catalogs(
         .add::<LoginPasswordAuthProvider>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
+        .add::<OsoAccountResourceServiceImpl>()
+        .add::<OsoResourceServiceImplStateHolder>()
         .add::<InMemoryRebacRepository>()
         .add_value(DefaultAccountProperties {
             is_admin: false,

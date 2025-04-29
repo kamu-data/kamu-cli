@@ -53,80 +53,21 @@ impl OsoResourceServiceImplStateHolder {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct OsoResourceServiceImpl {
-    state_holder: Arc<OsoResourceServiceImplStateHolder>,
+pub struct OsoDatasetResourceServiceImpl {
     dataset_entry_svc: Arc<dyn DatasetEntryService>,
     rebac_service: Arc<dyn RebacService>,
-    account_service: Arc<dyn AccountService>,
 }
 
 #[component(pub)]
-impl OsoResourceServiceImpl {
+impl OsoDatasetResourceServiceImpl {
     pub fn new(
-        state_holder: Arc<OsoResourceServiceImplStateHolder>,
         dataset_entry_svc: Arc<dyn DatasetEntryService>,
         rebac_service: Arc<dyn RebacService>,
-        account_service: Arc<dyn AccountService>,
     ) -> Self {
         Self {
-            state_holder,
             dataset_entry_svc,
             rebac_service,
-            account_service,
         }
-    }
-
-    pub async fn user_actor(
-        &self,
-        maybe_account_id: Option<&odf::AccountID>,
-    ) -> Result<UserActor, GetUserActorError> {
-        let Some(account_id) = maybe_account_id else {
-            return Ok(UserActor::anonymous());
-        };
-
-        // First, an attempt to get from the cache
-        {
-            let readable_state = self.state_holder.state.read().await;
-
-            let account_id_stack = account_id.as_did_str().to_stack_string();
-            let maybe_cached_user_actor = readable_state
-                .user_actor_cache_map
-                .get(account_id_stack.as_str())
-                .cloned();
-
-            if let Some(cached_user_actor) = maybe_cached_user_actor {
-                return Ok(cached_user_actor);
-            }
-        }
-
-        // The second attempt is from the database
-        let user_actor = {
-            let account = match self.account_service.get_account_by_id(account_id).await {
-                Ok(found_account) => found_account,
-                Err(e) => return Err(e.into()),
-            };
-
-            let account_properties = self
-                .rebac_service
-                .get_account_properties(&account.id)
-                .await
-                .int_err()?;
-
-            UserActor::logged(
-                &account.id,
-                account_properties.is_admin,
-                account_properties.can_provision_accounts,
-            )
-        };
-
-        // Lastly, caching
-        let mut writable_state = self.state_holder.state.write().await;
-
-        writable_state
-            .user_actor_cache_map
-            .insert(user_actor.account_id.clone(), user_actor.clone());
-
-        Ok(user_actor)
     }
 
     pub async fn dataset_resource(
@@ -244,6 +185,82 @@ impl OsoResourceServiceImpl {
             resolved_resources: dataset_resources_stream.try_collect().await?,
             unresolved_resources: unresolved_entries,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct OsoAccountResourceServiceImpl {
+    state_holder: Arc<OsoResourceServiceImplStateHolder>,
+    rebac_service: Arc<dyn RebacService>,
+    account_service: Arc<dyn AccountService>,
+}
+
+#[component(pub)]
+impl OsoAccountResourceServiceImpl {
+    pub fn new(
+        state_holder: Arc<OsoResourceServiceImplStateHolder>,
+        rebac_service: Arc<dyn RebacService>,
+        account_service: Arc<dyn AccountService>,
+    ) -> Self {
+        Self {
+            state_holder,
+            rebac_service,
+            account_service,
+        }
+    }
+
+    pub async fn user_actor(
+        &self,
+        maybe_account_id: Option<&odf::AccountID>,
+    ) -> Result<UserActor, GetUserActorError> {
+        let Some(account_id) = maybe_account_id else {
+            return Ok(UserActor::anonymous());
+        };
+
+        // First, an attempt to get from the cache
+        {
+            let readable_state = self.state_holder.state.read().await;
+
+            let account_id_stack = account_id.as_did_str().to_stack_string();
+            let maybe_cached_user_actor = readable_state
+                .user_actor_cache_map
+                .get(account_id_stack.as_str())
+                .cloned();
+
+            if let Some(cached_user_actor) = maybe_cached_user_actor {
+                return Ok(cached_user_actor);
+            }
+        }
+
+        // The second attempt is from the database
+        let user_actor = {
+            let account = match self.account_service.get_account_by_id(account_id).await {
+                Ok(found_account) => found_account,
+                Err(e) => return Err(e.into()),
+            };
+
+            let account_properties = self
+                .rebac_service
+                .get_account_properties(&account.id)
+                .await
+                .int_err()?;
+
+            UserActor::logged(
+                &account.id,
+                account_properties.is_admin,
+                account_properties.can_provision_accounts,
+            )
+        };
+
+        // Lastly, caching
+        let mut writable_state = self.state_holder.state.write().await;
+
+        writable_state
+            .user_actor_cache_map
+            .insert(user_actor.account_id.clone(), user_actor.clone());
+
+        Ok(user_actor)
     }
 }
 
