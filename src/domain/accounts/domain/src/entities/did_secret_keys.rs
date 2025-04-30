@@ -15,7 +15,7 @@ use secrecy::{ExposeSecret, SecretString};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct SecretKey {
+pub struct DidSecretKey {
     pub id: uuid::Uuid,
     pub secret_key: Vec<u8>,
     pub secret_nonce: Vec<u8>,
@@ -23,7 +23,7 @@ pub struct SecretKey {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SecretKey {
+impl DidSecretKey {
     pub fn try_new(
         secret_key: SecretString,
         encryption_key: &str,
@@ -44,7 +44,7 @@ impl SecretKey {
 
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
-pub struct DatasetSecretKeyRowModel {
+pub struct DatasetDidSecretKeyRowModel {
     pub id: uuid::Uuid,
     pub dataset_id: odf::DatasetID,
     pub value: Vec<u8>,
@@ -53,7 +53,7 @@ pub struct DatasetSecretKeyRowModel {
 
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
-pub struct AccountSecretKeyRowModel {
+pub struct AccountDidSecretKeyRowModel {
     pub id: uuid::Uuid,
     pub account_id: odf::AccountID,
     pub value: Vec<u8>,
@@ -63,9 +63,9 @@ pub struct AccountSecretKeyRowModel {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "sqlx")]
-impl From<DatasetSecretKeyRowModel> for SecretKey {
-    fn from(value: DatasetSecretKeyRowModel) -> Self {
-        SecretKey {
+impl From<DatasetDidSecretKeyRowModel> for DidSecretKey {
+    fn from(value: DatasetDidSecretKeyRowModel) -> Self {
+        DidSecretKey {
             id: value.id,
             secret_key: value.value,
             secret_nonce: value.secret_nonce,
@@ -74,9 +74,9 @@ impl From<DatasetSecretKeyRowModel> for SecretKey {
 }
 
 #[cfg(feature = "sqlx")]
-impl From<AccountSecretKeyRowModel> for SecretKey {
-    fn from(value: AccountSecretKeyRowModel) -> Self {
-        SecretKey {
+impl From<AccountDidSecretKeyRowModel> for DidSecretKey {
+    fn from(value: AccountDidSecretKeyRowModel) -> Self {
+        DidSecretKey {
             id: value.id,
             secret_key: value.value,
             secret_nonce: value.secret_nonce,

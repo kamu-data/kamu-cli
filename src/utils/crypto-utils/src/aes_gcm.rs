@@ -67,42 +67,6 @@ impl Encryptor for AesGcmEncryptor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// pub fn encrypt_str(
-//     value: &str,
-//     encryption_key: &str,
-// ) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
-//     let cipher = try_asm_256_gcm_from_str(encryption_key)?;
-//     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-//     let cipher = cipher.encrypt(&nonce, value.as_bytes()).map_err(|err| {
-//         EncryptionError::InvalidCipherKeyError {
-//             source: Box::new(AesGcmError(err)),
-//         }
-//     })?;
-//     Ok((cipher, nonce.to_vec()))
-// }
-
-// /////////////////////////////////////////////////////////////////////////////
-// ///////////////////////////////////////////
-
-// pub fn decrypt_str(
-//     value: &str,
-//     encryption_key: &str,
-//     secret_nonce: &[u8],
-// ) -> Result<SecretString, EncryptionError> {
-//     let cipher = try_asm_256_gcm_from_str(encryption_key)?;
-//     let decrypted_value = cipher
-//         .decrypt(GenericArray::from_slice(secret_nonce), value.as_bytes())
-//         .map_err(|err| EncryptionError::InvalidCipherKeyError {
-//             source: Box::new(AesGcmError(err)),
-//         })?;
-//     Ok(SecretString::from(
-//         std::str::from_utf8(decrypted_value.as_slice())
-//             .map_err(|err| EncryptionError::InternalError(err.int_err()))?,
-//     ))
-// }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug)]
 struct AesGcmError(aes_gcm::Error);
 
