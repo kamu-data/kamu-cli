@@ -9,7 +9,7 @@
 
 /// Base64-encoded binary data (url-safe, no padding)
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct Base64Usnp(#[serde(with = "base64_urlsafe_nopad")] pub Vec<u8>);
+pub struct Base64Usnp(#[serde(with = "base64_urlsafe_nopad")] pub bytes::Bytes);
 
 async_graphql::scalar!(
     Base64Usnp,
@@ -18,25 +18,25 @@ async_graphql::scalar!(
 );
 
 impl Base64Usnp {
-    pub fn into_inner(self) -> Vec<u8> {
+    pub fn into_inner(self) -> bytes::Bytes {
         self.0
     }
 }
 
-impl From<Vec<u8>> for Base64Usnp {
-    fn from(value: Vec<u8>) -> Self {
+impl From<bytes::Bytes> for Base64Usnp {
+    fn from(value: bytes::Bytes) -> Self {
         Self(value)
     }
 }
 
-impl AsRef<Vec<u8>> for Base64Usnp {
-    fn as_ref(&self) -> &Vec<u8> {
+impl AsRef<bytes::Bytes> for Base64Usnp {
+    fn as_ref(&self) -> &bytes::Bytes {
         &self.0
     }
 }
 
 impl std::ops::Deref for Base64Usnp {
-    type Target = Vec<u8>;
+    type Target = bytes::Bytes;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -47,15 +47,18 @@ pub mod base64_urlsafe_nopad {
     use ::base64::Engine;
     use serde::{Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<S: Serializer>(data: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error> {
+    pub fn serialize<S: Serializer>(data: &bytes::Bytes, serializer: S) -> Result<S::Ok, S::Error> {
         let s = ::base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(data);
         serializer.serialize_str(&s)
     }
 
-    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<bytes::Bytes, D::Error> {
         let s = String::deserialize(deserializer)?;
-        ::base64::engine::general_purpose::URL_SAFE_NO_PAD
+        let buf = ::base64::engine::general_purpose::URL_SAFE_NO_PAD
             .decode(s)
-            .map_err(|e| serde::de::Error::custom(e.to_string()))
+            .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+        Ok(buf.into())
     }
 }

@@ -338,14 +338,19 @@ impl QueryServiceImpl {
         &self,
         dataset_ref: &odf::DatasetRef,
         last_records_to_consider: Option<u64>,
+        head: Option<odf::Multihash>,
     ) -> Result<(ResolvedDataset, odf::Multihash, DataFrameExt), QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
-        let head = resolved_dataset
-            .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
-            .await
-            .int_err()?;
+        let head = if let Some(head) = head {
+            head
+        } else {
+            resolved_dataset
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?
+        };
 
         let ctx = self
             .session_context(QueryOptions {
@@ -526,9 +531,11 @@ impl QueryService for QueryServiceImpl {
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
+        options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError> {
-        let (resolved_dataset, head, df) =
-            self.single_dataset(dataset_ref, Some(skip + limit)).await?;
+        let (resolved_dataset, head, df) = self
+            .single_dataset(dataset_ref, Some(skip + limit), options.block_hash)
+            .await?;
 
         // Our custom catalog provider resolves schemas lazily, so the dataset will be
         // found even if it's empty and its schema will be empty, but we decide not to
@@ -607,9 +614,15 @@ impl QueryService for QueryServiceImpl {
     }
 
     #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(%dataset_ref))]
-    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<GetDataResponse, QueryError> {
+    async fn get_data(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
         // TODO: PERF: Limit push-down opportunity
-        let (resolved_dataset, head, df) = self.single_dataset(dataset_ref, None).await?;
+        let (resolved_dataset, head, df) = self
+            .single_dataset(dataset_ref, None, options.block_hash)
+            .await?;
 
         Ok(GetDataResponse {
             df,

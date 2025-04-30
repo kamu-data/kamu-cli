@@ -205,31 +205,69 @@ impl DatasetsMut {
         #[graphql(desc = "Extra metadata events (e.g. to populate readme)")] extra_events: Option<
             Vec<String>,
         >,
-        #[graphql(desc = "How extra events are represented")] event_events_format: Option<
+        #[graphql(desc = "How extra events are represented")] extra_events_format: Option<
             MetadataManifestFormat,
         >,
         #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
+        let push_source = odf::metadata::AddPushSource {
+            source_name: "default".into(),
+            read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
+                schema: Some(
+                    [
+                        "version INT".to_string(),
+                        "content_hash STRING".to_string(),
+                        "content_type STRING".to_string(),
+                    ]
+                    .into_iter()
+                    .chain(
+                        extra_columns
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
+                    )
+                    .collect(),
+                ),
+                ..Default::default()
+            }),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
+        };
+
+        let mut extra_events_parsed = Vec::new();
+        match extra_events_format.unwrap_or(MetadataManifestFormat::Yaml) {
+            MetadataManifestFormat::Yaml => {
+                let de = odf::metadata::serde::yaml::YamlMetadataEventDeserializer;
+                for event in extra_events.unwrap_or_default() {
+                    match de.read_manifest(event.as_bytes()) {
+                        Ok(event) => extra_events_parsed.push(event),
+                        Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
+                            return Ok(CreateDatasetFromSnapshotResult::Malformed(
+                                MetadataManifestMalformed {
+                                    message: e.to_string(),
+                                },
+                            ))
+                        }
+                        Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
+                            return Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(
+                                e.into(),
+                            ))
+                        }
+                        Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
+                            return Err(e.int_err().into())
+                        }
+                    }
+                }
+            }
+        };
+
         let snapshot = odf::DatasetSnapshot {
             name: dataset_alias.into(),
             kind: odf::DatasetKind::Root,
-            metadata: vec![odf::MetadataEvent::AddPushSource(
-                odf::metadata::AddPushSource {
-                    source_name: "default".into(),
-                    read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
-                        schema: Some(vec![
-                            "version INT".into(),
-                            "content_hash STRING".into(),
-                            "content_type STRING".into(),
-                        ]),
-                        ..Default::default()
-                    }),
-                    preprocess: None,
-                    merge: odf::metadata::MergeStrategy::Append(
-                        odf::metadata::MergeStrategyAppend {},
-                    ),
-                },
-            )],
+            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
+                .into_iter()
+                .chain(extra_events_parsed.into_iter())
+                .collect(),
         };
 
         self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())

@@ -82,6 +82,7 @@ impl<'a> DatasetData<'a> {
                 &self.dataset_request_state.dataset_handle().as_local_ref(),
                 skip.unwrap_or(0),
                 limit,
+                domain::GetDataOptions::default(),
             )
             .await;
 

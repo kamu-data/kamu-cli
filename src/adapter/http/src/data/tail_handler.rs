@@ -43,8 +43,14 @@ pub async fn dataset_tail_handler(
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
+    // TODO: Support `asOfBlockHash` parameter
     let res = query_svc
-        .tail(&dataset_ref, params.skip, params.limit)
+        .tail(
+            &dataset_ref,
+            params.skip,
+            params.limit,
+            GetDataOptions::default(),
+        )
         .await
         .map_err(|e| match e {
             QueryError::DatasetNotFound(e) => ApiError::not_found(e),

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::{Int32Array, UInt8Array};
 use datafusion::arrow::datatypes::DataType;
-use kamu::domain::QueryService;
+use kamu::domain::{GetDataOptions, QueryService};
 
 use super::{CLIError, Command};
 use crate::output::*;
@@ -39,7 +39,12 @@ impl Command for TailCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let res = self
             .query_svc
-            .tail(&self.dataset_ref, self.skip, self.limit)
+            .tail(
+                &self.dataset_ref,
+                self.skip,
+                self.limit,
+                GetDataOptions::default(),
+            )
             .await
             .map_err(CLIError::failure)?;
 

@@ -69,6 +69,42 @@ async fn test_versioned_file_create_in_band() {
         .unwrap()
         .to_string();
 
+    // Check no content
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                getContent {
+                                    isSuccess
+                                    errorMessage
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let get_content =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    pretty_assertions::assert_eq!(
+        get_content,
+        json!({
+            "isSuccess": false,
+            "errorMessage": "Specified version or block not found",
+        })
+    );
+
     // Upload first version
     let res = harness
         .execute_authorized_query(
@@ -82,6 +118,7 @@ async fn test_versioned_file_create_in_band() {
                                     ... on UpdateVersionSuccess {
                                         newVersion
                                         contentHash
+                                        newHead
                                     }
                                 }
                             }
@@ -101,13 +138,64 @@ async fn test_versioned_file_create_in_band() {
     let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
         ["uploadNewVersion"]
         .clone();
-    let new_version = upload_result["newVersion"].as_i64().unwrap();
-    let content_hash = upload_result["contentHash"].as_str().unwrap();
+    let head_v1 = &upload_result["newHead"];
+    pretty_assertions::assert_eq!(
+        upload_result,
+        json!({
+            "newVersion": 1,
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "newHead": head_v1,
+        })
+    );
 
-    assert_eq!(new_version, 1);
-    assert_eq!(
-        content_hash,
-        "f16203338be694f50c5f338814986cdf0686453a888b84f424d792af4b9202398f392"
+    // Read back latest content
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                getContent {
+                                    isSuccess
+                                    errorMessage
+                                    ... on GetFileContentSuccess {
+                                        version
+                                        blockHash
+                                        contentType
+                                        contentHash
+                                        content
+                                        extraData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let get_content =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    pretty_assertions::assert_eq!(
+        get_content,
+        json!({
+            "isSuccess": true,
+            "errorMessage": "",
+            "version": 1,
+            "blockHash": head_v1,
+            "content": base64usnp_encode(b"hello"),
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "contentType": "application/octet-stream",
+            "extraData": {},
+        })
     );
 
     // Upload second version
@@ -123,6 +211,7 @@ async fn test_versioned_file_create_in_band() {
                                     ... on UpdateVersionSuccess {
                                         newVersion
                                         contentHash
+                                        newHead
                                     }
                                 }
                             }
@@ -139,16 +228,421 @@ async fn test_versioned_file_create_in_band() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
+    assert!(res.is_ok(), "{res:#?}");
     let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
         ["uploadNewVersion"]
         .clone();
-    let new_version = upload_result["newVersion"].as_i64().unwrap();
-    let content_hash = upload_result["contentHash"].as_str().unwrap();
+    let head_v2 = &upload_result["newHead"];
+    pretty_assertions::assert_eq!(
+        upload_result,
+        json!({
+            "newVersion": 2,
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"bye"),
+            "newHead": head_v2,
+        })
+    );
 
-    assert_eq!(new_version, 2);
-    assert_eq!(
-        content_hash,
-        "f162040d234965143cf2113060344aec5c3ad74b34a5f713b16df21c6fc9349fb047b"
+    // Read back latest content
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                getContent {
+                                    isSuccess
+                                    errorMessage
+                                    ... on GetFileContentSuccess {
+                                        version
+                                        blockHash
+                                        contentType
+                                        contentHash
+                                        content
+                                        extraData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let get_content =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    pretty_assertions::assert_eq!(
+        get_content,
+        json!({
+            "isSuccess": true,
+            "errorMessage": "",
+            "version": 2,
+            "blockHash": head_v2,
+            "content": base64usnp_encode(b"bye"),
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"bye"),
+            "contentType": "application/octet-stream",
+            "extraData": {},
+        })
+    );
+
+    // Read back first version (via block hash)
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!, $blockHash: Multihash!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                getContent(asOfBlockHash: $blockHash) {
+                                    isSuccess
+                                    errorMessage
+                                    ... on GetFileContentSuccess {
+                                        version
+                                        blockHash
+                                        contentType
+                                        contentHash
+                                        content
+                                        extraData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "blockHash": head_v1,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let get_content =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    pretty_assertions::assert_eq!(
+        get_content,
+        json!({
+            "isSuccess": true,
+            "errorMessage": "",
+            "version": 1,
+            "blockHash": head_v1,
+            "content": base64usnp_encode(b"hello"),
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "contentType": "application/octet-stream",
+            "extraData": {},
+        })
+    );
+
+    // Read back first version (via version number)
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                getContent(asOfVersion: 1) {
+                                    isSuccess
+                                    errorMessage
+                                    ... on GetFileContentSuccess {
+                                        version
+                                        blockHash
+                                        contentType
+                                        contentHash
+                                        content
+                                        extraData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let get_content =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    pretty_assertions::assert_eq!(
+        get_content,
+        json!({
+            "isSuccess": true,
+            "errorMessage": "",
+            "version": 1,
+            "blockHash": head_v2,
+            "content": base64usnp_encode(b"hello"),
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "contentType": "application/octet-stream",
+            "extraData": {},
+        })
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_versioned_file_extra_data() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Create versioned file dataset
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetAlias: DatasetAlias!, $extraColumns: [ColumnInput]) {
+                    datasets {
+                        createVersionedFile(
+                            datasetAlias: $datasetAlias,
+                            extraColumns: $extraColumns,
+                            datasetVisibility: PUBLIC,
+                        ) {
+                            ... on CreateDatasetResultSuccess {
+                                dataset {
+                                    id
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetAlias": "x",
+                "extraColumns": [{
+                    "name": "foo",
+                    "type": {
+                        "ddl": "string",
+                    }
+                }, {
+                    "name": "bar",
+                    "type": {
+                        "ddl": "int",
+                    }
+                }]
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let did = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Upload first version
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetId: DatasetID!, $content: Base64Usnp!, $extraData: JSON!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                uploadNewVersion(content: $content, extraData: $extraData) {
+                                    ... on UpdateVersionSuccess {
+                                        newVersion
+                                        contentHash
+                                        newHead
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "content": base64usnp_encode(b"hello"),
+                "extraData": {
+                    "foo": "extra",
+                    "bar": 123,
+                }
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+        ["uploadNewVersion"]
+        .clone();
+    let head_v1 = &upload_result["newHead"];
+    pretty_assertions::assert_eq!(
+        upload_result,
+        json!({
+            "newVersion": 1,
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "newHead": head_v1,
+        })
+    );
+
+    // Read back latest content
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                getContent {
+                                    isSuccess
+                                    errorMessage
+                                    ... on GetFileContentSuccess {
+                                        version
+                                        blockHash
+                                        contentType
+                                        contentHash
+                                        content
+                                        extraData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let get_content =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    pretty_assertions::assert_eq!(
+        get_content,
+        json!({
+            "isSuccess": true,
+            "errorMessage": "",
+            "version": 1,
+            "blockHash": head_v1,
+            "content": base64usnp_encode(b"hello"),
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "contentType": "application/octet-stream",
+            "extraData": {
+                "foo": "extra",
+                "bar": 123,
+            }
+        })
+    );
+
+    // Update just the extra data
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetId: DatasetID!, $extraData: JSON!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                updateExtraData(extraData: $extraData) {
+                                    ... on UpdateVersionSuccess {
+                                        newVersion
+                                        contentHash
+                                        newHead
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "extraData": {
+                    "foo": "mega",
+                    "bar": 321,
+                }
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+        ["updateExtraData"]
+        .clone();
+    let head_v2 = &upload_result["newHead"];
+    pretty_assertions::assert_eq!(
+        upload_result,
+        json!({
+            "newVersion": 2,
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "newHead": head_v2,
+        })
+    );
+
+    // Read back latest content
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                getContent {
+                                    isSuccess
+                                    errorMessage
+                                    ... on GetFileContentSuccess {
+                                        version
+                                        blockHash
+                                        contentType
+                                        contentHash
+                                        content
+                                        extraData
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let get_content =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    pretty_assertions::assert_eq!(
+        get_content,
+        json!({
+            "isSuccess": true,
+            "errorMessage": "",
+            "version": 2,
+            "blockHash": head_v2,
+            "content": base64usnp_encode(b"hello"),
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "contentType": "application/octet-stream",
+            "extraData": {
+                "foo": "mega",
+                "bar": 321,
+            }
+        })
     );
 }
 

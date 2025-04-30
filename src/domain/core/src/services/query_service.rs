@@ -46,6 +46,7 @@ pub trait QueryService: Send + Sync {
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
+        options: GetDataOptions,
     ) -> Result<GetDataResponse, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
@@ -75,13 +76,26 @@ pub trait QueryService: Send + Sync {
     // number of files we collect to construct the dataframe.
     //
     /// Returns a [DataFrame] representing the contents of an entire dataset
-    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<GetDataResponse, QueryError>;
+    async fn get_data(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default)]
+pub struct GetDataOptions {
+    /// Last block hash of an input dataset that should be used for query
+    /// execution. This is used to achieve full reproducibility of queries
+    /// as no matter what updates happen in the datasets - the query will
+    /// only consider a specific subset of the data ledger.
+    pub block_hash: Option<odf::Multihash>,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct QueryOptions {

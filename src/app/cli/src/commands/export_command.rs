@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use kamu::domain::{ExportFormat, ExportOptions, ExportService, QueryService};
+use kamu::domain::{ExportFormat, ExportOptions, ExportService, GetDataOptions, QueryService};
 
 use crate::{CLIError, Command};
 
@@ -43,7 +43,7 @@ impl Command for ExportCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let res = self
             .query_service
-            .get_data(&self.dataset_ref)
+            .get_data(&self.dataset_ref, GetDataOptions::default())
             .await
             .map_err(CLIError::failure)?;
 

@@ -107,17 +107,17 @@ impl DataSchema {
 #[derive(InputObject)]
 pub struct ColumnInput {
     /// Column name
-    name: String,
+    pub name: String,
 
     /// Column data type
     #[graphql(name = "type")]
-    data_type: DataTypeInput,
+    pub data_type: DataTypeInput,
 }
 
 #[derive(InputObject)]
 pub struct DataTypeInput {
     /// Defines type using DDL syntax
-    ddl: String,
+    pub ddl: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
