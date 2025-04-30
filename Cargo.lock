@@ -7372,6 +7372,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-webhooks"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "enum-variants",
+ "event-sourcing",
+ "internal-error",
+ "nutype",
+ "opendatafabric",
+ "serde",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "keccak"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12222,6 +12238,7 @@ checksum = "458f7a779bf54acc9f347480ac654f68407d3aab21269a6e3c9f922acd9e2da9"
 dependencies = [
  "getrandom 0.3.2",
  "js-sys",
+ "serde",
  "wasm-bindgen",
 ]
 
