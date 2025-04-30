@@ -55,6 +55,12 @@ pub trait AccountService: Sync + Send {
         filters: SearchAccountsByNamePatternFilters,
         pagination: PaginationOpts,
     ) -> AccountPageStream<'a>;
+
+    async fn create_account(
+        &self,
+        account_name: &odf::AccountName,
+        email: email_utils::Email,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

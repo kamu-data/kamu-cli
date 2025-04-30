@@ -57,13 +57,13 @@ async fn test_indexes_datasets_correctly() {
     let (_, owner_account_id_1) = odf::AccountID::new_generated_ed25519();
     harness
         .account_repo
-        .create_account(&Account::test(owner_account_id_1.clone(), "user1"))
+        .save_account(&Account::test(owner_account_id_1.clone(), "user1"))
         .await
         .unwrap();
     let (_, owner_account_id_2) = odf::AccountID::new_generated_ed25519();
     harness
         .account_repo
-        .create_account(&Account::test(owner_account_id_2.clone(), "user2"))
+        .save_account(&Account::test(owner_account_id_2.clone(), "user2"))
         .await
         .unwrap();
 

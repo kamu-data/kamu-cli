@@ -386,7 +386,7 @@ impl ServerHarness {
         base_catalog
             .get_one::<dyn AccountRepository>()
             .unwrap()
-            .create_account(&Account::dummy())
+            .save_account(&Account::dummy())
             .await
             .unwrap();
 

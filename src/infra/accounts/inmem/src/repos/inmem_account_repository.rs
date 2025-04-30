@@ -107,7 +107,7 @@ impl InMemoryAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for InMemoryAccountRepository {
-    async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut guard = self.state.lock().unwrap();
         if guard.accounts_by_id.contains_key(&account.id) {
             return Err(CreateAccountError::Duplicate(AccountErrorDuplicate {

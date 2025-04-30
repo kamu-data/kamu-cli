@@ -76,7 +76,7 @@ impl PredefinedAccountsRegistrator {
         let account = account_config.into();
 
         self.account_repository
-            .create_account(&account)
+            .save_account(&account)
             .await
             .int_err()?;
 

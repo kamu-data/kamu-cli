@@ -81,7 +81,7 @@ impl SqliteAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for SqliteAccountRepository {
-    async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;

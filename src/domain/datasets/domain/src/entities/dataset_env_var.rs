@@ -47,7 +47,7 @@ impl DatasetEnvVar {
             DatasetEnvVarValue::Secret(secret_value) => {
                 let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
                 let encryption_result =
-                    encryptor.encrypt_str(secret_value.expose_secret().as_ref())?;
+                    encryptor.encrypt_bytes(secret_value.expose_secret().as_bytes())?;
                 secret_nonce = Some(encryption_result.1);
                 final_value = encryption_result.0;
             }
@@ -96,7 +96,7 @@ impl DatasetEnvVar {
             DatasetEnvVarValue::Secret(secret_value) => {
                 let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
                 let encryption_res =
-                    encryptor.encrypt_str(secret_value.expose_secret().as_ref())?;
+                    encryptor.encrypt_bytes(secret_value.expose_secret().as_bytes())?;
                 (encryption_res.0, Some(encryption_res.1))
             }
             DatasetEnvVarValue::Regular(value) => (value.as_bytes().to_vec(), None),

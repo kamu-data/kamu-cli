@@ -823,6 +823,19 @@ pub fn register_config_in_catalog(
     }
     //
 
+    // Did secret key encryption configuration
+    if let Some(did_encryption_config) = config.did_encryption.as_ref() {
+        assert!(
+            AesGcmEncryptor::try_new(did_secret_key_encryption_key).is_ok(),
+            "Invalid did secret encryption key",
+        );
+        catalog_builder.add_value(did_encryption_config.clone());
+    } else {
+        panic!("Did secret encryption key is required");
+    }
+
+    //
+
     // Outbox configuration
     let outbox_config = config.outbox.as_ref().unwrap();
     catalog_builder.add_value(messaging_outbox::OutboxConfig::new(

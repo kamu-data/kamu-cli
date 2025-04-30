@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
-use secrecy::{ExposeSecret, SecretString};
+use odf::metadata::PrivateKey;
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,13 +24,10 @@ pub struct DidSecretKey {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DidSecretKey {
-    pub fn try_new(
-        secret_key: SecretString,
-        encryption_key: &str,
-    ) -> Result<Self, EncryptionError> {
+    pub fn try_new(secret_key: PrivateKey, encryption_key: &str) -> Result<Self, EncryptionError> {
         let secret_key_id = uuid::Uuid::new_v4();
         let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
-        let encryption_result = encryptor.encrypt_str(secret_key.expose_secret().as_ref())?;
+        let encryption_result = encryptor.encrypt_bytes(secret_key.as_bytes())?;
 
         Ok(Self {
             id: secret_key_id,
@@ -85,3 +82,29 @@ impl From<AccountDidSecretKeyRowModel> for DidSecretKey {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DidSecretEncryptionConfig {
+    /// The encryption key must be a 32-character alphanumeric string, which
+    /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
+    /// digits (0-9).
+    ///
+    /// # Example
+    /// let config = DidSecretEncryptionConfig {
+    ///     encryption_key: String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")
+    /// };
+    /// ```
+    pub encryption_key: String,
+}
+
+impl DidSecretEncryptionConfig {
+    const SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
+
+    pub fn sample() -> Self {
+        Self {
+            encryption_key: Self::SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY.to_owned(),
+        }
+    }
+}

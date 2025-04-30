@@ -11,33 +11,54 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
+    AccountDidSecretKeyRepository,
     AccountPageStream,
     AccountRepository,
     AccountService,
+    AccountType,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
     FindAccountIdByNameError,
     GetAccountByIdError,
     GetAccountByNameError,
     GetAccountMapError,
     SearchAccountsByNamePatternFilters,
+    PROVIDER_PASSWORD,
 };
+use secrecy::{ExposeSecret, SecretString};
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountServiceImpl {
+    account_did_secret_key_repo: Arc<dyn AccountDidSecretKeyRepository>,
     account_repo: Arc<dyn AccountRepository>,
+    time_source: Arc<dyn SystemTimeSource>,
+    did_secret_encryption_key: SecretString,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AccountService)]
+#[dill::component(pub)]
+#[dill::interface(dyn AccountService)]
 impl AccountServiceImpl {
-    pub fn new(account_repo: Arc<dyn AccountRepository>) -> Self {
-        Self { account_repo }
+    fn new(
+        account_did_secret_key_repo: Arc<dyn AccountDidSecretKeyRepository>,
+        account_repo: Arc<dyn AccountRepository>,
+        time_source: Arc<dyn SystemTimeSource>,
+        did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
+    ) -> Self {
+        Self {
+            account_did_secret_key_repo,
+            account_repo,
+            time_source,
+            did_secret_encryption_key: SecretString::from(
+                did_secret_encryption_config.encryption_key.clone(),
+            ),
+        }
     }
 }
 
@@ -128,6 +149,40 @@ impl AccountService for AccountServiceImpl {
     ) -> AccountPageStream<'a> {
         self.account_repo
             .search_accounts_by_name_pattern(name_pattern, filters, pagination)
+    }
+
+    async fn create_account(
+        &self,
+        account_name: &odf::AccountName,
+        email: email_utils::Email,
+    ) -> Result<(), InternalError> {
+        let account_did = odf::AccountID::new_generated_ed25519();
+        let account = Account {
+            id: account_did.1,
+            account_name: account_name.clone(),
+            email,
+            display_name: account_name.to_string(),
+            account_type: AccountType::User,
+            avatar_url: None,
+            registered_at: self.time_source.now(),
+            provider: String::from(PROVIDER_PASSWORD),
+            provider_identity_key: String::from(account_name.as_str()),
+        };
+
+        self.account_repo.save_account(&account).await.int_err()?;
+
+        let did_secret_key = DidSecretKey::try_new(
+            account_did.0.into(),
+            self.did_secret_encryption_key.expose_secret(),
+        )
+        .int_err()?;
+
+        self.account_did_secret_key_repo
+            .save_did_secret_key(&account.id, &did_secret_key)
+            .await
+            .int_err()?;
+
+        // TODO: Add password
     }
 }
 

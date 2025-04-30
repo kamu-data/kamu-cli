@@ -117,10 +117,7 @@ impl DatasetBaseUseCaseHarness {
         };
 
         let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-        account_repo
-            .create_account(&Account::dummy())
-            .await
-            .unwrap();
+        account_repo.save_account(&Account::dummy()).await.unwrap();
 
         Self {
             _temp_dir: temp_dir,

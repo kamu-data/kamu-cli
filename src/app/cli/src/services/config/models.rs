@@ -75,6 +75,10 @@ pub struct CLIConfig {
     /// Uploads configuration
     #[merge(strategy = merge_recursive)]
     pub uploads: Option<UploadsConfig>,
+
+    /// Uploads configuration
+    #[merge(strategy = merge_recursive)]
+    pub did_encryption: Option<DidSecretEncryptionConfig>,
 }
 
 impl CLIConfig {
@@ -92,6 +96,7 @@ impl CLIConfig {
             source: None,
             users: None,
             uploads: None,
+            did_encryption: None,
         }
     }
 
@@ -113,6 +118,7 @@ impl CLIConfig {
             source: Some(SourceConfig::sample()),
             users: Some(PredefinedAccountsConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
+            did_encryption: Some(DidSecretKeyEncryptionConfig::sample()),
         }
     }
 }
@@ -132,6 +138,8 @@ impl Default for CLIConfig {
             source: Some(SourceConfig::default()),
             users: Some(PredefinedAccountsConfig::default()),
             uploads: Some(UploadsConfig::default()),
+            uploads: Some(UploadsConfig::default()),
+            did_encryption: None,
         }
     }
 }

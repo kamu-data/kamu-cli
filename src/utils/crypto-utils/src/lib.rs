@@ -16,7 +16,7 @@ use thiserror::Error;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait Encryptor {
-    fn encrypt_str(&self, value: &str) -> Result<(Vec<u8>, Vec<u8>), EncryptionError>;
+    fn encrypt_bytes(&self, value: &[u8]) -> Result<(Vec<u8>, Vec<u8>), EncryptionError>;
     fn decrypt_str(
         &self,
         value: &str,

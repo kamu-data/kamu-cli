@@ -32,7 +32,7 @@ async fn test_create_access_token() {
 
     let harness = AccessTokenServiceHarness::new(mock_outbox);
     let account = Account::dummy();
-    harness.create_account(&account).await.unwrap();
+    harness.save_account(&account).await.unwrap();
     let access_token = harness
         .access_token_service
         .create_access_token("foo", &account.id)
@@ -68,8 +68,8 @@ impl AccessTokenServiceHarness {
         }
     }
 
-    async fn create_account(&self, account: &Account) -> Result<(), InternalError> {
-        self.account_repo.create_account(account).await.int_err()
+    async fn save_account(&self, account: &Account) -> Result<(), InternalError> {
+        self.account_repo.save_account(account).await.int_err()
     }
 
     fn expect_outbox_access_token_created(mock_outbox: &mut MockOutbox) {

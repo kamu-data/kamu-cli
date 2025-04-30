@@ -34,8 +34,8 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     let account_wasya = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
     let account_petya = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
 
-    account_repo.create_account(&account_wasya).await.unwrap();
-    account_repo.create_account(&account_petya).await.unwrap();
+    account_repo.save_account(&account_wasya).await.unwrap();
+    account_repo.save_account(&account_petya).await.unwrap();
 
     const PASSWORD_WASYA: &str = "password_wasya";
     const PASSWORD_PETYA: &str = "password_petya";

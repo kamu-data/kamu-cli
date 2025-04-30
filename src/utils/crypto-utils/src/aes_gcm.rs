@@ -36,14 +36,13 @@ impl AesGcmEncryptor {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Encryptor for AesGcmEncryptor {
-    fn encrypt_str(&self, value: &str) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
+    fn encrypt_bytes(&self, value: &[u8]) -> Result<(Vec<u8>, Vec<u8>), EncryptionError> {
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-        let cipher = self
-            .cipher
-            .encrypt(&nonce, value.as_bytes())
-            .map_err(|err| EncryptionError::InvalidCipherKeyError {
+        let cipher = self.cipher.encrypt(&nonce, value).map_err(|err| {
+            EncryptionError::InvalidCipherKeyError {
                 source: Box::new(AesGcmError(err)),
-            })?;
+            }
+        })?;
         Ok((cipher, nonce.to_vec()))
     }
 
