@@ -1,0 +1,184 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use chrono::{DateTime, Utc};
+use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
+
+use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebhookSubscriptionState {
+    id: uuid::Uuid,
+    target_url: url::Url,
+    label: WebhookSubscriptionLabel,
+    dataset_id: Option<odf::DatasetID>,
+    status: WebhookSubscriptionStatus,
+    event_types: Vec<WebhookSubscriptionEventType>,
+    secret: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Projection for WebhookSubscriptionState {
+    type Query = uuid::Uuid;
+    type Event = WebhookSubscriptionEvent;
+
+    fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
+        use WebhookSubscriptionEvent as E;
+
+        match (state, event) {
+            (None, event) => match event {
+                E::Created(WebhookSubscriptionEventCreated {
+                    subscription_id,
+                    dataset_id,
+                    event_types,
+                    label,
+                    target_url,
+                    secret,
+                    ..
+                }) => Ok(Self {
+                    id: subscription_id,
+                    dataset_id,
+                    event_types,
+                    label,
+                    target_url,
+                    secret,
+                    status: WebhookSubscriptionStatus::Unverified,
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                }),
+                _ => Err(ProjectionError::new(None, event)),
+            },
+            (Some(s), event) => {
+                assert_eq!(&s.id, event.subscription_id());
+
+                match &event {
+                    E::Created(_) => Err(ProjectionError::new(Some(s), event)),
+
+                    E::Enabled(_) => {
+                        if s.status == WebhookSubscriptionStatus::Unverified {
+                            Ok(WebhookSubscriptionState {
+                                status: WebhookSubscriptionStatus::Enabled,
+                                updated_at: Utc::now(),
+                                ..s
+                            })
+                        } else {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
+                    }
+
+                    E::Paused(_) => {
+                        if s.status == WebhookSubscriptionStatus::Enabled {
+                            Ok(WebhookSubscriptionState {
+                                status: WebhookSubscriptionStatus::Paused,
+                                updated_at: Utc::now(),
+                                ..s
+                            })
+                        } else {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
+                    }
+
+                    E::Resumed(_) => {
+                        if s.status == WebhookSubscriptionStatus::Paused {
+                            Ok(WebhookSubscriptionState {
+                                status: WebhookSubscriptionStatus::Enabled,
+                                updated_at: Utc::now(),
+                                ..s
+                            })
+                        } else {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
+                    }
+
+                    E::MarkedUnreachable(_) => match s.status {
+                        WebhookSubscriptionStatus::Enabled | WebhookSubscriptionStatus::Paused => {
+                            Ok(WebhookSubscriptionState {
+                                status: WebhookSubscriptionStatus::Unreachable,
+                                updated_at: Utc::now(),
+                                ..s
+                            })
+                        }
+                        _ => Err(ProjectionError::new(Some(s), event)),
+                    },
+
+                    E::Reactivated(_) => {
+                        if s.status == WebhookSubscriptionStatus::Unreachable {
+                            Ok(WebhookSubscriptionState {
+                                status: WebhookSubscriptionStatus::Enabled,
+                                updated_at: Utc::now(),
+                                ..s
+                            })
+                        } else {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
+                    }
+
+                    E::SecretRotated(WebhookSubscriptionEventSecretRotated {
+                        new_secret, ..
+                    }) => {
+                        if s.status != WebhookSubscriptionStatus::Removed {
+                            Ok(WebhookSubscriptionState {
+                                secret: new_secret.clone(),
+                                updated_at: Utc::now(),
+                                ..s
+                            })
+                        } else {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
+                    }
+
+                    E::Updated(WebhookSubscriptionEventUpdated {
+                        new_target_url,
+                        new_label,
+                        new_event_types,
+                        ..
+                    }) => {
+                        if s.status != WebhookSubscriptionStatus::Removed {
+                            Ok(WebhookSubscriptionState {
+                                label: new_label.clone(),
+                                event_types: new_event_types.clone(),
+                                target_url: new_target_url.clone(),
+                                ..s
+                            })
+                        } else {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
+                    }
+
+                    E::Removed(_) => {
+                        if s.status == WebhookSubscriptionStatus::Removed {
+                            Ok(s) // idempotent DELETE
+                        } else {
+                            Ok(WebhookSubscriptionState {
+                                status: WebhookSubscriptionStatus::Removed,
+                                updated_at: Utc::now(),
+                                ..s
+                            })
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ProjectionEvent<uuid::Uuid> for WebhookSubscriptionEvent {
+    fn matches_query(&self, query: &uuid::Uuid) -> bool {
+        self.subscription_id() == query
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
