@@ -30,7 +30,6 @@ pub(crate) fn make_test_account(
         account_type: AccountType::User,
         avatar_url: None,
         registered_at: Utc::now().round_subsecs(6),
-        is_admin: false,
         provider: String::from(provider),
         provider_identity_key: String::from(provider_identity_key),
     }

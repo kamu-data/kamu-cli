@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin as \"is_admin: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ?\n            ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -68,15 +68,6 @@
       },
       {
         "ordinal": 7,
-        "name": "is_admin: _",
-        "type_info": {
-          "type": "Tiny",
-          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
-          "max_size": 4
-        }
-      },
-      {
-        "ordinal": 8,
         "name": "provider",
         "type_info": {
           "type": "VarString",
@@ -85,7 +76,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "provider_identity_key",
         "type_info": {
           "type": "VarString",
@@ -106,9 +97,8 @@
       true,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "789af20fe1e6d19333b7554b8432ccabb7ccf1a50a5d38f52f2ae846c7fc1413"
+  "hash": "e0708a926c576f89be04965cfc56d54cf5832f3406a8cff2f909f74bcb475d7b"
 }

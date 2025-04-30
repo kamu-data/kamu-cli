@@ -197,6 +197,10 @@ impl WebUIServer {
             "/system/metrics",
             axum::routing::get(observability::metrics::metrics_handler),
         )
+        .route(
+            "/system/info",
+            axum::routing::get(observability::build_info::build_info_handler),
+        )
         .merge(kamu_adapter_http::openapi::router().into())
         .layer(axum::extract::Extension(web_ui_catalog))
         .layer(axum::extract::Extension(gql_schema))

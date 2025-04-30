@@ -267,7 +267,6 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     account_type: provider_response.account_type,
                     avatar_url: provider_response.avatar_url,
                     registered_at: Utc::now(),
-                    is_admin: false,
                     provider: String::from(login_method),
                     provider_identity_key: provider_response.provider_identity_key,
                 };

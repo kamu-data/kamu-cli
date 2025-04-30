@@ -105,7 +105,6 @@ pub(crate) fn make_server_account(tenancy_config: TenancyConfig) -> Account {
             email: Email::parse(SERVER_ACCOUNT_EMAIL_ADDRESS).unwrap(),
             avatar_url: None,
             registered_at: Utc::now(),
-            is_admin: false,
             provider: String::from(PROVIDER_PASSWORD),
             provider_identity_key: String::from(SERVER_ACCOUNT_NAME),
         },
@@ -119,18 +118,13 @@ pub(crate) fn create_cli_user_catalog(
     base_catalog: &dill::Catalog,
     tenancy_config: TenancyConfig,
 ) -> dill::Catalog {
-    let is_admin = false;
-
     let current_account_subject = match tenancy_config {
-        TenancyConfig::SingleTenant => CurrentAccountSubject::logged(
-            DEFAULT_ACCOUNT_ID.clone(),
-            DEFAULT_ACCOUNT_NAME.clone(),
-            is_admin,
-        ),
+        TenancyConfig::SingleTenant => {
+            CurrentAccountSubject::logged(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
+        }
         TenancyConfig::MultiTenant => CurrentAccountSubject::logged(
             odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
             odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
-            is_admin,
         ),
     };
 

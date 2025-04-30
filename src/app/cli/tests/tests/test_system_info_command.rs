@@ -10,23 +10,37 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
+use container_runtime::ContainerRuntimeConfig;
+use dill::TypedBuilder;
+use kamu::domain::TenancyConfig;
 use kamu_cli::*;
+use observability::build_info::BuildInfo;
 
 #[test_log::test(tokio::test)]
-async fn test_system_info() {
-    let container_runtime = Arc::new(ContainerRuntime::new(ContainerRuntimeConfig::default()));
-    let multi_tenant = true;
-    let workspace_svc = Arc::new(WorkspaceService::new(
-        Arc::new(WorkspaceService::find_workspace()),
-        multi_tenant,
-    ));
+async fn test_system_info_command() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_layout = WorkspaceLayout::new(temp_dir.path());
+    let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()), false);
+    let cat = kamu_cli::configure_base_catalog(
+        &workspace_layout,
+        WorkspaceStatus::NoWorkspace,
+        TenancyConfig::SingleTenant,
+        None,
+        false,
+    )
+    .add_value(workspace_svc)
+    .add_value(ContainerRuntimeConfig::default())
+    .add_value(OutputConfig::default())
+    .build();
+
+    let cmd = SystemInfoCommand::builder(None).get(&cat).unwrap();
+    let system_info = cmd.collect().await;
 
     assert_matches!(
-        SystemInfo::collect(&container_runtime, &workspace_svc).await,
+        system_info,
         SystemInfo {
             build: BuildInfo {
-                app_version: VERSION,
+                app_version: kamu_cli::VERSION,
                 // We trust vergen to do its job and simply ensure that we detect any incompatible
                 // env var name changes
                 build_timestamp: Some(_),

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE accounts SET\n                account_name = $2,\n                email = $3,\n                display_name = $4,\n                account_type = $5,\n                avatar_url = $6,\n                registered_at = $7,\n                provider = $8,\n                provider_identity_key = $9\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "65eb17566199730c319ae59ee5e57a01e5c3394c4d914df5b06e294374cff594"
+}

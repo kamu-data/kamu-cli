@@ -19,7 +19,7 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
-use kamu_auth_rebac::{AccountPropertyName, DatasetPropertyName, RebacService};
+use kamu_auth_rebac::{DatasetPropertyName, RebacService};
 use kamu_datasets::{DatasetEntryService, JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER};
 
 use crate::JOB_KAMU_REBAC_INDEXER;
@@ -127,13 +127,6 @@ impl RebacIndexer {
         let mut visibility_map = HashMap::new();
 
         while let Some(account) = accounts_stream.try_next().await? {
-            for (name, value) in [AccountPropertyName::is_admin(account.is_admin)] {
-                self.rebac_service
-                    .set_account_property(&account.id, name, &value)
-                    .await
-                    .int_err()?;
-            }
-
             if let Some(treat_datasets_as_public) =
                 predefined_accounts_map.get(&account.account_name)
             {

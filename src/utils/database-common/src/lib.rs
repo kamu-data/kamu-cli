@@ -10,6 +10,7 @@
 #![feature(iter_intersperse)]
 
 // Re-exports
+pub use sqlx::postgres::PgPoolOptions;
 pub use sqlx::sqlite::SqlitePoolOptions;
 
 mod db_connection_settings;

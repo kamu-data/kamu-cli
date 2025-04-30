@@ -9,6 +9,7 @@
 
 use async_graphql::{Context, Guard, Result};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
+use kamu_auth_rebac::{RebacService, RebacServiceExt};
 
 use crate::prelude::*;
 
@@ -61,10 +62,20 @@ impl AdminGuard {
 
 impl Guard for AdminGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
+        let (current_account_subject, rebac_service) =
+            from_catalog_n!(ctx, CurrentAccountSubject, dyn RebacService);
 
         match current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(a) if a.is_admin => Ok(()),
+            CurrentAccountSubject::Logged(a) => {
+                if rebac_service
+                    .is_account_admin(&a.account_id)
+                    .await
+                    .int_err()?
+                {
+                    return Ok(());
+                }
+                Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE))
+            }
             _ => Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE)),
         }
     }

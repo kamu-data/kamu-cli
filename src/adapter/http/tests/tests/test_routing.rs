@@ -23,6 +23,12 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::DatasetAuthorizationLayer;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
@@ -83,6 +89,10 @@ async fn setup_repo() -> RepoFixture {
         .add::<AccountServiceImpl>()
         .add::<InMemoryAccountRepository>()
         .add::<PredefinedAccountsRegistrator>()
+        .add::<RebacServiceImpl>()
+        .add::<InMemoryRebacRepository>()
+        .add_value(DefaultAccountProperties::default())
+        .add_value(DefaultDatasetProperties::default())
         .add_value(PredefinedAccountsConfig::single_tenant())
         .add::<LoginPasswordAuthProvider>();
 

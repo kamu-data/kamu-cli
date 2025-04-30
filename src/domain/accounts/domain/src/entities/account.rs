@@ -42,9 +42,6 @@ pub struct Account {
     pub account_type: AccountType,
     pub avatar_url: Option<String>,
     pub registered_at: DateTime<Utc>,
-    // TODO: Private Datasets: absorb the `is_admin` attribute from the Accounts domain
-    //       https://github.com/kamu-data/kamu-cli/issues/766
-    pub is_admin: bool,
     pub provider: String,
     pub provider_identity_key: String,
 }
@@ -61,7 +58,6 @@ impl From<&AccountConfig> for Account {
             account_type: account_config.account_type,
             avatar_url: account_config.avatar_url.clone(),
             registered_at: account_config.registered_at,
-            is_admin: account_config.is_admin,
             provider: account_config.provider.clone(),
             provider_identity_key: account_config.account_name.to_string(),
         }
@@ -102,7 +98,6 @@ impl Account {
             avatar_url: None,
             email: Email::parse(format!("{name}@example.com").as_str()).unwrap(),
             registered_at: DUMMY_REGISTRATION_TIME.to_utc(),
-            is_admin: false,
             provider: String::from(PROVIDER_PASSWORD),
             provider_identity_key: String::from(name),
         }
@@ -122,7 +117,6 @@ pub struct AccountRowModel {
     pub account_type: AccountType,
     pub avatar_url: Option<String>,
     pub registered_at: DateTime<Utc>,
-    pub is_admin: bool,
     pub provider: String,
     pub provider_identity_key: String,
 }
@@ -145,7 +139,6 @@ impl From<AccountRowModel> for Account {
             account_type: value.account_type,
             avatar_url: value.avatar_url,
             registered_at: value.registered_at,
-            is_admin: value.is_admin,
             provider: value.provider,
             provider_identity_key: value.provider_identity_key,
         }
@@ -163,7 +156,6 @@ impl From<AccountWithTokenRowModel> for Account {
             account_type: value.account_type,
             avatar_url: value.avatar_url,
             registered_at: value.registered_at,
-            is_admin: value.is_admin,
             provider: value.provider,
             provider_identity_key: value.provider_identity_key,
         }

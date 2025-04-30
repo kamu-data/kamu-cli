@@ -30,7 +30,13 @@ use kamu_accounts_inmem::{
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::*;
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacDatasetRegistryFacadeImpl,
+    RebacServiceImpl,
+};
 use kamu_core::{
     CompactionExecutor,
     CompactionPlanner,
@@ -161,6 +167,10 @@ impl ServerSideLocalFsHarness {
                 .add_value(jwt_authentication_config)
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add_value(DefaultAccountProperties::default())
+                .add_value(DefaultDatasetProperties::default())
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add_value(predefined_accounts_config)
                 .add::<OAuthDeviceCodeServiceImpl>()

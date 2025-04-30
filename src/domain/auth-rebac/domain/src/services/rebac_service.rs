@@ -112,7 +112,28 @@ pub trait RebacService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[async_trait::async_trait]
+pub trait RebacServiceExt {
+    async fn is_account_admin(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, GetPropertiesError>;
+}
+
+#[async_trait::async_trait]
+impl<T: RebacService + ?Sized> RebacServiceExt for T {
+    async fn is_account_admin(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, GetPropertiesError> {
+        let account_properties = self.get_account_properties(account_id).await?;
+        Ok(account_properties.is_admin)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default)]
 pub struct AccountProperties {
     pub is_admin: bool,
     pub can_provision_accounts: bool,
@@ -121,7 +142,7 @@ pub struct AccountProperties {
 impl AccountProperties {
     pub fn apply(&mut self, name: AccountPropertyName, value: &PropertyValue) {
         match name {
-            AccountPropertyName::IsAnAdmin => {
+            AccountPropertyName::IsAdmin => {
                 self.is_admin = value == PROPERTY_VALUE_BOOLEAN_TRUE;
             }
             AccountPropertyName::CanProvisionAccounts => {
@@ -133,7 +154,7 @@ impl AccountProperties {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DatasetProperties {
     pub allows_anonymous_read: bool,
     pub allows_public_read: bool,
