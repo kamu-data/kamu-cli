@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::{EntityPageListing, EntityPageStreamer};
-use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountNotFoundByIdError, AccountService, GetAccountByIdError};
 use kamu_auth_rebac::{AuthorizedAccount, RebacService};
@@ -27,26 +26,14 @@ use crate::{DatasetResource, UserActor};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component]
 pub struct OsoResourceServiceImpl {
     dataset_entry_svc: Arc<dyn DatasetEntryService>,
     rebac_service: Arc<dyn RebacService>,
     account_service: Arc<dyn AccountService>,
 }
 
-#[component(pub)]
 impl OsoResourceServiceImpl {
-    pub fn new(
-        dataset_entry_svc: Arc<dyn DatasetEntryService>,
-        rebac_service: Arc<dyn RebacService>,
-        account_service: Arc<dyn AccountService>,
-    ) -> Self {
-        Self {
-            dataset_entry_svc,
-            rebac_service,
-            account_service,
-        }
-    }
-
     pub async fn user_actor(
         &self,
         maybe_account_id: Option<&odf::AccountID>,

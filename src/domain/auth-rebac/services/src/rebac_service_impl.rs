@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dill::{component, interface, *};
+use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::*;
 use tokio::sync::RwLock;
@@ -22,29 +22,15 @@ pub type DefaultDatasetProperties = DatasetProperties;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Default)]
-pub struct State {
+#[derive(Default)]
+struct RebacServiceImplCacheState {
     account_properties_cache_map: HashMap<String, AccountProperties>,
-}
-
-pub struct RebacServiceImplCacheState {
-    pub state: RwLock<State>,
-}
-
-#[component(pub)]
-#[scope(Singleton)]
-impl RebacServiceImplCacheState {
-    pub fn new() -> Self {
-        Self {
-            state: RwLock::new(State::default()),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RebacServiceImpl {
-    cache_state: Arc<RebacServiceImplCacheState>,
+    cache_state: Arc<RwLock<RebacServiceImplCacheState>>,
     rebac_repo: Arc<dyn RebacRepository>,
     default_account_properties: Arc<DefaultAccountProperties>,
     default_dataset_properties: Arc<DefaultDatasetProperties>,
@@ -54,13 +40,12 @@ pub struct RebacServiceImpl {
 #[interface(dyn RebacService)]
 impl RebacServiceImpl {
     pub fn new(
-        cache_state: Arc<RebacServiceImplCacheState>,
         rebac_repo: Arc<dyn RebacRepository>,
         default_account_properties: Arc<DefaultAccountProperties>,
         default_dataset_properties: Arc<DefaultDatasetProperties>,
     ) -> Self {
         Self {
-            cache_state,
+            cache_state: Arc::new(RwLock::new(RebacServiceImplCacheState::default())),
             rebac_repo,
             default_account_properties,
             default_dataset_properties,
@@ -87,7 +72,7 @@ impl RebacService for RebacServiceImpl {
             .set_entity_property(&account_entity, property_name.into(), property_value)
             .await?;
 
-        let mut writable_state = self.cache_state.state.write().await;
+        let mut writable_state = self.cache_state.write().await;
         if let Some(account_properties_cache) = writable_state
             .account_properties_cache_map
             .get_mut(account_id.as_str())
@@ -117,7 +102,7 @@ impl RebacService for RebacServiceImpl {
             .map(map_delete_entity_property_result)
             .await?;
 
-        let mut writable_state = self.cache_state.state.write().await;
+        let mut writable_state = self.cache_state.write().await;
         if let Some(account_properties_cache) = writable_state
             .account_properties_cache_map
             .get_mut(account_id.as_str())
@@ -139,7 +124,7 @@ impl RebacService for RebacServiceImpl {
         let account_id = account_id.as_did_str().to_stack_string();
 
         {
-            let readable_state = self.cache_state.state.read().await;
+            let readable_state = self.cache_state.read().await;
 
             let maybe_cached_account_properties = readable_state
                 .account_properties_cache_map

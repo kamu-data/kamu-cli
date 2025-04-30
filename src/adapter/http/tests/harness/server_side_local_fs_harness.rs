@@ -36,7 +36,6 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacDatasetRegistryFacadeImpl,
     RebacServiceImpl,
-    RebacServiceImplCacheState,
 };
 use kamu_core::{
     CompactionExecutor,
@@ -169,7 +168,6 @@ impl ServerSideLocalFsHarness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
-                .add::<RebacServiceImplCacheState>()
                 .add::<InMemoryRebacRepository>()
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())

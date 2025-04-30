@@ -28,7 +28,6 @@ use kamu_auth_rebac_services::{
     DefaultAccountProperties,
     DefaultDatasetProperties,
     RebacServiceImpl,
-    RebacServiceImplCacheState,
 };
 use kamu_core::*;
 use kamu_datasets::*;
@@ -74,7 +73,6 @@ async fn create_catalog_with_local_workspace(
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<LoginPasswordAuthProvider>()
             .add::<RebacServiceImpl>()
-            .add::<RebacServiceImplCacheState>()
             .add::<InMemoryRebacRepository>()
             .add_value(DefaultAccountProperties::default())
             .add_value(DefaultDatasetProperties::default())

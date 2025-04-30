@@ -19,7 +19,6 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     }
     b.add::<RebacDatasetLifecycleMessageConsumer>();
     b.add::<RebacServiceImpl>();
-    b.add::<RebacServiceImplCacheState>();
     b.add::<RebacDatasetRegistryFacadeImpl>();
     b.add_value(DefaultAccountProperties::default());
     b.add_value(DefaultDatasetProperties::default());

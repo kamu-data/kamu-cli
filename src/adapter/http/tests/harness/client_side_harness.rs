@@ -29,7 +29,6 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacDatasetRegistryFacadeImpl,
     RebacServiceImpl,
-    RebacServiceImplCacheState,
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
@@ -195,7 +194,6 @@ impl ClientSideHarness {
         b.add::<LoginPasswordAuthProvider>();
         b.add::<PredefinedAccountsRegistrator>();
         b.add::<RebacServiceImpl>();
-        b.add::<RebacServiceImplCacheState>();
         b.add::<InMemoryRebacRepository>();
         b.add_value(DefaultAccountProperties::default());
         b.add_value(DefaultDatasetProperties::default());

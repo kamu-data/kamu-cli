@@ -29,7 +29,6 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacDatasetRegistryFacadeImpl,
     RebacServiceImpl,
-    RebacServiceImplCacheState,
 };
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
@@ -422,7 +421,6 @@ impl TestHarness {
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
-                .add::<RebacServiceImplCacheState>()
                 .add::<InMemoryRebacRepository>()
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())

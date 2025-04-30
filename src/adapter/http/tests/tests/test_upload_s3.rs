@@ -39,7 +39,6 @@ use kamu_auth_rebac_services::{
     DefaultAccountProperties,
     DefaultDatasetProperties,
     RebacServiceImpl,
-    RebacServiceImplCacheState,
 };
 use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
@@ -86,7 +85,6 @@ impl Harness {
                 .add_builder(UploadServiceS3::builder(s3_upload_context.clone()))
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
-                .add::<RebacServiceImplCacheState>()
                 .add::<InMemoryRebacRepository>()
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())
