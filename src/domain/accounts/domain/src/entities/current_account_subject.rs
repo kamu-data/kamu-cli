@@ -23,7 +23,6 @@ pub enum CurrentAccountSubject {
 pub struct LoggedAccount {
     pub account_id: odf::AccountID,
     pub account_name: odf::AccountName,
-    pub is_admin: bool,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -38,37 +37,23 @@ impl CurrentAccountSubject {
         Self::Anonymous(reason)
     }
 
-    pub fn logged(
-        account_id: odf::AccountID,
-        account_name: odf::AccountName,
-        is_admin: bool,
-    ) -> Self {
+    pub fn logged(account_id: odf::AccountID, account_name: odf::AccountName) -> Self {
         Self::Logged(LoggedAccount {
             account_id,
             account_name,
-            is_admin,
         })
     }
 
     #[cfg(any(feature = "testing", test))]
     pub fn new_test() -> Self {
-        let is_admin = false;
-
-        Self::logged(
-            DEFAULT_ACCOUNT_ID.clone(),
-            DEFAULT_ACCOUNT_NAME.clone(),
-            is_admin,
-        )
+        Self::logged(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
     }
 
     #[cfg(any(feature = "testing", test))]
     pub fn new_test_with(account_name: &odf::AccountName) -> Self {
-        let is_admin = false;
-
         Self::logged(
             odf::metadata::testing::account_id(account_name),
             account_name.clone(),
-            is_admin,
         )
     }
 

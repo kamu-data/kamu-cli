@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE accounts SET\n                account_name = ?,\n                email = ?,\n                display_name = ?,\n                account_type = ?,\n                avatar_url = ?,\n                registered_at = ?,\n                provider = ?,\n                provider_identity_key = ?\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "8a7075173de611e8efc7745b67b9fbbf7ca4d72d2d87a2f9d2ce237d156d1b79"
+}

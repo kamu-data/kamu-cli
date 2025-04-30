@@ -91,7 +91,8 @@ async fn test_owner_can_read_and_write_owned_private_dataset() {
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner"), false)
+            .await;
     harness
         .create_private_datasets(&[&owned_private_dataset_handle])
         .await;
@@ -121,7 +122,8 @@ async fn test_owner_can_read_and_write_owned_public_dataset() {
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner"), false)
+            .await;
     harness
         .create_public_datasets(&[&owned_public_dataset_handle])
         .await;
@@ -150,7 +152,8 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
     let public_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
-    let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous(), false).await;
     harness
         .create_public_datasets(&[&public_dataset_handle])
         .await;
@@ -174,7 +177,8 @@ async fn test_guest_can_not_read_and_write_private_dataset() {
     let private_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
-    let harness = DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous(), false).await;
     harness
         .create_private_datasets(&[&private_dataset_handle])
         .await;
@@ -199,7 +203,8 @@ async fn test_not_owner_can_read_but_not_write_public_dataset() {
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner")).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner"), false)
+            .await;
 
     harness
         .create_public_datasets(&[&not_owned_public_dataset_handle])
@@ -225,7 +230,8 @@ async fn test_not_owner_can_not_read_and_write_private_dataset() {
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner")).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner"), false)
+            .await;
 
     harness
         .create_private_datasets(&[&not_owned_private_dataset_handle])
@@ -251,7 +257,7 @@ async fn test_admin_can_read_and_write_not_owned_public_dataset() {
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged_admin()).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("admin"), true).await;
 
     harness
         .create_public_datasets(&[&not_owned_public_dataset_handle])
@@ -282,7 +288,7 @@ async fn test_admin_can_read_and_write_not_owned_private_dataset() {
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged_admin()).await;
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("admin"), true).await;
 
     harness
         .create_private_datasets(&[&not_owned_private_dataset_handle])
@@ -349,6 +355,7 @@ async fn test_multi_datasets_matrix() {
     let subjects_with_expected_results = [
         (
             CurrentAccountSubjectTestHelper::anonymous(),
+            false,
             ExpectedResults {
                 read_filter_datasets_allowing_result: vec![
                     // alice_private_dataset_1_handle.clone(),
@@ -405,6 +412,7 @@ async fn test_multi_datasets_matrix() {
         ),
         (
             CurrentAccountSubjectTestHelper::logged("alice"),
+            false,
             ExpectedResults {
                 read_filter_datasets_allowing_result: vec![
                     alice_private_dataset_1_handle.clone(),
@@ -465,7 +473,8 @@ async fn test_multi_datasets_matrix() {
             },
         ),
         (
-            CurrentAccountSubjectTestHelper::logged_admin(),
+            CurrentAccountSubjectTestHelper::logged("admin"),
+            true,
             ExpectedResults {
                 read_filter_datasets_allowing_result: vec![
                     alice_private_dataset_1_handle.clone(),
@@ -527,8 +536,8 @@ async fn test_multi_datasets_matrix() {
         ),
     ];
 
-    for (subject, expected_results) in subjects_with_expected_results {
-        let harness = DatasetAuthorizerHarness::new(subject).await;
+    for (subject, is_admin, expected_results) in subjects_with_expected_results {
+        let harness = DatasetAuthorizerHarness::new(subject, is_admin).await;
 
         harness
             .create_private_datasets(&[
@@ -643,13 +652,13 @@ struct DatasetAuthorizerHarness {
 }
 
 impl DatasetAuthorizerHarness {
-    pub async fn new(current_account_subject: CurrentAccountSubject) -> Self {
+    pub async fn new(current_account_subject: CurrentAccountSubject, is_admin: bool) -> Self {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
         if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
             let mut account_config =
                 AccountConfig::test_config_from_name(logged_account.account_name.clone());
-            account_config.is_admin = logged_account.is_admin;
+            account_config.is_admin = is_admin;
 
             predefined_accounts_config.predefined.push(account_config);
         }
@@ -664,11 +673,8 @@ impl DatasetAuthorizerHarness {
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
-                .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
-                .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
-                    allows_anonymous_read: false,
-                    allows_public_read: false,
-                })
+                .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
+                .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
                 .add::<kamu_auth_rebac_services::RebacDatasetLifecycleMessageConsumer>()
                 .add::<InMemoryRebacRepository>()
                 .add_builder(

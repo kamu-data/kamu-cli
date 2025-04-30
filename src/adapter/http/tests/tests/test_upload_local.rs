@@ -42,6 +42,12 @@ use kamu_adapter_http::platform::{
     UploadToken,
     UploadTokenBase64Json,
 };
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_core::{MediaType, TenancyConfig};
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
@@ -94,6 +100,10 @@ impl Harness {
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add::<UploadServiceLocal>()
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add_value(DefaultAccountProperties::default())
+                .add_value(DefaultDatasetProperties::default())
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<OAuthDeviceCodeGeneratorDefault>()

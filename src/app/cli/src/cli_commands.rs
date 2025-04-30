@@ -123,26 +123,18 @@ pub fn get_command(
             ),
         },
 
-        cli::Command::List(c) => {
-            let user_config = cli_catalog.get_one::<kamu_accounts::PredefinedAccountsConfig>()?;
-
-            Box::new(
-                ListCommand::builder(
-                    accounts::AccountService::current_account_indication(
-                        args.account,
-                        tenancy_config,
-                        user_config.as_ref(),
-                    ),
-                    accounts::AccountService::related_account_indication(
-                        c.target_account,
-                        c.all_accounts,
-                    ),
-                    cli_catalog.get_one()?,
-                    c.wide,
-                )
-                .cast(),
+        cli::Command::List(c) => Box::new(
+            ListCommand::builder(
+                accounts::AccountService::current_account_indication(args.account, tenancy_config),
+                accounts::AccountService::related_account_indication(
+                    c.target_account,
+                    c.all_accounts,
+                ),
+                cli_catalog.get_one()?,
+                c.wide,
             )
-        }
+            .cast(),
+        ),
 
         cli::Command::Log(c) => Box::new(
             LogCommand::builder(

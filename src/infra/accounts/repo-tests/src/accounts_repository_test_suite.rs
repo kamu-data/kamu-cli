@@ -402,7 +402,6 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
             account_type: AccountType::User,
             avatar_url: None,
             registered_at: Utc::now(),
-            is_admin: false,
             provider: PROVIDER_PASSWORD.to_string(),
             provider_identity_key: account_name.to_string(),
         }

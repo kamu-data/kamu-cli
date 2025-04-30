@@ -55,6 +55,7 @@ kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }

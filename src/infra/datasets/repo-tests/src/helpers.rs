@@ -38,7 +38,6 @@ pub(crate) async fn new_account_with_name(
         account_type: AccountType::User,
         avatar_url: None,
         registered_at: Default::default(),
-        is_admin: false,
         provider: "unit-test-provider".to_string(),
         provider_identity_key: account_name.to_string(),
     };

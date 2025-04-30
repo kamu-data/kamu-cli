@@ -15,6 +15,12 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +43,10 @@ pub async fn authentication_catalogs(
     let base_auth_catalog = dill::CatalogBuilder::new_chained(base_catalog)
         .add::<LoginPasswordAuthProvider>()
         .add::<PredefinedAccountsRegistrator>()
+        .add::<RebacServiceImpl>()
+        .add::<InMemoryRebacRepository>()
+        .add_value(DefaultAccountProperties::default())
+        .add_value(DefaultDatasetProperties::default())
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
         .add_value(predefined_accounts_config)

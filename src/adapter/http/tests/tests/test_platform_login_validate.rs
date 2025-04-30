@@ -28,6 +28,12 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_http::platform::{LoginRequestBody, LoginResponseBody};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
@@ -80,6 +86,10 @@ impl Harness {
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add_value(DefaultAccountProperties::default())
+                .add_value(DefaultDatasetProperties::default())
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<OAuthDeviceCodeGeneratorDefault>()

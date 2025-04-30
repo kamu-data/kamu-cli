@@ -61,7 +61,7 @@ fn test_try_parse_unexpected_property_group() {
 #[test]
 fn test_try_parse_unexpected_property_name() {
     let group = PropertyName::Dataset(DatasetPropertyName::AllowsAnonymousRead).property_group();
-    let unexpected_property = AccountPropertyName::IsAnAdmin;
+    let unexpected_property = AccountPropertyName::IsAdmin;
 
     let input = format!("{group}{SEP}{unexpected_property}");
 
@@ -69,7 +69,7 @@ fn test_try_parse_unexpected_property_name() {
         PropertyName::from_str(&input),
         Err(e)
             if e.reason() == "Internal error: Matching variant not found (context: group 'dataset', \
-                property_name 'is_an_admin')"
+                property_name 'is_admin')"
     );
 }
 
@@ -80,7 +80,7 @@ fn test_parse_property() {
     let inputs = [
         "dataset/allows_anonymous_read",
         "dataset/allows_public_read",
-        "account/is_an_admin",
+        "account/is_admin",
     ];
 
     for input in inputs {

@@ -244,7 +244,6 @@ impl AccessTokenRepository for SqliteAccessTokenRepository {
                     a.account_type as "account_type: AccountType",
                     registered_at as "registered_at: _",
                     a.avatar_url,
-                    a.is_admin as "is_admin: _",
                     a.provider,
                     a.provider_identity_key
                 FROM access_tokens at

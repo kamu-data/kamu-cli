@@ -201,7 +201,6 @@ pub async fn test_gql_dataset_flows_initiators(mut kamu_api_server_client: KamuA
                   accountType
                   avatarUrl
                   isAdmin
-
                   __typename
                 }
                 "#

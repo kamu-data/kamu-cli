@@ -73,9 +73,8 @@ impl SqliteAccountRepository {
             account_type: account_row.get_unchecked(4),
             avatar_url: account_row.get(5),
             registered_at: account_row.get(6),
-            is_admin: account_row.get(7),
-            provider: account_row.get(8),
-            provider_identity_key: account_row.get(9),
+            provider: account_row.get(7),
+            provider_identity_key: account_row.get(8),
         }
     }
 }
@@ -95,8 +94,8 @@ impl AccountRepository for SqliteAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, is_admin, provider, provider_identity_key)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             "#,
             account_id,
             account_name,
@@ -105,7 +104,6 @@ impl AccountRepository for SqliteAccountRepository {
             account.account_type,
             account.avatar_url,
             account.registered_at,
-            account.is_admin,
             provider,
             provider_identity_key
         )
@@ -145,9 +143,8 @@ impl AccountRepository for SqliteAccountRepository {
                 account_type = $5,
                 avatar_url = $6,
                 registered_at = $7,
-                is_admin = $8,
-                provider = $9,
-                provider_identity_key = $10
+                provider = $8,
+                provider_identity_key = $9
             WHERE id = $1
             "#,
             account_id,
@@ -157,7 +154,6 @@ impl AccountRepository for SqliteAccountRepository {
             updated_account.account_type,
             updated_account.avatar_url,
             updated_account.registered_at,
-            updated_account.is_admin,
             provider,
             provider_identity_key
         )
@@ -249,7 +245,6 @@ impl AccountRepository for SqliteAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at as "registered_at: _",
-                is_admin as "is_admin: _",
                 provider,
                 provider_identity_key
             FROM accounts
@@ -292,7 +287,6 @@ impl AccountRepository for SqliteAccountRepository {
                     account_type,
                     avatar_url,
                     registered_at,
-                    is_admin,
                     provider,
                     provider_identity_key
                 FROM accounts
@@ -334,7 +328,6 @@ impl AccountRepository for SqliteAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at as "registered_at: _",
-                is_admin as "is_admin: _",
                 provider,
                 provider_identity_key
             FROM accounts
@@ -454,7 +447,6 @@ impl AccountRepository for SqliteAccountRepository {
                        account_type,
                        avatar_url,
                        registered_at,
-                       is_admin,
                        provider,
                        provider_identity_key
                 FROM accounts
@@ -534,7 +526,6 @@ impl ExpensiveAccountRepository for SqliteAccountRepository {
                        account_type  AS "account_type: AccountType",
                        avatar_url,
                        registered_at AS "registered_at: _",
-                       is_admin      AS "is_admin: _",
                        provider,
                        provider_identity_key
                 FROM accounts

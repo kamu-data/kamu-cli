@@ -13,6 +13,8 @@ use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
+use kamu_auth_rebac::{AccountPropertyName, RebacService};
+use odf::AccountID;
 
 use crate::LoginPasswordAuthProvider;
 
@@ -23,6 +25,7 @@ pub struct PredefinedAccountsRegistrator {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
     account_repository: Arc<dyn AccountRepository>,
+    rebac_service: Arc<dyn RebacService>,
 }
 
 #[component(pub)]
@@ -37,12 +40,30 @@ impl PredefinedAccountsRegistrator {
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
         account_repository: Arc<dyn AccountRepository>,
+        rebac_service: Arc<dyn RebacService>,
     ) -> Self {
         Self {
             predefined_accounts_config,
             login_password_auth_provider,
             account_repository,
+            rebac_service,
         }
+    }
+
+    async fn set_rebac_properties(
+        &self,
+        account_id: &AccountID,
+        account_config: &AccountConfig,
+    ) -> Result<(), InternalError> {
+        // TODO: Revisit if batch property setting will be implemented
+        for (name, value) in [AccountPropertyName::is_admin(account_config.is_admin)] {
+            self.rebac_service
+                .set_account_property(account_id, name, &value)
+                .await
+                .int_err()?;
+        }
+
+        Ok(())
     }
 
     async fn register_unknown_account(
@@ -108,6 +129,8 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
                 }
                 Err(GetAccountByIdError::Internal(e)) => return Err(e),
             }
+            self.set_rebac_properties(&account_id, account_config)
+                .await?;
         }
 
         Ok(())

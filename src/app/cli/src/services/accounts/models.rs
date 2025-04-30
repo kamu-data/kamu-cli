@@ -40,16 +40,10 @@ pub struct CurrentAccountIndication {
     pub account_name: odf::AccountName,
     pub user_name: String,
     pub specified_explicitly: bool,
-    is_admin: bool,
 }
 
 impl CurrentAccountIndication {
-    pub fn new<A, U>(
-        account_name: A,
-        user_name: U,
-        specified_explicitly: bool,
-        is_admin: bool,
-    ) -> Self
+    pub fn new<A, U>(account_name: A, user_name: U, specified_explicitly: bool) -> Self
     where
         A: Into<String>,
         U: Into<String>,
@@ -58,7 +52,6 @@ impl CurrentAccountIndication {
             account_name: odf::AccountName::try_from(account_name.into()).unwrap(),
             user_name: user_name.into(),
             specified_explicitly,
-            is_admin,
         }
     }
 
@@ -70,7 +63,6 @@ impl CurrentAccountIndication {
         CurrentAccountSubject::logged(
             odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes()),
             self.account_name.clone(),
-            self.is_admin,
         )
     }
 }

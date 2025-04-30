@@ -1,30 +1,35 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                is_admin,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = $1\n            ",
+  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email,\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    a.avatar_url,\n                    a.registered_at,\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON a.id = account_id\n                WHERE at.id = $1 AND at.revoked_at IS null\n                ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
+        "name": "token_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
         "name": "id: _",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 1,
+        "ordinal": 2,
         "name": "account_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "email",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "display_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "account_type: AccountType",
         "type_info": {
           "Custom": {
@@ -39,19 +44,14 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "avatar_url",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "registered_at",
         "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 7,
-        "name": "is_admin",
-        "type_info": "Bool"
       },
       {
         "ordinal": 8,
@@ -66,7 +66,7 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -75,12 +75,12 @@
       false,
       false,
       false,
-      true,
       false,
+      true,
       false,
       false,
       false
     ]
   },
-  "hash": "d4a64e44be9857fc3772373cf7464f924dd889483c64316c5dba05c97ee23cba"
+  "hash": "7f51103e69770d358383e4fa7bce84d38b07ac769374320e177e5d64aa36a359"
 }

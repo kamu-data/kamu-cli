@@ -10,36 +10,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_auth_rebac::{
-    AccountProperties,
-    AccountPropertyName,
-    AccountToDatasetRelation,
-    AuthorizedAccount,
-    DatasetProperties,
-    DatasetPropertyName,
-    DeleteEntityPropertiesError,
-    DeleteEntityPropertyError,
-    DeletePropertiesError,
-    DeleteSubjectEntitiesObjectEntityRelationsError,
-    EntitiesWithRelation,
-    Entity,
-    EntityWithRelation,
-    GetObjectEntityRelationsError,
-    GetPropertiesError,
-    PropertiesCountError,
-    PropertyName,
-    PropertyValue,
-    RebacRepository,
-    RebacService,
-    Relation,
-    SetEntityPropertyError,
-    SetRelationError,
-    SubjectEntityRelationsError,
-    UnsetEntityPropertyError,
-    UnsetRelationError,
-};
+use kamu_auth_rebac::*;
+use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,14 +21,22 @@ pub type DefaultDatasetProperties = DatasetProperties;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
+struct AccountPropertiesCacheState {
+    account_properties_cache_map: HashMap<String, AccountProperties>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct RebacServiceImpl {
+    cache_state: Arc<RwLock<AccountPropertiesCacheState>>,
     rebac_repo: Arc<dyn RebacRepository>,
     default_account_properties: Arc<DefaultAccountProperties>,
     default_dataset_properties: Arc<DefaultDatasetProperties>,
 }
 
-#[component(pub)]
-#[interface(dyn RebacService)]
+#[dill::component(pub)]
+#[dill::interface(dyn RebacService)]
 impl RebacServiceImpl {
     pub fn new(
         rebac_repo: Arc<dyn RebacRepository>,
@@ -63,6 +44,7 @@ impl RebacServiceImpl {
         default_dataset_properties: Arc<DefaultDatasetProperties>,
     ) -> Self {
         Self {
+            cache_state: Arc::new(RwLock::new(AccountPropertiesCacheState::default())),
             rebac_repo,
             default_account_properties,
             default_dataset_properties,
@@ -87,7 +69,18 @@ impl RebacService for RebacServiceImpl {
 
         self.rebac_repo
             .set_entity_property(&account_entity, property_name.into(), property_value)
-            .await
+            .await?;
+
+        // Update the cache state
+        let mut writable_state = self.cache_state.write().await;
+        let account_properties = writable_state
+            .account_properties_cache_map
+            .entry(account_id.to_string())
+            .or_insert_with(|| (*self.default_account_properties).clone());
+
+        account_properties.apply(property_name, property_value);
+
+        Ok(())
     }
 
     async fn unset_account_property(
@@ -103,7 +96,14 @@ impl RebacService for RebacServiceImpl {
         self.rebac_repo
             .delete_entity_property(&account_entity, property_name.into())
             .map(map_delete_entity_property_result)
-            .await
+            .await?;
+
+        let mut writable_state = self.cache_state.write().await;
+        writable_state
+            .account_properties_cache_map
+            .remove(account_id.as_str());
+
+        Ok(())
     }
 
     async fn get_account_properties(
@@ -111,6 +111,20 @@ impl RebacService for RebacServiceImpl {
         account_id: &odf::AccountID,
     ) -> Result<AccountProperties, GetPropertiesError> {
         let account_id = account_id.as_did_str().to_stack_string();
+
+        {
+            let readable_state = self.cache_state.read().await;
+
+            let maybe_cached_account_properties = readable_state
+                .account_properties_cache_map
+                .get(account_id.as_str())
+                .cloned();
+
+            if let Some(cached_account_properties) = maybe_cached_account_properties {
+                return Ok(cached_account_properties);
+            }
+        }
+
         let account_entity = Entity::new_account(account_id.as_str());
 
         let entity_properties = self

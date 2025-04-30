@@ -71,9 +71,8 @@ impl MySqlAccountRepository {
             account_type: account_row.get_unchecked(4),
             avatar_url: account_row.get(5),
             registered_at: account_row.get(6),
-            is_admin: account_row.get(7),
-            provider: account_row.get(8),
-            provider_identity_key: account_row.get(9),
+            provider: account_row.get(7),
+            provider_identity_key: account_row.get(8),
         }
     }
 }
@@ -87,8 +86,8 @@ impl AccountRepository for MySqlAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, is_admin, provider, provider_identity_key)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             account.id.to_string(),
             account.account_name.to_ascii_lowercase(),
@@ -97,7 +96,6 @@ impl AccountRepository for MySqlAccountRepository {
             account.account_type,
             account.avatar_url,
             account.registered_at,
-            account.is_admin,
             account.provider.to_string(),
             account.provider_identity_key.to_string(),
         )
@@ -131,7 +129,6 @@ impl AccountRepository for MySqlAccountRepository {
                 account_type = ?,
                 avatar_url = ?,
                 registered_at = ?,
-                is_admin = ?,
                 provider = ?,
                 provider_identity_key = ?
             WHERE id = ?
@@ -142,7 +139,6 @@ impl AccountRepository for MySqlAccountRepository {
             updated_account.account_type as AccountType,
             updated_account.avatar_url,
             updated_account.registered_at,
-            updated_account.is_admin,
             updated_account.provider.to_string(),
             updated_account.provider_identity_key.to_string(),
             updated_account.id.to_string(),
@@ -231,7 +227,6 @@ impl AccountRepository for MySqlAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at,
-                is_admin as "is_admin: _",
                 provider,
                 provider_identity_key
             FROM accounts
@@ -274,7 +269,6 @@ impl AccountRepository for MySqlAccountRepository {
                     account_type,
                     avatar_url,
                     registered_at,
-                    is_admin,
                     provider,
                     provider_identity_key
                 FROM accounts
@@ -314,7 +308,6 @@ impl AccountRepository for MySqlAccountRepository {
                 account_type as "account_type: AccountType",
                 avatar_url,
                 registered_at,
-                is_admin as "is_admin: _",
                 provider,
                 provider_identity_key
             FROM accounts
@@ -431,7 +424,6 @@ impl AccountRepository for MySqlAccountRepository {
                        account_type,
                        avatar_url,
                        registered_at,
-                       is_admin,
                        provider,
                        provider_identity_key
                 FROM accounts
@@ -510,7 +502,6 @@ impl ExpensiveAccountRepository for MySqlAccountRepository {
                        account_type  AS "account_type: AccountType",
                        avatar_url,
                        registered_at AS "registered_at: _",
-                       is_admin      AS "is_admin: _",
                        provider,
                        provider_identity_key
                 FROM accounts

@@ -1990,10 +1990,8 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
     let wasya = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("wasya"));
     let petya = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("petya"));
 
-    let subject_wasya =
-        CurrentAccountSubject::logged(wasya.get_id(), wasya.account_name.clone(), false);
-    let subject_petya =
-        CurrentAccountSubject::logged(petya.get_id(), petya.account_name.clone(), false);
+    let subject_wasya = CurrentAccountSubject::logged(wasya.get_id(), wasya.account_name.clone());
+    let subject_petya = CurrentAccountSubject::logged(petya.get_id(), petya.account_name.clone());
 
     let harness = FlowHarness::new();
 
@@ -5250,8 +5248,8 @@ async fn test_list_all_flow_initiators() {
     let foo = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("foo"));
     let bar = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("bar"));
 
-    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
-    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
+    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone());
+    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone());
 
     let harness = FlowHarness::new();
 
@@ -5388,8 +5386,8 @@ async fn test_list_all_datasets_with_flow() {
     let foo = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("foo"));
     let bar = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("bar"));
 
-    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone(), false);
-    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone(), false);
+    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone());
+    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone());
 
     let harness = FlowHarness::new();
 
