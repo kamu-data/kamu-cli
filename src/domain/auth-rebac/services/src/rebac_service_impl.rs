@@ -76,7 +76,7 @@ impl RebacService for RebacServiceImpl {
         let account_properties = writable_state
             .account_properties_cache_map
             .entry(account_id.to_string())
-            .or_insert_with(AccountProperties::default);
+            .or_insert_with(|| (*self.default_account_properties).clone());
 
         account_properties.apply(property_name, property_value);
 

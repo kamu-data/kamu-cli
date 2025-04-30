@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use database_common::{EntityPageListing, EntityPageStreamer};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountNotFoundByIdError, AccountService, GetAccountByIdError};
 use kamu_auth_rebac::{AuthorizedAccount, RebacService};
 use kamu_datasets::{
     DatasetEntriesResolution,
@@ -30,7 +29,6 @@ use crate::{DatasetResource, UserActor};
 pub struct OsoResourceServiceImpl {
     dataset_entry_svc: Arc<dyn DatasetEntryService>,
     rebac_service: Arc<dyn RebacService>,
-    account_service: Arc<dyn AccountService>,
 }
 
 impl OsoResourceServiceImpl {
@@ -42,18 +40,13 @@ impl OsoResourceServiceImpl {
             return Ok(UserActor::anonymous());
         };
 
-        let account = match self.account_service.get_account_by_id(account_id).await {
-            Ok(found_account) => found_account,
-            Err(e) => return Err(e.into()),
-        };
-
         let account_properties = self
             .rebac_service
-            .get_account_properties(&account.id)
+            .get_account_properties(account_id)
             .await
             .int_err()?;
 
-        Ok(UserActor::logged(&account.id, account_properties.is_admin))
+        Ok(UserActor::logged(account_id, account_properties.is_admin))
     }
 
     pub async fn dataset_resource(
@@ -189,19 +182,7 @@ pub struct DatasetResourcesResolution {
 #[derive(Error, Debug)]
 pub enum GetUserActorError {
     #[error(transparent)]
-    NotFound(#[from] AccountNotFoundByIdError),
-
-    #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl From<GetAccountByIdError> for GetUserActorError {
-    fn from(err: GetAccountByIdError) -> Self {
-        match err {
-            GetAccountByIdError::NotFound(e) => Self::NotFound(e),
-            e @ GetAccountByIdError::Internal(_) => Self::Internal(e.int_err()),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
