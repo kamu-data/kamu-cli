@@ -95,6 +95,7 @@ members = [
     "src/adapter/http",
     "src/adapter/oauth",
     "src/adapter/odata",
+    "src/adapter/web3-evm",
     # Apps
     "src/app/cli",
     # E2E

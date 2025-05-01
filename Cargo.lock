@@ -6351,6 +6351,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-web3-evm"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "dill",
+ "kamu-accounts",
+ "opendatafabric",
+]
+
+[[package]]
 name = "kamu-auth-rebac"
 version = "0.235.0"
 dependencies = [
@@ -6759,7 +6769,6 @@ dependencies = [
  "database-common",
  "futures",
  "internal-error",
- "itertools 0.14.0",
  "merge",
  "messaging-outbox",
  "mockall",
