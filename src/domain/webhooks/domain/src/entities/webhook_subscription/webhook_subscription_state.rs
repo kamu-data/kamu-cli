@@ -21,7 +21,7 @@ pub struct WebhookSubscriptionState {
     label: WebhookSubscriptionLabel,
     dataset_id: Option<odf::DatasetID>,
     status: WebhookSubscriptionStatus,
-    event_types: Vec<WebhookSubscriptionEventType>,
+    event_types: Vec<WebhookEventType>,
     secret: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,

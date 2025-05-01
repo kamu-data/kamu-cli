@@ -7,24 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use nutype::nutype;
+use chrono::{DateTime, Utc};
+
+use crate::WebhookEventType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Note: empty label is fine
-#[nutype(
-    sanitize(trim),
-    derive(Debug, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
-)]
-pub struct WebhookSubscriptionLabel(String);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[nutype(
-    sanitize(trim, uppercase),
-    validate(not_empty),
-    derive(Debug, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
-)]
-pub struct WebhookSubscriptionEventType(String);
+pub struct WebhookEvent {
+    pub id: uuid::Uuid,
+    pub event_type: WebhookEventType,
+    pub payload: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
