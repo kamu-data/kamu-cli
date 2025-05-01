@@ -44,15 +44,12 @@ async fn test_creates_task() {
         .unwrap();
 
     assert_matches!(task_state_actual, TaskState {
-        outcome: None,
-        cancellation_requested: false,
+        attempts,
         logical_plan,
         metadata,
-        ran_at: None,
         cancellation_requested_at: None,
-        finished_at: None,
         ..
-    } if logical_plan == logical_plan_expected && metadata == metadata_expected );
+    } if attempts.is_empty() && logical_plan == logical_plan_expected && metadata == metadata_expected );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

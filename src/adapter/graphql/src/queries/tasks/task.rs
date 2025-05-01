@@ -38,13 +38,13 @@ impl Task {
 
     /// Whether the task was ordered to be cancelled
     async fn cancellation_requested(&self) -> bool {
-        self.state.cancellation_requested
+        self.state.cancellation_requested_at.is_some()
     }
 
     /// Describes a certain final outcome of the task once it reaches the
     /// "finished" status
     async fn outcome(&self) -> Option<TaskOutcome> {
-        self.state.outcome.as_ref().map(Into::into)
+        self.state.outcome().map(Into::into)
     }
 
     /// Time when task was originally created and placed in a queue
@@ -54,7 +54,7 @@ impl Task {
 
     /// Time when task transitioned into a running state
     async fn ran_at(&self) -> Option<DateTime<Utc>> {
-        self.state.ran_at
+        self.state.ran_at()
     }
 
     /// Time when cancellation of task was requested
@@ -64,6 +64,6 @@ impl Task {
 
     /// Time when task has reached a final outcome
     async fn finished_at(&self) -> Option<DateTime<Utc>> {
-        self.state.finished_at
+        self.state.finished_at()
     }
 }

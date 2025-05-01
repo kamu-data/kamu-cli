@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod logical_plan;
+mod task_attempt;
 mod task_attempt_id;
 mod task_event;
 mod task_id;
@@ -16,6 +17,7 @@ mod task_state;
 mod task_status;
 
 pub use logical_plan::*;
+pub use task_attempt::*;
 pub use task_attempt_id::*;
 pub use task_event::*;
 pub use task_id::*;

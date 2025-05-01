@@ -19,34 +19,45 @@ use crate::*;
 pub struct TaskState {
     /// Unique and stable identifier of this task
     pub task_id: TaskID,
-    /// Outcome of a task
-    pub outcome: Option<TaskOutcome>,
-    /// Whether the task was ordered to be cancelled
-    pub cancellation_requested: bool,
+    /// List of attempts to execute this task
+    pub attempts: Vec<TaskAttempt>,
     /// Execution plan of the task
     pub logical_plan: LogicalPlan,
     /// Optional associated metadata
     pub metadata: TaskMetadata,
-
     /// Time when task was originally created and placed in a queue
     pub created_at: DateTime<Utc>,
-    /// Time when task transitioned into a running state
-    pub ran_at: Option<DateTime<Utc>>,
     /// Time when cancellation of task was requested
     pub cancellation_requested_at: Option<DateTime<Utc>>,
-    /// Time when task has reached a final outcome
-    pub finished_at: Option<DateTime<Utc>>,
 }
 
 impl TaskState {
+    /// Computes the time when task recently started running, if it did
+    pub fn ran_at(&self) -> Option<DateTime<Utc>> {
+        self.attempts.last().map(|a| a.started_at)
+    }
+
+    /// Computes the time when task finished, if it did
+    pub fn finished_at(&self) -> Option<DateTime<Utc>> {
+        self.attempts
+            .last()
+            .and_then(|attempt| attempt.attempt_result.as_ref().map(|r| r.finished_at))
+    }
+
+    /// Computes the outcome of the task
+    pub fn outcome(&self) -> Option<&TaskOutcome> {
+        self.attempts
+            .last()
+            .and_then(|attempt| attempt.attempt_result.as_ref().map(|r| &r.outcome))
+    }
+
     /// Computes status
     pub fn status(&self) -> TaskStatus {
-        if self.outcome.is_some() {
-            TaskStatus::Finished
-        } else if self.ran_at.is_some() {
-            TaskStatus::Running
-        } else {
-            TaskStatus::Queued
+        let last_attempt = self.attempts.last();
+        match last_attempt {
+            Some(attempt) if attempt.attempt_result.is_some() => TaskStatus::Finished,
+            Some(_) => TaskStatus::Running,
+            None => TaskStatus::Queued,
         }
     }
 }
@@ -69,14 +80,11 @@ impl Projection for TaskState {
                     metadata,
                 }) => Ok(Self {
                     task_id,
-                    outcome: None,
-                    cancellation_requested: false,
+                    attempts: vec![],
                     logical_plan,
                     metadata: metadata.unwrap_or_default(),
                     created_at: event_time,
-                    ran_at: None,
                     cancellation_requested_at: None,
-                    finished_at: None,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -87,20 +95,30 @@ impl Projection for TaskState {
                     E::TaskRunning(TaskEventRunning { event_time, .. })
                         if s.status() == TaskStatus::Queued =>
                     {
-                        Ok(Self {
-                            ran_at: Some(event_time),
-                            ..s
-                        })
+                        let mut attempts = s.attempts;
+                        attempts.push(TaskAttempt {
+                            attempt_number: u32::try_from(attempts.len()).unwrap() + 1,
+                            started_at: event_time,
+                            attempt_result: None,
+                        });
+
+                        Ok(Self { attempts, ..s })
                     }
-                    E::TaskRequeued(_) if s.status() == TaskStatus::Running => {
-                        Ok(Self { ran_at: None, ..s })
+                    E::TaskRequeued(_)
+                        if s.status() == TaskStatus::Running
+                            && s.cancellation_requested_at.is_none() =>
+                    {
+                        let mut attempts = s.attempts;
+                        attempts.pop();
+
+                        Ok(Self { attempts, ..s })
                     }
                     E::TaskCancelled(TaskEventCancelled { event_time, .. })
                         if s.status() == TaskStatus::Queued
-                            || s.status() == TaskStatus::Running && !s.cancellation_requested =>
+                            || s.status() == TaskStatus::Running
+                                && s.cancellation_requested_at.is_none() =>
                     {
                         Ok(Self {
-                            cancellation_requested: true,
                             cancellation_requested_at: Some(event_time),
                             ..s
                         })
@@ -109,12 +127,19 @@ impl Projection for TaskState {
                         event_time,
                         outcome,
                         ..
-                    }) if s.status() == TaskStatus::Queued || s.status() == TaskStatus::Running => {
-                        Ok(Self {
-                            outcome: Some(outcome),
-                            finished_at: Some(event_time),
-                            ..s
-                        })
+                    }) if s.status() == TaskStatus::Running => {
+                        let mut attempts = s.attempts;
+                        let last_attempt = attempts.last_mut().unwrap();
+
+                        last_attempt.attempt_result = Some(TaskAttemptResult {
+                            finished_at: event_time,
+                            outcome: if s.cancellation_requested_at.is_some() {
+                                TaskOutcome::Cancelled
+                            } else {
+                                outcome
+                            },
+                        });
+                        Ok(Self { attempts, ..s })
                     }
                     E::TaskCreated(_)
                     | E::TaskRunning(_)
