@@ -9,16 +9,24 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::WebhookEventType;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct WebhookEvent {
-    pub id: uuid::Uuid,
-    pub event_type: WebhookEventType,
-    pub payload: serde_json::Value,
-    pub created_at: DateTime<Utc>,
+pub struct WebhookRequest {
+    pub headers: Vec<(http::header::HeaderName, String)>,
+    pub started_at: DateTime<Utc>,
+}
+
+impl WebhookRequest {
+    pub fn new<I>(headers: I, started_at: DateTime<Utc>) -> Self
+    where
+        I: IntoIterator<Item = (http::header::HeaderName, String)>,
+    {
+        Self {
+            headers: headers.into_iter().collect(),
+            started_at,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
