@@ -10,7 +10,7 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::WebhookDelivery;
+use crate::{WebhookDelivery, WebhookResponse};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,11 +18,15 @@ use crate::WebhookDelivery;
 pub trait WebhookDeliveryRepository {
     async fn create(&self, delivery: WebhookDelivery) -> Result<(), CreateWebhookDeliveryError>;
 
-    async fn update(&self, delivery: WebhookDelivery) -> Result<(), UpdateWebhookDeliveryError>;
-
-    async fn get_by_attempt_id(
+    async fn update_response(
         &self,
         attempt_id: uuid::Uuid,
+        response: WebhookResponse,
+    ) -> Result<(), UpdateWebhookDeliveryError>;
+
+    async fn get_by_task_attempt_id(
+        &self,
+        task_attempt_id: uuid::Uuid,
     ) -> Result<Option<WebhookDelivery>, GetWebhookDeliveryError>;
 
     async fn list_by_task_id(
