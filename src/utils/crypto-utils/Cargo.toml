@@ -24,4 +24,7 @@ doctest = false
 [dependencies]
 aes-gcm = { version = "0.10.3" }
 internal-error = { workspace = true }
+odf = { workspace = true }
 thiserror = { version = "2", default-features = false, features = ["std"] }
+serde = "1"
+serde_with = { version = "3", default-features = false }

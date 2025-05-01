@@ -10,22 +10,22 @@
 use crypto_utils::DidSecretKey;
 use database_common::{TransactionRef, TransactionRefT};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{
-    AccountDidSecretKeyRepository,
-    AccountDidSecretKeyRowModel,
-    GetDidSecretKeysByAccountIdError,
-    SaveAccountDidSecretKeyError,
+use kamu_datasets::{
+    DatasetDidSecretKeyRepository,
+    DatasetDidSecretKeyRowModel,
+    GetDatasetDidSecretKeysByOwnerIdError,
+    SaveDatasetDidSecretKeyError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteAccountDidSecretKeyRepository {
-    transaction: TransactionRefT<sqlx::Sqlite>,
+pub struct PostgresDatasetDidSecretKeyRepository {
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn AccountDidSecretKeyRepository)]
-impl SqliteAccountDidSecretKeyRepository {
+#[dill::interface(dyn DatasetDidSecretKeyRepository)]
+impl PostgresDatasetDidSecretKeyRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -36,31 +36,26 @@ impl SqliteAccountDidSecretKeyRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AccountDidSecretKeyRepository for SqliteAccountDidSecretKeyRepository {
+impl DatasetDidSecretKeyRepository for PostgresDatasetDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
-        account_id: &odf::AccountID,
+        dataset_id: &odf::DatasetID,
         owner_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
-    ) -> Result<(), SaveAccountDidSecretKeyError> {
+    ) -> Result<(), SaveDatasetDidSecretKeyError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let did_secret_key_secret_key = did_secret_key.secret_key.clone();
-        let did_secret_key_secret_nonce = did_secret_key.secret_nonce.clone();
-        let account_id = account_id.to_string();
-        let owner_id = owner_id.to_string();
-
         sqlx::query!(
             r#"
-                INSERT INTO account_did_secret_keys (account_id, secret_key, secret_nonce, owner_id)
+                INSERT INTO dataset_did_secret_keys (dataset_id, secret_key, secret_nonce, owner_id)
                     VALUES ($1, $2, $3, $4)
                 "#,
-            account_id,
-            did_secret_key_secret_key,
-            did_secret_key_secret_nonce,
-            owner_id,
+            dataset_id.to_string(),
+            did_secret_key.secret_key,
+            did_secret_key.secret_nonce,
+            owner_id.to_string(),
         )
         .execute(connection_mut)
         .await
@@ -72,24 +67,22 @@ impl AccountDidSecretKeyRepository for SqliteAccountDidSecretKeyRepository {
     async fn get_did_secret_keys_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
-    ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByAccountIdError> {
+    ) -> Result<Vec<DidSecretKey>, GetDatasetDidSecretKeysByOwnerIdError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let owner_id = owner_id.to_string();
-
         let did_secret_keys = sqlx::query_as!(
-            AccountDidSecretKeyRowModel,
+            DatasetDidSecretKeyRowModel,
             r#"
-                SELECT  account_id as "account_id: _",
-                        owner_id as "owner_id: _",
-                        secret_key,
-                        secret_nonce
-                FROM account_did_secret_keys
+                SELECT dataset_id as "dataset_id: _",
+                       secret_key,
+                       secret_nonce,
+                       owner_id as "owner_id: _"
+                FROM dataset_did_secret_keys
                 WHERE owner_id = $1
                 "#,
-            owner_id,
+            owner_id.to_string(),
         )
         .fetch_all(connection_mut)
         .await

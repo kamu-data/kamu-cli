@@ -14,30 +14,30 @@ use thiserror::Error;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait AccountDidSecretKeyRepository: Send + Sync {
+pub trait DatasetDidSecretKeyRepository: Send + Sync {
     async fn save_did_secret_key(
         &self,
-        account_id: &odf::AccountID,
+        dataset_id: &odf::DatasetID,
         owner_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
-    ) -> Result<(), SaveAccountDidSecretKeyError>;
+    ) -> Result<(), SaveDatasetDidSecretKeyError>;
 
     async fn get_did_secret_keys_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
-    ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByAccountIdError>;
+    ) -> Result<Vec<DidSecretKey>, GetDatasetDidSecretKeysByOwnerIdError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum SaveAccountDidSecretKeyError {
+pub enum SaveDatasetDidSecretKeyError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
-pub enum GetDidSecretKeysByAccountIdError {
+pub enum GetDatasetDidSecretKeysByOwnerIdError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -46,8 +46,8 @@ pub enum GetDidSecretKeysByAccountIdError {
 
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
-pub struct AccountDidSecretKeyRowModel {
-    pub account_id: odf::AccountID,
+pub struct DatasetDidSecretKeyRowModel {
+    pub dataset_id: odf::DatasetID,
     pub owner_id: odf::AccountID,
     pub secret_key: Vec<u8>,
     pub secret_nonce: Vec<u8>,
@@ -56,8 +56,8 @@ pub struct AccountDidSecretKeyRowModel {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "sqlx")]
-impl From<AccountDidSecretKeyRowModel> for DidSecretKey {
-    fn from(value: AccountDidSecretKeyRowModel) -> Self {
+impl From<DatasetDidSecretKeyRowModel> for DidSecretKey {
+    fn from(value: DatasetDidSecretKeyRowModel) -> Self {
         DidSecretKey {
             secret_key: value.secret_key,
             secret_nonce: value.secret_nonce,

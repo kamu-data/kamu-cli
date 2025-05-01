@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{
-    AccountDidSecretKeyRepository,
-    AccountRepository,
-    DidSecretKey,
-    SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
-};
+use crypto_utils::{DidSecretKey, SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY};
+use kamu_accounts::{AccountDidSecretKeyRepository, AccountRepository};
 
 use crate::{make_test_account, GITHUB_ACCOUNT_ID_PETYA, GITHUB_ACCOUNT_ID_WASYA};
 
@@ -37,7 +33,7 @@ pub async fn test_insert_and_locate_did_secret_keys(catalog: &dill::Catalog) {
     );
 
     let did_secret_key = DidSecretKey::try_new(
-        new_account_did.0.into(),
+        &new_account_did.0.into(),
         SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
     )
     .unwrap();

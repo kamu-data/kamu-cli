@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod inmem_dataset_dependency_repository;
+mod inmem_dataset_did_secret_key_repository;
 mod inmem_dataset_entry_repository;
 mod inmem_dataset_env_var_repository;
 mod inmem_dataset_key_blocks_repository;
@@ -15,6 +16,7 @@ mod inmem_dataset_reference_repository;
 mod inmem_dataset_statistics_repository;
 
 pub use inmem_dataset_dependency_repository::*;
+pub use inmem_dataset_did_secret_key_repository::*;
 pub use inmem_dataset_entry_repository::*;
 pub use inmem_dataset_env_var_repository::*;
 pub use inmem_dataset_key_blocks_repository::*;

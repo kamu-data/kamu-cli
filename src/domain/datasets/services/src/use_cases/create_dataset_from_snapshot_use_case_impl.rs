@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use crypto_utils::{DidSecretEncryptionConfig, DidSecretKey};
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
@@ -18,21 +19,50 @@ use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     CreateDatasetUseCaseOptions,
+    DatasetDidSecretKeyRepository,
 };
+use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 
 use crate::utils::CreateDatasetUseCaseHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     system_time_source: Arc<dyn SystemTimeSource>,
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
+    did_secret_encryption_key: SecretString,
+    dataset_did_secret_key_repo: Arc<dyn DatasetDidSecretKeyRepository>,
+}
+
+#[component(pub)]
+#[interface(dyn CreateDatasetFromSnapshotUseCase)]
+impl CreateDatasetFromSnapshotUseCaseImpl {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(
+        current_account_subject: Arc<CurrentAccountSubject>,
+        system_time_source: Arc<dyn SystemTimeSource>,
+        did_generator: Arc<dyn DidGenerator>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
+        create_helper: Arc<CreateDatasetUseCaseHelper>,
+        did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
+        dataset_did_secret_key_repo: Arc<dyn DatasetDidSecretKeyRepository>,
+    ) -> Self {
+        Self {
+            current_account_subject,
+            system_time_source,
+            did_generator,
+            dataset_registry,
+            create_helper,
+            did_secret_encryption_key: SecretString::from(
+                did_secret_encryption_config.encryption_key.clone(),
+            ),
+            dataset_did_secret_key_repo,
+        }
+    }
 }
 
 #[common_macros::method_names_consts]
@@ -68,13 +98,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         self.create_helper
             .validate_canonical_dataset_alias_account_name(&canonical_alias, logged_account_name)?;
 
+        let dataset_did = self.did_generator.generate_dataset_id();
         // Make a seed block
         let system_time = self.system_time_source.now();
-        let seed_block = odf::dataset::make_seed_block(
-            self.did_generator.generate_dataset_id().0,
-            snapshot.kind,
-            system_time,
-        );
+        let seed_block =
+            odf::dataset::make_seed_block(dataset_did.0.clone(), snapshot.kind, system_time);
 
         // Dataset entry goes first, this guarantees name collision check
         self.create_helper
@@ -85,6 +113,16 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 snapshot.kind,
             )
             .await?;
+
+        let dataset_did_secret_key = DidSecretKey::try_new(
+            &dataset_did.1,
+            self.did_secret_encryption_key.expose_secret(),
+        )
+        .int_err()?;
+        self.dataset_did_secret_key_repo
+            .save_did_secret_key(&dataset_did.0, logged_account_id, &dataset_did_secret_key)
+            .await
+            .int_err()?;
 
         // Make storage level dataset (no HEAD yet)
         let store_result = self

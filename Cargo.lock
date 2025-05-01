@@ -3083,6 +3083,9 @@ version = "0.235.0"
 dependencies = [
  "aes-gcm",
  "internal-error",
+ "opendatafabric",
+ "serde",
+ "serde_with",
  "thiserror 2.0.12",
 ]
 
@@ -5850,6 +5853,7 @@ version = "0.235.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -5895,6 +5899,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -5917,6 +5922,7 @@ version = "0.235.0"
 dependencies = [
  "argon2",
  "chrono",
+ "crypto-utils",
  "database-common",
  "dill",
  "email-utils",
@@ -5939,6 +5945,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "common-macros",
+ "crypto-utils",
  "database-common",
  "dill",
  "email-utils",
@@ -5973,6 +5980,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6674,6 +6682,7 @@ name = "kamu-datasets-inmem"
 version = "0.235.0"
 dependencies = [
  "async-trait",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6697,6 +6706,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytes",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6719,6 +6729,7 @@ version = "0.235.0"
 dependencies = [
  "bytes",
  "chrono",
+ "crypto-utils",
  "database-common",
  "dill",
  "email-utils",
@@ -6739,6 +6750,7 @@ dependencies = [
  "bytes",
  "chrono",
  "common-macros",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6786,6 +6798,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "chrono",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",

@@ -9,10 +9,11 @@
 
 use std::sync::Arc;
 
+use crypto_utils::DidSecretEncryptionConfig;
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
@@ -63,6 +64,9 @@ impl DatasetBaseUseCaseHarness {
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<InMemoryDatasetDidSecretKeyRepository>()
+                .add::<InMemoryAccountDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
                 .add::<DatasetAliasUpdateHandler>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()

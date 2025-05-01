@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT dataset_id as \"dataset_id: _\",\n                       secret_key,\n                       secret_nonce,\n                       owner_id as \"owner_id: _\"\n                FROM dataset_did_secret_keys\n                WHERE owner_id = $1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "dataset_id: _",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "secret_key",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 2,
+        "name": "secret_nonce",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "owner_id: _",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5f77c8f510f5e6e5685b974d52f6d899bfd85ccfe81172068fa693c3dc4b3ea5"
+}

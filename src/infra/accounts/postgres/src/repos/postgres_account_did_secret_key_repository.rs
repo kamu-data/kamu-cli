@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crypto_utils::DidSecretKey;
 use database_common::{TransactionRef, TransactionRefT};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::{
     AccountDidSecretKeyRepository,
     AccountDidSecretKeyRowModel,
-    DidSecretKey,
     GetDidSecretKeysByAccountIdError,
     SaveAccountDidSecretKeyError,
 };

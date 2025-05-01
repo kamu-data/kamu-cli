@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 common-macros = { workspace = true }
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 init-on-startup = { workspace = true }

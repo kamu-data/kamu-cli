@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT  dataset_id as \"dataset_id: _\",\n                        owner_id as \"owner_id: _\",\n                        secret_key,\n                        secret_nonce\n                FROM dataset_did_secret_keys\n                WHERE owner_id = $1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "dataset_id: _",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "owner_id: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "secret_key",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "secret_nonce",
+        "ordinal": 3,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7f8dafd84511f52d35a8a95af991b4bcb3f803766eeec433b3dbb37d4aabf8a4"
+}

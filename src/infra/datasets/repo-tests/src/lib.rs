@@ -10,6 +10,7 @@
 #![feature(assert_matches)]
 
 mod dataset_dependencies_repository_test_suite;
+mod dataset_did_secret_key_repository_suite;
 mod dataset_entry_repository_test_suite;
 mod dataset_env_var_repository_test_suite;
 mod dataset_key_blocks_repository_test_suite;
@@ -35,4 +36,7 @@ pub mod dataset_statistics_repo {
 }
 pub mod dataset_key_blocks_repo {
     pub use crate::dataset_key_blocks_repository_test_suite::*;
+}
+pub mod dataset_did_secret_key_repo {
+    pub use crate::dataset_did_secret_key_repository_suite::*;
 }

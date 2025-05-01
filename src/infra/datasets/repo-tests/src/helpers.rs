@@ -83,10 +83,7 @@ pub(crate) fn new_dataset_entry(owner: &Account, dataset_kind: odf::DatasetKind)
 
 pub(crate) async fn init_test_account(catalog: &Catalog) -> (odf::AccountID, odf::AccountName) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-    account_repo
-        .save_account(&Account::dummy())
-        .await
-        .unwrap();
+    account_repo.save_account(&Account::dummy()).await.unwrap();
 
     (DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
 }

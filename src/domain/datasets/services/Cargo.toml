@@ -30,6 +30,7 @@ testing = ["dep:mockall", "dep:serde_json"]
 
 [dependencies]
 common-macros = { workspace = true }
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }

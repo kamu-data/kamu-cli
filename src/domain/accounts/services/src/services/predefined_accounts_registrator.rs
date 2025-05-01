@@ -61,7 +61,7 @@ impl PredefinedAccountsRegistrator {
             AccountPropertyName::can_provision_accounts(account_config.can_provision_accounts),
         ] {
             self.rebac_service
-                .set_account_property(&account_id, name, &value)
+                .set_account_property(account_id, name, &value)
                 .await
                 .int_err()?;
         }

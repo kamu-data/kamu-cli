@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crypto_utils::{DidSecretEncryptionConfig, DidSecretKey};
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
@@ -19,8 +20,6 @@ use kamu_accounts::{
     AccountRepository,
     AccountService,
     AccountType,
-    DidSecretEncryptionConfig,
-    DidSecretKey,
     FindAccountIdByNameError,
     GetAccountByIdError,
     GetAccountByNameError,
@@ -47,6 +46,7 @@ pub struct AccountServiceImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn AccountService)]
 impl AccountServiceImpl {
+    #[allow(clippy::needless_pass_by_value)]
     fn new(
         account_did_secret_key_repo: Arc<dyn AccountDidSecretKeyRepository>,
         account_repo: Arc<dyn AccountRepository>,
@@ -178,7 +178,7 @@ impl AccountService for AccountServiceImpl {
         self.account_repo.save_account(&account).await.int_err()?;
 
         let did_secret_key = DidSecretKey::try_new(
-            account_did.0.into(),
+            &account_did.0.into(),
             self.did_secret_encryption_key.expose_secret(),
         )
         .int_err()?;

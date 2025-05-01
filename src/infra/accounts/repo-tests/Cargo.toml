@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 kamu-accounts = { workspace = true }

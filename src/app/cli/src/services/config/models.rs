@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
+use crypto_utils::DidSecretEncryptionConfig;
 use database_common::DatabaseProvider;
 use duration_string::DurationString;
 use kamu::utils::docker_images;

@@ -13,41 +13,41 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crypto_utils::DidSecretKey;
-use kamu_accounts::{
-    AccountDidSecretKeyRepository,
-    GetDidSecretKeysByAccountIdError,
-    SaveAccountDidSecretKeyError,
+use kamu_datasets::{
+    DatasetDidSecretKeyRepository,
+    GetDatasetDidSecretKeysByOwnerIdError,
+    SaveDatasetDidSecretKeyError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct State {
-    account_dids_by_owner_id: HashMap<odf::AccountID, Vec<odf::AccountID>>,
-    did_secret_keys_by_account_id: HashMap<odf::AccountID, DidSecretKey>,
+    dataset_dids_by_owner_id: HashMap<odf::AccountID, Vec<odf::DatasetID>>,
+    did_secret_keys_by_dataset_id: HashMap<odf::DatasetID, DidSecretKey>,
 }
 
 impl State {
     fn new() -> Self {
         Self {
-            account_dids_by_owner_id: HashMap::new(),
-            did_secret_keys_by_account_id: HashMap::new(),
+            dataset_dids_by_owner_id: HashMap::new(),
+            did_secret_keys_by_dataset_id: HashMap::new(),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryAccountDidSecretKeyRepository {
+pub struct InMemoryDatasetDidSecretKeyRepository {
     state: Arc<Mutex<State>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn AccountDidSecretKeyRepository)]
+#[dill::interface(dyn DatasetDidSecretKeyRepository)]
 #[dill::scope(dill::Singleton)]
-impl InMemoryAccountDidSecretKeyRepository {
+impl InMemoryDatasetDidSecretKeyRepository {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(State::new())),
@@ -58,38 +58,38 @@ impl InMemoryAccountDidSecretKeyRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AccountDidSecretKeyRepository for InMemoryAccountDidSecretKeyRepository {
+impl DatasetDidSecretKeyRepository for InMemoryDatasetDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
-        account_id: &odf::AccountID,
+        dataset_id: &odf::DatasetID,
         owner_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
-    ) -> Result<(), SaveAccountDidSecretKeyError> {
+    ) -> Result<(), SaveDatasetDidSecretKeyError> {
         let mut state = self.state.lock().unwrap();
         state
-            .did_secret_keys_by_account_id
-            .insert(account_id.clone(), did_secret_key.clone());
+            .did_secret_keys_by_dataset_id
+            .insert(dataset_id.clone(), did_secret_key.clone());
         state
-            .account_dids_by_owner_id
+            .dataset_dids_by_owner_id
             .entry(owner_id.clone())
             .or_default()
-            .push(account_id.clone());
+            .push(dataset_id.clone());
         Ok(())
     }
 
     async fn get_did_secret_keys_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
-    ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByAccountIdError> {
+    ) -> Result<Vec<DidSecretKey>, GetDatasetDidSecretKeysByOwnerIdError> {
         let state = self.state.lock().unwrap();
         let did_secret_key_ids = state
-            .account_dids_by_owner_id
+            .dataset_dids_by_owner_id
             .get(owner_id)
             .cloned()
             .unwrap_or_default();
         let did_secret_keys = did_secret_key_ids
             .into_iter()
-            .filter_map(|id| state.did_secret_keys_by_account_id.get(&id).cloned())
+            .filter_map(|id| state.did_secret_keys_by_dataset_id.get(&id).cloned())
             .collect();
         Ok(did_secret_keys)
     }

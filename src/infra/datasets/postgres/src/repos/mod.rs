@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod postgres_dataset_dependency_repository;
+mod postgres_dataset_did_secret_key_repository;
 mod postgres_dataset_entry_repository;
 mod postgres_dataset_env_var_repository;
 mod postgres_dataset_key_blocks_repository;
@@ -15,6 +16,7 @@ mod postgres_dataset_reference_repository;
 mod postgres_dataset_statistics_repository;
 
 pub use postgres_dataset_dependency_repository::*;
+pub use postgres_dataset_did_secret_key_repository::*;
 pub use postgres_dataset_entry_repository::*;
 pub use postgres_dataset_env_var_repository::*;
 pub use postgres_dataset_key_blocks_repository::*;

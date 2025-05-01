@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
 kamu-datasets = { workspace = true, features = ["sqlx"] }
 internal-error = { workspace = true }

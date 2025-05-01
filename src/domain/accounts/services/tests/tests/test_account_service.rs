@@ -9,6 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
+use crypto_utils::{DidSecretEncryptionConfig, DidSecretKey, SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY};
 use database_common::NoOpDatabasePlugin;
 use email_utils::Email;
 use kamu_accounts::{
@@ -16,10 +17,7 @@ use kamu_accounts::{
     AccountDidSecretKeyRepository,
     AccountService,
     AccountServiceExt,
-    DidSecretEncryptionConfig,
-    DidSecretKey,
     PredefinedAccountsConfig,
-    SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
 use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
@@ -172,7 +170,7 @@ async fn test_create_account() {
 async fn test_did_secret_key_generation() {
     let account_did = odf::AccountID::new_generated_ed25519();
     let new_did_secret_key =
-        DidSecretKey::try_new(account_did.0.into(), SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY).unwrap();
+        DidSecretKey::try_new(&account_did.0.into(), SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY).unwrap();
 
     let original_value = new_did_secret_key
         .get_decrypted_private_key(SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY)
