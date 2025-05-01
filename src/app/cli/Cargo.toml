@@ -65,7 +65,7 @@ kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
 odf = { workspace = true, features = ["http", "s3"] }
-random-names = { workspace = true }
+random-strings = { workspace = true }
 
 kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }

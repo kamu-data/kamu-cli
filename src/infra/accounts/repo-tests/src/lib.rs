@@ -14,6 +14,7 @@ mod access_token_repository_test_utils;
 mod accounts_repository_test_utils;
 
 mod access_token_repository_test_suite;
+mod account_did_secret_key_repository_suite;
 mod accounts_repository_test_suite;
 mod oauth_device_code_repository_test_suite;
 mod password_hash_repository_test_suite;
@@ -26,3 +27,4 @@ pub use password_hash_repository_test_suite::*;
 pub mod oauth_device_code_repository {
     pub use super::oauth_device_code_repository_test_suite::*;
 }
+pub use account_did_secret_key_repository_suite::*;

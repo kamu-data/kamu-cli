@@ -22,7 +22,7 @@ doctest = false
 
 
 [dependencies]
-random-names = { workspace = true }
+random-strings = { workspace = true }
 
 async-trait = "0.1"
 cfg-if = "1"

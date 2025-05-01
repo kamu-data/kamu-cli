@@ -25,4 +25,3 @@ doctest = false
 aes-gcm = { version = "0.10.3" }
 internal-error = { workspace = true }
 thiserror = { version = "2", default-features = false, features = ["std"] }
-secrecy = "0.10"

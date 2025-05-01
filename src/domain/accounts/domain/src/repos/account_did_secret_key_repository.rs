@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use thiserror::Error;
 
 use crate::DidSecretKey;
 
@@ -18,6 +19,28 @@ pub trait AccountDidSecretKeyRepository: Send + Sync {
     async fn save_did_secret_key(
         &self,
         account_id: &odf::AccountID,
+        owner_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
-    ) -> Result<(), InternalError>;
+    ) -> Result<(), SaveAccountDidSecretKeyError>;
+
+    async fn get_did_secret_keys_by_owner_id(
+        &self,
+        owner_id: &odf::AccountID,
+    ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByAccountIdError>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum SaveAccountDidSecretKeyError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum GetDidSecretKeysByAccountIdError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

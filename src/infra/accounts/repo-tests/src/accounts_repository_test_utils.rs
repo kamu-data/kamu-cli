@@ -21,9 +21,10 @@ pub(crate) fn make_test_account(
     email: &str,
     provider: &str,
     provider_identity_key: &str,
+    account_id_maybe: Option<odf::AccountID>,
 ) -> Account {
     Account {
-        id: odf::AccountID::new_seeded_ed25519(name.as_bytes()),
+        id: account_id_maybe.unwrap_or(odf::AccountID::new_seeded_ed25519(name.as_bytes())),
         account_name: odf::AccountName::new_unchecked(name),
         email: Email::parse(email).unwrap(),
         display_name: String::from(name),

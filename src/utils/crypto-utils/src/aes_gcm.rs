@@ -12,8 +12,6 @@ use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
 use aes_gcm::aes::Aes256;
 use aes_gcm::{Aes256Gcm, AesGcm, Key};
-use internal_error::ErrorIntoInternal;
-use secrecy::SecretString;
 
 use crate::{EncryptionError, Encryptor, ParseEncryptionKey};
 
@@ -46,21 +44,14 @@ impl Encryptor for AesGcmEncryptor {
         Ok((cipher, nonce.to_vec()))
     }
 
-    fn decrypt_str(
-        &self,
-        value: &str,
-        secret_nonce: &[u8],
-    ) -> Result<SecretString, EncryptionError> {
+    fn decrypt_bytes(&self, value: &[u8], secret_nonce: &[u8]) -> Result<Vec<u8>, EncryptionError> {
         let decrypted_value = self
             .cipher
-            .decrypt(GenericArray::from_slice(secret_nonce), value.as_bytes())
+            .decrypt(GenericArray::from_slice(secret_nonce), value)
             .map_err(|err| EncryptionError::InvalidCipherKeyError {
                 source: Box::new(AesGcmError(err)),
             })?;
-        Ok(SecretString::from(
-            std::str::from_utf8(decrypted_value.as_slice())
-                .map_err(|err| EncryptionError::InternalError(err.int_err()))?,
-        ))
+        Ok(decrypted_value)
     }
 }
 

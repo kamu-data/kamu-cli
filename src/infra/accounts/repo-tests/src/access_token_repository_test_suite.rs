@@ -34,6 +34,7 @@ pub async fn test_insert_and_locate_access_token(catalog: &Catalog) {
         "wasya@example.com",
         kamu_adapter_oauth::PROVIDER_GITHUB,
         GITHUB_ACCOUNT_ID_WASYA,
+        None,
     );
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -63,6 +64,7 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
         "wasya@example.com",
         kamu_adapter_oauth::PROVIDER_GITHUB,
         GITHUB_ACCOUNT_ID_WASYA,
+        None,
     );
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -123,6 +125,7 @@ pub async fn test_mark_existing_access_token_revoked(catalog: &Catalog) {
         "wasya@example.com",
         kamu_adapter_oauth::PROVIDER_GITHUB,
         GITHUB_ACCOUNT_ID_WASYA,
+        None,
     );
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -166,6 +169,7 @@ pub async fn test_create_duplicate_active_access_token(catalog: &Catalog) {
         "wasya@example.com",
         kamu_adapter_oauth::PROVIDER_GITHUB,
         GITHUB_ACCOUNT_ID_WASYA,
+        None,
     );
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -208,6 +212,7 @@ pub async fn test_create_duplicate_access_token_error(catalog: &Catalog) {
         "wasya@example.com",
         kamu_adapter_oauth::PROVIDER_GITHUB,
         GITHUB_ACCOUNT_ID_WASYA,
+        None,
     );
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -257,6 +262,7 @@ pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
         "wasya@example.com",
         kamu_adapter_oauth::PROVIDER_GITHUB,
         GITHUB_ACCOUNT_ID_WASYA,
+        None,
     );
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();

@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT  account_id as \"account_id: _\",\n                        owner_id as \"owner_id: _\",\n                        secret_key,\n                        secret_nonce\n                FROM account_did_secret_keys\n                WHERE owner_id = $1\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "account_id: _",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "owner_id: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "secret_key",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "secret_nonce",
+        "ordinal": 3,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2bbfd41e3d21e90750665b94ecfbffcd0f4a5335762f30b02c99ba9976ded783"
+}

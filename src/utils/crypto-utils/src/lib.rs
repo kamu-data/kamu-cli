@@ -10,18 +10,13 @@
 mod aes_gcm;
 pub use aes_gcm::*;
 use internal_error::{BoxedError, InternalError};
-use secrecy::SecretString;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait Encryptor {
     fn encrypt_bytes(&self, value: &[u8]) -> Result<(Vec<u8>, Vec<u8>), EncryptionError>;
-    fn decrypt_str(
-        &self,
-        value: &str,
-        secret_nonce: &[u8],
-    ) -> Result<SecretString, EncryptionError>;
+    fn decrypt_bytes(&self, value: &[u8], secret_nonce: &[u8]) -> Result<Vec<u8>, EncryptionError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

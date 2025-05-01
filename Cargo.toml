@@ -20,7 +20,7 @@ members = [
     "src/utils/messaging-outbox",
     "src/utils/multiformats",
     "src/utils/observability",
-    "src/utils/random-names",
+    "src/utils/random-strings",
     "src/utils/repo-tools",
     "src/utils/s3-utils",
     "src/utils/server-console",
@@ -137,7 +137,7 @@ kamu-datafusion-cli = { version = "0.235.0", path = "src/utils/datafusion-cli", 
 messaging-outbox = { version = "0.235.0", path = "src/utils/messaging-outbox", default-features = false }
 multiformats = { version = "0.235.0", path = "src/utils/multiformats", default-features = false }
 observability = { version = "0.235.0", path = "src/utils/observability", default-features = false }
-random-names = { version = "0.235.0", path = "src/utils/random-names", default-features = false }
+random-strings = { version = "0.235.0", path = "src/utils/random-strings", default-features = false }
 s3-utils = { version = "0.235.0", path = "src/utils/s3-utils", default-features = false }
 server-console = { version = "0.235.0", path = "src/utils/server-console", default-features = false }
 test-utils = { version = "0.235.0", path = "src/utils/test-utils", default-features = false }

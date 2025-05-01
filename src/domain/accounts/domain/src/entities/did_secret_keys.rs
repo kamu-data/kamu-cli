@@ -8,15 +8,19 @@
 // by the Apache License, Version 2.0.
 
 use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
+use internal_error::ResultIntoInternal;
 use odf::metadata::PrivateKey;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DidSecretKey {
-    pub id: uuid::Uuid,
     pub secret_key: Vec<u8>,
     pub secret_nonce: Vec<u8>,
 }
@@ -25,15 +29,25 @@ pub struct DidSecretKey {
 
 impl DidSecretKey {
     pub fn try_new(secret_key: PrivateKey, encryption_key: &str) -> Result<Self, EncryptionError> {
-        let secret_key_id = uuid::Uuid::new_v4();
         let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
         let encryption_result = encryptor.encrypt_bytes(secret_key.as_bytes())?;
 
         Ok(Self {
-            id: secret_key_id,
             secret_key: encryption_result.0,
             secret_nonce: encryption_result.1,
         })
+    }
+
+    pub fn get_decrypted_private_key(
+        &self,
+        encryption_key: &str,
+    ) -> Result<PrivateKey, EncryptionError> {
+        let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
+        let decrypted_bytes = encryptor.decrypt_bytes(&self.secret_key, &self.secret_nonce)?;
+
+        Ok(PrivateKey::from_bytes(
+            decrypted_bytes.as_slice().try_into().int_err()?,
+        ))
     }
 }
 
@@ -42,18 +56,18 @@ impl DidSecretKey {
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct DatasetDidSecretKeyRowModel {
-    pub id: uuid::Uuid,
     pub dataset_id: odf::DatasetID,
-    pub value: Vec<u8>,
+    pub owner_id: odf::AccountID,
+    pub secret_key: Vec<u8>,
     pub secret_nonce: Vec<u8>,
 }
 
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct AccountDidSecretKeyRowModel {
-    pub id: uuid::Uuid,
     pub account_id: odf::AccountID,
-    pub value: Vec<u8>,
+    pub owner_id: odf::AccountID,
+    pub secret_key: Vec<u8>,
     pub secret_nonce: Vec<u8>,
 }
 
@@ -63,8 +77,7 @@ pub struct AccountDidSecretKeyRowModel {
 impl From<DatasetDidSecretKeyRowModel> for DidSecretKey {
     fn from(value: DatasetDidSecretKeyRowModel) -> Self {
         DidSecretKey {
-            id: value.id,
-            secret_key: value.value,
+            secret_key: value.secret_key,
             secret_nonce: value.secret_nonce,
         }
     }
@@ -74,8 +87,7 @@ impl From<DatasetDidSecretKeyRowModel> for DidSecretKey {
 impl From<AccountDidSecretKeyRowModel> for DidSecretKey {
     fn from(value: AccountDidSecretKeyRowModel) -> Self {
         DidSecretKey {
-            id: value.id,
-            secret_key: value.value,
+            secret_key: value.secret_key,
             secret_nonce: value.secret_nonce,
         }
     }
@@ -100,11 +112,11 @@ pub struct DidSecretEncryptionConfig {
 }
 
 impl DidSecretEncryptionConfig {
-    const SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
-
     pub fn sample() -> Self {
         Self {
-            encryption_key: Self::SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY.to_owned(),
+            encryption_key: SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY.to_owned(),
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

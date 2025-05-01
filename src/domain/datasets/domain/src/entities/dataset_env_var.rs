@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
+use internal_error::ErrorIntoInternal;
 use merge::Merge;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
@@ -77,12 +78,11 @@ impl DatasetEnvVar {
     ) -> Result<String, EncryptionError> {
         if let Some(secret_nonce) = self.secret_nonce.as_ref() {
             let encryptor = AesGcmEncryptor::try_new(encryption_key)?;
-            let decrypted_value = encryptor.decrypt_str(
-                std::str::from_utf8(&self.value).unwrap(),
-                secret_nonce.as_slice(),
-            )?;
+            let decrypted_value = encryptor.decrypt_bytes(&self.value, secret_nonce.as_slice())?;
 
-            return Ok(decrypted_value.expose_secret().to_string());
+            return Ok(std::str::from_utf8(decrypted_value.as_slice())
+                .map_err(|err| EncryptionError::InternalError(err.int_err()))?
+                .to_string());
         }
         Ok(std::str::from_utf8(&self.value).unwrap().to_string())
     }

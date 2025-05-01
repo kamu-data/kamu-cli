@@ -60,6 +60,8 @@ pub trait AccountService: Sync + Send {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
+        password_hash: String,
+        owner_account_id: &odf::AccountID,
     ) -> Result<(), InternalError>;
 }
 

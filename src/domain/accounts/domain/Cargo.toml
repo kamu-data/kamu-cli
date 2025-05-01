@@ -34,7 +34,7 @@ email-utils = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
-random-names = { workspace = true }
+random-strings = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 base32 = { version = "0.5" }

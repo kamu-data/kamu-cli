@@ -826,7 +826,7 @@ pub fn register_config_in_catalog(
     // Did secret key encryption configuration
     if let Some(did_encryption_config) = config.did_encryption.as_ref() {
         assert!(
-            AesGcmEncryptor::try_new(did_secret_key_encryption_key).is_ok(),
+            AesGcmEncryptor::try_new(&did_encryption_config.encryption_key).is_ok(),
             "Invalid did secret encryption key",
         );
         catalog_builder.add_value(did_encryption_config.clone());

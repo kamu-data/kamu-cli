@@ -59,7 +59,7 @@ odf = { workspace = true, default-features = false, features = [
     "lfs",
     "s3"
 ] }
-random-names = { workspace = true }
+random-strings = { workspace = true }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
 

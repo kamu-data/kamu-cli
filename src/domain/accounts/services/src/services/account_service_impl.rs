@@ -25,6 +25,7 @@ use kamu_accounts::{
     GetAccountByIdError,
     GetAccountByNameError,
     GetAccountMapError,
+    PasswordHashRepository,
     SearchAccountsByNamePatternFilters,
     PROVIDER_PASSWORD,
 };
@@ -38,6 +39,7 @@ pub struct AccountServiceImpl {
     account_repo: Arc<dyn AccountRepository>,
     time_source: Arc<dyn SystemTimeSource>,
     did_secret_encryption_key: SecretString,
+    password_hash_repository: Arc<dyn PasswordHashRepository>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,6 +52,7 @@ impl AccountServiceImpl {
         account_repo: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
+        password_hash_repository: Arc<dyn PasswordHashRepository>,
     ) -> Self {
         Self {
             account_did_secret_key_repo,
@@ -58,6 +61,7 @@ impl AccountServiceImpl {
             did_secret_encryption_key: SecretString::from(
                 did_secret_encryption_config.encryption_key.clone(),
             ),
+            password_hash_repository,
         }
     }
 }
@@ -155,6 +159,8 @@ impl AccountService for AccountServiceImpl {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
+        password_hash: String,
+        owner_account_id: &odf::AccountID,
     ) -> Result<(), InternalError> {
         let account_did = odf::AccountID::new_generated_ed25519();
         let account = Account {
@@ -178,11 +184,15 @@ impl AccountService for AccountServiceImpl {
         .int_err()?;
 
         self.account_did_secret_key_repo
-            .save_did_secret_key(&account.id, &did_secret_key)
+            .save_did_secret_key(&account.id, owner_account_id, &did_secret_key)
+            .await
+            .int_err()?;
+        self.password_hash_repository
+            .save_password_hash(account_name, password_hash)
             .await
             .int_err()?;
 
-        // TODO: Add password
+        Ok(())
     }
 }
 

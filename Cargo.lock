@@ -2803,7 +2803,7 @@ dependencies = [
  "dill",
  "libc",
  "once_cell",
- "random-names",
+ "random-strings",
  "regex",
  "serde",
  "tempfile",
@@ -3083,7 +3083,6 @@ version = "0.235.0"
 dependencies = [
  "aes-gcm",
  "internal-error",
- "secrecy",
  "thiserror 2.0.12",
 ]
 
@@ -5789,7 +5788,7 @@ dependencies = [
  "opendatafabric",
  "pretty_assertions",
  "rand 0.8.5",
- "random-names",
+ "random-strings",
  "regex",
  "reqwest",
  "ringbuf",
@@ -5835,7 +5834,7 @@ dependencies = [
  "nutype",
  "opendatafabric",
  "rand 0.8.5",
- "random-names",
+ "random-strings",
  "reusable",
  "secrecy",
  "serde",
@@ -5955,6 +5954,7 @@ dependencies = [
  "mockall",
  "opendatafabric",
  "password-hash",
+ "random-strings",
  "secrecy",
  "serde",
  "serde_json",
@@ -6428,7 +6428,7 @@ dependencies = [
  "pretty_assertions",
  "prettytable-rs",
  "prometheus",
- "random-names",
+ "random-strings",
  "read_input",
  "regex",
  "reqwest",
@@ -8390,7 +8390,7 @@ dependencies = [
  "opendatafabric-metadata",
  "opendatafabric-storage-lfs",
  "pretty_assertions",
- "random-names",
+ "random-strings",
  "tempfile",
  "thiserror 2.0.12",
  "tokio",
@@ -9559,7 +9559,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "random-names"
+name = "random-strings"
 version = "0.235.0"
 dependencies = [
  "rand 0.8.5",

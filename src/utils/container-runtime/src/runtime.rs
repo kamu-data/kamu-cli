@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
-use random_names::get_random_name;
+use random_strings::get_random_name;
 use tokio::process::Command;
 
 use super::errors::*;
