@@ -197,6 +197,24 @@ impl DataFrameExt {
         self.select(columns)
     }
 
+    /// Collects and serializes records into Json array-of-structures format
+    pub async fn collect_json_aos(self) -> Result<Vec<serde_json::Value>> {
+        use crate::data::format::{JsonArrayOfStructsWriter, RecordsWriter as _};
+
+        let record_batches = self.collect().await?;
+
+        let mut json = Vec::new();
+        let mut writer = JsonArrayOfStructsWriter::new(&mut json);
+        writer.write_batches(&record_batches).unwrap();
+        writer.finish().unwrap();
+
+        let serde_json::Value::Array(records) = serde_json::from_slice(&json).unwrap() else {
+            unreachable!()
+        };
+
+        Ok(records)
+    }
+
     /// Given a data frame with a zero or one row and one column extracts the
     /// typed scalar value
     pub async fn collect_scalar<T: ArrowPrimitiveType>(self) -> Result<Option<T::Native>> {

@@ -41,6 +41,7 @@ async fn test_push_ingest_data_source_not_found() {
                     source_event_time: None,
                     is_ingest_from_upload: false,
                     media_type: None,
+                    expected_head: None,
                 }
             )
             .await,
@@ -79,6 +80,7 @@ async fn test_push_ingest_data_from_json() {
                     source_event_time: None,
                     is_ingest_from_upload: false,
                     media_type: None,
+                    expected_head: None,
                 }
             )
             .await,
@@ -122,7 +124,8 @@ async fn test_push_ingest_data_from_file() {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: true,
-                    media_type: Some(MediaType::NDJSON.to_owned())
+                    media_type: Some(MediaType::NDJSON.to_owned()),
+                    expected_head: None,
                 }
             )
             .await,

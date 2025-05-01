@@ -25,7 +25,7 @@ use time_source::SystemTimeSourceDefault;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct BaseGQLDatasetHarness {
-    _tempdir: TempDir,
+    tempdir: TempDir,
     catalog: Catalog,
 }
 
@@ -101,10 +101,11 @@ impl BaseGQLDatasetHarness {
             b.build()
         };
 
-        Self {
-            _tempdir: tempdir,
-            catalog,
-        }
+        Self { tempdir, catalog }
+    }
+
+    pub fn temp_dir(&self) -> &std::path::Path {
+        self.tempdir.path()
     }
 
     pub fn catalog(&self) -> &Catalog {

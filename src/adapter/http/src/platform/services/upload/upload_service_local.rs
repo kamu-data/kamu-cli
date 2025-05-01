@@ -13,24 +13,12 @@ use std::sync::Arc;
 use bytes::Bytes;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_core::services::upload_service::*;
 use kamu_core::{CacheDir, MediaType, ServerUrlConfig};
 use thiserror::Error;
 use tokio::io::AsyncRead;
 use uuid::Uuid;
 
-use crate::platform::{
-    ContentLengthMismatchError,
-    ContentNotFoundError,
-    ContentTooLargeError,
-    FileUploadLimitConfig,
-    MakeUploadContextError,
-    SaveUploadError,
-    UploadContext,
-    UploadService,
-    UploadToken,
-    UploadTokenBase64Json,
-    UploadTokenIntoStreamError,
-};
 use crate::AccessToken;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

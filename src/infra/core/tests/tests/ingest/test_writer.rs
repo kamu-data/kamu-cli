@@ -1056,7 +1056,7 @@ async fn test_data_writer_builder_scan_no_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None)
+        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 
@@ -1098,7 +1098,7 @@ async fn test_data_writer_builder_scan_polling_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None)
+        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 
@@ -1139,7 +1139,7 @@ async fn test_data_writer_builder_scan_push_source() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None)
+        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 
@@ -1189,7 +1189,7 @@ async fn test_data_writer_builder_scan_push_source_with_extra_events() {
     .await;
 
     let metadata_state =
-        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None)
+        DataWriterMetadataState::build(harness.target.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 

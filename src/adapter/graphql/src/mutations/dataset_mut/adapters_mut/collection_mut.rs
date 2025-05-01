@@ -27,24 +27,28 @@ impl CollectionMut {
 
     /// Links new entry to this collection
     #[tracing::instrument(level = "info", name = CollectionMut_add_entry, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn add_entry(&self, entry: CollectionEntryInput) -> CollectionUpdateResult {
         todo!()
     }
 
     /// Moves or rename an entry
     #[tracing::instrument(level = "info", name = CollectionMut_move_entry, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn move_entry(&self, path_from: String, path_to: String) -> CollectionUpdateResult {
         todo!()
     }
 
     /// Remove an entry from this collection
     #[tracing::instrument(level = "info", name = CollectionMut_unlink_entry, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn unlink_entry(&self, path: String) -> CollectionUpdateResult {
         todo!()
     }
 
     /// Execute multiple add / move / unlink operations as a single transaction
     #[tracing::instrument(level = "info", name = CollectionMut_batch_update, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn batch_update(
         &self,
         operations: Vec<CollectionUpdateInput>,

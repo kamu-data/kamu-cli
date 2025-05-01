@@ -14,6 +14,12 @@ use std::sync::Arc;
 
 use database_common::NoOpDatabasePlugin;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu::domain::upload_service::{
+    FileUploadLimitConfig,
+    UploadContext,
+    UploadToken,
+    UploadTokenBase64Json,
+};
 use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
@@ -35,13 +41,7 @@ use kamu_accounts_services::{
     OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::platform::{
-    FileUploadLimitConfig,
-    UploadContext,
-    UploadServiceLocal,
-    UploadToken,
-    UploadTokenBase64Json,
-};
+use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,

@@ -40,16 +40,21 @@ impl PushIngestPlannerImpl {
         &self,
         target: ResolvedDataset,
         source_name: Option<&str>,
+        expected_head: Option<odf::Multihash>,
     ) -> Result<DataWriterMetadataState, PushIngestPlanningError> {
-        let metadata_state =
-            DataWriterMetadataState::build(target, &odf::BlockRef::Head, source_name)
-                .await
-                .map_err(|e| match e {
-                    ScanMetadataError::SourceNotFound(err) => {
-                        PushIngestPlanningError::SourceNotFound(err.into())
-                    }
-                    ScanMetadataError::Internal(err) => PushIngestPlanningError::Internal(err),
-                })?;
+        let metadata_state = DataWriterMetadataState::build(
+            target,
+            &odf::BlockRef::Head,
+            source_name,
+            expected_head,
+        )
+        .await
+        .map_err(|e| match e {
+            ScanMetadataError::SourceNotFound(err) => {
+                PushIngestPlanningError::SourceNotFound(err.into())
+            }
+            ScanMetadataError::Internal(err) => PushIngestPlanningError::Internal(err),
+        })?;
         Ok(metadata_state)
     }
 
@@ -111,7 +116,7 @@ impl PushIngestPlanner for PushIngestPlannerImpl {
         opts: PushIngestOpts,
     ) -> Result<PushIngestPlan, PushIngestPlanningError> {
         let mut metadata_state = self
-            .prepare_metadata_state(target.clone(), source_name)
+            .prepare_metadata_state(target.clone(), source_name, opts.expected_head.clone())
             .await?;
 
         let push_source = match (&metadata_state.source_event, opts.auto_create_push_source) {
@@ -123,7 +128,9 @@ impl PushIngestPlanner for PushIngestPlannerImpl {
                     .await?;
 
                 // Update data writer, as we've modified the dataset
-                metadata_state = self.prepare_metadata_state(target, source_name).await?;
+                metadata_state = self
+                    .prepare_metadata_state(target, source_name, opts.expected_head.clone())
+                    .await?;
                 Ok(add_push_source_event)
             }
 

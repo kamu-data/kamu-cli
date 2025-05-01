@@ -229,6 +229,7 @@ impl TransformTestHarness {
                     source_event_time: None,
                     is_ingest_from_upload: false,
                     media_type: None,
+                    expected_head: None,
                 },
                 None,
             )

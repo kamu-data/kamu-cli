@@ -20,7 +20,7 @@ use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
 use http_common::ApiError;
 use internal_error::*;
-use kamu::domain::{Protocols, ServerUrlConfig, TenancyConfig};
+use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{
     AccountConfig,
     AuthenticationService,
@@ -28,7 +28,6 @@ use kamu_accounts::{
     PROVIDER_PASSWORD,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_http::platform::FileUploadLimitConfig;
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use observability::axum::unknown_fallback_handler;
 use rust_embed::RustEmbed;

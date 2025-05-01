@@ -15,24 +15,11 @@ use aws_sdk_s3::types::ObjectCannedAcl;
 use bytes::Bytes;
 use dill::*;
 use internal_error::ErrorIntoInternal;
+use kamu_core::services::upload_service::*;
 use kamu_core::MediaType;
 use s3_utils::{PutObjectOptions, S3Context};
 use tokio::io::AsyncRead;
 use uuid::Uuid;
-
-use crate::platform::{
-    ContentNotFoundError,
-    ContentTooLargeError,
-    FileUploadLimitConfig,
-    MakeUploadContextError,
-    SaveUploadError,
-    UploadContext,
-    UploadNotSupportedError,
-    UploadService,
-    UploadToken,
-    UploadTokenBase64Json,
-    UploadTokenIntoStreamError,
-};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

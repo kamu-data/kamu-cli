@@ -146,7 +146,7 @@ async fn test_engine_io_common<
     let root_target = ResolvedDataset::from_stored(&root_stored, &root_alias);
 
     let root_metadata_state =
-        DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None)
+        DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 
@@ -229,7 +229,7 @@ async fn test_engine_io_common<
     .unwrap();
 
     let root_metadata_state =
-        DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None)
+        DataWriterMetadataState::build(root_target.clone(), &odf::BlockRef::Head, None, None)
             .await
             .unwrap();
 

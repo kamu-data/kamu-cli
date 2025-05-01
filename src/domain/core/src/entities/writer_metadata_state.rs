@@ -48,17 +48,22 @@ impl DataWriterMetadataState {
         target: ResolvedDataset,
         block_ref: &odf::BlockRef,
         source_name: Option<&str>,
+        head: Option<odf::Multihash>,
     ) -> Result<Self, ScanMetadataError> {
         // TODO: PERF: Full metadata scan below - this is expensive and should be
         //       improved using skip lists.
 
         use odf::dataset::MetadataChainVisitorExtInfallible;
 
-        let head = target
-            .as_metadata_chain()
-            .resolve_ref(block_ref)
-            .await
-            .int_err()?;
+        let head = if let Some(head) = head {
+            head
+        } else {
+            target
+                .as_metadata_chain()
+                .resolve_ref(block_ref)
+                .await
+                .int_err()?
+        };
         let mut seed_visitor = odf::dataset::SearchSeedVisitor::new().adapt_err();
         let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new().adapt_err();
         let mut set_data_schema_visitor =

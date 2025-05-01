@@ -51,7 +51,7 @@ impl DataWriterDataFusion {
         source_name: Option<&str>,
     ) -> Result<Self, ScanMetadataError> {
         let metadata_state =
-            DataWriterMetadataState::build(target.clone(), block_ref, source_name).await?;
+            DataWriterMetadataState::build(target.clone(), block_ref, source_name, None).await?;
 
         Ok(Self::from_metadata_state(ctx, target, metadata_state))
     }

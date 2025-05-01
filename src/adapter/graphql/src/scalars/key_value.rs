@@ -12,6 +12,6 @@ use async_graphql::SimpleObject;
 /// Represents base64-encoded binary data using standard encoding
 #[derive(Debug, SimpleObject)]
 pub struct KeyValue {
-    key: String,
-    value: String,
+    pub key: String,
+    pub value: String,
 }

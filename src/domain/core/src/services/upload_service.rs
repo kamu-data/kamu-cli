@@ -10,10 +10,11 @@
 use base64::Engine;
 use bytes::Bytes;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::MediaType;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::io::AsyncRead;
+
+use crate::MediaType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,7 +86,7 @@ pub trait UploadService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadContext {
     pub upload_url: String,
@@ -93,8 +94,6 @@ pub struct UploadContext {
     pub use_multipart: bool,
     pub headers: Vec<(String, String)>,
     pub fields: Vec<(String, String)>,
-
-    #[schema(value_type = String)]
     pub upload_token: UploadTokenBase64Json,
 }
 
@@ -184,6 +183,8 @@ impl FileUploadLimitConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: SEC: It is currently possible to spoof `content_length` - we should
+// consider singing/encrypting a token
 #[serde_with::serde_as]
 #[serde_with::skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]

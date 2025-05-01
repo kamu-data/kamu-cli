@@ -44,6 +44,7 @@ pub struct PushIngestDataUseCaseOptions {
     pub source_event_time: Option<DateTime<Utc>>,
     pub is_ingest_from_upload: bool,
     pub media_type: Option<MediaType>,
+    pub expected_head: Option<odf::Multihash>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

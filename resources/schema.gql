@@ -1244,7 +1244,7 @@ type DatasetsMut {
 		"""
 		How extra events are represented
 		"""
-		eventEventsFormat: MetadataManifestFormat,
+		extraEventsFormat: MetadataManifestFormat,
 		"""
 		Visibility of the dataset
 		"""
@@ -2056,7 +2056,7 @@ type GetFileContentSuccess implements GetFileContentResult {
 	"""
 	version: Int!
 	"""
-	Block that this result corresponds to
+	Latest block that this result has considered
 	"""
 	blockHash: Multihash!
 	"""
@@ -2067,6 +2067,10 @@ type GetFileContentSuccess implements GetFileContentResult {
 	Media type of the file content
 	"""
 	contentType: String!
+	"""
+	Multihash of the file content
+	"""
+	contentHash: Multihash!
 	"""
 	Extra data associated with this file version
 	"""
@@ -2090,17 +2094,29 @@ type GetFileContentUrlSuccess implements GetFileContentUrlResult {
 	"""
 	blockHash: Multihash!
 	"""
-	Direct download URL
-	"""
-	contentUrl: String!
-	"""
 	Media type of the file content
 	"""
 	contentType: String!
 	"""
+	Multihash of the file content
+	"""
+	contentHash: Multihash!
+	"""
 	Extra data associated with this file version
 	"""
 	extraData: JSON!
+	"""
+	Direct download URL
+	"""
+	url: String!
+	"""
+	Headers to include in request
+	"""
+	headers: [KeyValue!]!
+	"""
+	Download URL expiration timestamp
+	"""
+	expiresAt: DateTime
 	isSuccess: Boolean!
 	errorMessage: String!
 }
@@ -3230,7 +3246,11 @@ interface StartUploadVersionResult {
 }
 
 type StartUploadVersionSuccess implements StartUploadVersionResult {
-	uploadContext: UploadContext!
+	uploadUrl: String!
+	method: String!
+	useMultipart: Boolean!
+	headers: [KeyValue!]!
+	uploadToken: String!
 	isSuccess: Boolean!
 	errorMessage: String!
 }
@@ -3426,6 +3446,19 @@ interface UpdateReadmeResult {
 	message: String!
 }
 
+type UpdateVersionErrorCasFailed implements UpdateVersionResult {
+	expectedHead: Multihash!
+	actualHead: Multihash!
+	isSuccess: Boolean!
+	errorMessage: String!
+}
+
+type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult {
+	message: String!
+	isSuccess: Boolean!
+	errorMessage: String!
+}
+
 interface UpdateVersionResult {
 	isSuccess: Boolean!
 	errorMessage: String!
@@ -3438,13 +3471,6 @@ type UpdateVersionSuccess implements UpdateVersionResult {
 	contentHash: Multihash!
 	isSuccess: Boolean!
 	errorMessage: String!
-}
-
-type UploadContext {
-	uploadUrl: String!
-	method: String!
-	headers: [KeyValue!]!
-	uploadToken: String!
 }
 
 interface UpsertDatasetEnvVarResult {
@@ -3493,7 +3519,11 @@ type VersionedFileMut {
 		"""
 		Json object containing values of extra columns
 		"""
-		extraData: JSON
+		extraData: JSON,
+		"""
+		Expected head block hash to prevent concurrent updates
+		"""
+		expectedHead: Multihash
 	): UpdateVersionResult!
 	"""
 	Returns a pre-signed URL and upload token for direct uploads of large
@@ -3503,7 +3533,7 @@ type VersionedFileMut {
 		"""
 		Size of the file being uploaded
 		"""
-		contentSize: Int!,
+		contentLength: Int!,
 		"""
 		Media type of content (e.g. application/pdf)
 		"""
@@ -3521,7 +3551,11 @@ type VersionedFileMut {
 		"""
 		Json object containing values of extra columns
 		"""
-		extraData: JSON
+		extraData: JSON,
+		"""
+		Expected head block hash to prevent concurrent updates
+		"""
+		expectedHead: Multihash
 	): UpdateVersionResult!
 	"""
 	Creating a new version with that has updated values of extra columns but
@@ -3531,7 +3565,11 @@ type VersionedFileMut {
 		"""
 		Json object containing values of extra columns
 		"""
-		extraData: JSON!
+		extraData: JSON!,
+		"""
+		Expected head block hash to prevent concurrent updates
+		"""
+		expectedHead: Multihash
 	): UpdateVersionResult!
 }
 

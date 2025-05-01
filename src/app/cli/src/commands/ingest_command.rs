@@ -180,6 +180,7 @@ impl Command for IngestCommand {
                         source_event_time,
                         is_ingest_from_upload: false,
                         media_type: self.get_media_type()?,
+                        expected_head: None,
                     },
                     listener.clone(),
                 )

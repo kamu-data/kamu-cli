@@ -1309,7 +1309,7 @@ impl IngestTestHarness {
         target: ResolvedDataset,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let metadata_state =
-            DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None)
+            DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None, None)
                 .await
                 .unwrap();
 

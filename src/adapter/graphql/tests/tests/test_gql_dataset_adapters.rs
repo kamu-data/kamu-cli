@@ -203,11 +203,11 @@ async fn test_versioned_file_create_in_band() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($datasetId: DatasetID!, $content: Base64Usnp!) {
+                mutation ($datasetId: DatasetID!, $content: Base64Usnp!, $expectedHead: Multihash!) {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
-                                uploadNewVersion(content: $content) {
+                                uploadNewVersion(content: $content, expectedHead: $expectedHead) {
                                     ... on UpdateVersionSuccess {
                                         newVersion
                                         contentHash
@@ -223,11 +223,11 @@ async fn test_versioned_file_create_in_band() {
             .variables(async_graphql::Variables::from_json(json!({
                 "datasetId": &did,
                 "content": base64usnp_encode(b"bye"),
+                "expectedHead": head_v1,
             }))),
         )
         .await;
 
-    assert!(res.is_ok(), "{res:#?}");
     assert!(res.is_ok(), "{res:#?}");
     let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
         ["uploadNewVersion"]
@@ -392,7 +392,48 @@ async fn test_versioned_file_create_in_band() {
             "extraData": {},
         })
     );
+
+    // Try upload with non-latest head to simulate concurrency
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetId: DatasetID!, $content: Base64Usnp!, $expectedHead: Multihash!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                uploadNewVersion(content: $content, expectedHead: $expectedHead) {
+                                    isSuccess
+                                    errorMessage
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "content": base64usnp_encode(b"boo"),
+                "expectedHead": head_v1,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+        ["uploadNewVersion"]
+        .clone();
+    pretty_assertions::assert_eq!(
+        upload_result,
+        json!({
+            "isSuccess": false,
+            "errorMessage": "Expected head didn't match, dataset was likely updated concurrently",
+        })
+    );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_versioned_file_extra_data() {
@@ -647,6 +688,231 @@ async fn test_versioned_file_extra_data() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_versioned_file_direct_upload_download() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Create versioned file dataset
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetAlias: DatasetAlias!) {
+                    datasets {
+                        createVersionedFile(
+                            datasetAlias: $datasetAlias,
+                            datasetVisibility: PUBLIC,
+                        ) {
+                            ... on CreateDatasetResultSuccess {
+                                dataset {
+                                    id
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetAlias": "x",
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let did = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Initiate direct upload
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetId: DatasetID!, $contentLength: Int!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                startUploadNewVersion(contentLength: $contentLength) {
+                                    isSuccess
+                                    errorMessage
+                                    ... on StartUploadVersionSuccess {
+                                        uploadContext {
+                                            method
+                                            useMultipart
+                                            headers { key value }
+                                            uploadUrl
+                                            uploadToken
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "contentLength": b"hello".len(),
+
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+        ["startUploadNewVersion"]
+        .clone();
+    let method = upload_result["uploadContext"]["method"].as_str().unwrap();
+    let use_multipart = upload_result["uploadContext"]["useMultipart"]
+        .as_bool()
+        .unwrap();
+    let headers = upload_result["uploadContext"]["headers"]
+        .as_array()
+        .unwrap();
+    let upload_url = upload_result["uploadContext"]["uploadUrl"]
+        .as_str()
+        .unwrap();
+    let upload_token = upload_result["uploadContext"]["uploadToken"]
+        .as_str()
+        .unwrap();
+    assert_eq!(method, "POST");
+    assert!(use_multipart);
+
+    // Use direct service access to simulate upload without spawning HTTP server
+    let upload_token: kamu::domain::UploadTokenBase64Json = upload_token.parse().unwrap();
+
+    let upload_service = harness
+        .catalog_authorized
+        .get_one::<kamu_adapter_http::platform::UploadServiceLocal>()
+        .unwrap();
+
+    upload_service
+        .save_upload(
+            &upload_token.0,
+            b"hello".len(),
+            bytes::Bytes::from_static(b"hello"),
+        )
+        .await
+        .unwrap();
+
+    // Finalize direct upload
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetId: DatasetID!, $uploadToken: String!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                finishUploadNewVersion(uploadToken: $uploadToken) {
+                                    isSuccess
+                                    errorMessage
+                                    ... on UpdateVersionSuccess {
+                                        newVersion
+                                        contentHash
+                                        newHead
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "uploadToken": upload_token,
+
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+        ["finishUploadNewVersion"]
+        .clone();
+    let head_v1 = &upload_result["newHead"];
+    pretty_assertions::assert_eq!(
+        upload_result,
+        json!({
+            "isSuccess": true,
+            "errorMessage": "",
+            "newVersion": 1,
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "newHead": head_v1,
+        })
+    );
+
+    // // Read back latest content
+    // let res = harness
+    //     .execute_authorized_query(
+    //         async_graphql::Request::new(indoc!(
+    //             r#"
+    //             query ($datasetId: DatasetID!) {
+    //                 datasets {
+    //                     byId(datasetId: $datasetId) {
+    //                         asVersionedFile {
+    //                             getContentUrl {
+    //                                 isSuccess
+    //                                 errorMessage
+    //                                 ... on GetFileContentUrlSuccess {
+    //                                     version
+    //                                     blockHash
+    //                                     contentType
+    //                                     contentHash
+    //                                     extraData
+    //                                     url
+    //                                     headers { key value }
+    //                                     expiresAt
+    //                                 }
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //             "#
+    //         ))
+    //         .variables(async_graphql::Variables::from_json(json!({
+    //             "datasetId": &did,
+    //         }))),
+    //     )
+    //     .await;
+
+    // assert!(res.is_ok(), "{res:#?}");
+    // let get_content_url =
+    // res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+    //     ["getContentUrl"]
+    //     .clone();
+    // let url = get_content_url["url"].as_str().unwrap();
+    // let headers = &get_content_url["headers"];
+    // let expires_at = get_content_url["expiresAt"].as_str().unwrap();
+    // pretty_assertions::assert_eq!(
+    //     get_content_url,
+    //     json!({
+    //         "isSuccess": true,
+    //         "errorMessage": "",
+    //         "version": 2,
+    //         "blockHash": head_v1,
+    //         "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+    //         "contentType": "application/octet-stream",
+    //         "extraData": {},
+    //         "url": url,
+    //         "headers": headers,
+    //         "expiresAt": expires_at,
+    //     })
+    // );
+
+    // assert_eq!(url, "");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -669,6 +935,9 @@ impl GraphQLDatasetsHarness {
             .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
             .build();
 
+        let cache_dir = base_gql_harness.temp_dir().join("cache");
+        std::fs::create_dir(&cache_dir).unwrap();
+
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
             .add::<RenameDatasetUseCaseImpl>()
             .add::<DeleteDatasetUseCaseImpl>()
@@ -689,9 +958,21 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<kamu_adapter_http::platform::UploadServiceLocal>()
+            .add_value(kamu::domain::ServerUrlConfig::new_test(None))
+            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100))
+            .add_value(kamu::domain::CacheDir::new(cache_dir))
             .build();
 
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
+
+        // TODO: Yuck
+        let catalog_authorized = catalog_authorized
+            .builder_chained()
+            .add_value(kamu_adapter_http::AccessToken {
+                token: "<secret>".into(),
+            })
+            .build();
 
         Self {
             base_gql_harness,

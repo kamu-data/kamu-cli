@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface, meta, Catalog};
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::*;
 use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetReferenceRepository,
@@ -82,11 +82,7 @@ impl DatasetReferenceService for DatasetReferenceServiceImpl {
         // Try repository operation
         self.dataset_reference_repo
             .set_dataset_reference(dataset_id, block_ref, maybe_prev_block_hash, new_block_hash)
-            .await
-            .map_err(|e| match e {
-                SetDatasetReferenceError::CASFailed(e) => e.int_err(),
-                SetDatasetReferenceError::Internal(e) => e,
-            })?;
+            .await?;
 
         // Send outbox message
         self.outbox

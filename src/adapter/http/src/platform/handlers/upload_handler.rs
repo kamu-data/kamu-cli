@@ -10,20 +10,49 @@
 use bytes::Bytes;
 use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_core::services::upload_service::{
+    MakeUploadContextError,
+    SaveUploadError,
+    UploadContext as UploadContextDto,
+    UploadService,
+    UploadTokenBase64Json,
+    UploadTokenIntoStreamError,
+};
 use kamu_core::MediaType;
 use serde::de::IntoDeserializer as _;
 use serde::Deserialize as _;
 use thiserror::Error;
 
 use crate::axum_utils::{ensure_authenticated_account, from_catalog_n};
-use crate::platform::{
-    MakeUploadContextError,
-    SaveUploadError,
-    UploadContext,
-    UploadService,
-    UploadTokenBase64Json,
-    UploadTokenIntoStreamError,
-};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadContext {
+    pub upload_url: String,
+    pub method: String,
+    pub use_multipart: bool,
+    pub headers: Vec<(String, String)>,
+    pub fields: Vec<(String, String)>,
+
+    #[schema(value_type = String)]
+    pub upload_token: UploadTokenBase64Json,
+}
+
+impl From<UploadContextDto> for UploadContext {
+    fn from(value: UploadContextDto) -> Self {
+        Self {
+            upload_url: value.upload_url,
+            method: value.method,
+            use_multipart: value.use_multipart,
+            headers: value.headers,
+            fields: value.fields,
+            upload_token: value.upload_token,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::IntoParams)]
@@ -67,7 +96,7 @@ pub async fn file_upload_prepare_post_handler(
         )
         .await
     {
-        Ok(upload_context) => Ok(axum::Json(upload_context)),
+        Ok(upload_context) => Ok(axum::Json(upload_context.into())),
         Err(e) => match e {
             MakeUploadContextError::TooLarge(e) => Err(ApiError::bad_request(e)),
             MakeUploadContextError::Internal(e) => Err(e.api_err()),
