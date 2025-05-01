@@ -7377,12 +7377,15 @@ version = "0.235.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "database-common",
  "enum-variants",
  "event-sourcing",
  "internal-error",
  "nutype",
  "opendatafabric",
  "serde",
+ "serde_json",
+ "thiserror 1.0.69",
  "url",
  "uuid",
 ]

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![feature(error_generic_member_access)]
+
 mod aggregates;
 mod entities;
 mod repos;
