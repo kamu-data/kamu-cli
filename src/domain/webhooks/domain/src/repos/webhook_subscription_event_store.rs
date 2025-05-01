@@ -8,12 +8,75 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::EventStore;
+use internal_error::InternalError;
+use thiserror::Error;
 
-use crate::WebhookSubscriptionState;
+use crate::{WebhookEventType, WebhookSubscriptionState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait WebhookSubscriptionEventStore: EventStore<WebhookSubscriptionState> {}
+pub trait WebhookSubscriptionEventStore: EventStore<WebhookSubscriptionState> {
+    async fn count_subscriptions_by_dataset(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<u64, CountWebhookSubscriptionsError>;
+
+    async fn list_subscription_ids_by_dataset(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<uuid::Uuid>, ListWebhookSubscriptionsError>;
+
+    async fn find_subscription_id_by_dataset_and_label(
+        &self,
+        dataset_id: &odf::DatasetID,
+        label: &str,
+    ) -> Result<Option<uuid::Uuid>, FindWebhookSubscriptionError>;
+
+    async fn list_subscription_ids_by_dataset_and_event_type(
+        &self,
+        dataset_id: &odf::DatasetID,
+        event_type: WebhookEventType,
+    ) -> Result<Vec<uuid::Uuid>, ListWebhookSubscriptionsError>;
+
+    // TODO: dataset removal reaction?
+    // TODO: system subscriptions?
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum CountWebhookSubscriptionsError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum ListWebhookSubscriptionsError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum FindWebhookSubscriptionError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
