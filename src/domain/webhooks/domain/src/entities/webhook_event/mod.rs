@@ -7,14 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod webhook_subscription_event;
-mod webhook_subscription_id;
-mod webhook_subscription_label;
-mod webhook_subscription_state;
-mod webhook_subscription_status;
+mod webhook_event_id;
+mod webhook_event_type;
+mod webhook_event_type_catalog;
 
-pub use webhook_subscription_event::*;
-pub use webhook_subscription_id::*;
-pub use webhook_subscription_label::*;
-pub use webhook_subscription_state::*;
-pub use webhook_subscription_status::*;
+pub use webhook_event_id::*;
+pub use webhook_event_type::*;
+pub use webhook_event_type_catalog::*;

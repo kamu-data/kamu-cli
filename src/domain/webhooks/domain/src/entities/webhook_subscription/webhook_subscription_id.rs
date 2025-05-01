@@ -7,18 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-
-use crate::{WebhookEventId, WebhookEventType};
+use nutype::nutype;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct WebhookEvent {
-    pub id: WebhookEventId,
-    pub event_type: WebhookEventType,
-    pub payload: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-}
+#[nutype(derive(Debug, AsRef, Clone, Eq, PartialEq, Hash, Serialize, Deserialize))]
+pub struct WebhookSubscriptionId(uuid::Uuid);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

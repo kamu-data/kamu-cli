@@ -8,17 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Duration;
+use kamu_task_system as ts;
 
-use crate::{WebhookRequest, WebhookResponse};
+use crate::{WebhookEventId, WebhookRequest, WebhookResponse, WebhookSubscriptionId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct WebhookDelivery {
-    pub task_attempt_id: uuid::Uuid,
-    pub task_id: uuid::Uuid,
-    pub webhook_subscription_id: uuid::Uuid,
-    pub webhook_event_id: uuid::Uuid,
+    pub task_attempt_id: ts::TaskAttemptID,
+    pub webhook_subscription_id: WebhookSubscriptionId,
+    pub webhook_event_id: WebhookEventId,
 
     pub request: WebhookRequest,
     pub response: Option<WebhookResponse>,
@@ -26,15 +26,13 @@ pub struct WebhookDelivery {
 
 impl WebhookDelivery {
     pub fn new(
-        task_attempt_id: uuid::Uuid,
-        task_id: uuid::Uuid,
-        webhook_subscription_id: uuid::Uuid,
-        webhook_event_id: uuid::Uuid,
+        task_attempt_id: ts::TaskAttemptID,
+        webhook_subscription_id: WebhookSubscriptionId,
+        webhook_event_id: WebhookEventId,
         request: WebhookRequest,
     ) -> Self {
         Self {
             task_attempt_id,
-            task_id,
             webhook_subscription_id,
             webhook_event_id,
             request,

@@ -7,14 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod webhook_subscription_event;
-mod webhook_subscription_id;
-mod webhook_subscription_label;
-mod webhook_subscription_state;
-mod webhook_subscription_status;
+use nutype::nutype;
 
-pub use webhook_subscription_event::*;
-pub use webhook_subscription_id::*;
-pub use webhook_subscription_label::*;
-pub use webhook_subscription_state::*;
-pub use webhook_subscription_status::*;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[nutype(derive(Debug, Display, AsRef))]
+pub struct WebhookEventId(uuid::Uuid);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

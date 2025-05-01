@@ -16,7 +16,7 @@ use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebhookSubscriptionState {
-    id: uuid::Uuid,
+    id: WebhookSubscriptionId,
     target_url: url::Url,
     label: WebhookSubscriptionLabel,
     dataset_id: Option<odf::DatasetID>,
@@ -30,7 +30,7 @@ pub struct WebhookSubscriptionState {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Projection for WebhookSubscriptionState {
-    type Query = uuid::Uuid;
+    type Query = WebhookSubscriptionId;
     type Event = WebhookSubscriptionEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
@@ -175,8 +175,8 @@ impl Projection for WebhookSubscriptionState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ProjectionEvent<uuid::Uuid> for WebhookSubscriptionEvent {
-    fn matches_query(&self, query: &uuid::Uuid) -> bool {
+impl ProjectionEvent<WebhookSubscriptionId> for WebhookSubscriptionEvent {
+    fn matches_query(&self, query: &WebhookSubscriptionId) -> bool {
         self.subscription_id() == query
     }
 }
