@@ -11,7 +11,7 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::WebhookEvent;
+use crate::{WebhookEvent, WebhookEventId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ pub trait WebhookEventRepository: Send + Sync {
 
     async fn get_event_by_id(
         &self,
-        event_id: uuid::Uuid,
+        event_id: WebhookEventId,
     ) -> Result<WebhookEvent, GetWebhookEventError>;
 
     async fn list_recent_events(
@@ -74,7 +74,7 @@ pub enum ListRecentWebhookEventsError {
 #[derive(Error, Debug)]
 #[error("Webhook event id='{event_id}' not found")]
 pub struct WebhookEventNotFoundError {
-    pub event_id: uuid::Uuid,
+    pub event_id: WebhookEventId,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

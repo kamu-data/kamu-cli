@@ -9,8 +9,9 @@
 
 use database_common::PaginationOpts;
 use internal_error::InternalError;
+use kamu_task_system as ts;
 
-use crate::{WebhookDelivery, WebhookResponse};
+use crate::{WebhookDelivery, WebhookEventId, WebhookResponse, WebhookSubscriptionId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,28 +21,28 @@ pub trait WebhookDeliveryRepository {
 
     async fn update_response(
         &self,
-        attempt_id: uuid::Uuid,
+        task_attempt_id: ts::TaskAttemptID,
         response: WebhookResponse,
     ) -> Result<(), UpdateWebhookDeliveryError>;
 
     async fn get_by_task_attempt_id(
         &self,
-        task_attempt_id: uuid::Uuid,
+        task_attempt_id: ts::TaskAttemptID,
     ) -> Result<Option<WebhookDelivery>, GetWebhookDeliveryError>;
 
     async fn list_by_task_id(
         &self,
-        task_id: uuid::Uuid,
+        task_id: ts::TaskID,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError>;
 
     async fn list_by_event_id(
         &self,
-        event_id: uuid::Uuid,
+        event_id: WebhookEventId,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError>;
 
     async fn list_by_subscription_id(
         &self,
-        event_id: uuid::Uuid,
+        event_id: WebhookSubscriptionId,
         pagination: PaginationOpts,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError>;
 }
@@ -100,9 +101,9 @@ pub enum ListWebhookDeliveriesError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-#[error("Webhook delivery attempt id='{attempt_id}' not found")]
+#[error("Webhook delivery task attempt '{}#{}' not found", task_attempt_id.task_id, task_attempt_id.attempt_number)]
 pub struct WebhookDeliveryNotFoundError {
-    pub attempt_id: uuid::Uuid,
+    pub task_attempt_id: ts::TaskAttemptID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

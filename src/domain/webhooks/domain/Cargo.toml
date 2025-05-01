@@ -27,6 +27,7 @@ enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 odf = { workspace = true }
+kamu-task-system = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }

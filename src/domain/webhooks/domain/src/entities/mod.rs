@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod webhook_delivery;
-mod webhook_event_type_catalog;
+mod webhook_event;
 mod webhook_subscription;
 
 pub use webhook_delivery::*;
-pub use webhook_event_type_catalog::*;
+pub use webhook_event::*;
 pub use webhook_subscription::*;
