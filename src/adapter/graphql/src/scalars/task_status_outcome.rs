@@ -20,6 +20,8 @@ pub enum TaskStatus {
     Queued,
     /// Task is being executed
     Running,
+    /// Task has failed and is scheduled for retry
+    Retrying,
     /// Task has reached a certain final outcome (see [`TaskOutcome`])
     Finished,
 }
@@ -29,6 +31,7 @@ impl From<&ts::TaskStatus> for TaskStatus {
         match v {
             ts::TaskStatus::Queued => Self::Queued,
             ts::TaskStatus::Running => Self::Running,
+            ts::TaskStatus::Retrying => Self::Retrying,
             ts::TaskStatus::Finished => Self::Finished,
         }
     }

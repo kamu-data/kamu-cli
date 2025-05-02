@@ -52,6 +52,7 @@ impl TaskScheduler for TaskSchedulerImpl {
             self.task_event_store.new_task_id().await?,
             logical_plan,
             metadata,
+            TaskRetryPolicy::default(),
         );
         task.save(self.task_event_store.as_ref()).await.int_err()?;
 

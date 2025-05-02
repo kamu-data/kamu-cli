@@ -19,6 +19,8 @@ pub enum TaskStatus {
     Queued,
     /// Task is being executed
     Running,
+    /// Task has failed and is scheduled for retry
+    Retrying,
     /// Task has reached a certain final outcome
     Finished,
 }

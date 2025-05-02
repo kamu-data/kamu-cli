@@ -7264,6 +7264,7 @@ dependencies = [
  "messaging-outbox",
  "nutype",
  "opendatafabric",
+ "rand 0.8.5",
  "serde",
  "sqlx",
  "thiserror 2.0.12",

@@ -26,6 +26,7 @@ async fn test_task_agg_create_new() {
         event_store.new_task_id().await.unwrap(),
         LogicalPlanProbe::default().into(),
         Some(metadata.clone()),
+        TaskRetryPolicy::default(),
     );
 
     assert_eq!(event_store.len().await.unwrap(), 0);
@@ -57,6 +58,7 @@ async fn test_task_save_load_update() {
         task_id,
         LogicalPlanProbe::default().into(),
         None,
+        TaskRetryPolicy::default(),
     );
     task.save(&event_store).await.unwrap();
 
@@ -88,7 +90,7 @@ async fn test_task_save_load_update() {
     .await
     .unwrap();
     assert_eq!(task.status(), TaskStatus::Running);
-    assert!(task.cancellation_requested_at.is_some());
+    assert!(task.timing.cancellation_requested_at.is_some());
 
     // Update
     task.update(&event_store).await.unwrap();
@@ -109,6 +111,7 @@ async fn test_task_load_multi() {
             task_id,
             LogicalPlanProbe::default().into(),
             None,
+            TaskRetryPolicy::default(),
         );
         task.save(&event_store).await.unwrap();
         task.run(Utc::now()).unwrap();
@@ -143,6 +146,7 @@ async fn test_task_agg_illegal_transition() {
         event_store.new_task_id().await.unwrap(),
         LogicalPlanProbe::default().into(),
         None,
+        TaskRetryPolicy::default(),
     );
     task.run(Utc::now()).unwrap();
     task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
@@ -161,6 +165,7 @@ async fn test_task_requeue() {
         event_store.new_task_id().await.unwrap(),
         LogicalPlanProbe::default().into(),
         None,
+        TaskRetryPolicy::default(),
     );
     task.run(Utc::now()).unwrap();
     task.save(&event_store).await.unwrap();

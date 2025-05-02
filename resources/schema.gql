@@ -3353,6 +3353,10 @@ enum TaskStatus {
 	"""
 	RUNNING
 	"""
+	Task has failed and is scheduled for retry
+	"""
+	RETRYING
+	"""
 	Task has reached a certain final outcome (see [`TaskOutcome`])
 	"""
 	FINISHED
