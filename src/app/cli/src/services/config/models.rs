@@ -138,7 +138,7 @@ impl Default for CLIConfig {
             source: Some(SourceConfig::default()),
             users: Some(PredefinedAccountsConfig::default()),
             uploads: Some(UploadsConfig::default()),
-            did_encryption: None,
+            did_encryption: Some(DidSecretEncryptionConfig::default()),
         }
     }
 }

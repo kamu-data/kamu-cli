@@ -153,7 +153,7 @@ async fn test_create_account() {
     let did_private_key = created_account_did_secret_keys
         .first()
         .unwrap()
-        .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key)
+        .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key.unwrap())
         .unwrap();
 
     let public_key = did_private_key.verifying_key().to_bytes();

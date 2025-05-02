@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod did_secret_encryption_config;
 mod did_secret_key;
 
+pub use did_secret_encryption_config::*;
 pub use did_secret_key::*;

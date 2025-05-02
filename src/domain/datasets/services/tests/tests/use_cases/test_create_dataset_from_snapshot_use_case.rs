@@ -231,7 +231,7 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
     let did_private_key = did_secret_keys
         .first()
         .unwrap()
-        .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key)
+        .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key.unwrap())
         .unwrap();
 
     let public_key = did_private_key.verifying_key().to_bytes();

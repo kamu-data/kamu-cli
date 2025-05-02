@@ -14,7 +14,7 @@ use std::sync::Arc;
 use async_utils::ResultAsync;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use crypto_utils::{AesGcmEncryptor, DidSecretEncryptionConfig};
+use crypto_utils::AesGcmEncryptor;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -824,21 +824,19 @@ pub fn register_config_in_catalog(
     //
 
     // Did secret key encryption configuration
-    // TODO: decide should we panic if the key is not set
-    let did_encryption_config = config
-        .did_encryption
-        .clone()
-        .unwrap_or(DidSecretEncryptionConfig::sample());
-    // if let Some(did_encryption_config) = config.did_encryption.as_ref() {
-    assert!(
-        AesGcmEncryptor::try_new(&did_encryption_config.encryption_key).is_ok(),
-        "Invalid did secret encryption key",
-    );
-    catalog_builder.add_value(did_encryption_config.clone());
-    // } else {
-    //     panic!("Did secret encryption key is required");
-    // }
+    catalog_builder.add_value(config.did_encryption.clone().unwrap());
 
+    if let Some(did_encryption_config) = config.did_encryption.as_ref()
+        && let Some(encryption_key) = &did_encryption_config.encryption_key
+        && did_encryption_config.is_enabled()
+    {
+        assert!(
+            AesGcmEncryptor::try_new(encryption_key).is_ok(),
+            "Invalid did secret encryption key",
+        );
+    } else {
+        warn!("Did secret keys will not be stored");
+    }
     //
 
     // Outbox configuration

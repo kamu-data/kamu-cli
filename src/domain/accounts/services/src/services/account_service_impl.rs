@@ -39,7 +39,7 @@ pub struct AccountServiceImpl {
     account_did_secret_key_repo: Arc<dyn AccountDidSecretKeyRepository>,
     account_repo: Arc<dyn AccountRepository>,
     time_source: Arc<dyn SystemTimeSource>,
-    did_secret_encryption_key: SecretString,
+    did_secret_encryption_key: Option<SecretString>,
     password_hash_repository: Arc<dyn PasswordHashRepository>,
     password_hashing_mode: PasswordHashingMode,
 }
@@ -62,9 +62,10 @@ impl AccountServiceImpl {
             account_did_secret_key_repo,
             account_repo,
             time_source,
-            did_secret_encryption_key: SecretString::from(
-                did_secret_encryption_config.encryption_key.clone(),
-            ),
+            did_secret_encryption_key: did_secret_encryption_config
+                .encryption_key
+                .as_ref()
+                .map(|encryption_key| SecretString::from(encryption_key.clone())),
             password_hash_repository,
             password_hashing_mode: password_hashing_mode
                 .map_or(PasswordHashingMode::Default, |mode| *mode),
@@ -183,16 +184,18 @@ impl AccountService for AccountServiceImpl {
 
         self.account_repo.save_account(&account).await?;
 
-        let did_secret_key = DidSecretKey::try_new(
-            &account_did.0.into(),
-            self.did_secret_encryption_key.expose_secret(),
-        )
-        .int_err()?;
-
-        self.account_did_secret_key_repo
-            .save_did_secret_key(&account.id, owner_account_id, &did_secret_key)
-            .await
+        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
+            let did_secret_key = DidSecretKey::try_new(
+                &account_did.0.into(),
+                did_secret_encryption_key.expose_secret(),
+            )
             .int_err()?;
+
+            self.account_did_secret_key_repo
+                .save_did_secret_key(&account.id, owner_account_id, &did_secret_key)
+                .await
+                .int_err()?;
+        }
 
         let password_hash = get_argon2_hash(&password, self.password_hashing_mode);
         self.password_hash_repository

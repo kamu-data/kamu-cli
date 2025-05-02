@@ -34,7 +34,7 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
-    did_secret_encryption_key: SecretString,
+    did_secret_encryption_key: Option<SecretString>,
     dataset_did_secret_key_repo: Arc<dyn DatasetDidSecretKeyRepository>,
 }
 
@@ -57,9 +57,10 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
             did_generator,
             dataset_registry,
             create_helper,
-            did_secret_encryption_key: SecretString::from(
-                did_secret_encryption_config.encryption_key.clone(),
-            ),
+            did_secret_encryption_key: did_secret_encryption_config
+                .encryption_key
+                .as_ref()
+                .map(|encryption_key| SecretString::from(encryption_key.clone())),
             dataset_did_secret_key_repo,
         }
     }
@@ -114,15 +115,15 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             )
             .await?;
 
-        let dataset_did_secret_key = DidSecretKey::try_new(
-            &dataset_did.1,
-            self.did_secret_encryption_key.expose_secret(),
-        )
-        .int_err()?;
-        self.dataset_did_secret_key_repo
-            .save_did_secret_key(&dataset_did.0, logged_account_id, &dataset_did_secret_key)
-            .await
-            .int_err()?;
+        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
+            let dataset_did_secret_key =
+                DidSecretKey::try_new(&dataset_did.1, did_secret_encryption_key.expose_secret())
+                    .int_err()?;
+            self.dataset_did_secret_key_repo
+                .save_did_secret_key(&dataset_did.0, logged_account_id, &dataset_did_secret_key)
+                .await
+                .int_err()?;
+        }
 
         // Make storage level dataset (no HEAD yet)
         let store_result = self
