@@ -9,6 +9,8 @@
 
 mod collection;
 mod versioned_file;
+mod versioned_file_entry;
 
 pub use collection::*;
 pub use versioned_file::*;
+pub use versioned_file_entry::*;

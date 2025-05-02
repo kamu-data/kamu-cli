@@ -123,6 +123,20 @@ impl Dataset {
         Ok(visibility)
     }
 
+    /// Quck access to `head` block hash
+    async fn head(&self, ctx: &Context<'_>) -> Result<Multihash<'static>> {
+        let head = self
+            .dataset_request_state
+            .resolved_dataset(ctx)
+            .await?
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?;
+
+        Ok(head.into())
+    }
+
     /// Access to the data of the dataset
     async fn data(&self) -> DatasetData {
         DatasetData::new(&self.dataset_request_state)

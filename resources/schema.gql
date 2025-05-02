@@ -763,6 +763,10 @@ type Dataset {
 	"""
 	visibility: DatasetVisibilityOutput!
 	"""
+	Quck access to `head` block hash
+	"""
+	head: Multihash!
+	"""
 	Access to the data of the dataset
 	"""
 	data: DatasetData!
@@ -2034,93 +2038,6 @@ type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowTriggerResul
 	message: String!
 }
 
-type GetFileContentErrorNotFound implements GetFileContentResult & GetFileContentUrlResult {
-	isSuccess: Boolean!
-	errorMessage: String!
-}
-
-type GetFileContentErrorTooLarge implements GetFileContentResult {
-	inBandContentSizeLimit: Int!
-	isSuccess: Boolean!
-	errorMessage: String!
-}
-
-interface GetFileContentResult {
-	isSuccess: Boolean!
-	errorMessage: String!
-}
-
-type GetFileContentSuccess implements GetFileContentResult {
-	"""
-	File version this result corresponds to
-	"""
-	version: Int!
-	"""
-	Latest block that this result has considered
-	"""
-	blockHash: Multihash!
-	"""
-	Base64-encoded data (url-safe, no padding)
-	"""
-	content: Base64Usnp!
-	"""
-	Media type of the file content
-	"""
-	contentType: String!
-	"""
-	Multihash of the file content
-	"""
-	contentHash: Multihash!
-	"""
-	Extra data associated with this file version
-	"""
-	extraData: JSON!
-	isSuccess: Boolean!
-	errorMessage: String!
-}
-
-interface GetFileContentUrlResult {
-	isSuccess: Boolean!
-	errorMessage: String!
-}
-
-type GetFileContentUrlSuccess implements GetFileContentUrlResult {
-	"""
-	File version this result corresponds to
-	"""
-	version: Int!
-	"""
-	Block that this result corresponds to
-	"""
-	blockHash: Multihash!
-	"""
-	Media type of the file content
-	"""
-	contentType: String!
-	"""
-	Multihash of the file content
-	"""
-	contentHash: Multihash!
-	"""
-	Extra data associated with this file version
-	"""
-	extraData: JSON!
-	"""
-	Direct download URL
-	"""
-	url: String!
-	"""
-	Headers to include in request
-	"""
-	headers: [KeyValue!]!
-	"""
-	Download URL expiration timestamp
-	"""
-	expiresAt: DateTime
-	isSuccess: Boolean!
-	errorMessage: String!
-}
-
 interface GetFlowResult {
 	message: String!
 }
@@ -3246,7 +3163,7 @@ interface StartUploadVersionResult {
 }
 
 type StartUploadVersionSuccess implements StartUploadVersionResult {
-	uploadUrl: String!
+	url: String!
 	method: String!
 	useMultipart: Boolean!
 	headers: [KeyValue!]!
@@ -3493,13 +3410,93 @@ type UpsertDatasetEnvVarUpToDate implements UpsertDatasetEnvVarResult {
 
 type VersionedFile {
 	"""
-	Returns encoded content in-band. Can be used for very small files only.
+	Returns list of versions in reverse chronological order
 	"""
-	getContent(asOfVersion: Int, asOfBlockHash: Multihash): GetFileContentResult!
+	versions(
+		"""
+		Upper version bound (inclusive)
+		"""
+		maxVersion: Int,		page: Int,		perPage: Int
+	): VersionedFileEntryConnection!
 	"""
-	Returns a direct download URL for use with large files
+	Returns the latest version entry, if any
 	"""
-	getContentUrl(asOfVersion: Int, asOfBlockHash: Multihash): GetFileContentUrlResult!
+	latest: VersionedFileEntry
+	"""
+	Returns the specified entry by block or version number
+	"""
+	asOf(version: Int, blockHash: Multihash): VersionedFileEntry
+}
+
+type VersionedFileContentDownload {
+	"""
+	Direct download URL
+	"""
+	url: String!
+	"""
+	Headers to include in request
+	"""
+	headers: [KeyValue!]!
+	"""
+	Download URL expiration timestamp
+	"""
+	expiresAt: DateTime
+}
+
+type VersionedFileEntry {
+	"""
+	Time when this version was created
+	"""
+	systemTime: DateTime!
+	"""
+	Time when this version was created
+	"""
+	eventTime: DateTime!
+	"""
+	File version
+	"""
+	version: Int!
+	"""
+	Media type of the file content
+	"""
+	contentType: String!
+	"""
+	Multihash of the file content
+	"""
+	contentHash: Multihash!
+	"""
+	Extra data associated with this file version
+	"""
+	extraData: JSON!
+	"""
+	Returns encoded content in-band. Should be used for small files only and
+	will retrurn error if called on large data.
+	"""
+	content: Base64Usnp!
+	"""
+	Returns a direct download URL
+	"""
+	contentUrl: VersionedFileContentDownload!
+}
+
+type VersionedFileEntryConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [VersionedFileEntry!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [VersionedFileEntryEdge!]!
+}
+
+type VersionedFileEntryEdge {
+	node: VersionedFileEntry!
 }
 
 type VersionedFileMut {

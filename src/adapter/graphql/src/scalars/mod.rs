@@ -142,6 +142,12 @@ macro_rules! __simple_string_scalar_general {
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name<'a>(std::borrow::Cow<'a, $source_type>);
 
+        impl<'a> AsRef<$source_type> for $name<'a> {
+            fn as_ref(&self) -> &$source_type {
+                self.0.as_ref()
+            }
+        }
+
         impl From<$source_type> for $name<'_> {
             fn from(value: $source_type) -> Self {
                 Self(std::borrow::Cow::Owned(value))

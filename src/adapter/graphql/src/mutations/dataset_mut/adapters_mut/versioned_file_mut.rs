@@ -11,7 +11,7 @@ use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 
 use crate::prelude::*;
-use crate::queries::{DatasetRequestState, FileVersion, FileVersionRecord};
+use crate::queries::{DatasetRequestState, FileVersion, VersionedFileEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,21 +23,6 @@ pub struct VersionedFileMut {
 impl VersionedFileMut {
     pub fn new(state: DatasetRequestState) -> Self {
         Self { state }
-    }
-
-    fn check_extra_data(
-        &self,
-        extra_data: Option<serde_json::Value>,
-    ) -> Result<Option<serde_json::Map<String, serde_json::Value>>, UpdateVersionResult> {
-        match extra_data {
-            None => Ok(None),
-            Some(serde_json::Value::Object(v)) => Ok(Some(v)),
-            Some(_) => Err(UpdateVersionResult::InvalidExtraData(
-                UpdateVersionErrorInvalidExtraData {
-                    message: "extraData should be a JSON object".to_string(),
-                },
-            )),
-        }
     }
 
     async fn get_latest_version(&self, ctx: &Context<'_>) -> Result<(FileVersion, odf::Multihash)> {
@@ -71,10 +56,7 @@ impl VersionedFileMut {
         }
     }
 
-    async fn get_latest_record(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<(Option<FileVersionRecord>, odf::Multihash)> {
+    async fn get_latest_entry(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileEntry>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // TODO: Consider retractons / corrections
@@ -91,15 +73,16 @@ impl VersionedFileMut {
                 let records = res.df.collect_json_aos().await.int_err()?;
 
                 assert_eq!(records.len(), 1);
-                let serde_json::Value::Object(record) = records.into_iter().next().unwrap() else {
-                    unreachable!()
-                };
+                let record = records.into_iter().next().unwrap();
 
-                let record = FileVersionRecord::from_json(record);
+                let entry = VersionedFileEntry::from_json(
+                    self.state.resolved_dataset(ctx).await?.clone(),
+                    record,
+                );
 
-                Ok((Some(record), res.block_hash))
+                Ok(Some(entry))
             }
-            Err(kamu_core::QueryError::DatasetSchemaNotAvailable(e)) => Ok((None, e.block_hash)),
+            Err(kamu_core::QueryError::DatasetSchemaNotAvailable(_)) => Ok(None),
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -110,19 +93,19 @@ impl VersionedFileMut {
     async fn write_record(
         &self,
         ctx: &Context<'_>,
-        record: FileVersionRecord,
+        entry: VersionedFileEntry,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
         let push_ingest_use_case = from_catalog_n!(ctx, dyn domain::PushIngestDataUseCase);
 
-        let new_version = record.version();
-        let content_hash = record.content_hash();
+        let new_version = entry.version;
+        let content_hash = entry.content_hash.clone();
 
         let ingest_result = match push_ingest_use_case
             .execute(
                 self.state.resolved_dataset(ctx).await?,
                 kamu_core::DataSource::Stream(Box::new(std::io::Cursor::new(
-                    record.into_json_string(),
+                    entry.to_record_data().to_string(),
                 ))),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -191,11 +174,6 @@ impl VersionedFileMut {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let extra_data = match self.check_extra_data(extra_data) {
-            Ok(v) => v,
-            Err(res) => return Ok(res),
-        };
-
         // Get latest version and head
         let (latest_version, _) = self.get_latest_version(ctx).await?;
         let new_version = latest_version + 1;
@@ -210,12 +188,16 @@ impl VersionedFileMut {
             .int_err()?;
         let content_hash = insert_data_res.hash;
 
-        // Form a new record
-        let record =
-            FileVersionRecord::new(new_version, content_hash.clone(), content_type, extra_data);
+        // Form and write a new record
+        let entry = VersionedFileEntry::new(
+            dataset.clone(),
+            new_version,
+            content_hash.clone(),
+            content_type,
+            extra_data,
+        );
 
-        // Write new record
-        self.write_record(ctx, record, expected_head).await
+        self.write_record(ctx, entry, expected_head).await
     }
 
     /// Returns a pre-signed URL and upload token for direct uploads of large
@@ -282,11 +264,6 @@ impl VersionedFileMut {
     ) -> Result<UpdateVersionResult> {
         let upload_svc = from_catalog_n!(ctx, dyn domain::UploadService);
 
-        let extra_data = match self.check_extra_data(extra_data) {
-            Ok(v) => v,
-            Err(res) => return Ok(res),
-        };
-
         let upload_token: domain::UploadTokenBase64Json =
             upload_token
                 .parse()
@@ -332,16 +309,16 @@ impl VersionedFileMut {
             .int_err()?;
         let content_hash = insert_result.hash;
 
-        // Form a new record
-        let record = FileVersionRecord::new(
+        // Form and write new record
+        let entry = VersionedFileEntry::new(
+            dataset.clone(),
             new_version,
             content_hash.clone(),
             upload_token.0.content_type,
             extra_data,
         );
 
-        // Write new record
-        self.write_record(ctx, record, expected_head).await
+        self.write_record(ctx, entry, expected_head).await
     }
 
     /// Creating a new version with that has updated values of extra columns but
@@ -356,14 +333,9 @@ impl VersionedFileMut {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let extra_data = match self.check_extra_data(Some(extra_data)) {
-            Ok(v) => v.unwrap(),
-            Err(res) => return Ok(res),
-        };
-
         // Get latest record and head
-        let (record, _) = self.get_latest_record(ctx).await?;
-        let Some(mut record) = record else {
+        let entry = self.get_latest_entry(ctx).await?;
+        let Some(mut entry) = entry else {
             return Ok(UpdateVersionResult::InvalidExtraData(
                 UpdateVersionErrorInvalidExtraData {
                     message: "Can't update extra data without initial content version".to_string(),
@@ -371,12 +343,11 @@ impl VersionedFileMut {
             ));
         };
 
-        // Form a new record
-        record.set_version(record.version() + 1);
-        record.set_extra_data(extra_data);
+        // Form and write new record
+        entry.version += 1;
+        entry.extra_data = extra_data;
 
-        // Write new record
-        self.write_record(ctx, record, expected_head).await
+        self.write_record(ctx, entry, expected_head).await
     }
 }
 
@@ -494,7 +465,7 @@ impl StartUploadVersionErrorTooLarge {
 
 #[derive(Debug, SimpleObject)]
 pub struct UploadContext {
-    pub upload_url: String,
+    pub url: String,
     pub method: String,
     pub use_multipart: bool,
     pub headers: Vec<KeyValue>,
@@ -506,7 +477,7 @@ impl From<domain::UploadContext> for UploadContext {
         assert_eq!(value.fields, Vec::new());
 
         Self {
-            upload_url: value.upload_url,
+            url: value.upload_url,
             method: value.method,
             use_multipart: value.use_multipart,
             headers: value

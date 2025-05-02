@@ -69,7 +69,7 @@ async fn test_versioned_file_create_in_band() {
         .unwrap()
         .to_string();
 
-    // Check no content
+    // Check no versions
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
@@ -78,9 +78,10 @@ async fn test_versioned_file_create_in_band() {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
-                                getContent {
-                                    isSuccess
-                                    errorMessage
+                                versions {
+                                    nodes {
+                                        version
+                                    }
                                 }
                             }
                         }
@@ -95,15 +96,38 @@ async fn test_versioned_file_create_in_band() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let get_content =
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
-    pretty_assertions::assert_eq!(
-        get_content,
-        json!({
-            "isSuccess": false,
-            "errorMessage": "Specified version or block not found",
-        })
-    );
+    let nodes = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["versions"]
+        ["nodes"]
+        .clone();
+    pretty_assertions::assert_eq!(nodes, json!([]));
+
+    // Check no latest version
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                latest {
+                                    version
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let latest = &res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["latest"];
+    assert_eq!(*latest, serde_json::Value::Null);
 
     // Upload first version
     let res = harness
@@ -156,18 +180,14 @@ async fn test_versioned_file_create_in_band() {
                 query ($datasetId: DatasetID!) {
                     datasets {
                         byId(datasetId: $datasetId) {
+                            head
                             asVersionedFile {
-                                getContent {
-                                    isSuccess
-                                    errorMessage
-                                    ... on GetFileContentSuccess {
-                                        version
-                                        blockHash
-                                        contentType
-                                        contentHash
-                                        content
-                                        extraData
-                                    }
+                                latest {
+                                    version
+                                    contentType
+                                    contentHash
+                                    content
+                                    extraData
                                 }
                             }
                         }
@@ -182,19 +202,17 @@ async fn test_versioned_file_create_in_band() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let get_content =
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    let dataset = res.data.into_json().unwrap()["datasets"]["byId"].clone();
+    let latest = dataset["asVersionedFile"]["latest"].clone();
+    pretty_assertions::assert_eq!(dataset["head"], *head_v1);
     pretty_assertions::assert_eq!(
-        get_content,
+        latest,
         json!({
-            "isSuccess": true,
-            "errorMessage": "",
             "version": 1,
-            "blockHash": head_v1,
-            "content": base64usnp_encode(b"hello"),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},
+            "content": base64usnp_encode(b"hello"),
         })
     );
 
@@ -250,18 +268,14 @@ async fn test_versioned_file_create_in_band() {
                 query ($datasetId: DatasetID!) {
                     datasets {
                         byId(datasetId: $datasetId) {
+                            head
                             asVersionedFile {
-                                getContent {
-                                    isSuccess
-                                    errorMessage
-                                    ... on GetFileContentSuccess {
-                                        version
-                                        blockHash
-                                        contentType
-                                        contentHash
-                                        content
-                                        extraData
-                                    }
+                                latest {
+                                    version
+                                    contentType
+                                    contentHash
+                                    content
+                                    extraData
                                 }
                             }
                         }
@@ -276,19 +290,17 @@ async fn test_versioned_file_create_in_band() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let get_content =
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    let dataset = res.data.into_json().unwrap()["datasets"]["byId"].clone();
+    let latest = dataset["asVersionedFile"]["latest"].clone();
+    pretty_assertions::assert_eq!(dataset["head"], *head_v2);
     pretty_assertions::assert_eq!(
-        get_content,
+        latest,
         json!({
-            "isSuccess": true,
-            "errorMessage": "",
             "version": 2,
-            "blockHash": head_v2,
-            "content": base64usnp_encode(b"bye"),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"bye"),
             "contentType": "application/octet-stream",
             "extraData": {},
+            "content": base64usnp_encode(b"bye"),
         })
     );
 
@@ -301,17 +313,12 @@ async fn test_versioned_file_create_in_band() {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
-                                getContent(asOfBlockHash: $blockHash) {
-                                    isSuccess
-                                    errorMessage
-                                    ... on GetFileContentSuccess {
-                                        version
-                                        blockHash
-                                        contentType
-                                        contentHash
-                                        content
-                                        extraData
-                                    }
+                                asOf(blockHash: $blockHash) {
+                                    version
+                                    contentType
+                                    contentHash
+                                    content
+                                    extraData
                                 }
                             }
                         }
@@ -327,19 +334,16 @@ async fn test_versioned_file_create_in_band() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let get_content =
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    let entry =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["asOf"].clone();
     pretty_assertions::assert_eq!(
-        get_content,
+        entry,
         json!({
-            "isSuccess": true,
-            "errorMessage": "",
             "version": 1,
-            "blockHash": head_v1,
-            "content": base64usnp_encode(b"hello"),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},
+            "content": base64usnp_encode(b"hello"),
         })
     );
 
@@ -352,17 +356,12 @@ async fn test_versioned_file_create_in_band() {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
-                                getContent(asOfVersion: 1) {
-                                    isSuccess
-                                    errorMessage
-                                    ... on GetFileContentSuccess {
-                                        version
-                                        blockHash
-                                        contentType
-                                        contentHash
-                                        content
-                                        extraData
-                                    }
+                                asOf(version: 1) {
+                                    version
+                                    contentType
+                                    contentHash
+                                    content
+                                    extraData
                                 }
                             }
                         }
@@ -377,19 +376,16 @@ async fn test_versioned_file_create_in_band() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let get_content =
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    let entry =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["asOf"].clone();
     pretty_assertions::assert_eq!(
-        get_content,
+        entry,
         json!({
-            "isSuccess": true,
-            "errorMessage": "",
             "version": 1,
-            "blockHash": head_v2,
-            "content": base64usnp_encode(b"hello"),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},
+            "content": base64usnp_encode(b"hello"),
         })
     );
 
@@ -430,6 +426,51 @@ async fn test_versioned_file_create_in_band() {
             "isSuccess": false,
             "errorMessage": "Expected head didn't match, dataset was likely updated concurrently",
         })
+    );
+
+    // Check list versions
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                versions {
+                                    nodes {
+                                        version
+                                        contentHash
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let nodes = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["versions"]
+        ["nodes"]
+        .clone();
+    pretty_assertions::assert_eq!(
+        nodes,
+        json!([
+            {
+                "version": 2,
+                "contentHash": odf::Multihash::from_digest_sha3_256(b"bye"),
+            },
+            {
+                "version": 1,
+                "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            }
+        ])
     );
 }
 
@@ -543,17 +584,12 @@ async fn test_versioned_file_extra_data() {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
-                                getContent {
-                                    isSuccess
-                                    errorMessage
-                                    ... on GetFileContentSuccess {
-                                        version
-                                        blockHash
-                                        contentType
-                                        contentHash
-                                        content
-                                        extraData
-                                    }
+                                latest {
+                                    version
+                                    contentType
+                                    contentHash
+                                    content
+                                    extraData
                                 }
                             }
                         }
@@ -568,22 +604,19 @@ async fn test_versioned_file_extra_data() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let get_content =
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    let entry =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["latest"].clone();
     pretty_assertions::assert_eq!(
-        get_content,
+        entry,
         json!({
-            "isSuccess": true,
-            "errorMessage": "",
             "version": 1,
-            "blockHash": head_v1,
-            "content": base64usnp_encode(b"hello"),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
+            "content": base64usnp_encode(b"hello"),
             "extraData": {
                 "foo": "extra",
                 "bar": 123,
-            }
+            },
         })
     );
 
@@ -642,17 +675,12 @@ async fn test_versioned_file_extra_data() {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
-                                getContent {
-                                    isSuccess
-                                    errorMessage
-                                    ... on GetFileContentSuccess {
-                                        version
-                                        blockHash
-                                        contentType
-                                        contentHash
-                                        content
-                                        extraData
-                                    }
+                                latest {
+                                    version
+                                    contentType
+                                    contentHash
+                                    content
+                                    extraData
                                 }
                             }
                         }
@@ -667,22 +695,19 @@ async fn test_versioned_file_extra_data() {
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
-    let get_content =
-        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["getContent"].clone();
+    let entry =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["latest"].clone();
     pretty_assertions::assert_eq!(
-        get_content,
+        entry,
         json!({
-            "isSuccess": true,
-            "errorMessage": "",
             "version": 2,
-            "blockHash": head_v2,
-            "content": base64usnp_encode(b"hello"),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
+            "content": base64usnp_encode(b"hello"),
             "extraData": {
                 "foo": "mega",
                 "bar": 321,
-            }
+            },
         })
     );
 }
@@ -742,13 +767,11 @@ async fn test_versioned_file_direct_upload_download() {
                                     isSuccess
                                     errorMessage
                                     ... on StartUploadVersionSuccess {
-                                        uploadContext {
-                                            method
-                                            useMultipart
-                                            headers { key value }
-                                            uploadUrl
-                                            uploadToken
-                                        }
+                                        method
+                                        url
+                                        headers { key value }
+                                        useMultipart
+                                        uploadToken
                                     }
                                 }
                             }
@@ -769,19 +792,11 @@ async fn test_versioned_file_direct_upload_download() {
     let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
         ["startUploadNewVersion"]
         .clone();
-    let method = upload_result["uploadContext"]["method"].as_str().unwrap();
-    let use_multipart = upload_result["uploadContext"]["useMultipart"]
-        .as_bool()
-        .unwrap();
-    let headers = upload_result["uploadContext"]["headers"]
-        .as_array()
-        .unwrap();
-    let upload_url = upload_result["uploadContext"]["uploadUrl"]
-        .as_str()
-        .unwrap();
-    let upload_token = upload_result["uploadContext"]["uploadToken"]
-        .as_str()
-        .unwrap();
+    let method = upload_result["method"].as_str().unwrap();
+    let use_multipart = upload_result["useMultipart"].as_bool().unwrap();
+    let headers = upload_result["headers"].as_array().unwrap();
+    let upload_url = upload_result["url"].as_str().unwrap();
+    let upload_token = upload_result["uploadToken"].as_str().unwrap();
     assert_eq!(method, "POST");
     assert!(use_multipart);
 
@@ -859,15 +874,13 @@ async fn test_versioned_file_direct_upload_download() {
     //                 datasets {
     //                     byId(datasetId: $datasetId) {
     //                         asVersionedFile {
-    //                             getContentUrl {
-    //                                 isSuccess
-    //                                 errorMessage
-    //                                 ... on GetFileContentUrlSuccess {
-    //                                     version
-    //                                     blockHash
-    //                                     contentType
-    //                                     contentHash
-    //                                     extraData
+    //                             latest {
+    //                                 version
+    //                                 blockHash
+    //                                 contentType
+    //                                 contentHash
+    //                                 extraData
+    //                                 contentDownload {
     //                                     url
     //                                     headers { key value }
     //                                     expiresAt
