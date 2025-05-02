@@ -8,8 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod aes_gcm;
+mod argon2_hash;
 mod entities;
+
 pub use aes_gcm::*;
+pub use argon2_hash::*;
 pub use entities::*;
 use internal_error::{BoxedError, InternalError};
 use serde::{Deserialize, Serialize};

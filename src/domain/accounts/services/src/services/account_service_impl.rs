@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crypto_utils::{DidSecretEncryptionConfig, DidSecretKey};
+use crypto_utils::{get_argon2_hash, DidSecretEncryptionConfig, DidSecretKey, PasswordHashingMode};
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
@@ -20,10 +20,12 @@ use kamu_accounts::{
     AccountRepository,
     AccountService,
     AccountType,
+    CreateAccountError,
     FindAccountIdByNameError,
     GetAccountByIdError,
     GetAccountByNameError,
     GetAccountMapError,
+    ModifyPasswordError,
     PasswordHashRepository,
     SearchAccountsByNamePatternFilters,
     PROVIDER_PASSWORD,
@@ -39,6 +41,7 @@ pub struct AccountServiceImpl {
     time_source: Arc<dyn SystemTimeSource>,
     did_secret_encryption_key: SecretString,
     password_hash_repository: Arc<dyn PasswordHashRepository>,
+    password_hashing_mode: PasswordHashingMode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +56,7 @@ impl AccountServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
         password_hash_repository: Arc<dyn PasswordHashRepository>,
+        password_hashing_mode: Option<Arc<PasswordHashingMode>>,
     ) -> Self {
         Self {
             account_did_secret_key_repo,
@@ -62,6 +66,8 @@ impl AccountServiceImpl {
                 did_secret_encryption_config.encryption_key.clone(),
             ),
             password_hash_repository,
+            password_hashing_mode: password_hashing_mode
+                .map_or(PasswordHashingMode::Default, |mode| *mode),
         }
     }
 }
@@ -159,9 +165,9 @@ impl AccountService for AccountServiceImpl {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        password_hash: String,
+        password: String,
         owner_account_id: &odf::AccountID,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Account, CreateAccountError> {
         let account_did = odf::AccountID::new_generated_ed25519();
         let account = Account {
             id: account_did.1,
@@ -175,7 +181,7 @@ impl AccountService for AccountServiceImpl {
             provider_identity_key: String::from(account_name.as_str()),
         };
 
-        self.account_repo.save_account(&account).await.int_err()?;
+        self.account_repo.save_account(&account).await?;
 
         let did_secret_key = DidSecretKey::try_new(
             &account_did.0.into(),
@@ -187,10 +193,25 @@ impl AccountService for AccountServiceImpl {
             .save_did_secret_key(&account.id, owner_account_id, &did_secret_key)
             .await
             .int_err()?;
+
+        let password_hash = get_argon2_hash(&password, self.password_hashing_mode);
         self.password_hash_repository
             .save_password_hash(account_name, password_hash)
             .await
             .int_err()?;
+
+        Ok(account)
+    }
+
+    async fn modify_password(
+        &self,
+        account_name: &odf::AccountName,
+        password: String,
+    ) -> Result<(), ModifyPasswordError> {
+        let password_hash = get_argon2_hash(&password, self.password_hashing_mode);
+        self.password_hash_repository
+            .modify_password_hash(account_name, password_hash)
+            .await?;
 
         Ok(())
     }

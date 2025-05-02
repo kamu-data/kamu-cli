@@ -7,8 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+
 use dill::Catalog;
-use kamu_accounts::{AccountRepository, PasswordHashRepository, PROVIDER_PASSWORD};
+use kamu_accounts::{
+    AccountRepository,
+    ModifyPasswordHashError,
+    PasswordHashRepository,
+    PROVIDER_PASSWORD,
+};
+use odf::AccountName;
 
 use crate::{generate_salt, make_password_hash, make_test_account};
 
@@ -85,6 +93,75 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
         assert_eq!(hash, hash_petya.to_string());
         true
     }));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_modify_password(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
+
+    let account_petya = make_test_account(
+        "petya",
+        "petya@example.com",
+        PROVIDER_PASSWORD,
+        "petya",
+        None,
+    );
+
+    account_repo.save_account(&account_petya).await.unwrap();
+
+    let password_petya = "password_petya";
+    let salt = generate_salt();
+    let hash_petya = make_password_hash(password_petya, &salt);
+
+    password_hash_repo
+        .save_password_hash(&account_petya.account_name, hash_petya.to_string())
+        .await
+        .unwrap();
+
+    let result = password_hash_repo
+        .find_password_hash_by_account_name(&account_petya.account_name)
+        .await
+        .unwrap();
+    assert!(result.is_some_and(|hash| {
+        assert_eq!(hash, hash_petya.to_string());
+        true
+    }));
+
+    let password_petya = "new_password_petya";
+    let salt = generate_salt();
+    let hash_petya = make_password_hash(password_petya, &salt);
+
+    password_hash_repo
+        .modify_password_hash(&account_petya.account_name, hash_petya.to_string())
+        .await
+        .unwrap();
+
+    let result = password_hash_repo
+        .find_password_hash_by_account_name(&account_petya.account_name)
+        .await
+        .unwrap();
+    assert!(result.is_some_and(|hash| {
+        assert_eq!(hash, hash_petya.to_string());
+        true
+    }));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_modify_password_non_existing(catalog: &Catalog) {
+    let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
+
+    assert_matches!(
+        password_hash_repo
+            .modify_password_hash(
+                &AccountName::new_unchecked("foo"),
+                "password_hash".to_string(),
+            )
+            .await,
+        Err(ModifyPasswordHashError::AccountNotFound(_))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

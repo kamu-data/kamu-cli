@@ -14,7 +14,7 @@ use std::sync::Arc;
 use async_utils::ResultAsync;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use crypto_utils::AesGcmEncryptor;
+use crypto_utils::{AesGcmEncryptor, DidSecretEncryptionConfig};
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -824,15 +824,20 @@ pub fn register_config_in_catalog(
     //
 
     // Did secret key encryption configuration
-    if let Some(did_encryption_config) = config.did_encryption.as_ref() {
-        assert!(
-            AesGcmEncryptor::try_new(&did_encryption_config.encryption_key).is_ok(),
-            "Invalid did secret encryption key",
-        );
-        catalog_builder.add_value(did_encryption_config.clone());
-    } else {
-        panic!("Did secret encryption key is required");
-    }
+    // TODO: decide should we panic if the key is not set
+    let did_encryption_config = config
+        .did_encryption
+        .clone()
+        .unwrap_or(DidSecretEncryptionConfig::sample());
+    // if let Some(did_encryption_config) = config.did_encryption.as_ref() {
+    assert!(
+        AesGcmEncryptor::try_new(&did_encryption_config.encryption_key).is_ok(),
+        "Invalid did secret encryption key",
+    );
+    catalog_builder.add_value(did_encryption_config.clone());
+    // } else {
+    //     panic!("Did secret encryption key is required");
+    // }
 
     //
 
@@ -847,10 +852,10 @@ pub fn register_config_in_catalog(
     // Password hashing mode configuration
     match password_hashing_mode {
         Some(cli::PasswordHashingMode::Testing) => {
-            catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Minimal);
+            catalog_builder.add_value(crypto_utils::PasswordHashingMode::Minimal);
         }
         Some(cli::PasswordHashingMode::Production) | None => {
-            catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Default);
+            catalog_builder.add_value(crypto_utils::PasswordHashingMode::Default);
         }
     }
     //

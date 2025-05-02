@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use random_strings::get_random_name;
+use random_strings::{get_random_string, AllowedSymbols};
 
 use crate::Account;
 
@@ -26,7 +26,8 @@ pub struct JwtAuthenticationConfig {
 impl JwtAuthenticationConfig {
     pub fn new(maybe_jwt_secret: Option<String>) -> Self {
         Self {
-            jwt_secret: maybe_jwt_secret.unwrap_or_else(|| get_random_name(None, 64)),
+            jwt_secret: maybe_jwt_secret
+                .unwrap_or_else(|| get_random_string(None, 64, &AllowedSymbols::Alphanumeric)),
             maybe_dummy_token_account: None,
         }
     }

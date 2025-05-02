@@ -3082,8 +3082,10 @@ name = "crypto-utils"
 version = "0.235.0"
 dependencies = [
  "aes-gcm",
+ "argon2",
  "internal-error",
  "opendatafabric",
+ "password-hash",
  "serde",
  "serde_with",
  "thiserror 2.0.12",
@@ -5941,7 +5943,6 @@ dependencies = [
 name = "kamu-accounts-services"
 version = "0.235.0"
 dependencies = [
- "argon2",
  "async-trait",
  "chrono",
  "common-macros",
@@ -5960,7 +5961,6 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "opendatafabric",
- "password-hash",
  "random-strings",
  "secrecy",
  "serde",
@@ -6071,6 +6071,7 @@ dependencies = [
  "bon",
  "chrono",
  "common-macros",
+ "crypto-utils",
  "database-common",
  "datafusion",
  "dill",
@@ -6104,6 +6105,7 @@ dependencies = [
  "oop",
  "opendatafabric",
  "pretty_assertions",
+ "random-strings",
  "secrecy",
  "serde",
  "serde_json",

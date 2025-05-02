@@ -19,7 +19,7 @@ use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::metadata::serde::yaml::Manifest;
 use odf::utils::data::DataFrameExt;
-use random_strings::get_random_name;
+use random_strings::{get_random_string, AllowedSymbols};
 use time_source::SystemTimeSource;
 
 use super::*;
@@ -76,7 +76,7 @@ impl PollingIngestServiceImpl {
         let mut combined_result = None;
         loop {
             iteration += 1;
-            let operation_id = get_random_name(None, 10);
+            let operation_id = get_random_string(None, 10, &AllowedSymbols::Alphanumeric);
 
             let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
             std::fs::create_dir_all(&operation_dir).int_err()?;
@@ -323,7 +323,7 @@ impl PollingIngestServiceImpl {
             std::fs::create_dir(self.cache_dir.as_path()).int_err()?;
         }
 
-        let data_cache_key = get_random_name(Some("fetch-"), 10);
+        let data_cache_key = get_random_string(Some("fetch-"), 10, &AllowedSymbols::Alphanumeric);
         let target_path = self.cache_dir.join(&data_cache_key);
 
         let fetch_result = self
@@ -444,7 +444,8 @@ impl PollingIngestServiceImpl {
             })
         } else {
             let src_path = fetch_result.data.path(&self.cache_dir);
-            let data_cache_key = get_random_name(Some("prepare-"), 10);
+            let data_cache_key =
+                get_random_string(Some("prepare-"), 10, &AllowedSymbols::Alphanumeric);
             let target_path = self.cache_dir.join(&data_cache_key);
 
             tracing::debug!(

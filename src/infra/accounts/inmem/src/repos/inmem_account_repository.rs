@@ -405,6 +405,29 @@ impl PasswordHashRepository for InMemoryAccountRepository {
         Ok(())
     }
 
+    async fn modify_password_hash(
+        &self,
+        account_name: &odf::AccountName,
+        password_hash: String,
+    ) -> Result<(), ModifyPasswordHashError> {
+        let mut writable_state = self.state.lock().unwrap();
+
+        let maybe_existing_password = writable_state
+            .password_hash_by_account_name
+            .get_mut(account_name);
+
+        let Some(existing_password) = maybe_existing_password else {
+            return Err(ModifyPasswordHashError::AccountNotFound(
+                AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                },
+            ));
+        };
+
+        *existing_password = password_hash;
+        Ok(())
+    }
+
     async fn find_password_hash_by_account_name(
         &self,
         account_name: &odf::AccountName,

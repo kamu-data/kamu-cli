@@ -135,6 +135,16 @@ impl AccountConfig {
         self
     }
 
+    pub fn set_can_provision_accounts(mut self, can_provision_accounts: bool) -> Self {
+        self.can_provision_accounts = can_provision_accounts;
+        self
+    }
+
+    pub fn set_is_admin(mut self, is_admin: bool) -> Self {
+        self.is_admin = is_admin;
+        self
+    }
+
     pub fn get_id(&self) -> odf::AccountID {
         if let Some(id) = &self.id {
             id.clone()

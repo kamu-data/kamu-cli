@@ -16,7 +16,7 @@ use dill::{component, interface};
 use file_utils::OwnedFile;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use random_strings::get_random_name;
+use random_strings::{get_random_string, AllowedSymbols};
 use time_source::SystemTimeSource;
 use url::Url;
 
@@ -35,9 +35,11 @@ pub struct CompactionExecutorImpl {
 
 impl CompactionExecutorImpl {
     fn create_run_compaction_dir(&self) -> Result<PathBuf, CompactionExecutionError> {
-        let compaction_dir_path = self
-            .run_info_dir
-            .join(get_random_name(Some("compaction-"), 10));
+        let compaction_dir_path = self.run_info_dir.join(get_random_string(
+            Some("compaction-"),
+            10,
+            &AllowedSymbols::Alphanumeric,
+        ));
         std::fs::create_dir_all(&compaction_dir_path).int_err()?;
         Ok(compaction_dir_path)
     }

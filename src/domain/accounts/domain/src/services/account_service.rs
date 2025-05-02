@@ -13,7 +13,15 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Account, AccountPageStream, GetAccountByIdError, SearchAccountsByNamePatternFilters};
+use crate::{
+    Account,
+    AccountNotFoundByNameError,
+    AccountPageStream,
+    CreateAccountError,
+    GetAccountByIdError,
+    ModifyPasswordHashError,
+    SearchAccountsByNamePatternFilters,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,9 +68,15 @@ pub trait AccountService: Sync + Send {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        password_hash: String,
+        password: String,
         owner_account_id: &odf::AccountID,
-    ) -> Result<(), InternalError>;
+    ) -> Result<Account, CreateAccountError>;
+
+    async fn modify_password(
+        &self,
+        account_name: &odf::AccountName,
+        password: String,
+    ) -> Result<(), ModifyPasswordError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,6 +111,25 @@ impl<T: AccountService + ?Sized> AccountServiceExt for T {
 pub enum GetAccountMapError {
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum ModifyPasswordError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+    #[error(transparent)]
+    AccountNotFound(#[from] AccountNotFoundByNameError),
+}
+
+impl From<ModifyPasswordHashError> for ModifyPasswordError {
+    fn from(value: ModifyPasswordHashError) -> Self {
+        match value {
+            ModifyPasswordHashError::AccountNotFound(err) => Self::AccountNotFound(err),
+            ModifyPasswordHashError::Internal(err) => Self::Internal(err),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

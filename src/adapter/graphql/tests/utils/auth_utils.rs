@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -21,21 +21,23 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn authentication_catalogs(
     base_catalog: &dill::Catalog,
+    predefined_account_opts: PredefinedAccountOpts,
 ) -> (dill::Catalog, dill::Catalog) {
     let current_account_subject = CurrentAccountSubject::new_test();
     let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
     if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
-        predefined_accounts_config
-            .predefined
-            .push(AccountConfig::test_config_from_name(
-                logged_account.account_name.clone(),
-            ));
+        predefined_accounts_config.predefined.push(
+            AccountConfig::test_config_from_name(logged_account.account_name.clone())
+                .set_can_provision_accounts(predefined_account_opts.can_provision_accounts)
+                .set_is_admin(predefined_account_opts.is_admin),
+        );
     } else {
         unreachable!();
     }
@@ -49,6 +51,9 @@ pub async fn authentication_catalogs(
         .add_value(DefaultDatasetProperties::default())
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
+        .add::<InMemoryAccountDidSecretKeyRepository>()
+        .add::<SystemTimeSourceDefault>()
+        .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
         .add_value(predefined_accounts_config)
         .build();
 
@@ -84,3 +89,9 @@ pub fn expect_anonymous_access_error(response: async_graphql::Response) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Default)]
+pub struct PredefinedAccountOpts {
+    pub is_admin: bool,
+    pub can_provision_accounts: bool,
+}

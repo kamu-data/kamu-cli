@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 common-macros = { workspace = true }
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 internal-error = { workspace = true }
@@ -33,6 +34,7 @@ odf = { workspace = true, default-features = false, features = [
     "lfs",
     "s3",
 ] }
+random-strings = { workspace = true }
 
 event-sourcing = { workspace = true }
 kamu = { workspace = true }

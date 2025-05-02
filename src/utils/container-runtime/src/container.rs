@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
 use std::time::Duration;
 
-use random_strings::get_random_name;
+use random_strings::{get_random_string, AllowedSymbols};
 use tokio::process::{ChildStderr, ChildStdin, ChildStdout, Command};
 
 use crate::*;
@@ -53,14 +53,14 @@ impl ContainerRunCommand {
     }
 
     pub fn random_container_network_with_prefix(mut self, prefix: &'static str) -> Self {
-        let network_name = get_random_name(Some(prefix), 10);
+        let network_name = get_random_string(Some(prefix), 10, &AllowedSymbols::Alphanumeric);
 
         self.args.network = Some(network_name);
         self
     }
 
     pub fn random_container_name_with_prefix(mut self, prefix: &'static str) -> Self {
-        let container_name = get_random_name(Some(prefix), 10);
+        let container_name = get_random_string(Some(prefix), 10, &AllowedSymbols::Alphanumeric);
 
         self.args.container_name = Some(container_name);
         self
