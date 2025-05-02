@@ -39,6 +39,8 @@ pub struct TaskEventCreated {
     pub task_id: TaskID,
     pub logical_plan: LogicalPlan,
     pub metadata: Option<TaskMetadata>,
+    #[serde(default)]
+    pub retry_policy: TaskRetryPolicy,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

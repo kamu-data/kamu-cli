@@ -64,6 +64,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     let event_2 = TaskEventCreated {
@@ -75,6 +76,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     let event_3 = TaskEventFinished {
@@ -142,6 +144,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     let event_2 = TaskEventRunning {
@@ -240,6 +243,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     let event_2_1 = TaskEventCreated {
@@ -251,6 +255,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     let event_1_2 = TaskEventRunning {
@@ -354,6 +359,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     let event_1_2 = TaskEventCreated {
@@ -365,6 +371,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     let event_2_1 = TaskEventCreated {
@@ -376,6 +383,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     let event_2_2 = TaskEventCreated {
@@ -387,6 +395,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
         }
         .into(),
         metadata: None,
+        retry_policy: TaskRetryPolicy::default(),
     };
 
     event_store
@@ -524,6 +533,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
                 task_id: task_id_1,
                 logical_plan: LogicalPlanProbe::default().into(),
                 metadata: None,
+                retry_policy: TaskRetryPolicy::default(),
             }
             .into()],
         )
@@ -616,6 +626,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
                     task_id,
                     logical_plan: LogicalPlanProbe::default().into(),
                     metadata: None,
+                    retry_policy: TaskRetryPolicy::default(),
                 }
                 .into()],
             )
@@ -771,6 +782,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
                     task_id,
                     logical_plan: LogicalPlanProbe::default().into(),
                     metadata: None,
+                    retry_policy: TaskRetryPolicy::default(),
                 }
                 .into()],
             )
@@ -946,6 +958,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                 task_id,
                 logical_plan: LogicalPlanProbe::default().into(),
                 metadata: None,
+                retry_policy: TaskRetryPolicy::default(),
             }
             .into()],
         )
@@ -962,6 +975,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                 task_id,
                 logical_plan: LogicalPlanProbe::default().into(),
                 metadata: None,
+                retry_policy: TaskRetryPolicy::default(),
             }
             .into()],
         )

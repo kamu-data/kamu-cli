@@ -33,6 +33,7 @@ kamu-core = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 nutype = { version = "0.6", default-features = false, features = ["serde"] }
+rand = { version = "0.8", default-features = false }
 serde = { version = "1", features = ["derive"] }
 sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
