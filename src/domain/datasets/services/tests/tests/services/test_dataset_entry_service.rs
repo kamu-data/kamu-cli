@@ -15,7 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
@@ -249,7 +249,10 @@ impl DatasetEntryServiceHarness {
             b.bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
 
             b.add::<InMemoryAccountRepository>();
+            b.add::<InMemoryAccountDidSecretKeyRepository>();
             b.add::<AccountServiceImpl>();
+
+            b.add_value(crypto_utils::DidSecretEncryptionConfig::sample());
 
             b.add_builder(
                 OutboxImmediateImpl::builder()

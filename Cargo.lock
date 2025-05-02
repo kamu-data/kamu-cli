@@ -6002,6 +6002,7 @@ name = "kamu-adapter-auth-oso-rebac"
 version = "0.235.0"
 dependencies = [
  "async-trait",
+ "crypto-utils",
  "database-common",
  "dill",
  "futures",
@@ -6133,6 +6134,7 @@ dependencies = [
  "canonical_json",
  "chrono",
  "container-runtime",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "datafusion",
@@ -6218,6 +6220,7 @@ dependencies = [
  "async-trait",
  "axum 0.8.3",
  "chrono",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "datafusion",

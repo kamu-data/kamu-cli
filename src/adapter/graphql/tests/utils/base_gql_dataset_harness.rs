@@ -71,6 +71,7 @@ impl BaseGQLDatasetHarness {
             .add::<InMemoryDatasetEntryRepository>()
             .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<InMemoryDatasetKeyBlockRepository>()
+            .add::<InMemoryDatasetDidSecretKeyRepository>()
             .add::<DatasetKeyBlockUpdateHandler>()
             .add_value(RunInfoDir::new(run_info_dir));
 

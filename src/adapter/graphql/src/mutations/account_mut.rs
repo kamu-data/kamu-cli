@@ -113,7 +113,6 @@ impl AccountMut {
             Ok(created_account) => Ok(CreateAccountResult::Success(CreateAccountSuccess {
                 account: AccountView::from_account(created_account),
             })),
-            // TODO for some reason duplicate email returns duplicate id
             Err(CreateAccountError::Duplicate(err)) => Ok(
                 CreateAccountResult::NonUniqueAccountField(AccountFieldNonUnique {
                     field: err.account_field.to_string(),

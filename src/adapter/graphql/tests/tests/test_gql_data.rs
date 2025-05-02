@@ -17,7 +17,7 @@ use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -74,6 +74,8 @@ async fn create_catalog_with_local_workspace(
             .add::<LoginPasswordAuthProvider>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
+            .add::<InMemoryAccountDidSecretKeyRepository>()
+            .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
             .add_value(DefaultAccountProperties::default())
             .add_value(DefaultDatasetProperties::default())
             .add::<PredefinedAccountsRegistrator>()

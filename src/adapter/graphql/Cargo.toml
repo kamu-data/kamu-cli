@@ -23,7 +23,6 @@ doctest = false
 
 [dependencies]
 common-macros = { workspace = true }
-crypto-utils = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 internal-error = { workspace = true }
@@ -68,6 +67,7 @@ uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
+crypto-utils = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }

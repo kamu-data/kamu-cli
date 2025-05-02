@@ -50,6 +50,7 @@ utoipa-axum = { version = "0.2", default-features = false, features = [] }
 
 
 [dev-dependencies]
+crypto-utils = { workspace = true } 
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }

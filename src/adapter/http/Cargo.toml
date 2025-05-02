@@ -106,6 +106,7 @@ http-body-util = { optional = true, version = "0.1" }
 
 [dev-dependencies]
 container-runtime = { workspace = true }
+crypto-utils = { workspace = true }
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-core = { workspace = true, features = ["testing"] }

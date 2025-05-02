@@ -20,6 +20,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
+    InMemoryDatasetDidSecretKeyRepository,
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
@@ -652,6 +653,8 @@ impl DependencyGraphHarness {
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceImpl>()
+        .add::<InMemoryDatasetDidSecretKeyRepository>()
+        .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
         .add::<InMemoryDatasetDependencyRepository>()
         .add::<DependencyGraphImmediateListener>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()

@@ -205,6 +205,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_accounts_inmem::InMemoryAccountRepository>();
     b.add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>();
     b.add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>();
+    b.add::<kamu_accounts_inmem::InMemoryAccountDidSecretKeyRepository>();
 
     b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
@@ -218,6 +219,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetStatisticsRepository>();
     b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlockRepository>();
+    b.add::<kamu_datasets_inmem::InMemoryDatasetDidSecretKeyRepository>();
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 

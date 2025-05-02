@@ -19,7 +19,7 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_NAME,
 };
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -687,6 +687,8 @@ impl DatasetAuthorizerHarness {
                 .add_value(tenancy_config)
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<InMemoryAccountDidSecretKeyRepository>()
+                .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<LoginPasswordAuthProvider>();

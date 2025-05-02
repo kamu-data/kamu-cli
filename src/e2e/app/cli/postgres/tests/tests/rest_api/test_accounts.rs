@@ -32,3 +32,25 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_create_account_and_modify_password,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(indoc::indoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+              users:
+                predefined:
+                  - accountName: kamu
+                    email: kamu@example.com
+                    isAdmin: true
+                    canProvisionAccounts: true
+            "#
+        ))
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

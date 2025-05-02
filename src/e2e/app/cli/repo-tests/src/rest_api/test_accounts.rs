@@ -46,3 +46,119 @@ pub async fn test_accounts_me_unauthorized(kamu_api_server_client: KamuApiServer
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_account_and_modify_password(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    // First try to create account with user without permissions
+    kamu_api_server_client.auth().login_as_e2e_user().await;
+    let owner_account_info = kamu_api_server_client.account().me().await.unwrap();
+
+    let result = kamu_api_server_client
+        .graphql_api_call(&create_account_query(&owner_account_info.id, "foo"))
+        .await;
+
+    assert!(result.is_err());
+    assert_eq!(
+        result.err().unwrap().first().unwrap().message,
+        "Account does not have permission to provision accounts"
+    );
+
+    kamu_api_server_client.auth().logout();
+    kamu_api_server_client.auth().login_as_kamu().await;
+    let owner_account_info = kamu_api_server_client.account().me().await.unwrap();
+
+    kamu_api_server_client
+        .graphql_api_call_assert(
+            &create_account_query(&owner_account_info.id, "foo"),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "accounts": {
+                    "byId": {
+                      "createAccount": {
+                        "account": {
+                          "accountName": "foo",
+                          "accountType": "USER",
+                          "displayName": "foo"
+                        },
+                        "message": "Account created"
+                      }
+                    }
+                  }
+                }
+            "#,
+            )),
+        )
+        .await;
+
+    kamu_api_server_client
+        .graphql_api_call_assert(
+            &indoc::indoc!(
+                r#"
+                mutation {
+                    accounts {
+                        byId (accountId: $accountId) {
+                            modifyPassword(accountName: "foo", password: "foo_password") {
+                                message
+                            }
+                        }
+                    }
+                }
+                "#
+            )
+            .replace("$accountId", &format!("\"{}\"", owner_account_info.id)),
+            Ok(indoc::indoc!(
+                r#"
+                {
+                  "accounts": {
+                    "byId": {
+                      "modifyPassword": {
+                        "message": "Password modified"
+                      }
+                    }
+                  }
+                }
+            "#,
+            )),
+        )
+        .await;
+
+    kamu_api_server_client.auth().logout();
+    kamu_api_server_client
+        .auth()
+        .login_with_password("foo", "foo_password")
+        .await;
+    assert_matches!(
+        kamu_api_server_client.account().me().await,
+        Ok(response)
+            if response.account_name == odf::AccountName::new_unchecked("foo")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn create_account_query(account_id: &odf::AccountID, account_name: &str) -> String {
+    indoc::indoc!(
+        r#"
+        mutation {
+            accounts {
+                byId (accountId: $accountId) {
+                    createAccount(accountName: "$accountName") {
+                        ... on CreateAccountSuccess {
+                            message
+                            account {
+                                accountName
+                                displayName
+                                accountType
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("$accountId", &format!("\"{account_id}\""))
+    .replace("$accountName", account_name)
+}

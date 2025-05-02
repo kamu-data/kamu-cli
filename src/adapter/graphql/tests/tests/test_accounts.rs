@@ -24,6 +24,7 @@ use kamu_accounts_services::{
     OAuthDeviceCodeServiceImpl,
 };
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
+use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, PredefinedAccountOpts};
 
@@ -617,40 +618,6 @@ async fn test_modify_password() {
             }
         })
     );
-
-    // Try to login with new credentials
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                mutation {{
-                    auth {{
-                        login (loginMethod: "password", loginCredentialsJson: "{{\"login\":\"foo\",\"password\":\"{new_password}\"}}") {{
-                            account {{
-                                accountName
-                            }}
-                        }}
-                    }}
-                }}
-                "#,
-            ))
-            .data(harness.catalog_anonymous),
-        )
-        .await;
-
-    assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
-            "auth": {
-                "login": {
-                    "account": {
-                        "accountName": "foo"
-                    }
-                },
-            }
-        })
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -743,6 +710,7 @@ impl GraphQLAccountsHarness {
             .add::<AccessTokenServiceImpl>()
             .add::<InMemoryAccessTokenRepository>()
             .add::<OAuthDeviceCodeServiceImpl>()
+            .add::<SystemTimeSourceDefault>()
             .add::<OAuthDeviceCodeGeneratorDefault>()
             .add::<InMemoryOAuthDeviceCodeRepository>()
             .add_value(JwtAuthenticationConfig::default())

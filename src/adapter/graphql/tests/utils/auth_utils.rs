@@ -21,7 +21,6 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +51,6 @@ pub async fn authentication_catalogs(
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
         .add::<InMemoryAccountDidSecretKeyRepository>()
-        .add::<SystemTimeSourceDefault>()
         .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
         .add_value(predefined_accounts_config)
         .build();
