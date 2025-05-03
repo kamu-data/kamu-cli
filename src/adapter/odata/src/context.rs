@@ -24,7 +24,7 @@ use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::dataframe::DataFrame;
 use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
-use datafusion_odata::error::ODataError;
+use datafusion_odata::error::{CollectionNotFound, ODataError};
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_core::auth::DatasetActionAuthorizerExt;
@@ -230,9 +230,15 @@ impl CollectionContext for ODataCollectionContext {
             .await
             .unwrap();
 
+        let Some(df) = res.df else {
+            return Err(ODataError::CollectionNotFound(CollectionNotFound {
+                collection: self.resolved_dataset.get_alias().to_string(),
+            }));
+        };
+
         query
             .apply(
-                res.df.into_inner(),
+                df.into_inner(),
                 &self.addr,
                 &vocab.offset_column,
                 KEY_COLUMN_ALIAS,

@@ -339,7 +339,7 @@ impl QueryServiceImpl {
         dataset_ref: &odf::DatasetRef,
         last_records_to_consider: Option<u64>,
         head: Option<odf::Multihash>,
-    ) -> Result<(ResolvedDataset, odf::Multihash, DataFrameExt), QueryError> {
+    ) -> Result<(ResolvedDataset, odf::Multihash, Option<DataFrameExt>), QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
 
         let head = if let Some(head) = head {
@@ -375,7 +375,11 @@ impl QueryServiceImpl {
             ))
             .await?;
 
-        Ok((resolved_dataset, head, df.into()))
+        if df.schema().fields().is_empty() {
+            Ok((resolved_dataset, head, None))
+        } else {
+            Ok((resolved_dataset, head, Some(df.into())))
+        }
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -539,14 +543,14 @@ impl QueryService for QueryServiceImpl {
 
         // Our custom catalog provider resolves schemas lazily, so the dataset will be
         // found even if it's empty and its schema will be empty, but we decide not to
-        // propagate this special case to the users and return an error instead
-        if df.schema().fields().is_empty() {
-            return Err(DatasetSchemaNotAvailableError {
+        // propagate this special case to the users and return `None` instead
+        let Some(df) = df else {
+            return Ok(GetDataResponse {
+                df: None,
                 dataset_handle: resolved_dataset.take_handle(),
                 block_hash: head,
-            }
-            .into());
-        }
+            });
+        };
 
         use odf::dataset::MetadataChainExt;
         let vocab: odf::metadata::DatasetVocabulary = resolved_dataset
@@ -571,7 +575,7 @@ impl QueryService for QueryServiceImpl {
             ])?;
 
         Ok(GetDataResponse {
-            df,
+            df: Some(df),
             dataset_handle: resolved_dataset.take_handle(),
             block_hash: head,
         })

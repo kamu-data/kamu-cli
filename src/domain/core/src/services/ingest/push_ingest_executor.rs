@@ -154,13 +154,16 @@ pub enum PushIngestError {
 
 pub enum DataSource {
     Url(url::Url),
+    Buffer(bytes::Bytes),
     Stream(Box<dyn AsyncRead + Send + Unpin>),
 }
 
+// TODO: Should this be Debug trait?
 impl Display for DataSource {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             DataSource::Url(url) => write!(f, "{url}"),
+            DataSource::Buffer(_) => write!(f, "Bytes data source"),
             DataSource::Stream(_) => write!(f, "Stream data source"),
         }
     }

@@ -33,7 +33,7 @@ impl VersionedFile {
     ) -> Result<Option<VersionedFileEntry>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
-        let query_result = if let Some(block_hash) = as_of_block_hash {
+        let query_res = if let Some(block_hash) = as_of_block_hash {
             query_svc
                 .tail(
                     &self.state.dataset_handle().as_local_ref(),
@@ -54,11 +54,9 @@ impl VersionedFile {
                 )
                 .await
                 .map(|res| domain::GetDataResponse {
-                    df: if res.df.schema().columns().is_empty() {
-                        res.df
-                    } else {
-                        res.df.filter(col("version").eq(lit(version))).unwrap()
-                    },
+                    df: res
+                        .df
+                        .map(|df| df.filter(col("version").eq(lit(version))).unwrap()),
                     dataset_handle: res.dataset_handle,
                     block_hash: res.block_hash,
                 })
@@ -71,33 +69,32 @@ impl VersionedFile {
                     domain::GetDataOptions::default(),
                 )
                 .await
+        }
+        .int_err()?;
+
+        let Some(df) = query_res.df else {
+            return Ok(None);
         };
 
-        let query_response = match query_result {
-            Ok(res) => res,
-            Err(domain::QueryError::DatasetSchemaNotAvailable(_)) => {
-                return Ok(None);
-            }
-            Err(e) => return Err(e.int_err().into()),
-        };
-
-        let records = query_response.df.collect_json_aos().await.int_err()?;
+        let records = df.collect_json_aos().await.int_err()?;
         if records.is_empty() {
             return Ok(None);
-        } else {
-            assert_eq!(records.len(), 1);
-            let entry = VersionedFileEntry::from_json(
-                self.state.resolved_dataset(ctx).await?.clone(),
-                records.into_iter().next().unwrap(),
-            );
-            Ok(Some(entry))
         }
+
+        assert_eq!(records.len(), 1);
+        let entry = VersionedFileEntry::from_json(
+            self.state.resolved_dataset(ctx).await?.clone(),
+            records.into_iter().next().unwrap(),
+        );
+        Ok(Some(entry))
     }
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl VersionedFile {
+    const DEFAULT_VERSIONS_PER_PAGE: usize = 100;
+
     /// Returns list of versions in reverse chronological order
     #[tracing::instrument(level = "info", name = VersionedFile_versions, skip_all)]
     pub async fn versions(
@@ -110,38 +107,26 @@ impl VersionedFile {
         use datafusion::logical_expr::{col, lit};
 
         let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(100);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_VERSIONS_PER_PAGE);
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
-        let query_res = match query_svc
+        let query_res = query_svc
             .get_data(
                 &self.state.dataset_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
             .await
-        {
-            Ok(res) if res.df.schema().columns().is_empty() => {
-                return Ok(VersionedFileEntryConnection::new(
-                    Vec::new(),
-                    page,
-                    per_page,
-                    0,
-                ))
-            }
-            Ok(res) => res,
-            Err(domain::QueryError::DatasetSchemaNotAvailable(_)) => {
-                return Ok(VersionedFileEntryConnection::new(
-                    Vec::new(),
-                    page,
-                    per_page,
-                    0,
-                ))
-            }
-            Err(err) => return Err(err.int_err().into()),
-        };
+            .int_err()?;
 
-        let df = query_res.df;
+        let Some(df) = query_res.df else {
+            return Ok(VersionedFileEntryConnection::new(
+                Vec::new(),
+                page,
+                per_page,
+                0,
+            ));
+        };
 
         let df = if let Some(max_version) = max_version {
             df.filter(col("version").lt_eq(lit(max_version)))

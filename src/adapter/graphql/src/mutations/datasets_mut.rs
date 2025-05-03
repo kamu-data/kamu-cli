@@ -11,7 +11,6 @@ use kamu_core::auth;
 use kamu_core::auth::DatasetActionAccess;
 use kamu_datasets::CreateDatasetFromSnapshotError;
 
-use super::CollectionEntryInput;
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
 use crate::queries::{Account, Dataset, DatasetRequestState};
@@ -20,6 +19,45 @@ use crate::{utils, LoggedInGuard};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetsMut;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DatasetsMut {
+    fn parse_metadata_events(
+        &self,
+        events: Vec<String>,
+        events_format: Option<MetadataManifestFormat>,
+    ) -> Result<Vec<odf::metadata::MetadataEvent>, Result<CreateDatasetFromSnapshotResult, GqlError>>
+    {
+        let mut res = Vec::new();
+        match events_format.unwrap_or(MetadataManifestFormat::Yaml) {
+            MetadataManifestFormat::Yaml => {
+                let de = odf::metadata::serde::yaml::YamlMetadataEventDeserializer;
+                for event in events {
+                    match de.read_manifest(event.as_bytes()) {
+                        Ok(event) => res.push(event),
+                        Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
+                            return Err(Ok(CreateDatasetFromSnapshotResult::Malformed(
+                                MetadataManifestMalformed {
+                                    message: e.to_string(),
+                                },
+                            )))
+                        }
+                        Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
+                            return Err(Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(
+                                e.into(),
+                            )))
+                        }
+                        Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
+                            return Err(Err(e.int_err().into()))
+                        }
+                    }
+                }
+            }
+        };
+        Ok(res)
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -234,31 +272,12 @@ impl DatasetsMut {
             merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
         };
 
-        let mut extra_events_parsed = Vec::new();
-        match extra_events_format.unwrap_or(MetadataManifestFormat::Yaml) {
-            MetadataManifestFormat::Yaml => {
-                let de = odf::metadata::serde::yaml::YamlMetadataEventDeserializer;
-                for event in extra_events.unwrap_or_default() {
-                    match de.read_manifest(event.as_bytes()) {
-                        Ok(event) => extra_events_parsed.push(event),
-                        Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
-                            return Ok(CreateDatasetFromSnapshotResult::Malformed(
-                                MetadataManifestMalformed {
-                                    message: e.to_string(),
-                                },
-                            ))
-                        }
-                        Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
-                            return Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(
-                                e.into(),
-                            ))
-                        }
-                        Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
-                            return Err(e.int_err().into())
-                        }
-                    }
-                }
-            }
+        let extra_events_parsed = match self
+            .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
+        {
+            Ok(res) => res,
+            Err(Ok(err)) => return Ok(err),
+            Err(Err(err)) => return Err(err),
         };
 
         let snapshot = odf::DatasetSnapshot {
@@ -291,14 +310,55 @@ impl DatasetsMut {
         #[graphql(desc = "Extra metadata events (e.g. to populate readme)")] extra_events: Option<
             Vec<String>,
         >,
-        #[graphql(desc = "How extra events are represented")] event_events_format: Option<
+        #[graphql(desc = "How extra events are represented")] extra_events_format: Option<
             MetadataManifestFormat,
         >,
-        initial_entries: Option<Vec<CollectionEntryInput>>,
         #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
-        dbg!(initial_entries);
-        todo!()
+        let push_source = odf::metadata::AddPushSource {
+            source_name: "default".into(),
+            read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
+                schema: Some(
+                    ["op INT", "path STRING", "ref STRING"]
+                        .into_iter()
+                        .map(str::to_string)
+                        .chain(
+                            extra_columns
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
+                        )
+                        .collect(),
+                ),
+                ..Default::default()
+            }),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::ChangelogStream(
+                odf::metadata::MergeStrategyChangelogStream {
+                    primary_key: vec!["path".to_string()],
+                },
+            ),
+        };
+
+        let extra_events_parsed = match self
+            .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
+        {
+            Ok(res) => res,
+            Err(Ok(err)) => return Ok(err),
+            Err(Err(err)) => return Err(err),
+        };
+
+        let snapshot = odf::DatasetSnapshot {
+            name: dataset_alias.into(),
+            kind: odf::DatasetKind::Root,
+            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
+                .into_iter()
+                .chain(extra_events_parsed.into_iter())
+                .collect(),
+        };
+
+        self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
+            .await
     }
 }
 

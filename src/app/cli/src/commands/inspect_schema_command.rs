@@ -112,7 +112,6 @@ impl InspectSchemaCommand {
     fn query_errors(e: QueryError) -> CLIError {
         match e {
             QueryError::DatasetNotFound(e) => CLIError::usage_error_from(e),
-            QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
             QueryError::DatasetBlockNotFound(_)
             | QueryError::BadQuery(_)
             | QueryError::Access(_) => CLIError::failure(e),

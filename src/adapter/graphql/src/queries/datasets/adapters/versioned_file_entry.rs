@@ -65,8 +65,7 @@ impl VersionedFileEntry {
             content_type: content_type
                 .map(Into::into)
                 .unwrap_or_else(|| Self::DEFAULT_CONTENT_TYPE.to_owned())
-                .to_string()
-                .into(),
+                .to_string(),
             content_hash: content_hash.into(),
             extra_data,
         }
@@ -133,6 +132,11 @@ impl VersionedFileEntry {
         record["content_type"] = self.content_type.clone().into();
         record
     }
+
+    pub fn to_bytes(&self) -> bytes::Bytes {
+        let buf = self.to_record_data().to_string().into_bytes();
+        bytes::Bytes::from_owner(buf)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +160,7 @@ impl VersionedFileEntry {
         let data_repo = self.dataset.as_data_repo();
         let download = match data_repo
             .get_external_download_url(
-                &self.content_hash.as_ref(),
+                self.content_hash.as_ref(),
                 odf::storage::ExternalTransferOpts::default(),
             )
             .await

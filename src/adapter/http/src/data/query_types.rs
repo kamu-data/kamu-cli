@@ -540,9 +540,9 @@ impl utoipa::PartialSchema for Schema {
 
 pub(crate) fn map_query_error(err: QueryError) -> ApiError {
     match err {
-        QueryError::DatasetNotFound(_)
-        | QueryError::DatasetBlockNotFound(_)
-        | QueryError::DatasetSchemaNotAvailable(_) => ApiError::not_found(err),
+        QueryError::DatasetNotFound(_) | QueryError::DatasetBlockNotFound(_) => {
+            ApiError::not_found(err)
+        }
         QueryError::BadQuery(_) => ApiError::bad_request(err),
         QueryError::Access(err) => err.api_err(),
         QueryError::Internal(err) => err.api_err(),

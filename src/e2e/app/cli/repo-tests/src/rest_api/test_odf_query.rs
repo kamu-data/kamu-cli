@@ -130,7 +130,10 @@ async fn test_dataset_tail(
         odf::DatasetAlias::new(maybe_account_name, DATASET_ROOT_PLAYER_NAME.clone());
 
     pretty_assertions::assert_eq!(
-        serde_json::Value::Null,
+        json!({
+            "data": [],
+            "dataFormat": "JsonAoS",
+        }),
         kamu_api_server_client
             .odf_query()
             .tail(&dataset_alias)

@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod collection;
+mod collection_entry;
 mod versioned_file;
 mod versioned_file_entry;
 
 pub use collection::*;
+pub use collection_entry::*;
 pub use versioned_file::*;
 pub use versioned_file_entry::*;

@@ -14,9 +14,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
-use kamu_datasets::*;
 use kamu_datasets_services::*;
-use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 
 use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
@@ -495,6 +493,7 @@ async fn test_versioned_file_extra_data() {
                             extraColumns: $extraColumns,
                             datasetVisibility: PUBLIC,
                         ) {
+                            message
                             ... on CreateDatasetResultSuccess {
                                 dataset {
                                     id
@@ -538,6 +537,8 @@ async fn test_versioned_file_extra_data() {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
                                 uploadNewVersion(content: $content, extraData: $extraData) {
+                                    isSuccess
+                                    errorMessage
                                     ... on UpdateVersionSuccess {
                                         newVersion
                                         contentHash
@@ -569,6 +570,8 @@ async fn test_versioned_file_extra_data() {
     pretty_assertions::assert_eq!(
         upload_result,
         json!({
+            "isSuccess": true,
+            "errorMessage": "",
             "newVersion": 1,
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "newHead": head_v1,
@@ -732,6 +735,7 @@ async fn test_versioned_file_direct_upload_download() {
                             datasetAlias: $datasetAlias,
                             datasetVisibility: PUBLIC,
                         ) {
+                            message
                             ... on CreateDatasetResultSuccess {
                                 dataset {
                                     id
@@ -794,8 +798,8 @@ async fn test_versioned_file_direct_upload_download() {
         .clone();
     let method = upload_result["method"].as_str().unwrap();
     let use_multipart = upload_result["useMultipart"].as_bool().unwrap();
-    let headers = upload_result["headers"].as_array().unwrap();
-    let upload_url = upload_result["url"].as_str().unwrap();
+    // let headers = upload_result["headers"].as_array().unwrap();
+    // let upload_url = upload_result["url"].as_str().unwrap();
     let upload_token = upload_result["uploadToken"].as_str().unwrap();
     assert_eq!(method, "POST");
     assert!(use_multipart);
@@ -932,7 +936,6 @@ async fn test_versioned_file_direct_upload_download() {
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GraphQLDatasetsHarness {
     base_gql_harness: BaseGQLDatasetHarness,
-    catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
@@ -977,7 +980,7 @@ impl GraphQLDatasetsHarness {
             .add_value(kamu::domain::CacheDir::new(cache_dir))
             .build();
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
+        let (_catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
 
         // TODO: Yuck
         let catalog_authorized = catalog_authorized
@@ -989,59 +992,8 @@ impl GraphQLDatasetsHarness {
 
         Self {
             base_gql_harness,
-            catalog_anonymous,
             catalog_authorized,
         }
-    }
-
-    pub async fn create_root_dataset(
-        &self,
-        account_name: Option<odf::AccountName>,
-        name: odf::DatasetName,
-    ) -> CreateDatasetResult {
-        let create_dataset = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(odf::DatasetAlias::new(account_name, name))
-                    .kind(odf::DatasetKind::Root)
-                    .push_event(MetadataFactory::set_polling_source().build())
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
-    }
-
-    pub async fn create_derived_dataset(
-        &self,
-        name: odf::DatasetName,
-        input_dataset: &odf::DatasetHandle,
-    ) -> CreateDatasetResult {
-        let create_dataset = self
-            .catalog_authorized
-            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-            .unwrap();
-
-        create_dataset
-            .execute(
-                MetadataFactory::dataset_snapshot()
-                    .name(odf::DatasetAlias::new(None, name))
-                    .kind(odf::DatasetKind::Derivative)
-                    .push_event(
-                        MetadataFactory::set_transform()
-                            .inputs_from_refs(vec![input_dataset.alias.clone()])
-                            .build(),
-                    )
-                    .build(),
-                Default::default(),
-            )
-            .await
-            .unwrap()
     }
 
     pub async fn execute_authorized_query(
@@ -1050,15 +1002,6 @@ impl GraphQLDatasetsHarness {
     ) -> async_graphql::Response {
         kamu_adapter_graphql::schema_quiet()
             .execute(query.into().data(self.catalog_authorized.clone()))
-            .await
-    }
-
-    pub async fn execute_anonymous_query(
-        &self,
-        query: impl Into<async_graphql::Request>,
-    ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema_quiet()
-            .execute(query.into().data(self.catalog_anonymous.clone()))
             .await
     }
 }

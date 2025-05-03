@@ -267,10 +267,18 @@ pub async fn test_ingest_recursive(kamu: KamuCliPuppet) {
     .await
     .success();
 
-    kamu.assert_failure_command_execution(
+    kamu.assert_success_command_execution(
         ["tail", "leaderboard", "--output-format", "table"],
-        None,
-        Some(["Error: Dataset schema is not yet available: leaderboard"]),
+        Some(indoc::indoc!(
+            r#"
+            ┌┐
+            ││
+            ├┤
+            ││
+            └┘
+            "#
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 

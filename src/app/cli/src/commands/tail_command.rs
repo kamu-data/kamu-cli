@@ -48,8 +48,16 @@ impl Command for TailCommand {
             .await
             .map_err(CLIError::failure)?;
 
+        let (schema, record_batches) = match res.df {
+            None => (datafusion::arrow::datatypes::Schema::empty(), Vec::new()),
+            Some(df) => (
+                df.schema().as_arrow().clone(),
+                df.collect().await.map_err(CLIError::failure)?,
+            ),
+        };
+
         let mut writer = self.output_cfg.get_records_writer(
-            res.df.schema().as_arrow(),
+            &schema,
             RecordsFormat::default().with_column_formats(vec![
                 // TODO: `RecordsFormat` should allow specifying column formats by name, not
                 // only positionally
@@ -83,7 +91,6 @@ impl Command for TailCommand {
             ]),
         );
 
-        let record_batches = res.df.collect().await.map_err(CLIError::failure)?;
         writer.write_batches(&record_batches)?;
         writer.finish()?;
         Ok(())

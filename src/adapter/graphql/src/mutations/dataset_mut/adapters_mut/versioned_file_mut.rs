@@ -29,7 +29,7 @@ impl VersionedFileMut {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // TODO: Consider retractons / corrections
-        match query_svc
+        let query_res = query_svc
             .tail(
                 &self.state.dataset_handle().as_local_ref(),
                 0,
@@ -37,30 +37,29 @@ impl VersionedFileMut {
                 domain::GetDataOptions::default(),
             )
             .await
-        {
-            Ok(res) => {
-                let last_version = res
-                    .df
-                    .select_columns(&["version"])
-                    .int_err()?
-                    .collect_scalar::<datafusion::arrow::datatypes::Int32Type>()
-                    .await
-                    .int_err()?;
+            .int_err()?;
 
-                let last_version = FileVersion::try_from(last_version.unwrap_or(0)).unwrap();
+        let Some(df) = query_res.df else {
+            return Ok((0, query_res.block_hash));
+        };
 
-                Ok((last_version, res.block_hash))
-            }
-            Err(kamu_core::QueryError::DatasetSchemaNotAvailable(e)) => Ok((0, e.block_hash)),
-            Err(e) => Err(e.int_err().into()),
-        }
+        let last_version = df
+            .select_columns(&["version"])
+            .int_err()?
+            .collect_scalar::<datafusion::arrow::datatypes::Int32Type>()
+            .await
+            .int_err()?;
+
+        let last_version = FileVersion::try_from(last_version.unwrap_or(0)).unwrap();
+
+        Ok((last_version, query_res.block_hash))
     }
 
     async fn get_latest_entry(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileEntry>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // TODO: Consider retractons / corrections
-        match query_svc
+        let query_res = query_svc
             .tail(
                 &self.state.dataset_handle().as_local_ref(),
                 0,
@@ -68,23 +67,21 @@ impl VersionedFileMut {
                 domain::GetDataOptions::default(),
             )
             .await
-        {
-            Ok(res) => {
-                let records = res.df.collect_json_aos().await.int_err()?;
+            .int_err()?;
 
-                assert_eq!(records.len(), 1);
-                let record = records.into_iter().next().unwrap();
+        let Some(df) = query_res.df else {
+            return Ok(None);
+        };
 
-                let entry = VersionedFileEntry::from_json(
-                    self.state.resolved_dataset(ctx).await?.clone(),
-                    record,
-                );
+        let records = df.collect_json_aos().await.int_err()?;
 
-                Ok(Some(entry))
-            }
-            Err(kamu_core::QueryError::DatasetSchemaNotAvailable(_)) => Ok(None),
-            Err(e) => Err(e.int_err().into()),
-        }
+        assert_eq!(records.len(), 1);
+        let record = records.into_iter().next().unwrap();
+
+        let entry =
+            VersionedFileEntry::from_json(self.state.resolved_dataset(ctx).await?.clone(), record);
+
+        Ok(Some(entry))
     }
 
     // Push ingest the new record
@@ -104,9 +101,7 @@ impl VersionedFileMut {
         let ingest_result = match push_ingest_use_case
             .execute(
                 self.state.resolved_dataset(ctx).await?,
-                kamu_core::DataSource::Stream(Box::new(std::io::Cursor::new(
-                    entry.to_record_data().to_string(),
-                ))),
+                kamu_core::DataSource::Buffer(entry.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
@@ -145,7 +140,7 @@ impl VersionedFileMut {
                 new_version,
                 old_head: old_head.into(),
                 new_head: new_head.into(),
-                content_hash: content_hash.into(),
+                content_hash,
             })),
             kamu_core::PushIngestResult::UpToDate => unreachable!(),
         }
@@ -394,7 +389,7 @@ impl UpdateVersionErrorCasFailed {
         false
     }
     async fn error_message(&self) -> String {
-        format!("Expected head didn't match, dataset was likely updated concurrently")
+        "Expected head didn't match, dataset was likely updated concurrently".to_string()
     }
 }
 

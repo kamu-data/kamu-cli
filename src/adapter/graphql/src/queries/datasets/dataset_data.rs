@@ -77,23 +77,32 @@ impl<'a> DatasetData<'a> {
         let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);
         let limit = limit.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
-        let tail_result = query_svc
+        let query_res = match query_svc
             .tail(
                 &self.dataset_request_state.dataset_handle().as_local_ref(),
                 skip.unwrap_or(0),
                 limit,
                 domain::GetDataOptions::default(),
             )
-            .await;
+            .await
+        {
+            Ok(r) => r,
+            Err(err) => return DataQueryResult::from_query_error(err),
+        };
 
-        let df = match tail_result {
-            Ok(r) => r.df,
-            Err(domain::QueryError::DatasetSchemaNotAvailable(_)) => {
-                return Ok(DataQueryResult::no_schema_yet(data_format, limit));
-            }
-            Err(err) => {
-                return DataQueryResult::from_query_error(err);
-            }
+        let state = vec![DatasetState {
+            id: query_res.dataset_handle.id.into(),
+            alias: query_res.dataset_handle.alias.to_string(),
+            block_hash: Some(query_res.block_hash.into()),
+        }];
+
+        let Some(df) = query_res.df else {
+            return Ok(DataQueryResult::success(
+                DataSchema::empty(schema_format),
+                DataBatch::empty(data_format),
+                state,
+                limit,
+            ));
         };
 
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
@@ -104,7 +113,7 @@ impl<'a> DatasetData<'a> {
 
         let data = DataBatch::from_records(&record_batches, data_format)?;
 
-        Ok(DataQueryResult::success(Some(schema), data, None, limit))
+        Ok(DataQueryResult::success(schema, data, state, limit))
     }
 }
 

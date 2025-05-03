@@ -18,6 +18,7 @@ async_graphql::scalar!(
 );
 
 impl Base64Usnp {
+    #[expect(dead_code)]
     pub fn into_inner(self) -> bytes::Bytes {
         self.0
     }

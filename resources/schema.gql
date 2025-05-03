@@ -377,13 +377,25 @@ type CliProtocolDesc {
 
 type Collection {
 	"""
-	Returns flattened list of entries in the collection at latest or
-	specified point in time
+	Latest state projection of the state of collection
 	"""
-	listEntries(pathPrefix: String, maxDepth: Int, page: Int, perPage: Int, asOfBlockHash: Multihash): CollectionEntryConnection!
+	latest: CollectionProjection!
+	"""
+	State projection of the state of collection at the specified point in
+	time
+	"""
+	asOf(blockHash: Multihash!): CollectionProjection!
 }
 
 type CollectionEntry {
+	"""
+	Time when this version was created
+	"""
+	systemTime: DateTime!
+	"""
+	Time when this version was created
+	"""
+	eventTime: DateTime!
 	"""
 	File system-like path
 	Rooted, separated by forward slashes, with elements URL-encoded
@@ -393,11 +405,15 @@ type CollectionEntry {
 	"""
 	DID of the linked dataset
 	"""
-	did: DatasetID!
+	ref: DatasetID!
 	"""
-	Json object containing extra column values
+	Extra data associated with this entry
 	"""
 	extraData: JSON!
+	"""
+	Resolves the reference to linked dataset
+	"""
+	asDataset: Dataset
 }
 
 type CollectionEntryConnection {
@@ -430,7 +446,7 @@ input CollectionEntryInput {
 	"""
 	DID of the linked dataset
 	"""
-	did: DatasetID!
+	ref: DatasetID!
 	"""
 	Json object containing extra column values
 	"""
@@ -441,19 +457,33 @@ type CollectionMut {
 	"""
 	Links new entry to this collection
 	"""
-	addEntry(entry: CollectionEntryInput!): CollectionUpdateResult!
+	addEntry(entry: CollectionEntryInput!, expectedHead: Multihash): CollectionUpdateResult!
 	"""
-	Moves or rename an entry
+	Moves or renames an entry
 	"""
-	moveEntry(pathFrom: String!, pathTo: String!): CollectionUpdateResult!
+	moveEntry(pathFrom: String!, pathTo: String!, extraData: JSON, expectedHead: Multihash): CollectionUpdateResult!
 	"""
 	Remove an entry from this collection
 	"""
-	unlinkEntry(path: String!): CollectionUpdateResult!
+	removeEntry(path: String!, expectedHead: Multihash): CollectionUpdateResult!
 	"""
 	Execute multiple add / move / unlink operations as a single transaction
 	"""
-	batchUpdate(operations: [CollectionUpdateInput!]!): CollectionUpdateResult!
+	updateEntries(operations: [CollectionUpdateInput!]!, expectedHead: Multihash): CollectionUpdateResult!
+}
+
+type CollectionProjection {
+	"""
+	Returns the state of entries as they existed at specified point in time
+	"""
+	entries(pathPrefix: String, maxDepth: Int, page: Int, perPage: Int): CollectionEntryConnection!
+}
+
+type CollectionUpdateErrorCasFailed implements CollectionUpdateResult {
+	expectedHead: Multihash!
+	actualHead: Multihash!
+	isSuccess: Boolean!
+	errorMessage: String!
 }
 
 type CollectionUpdateErrorNotFound implements CollectionUpdateResult {
@@ -463,9 +493,22 @@ type CollectionUpdateErrorNotFound implements CollectionUpdateResult {
 }
 
 input CollectionUpdateInput {
+	"""
+	Inserts new entry under specified path. If an entry at the target path
+	already exists it will be retracted.
+	"""
 	add: CollectionUpdateInputAdd
+	"""
+	Retracts and appends an entry under the new path. Returns error if from
+	path does not exist. If an entry at the target path already exists it
+	will be retracted. Use this to update extra data by specifying same
+	source and target paths.
+	"""
 	move: CollectionUpdateInputMove
-	unlink: CollectionUpdateInputUnlink
+	"""
+	Removes the collection entry. Does nothing if entry does not exist.
+	"""
+	remove: CollectionUpdateInputRemove
 }
 
 input CollectionUpdateInputAdd {
@@ -475,9 +518,13 @@ input CollectionUpdateInputAdd {
 input CollectionUpdateInputMove {
 	pathFrom: String!
 	pathTo: String!
+	"""
+	Optionally update the extra data
+	"""
+	extraData: JSON
 }
 
-input CollectionUpdateInputUnlink {
+input CollectionUpdateInputRemove {
 	path: String!
 }
 
@@ -487,7 +534,13 @@ interface CollectionUpdateResult {
 }
 
 type CollectionUpdateSuccess implements CollectionUpdateResult {
+	oldHead: Multihash!
 	newHead: Multihash!
+	isSuccess: Boolean!
+	errorMessage: String!
+}
+
+type CollectionUpdateUpToDate implements CollectionUpdateResult {
 	isSuccess: Boolean!
 	errorMessage: String!
 }
@@ -687,9 +740,9 @@ enum DataQueryResultErrorKind {
 }
 
 type DataQueryResultSuccess {
-	schema: DataSchema
+	schema: DataSchema!
 	data: DataBatch!
-	datasets: [DatasetState!]
+	datasets: [DatasetState!]!
 	limit: Int!
 }
 
@@ -1275,7 +1328,7 @@ type DatasetsMut {
 		"""
 		How extra events are represented
 		"""
-		eventEventsFormat: MetadataManifestFormat,		initialEntries: [CollectionEntryInput!],
+		extraEventsFormat: MetadataManifestFormat,
 		"""
 		Visibility of the dataset
 		"""

@@ -369,7 +369,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
         .unwrap();
 
     odf::utils::testing::assert_data_eq(
-        res.df,
+        res.df.unwrap(),
         indoc::indoc!(
             r#"
             +--------+------+
@@ -389,7 +389,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
         .unwrap();
 
     odf::utils::testing::assert_data_eq(
-        res.df,
+        res.df.unwrap(),
         indoc::indoc!(
             r#"
             +--------+------+
@@ -443,8 +443,9 @@ async fn test_dataset_tail_empty_dataset() {
             10,
             GetDataOptions::default(),
         )
-        .await;
-    assert_matches!(res, Err(QueryError::DatasetSchemaNotAvailable(_)));
+        .await
+        .unwrap();
+    assert_matches!(res.df, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

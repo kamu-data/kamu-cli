@@ -47,6 +47,16 @@ impl Command for ExportCommand {
             .await
             .map_err(CLIError::failure)?;
 
+        let Some(df) = res.df else {
+            if !self.quiet {
+                eprintln!(
+                    "{}",
+                    console::style("Dataset is empty and has no schema").yellow(),
+                );
+            }
+            return Ok(());
+        };
+
         let mut default_path: PathBuf = PathBuf::new();
         default_path.push(self.dataset_ref.to_string());
         default_path.push(""); // ensure trailing slash to have it as a dir
@@ -62,7 +72,7 @@ impl Command for ExportCommand {
         };
         let rows_exported = self
             .export_service
-            .export_to_fs(res.df, output_path, options)
+            .export_to_fs(df, output_path, options)
             .await?;
 
         if !self.quiet {

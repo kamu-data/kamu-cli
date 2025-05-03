@@ -172,10 +172,11 @@ pub struct QueryStateDataset {
 #[derive(Debug, Clone)]
 pub struct GetDataResponse {
     /// A [`DataFrameExt`] that can be used to read schema and access the data.
-    /// Note that the data frames are "lazy". They are a representation of a
-    /// logical query plan. The actual query is executed only when you pull
-    /// the resulting data from it.
-    pub df: DataFrameExt,
+    /// `None` when dataset schema was not yet defined. Note that the data
+    /// frames are "lazy". They are a representation of a logical query
+    /// plan. The actual query is executed only when you pull the resulting
+    /// data from it.
+    pub df: Option<DataFrameExt>,
 
     /// Handle of the resolved dataset
     pub dataset_handle: odf::DatasetHandle,
@@ -242,13 +243,6 @@ pub enum QueryError {
         #[from]
         #[backtrace]
         DatasetBlockNotFoundError,
-    ),
-
-    #[error(transparent)]
-    DatasetSchemaNotAvailable(
-        #[from]
-        #[backtrace]
-        DatasetSchemaNotAvailableError,
     ),
 
     #[error(transparent)]
@@ -442,15 +436,6 @@ pub enum BadQueryErrorSource {
     Single(datafusion::error::DataFusionError),
     Shared(Arc<datafusion::error::DataFusionError>),
     Collection(Vec<datafusion::error::DataFusionError>),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset schema is not yet available for {dataset_handle}")]
-pub struct DatasetSchemaNotAvailableError {
-    pub dataset_handle: odf::DatasetHandle,
-    pub block_hash: odf::Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

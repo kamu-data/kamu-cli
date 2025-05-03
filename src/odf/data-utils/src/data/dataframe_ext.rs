@@ -121,6 +121,11 @@ impl DataFrameExt {
         self.0.select_columns(columns).map(Self)
     }
 
+    #[tracing::instrument(level = "info", name = "DataFrame::show", skip_all)]
+    pub async fn show(self) -> Result<(), DataFusionError> {
+        self.0.show().await
+    }
+
     pub fn sort(self, expr: Vec<SortExpr>) -> Result<Self, DataFusionError> {
         self.0.sort(expr).map(Self)
     }

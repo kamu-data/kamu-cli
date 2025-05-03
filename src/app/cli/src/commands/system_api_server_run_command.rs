@@ -164,7 +164,7 @@ impl Command for APIServerRunCommand {
                     s(access_token).dim()
                 );
             } else {
-                tracing::warn!("Access token: {}", access_token)
+                tracing::warn!("Access token: {access_token}");
             }
         }
 
