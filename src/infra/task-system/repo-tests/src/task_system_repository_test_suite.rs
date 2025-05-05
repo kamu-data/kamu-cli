@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
@@ -523,7 +523,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskEventStore>().unwrap();
 
     // Initially, there is nothing to get
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert!(maybe_task_id.is_none());
 
     // Schedule a task
@@ -545,7 +545,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
         .unwrap();
 
     // The only queued task should be returned
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert_eq!(maybe_task_id, Some(task_id_1));
 
     // Mark the task as running
@@ -563,7 +563,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
         .unwrap();
 
     // Right now nothing should be visible
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert!(maybe_task_id.is_none());
 
     // Requeue the task (server restarted)
@@ -581,7 +581,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
         .unwrap();
 
     // The task should be visible again
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert_eq!(maybe_task_id, Some(task_id_1));
 
     // Now run and finish the task
@@ -608,7 +608,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
         .unwrap();
 
     // The task should disappear again
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert!(maybe_task_id.is_none());
 }
 
@@ -643,7 +643,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
     }
 
     // We should see the earliest registered task
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert_eq!(maybe_task_id, Some(task_ids[0]));
 
     // Mark task 0 as running
@@ -661,7 +661,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
         .unwrap();
 
     // Now we should see the next registered task
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert_eq!(maybe_task_id, Some(task_ids[1]));
 
     // Mark task 1 as running, then finished
@@ -688,7 +688,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
         .unwrap();
 
     // Now we should see the last registered task
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert_eq!(maybe_task_id, Some(task_ids[2]));
 
     // Task 0 got requeued
@@ -697,7 +697,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
             &task_ids[0],
             Some(last_event_ids[0]),
             vec![TaskEventRequeued {
-                event_time: Utc::now(),
+                event_time: Utc::now() - Duration::seconds(1), // to ensure time order
                 task_id: task_ids[0],
             }
             .into()],
@@ -705,8 +705,10 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
         .await
         .unwrap();
 
+    println!("===Before problem===");
+
     // This should bring task 0 back to the top of the queue
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert_eq!(maybe_task_id, Some(task_ids[0]));
 
     // Mark task 0 as running, then finished
@@ -733,7 +735,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
         .unwrap();
 
     // Task 2 should be the top again
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert_eq!(maybe_task_id, Some(task_ids[2]));
 
     // Mark task 2 as running
@@ -751,7 +753,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
         .unwrap();
 
     // We should see empty queue
-    let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
+    let maybe_task_id = event_store.try_get_queued_task(Utc::now()).await.unwrap();
     assert!(maybe_task_id.is_none());
 }
 

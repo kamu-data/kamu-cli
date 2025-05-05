@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use event_sourcing::EventStore;
 
@@ -19,8 +20,11 @@ pub trait TaskEventStore: EventStore<TaskState> {
     /// Generates new unique task identifier
     async fn new_task_id(&self) -> Result<TaskID, InternalError>;
 
-    /// Attempts to get the earliest queued task, if any
-    async fn try_get_queued_task(&self) -> Result<Option<TaskID>, InternalError>;
+    /// Attempts to get the earliest queued/retrying task, that is ready to run
+    async fn try_get_queued_task(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<TaskID>, InternalError>;
 
     /// Returns list of tasks, which are in Running state,
     /// from earliest to latest

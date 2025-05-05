@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
@@ -280,19 +280,25 @@ impl TaskEventStore for SqliteTaskSystemEventStore {
         Ok(TaskID::try_from(result.task_id).unwrap())
     }
 
-    /// Attempts to get the earliest queued task, if any
-    async fn try_get_queued_task(&self) -> Result<Option<TaskID>, InternalError> {
+    async fn try_get_queued_task(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<TaskID>, InternalError> {
         let mut tr = self.transaction.lock().await;
+
         let connection_mut = tr.connection_mut().await?;
+
+        let now_str = now.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
 
         let maybe_task_id = sqlx::query!(
             r#"
             SELECT task_id FROM tasks
             WHERE task_status IN ('queued', 'retrying')
-                AND next_attempt_at <= CURRENT_TIMESTAMP
+                AND next_attempt_at <= ?
             ORDER BY next_attempt_at ASC, task_id ASC
             LIMIT 1;
             "#,
+            now_str,
         )
         .try_map(|event_row| {
             let task_id = event_row.task_id;
