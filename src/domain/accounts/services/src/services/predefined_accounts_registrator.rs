@@ -13,7 +13,7 @@ use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
-use kamu_auth_rebac::{AccountPropertyName, RebacService};
+use kamu_auth_rebac::{boolean_property_value, RebacService};
 use odf::AccountID;
 
 use crate::LoginPasswordAuthProvider;
@@ -56,12 +56,13 @@ impl PredefinedAccountsRegistrator {
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
         // TODO: Revisit if batch property setting will be implemented
-        for (name, value) in [
-            AccountPropertyName::is_admin(account_config.is_admin),
-            AccountPropertyName::can_provision_accounts(account_config.can_provision_accounts),
-        ] {
+        let Some(account_properties) = account_config.properties.as_ref() else {
+            return Ok(());
+        };
+
+        for name in account_properties {
             self.rebac_service
-                .set_account_property(account_id, name, &value)
+                .set_account_property(account_id, *name, &boolean_property_value(true))
                 .await
                 .int_err()?;
         }

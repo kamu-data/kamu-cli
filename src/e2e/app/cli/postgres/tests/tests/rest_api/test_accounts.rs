@@ -47,8 +47,7 @@ kamu_cli_run_api_server_e2e_test!(
                 predefined:
                   - accountName: kamu
                     email: kamu@example.com
-                    isAdmin: true
-                    canProvisionAccounts: true
+                    properties: [isAdmin,canProvisionAccounts]
             "#
         ))
 );

@@ -25,6 +25,7 @@ use kamu_accounts_services::{
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
 };
+use kamu_auth_rebac::AccountPropertyName;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::testing::ClassifyByAllowanceIdsResponseTestHelper;
@@ -656,9 +657,13 @@ impl DatasetAuthorizerHarness {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
         if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
-            let mut account_config =
-                AccountConfig::test_config_from_name(logged_account.account_name.clone());
-            account_config.is_admin = is_admin;
+            let mut account_properties = Vec::new();
+            if is_admin {
+                account_properties.push(AccountPropertyName::IsAdmin);
+            }
+            let account_config =
+                AccountConfig::test_config_from_name(logged_account.account_name.clone())
+                    .set_properties(account_properties);
 
             predefined_accounts_config.predefined.push(account_config);
         }

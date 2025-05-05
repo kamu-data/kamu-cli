@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use email_utils::Email;
+use kamu_auth_rebac::AccountPropertyName;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -52,8 +53,7 @@ impl PredefinedAccountsConfig {
                 account_type: AccountType::User,
                 display_name: None,
                 avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
-                is_admin: true,
-                can_provision_accounts: false,
+                properties: Some(vec![AccountPropertyName::IsAdmin]),
                 registered_at: Utc::now(),
                 provider: String::from(PROVIDER_PASSWORD),
                 email: DUMMY_EMAIL_ADDRESS.clone(),
@@ -96,10 +96,7 @@ pub struct AccountConfig {
     pub avatar_url: Option<String>,
     #[serde(default = "AccountConfig::default_registered_at")]
     pub registered_at: DateTime<Utc>,
-    #[serde(default)]
-    pub is_admin: bool,
-    #[serde(default)]
-    pub can_provision_accounts: bool,
+    pub properties: Option<Vec<AccountPropertyName>>,
     #[serde(default)]
     pub treat_datasets_as_public: bool,
 }
@@ -119,8 +116,7 @@ impl AccountConfig {
             provider: Self::default_provider(),
             avatar_url: None,
             registered_at: Self::default_registered_at(),
-            is_admin: false,
-            can_provision_accounts: false,
+            properties: None,
             treat_datasets_as_public: false,
         }
     }
@@ -135,13 +131,14 @@ impl AccountConfig {
         self
     }
 
-    pub fn set_can_provision_accounts(mut self, can_provision_accounts: bool) -> Self {
-        self.can_provision_accounts = can_provision_accounts;
-        self
-    }
+    pub fn set_properties(mut self, properties: Vec<AccountPropertyName>) -> Self {
+        for property in properties {
+            let existing_properties = self.properties.get_or_insert_with(Vec::new);
 
-    pub fn set_is_admin(mut self, is_admin: bool) -> Self {
-        self.is_admin = is_admin;
+            if !existing_properties.contains(&property) {
+                existing_properties.push(property);
+            }
+        }
         self
     }
 

@@ -139,7 +139,13 @@ type AccountMut {
 	Update account email
 	"""
 	updateEmail(newEmail: String!): UpdateEmailResult!
+	"""
+	Create a new account
+	"""
 	createAccount(accountName: String!, email: String): CreateAccountResult!
+	"""
+	Reset password for selected account. Allowed only for admin users
+	"""
 	modifyPassword(accountName: AccountName!, password: String!): ModifyPasswordResult!
 	"""
 	Access to the mutable flow configurations of this account

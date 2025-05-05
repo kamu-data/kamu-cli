@@ -15,6 +15,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
+use kamu_auth_rebac::AccountPropertyName;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,
@@ -34,8 +35,7 @@ pub async fn authentication_catalogs(
     if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
         predefined_accounts_config.predefined.push(
             AccountConfig::test_config_from_name(logged_account.account_name.clone())
-                .set_can_provision_accounts(predefined_account_opts.can_provision_accounts)
-                .set_is_admin(predefined_account_opts.is_admin),
+                .set_properties(predefined_account_opts.into()),
         );
     } else {
         unreachable!();
@@ -92,4 +92,17 @@ pub fn expect_anonymous_access_error(response: async_graphql::Response) {
 pub struct PredefinedAccountOpts {
     pub is_admin: bool,
     pub can_provision_accounts: bool,
+}
+
+impl From<PredefinedAccountOpts> for Vec<AccountPropertyName> {
+    fn from(value: PredefinedAccountOpts) -> Self {
+        let mut result = Vec::new();
+        if value.is_admin {
+            result.push(AccountPropertyName::IsAdmin);
+        }
+        if value.can_provision_accounts {
+            result.push(AccountPropertyName::CanProvisionAccounts);
+        }
+        result
+    }
 }
