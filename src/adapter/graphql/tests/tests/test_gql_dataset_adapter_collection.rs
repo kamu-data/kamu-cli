@@ -785,7 +785,7 @@ impl GraphQLDatasetsHarness {
                                 asCollection {
                                     updateEntries(operations: $operations) {
                                         isSuccess
-                                        errorMessage
+                                        message
                                     }
                                 }
                             }
@@ -805,7 +805,7 @@ impl GraphQLDatasetsHarness {
             res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["updateEntries"],
             json!({
                 "isSuccess": true,
-                "errorMessage": "",
+                "message": "",
             })
         );
     }

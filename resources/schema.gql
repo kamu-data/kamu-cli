@@ -483,13 +483,13 @@ type CollectionUpdateErrorCasFailed implements CollectionUpdateResult {
 	expectedHead: Multihash!
 	actualHead: Multihash!
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 type CollectionUpdateErrorNotFound implements CollectionUpdateResult {
 	path: String!
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 input CollectionUpdateInput {
@@ -530,19 +530,19 @@ input CollectionUpdateInputRemove {
 
 interface CollectionUpdateResult {
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 type CollectionUpdateSuccess implements CollectionUpdateResult {
 	oldHead: Multihash!
 	newHead: Multihash!
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 type CollectionUpdateUpToDate implements CollectionUpdateResult {
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 """
@@ -3207,12 +3207,12 @@ type StartUploadVersionErrorTooLarge implements StartUploadVersionResult {
 	uploadSize: Int!
 	uploadLimit: Int!
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 interface StartUploadVersionResult {
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 type StartUploadVersionSuccess implements StartUploadVersionResult {
@@ -3222,7 +3222,7 @@ type StartUploadVersionSuccess implements StartUploadVersionResult {
 	headers: [KeyValue!]!
 	uploadToken: String!
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 
@@ -3420,18 +3420,17 @@ type UpdateVersionErrorCasFailed implements UpdateVersionResult {
 	expectedHead: Multihash!
 	actualHead: Multihash!
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult {
 	message: String!
 	isSuccess: Boolean!
-	errorMessage: String!
 }
 
 interface UpdateVersionResult {
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 type UpdateVersionSuccess implements UpdateVersionResult {
@@ -3440,7 +3439,7 @@ type UpdateVersionSuccess implements UpdateVersionResult {
 	newHead: Multihash!
 	contentHash: Multihash!
 	isSuccess: Boolean!
-	errorMessage: String!
+	message: String!
 }
 
 interface UpsertDatasetEnvVarResult {

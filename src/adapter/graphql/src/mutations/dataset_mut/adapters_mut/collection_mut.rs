@@ -355,7 +355,7 @@ pub struct CollectionUpdateInputRemove {
 #[derive(Interface)]
 #[graphql(
     field(name = "is_success", ty = "bool"),
-    field(name = "error_message", ty = "String")
+    field(name = "message", ty = "String")
 )]
 pub enum CollectionUpdateResult {
     Success(CollectionUpdateSuccess),
@@ -375,7 +375,7 @@ impl CollectionUpdateSuccess {
     async fn is_success(&self) -> bool {
         true
     }
-    async fn error_message(&self) -> String {
+    async fn message(&self) -> String {
         String::new()
     }
 }
@@ -386,7 +386,7 @@ impl CollectionUpdateUpToDate {
     async fn is_success(&self) -> bool {
         true
     }
-    async fn error_message(&self) -> String {
+    async fn message(&self) -> String {
         String::new()
     }
 }
@@ -402,7 +402,7 @@ impl CollectionUpdateErrorCasFailed {
     async fn is_success(&self) -> bool {
         false
     }
-    async fn error_message(&self) -> String {
+    async fn message(&self) -> String {
         "Expected head didn't match, dataset was likely updated concurrently".to_string()
     }
 }
@@ -417,7 +417,7 @@ impl CollectionUpdateErrorNotFound {
     async fn is_success(&self) -> bool {
         false
     }
-    async fn error_message(&self) -> String {
+    async fn message(&self) -> String {
         format!("Path {} does not exist", self.path)
     }
 }

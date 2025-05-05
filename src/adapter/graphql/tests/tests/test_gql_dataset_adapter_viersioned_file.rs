@@ -398,7 +398,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 uploadNewVersion(content: $content, expectedHead: $expectedHead) {
                                     isSuccess
-                                    errorMessage
+                                    message
                                 }
                             }
                         }
@@ -422,7 +422,7 @@ async fn test_versioned_file_create_in_band() {
         upload_result,
         json!({
             "isSuccess": false,
-            "errorMessage": "Expected head didn't match, dataset was likely updated concurrently",
+            "message": "Expected head didn't match, dataset was likely updated concurrently",
         })
     );
 
@@ -538,7 +538,7 @@ async fn test_versioned_file_extra_data() {
                             asVersionedFile {
                                 uploadNewVersion(content: $content, extraData: $extraData) {
                                     isSuccess
-                                    errorMessage
+                                    message
                                     ... on UpdateVersionSuccess {
                                         newVersion
                                         contentHash
@@ -571,7 +571,7 @@ async fn test_versioned_file_extra_data() {
         upload_result,
         json!({
             "isSuccess": true,
-            "errorMessage": "",
+            "message": "",
             "newVersion": 1,
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "newHead": head_v1,
@@ -769,7 +769,7 @@ async fn test_versioned_file_direct_upload_download() {
                             asVersionedFile {
                                 startUploadNewVersion(contentLength: $contentLength) {
                                     isSuccess
-                                    errorMessage
+                                    message
                                     ... on StartUploadVersionSuccess {
                                         method
                                         url
@@ -832,7 +832,7 @@ async fn test_versioned_file_direct_upload_download() {
                             asVersionedFile {
                                 finishUploadNewVersion(uploadToken: $uploadToken) {
                                     isSuccess
-                                    errorMessage
+                                    message
                                     ... on UpdateVersionSuccess {
                                         newVersion
                                         contentHash
@@ -862,7 +862,7 @@ async fn test_versioned_file_direct_upload_download() {
         upload_result,
         json!({
             "isSuccess": true,
-            "errorMessage": "",
+            "message": "",
             "newVersion": 1,
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "newHead": head_v1,
@@ -914,7 +914,7 @@ async fn test_versioned_file_direct_upload_download() {
     //     get_content_url,
     //     json!({
     //         "isSuccess": true,
-    //         "errorMessage": "",
+    //         "message": "",
     //         "version": 2,
     //         "blockHash": head_v1,
     //         "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),

@@ -351,7 +351,7 @@ impl VersionedFileMut {
 #[derive(Interface)]
 #[graphql(
     field(name = "is_success", ty = "bool"),
-    field(name = "error_message", ty = "String")
+    field(name = "message", ty = "String")
 )]
 pub enum UpdateVersionResult {
     Success(UpdateVersionSuccess),
@@ -372,7 +372,7 @@ impl UpdateVersionSuccess {
     async fn is_success(&self) -> bool {
         true
     }
-    async fn error_message(&self) -> String {
+    async fn message(&self) -> String {
         String::new()
     }
 }
@@ -388,7 +388,7 @@ impl UpdateVersionErrorCasFailed {
     async fn is_success(&self) -> bool {
         false
     }
-    async fn error_message(&self) -> String {
+    async fn message(&self) -> String {
         "Expected head didn't match, dataset was likely updated concurrently".to_string()
     }
 }
@@ -403,9 +403,6 @@ impl UpdateVersionErrorInvalidExtraData {
     async fn is_success(&self) -> bool {
         false
     }
-    async fn error_message(&self) -> &String {
-        &self.message
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -413,7 +410,7 @@ impl UpdateVersionErrorInvalidExtraData {
 #[derive(Interface)]
 #[graphql(
     field(name = "is_success", ty = "bool"),
-    field(name = "error_message", ty = "String")
+    field(name = "message", ty = "String")
 )]
 pub enum StartUploadVersionResult {
     Success(StartUploadVersionSuccess),
@@ -431,7 +428,7 @@ impl StartUploadVersionSuccess {
     async fn is_success(&self) -> bool {
         true
     }
-    async fn error_message(&self) -> String {
+    async fn message(&self) -> String {
         String::new()
     }
 }
@@ -447,7 +444,7 @@ impl StartUploadVersionErrorTooLarge {
     async fn is_success(&self) -> bool {
         false
     }
-    async fn error_message(&self) -> String {
+    async fn message(&self) -> String {
         format!(
             "Upload of {} exceeds the {} limit",
             humansize::format_size(self.upload_size, humansize::BINARY),
