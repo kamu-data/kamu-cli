@@ -467,6 +467,88 @@ async fn test_collection_path_prefix_and_max_depth() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_collection_entry_search() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Create empty dataset to link to
+    let foo = harness.create_root_dataset("foo").await.dataset_handle.id;
+    let bar = harness.create_root_dataset("bar").await.dataset_handle.id;
+    let baz = harness.create_root_dataset("baz").await.dataset_handle.id;
+
+    // Create collection dataset
+    let did = harness.create_collection("x", None).await;
+
+    harness
+        .update_entries(
+            &did,
+            json!([
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/foo",
+                            "ref": foo,
+                        }
+                    }
+                },
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/bar",
+                            "ref": bar,
+                        }
+                    }
+                },
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/baz/foo",
+                            "ref": foo,
+                        }
+                    }
+                }
+            ]),
+        )
+        .await;
+
+    // Path does not exist
+    pretty_assertions::assert_eq!(harness.get_entry(&did, "/barz").await, json!(null));
+
+    // Get single entry by path
+    pretty_assertions::assert_eq!(
+        harness.get_entry(&did, "/bar").await,
+        json!({
+            "path": "/bar",
+            "ref": bar,
+            "extraData": {},
+        })
+    );
+
+    // Reverse search by refs
+    pretty_assertions::assert_eq!(
+        harness.entries_by_ref(&did, &[&foo]).await,
+        json!([
+            {
+                "path": "/baz/foo",
+                "ref": foo,
+                "extraData": {},
+            },
+            {
+                "path": "/foo",
+                "ref": foo,
+                "extraData": {},
+            },
+        ])
+    );
+
+    pretty_assertions::assert_eq!(harness.entries_by_ref(&did, &[&baz]).await, json!([]));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_collection_resolve_ref_to_dataset() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
@@ -808,6 +890,73 @@ impl GraphQLDatasetsHarness {
                 "message": "",
             })
         );
+    }
+
+    pub async fn get_entry(&self, did: &str, path: &str) -> serde_json::Value {
+        let res = self
+            .execute_authorized_query(
+                async_graphql::Request::new(indoc!(
+                    r#"
+                    query ($datasetId: DatasetID!, $path: String!) {
+                        datasets {
+                            byId(datasetId: $datasetId) {
+                                asCollection {
+                                    latest {
+                                        entry(path: $path) {
+                                            path
+                                            ref
+                                            extraData
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "#
+                ))
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": did,
+                    "path": path,
+                }))),
+            )
+            .await;
+
+        assert!(res.is_ok(), "{res:#?}");
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["latest"]["entry"].clone()
+    }
+
+    pub async fn entries_by_ref(&self, did: &str, refs: &[&odf::DatasetID]) -> serde_json::Value {
+        let res = self
+            .execute_authorized_query(
+                async_graphql::Request::new(indoc!(
+                    r#"
+                    query ($datasetId: DatasetID!, $refs: [DatasetID!]!) {
+                        datasets {
+                            byId(datasetId: $datasetId) {
+                                asCollection {
+                                    latest {
+                                        entriesByRef(refs: $refs) {
+                                            path
+                                            ref
+                                            extraData
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "#
+                ))
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": did,
+                    "refs": refs,
+                }))),
+            )
+            .await;
+
+        assert!(res.is_ok(), "{res:#?}");
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["latest"]["entriesByRef"]
+            .clone()
     }
 }
 

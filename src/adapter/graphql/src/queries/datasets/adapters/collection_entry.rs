@@ -32,7 +32,7 @@ pub struct CollectionEntry {
     /// File system-like path
     /// Rooted, separated by forward slashes, with elements URL-encoded
     /// (e.g. `/foo%20bar/baz`)
-    pub path: String,
+    pub path: CollectionPath,
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
@@ -98,7 +98,7 @@ impl CollectionEntry {
             dataset,
             system_time,
             event_time,
-            path,
+            path: path.into(),
             reference: reference.into(),
             extra_data: record.into(),
         }

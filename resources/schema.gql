@@ -401,7 +401,7 @@ type CollectionEntry {
 	Rooted, separated by forward slashes, with elements URL-encoded
 	(e.g. `/foo%20bar/baz`)
 	"""
-	path: String!
+	path: CollectionPath!
 	"""
 	DID of the linked dataset
 	"""
@@ -438,11 +438,9 @@ type CollectionEntryEdge {
 
 input CollectionEntryInput {
 	"""
-	File system-like path
-	Rooted, separated by forward slashes, with elements URL-encoded
-	(e.g. `/foo%20bar/baz`)
+	Entry path
 	"""
-	path: String!
+	path: CollectionPath!
 	"""
 	DID of the linked dataset
 	"""
@@ -461,22 +459,35 @@ type CollectionMut {
 	"""
 	Moves or renames an entry
 	"""
-	moveEntry(pathFrom: String!, pathTo: String!, extraData: JSON, expectedHead: Multihash): CollectionUpdateResult!
+	moveEntry(pathFrom: CollectionPath!, pathTo: CollectionPath!, extraData: JSON, expectedHead: Multihash): CollectionUpdateResult!
 	"""
 	Remove an entry from this collection
 	"""
-	removeEntry(path: String!, expectedHead: Multihash): CollectionUpdateResult!
+	removeEntry(path: CollectionPath!, expectedHead: Multihash): CollectionUpdateResult!
 	"""
 	Execute multiple add / move / unlink operations as a single transaction
 	"""
 	updateEntries(operations: [CollectionUpdateInput!]!, expectedHead: Multihash): CollectionUpdateResult!
 }
 
+"""
+Collection entry paths are similar to HTTP path components. They are rooted (start with `/`), separated by forward slashes, with elements URL-encoded (e.g. `/foo%20bar/baz`)
+"""
+scalar CollectionPath
+
 type CollectionProjection {
+	"""
+	Returns an entry at the specified path
+	"""
+	entry(path: CollectionPath!): CollectionEntry
 	"""
 	Returns the state of entries as they existed at specified point in time
 	"""
-	entries(pathPrefix: String, maxDepth: Int, page: Int, perPage: Int): CollectionEntryConnection!
+	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int): CollectionEntryConnection!
+	"""
+	Find entries that link to specified DIDs
+	"""
+	entriesByRef(refs: [DatasetID!]!): [CollectionEntry!]!
 }
 
 type CollectionUpdateErrorCasFailed implements CollectionUpdateResult {
@@ -487,7 +498,7 @@ type CollectionUpdateErrorCasFailed implements CollectionUpdateResult {
 }
 
 type CollectionUpdateErrorNotFound implements CollectionUpdateResult {
-	path: String!
+	path: CollectionPath!
 	isSuccess: Boolean!
 	message: String!
 }
@@ -516,8 +527,8 @@ input CollectionUpdateInputAdd {
 }
 
 input CollectionUpdateInputMove {
-	pathFrom: String!
-	pathTo: String!
+	pathFrom: CollectionPath!
+	pathTo: CollectionPath!
 	"""
 	Optionally update the extra data
 	"""
@@ -525,7 +536,7 @@ input CollectionUpdateInputMove {
 }
 
 input CollectionUpdateInputRemove {
-	path: String!
+	path: CollectionPath!
 }
 
 interface CollectionUpdateResult {

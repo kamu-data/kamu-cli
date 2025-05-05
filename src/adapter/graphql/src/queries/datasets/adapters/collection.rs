@@ -61,12 +61,64 @@ impl CollectionProjection {
 impl CollectionProjection {
     const DEFAULT_ENTRIES_PER_PAGE: usize = 100;
 
+    /// Returns an entry at the specified path
+    #[tracing::instrument(level = "info", name = CollectionProjection_entry, skip_all)]
+    pub async fn entry(
+        &self,
+        ctx: &Context<'_>,
+        path: CollectionPath,
+    ) -> Result<Option<CollectionEntry>> {
+        use datafusion::logical_expr::{col, lit};
+
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
+        let Some(df) = query_svc
+            .get_data(
+                &self.state.dataset_handle().as_local_ref(),
+                domain::GetDataOptions {
+                    block_hash: self.as_of.clone(),
+                },
+            )
+            .await
+            .int_err()?
+            .df
+        else {
+            return Ok(None);
+        };
+
+        // Apply filters
+        // Note: we are still working with a changelog here in hope to narrow down the
+        // record set before projecting
+        let df = df.filter(col("path").eq(lit(path.to_string()))).int_err()?;
+
+        // Project changelog into a state
+        let df = odf::utils::data::changelog::project(
+            df,
+            &["path".to_string()],
+            &odf::metadata::DatasetVocabulary::default(),
+        )
+        .int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+
+        if records.is_empty() {
+            return Ok(None);
+        }
+
+        assert_eq!(records.len(), 1);
+        let record = records.into_iter().next().unwrap();
+        let entry =
+            CollectionEntry::from_json(self.state.resolved_dataset(ctx).await?.clone(), record);
+
+        Ok(Some(entry))
+    }
+
     /// Returns the state of entries as they existed at specified point in time
     #[tracing::instrument(level = "info", name = CollectionProjection_entries, skip_all)]
     pub async fn entries(
         &self,
         ctx: &Context<'_>,
-        path_prefix: Option<String>,
+        path_prefix: Option<CollectionPath>,
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,
@@ -101,7 +153,7 @@ impl CollectionProjection {
             Some(path_prefix) => df
                 .filter(
                     datafusion::functions::string::starts_with()
-                        .call(vec![col("path"), lit(path_prefix)]),
+                        .call(vec![col("path"), lit(path_prefix.to_string())]),
                 )
                 .int_err()?,
         };
@@ -136,6 +188,62 @@ impl CollectionProjection {
             per_page,
             total_count,
         ))
+    }
+
+    /// Find entries that link to specified DIDs
+    #[tracing::instrument(level = "info", name = CollectionProjection_entries_by_ref, skip_all, fields(refs))]
+    pub async fn entries_by_ref(
+        &self,
+        ctx: &Context<'_>,
+        refs: Vec<DatasetID<'static>>,
+    ) -> Result<Vec<CollectionEntry>> {
+        use datafusion::logical_expr::{col, lit};
+
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
+        let Some(df) = query_svc
+            .get_data(
+                &self.state.dataset_handle().as_local_ref(),
+                domain::GetDataOptions {
+                    block_hash: self.as_of.clone(),
+                },
+            )
+            .await
+            .int_err()?
+            .df
+        else {
+            return Ok(Vec::new());
+        };
+
+        // Apply filters
+        // Note: we are still working with a changelog here in hope to narrow down the
+        // record set before projecting
+        let df = df
+            .filter(col("ref").in_list(
+                refs.into_iter().map(|r| lit(r.to_string())).collect(),
+                false,
+            ))
+            .int_err()?;
+
+        // Project changelog into a state
+        let df = odf::utils::data::changelog::project(
+            df,
+            &["path".to_string()],
+            &odf::metadata::DatasetVocabulary::default(),
+        )
+        .int_err()?;
+
+        let df = df.sort(vec![col("path").sort(true, false)]).int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+
+        let dataset = self.state.resolved_dataset(ctx).await?;
+        let nodes = records
+            .into_iter()
+            .map(|r| CollectionEntry::from_json(dataset.clone(), r))
+            .collect();
+
+        Ok(nodes)
     }
 }
 

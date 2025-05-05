@@ -186,6 +186,10 @@ impl CollectionMut {
             }
         }
 
+        if diff.is_empty() {
+            return Ok(CollectionUpdateResult::UpToDate(CollectionUpdateUpToDate));
+        }
+
         let mut expected_head: odf::Multihash = expected_head;
         let mut res = None;
 
@@ -242,8 +246,8 @@ impl CollectionMut {
     pub async fn move_entry(
         &self,
         ctx: &Context<'_>,
-        path_from: String,
-        path_to: String,
+        path_from: CollectionPath,
+        path_to: CollectionPath,
         extra_data: Option<serde_json::Value>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
@@ -268,7 +272,7 @@ impl CollectionMut {
     pub async fn remove_entry(
         &self,
         ctx: &Context<'_>,
-        path: String,
+        path: CollectionPath,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
         self.update_entries_impl(
@@ -300,10 +304,8 @@ impl CollectionMut {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionEntryInput {
-    /// File system-like path
-    /// Rooted, separated by forward slashes, with elements URL-encoded
-    /// (e.g. `/foo%20bar/baz`)
-    pub path: String,
+    /// Entry path
+    pub path: CollectionPath,
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
@@ -338,8 +340,8 @@ pub struct CollectionUpdateInputAdd {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputMove {
-    pub path_from: String,
-    pub path_to: String,
+    pub path_from: CollectionPath,
+    pub path_to: CollectionPath,
 
     /// Optionally update the extra data
     pub extra_data: Option<serde_json::Value>,
@@ -347,7 +349,7 @@ pub struct CollectionUpdateInputMove {
 
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputRemove {
-    pub path: String,
+    pub path: CollectionPath,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -410,7 +412,7 @@ impl CollectionUpdateErrorCasFailed {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CollectionUpdateErrorNotFound {
-    pub path: String,
+    pub path: CollectionPath,
 }
 #[ComplexObject]
 impl CollectionUpdateErrorNotFound {
