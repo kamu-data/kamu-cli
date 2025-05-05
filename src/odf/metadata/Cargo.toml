@@ -42,7 +42,7 @@ digest = "0.10"
 thiserror = { version = "2", default-features = false, features = ["std"] }
 bitflags = { version = "2", default-features = false }
 
-datafusion = { optional = true, version = "46", default-features = false }
+datafusion = { optional = true, version = "47", default-features = false }
 rand = { optional = true, version = "0.8", default-features =  false }
 
 like = { version = "0.3", default-features = false }
@@ -59,7 +59,7 @@ ed25519-dalek = { version = "2", default-features = false, features = [
 
 # Serialization
 base64 = { version = "0.22", default-features = false, features = ["std"] }
-flatbuffers = "24"
+flatbuffers = "25"
 serde = { version = "1", features = ["derive"] }
 serde_with = "3"
 serde_yaml = "0.9"
@@ -69,7 +69,7 @@ prost = "0.13"
 tonic = "0.12"
 
 # Optional
-arrow = { optional = true, version = "54", default-features = false, features = ["ipc"] }
+arrow = { optional = true, version = "55", default-features = false, features = ["ipc"] }
 sqlx = { optional = true, version = "0.8", default-features = false }
 utoipa = { optional = true, version = "5", default-features = false, features = [
 ] }

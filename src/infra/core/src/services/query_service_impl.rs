@@ -255,7 +255,9 @@ impl QueryServiceImpl {
                 // We simply ignore unresolvable, letting query to fail at the execution stage.
                 for mut table in table_refs {
                     // Strip possible `kamu.kamu.` prefix
-                    while table.0.len() > 1 && table.0[0].value == "kamu" {
+                    while table.0.len() > 1
+                        && table.0[0].as_ident().map(|i| i.value.as_ref()) == Some("kamu")
+                    {
                         table.0.remove(0);
                     }
 
@@ -263,7 +265,9 @@ impl QueryServiceImpl {
                         continue;
                     }
 
-                    let alias = table.0.pop().unwrap().value;
+                    let datafusion::sql::sqlparser::ast::ObjectNamePart::Identifier(ident) =
+                        table.0.pop().unwrap();
+                    let alias = ident.value;
                     let Ok(dataset_ref) = odf::DatasetRef::try_from(&alias) else {
                         tracing::warn!(alias, "Ignoring table with invalid alias");
                         continue;
@@ -429,7 +433,7 @@ impl QueryServiceImpl {
                 let data_path =
                     object_store::path::Path::from_url_path(data_url.path()).int_err()?;
 
-                let metadata = read_data_slice_metadata(object_store, &data_path).await?;
+                let metadata = read_data_slice_metadata(object_store, data_path).await?;
 
                 Ok(Some(metadata.file_metadata().schema().clone()))
             }
@@ -627,26 +631,13 @@ impl QueryService for QueryServiceImpl {
 #[tracing::instrument(level = "debug", skip_all, fields(%data_slice_store_path))]
 async fn read_data_slice_metadata(
     object_store: Arc<dyn object_store::ObjectStore>,
-    data_slice_store_path: &object_store::path::Path,
+    data_slice_store_path: object_store::path::Path,
 ) -> Result<Arc<ParquetMetaData>, QueryError> {
-    let object_meta = object_store
-        .head(data_slice_store_path)
-        .await
-        .map_err(|e| {
-            tracing::error!(
-                error = ?e,
-                error_msg = %e,
-                "QueryService::read_data_slice_metadata: object store head failed",
-            );
-            e
-        })
-        .int_err()?;
-
-    let mut parquet_object_reader = ParquetObjectReader::new(object_store, object_meta);
+    let mut parquet_object_reader = ParquetObjectReader::new(object_store, data_slice_store_path);
 
     use datafusion::parquet::arrow::async_reader::AsyncFileReader;
     let metadata = parquet_object_reader
-        .get_metadata()
+        .get_metadata(None)
         .await
         .map_err(|e| {
             tracing::error!(
@@ -680,7 +671,7 @@ fn extract_table_refs_rec(
     // TODO: This may fail in some tricky cases like nested CTEs
     if let Some(with) = &query.with {
         for cte in &with.cte_tables {
-            tables.retain(|tn| tn.0.len() != 1 || tn.0[0] != cte.alias.name);
+            tables.retain(|tn| tn.0.len() != 1 || tn.0[0].as_ident() != Some(&cte.alias.name));
         }
     }
 

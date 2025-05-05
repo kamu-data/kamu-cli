@@ -124,7 +124,18 @@ impl Harness {
 
         let target = ResolvedDataset::from_created(&create_result);
 
-        let ctx = SessionContext::new();
+        let ctx = SessionContext::new_with_config(
+            // Override parquet `created_by` field for reproducible data and block hashes
+            SessionConfig::from_string_hash_map(
+                &[(
+                    "datafusion.execution.parquet.created_by".to_string(),
+                    "kamu tests".to_string(),
+                )]
+                .into_iter()
+                .collect(),
+            )
+            .unwrap(),
+        );
         let mut writer = DataWriterDataFusion::from_metadata_chain(
             ctx.clone(),
             target.clone(),
@@ -353,7 +364,7 @@ async fn test_data_tail_handler() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_query_handler() {
+async fn test_data_query_handler_success() {
     let harness = Harness::new().await;
 
     let client = async move {
@@ -489,14 +500,14 @@ async fn test_data_query_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620eff0958108b69c22e564b51059c199a81aa4645bad6bf316c305a4f6a7246333",
+                    "inputHash": "f1620b3c7db78f8343423b488aa0431793243f8828d99d1a416eeefbdaf7cfe8f476c",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u-OKQSymKgKkT57ERW_rY2hTHTDWgUZpwRhSJlFVvLm5KD9pilgehNbwjuA4QvUDYsUgqiPq2f_LrGl3CpJe4CA",
+                    "proofValue": "uX3T4s2bOOo0NKxHuE_DJc6oeRkZcmHnTVgJXuwTTKx1GkQ7AJs4njqw8FyYxsH1ANzUbSrA81NidYt35RDaFAA",
                 }
             }),
             response
@@ -647,14 +658,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f16208d66ab91456e3a5872efcfcda8e695cf0ae58d4bca1be38205a30883ac5c63ca",
+                    "inputHash": "f1620ea04d37acc04446aa2e87daa09152e0eb42ea1545ef2992ffe97404d501584cd",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u3MgIfrgWHjr89cAYXovpcJTu85OPabzsVLOJscahU8iTMi5K3hyX_-UOm9AxJ6yTpNHLszBPB1Un4WN1tt0gBw",
+                    "proofValue": "uT1ZArQ-FjxZdhpU3SjvLXBB4kOJN0VdGsLJUYFOjJfX08yQhUI6q4rrW5Y2Mm3P2Z71G30eZ_9t14wfjIyBwAw",
                 }
             }),
             response

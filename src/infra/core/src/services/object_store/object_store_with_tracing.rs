@@ -107,7 +107,7 @@ where
         skip_all,
         fields(%location, ?range, kind = std::any::type_name::<S>()),
     )]
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         self.0.get_range(location, range).await
     }
 
@@ -117,7 +117,7 @@ where
         skip_all,
         fields(%location, ?ranges, kind = std::any::type_name::<S>()),
     )]
-    async fn get_ranges(&self, location: &Path, ranges: &[Range<usize>]) -> Result<Vec<Bytes>> {
+    async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
         self.0.get_ranges(location, ranges).await
     }
 
@@ -160,7 +160,7 @@ where
         skip_all,
         fields(?prefix, kind = std::any::type_name::<S>()),
     )]
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         self.0.list(prefix)
     }
 
@@ -174,7 +174,7 @@ where
         &self,
         prefix: Option<&Path>,
         offset: &Path,
-    ) -> BoxStream<'_, Result<ObjectMeta>> {
+    ) -> BoxStream<'static, Result<ObjectMeta>> {
         self.0.list_with_offset(prefix, offset)
     }
 

@@ -51,8 +51,8 @@ tracing = "0.1"
 url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
-datafusion = { version = "46", default-features = false, features = ["parquet"] }
-object_store = { version = "0.11", default-features = false }
+datafusion = { version = "47", default-features = false, features = ["parquet"] }
+object_store = { version = "0.12", default-features = false }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }

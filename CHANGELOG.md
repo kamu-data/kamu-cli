@@ -14,12 +14,14 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - New REST endpoint `/system/info` and GQL endpoint `buildInfo` that return application version and build details
+### Changed
+- Upgraded to `datafusion v47.0.0` and latest `arrow`, `object-store`, and `flatbuffers` versions
 ### Fixed
 - Patched `GQL DatasetFlowTriggers::all_paused` to use similar optimization as account flow views
 
 ## [0.235.0] - 2025-04-24
 ### Added
-- `kamu-adapter-http`: Introduced the `from_catalog_n` macro for easier dependency extraction from the catalog.### Changed
+- `kamu-adapter-http`: Introduced the `from_catalog_n` macro for easier dependency extraction from the catalog.
 ### Changed
 - More flows listing speedup:
   - Using batch query to count datasets with flows belonging to an account
