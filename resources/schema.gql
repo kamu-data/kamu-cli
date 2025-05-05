@@ -3318,6 +3318,14 @@ type Task {
 	Time when task has reached a final outcome
 	"""
 	finishedAt: DateTime
+	"""
+	Time when next run attempt is planned
+	"""
+	nextAttemptAt: DateTime
+	"""
+	Number of attempts to run this task
+	"""
+	runAttempts: Int!
 }
 
 scalar TaskID

@@ -869,9 +869,28 @@ pub fn register_config_in_catalog(
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
-        Duration::seconds(task_agent_config.task_checking_interval_secs.unwrap()),
+        Duration::seconds(i64::from(task_agent_config.checking_interval_secs.unwrap())),
     ));
-    //
+    catalog_builder.add_value(kamu_task_system_inmem::domain::TaskSchedulerConfig::new(
+        kamu_task_system_services::domain::TaskRetryPolicy::new(
+            task_agent_config.max_retries.unwrap(),
+            task_agent_config.min_retry_delay_secs.unwrap(),
+            match task_agent_config.retry_backoff_type.unwrap() {
+                config::TaskRetryBackoffType::Fixed => {
+                    kamu_task_system_services::domain::TaskRetryBackoffType::Fixed
+                }
+                config::TaskRetryBackoffType::Linear => {
+                    kamu_task_system_services::domain::TaskRetryBackoffType::Linear
+                }
+                config::TaskRetryBackoffType::Exponential => {
+                    kamu_task_system_services::domain::TaskRetryBackoffType::Exponential
+                }
+                config::TaskRetryBackoffType::ExponentialWithJitter => {
+                    kamu_task_system_services::domain::TaskRetryBackoffType::ExponentialWithJitter
+                }
+            },
+        ),
+    ));
 
     // Search configuration
     let crate::config::SearchConfig {
