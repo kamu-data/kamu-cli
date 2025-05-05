@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO tasks (task_id, dataset_id, task_status, next_attempt_at, last_event_id)\n                VALUES ($1, $2, 'queued'::task_status_type, NULL, NULL)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "860b93252b3482abaaa0d0dae051608055f433ef7f5c2736509fb1ca95f8babe"
+}

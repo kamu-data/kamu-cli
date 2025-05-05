@@ -42,8 +42,8 @@ impl SqliteTaskSystemEventStore {
 
         sqlx::query!(
             r#"
-            INSERT INTO tasks (task_id, dataset_id, task_status, last_event_id)
-                VALUES ($1, $2, 'queued', NULL)
+            INSERT INTO tasks (task_id, dataset_id, task_status, next_attempt_at, last_event_id)
+                VALUES ($1, $2, 'queued', NULL, NULL)
             "#,
             task_id,
             maybe_dataset_id,
@@ -70,21 +70,23 @@ impl SqliteTaskSystemEventStore {
         let last_event = events.last().expect("Non empty event list expected");
 
         let event_task_id: i64 = (last_event.task_id()).try_into().unwrap();
+        let next_attempt_at = last_event.next_attempt_at();
         let latest_status = last_event.new_status();
 
         let affected_rows_count =
             sqlx::query!(
                 r#"
                 UPDATE tasks
-                    SET task_status = $2, last_event_id = $3
+                    SET task_status = $2, next_attempt_at = $3, last_event_id = $4
                     WHERE task_id = $1 AND (
-                        last_event_id IS NULL AND CAST($4 as INT8) IS NULL OR
-                        last_event_id IS NOT NULL AND CAST($4 as INT8) IS NOT NULL AND last_event_id = $4
+                        last_event_id IS NULL AND CAST($5 as INT8) IS NULL OR
+                        last_event_id IS NOT NULL AND CAST($5 as INT8) IS NOT NULL AND last_event_id = $5
                     )
                     RETURNING task_id
                 "#,
                 event_task_id,
                 latest_status,
+                next_attempt_at,
                 last_event_id,
                 maybe_prev_stored_event_id,
             )
@@ -286,9 +288,10 @@ impl TaskEventStore for SqliteTaskSystemEventStore {
         let maybe_task_id = sqlx::query!(
             r#"
             SELECT task_id FROM tasks
-                WHERE task_status = 'queued'
-                ORDER BY task_id ASC
-                LIMIT 1
+            WHERE task_status IN ('queued', 'retrying')
+                AND next_attempt_at <= CURRENT_TIMESTAMP
+            ORDER BY next_attempt_at ASC, task_id ASC
+            LIMIT 1;
             "#,
         )
         .try_map(|event_row| {

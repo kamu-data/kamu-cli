@@ -74,6 +74,8 @@ pub struct TaskEventFinished {
     pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
     pub outcome: TaskOutcome,
+    #[serde(default)]
+    pub next_attempt_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,7 +115,22 @@ impl TaskEvent {
         match self {
             TaskEvent::TaskCreated(_) | TaskEvent::TaskRequeued(_) => TaskStatus::Queued,
             TaskEvent::TaskRunning(_) => TaskStatus::Running,
-            TaskEvent::TaskCancelled(_) | TaskEvent::TaskFinished(_) => TaskStatus::Finished,
+            TaskEvent::TaskCancelled(_) => TaskStatus::Finished,
+            TaskEvent::TaskFinished(e) => {
+                if e.next_attempt_at.is_some() {
+                    TaskStatus::Retrying
+                } else {
+                    TaskStatus::Finished
+                }
+            }
+        }
+    }
+
+    pub fn next_attempt_at(&self) -> Option<DateTime<Utc>> {
+        if let TaskEvent::TaskFinished(e) = self {
+            e.next_attempt_at
+        } else {
+            None
         }
     }
 }

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT task_id FROM tasks\n            WHERE task_status IN ('queued', 'retrying')\n                AND next_attempt_at <= CURRENT_TIMESTAMP\n            ORDER BY next_attempt_at ASC, task_id ASC\n            LIMIT 1;\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "988c2db625751b04666096ed162fc900b34c26ef338a15ffaacbba1dfa119a0f"
+}
