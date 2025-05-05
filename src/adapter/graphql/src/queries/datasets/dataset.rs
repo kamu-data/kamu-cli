@@ -10,6 +10,7 @@
 use chrono::prelude::*;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{auth, ServerUrlConfig};
+use odf::dataset::MetadataChainExt;
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -22,17 +23,13 @@ pub struct Dataset {
     dataset_request_state: DatasetRequestStateWithOwner,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
-#[Object]
 impl Dataset {
-    #[graphql(skip)]
     pub fn new_access_checked(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
         Self {
             dataset_request_state: DatasetRequestState::new(dataset_handle).with_owner(owner),
         }
     }
 
-    #[graphql(skip)]
     pub async fn try_from_ref(
         ctx: &Context<'_>,
         dataset_ref: &odf::DatasetRef,
@@ -63,7 +60,6 @@ impl Dataset {
         Ok(TransformInputDataset::accessible(dataset))
     }
 
-    #[graphql(skip)]
     pub fn from_resolved_authorized_dataset(
         owner: Account,
         resolved_dataset: &kamu_core::ResolvedDataset,
@@ -74,6 +70,42 @@ impl Dataset {
         }
     }
 
+    async fn push_source_has_columns(&self, ctx: &Context<'_>, columns: &[&str]) -> Result<bool> {
+        let dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let (source, _merge) = match dataset
+            .as_metadata_chain()
+            .accept_one(kamu_core::WriterSourceEventVisitor::new(None))
+            .await
+            .int_err()?
+            .get_source_event_and_merge_strategy()
+        {
+            Ok(src) => src,
+            Err(kamu_core::ScanMetadataError::SourceNotFound(_)) => return Ok(false),
+            Err(kamu_core::ScanMetadataError::Internal(err)) => return Err(err.into()),
+        };
+
+        let Some(odf::MetadataEvent::AddPushSource(source)) = source else {
+            return Ok(false);
+        };
+
+        let push_source_columns: std::collections::BTreeSet<String> = source
+            .read
+            .schema()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|c| c.split_once(' ').map(|s| s.0.to_string()))
+            .collect();
+
+        Ok(columns
+            .iter()
+            .all(|name| push_source_columns.contains(*name)))
+    }
+}
+
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[Object]
+impl Dataset {
     /// Unique identifier of the dataset
     async fn id(&self) -> DatasetID {
         self.dataset_request_state.dataset_id().into()
@@ -259,13 +291,28 @@ impl Dataset {
     }
 
     /// Downcast a dataset to a versioned file interface
-    async fn as_versioned_file(&self) -> VersionedFile {
-        VersionedFile::new(self.dataset_request_state.clone())
+    async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile>> {
+        // TODO: Currently guessing whether its OK to cast by push source. Replace with
+        // some archetype metadata on ODF layer.
+        if !self
+            .push_source_has_columns(ctx, &["version", "content_hash"])
+            .await?
+        {
+            return Ok(None);
+        }
+
+        Ok(Some(VersionedFile::new(self.dataset_request_state.clone())))
     }
 
     /// Downcast a dataset to a collection interface
-    async fn as_collection(&self) -> Collection {
-        Collection::new(self.dataset_request_state.clone())
+    async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<Collection>> {
+        // TODO: Currently guessing whether its OK to cast by push source. Replace with
+        // some archetype metadata on ODF layer.
+        if !self.push_source_has_columns(ctx, &["path", "ref"]).await? {
+            return Ok(None);
+        }
+
+        Ok(Some(Collection::new(self.dataset_request_state.clone())))
     }
 }
 
