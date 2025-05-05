@@ -197,6 +197,7 @@ impl Projection for TaskState {
                     E::TaskFinished(TaskEventFinished {
                         event_time,
                         outcome,
+                        next_attempt_at,
                         ..
                     }) if s.status() == TaskStatus::Running => {
                         // Record the result of the last attempt
@@ -206,11 +207,6 @@ impl Projection for TaskState {
                             finished_at: event_time,
                             outcome,
                         });
-
-                        // Compute if there will be a next attempt and when
-                        let next_attempt_at = s
-                            .retry_policy
-                            .next_attempt_at(u32::try_from(attempts.len()).unwrap(), event_time);
 
                         Ok(Self {
                             attempts,

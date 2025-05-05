@@ -74,10 +74,19 @@ impl Task {
         now: DateTime<Utc>,
         outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<TaskState>> {
+        // Compute if there will be a next attempt and when
+        let next_attempt_at = if outcome.is_failed() {
+            self.retry_policy
+                .next_attempt_at(u32::try_from(self.attempts.len()).unwrap(), now)
+        } else {
+            None
+        };
+
         let event = TaskEventFinished {
             event_time: now,
             task_id: self.task_id,
             outcome,
+            next_attempt_at,
         };
         self.apply(event)
     }

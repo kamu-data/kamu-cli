@@ -83,6 +83,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         task_id: task_id_1,
         outcome: TaskOutcome::Cancelled,
+        next_attempt_at: None,
     };
 
     event_store
@@ -156,6 +157,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         event_time: Utc::now(),
         task_id,
         outcome: TaskOutcome::Cancelled,
+        next_attempt_at: None,
     };
 
     let latest_event_id = event_store
@@ -272,12 +274,14 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
         event_time: Utc::now(),
         task_id: task_id_1,
         outcome: TaskOutcome::Cancelled,
+        next_attempt_at: None,
     };
 
     let event_2_3 = TaskEventFinished {
         event_time: Utc::now(),
         task_id: task_id_2,
         outcome: TaskOutcome::Failed(TaskError::Empty),
+        next_attempt_at: None,
     };
 
     event_store
@@ -595,6 +599,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
                     event_time: Utc::now(),
                     task_id: task_id_1,
                     outcome: TaskOutcome::Success(TaskResult::Empty),
+                    next_attempt_at: None,
                 }
                 .into(),
             ],
@@ -674,6 +679,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
                     event_time: Utc::now(),
                     task_id: task_ids[1],
                     outcome: TaskOutcome::Success(TaskResult::Empty),
+                    next_attempt_at: None,
                 }
                 .into(),
             ],
@@ -718,6 +724,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
                     event_time: Utc::now(),
                     task_id: task_ids[0],
                     outcome: TaskOutcome::Success(TaskResult::Empty),
+                    next_attempt_at: None,
                 }
                 .into(),
             ],
@@ -890,6 +897,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
                 event_time: Utc::now(),
                 task_id: task_ids[1],
                 outcome: TaskOutcome::Success(TaskResult::Empty),
+                next_attempt_at: None,
             }
             .into()],
         )
