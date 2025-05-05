@@ -34,7 +34,7 @@ use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
-use kamu_task_system::{self as ts, TaskMetadata};
+use kamu_task_system::{self as ts, TaskSchedulerConfig};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt};
@@ -159,7 +159,7 @@ async fn test_trigger_ingest_root_dataset() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let response = schema
         .execute(
@@ -457,7 +457,7 @@ async fn test_trigger_reset_root_dataset_flow() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
@@ -773,7 +773,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
@@ -988,7 +988,7 @@ async fn test_trigger_compaction_root_dataset() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let response = schema
         .execute(
@@ -1937,7 +1937,7 @@ async fn test_cancel_ingest_root_dataset() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness
@@ -2009,7 +2009,7 @@ async fn test_cancel_running_transform_derived_dataset() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness
@@ -2080,7 +2080,7 @@ async fn test_cancel_hard_compaction_root_dataset() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness
@@ -2317,7 +2317,7 @@ async fn test_cancel_already_aborted_flow() {
     let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
         .as_str()
         .unwrap();
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness
@@ -2397,7 +2397,7 @@ async fn test_cancel_already_succeeded_flow() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness
@@ -2475,7 +2475,7 @@ async fn test_history_of_completed_flow() {
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     harness
         .mimic_flow_secondary_trigger(
@@ -2643,7 +2643,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
     );
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]);
 
     let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
@@ -2790,7 +2790,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
 
     let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("1", schedule_time).await;
-    let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]);
+    let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]);
 
     let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
@@ -3086,6 +3086,7 @@ impl FlowRunsHarness {
                     Duration::seconds(1),
                     Duration::minutes(1),
                 ))
+                .add_value(TaskSchedulerConfig::default())
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>();
 

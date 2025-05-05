@@ -66,4 +66,14 @@ impl Task {
     async fn finished_at(&self) -> Option<DateTime<Utc>> {
         self.state.finished_at()
     }
+
+    /// Time when next run attempt is planned
+    async fn next_attempt_at(&self) -> Option<DateTime<Utc>> {
+        self.state.timing.next_attempt_at
+    }
+
+    /// Number of attempts to run this task
+    async fn run_attempts(&self) -> usize {
+        self.state.attempts.len()
+    }
 }

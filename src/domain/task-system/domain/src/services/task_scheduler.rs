@@ -112,3 +112,19 @@ impl From<LoadError<TaskState>> for CancelTaskError {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct TaskSchedulerConfig {
+    /// Defines retry policy for task execution
+    pub task_retry_policy: TaskRetryPolicy,
+}
+
+impl TaskSchedulerConfig {
+    pub fn new(task_retry_policy: TaskRetryPolicy) -> Self {
+        Self { task_retry_policy }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

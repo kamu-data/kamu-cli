@@ -17,8 +17,8 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
-use kamu_datasets_services::DatasetEnvVarServiceImpl;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
+use kamu_datasets_services::{DatasetEnvVarServiceImpl, DependencyGraphServiceImpl};
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::*;
@@ -32,12 +32,18 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_pre_run_requeues_running_tasks() {
-    let harness = TaskAgentHarness::new(MockOutbox::new(), MockTaskRunner::new());
+    let harness = TaskAgentHarness::new(None, MockOutbox::new(), MockTaskRunner::new());
 
     // Schedule 3 tasks
-    let task_id_1 = harness.schedule_probe_task().await;
-    let task_id_2 = harness.schedule_probe_task().await;
-    let task_id_3 = harness.schedule_probe_task().await;
+    let task_id_1 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_2 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_3 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
 
     // Make 2 of 3 Running
     let task_1 = harness.try_take_task().await;
@@ -84,8 +90,10 @@ async fn test_run_single_task() {
     );
 
     // Schedule the only task
-    let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
-    let task_id = harness.schedule_probe_task().await;
+    let harness = TaskAgentHarness::new(None, mock_outbox, mock_task_runner);
+    let task_id = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
     let task = harness.get_task(task_id).await;
     assert_eq!(task.status(), TaskStatus::Queued);
 
@@ -115,10 +123,16 @@ async fn test_run_two_of_three_tasks() {
     );
 
     // Schedule 3 tasks
-    let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
-    let task_id_1 = harness.schedule_probe_task().await;
-    let task_id_2 = harness.schedule_probe_task().await;
-    let task_id_3 = harness.schedule_probe_task().await;
+    let harness = TaskAgentHarness::new(None, mock_outbox, mock_task_runner);
+    let task_id_1 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_2 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_3 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
 
     // All 3 must be in Queued state before runs
     let task_1 = harness.get_task(task_id_1).await;
@@ -143,6 +157,60 @@ async fn test_run_two_of_three_tasks() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_failures_are_retried_with_policy() {
+    let mut mock_outbox = MockOutbox::new();
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+
+    let custom_probe_plan = LogicalPlanProbe {
+        dataset_id: None,
+        busy_time: None,
+        end_with_outcome: Some(TaskOutcome::Failed(TaskError::Empty)),
+    };
+
+    let mut mock_task_runner = MockTaskRunner::new();
+    TaskAgentHarness::add_run_probe_plan_expectations(
+        &mut mock_task_runner,
+        custom_probe_plan.clone(),
+        3, // 3 attempts
+    );
+
+    // Make harness with custom retry policy
+    let harness = TaskAgentHarness::new(
+        Some(TaskSchedulerConfig {
+            task_retry_policy: TaskRetryPolicy::new(2, 1, TaskRetryBackoffType::Fixed),
+        }),
+        mock_outbox,
+        mock_task_runner,
+    );
+
+    // Schedule a task
+    let task_id = harness.schedule_probe_task(custom_probe_plan).await;
+
+    // Task must be in Queued state before run
+    let task = harness.get_task(task_id).await;
+    assert_eq!(task.status(), TaskStatus::Queued);
+
+    // Round 1... expect retrying after
+    harness.task_agent.run_single_task().await.unwrap();
+    let task = harness.get_task(task_id).await;
+    assert_eq!(task.status(), TaskStatus::Retrying);
+
+    // Round 2... still expect retrying after
+    harness.task_agent.run_single_task().await.unwrap();
+    let task = harness.get_task(task_id).await;
+    assert_eq!(task.status(), TaskStatus::Retrying);
+
+    // Round 3.. now it should fail
+    harness.task_agent.run_single_task().await.unwrap();
+    let task = harness.get_task(task_id).await;
+    assert_eq!(task.status(), TaskStatus::Finished);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct TaskAgentHarness {
     _tempdir: TempDir,
     catalog: Catalog,
@@ -151,7 +219,11 @@ struct TaskAgentHarness {
 }
 
 impl TaskAgentHarness {
-    pub fn new(mock_outbox: MockOutbox, mock_task_runner: MockTaskRunner) -> Self {
+    pub fn new(
+        maybe_task_scheduler_config: Option<TaskSchedulerConfig>,
+        mock_outbox: MockOutbox,
+        mock_task_runner: MockTaskRunner,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -159,6 +231,8 @@ impl TaskAgentHarness {
 
         let repos_dir = tempdir.path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();
+
+        let task_scheduler_config = maybe_task_scheduler_config.unwrap_or_default();
 
         let mut b = CatalogBuilder::new();
         b.add::<TaskAgentImpl>()
@@ -180,18 +254,23 @@ impl TaskAgentHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteRepositoryRegistryImpl>()
+            .add::<RemoteAliasResolverImpl>()
             .add_value(IpfsGateway::default())
             .add_value(IpfsClient::default())
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DatasetEnvVarServiceImpl>()
             .add::<InMemoryDatasetEnvVarRepository>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
             ))
             .add::<DatasetRegistrySoloUnitBridge>()
+            .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_value(TaskAgentConfig::new(chrono::Duration::seconds(1)))
+            .add_value(task_scheduler_config)
             .add_value(DatasetEnvVarsConfig::sample());
 
         NoOpDatabasePlugin::init_database_components(&mut b);
@@ -209,15 +288,9 @@ impl TaskAgentHarness {
         }
     }
 
-    async fn schedule_probe_task(&self) -> TaskID {
+    async fn schedule_probe_task(&self, probe_plan: LogicalPlanProbe) -> TaskID {
         self.task_scheduler
-            .create_task(
-                LogicalPlanProbe {
-                    ..LogicalPlanProbe::default()
-                }
-                .into(),
-                None,
-            )
+            .create_task(probe_plan.into(), None)
             .await
             .unwrap()
             .task_id
@@ -274,17 +347,24 @@ impl TaskAgentHarness {
         probe: LogicalPlanProbe,
         times: usize,
     ) {
+        let probe_plan = probe.clone();
+
         mock_task_runner
             .expect_run_task()
             .withf(move |td| {
                 matches!(
                     td,
                     TaskDefinition::Probe(TaskDefinitionProbe { probe: probe_ })
-                    if probe_ == &probe
+                    if probe_ == &probe_plan
                 )
             })
             .times(times)
-            .returning(|_| Ok(TaskOutcome::Success(TaskResult::Empty)));
+            .returning(move |_| {
+                Ok(probe
+                    .end_with_outcome
+                    .clone()
+                    .unwrap_or(TaskOutcome::Success(TaskResult::Empty)))
+            });
     }
 }
 

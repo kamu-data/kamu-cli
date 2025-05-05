@@ -18,6 +18,7 @@ use time_source::SystemTimeSource;
 pub struct TaskSchedulerImpl {
     task_event_store: Arc<dyn TaskEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
+    scheduler_config: Arc<TaskSchedulerConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,10 +29,12 @@ impl TaskSchedulerImpl {
     pub fn new(
         task_event_store: Arc<dyn TaskEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
+        scheduler_config: Arc<TaskSchedulerConfig>,
     ) -> Self {
         Self {
             task_event_store,
             time_source,
+            scheduler_config,
         }
     }
 }
@@ -52,7 +55,7 @@ impl TaskScheduler for TaskSchedulerImpl {
             self.task_event_store.new_task_id().await?,
             logical_plan,
             metadata,
-            TaskRetryPolicy::default(),
+            self.scheduler_config.task_retry_policy,
         );
         task.save(self.task_event_store.as_ref()).await.int_err()?;
 
