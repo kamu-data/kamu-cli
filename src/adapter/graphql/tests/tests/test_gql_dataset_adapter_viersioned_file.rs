@@ -11,8 +11,6 @@ use base64::Engine;
 use bon::bon;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::RebacServiceImpl;
 use kamu_core::*;
 use kamu_datasets_services::*;
 use serde_json::json;
@@ -868,65 +866,6 @@ async fn test_versioned_file_direct_upload_download() {
             "newHead": head_v1,
         })
     );
-
-    // // Read back latest content
-    // let res = harness
-    //     .execute_authorized_query(
-    //         async_graphql::Request::new(indoc!(
-    //             r#"
-    //             query ($datasetId: DatasetID!) {
-    //                 datasets {
-    //                     byId(datasetId: $datasetId) {
-    //                         asVersionedFile {
-    //                             latest {
-    //                                 version
-    //                                 blockHash
-    //                                 contentType
-    //                                 contentHash
-    //                                 extraData
-    //                                 contentDownload {
-    //                                     url
-    //                                     headers { key value }
-    //                                     expiresAt
-    //                                 }
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //             "#
-    //         ))
-    //         .variables(async_graphql::Variables::from_json(json!({
-    //             "datasetId": &did,
-    //         }))),
-    //     )
-    //     .await;
-
-    // assert!(res.is_ok(), "{res:#?}");
-    // let get_content_url =
-    // res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
-    //     ["getContentUrl"]
-    //     .clone();
-    // let url = get_content_url["url"].as_str().unwrap();
-    // let headers = &get_content_url["headers"];
-    // let expires_at = get_content_url["expiresAt"].as_str().unwrap();
-    // pretty_assertions::assert_eq!(
-    //     get_content_url,
-    //     json!({
-    //         "isSuccess": true,
-    //         "message": "",
-    //         "version": 2,
-    //         "blockHash": head_v1,
-    //         "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
-    //         "contentType": "application/octet-stream",
-    //         "extraData": {},
-    //         "url": url,
-    //         "headers": headers,
-    //         "expiresAt": expires_at,
-    //     })
-    // );
-
-    // assert_eq!(url, "");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -957,13 +896,6 @@ impl GraphQLDatasetsHarness {
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
             .add::<RenameDatasetUseCaseImpl>()
             .add::<DeleteDatasetUseCaseImpl>()
-            .add::<RebacServiceImpl>()
-            .add_value(kamu_auth_rebac_services::DefaultAccountProperties { is_admin: false })
-            .add_value(kamu_auth_rebac_services::DefaultDatasetProperties {
-                allows_anonymous_read: false,
-                allows_public_read: false,
-            })
-            .add::<InMemoryRebacRepository>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add::<kamu::QueryServiceImpl>()
             .add::<kamu::ObjectStoreRegistryImpl>()

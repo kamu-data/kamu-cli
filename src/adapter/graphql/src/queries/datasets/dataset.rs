@@ -88,12 +88,12 @@ impl Dataset {
             return Ok(false);
         };
 
-        let push_source_columns: std::collections::BTreeSet<String> = source
-            .read
-            .schema()
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
+        let Some(schema_ddl) = source.read.schema() else {
+            return Ok(false);
+        };
+
+        let push_source_columns: std::collections::BTreeSet<String> = schema_ddl
+            .iter()
             .filter_map(|c| c.split_once(' ').map(|s| s.0.to_string()))
             .collect();
 

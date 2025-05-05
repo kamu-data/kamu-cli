@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - New REST endpoint `/system/info` and GQL endpoint `buildInfo` that return application version and build details
+- New experimental "Versioned File" dataset archetype that simplifies using ODF datasets for storing versioned history of binary content
+- New experimental "Collection" dataset archetype that allows organizing other ODF datasets into hierarchical collections similar to directory structure
 ### Changed
 - Upgraded to `datafusion v47.0.0` and latest `arrow`, `object-store`, and `flatbuffers` versions
 ### Fixed

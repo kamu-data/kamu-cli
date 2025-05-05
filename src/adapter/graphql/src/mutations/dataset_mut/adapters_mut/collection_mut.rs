@@ -193,9 +193,9 @@ impl CollectionMut {
         let mut expected_head: odf::Multihash = expected_head;
         let mut res = None;
 
-        // TODO: PERF: FIXMEEEEEEEEEEEEEEEEEEEEEEEEEEEEE: Writing each operation in a
-        // different block to work around changelog sorting issue. This is a performance
-        // killer.
+        // TODO: PERF: FIXME: Writing each operation in a different block to work around
+        // changelog sorting issue.
+        // See: https://github.com/kamu-data/kamu-cli/issues/1228
         for op in diff {
             match self
                 .write_records(ctx, vec![op], Some(expected_head.clone()))

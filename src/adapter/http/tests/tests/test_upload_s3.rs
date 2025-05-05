@@ -40,7 +40,6 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use s3_utils::S3Context;
 use serde_json::json;
