@@ -85,7 +85,11 @@ impl TaskScheduler for TaskSchedulerImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn try_take(&self) -> Result<Option<Task>, TakeTaskError> {
         // Try reading just 1 earliest queued task
-        let Some(task_id) = self.task_event_store.try_get_queued_task().await? else {
+        let Some(task_id) = self
+            .task_event_store
+            .try_get_queued_task(self.time_source.now())
+            .await?
+        else {
             // No queued tasks yet..
             return Ok(None);
         };

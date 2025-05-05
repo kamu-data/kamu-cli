@@ -10,6 +10,7 @@
 use std::collections::hash_map::{Entry, HashMap};
 use std::collections::BTreeMap;
 
+use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_task_system::*;
@@ -26,7 +27,7 @@ pub struct InMemoryTaskEventStore {
 struct State {
     events: Vec<TaskEvent>,
     tasks_by_dataset: HashMap<odf::DatasetID, Vec<TaskID>>,
-    task_statuses: BTreeMap<TaskID, TaskStatus>,
+    task_data: BTreeMap<TaskID, (TaskStatus, Option<DateTime<Utc>>)>,
     last_task_id: Option<TaskID>,
 }
 
@@ -80,9 +81,10 @@ impl InMemoryTaskEventStore {
             }
         }
 
-        state
-            .task_statuses
-            .insert(event.task_id(), event.new_status());
+        state.task_data.insert(
+            event.task_id(),
+            (event.new_status(), event.next_attempt_at()),
+        );
     }
 }
 
@@ -131,15 +133,43 @@ impl TaskEventStore for InMemoryTaskEventStore {
         Ok(self.inner.as_state().lock().unwrap().next_task_id())
     }
 
-    /// Attempts to get the earliest queued task, if any
-    async fn try_get_queued_task(&self) -> Result<Option<TaskID>, InternalError> {
+    async fn try_get_queued_task(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<TaskID>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
+
         let maybe_task_id = g
-            .task_statuses
+            .task_data
             .iter()
-            .find(|(_, status)| **status == TaskStatus::Queued)
+            .filter_map(|(id, (status, next_attempt_at))| match status {
+                TaskStatus::Queued | TaskStatus::Retrying => {
+                    assert!(next_attempt_at.is_some());
+                    if next_attempt_at.unwrap() > now {
+                        None
+                    } else {
+                        Some((id, next_attempt_at.unwrap()))
+                    }
+                }
+                TaskStatus::Running | TaskStatus::Finished => {
+                    assert!(next_attempt_at.is_none());
+                    None
+                }
+            })
+            .inspect(|(id, time)| {
+                println!(
+                    "Task ID: {}, Next Attempt At: {}",
+                    id,
+                    time.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                );
+            })
+            .min_by(|(id_a, time_a), (id_b, time_b)| match time_a.cmp(time_b) {
+                std::cmp::Ordering::Equal => id_a.cmp(id_b),
+                ord => ord,
+            })
             .map(|(id, _)| *id);
+
         Ok(maybe_task_id)
     }
 
@@ -149,9 +179,9 @@ impl TaskEventStore for InMemoryTaskEventStore {
         let task_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
-            g.task_statuses
+            g.task_data
                 .iter()
-                .filter(|(_, status)| **status == TaskStatus::Running)
+                .filter(|(_, (status, _))| *status == TaskStatus::Running)
                 .skip(pagination.offset)
                 .take(pagination.limit)
                 .map(|(id, _)| Ok(*id))
@@ -167,7 +197,7 @@ impl TaskEventStore for InMemoryTaskEventStore {
         let g = state.lock().unwrap();
         let mut count = 0;
 
-        for task_status in g.task_statuses.values() {
+        for (task_status, _) in g.task_data.values() {
             if *task_status == TaskStatus::Running {
                 count += 1;
             }
