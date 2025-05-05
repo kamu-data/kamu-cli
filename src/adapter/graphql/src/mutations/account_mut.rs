@@ -70,7 +70,7 @@ impl AccountMut {
         }
     }
 
-    // Create a new account
+    /// Create a new account
     async fn create_account(
         &self,
         ctx: &Context<'_>,
@@ -88,7 +88,7 @@ impl AccountMut {
         let new_email = email.unwrap_or(
             if let Some(parent_account_parts) = self.account.email.to_string().split_once('@') {
                 format!(
-                    "{}_{}@{}",
+                    "{}+{}@{}",
                     parent_account_parts.0, account_name, parent_account_parts.1
                 )
             } else {
@@ -122,7 +122,7 @@ impl AccountMut {
         }
     }
 
-    // Reset password for selected account
+    /// Reset password for selected account. Allowed only for admin users
     #[graphql(guard = "AdminGuard::new()")]
     async fn modify_password(
         &self,
