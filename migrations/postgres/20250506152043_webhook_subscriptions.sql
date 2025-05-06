@@ -13,14 +13,11 @@ CREATE TYPE webhook_subscription_status AS ENUM (
 
 CREATE TABLE webhook_subscriptions (
   id UUID PRIMARY KEY,
-  target_url VARCHAR(2048) NOT NULL,
   dataset_id VARCHAR(100),
-  events VARCHAR(64)[] NOT NULL,
-  secret VARCHAR(128) NOT NULL,
+  event_types VARCHAR(64)[] NOT NULL,
   status webhook_subscription_status NOT NULL DEFAULT 'UNVERIFIED',
   label VARCHAR(100),
-  created_at TIMESTAMPTZ NOT NULL,
-  updated_at TIMESTAMPTZ NOT NULL
+  last_event_id BIGINT -- Must be an event id, but don't create FK loop
 );
 
 CREATE INDEX idx_webhook_subscription_dataset_status
@@ -53,7 +50,7 @@ CREATE TYPE webhook_subscription_event_type AS ENUM (
 /* ------------------------------ */
 
 CREATE TABLE webhook_subscription_events (
-  id BIGINT PRIMARY KEY DEFAULT nextval('webhook_subscription_event_seq'),
+  event_id BIGINT PRIMARY KEY DEFAULT nextval('webhook_subscription_event_seq'),
   subscription_id UUID NOT NULL REFERENCES webhook_subscriptions(id),
   created_at TIMESTAMPTZ NOT NULL,
   event_type webhook_subscription_event_type NOT NULL,

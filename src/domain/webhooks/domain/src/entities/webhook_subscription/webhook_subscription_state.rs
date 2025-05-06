@@ -24,7 +24,6 @@ pub struct WebhookSubscriptionState {
     event_types: Vec<WebhookEventType>,
     secret: String,
     created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
 }
 
 impl WebhookSubscriptionState {
@@ -57,6 +56,7 @@ impl Projection for WebhookSubscriptionState {
         match (state, event) {
             (None, event) => match event {
                 E::Created(WebhookSubscriptionEventCreated {
+                    event_time,
                     subscription_id,
                     dataset_id,
                     event_types,
@@ -72,8 +72,7 @@ impl Projection for WebhookSubscriptionState {
                     target_url,
                     secret,
                     status: WebhookSubscriptionStatus::Unverified,
-                    created_at: Utc::now(),
-                    updated_at: Utc::now(),
+                    created_at: event_time,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -87,7 +86,6 @@ impl Projection for WebhookSubscriptionState {
                         if s.status == WebhookSubscriptionStatus::Unverified {
                             Ok(WebhookSubscriptionState {
                                 status: WebhookSubscriptionStatus::Enabled,
-                                updated_at: Utc::now(),
                                 ..s
                             })
                         } else {
@@ -99,7 +97,6 @@ impl Projection for WebhookSubscriptionState {
                         if s.status == WebhookSubscriptionStatus::Enabled {
                             Ok(WebhookSubscriptionState {
                                 status: WebhookSubscriptionStatus::Paused,
-                                updated_at: Utc::now(),
                                 ..s
                             })
                         } else {
@@ -111,7 +108,6 @@ impl Projection for WebhookSubscriptionState {
                         if s.status == WebhookSubscriptionStatus::Paused {
                             Ok(WebhookSubscriptionState {
                                 status: WebhookSubscriptionStatus::Enabled,
-                                updated_at: Utc::now(),
                                 ..s
                             })
                         } else {
@@ -123,7 +119,6 @@ impl Projection for WebhookSubscriptionState {
                         WebhookSubscriptionStatus::Enabled | WebhookSubscriptionStatus::Paused => {
                             Ok(WebhookSubscriptionState {
                                 status: WebhookSubscriptionStatus::Unreachable,
-                                updated_at: Utc::now(),
                                 ..s
                             })
                         }
@@ -134,7 +129,6 @@ impl Projection for WebhookSubscriptionState {
                         if s.status == WebhookSubscriptionStatus::Unreachable {
                             Ok(WebhookSubscriptionState {
                                 status: WebhookSubscriptionStatus::Enabled,
-                                updated_at: Utc::now(),
                                 ..s
                             })
                         } else {
@@ -148,7 +142,6 @@ impl Projection for WebhookSubscriptionState {
                         if s.status != WebhookSubscriptionStatus::Removed {
                             Ok(WebhookSubscriptionState {
                                 secret: new_secret.clone(),
-                                updated_at: Utc::now(),
                                 ..s
                             })
                         } else {
@@ -180,7 +173,6 @@ impl Projection for WebhookSubscriptionState {
                         } else {
                             Ok(WebhookSubscriptionState {
                                 status: WebhookSubscriptionStatus::Removed,
-                                updated_at: Utc::now(),
                                 ..s
                             })
                         }

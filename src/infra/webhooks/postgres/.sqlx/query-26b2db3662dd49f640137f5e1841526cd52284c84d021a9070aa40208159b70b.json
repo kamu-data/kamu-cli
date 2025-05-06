@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE webhook_subscriptions\n                    SET status = $2\n                    WHERE id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "webhook_subscription_status",
+            "kind": {
+              "Enum": [
+                "UNVERIFIED",
+                "ENABLED",
+                "PAUSED",
+                "UNREACHABLE",
+                "REMOVED"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "26b2db3662dd49f640137f5e1841526cd52284c84d021a9070aa40208159b70b"
+}

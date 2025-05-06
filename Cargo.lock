@@ -7297,6 +7297,8 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "url",
+ "uuid",
 ]
 
 [[package]]

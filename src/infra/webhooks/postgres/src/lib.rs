@@ -12,6 +12,8 @@ pub use kamu_webhooks as domain;
 
 mod postgres_webhook_delivery_repository;
 mod postgres_webhook_event_repository;
+mod postgres_webhook_subscription_event_store;
 
 pub use postgres_webhook_delivery_repository::*;
 pub use postgres_webhook_event_repository::*;
+pub use postgres_webhook_subscription_event_store::*;

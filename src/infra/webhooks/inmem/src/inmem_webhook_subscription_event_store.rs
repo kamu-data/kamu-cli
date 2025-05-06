@@ -15,7 +15,7 @@ use kamu_webhooks::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryWebhookSubscriptionStore {
+pub struct InMemoryWebhookSubscriptionEventStore {
     inner: InMemoryEventStore<WebhookSubscriptionState, State>,
 }
 
@@ -47,7 +47,7 @@ impl EventStoreState<WebhookSubscriptionState> for State {
 #[component(pub)]
 #[interface(dyn WebhookSubscriptionEventStore)]
 #[scope(Singleton)]
-impl InMemoryWebhookSubscriptionStore {
+impl InMemoryWebhookSubscriptionEventStore {
     pub fn new() -> Self {
         Self {
             inner: InMemoryEventStore::new(),
@@ -110,7 +110,7 @@ impl InMemoryWebhookSubscriptionStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionStore {
+impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventStore {
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
     }
@@ -150,7 +150,7 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionStore {
+impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
     async fn count_subscriptions_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
