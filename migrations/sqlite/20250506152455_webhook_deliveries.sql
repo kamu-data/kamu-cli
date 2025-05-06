@@ -7,7 +7,7 @@ CREATE TABLE webhook_deliveries (
     subscription_id UUID NOT NULL REFERENCES webhook_subscriptions(id),
     request_headers JSONB NOT NULL,
     requested_at TIMESTAMPTZ NOT NULL,
-    response_code INT,
+    response_code SMALLINT,
     response_body TEXT,
     response_headers JSONB,
     response_at TIMESTAMPTZ,

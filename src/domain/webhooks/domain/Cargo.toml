@@ -20,6 +20,10 @@ workspace = true
 [lib]
 doctest = false
 
+[features]
+default = []
+sqlx = ["dep:sqlx"]
+
 
 [dependencies]
 database-common = { workspace = true }
@@ -38,5 +42,12 @@ serde_json = { version = "1", default-features = false }
 thiserror = { version = "1", default-features = false }
 url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
+
+# Optional
+sqlx = { optional = true, version = "0.8", default-features = false, features = [
+    "macros",
+] }
+
+
 
 [dev-dependencies]

@@ -25,7 +25,8 @@ doctest = false
 database-common = { workspace = true }
 internal-error = { workspace = true }
 odf = { workspace = true }
-kamu-webhooks = { workspace = true }
+kamu-task-system = { workspace = true }
+kamu-webhooks = { workspace = true, features = ["sqlx"]}
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

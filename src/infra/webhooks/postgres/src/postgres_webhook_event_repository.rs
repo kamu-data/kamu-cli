@@ -15,7 +15,7 @@ use kamu_webhooks::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresWebhookEventRepository {
-    _transaction: TransactionRefT<sqlx::Postgres>,
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +25,7 @@ pub struct PostgresWebhookEventRepository {
 impl PostgresWebhookEventRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
-            _transaction: transaction.into(),
+            transaction: transaction.into(),
         }
     }
 }
@@ -35,7 +35,7 @@ impl PostgresWebhookEventRepository {
 #[async_trait::async_trait]
 impl WebhookEventRepository for PostgresWebhookEventRepository {
     async fn create_event(&self, event: &WebhookEvent) -> Result<(), CreateWebhookEventError> {
-        let mut tr = self._transaction.lock().await;
+        let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
@@ -67,7 +67,7 @@ impl WebhookEventRepository for PostgresWebhookEventRepository {
         &self,
         event_id: WebhookEventId,
     ) -> Result<WebhookEvent, GetWebhookEventError> {
-        let mut tr = self._transaction.lock().await;
+        let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
@@ -101,7 +101,7 @@ impl WebhookEventRepository for PostgresWebhookEventRepository {
         &self,
         pagination: PaginationOpts,
     ) -> Result<Vec<WebhookEvent>, ListRecentWebhookEventsError> {
-        let mut tr = self._transaction.lock().await;
+        let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 

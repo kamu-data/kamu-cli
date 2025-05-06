@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                task_id,\n                attempt_number,\n                event_id,\n                subscription_id,\n                request_headers,\n                requested_at,\n                response_code,\n                response_body,\n                response_headers,\n                response_at\n            FROM webhook_deliveries\n                WHERE subscription_id = $1\n            ORDER BY requested_at DESC\n            LIMIT $2 OFFSET $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "task_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "attempt_number",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "event_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "subscription_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "request_headers",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "requested_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "response_code",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 7,
+        "name": "response_body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "response_headers",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "response_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "9a8c1c11109748cb27ef9d7359f9909c94370826bd44f24407d50eb6e52ae04a"
+}
