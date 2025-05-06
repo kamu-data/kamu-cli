@@ -10,13 +10,14 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 use kamu_task_system as ts;
+use thiserror::Error;
 
 use crate::{WebhookDelivery, WebhookEventId, WebhookResponse, WebhookSubscriptionId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait WebhookDeliveryRepository {
+pub trait WebhookDeliveryRepository: Send + Sync {
     async fn create(&self, delivery: WebhookDelivery) -> Result<(), CreateWebhookDeliveryError>;
 
     async fn update_response(
@@ -49,8 +50,11 @@ pub trait WebhookDeliveryRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub enum CreateWebhookDeliveryError {
+    #[error(transparent)]
+    DeliveryExists(#[from] WebhookDeliveryAlreadyExistsError),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -61,7 +65,7 @@ pub enum CreateWebhookDeliveryError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub enum UpdateWebhookDeliveryError {
     #[error(transparent)]
     NotFound(WebhookDeliveryNotFoundError),
@@ -76,7 +80,7 @@ pub enum UpdateWebhookDeliveryError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub enum GetWebhookDeliveryError {
     #[error(transparent)]
     Internal(
@@ -88,7 +92,7 @@ pub enum GetWebhookDeliveryError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub enum ListWebhookDeliveriesError {
     #[error(transparent)]
     Internal(
@@ -100,9 +104,17 @@ pub enum ListWebhookDeliveriesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 #[error("Webhook delivery task attempt '{}#{}' not found", task_attempt_id.task_id, task_attempt_id.attempt_number)]
 pub struct WebhookDeliveryNotFoundError {
+    pub task_attempt_id: ts::TaskAttemptID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Webhook delivery for task attempt '{}#{}' already exists", task_attempt_id.task_id, task_attempt_id.attempt_number)]
+pub struct WebhookDeliveryAlreadyExistsError {
     pub task_attempt_id: ts::TaskAttemptID,
 }
 

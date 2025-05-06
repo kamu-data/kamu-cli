@@ -25,6 +25,7 @@ doctest = false
 database-common = { workspace = true }
 event-sourcing = { workspace = true }
 odf = { workspace = true }
+kamu-task-system = { workspace = true }
 kamu-webhooks = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

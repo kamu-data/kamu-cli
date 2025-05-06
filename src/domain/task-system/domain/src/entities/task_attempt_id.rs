@@ -11,7 +11,7 @@ use crate::TaskID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TaskAttemptID {
     pub task_id: TaskID,
     pub attempt_number: u32,
