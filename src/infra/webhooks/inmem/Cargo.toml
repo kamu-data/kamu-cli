@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+event-sourcing = { workspace = true }
 odf = { workspace = true }
 kamu-webhooks = { workspace = true }
 
