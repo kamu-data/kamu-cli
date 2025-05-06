@@ -14,7 +14,7 @@ use crate::{WebhookEventId, WebhookRequest, WebhookResponse, WebhookSubscription
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WebhookDelivery {
     pub task_attempt_id: ts::TaskAttemptID,
     pub webhook_subscription_id: WebhookSubscriptionId,

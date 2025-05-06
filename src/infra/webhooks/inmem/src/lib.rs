@@ -10,8 +10,10 @@
 // Re-exports
 pub use kamu_webhooks as domain;
 
+mod inmem_webhook_delivery_repository;
 mod inmem_webhook_event_repository;
 mod inmem_webhook_subscription_event_store;
 
+pub use inmem_webhook_delivery_repository::*;
 pub use inmem_webhook_event_repository::*;
 pub use inmem_webhook_subscription_event_store::*;

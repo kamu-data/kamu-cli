@@ -7266,6 +7266,7 @@ dependencies = [
  "dill",
  "event-sourcing",
  "futures",
+ "kamu-task-system",
  "kamu-webhooks",
  "kamu-webhooks-repo-tests",
  "opendatafabric",
