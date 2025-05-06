@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use enum_variants::*;
 use serde::{Deserialize, Serialize};
 
+use super::WebhookSubscriptionStatus;
 use crate::{WebhookEventType, WebhookSubscriptionId, WebhookSubscriptionLabel};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -151,6 +152,19 @@ impl WebhookSubscriptionEvent {
             Self::Updated(e) => e.event_time,
             Self::SecretRotated(e) => e.event_time,
             Self::Removed(e) => e.event_time,
+        }
+    }
+
+    pub fn new_status(&self, old_status: WebhookSubscriptionStatus) -> WebhookSubscriptionStatus {
+        match self {
+            Self::Created(_) => WebhookSubscriptionStatus::Unverified,
+            Self::Enabled(_) | Self::Resumed(_) | Self::Reactivated(_) => {
+                WebhookSubscriptionStatus::Enabled
+            }
+            Self::Paused(_) => WebhookSubscriptionStatus::Paused,
+            Self::MarkedUnreachable(_) => WebhookSubscriptionStatus::Unreachable,
+            Self::Updated(_) | Self::SecretRotated(_) => old_status,
+            Self::Removed(_) => WebhookSubscriptionStatus::Removed,
         }
     }
 }

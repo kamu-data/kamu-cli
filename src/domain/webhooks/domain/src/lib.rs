@@ -9,6 +9,9 @@
 
 #![feature(error_generic_member_access)]
 
+// Re-exports
+pub use event_sourcing::*;
+
 mod aggregates;
 mod entities;
 mod repos;

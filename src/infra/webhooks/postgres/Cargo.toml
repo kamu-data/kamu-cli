@@ -43,6 +43,8 @@ sqlx = { version = "0.8", default-features = false, features = [
     "chrono",
     "uuid"
 ] }
+url = { version = "2", default-features = false }
+uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]

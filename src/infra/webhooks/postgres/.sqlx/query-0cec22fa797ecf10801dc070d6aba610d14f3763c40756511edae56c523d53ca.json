@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(event_id) AS events_count from webhook_subscription_events\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "events_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0cec22fa797ecf10801dc070d6aba610d14f3763c40756511edae56c523d53ca"
+}
