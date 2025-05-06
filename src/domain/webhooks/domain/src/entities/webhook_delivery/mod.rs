@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod webhook_delivery_record;
 mod webhook_request;
 mod webhook_response;
 
+pub use webhook_delivery_record::*;
 pub use webhook_request::*;
 pub use webhook_response::*;

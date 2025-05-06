@@ -17,4 +17,13 @@ pub struct TaskAttemptID {
     pub attempt_number: u32,
 }
 
+impl TaskAttemptID {
+    pub fn new(task_id: TaskID, attempt_number: u32) -> Self {
+        Self {
+            task_id,
+            attempt_number,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

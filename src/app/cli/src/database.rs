@@ -130,6 +130,7 @@ pub fn configure_database_components(
             b.add::<kamu_auth_rebac_postgres::PostgresRebacRepository>();
 
             b.add::<kamu_webhooks_postgres::PostgresWebhookEventRepository>();
+            b.add::<kamu_webhooks_postgres::PostgresWebhookDeliveryRepository>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
             MySqlPlugin::init_database_components(b);
@@ -160,6 +161,7 @@ pub fn configure_database_components(
             b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
             b.add::<kamu_webhooks_inmem::InMemoryWebhookEventRepository>();
+            b.add::<kamu_webhooks_inmem::InMemoryWebhookDeliveryRepository>();
         }
         DatabaseProvider::Sqlite => {
             SqlitePlugin::init_database_components(b);
@@ -187,6 +189,7 @@ pub fn configure_database_components(
             b.add::<kamu_auth_rebac_sqlite::SqliteRebacRepository>();
 
             b.add::<kamu_webhooks_sqlite::SqliteWebhookEventRepository>();
+            b.add::<kamu_webhooks_sqlite::SqliteWebhookDeliveryRepository>();
         }
     }
 
@@ -222,6 +225,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
     b.add::<kamu_webhooks_inmem::InMemoryWebhookEventRepository>();
+    b.add::<kamu_webhooks_inmem::InMemoryWebhookDeliveryRepository>();
 
     NoOpDatabasePlugin::init_database_components(b);
 }
