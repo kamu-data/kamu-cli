@@ -27,6 +27,24 @@ pub struct WebhookSubscriptionState {
     updated_at: DateTime<Utc>,
 }
 
+impl WebhookSubscriptionState {
+    pub fn status(&self) -> WebhookSubscriptionStatus {
+        self.status
+    }
+
+    pub fn label(&self) -> &WebhookSubscriptionLabel {
+        &self.label
+    }
+
+    pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
+        self.dataset_id.as_ref()
+    }
+
+    pub fn event_types(&self) -> &[WebhookEventType] {
+        &self.event_types
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Projection for WebhookSubscriptionState {

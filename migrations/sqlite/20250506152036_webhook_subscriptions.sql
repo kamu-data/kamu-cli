@@ -14,6 +14,14 @@ CREATE TABLE webhook_subscriptions (
     updated_at TIMESTAMPTZ NOT NULL    
 );
 
+CREATE INDEX idx_webhook_subscription_dataset_status
+  ON webhook_subscriptions (dataset_id, status)
+  WHERE dataset_id IS NOT NULL;
+
+CREATE UNIQUE INDEX uniq_webhook_subscription_label
+  ON webhook_subscriptions (dataset_id, label)  -- NULL dataset_id is fine
+  WHERE label IS NOT NULL AND status != 'REMOVED';
+
 /* ------------------------------ */
 
 CREATE TABLE webhook_subscription_events (

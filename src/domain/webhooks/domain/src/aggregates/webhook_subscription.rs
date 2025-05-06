@@ -9,7 +9,7 @@
 
 use event_sourcing::*;
 
-use crate::{WebhookSubscriptionEventStore, WebhookSubscriptionState};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,5 +17,33 @@ use crate::{WebhookSubscriptionEventStore, WebhookSubscriptionState};
 pub struct WebhookSubscription(
     Aggregate<WebhookSubscriptionState, (dyn WebhookSubscriptionEventStore + 'static)>,
 );
+
+impl WebhookSubscription {
+    /// Creates a new webhook subscription
+    pub fn new(
+        subscription_id: WebhookSubscriptionId,
+        target_url: url::Url,
+        label: WebhookSubscriptionLabel,
+        dataset_id: Option<odf::DatasetID>,
+        event_types: Vec<WebhookEventType>,
+        secret: String,
+    ) -> Self {
+        Self(
+            Aggregate::new(
+                subscription_id,
+                WebhookSubscriptionEventCreated {
+                    event_time: chrono::Utc::now(),
+                    subscription_id,
+                    dataset_id,
+                    label,
+                    event_types,
+                    target_url,
+                    secret,
+                },
+            )
+            .unwrap(),
+        )
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

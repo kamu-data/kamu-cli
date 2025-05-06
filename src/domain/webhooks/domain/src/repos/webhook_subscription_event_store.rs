@@ -11,7 +11,12 @@ use event_sourcing::EventStore;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{WebhookEventType, WebhookSubscriptionId, WebhookSubscriptionState};
+use crate::{
+    WebhookEventType,
+    WebhookSubscriptionId,
+    WebhookSubscriptionLabel,
+    WebhookSubscriptionState,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +25,7 @@ pub trait WebhookSubscriptionEventStore: EventStore<WebhookSubscriptionState> {
     async fn count_subscriptions_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<u64, CountWebhookSubscriptionsError>;
+    ) -> Result<usize, CountWebhookSubscriptionsError>;
 
     async fn list_subscription_ids_by_dataset(
         &self,
@@ -30,7 +35,7 @@ pub trait WebhookSubscriptionEventStore: EventStore<WebhookSubscriptionState> {
     async fn find_subscription_id_by_dataset_and_label(
         &self,
         dataset_id: &odf::DatasetID,
-        label: &str,
+        label: &WebhookSubscriptionLabel,
     ) -> Result<Option<WebhookSubscriptionId>, FindWebhookSubscriptionError>;
 
     async fn list_subscription_ids_by_dataset_and_event_type(

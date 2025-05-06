@@ -7264,6 +7264,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "event-sourcing",
  "futures",
  "kamu-webhooks",
  "kamu-webhooks-repo-tests",
