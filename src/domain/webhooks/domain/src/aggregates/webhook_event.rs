@@ -13,7 +13,7 @@ use crate::{WebhookEventId, WebhookEventType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebhookEvent {
     pub id: WebhookEventId,
     pub event_type: WebhookEventType,

@@ -1,6 +1,6 @@
 [package]
-name = "kamu-webhooks-inmem"
-description = "In-memory implementation of the webhooks for testing purposes"
+name = "kamu-webhooks-repo-tests"
+description = "Shared repository tests for Kamu webhooks"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -23,20 +23,13 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-odf = { workspace = true }
 kamu-webhooks = { workspace = true }
+odf = { workspace = true }
 
-async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.13", default-features = false }
 futures = "0.3"
-
+serde_json = "1"
+uuid = { version = "1", default-features = false }
 
 [dev-dependencies]
-database-common = { workspace = true }
-database-common-macros = { workspace = true }
-kamu-webhooks-repo-tests = { workspace = true }
-
-test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

@@ -35,6 +35,9 @@ pub trait WebhookEventRepository: Send + Sync {
 #[derive(Error, Debug)]
 pub enum CreateWebhookEventError {
     #[error(transparent)]
+    DuplicateId(WebhookEventDuplicateIdError),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -67,6 +70,14 @@ pub enum ListRecentWebhookEventsError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Webhook event id='{event_id}' already exists")]
+pub struct WebhookEventDuplicateIdError {
+    pub event_id: WebhookEventId,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

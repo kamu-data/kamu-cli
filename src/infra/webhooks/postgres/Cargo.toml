@@ -45,7 +45,7 @@ sqlx = { version = "0.8", default-features = false, features = [
 
 [dev-dependencies]
 database-common-macros = { workspace = true }
-# kamu-webhooks-repo-tests = { workspace = true }
+kamu-webhooks-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }
