@@ -1,6 +1,6 @@
 [package]
-name = "kamu-task-system-sqlite"
-description = "SQLite-specific implementation of the compute node's task system"
+name = "kamu-webhooks-postgres"
+description = "Postgres-specific implementation of the webhooks"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -23,8 +23,9 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+internal-error = { workspace = true }
 odf = { workspace = true }
-kamu-task-system = { workspace = true }
+kamu-webhooks = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
@@ -33,18 +34,18 @@ dill = { version = "0.13", default-features = false }
 futures = "0.3"
 serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
+    "runtime-tokio-rustls",
     "json",
     "macros",
-    "sqlite",
+    "postgres",
     "chrono",
+    "uuid"
 ] }
 
 
 [dev-dependencies]
 database-common-macros = { workspace = true }
-internal-error = { workspace = true }
-kamu-task-system-repo-tests = { workspace = true }
+# kamu-webhooks-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }

@@ -101,6 +101,10 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-auth-rebac-postgres = { workspace = true }
 kamu-auth-rebac-sqlite = { workspace = true }
 
+kamu-webhooks-inmem = { workspace = true }
+kamu-webhooks-postgres = { workspace = true }
+kamu-webhooks-sqlite = { workspace = true }
+
 kamu-search = { workspace = true }
 kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
