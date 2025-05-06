@@ -53,10 +53,20 @@ impl InMemoryWebhookEventRepository {
 impl WebhookEventRepository for InMemoryWebhookEventRepository {
     async fn create_event(&self, event: &WebhookEvent) -> Result<(), CreateWebhookEventError> {
         let mut write_guard = self.state.write().unwrap();
+
+        // Check against duplicates
+        if write_guard.webhook_events_by_id.contains_key(&event.id) {
+            return Err(CreateWebhookEventError::DuplicateId(
+                WebhookEventDuplicateIdError { event_id: event.id },
+            ));
+        }
+
+        // Save webhook event record
         write_guard.webhook_events.push(event.clone());
         write_guard
             .webhook_events_by_id
             .insert(event.id, event.clone());
+
         Ok(())
     }
 
@@ -65,6 +75,7 @@ impl WebhookEventRepository for InMemoryWebhookEventRepository {
         event_id: WebhookEventId,
     ) -> Result<WebhookEvent, GetWebhookEventError> {
         let guard = self.state.read().unwrap();
+
         let event = guard
             .webhook_events_by_id
             .get(&event_id)
@@ -72,6 +83,7 @@ impl WebhookEventRepository for InMemoryWebhookEventRepository {
             .ok_or_else(|| {
                 GetWebhookEventError::NotFound(WebhookEventNotFoundError { event_id })
             })?;
+
         Ok(event)
     }
 
@@ -80,6 +92,7 @@ impl WebhookEventRepository for InMemoryWebhookEventRepository {
         pagination: PaginationOpts,
     ) -> Result<Vec<WebhookEvent>, ListRecentWebhookEventsError> {
         let guard = self.state.read().unwrap();
+
         let events = guard
             .webhook_events
             .iter()
@@ -88,6 +101,7 @@ impl WebhookEventRepository for InMemoryWebhookEventRepository {
             .take(pagination.limit)
             .cloned()
             .collect();
+
         Ok(events)
     }
 }

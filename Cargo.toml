@@ -91,7 +91,7 @@ members = [
     "src/infra/messaging-outbox/postgres",
     "src/infra/messaging-outbox/sqlite",
     ## Webhooks
-    #"src/infra/webhooks/repo-tests",
+    "src/infra/webhooks/repo-tests",
     "src/infra/webhooks/inmem",
     "src/infra/webhooks/postgres",
     "src/infra/webhooks/sqlite",    
@@ -221,7 +221,7 @@ kamu-messaging-outbox-repo-tests = { version = "0.237.0", path = "src/infra/mess
 kamu-webhooks-inmem = { version = "0.237.0", path = "src/infra/webhooks/inmem", default-features = false }
 kamu-webhooks-postgres = { version = "0.237.0", path = "src/infra/webhooks/postgres", default-features = false }
 kamu-webhooks-sqlite = { version = "0.237.0", path = "src/infra/webhooks/sqlite", default-features = false }
-# kamu-webhooks-repo-tests = { version = "0.237.0", path = "src/infra/webhooks/repo-tests", default-features = false }
+kamu-webhooks-repo-tests = { version = "0.237.0", path = "src/infra/webhooks/repo-tests", default-features = false }
 
 # Adapters
 kamu-adapter-auth-oso-rebac = { version = "0.237.0", path = "src/adapter/auth-oso-rebac", default-features = false }

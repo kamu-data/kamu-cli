@@ -7410,6 +7410,7 @@ dependencies = [
  "dill",
  "futures",
  "kamu-webhooks",
+ "kamu-webhooks-repo-tests",
  "opendatafabric",
  "test-group",
  "test-log",
@@ -7429,11 +7430,26 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-webhooks",
+ "kamu-webhooks-repo-tests",
  "opendatafabric",
  "serde_json",
  "sqlx",
  "test-group",
  "test-log",
+]
+
+[[package]]
+name = "kamu-webhooks-repo-tests"
+version = "0.235.0"
+dependencies = [
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "kamu-webhooks",
+ "opendatafabric",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -7449,6 +7465,7 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-webhooks",
+ "kamu-webhooks-repo-tests",
  "opendatafabric",
  "serde_json",
  "sqlx",

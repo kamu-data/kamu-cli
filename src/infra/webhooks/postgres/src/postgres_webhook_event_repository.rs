@@ -9,7 +9,7 @@
 
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_webhooks::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +51,14 @@ impl WebhookEventRepository for PostgresWebhookEventRepository {
         )
         .execute(connection_mut)
         .await
-        .int_err()?;
+        .map_err(|e: sqlx::Error| match e {
+            sqlx::Error::Database(e) if e.is_unique_violation() => {
+                CreateWebhookEventError::DuplicateId(WebhookEventDuplicateIdError {
+                    event_id: event.id,
+                })
+            }
+            _ => CreateWebhookEventError::Internal(e.int_err()),
+        })?;
 
         Ok(())
     }
