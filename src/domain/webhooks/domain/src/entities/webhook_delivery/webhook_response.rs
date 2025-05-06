@@ -14,14 +14,21 @@ use chrono::{DateTime, Utc};
 #[derive(Debug)]
 pub struct WebhookResponse {
     pub status_code: http::StatusCode,
+    pub headers: Vec<(http::header::HeaderName, String)>,
     pub body: String,
     pub finished_at: DateTime<Utc>,
 }
 
 impl WebhookResponse {
-    pub fn new(status_code: http::StatusCode, body: String, finished_at: DateTime<Utc>) -> Self {
+    pub fn new(
+        status_code: http::StatusCode,
+        headers: Vec<(http::header::HeaderName, String)>,
+        body: String,
+        finished_at: DateTime<Utc>,
+    ) -> Self {
         Self {
             status_code,
+            headers,
             body,
             finished_at,
         }
