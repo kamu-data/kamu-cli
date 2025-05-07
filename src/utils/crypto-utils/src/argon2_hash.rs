@@ -9,10 +9,9 @@
 
 use aes_gcm::aead::OsRng;
 use argon2::{Algorithm, Argon2, Params, PasswordHash, Version};
-use internal_error::InternalError;
-use password_hash::{Error as PasswordHashError, PasswordHasher, PasswordVerifier, SaltString};
+use password_hash::{PasswordHasher, PasswordVerifier, SaltString};
 
-use crate::{Hasher, HashingError};
+use crate::Hasher;
 
 pub struct Argon2Hasher<'a> {
     argon2: Argon2<'a>,
@@ -45,26 +44,16 @@ impl Argon2Hasher<'_> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Hasher for Argon2Hasher<'_> {
-    fn hash(&self, value: &[u8]) -> Result<String, crate::HashingError> {
+    fn hash(&self, value: &[u8]) -> String {
         let salt = SaltString::generate(&mut OsRng);
 
-        Ok(self.argon2.hash_password(value, &salt).unwrap().to_string())
+        self.argon2.hash_password(value, &salt).unwrap().to_string()
     }
 
-    fn verify(&self, value: &[u8], hashed_value: &str) -> Result<(), crate::HashingError> {
-        let password_hash = PasswordHash::new(hashed_value)?;
+    fn verify(&self, value: &[u8], hashed_value: &str) -> bool {
+        let password_hash = PasswordHash::new(hashed_value).unwrap();
 
-        self.argon2.verify_password(value, &password_hash)?;
-
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<PasswordHashError> for HashingError {
-    fn from(value: PasswordHashError) -> Self {
-        Self::InternalError(InternalError::bail(value.to_string()).unwrap())
+        self.argon2.verify_password(value, &password_hash).is_ok()
     }
 }
 

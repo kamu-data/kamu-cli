@@ -176,6 +176,7 @@ impl From<DatasetPropertyName> for PropertyName {
 #[strum(serialize_all = "snake_case")]
 pub enum AccountPropertyName {
     CanProvisionAccounts,
+    #[serde(rename = "admin")]
     IsAdmin,
 }
 

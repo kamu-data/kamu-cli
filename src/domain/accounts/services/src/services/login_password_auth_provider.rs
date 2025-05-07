@@ -57,11 +57,11 @@ impl LoginPasswordAuthProvider {
         let password_hash = tokio::task::spawn_blocking(move || {
             tracing::info_span!("Generate password hash").in_scope(|| {
                 let argon2_hasher = Argon2Hasher::new(hashing_mode);
-                argon2_hasher.hash(password.as_bytes()).int_err()
+                argon2_hasher.hash(password.as_bytes())
             })
         })
         .await
-        .int_err()??;
+        .int_err()?;
 
         // Save hash in the repository
         self.password_hash_repository
@@ -133,14 +133,16 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         tokio::task::spawn_blocking(move || {
             tracing::info_span!("Verify password hash").in_scope(|| {
                 let argon2_hasher = Argon2Hasher::new(hashing_mode);
-                argon2_hasher
-                    .verify(
-                        password_login_credentials.password.as_bytes(),
-                        password_hash.as_str(),
-                    )
-                    .map_err(|_| {
-                        ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
-                    })
+                if !argon2_hasher.verify(
+                    password_login_credentials.password.as_bytes(),
+                    password_hash.as_str(),
+                ) {
+                    return Err(ProviderLoginError::RejectedCredentials(
+                        RejectedCredentialsError {},
+                    ));
+                }
+
+                Ok(())
             })
         })
         .await

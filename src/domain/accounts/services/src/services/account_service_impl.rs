@@ -206,10 +206,10 @@ impl AccountService for AccountServiceImpl {
         let hashing_mode = self.password_hashing_mode;
         let password_hash = tokio::task::spawn_blocking(move || {
             let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(password.as_bytes()).int_err()
+            argon2_hasher.hash(password.as_bytes())
         })
         .await
-        .int_err()??;
+        .int_err()?;
 
         self.password_hash_repository
             .save_password_hash(account_name, password_hash)
@@ -227,10 +227,10 @@ impl AccountService for AccountServiceImpl {
         let hashing_mode = self.password_hashing_mode;
         let password_hash = tokio::task::spawn_blocking(move || {
             let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(password.as_bytes()).int_err()
+            argon2_hasher.hash(password.as_bytes())
         })
         .await
-        .int_err()??;
+        .int_err()?;
 
         self.password_hash_repository
             .modify_password_hash(account_name, password_hash)

@@ -7,22 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-use thiserror::Error;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub trait Hasher {
-    fn hash(&self, value: &[u8]) -> Result<String, HashingError>;
-    fn verify(&self, value: &[u8], hashed_value: &str) -> Result<(), HashingError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum HashingError {
-    #[error(transparent)]
-    InternalError(#[from] InternalError),
+    fn hash(&self, value: &[u8]) -> String;
+    fn verify(&self, value: &[u8], hashed_value: &str) -> bool;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
