@@ -159,10 +159,6 @@ type AccountNameInvalid implements CreateAccountResult {
 	message: String!
 }
 
-type AccountNotFound implements ModifyPasswordResult {
-	message: String!
-}
-
 enum AccountType {
 	USER
 	ORGANIZATION
@@ -2090,6 +2086,15 @@ type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapsh
 }
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
+	message: String!
+}
+
+type ModifyPasswordAccountNotFound implements ModifyPasswordResult {
+	message: String!
+}
+
+type ModifyPasswordInvalidPassword implements ModifyPasswordResult {
+	reason: String!
 	message: String!
 }
 

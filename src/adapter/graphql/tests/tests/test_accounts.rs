@@ -10,6 +10,7 @@
 use async_graphql::value;
 use database_common::NoOpDatabasePlugin;
 use dill::Component;
+use indoc::indoc;
 use kamu_accounts::{
     JwtAuthenticationConfig,
     DEFAULT_ACCOUNT_ID,
@@ -623,6 +624,80 @@ async fn test_modify_password() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_modify_password_errors() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        can_provision_accounts: true,
+        is_admin: true,
+    })
+    .await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    // Create account
+    let res = schema
+        .execute(
+            async_graphql::Request::new(format!(
+                r#"
+                mutation {{
+                    accounts {{
+                        byId (accountId: "{}") {{
+                            createAccount(accountName: "{}") {{
+                                ... on CreateAccountSuccess {{
+                                    message
+                                    account {{
+                                        accountName
+                                        displayName
+                                        accountType
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+                "#,
+                *DEFAULT_ACCOUNT_ID, "foo"
+            ))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    for test_case in [
+        ("", "Minimum password length is 8"),
+        ("foo±password", "Password contains non-ASCII characters"),
+    ] {
+        let mutation_code = GraphQLAccountsHarness::modify_password(
+            &DEFAULT_ACCOUNT_ID.to_string(),
+            "foo",
+            test_case.0,
+        );
+
+        let response = schema
+            .execute(
+                async_graphql::Request::new(mutation_code.clone())
+                    .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+        assert!(response.is_ok(), "{response:?}");
+        assert_eq!(
+            response.data,
+            value!({
+                    "accounts": {
+                        "byId": {
+                            "modifyPassword": {
+                                "__typename": "ModifyPasswordInvalidPassword",
+                                "message": test_case.1,
+                            }
+                        }
+                    }
+            })
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_modify_password_non_admin() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
         can_provision_accounts: true,
@@ -728,6 +803,26 @@ impl GraphQLAccountsHarness {
             catalog_anonymous,
             catalog_authorized,
         }
+    }
+
+    fn modify_password(account_id: &str, account_name: &str, password: &str) -> String {
+        indoc!(
+            r#"
+            mutation {
+                accounts {
+                    byId (accountId: "<account_id>") {
+                        modifyPassword(accountName: "<account_name>", password: "<password>") {
+                            __typename
+                            message
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<account_id>", account_id)
+        .replace("<account_name>", account_name)
+        .replace("<password>", password)
     }
 }
 

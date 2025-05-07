@@ -32,6 +32,7 @@ use kamu_accounts::{
     GetAccountByNameError,
     GetAccountMapError,
     ModifyPasswordError,
+    Password,
     PasswordHashRepository,
     SearchAccountsByNamePatternFilters,
     PROVIDER_PASSWORD,
@@ -172,7 +173,7 @@ impl AccountService for AccountServiceImpl {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        password: String,
+        password: Password,
         owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError> {
         let account_did = odf::AccountID::new_generated_ed25519();
@@ -222,7 +223,7 @@ impl AccountService for AccountServiceImpl {
     async fn modify_password(
         &self,
         account_name: &odf::AccountName,
-        password: String,
+        password: Password,
     ) -> Result<(), ModifyPasswordError> {
         let hashing_mode = self.password_hashing_mode;
         let password_hash = tokio::task::spawn_blocking(move || {

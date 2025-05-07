@@ -16,6 +16,7 @@ use kamu_accounts::{
     AccountService,
     CreateAccountError,
     ModifyPasswordError,
+    Password,
     UpdateAccountError,
 };
 use random_strings::AllowedSymbols;
@@ -107,7 +108,12 @@ impl AccountMut {
 
         let account_service = from_catalog_n!(ctx, dyn AccountService);
         match account_service
-            .create_account(&account_name, new_email, random_password, &self.account.id)
+            .create_account(
+                &account_name,
+                new_email,
+                Password::try_new(&random_password).unwrap(),
+                &self.account.id,
+            )
             .await
         {
             Ok(created_account) => Ok(CreateAccountResult::Success(CreateAccountSuccess {
@@ -131,6 +137,17 @@ impl AccountMut {
         password: String,
     ) -> Result<ModifyPasswordResult> {
         let account_service = from_catalog_n!(ctx, dyn AccountService);
+        let password = match Password::try_new(password.as_str()) {
+            Ok(pass) => pass,
+            Err(err) => {
+                return Ok(ModifyPasswordResult::InvalidPassword(
+                    ModifyPasswordInvalidPassword {
+                        reason: err.to_string(),
+                    },
+                ))
+            }
+        };
+
         match account_service
             .modify_password(&account_name, password)
             .await
@@ -139,7 +156,7 @@ impl AccountMut {
                 ModifyPasswordSuccess::default(),
             )),
             Err(ModifyPasswordError::AccountNotFound(_)) => Ok(
-                ModifyPasswordResult::AccountNotFound(AccountNotFound::default()),
+                ModifyPasswordResult::AccountNotFound(ModifyPasswordAccountNotFound::default()),
             ),
             Err(ModifyPasswordError::Internal(e)) => Err(e.into()),
         }
@@ -283,7 +300,8 @@ impl Default for CreateAccountEmailInvalid {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum ModifyPasswordResult {
     Success(ModifyPasswordSuccess),
-    AccountNotFound(AccountNotFound),
+    AccountNotFound(ModifyPasswordAccountNotFound),
+    InvalidPassword(ModifyPasswordInvalidPassword),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -303,15 +321,30 @@ impl Default for ModifyPasswordSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct AccountNotFound {
+pub struct ModifyPasswordAccountNotFound {
     pub message: String,
 }
 
-impl Default for AccountNotFound {
+impl Default for ModifyPasswordAccountNotFound {
     fn default() -> Self {
         Self {
             message: "Account not found".to_string(),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, SimpleObject)]
+#[graphql(complex)]
+pub struct ModifyPasswordInvalidPassword {
+    pub reason: String,
+}
+
+#[ComplexObject]
+impl ModifyPasswordInvalidPassword {
+    pub async fn message(&self) -> String {
+        self.reason.clone()
     }
 }
 

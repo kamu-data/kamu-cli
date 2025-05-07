@@ -20,6 +20,7 @@ use crate::{
     CreateAccountError,
     GetAccountByIdError,
     ModifyPasswordHashError,
+    Password,
     SearchAccountsByNamePatternFilters,
 };
 
@@ -68,14 +69,14 @@ pub trait AccountService: Sync + Send {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        password: String,
+        password: Password,
         owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError>;
 
     async fn modify_password(
         &self,
         account_name: &odf::AccountName,
-        password: String,
+        password: Password,
     ) -> Result<(), ModifyPasswordError>;
 }
 

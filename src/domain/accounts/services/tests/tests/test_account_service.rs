@@ -17,6 +17,7 @@ use kamu_accounts::{
     AccountDidSecretKeyRepository,
     AccountService,
     AccountServiceExt,
+    Password,
     PredefinedAccountsConfig,
 };
 use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
@@ -133,7 +134,7 @@ async fn test_create_account() {
         .create_account(
             &new_account_name,
             Email::parse("new_email@com").unwrap(),
-            "foo".to_string(),
+            Password::try_new("foo_password").unwrap(),
             &creator_account_id,
         )
         .await
