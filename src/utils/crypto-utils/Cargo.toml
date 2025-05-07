@@ -22,10 +22,11 @@ doctest = false
 
 
 [dependencies]
-aes-gcm = { version = "0.10.3" }
-argon2 = { version = "0.5" }
 internal-error = { workspace = true }
 odf = { workspace = true }
+
+aes-gcm = { version = "0.10.3" }
+argon2 = { version = "0.5" }
 password-hash = { version = "0.5", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 serde = "1"

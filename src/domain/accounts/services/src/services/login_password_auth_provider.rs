@@ -10,7 +10,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crypto_utils::{get_argon2_hash, verify_argon2_hash, PasswordHashingMode};
+use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::{Deserialize, Serialize};
@@ -55,11 +55,13 @@ impl LoginPasswordAuthProvider {
         // Generate password hash: this is a compute-intensive operation,
         // so spawn a blocking task
         let password_hash = tokio::task::spawn_blocking(move || {
-            tracing::info_span!("Generate password hash")
-                .in_scope(|| get_argon2_hash(&password, hashing_mode))
+            tracing::info_span!("Generate password hash").in_scope(|| {
+                let argon2_hasher = Argon2Hasher::new(hashing_mode);
+                argon2_hasher.hash(password.as_bytes()).int_err()
+            })
         })
         .await
-        .int_err()?;
+        .int_err()??;
 
         // Save hash in the repository
         self.password_hash_repository
@@ -130,16 +132,15 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         // so spawn a blocking task
         tokio::task::spawn_blocking(move || {
             tracing::info_span!("Verify password hash").in_scope(|| {
-                if !verify_argon2_hash(
-                    &password_login_credentials.password,
-                    password_hash.as_str(),
-                    hashing_mode,
-                ) {
-                    return Err(ProviderLoginError::RejectedCredentials(
-                        RejectedCredentialsError {},
-                    ));
-                }
-                Ok(())
+                let argon2_hasher = Argon2Hasher::new(hashing_mode);
+                argon2_hasher
+                    .verify(
+                        password_login_credentials.password.as_bytes(),
+                        password_hash.as_str(),
+                    )
+                    .map_err(|_| {
+                        ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
+                    })
             })
         })
         .await

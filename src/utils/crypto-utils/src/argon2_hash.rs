@@ -8,55 +8,63 @@
 // by the Apache License, Version 2.0.
 
 use aes_gcm::aead::OsRng;
-use argon2::PasswordHash;
-use password_hash::{PasswordHasher, PasswordVerifier, SaltString};
+use argon2::{Algorithm, Argon2, Params, PasswordHash, Version};
+use internal_error::InternalError;
+use password_hash::{Error as PasswordHashError, PasswordHasher, PasswordVerifier, SaltString};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+use crate::{Hasher, HashingError};
 
-pub fn get_argon2_hash(password: &str, hashing_mode: PasswordHashingMode) -> String {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = setup_argon2(hashing_mode);
+pub struct Argon2Hasher<'a> {
+    argon2: Argon2<'a>,
+}
 
-    argon2
-        .hash_password(password.as_bytes(), &salt)
-        .unwrap()
-        .to_string()
+impl Argon2Hasher<'_> {
+    pub fn new(password_hashing_mode: PasswordHashingMode) -> Self {
+        let argon2 = match password_hashing_mode {
+            // Use default Argon2 settings in production
+            PasswordHashingMode::Default => Argon2::default(),
+
+            // Use minimal Argon2 settings in test mode
+            PasswordHashingMode::Minimal => Argon2::new(
+                Algorithm::default(),
+                Version::default(),
+                Params::new(
+                    Params::MIN_M_COST,
+                    Params::MIN_T_COST,
+                    Params::MIN_P_COST,
+                    None,
+                )
+                .expect("Settings for testing hashing mode must be fine"),
+            ),
+        };
+
+        Self { argon2 }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn verify_argon2_hash(
-    password: &str,
-    password_hash: &str,
-    hashing_mode: PasswordHashingMode,
-) -> bool {
-    let password_hash = PasswordHash::new(password_hash).unwrap();
-    let argon2 = setup_argon2(hashing_mode);
+impl Hasher for Argon2Hasher<'_> {
+    fn hash(&self, value: &[u8]) -> Result<String, crate::HashingError> {
+        let salt = SaltString::generate(&mut OsRng);
 
-    argon2
-        .verify_password(password.as_bytes(), &password_hash)
-        .is_ok()
+        Ok(self.argon2.hash_password(value, &salt).unwrap().to_string())
+    }
+
+    fn verify(&self, value: &[u8], hashed_value: &str) -> Result<(), crate::HashingError> {
+        let password_hash = PasswordHash::new(hashed_value)?;
+
+        self.argon2.verify_password(value, &password_hash)?;
+
+        Ok(())
+    }
 }
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn setup_argon2<'a>(password_hashing_mode: PasswordHashingMode) -> argon2::Argon2<'a> {
-    use argon2::*;
-    match password_hashing_mode {
-        // Use default Argon2 settings in production
-        PasswordHashingMode::Default => Argon2::default(),
-
-        // Use minimal Argon2 settings in test mode
-        PasswordHashingMode::Minimal => Argon2::new(
-            Algorithm::default(),
-            Version::default(),
-            Params::new(
-                Params::MIN_M_COST,
-                Params::MIN_T_COST,
-                Params::MIN_P_COST,
-                None,
-            )
-            .expect("Settings for testing hashing mode must be fine"),
-        ),
+impl From<PasswordHashError> for HashingError {
+    fn from(value: PasswordHashError) -> Self {
+        Self::InternalError(InternalError::bail(value.to_string()).unwrap())
     }
 }
 

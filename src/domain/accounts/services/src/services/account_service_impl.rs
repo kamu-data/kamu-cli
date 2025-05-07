@@ -10,7 +10,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crypto_utils::{get_argon2_hash, DidSecretEncryptionConfig, DidSecretKey, PasswordHashingMode};
+use crypto_utils::{
+    Argon2Hasher,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    Hasher,
+    PasswordHashingMode,
+};
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
@@ -197,7 +203,14 @@ impl AccountService for AccountServiceImpl {
                 .int_err()?;
         }
 
-        let password_hash = get_argon2_hash(&password, self.password_hashing_mode);
+        let hashing_mode = self.password_hashing_mode;
+        let password_hash = tokio::task::spawn_blocking(move || {
+            let argon2_hasher = Argon2Hasher::new(hashing_mode);
+            argon2_hasher.hash(password.as_bytes()).int_err()
+        })
+        .await
+        .int_err()??;
+
         self.password_hash_repository
             .save_password_hash(account_name, password_hash)
             .await
@@ -211,7 +224,14 @@ impl AccountService for AccountServiceImpl {
         account_name: &odf::AccountName,
         password: String,
     ) -> Result<(), ModifyPasswordError> {
-        let password_hash = get_argon2_hash(&password, self.password_hashing_mode);
+        let hashing_mode = self.password_hashing_mode;
+        let password_hash = tokio::task::spawn_blocking(move || {
+            let argon2_hasher = Argon2Hasher::new(hashing_mode);
+            argon2_hasher.hash(password.as_bytes()).int_err()
+        })
+        .await
+        .int_err()??;
+
         self.password_hash_repository
             .modify_password_hash(account_name, password_hash)
             .await?;
