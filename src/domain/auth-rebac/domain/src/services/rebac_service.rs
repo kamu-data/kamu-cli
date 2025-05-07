@@ -118,6 +118,11 @@ pub trait RebacServiceExt {
         &self,
         account_id: &odf::AccountID,
     ) -> Result<bool, GetPropertiesError>;
+
+    async fn can_provision_accounts(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, GetPropertiesError>;
 }
 
 #[async_trait::async_trait]
@@ -128,6 +133,14 @@ impl<T: RebacService + ?Sized> RebacServiceExt for T {
     ) -> Result<bool, GetPropertiesError> {
         let account_properties = self.get_account_properties(account_id).await?;
         Ok(account_properties.is_admin)
+    }
+
+    async fn can_provision_accounts(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, GetPropertiesError> {
+        let account_properties = self.get_account_properties(account_id).await?;
+        Ok(account_properties.is_admin || account_properties.can_provision_accounts)
     }
 }
 
