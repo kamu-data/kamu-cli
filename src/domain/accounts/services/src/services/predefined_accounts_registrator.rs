@@ -13,7 +13,7 @@ use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
-use kamu_auth_rebac::{boolean_property_value, RebacService};
+use kamu_auth_rebac::{boolean_property_value, AccountPropertyName, RebacService};
 use odf::AccountID;
 
 use crate::LoginPasswordAuthProvider;
@@ -55,14 +55,28 @@ impl PredefinedAccountsRegistrator {
         account_id: &AccountID,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
-        // TODO: Revisit if batch property setting will be implemented
-        let Some(account_properties) = account_config.properties.as_ref() else {
-            return Ok(());
-        };
+        let default_account_properties = vec![
+            AccountPropertyName::is_admin(false),
+            AccountPropertyName::can_provision_accounts(false),
+        ];
 
-        for name in account_properties {
+        let predefined_properties =
+            if let Some(account_properties) = account_config.properties.as_ref() {
+                account_properties.clone()
+            } else {
+                Vec::new()
+            };
+
+        // TODO: Revisit if batch property setting will be implemented
+        for (name, default_value) in default_account_properties {
+            let value = if predefined_properties.contains(&name) {
+                boolean_property_value(true)
+            } else {
+                default_value
+            };
+
             self.rebac_service
-                .set_account_property(account_id, *name, &boolean_property_value(true))
+                .set_account_property(account_id, name, &value)
                 .await
                 .int_err()?;
         }
