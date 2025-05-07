@@ -196,6 +196,7 @@ impl ClientSideHarness {
         b.add::<InMemoryDatasetDidSecretKeyRepository>();
 
         b.add::<AccountServiceImpl>();
+        b.add::<CreateAccountUseCaseImpl>();
         b.add::<InMemoryAccountRepository>();
         b.add::<InMemoryAccountDidSecretKeyRepository>();
         b.add::<LoginPasswordAuthProvider>();

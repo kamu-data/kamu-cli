@@ -21,6 +21,7 @@ use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryOAuthDeviceCode
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
+    CreateAccountUseCaseImpl,
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
 };
@@ -783,6 +784,7 @@ impl GraphQLAccountsHarness {
         let final_catalog = dill::CatalogBuilder::new_chained(&catalog)
             .add::<AuthenticationServiceImpl>()
             .add::<AccessTokenServiceImpl>()
+            .add::<CreateAccountUseCaseImpl>()
             .add::<InMemoryAccessTokenRepository>()
             .add::<OAuthDeviceCodeServiceImpl>()
             .add::<SystemTimeSourceDefault>()

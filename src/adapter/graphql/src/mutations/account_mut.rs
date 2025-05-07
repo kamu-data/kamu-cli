@@ -15,11 +15,11 @@ use kamu_accounts::{
     AccountRepository,
     AccountService,
     CreateAccountError,
+    CreateAccountUseCase,
     ModifyPasswordError,
     Password,
     UpdateAccountError,
 };
-use random_strings::AllowedSymbols;
 
 use super::AccountFlowsMut;
 use crate::prelude::*;
@@ -79,41 +79,20 @@ impl AccountMut {
         email: Option<String>,
     ) -> Result<CreateAccountResult> {
         ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
-
         let Ok(account_name) = odf::AccountName::from_str(&account_name) else {
             return Ok(CreateAccountResult::InvalidAccountName(
                 AccountNameInvalid::default(),
             ));
         };
-
-        let new_email = email.unwrap_or(
-            if let Some(parent_account_parts) = self.account.email.to_string().split_once('@') {
-                format!(
-                    "{}+{}@{}",
-                    parent_account_parts.0, account_name, parent_account_parts.1
-                )
-            } else {
-                format!("{account_name}@example.com",)
-            },
-        );
-
-        let Ok(new_email) = Email::parse(&new_email) else {
+        let Ok(email) = email.map(|e| Email::parse(&e)).transpose() else {
             return Ok(CreateAccountResult::InvalidEmail(
                 CreateAccountEmailInvalid::default(),
             ));
         };
 
-        let random_password =
-            random_strings::get_random_string(None, 10, &AllowedSymbols::AsciiSymbols);
-
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
-        match account_service
-            .create_account(
-                &account_name,
-                new_email,
-                Password::try_new(&random_password).unwrap(),
-                &self.account.id,
-            )
+        let create_account_use_case = from_catalog_n!(ctx, dyn CreateAccountUseCase);
+        match create_account_use_case
+            .execute(&self.account, &account_name, email)
             .await
         {
             Ok(created_account) => Ok(CreateAccountResult::Success(CreateAccountSuccess {

@@ -145,6 +145,7 @@ impl ServerSideS3Harness {
                 .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
+                .add::<CreateAccountUseCaseImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<InMemoryAccountDidSecretKeyRepository>()
                 .add::<InMemoryDatasetDidSecretKeyRepository>()

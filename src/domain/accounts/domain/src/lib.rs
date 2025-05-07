@@ -17,9 +17,11 @@ mod repos;
 mod services;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
+mod use_cases;
 
 pub use entities::*;
 pub use jobs::*;
 pub use messages::*;
 pub use repos::*;
 pub use services::*;
+pub use use_cases::*;
