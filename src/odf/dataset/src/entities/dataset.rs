@@ -22,7 +22,7 @@ use crate::{AppendError, BlockRef, MetadataChain};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait Dataset: Send + Sync {
+pub trait Dataset: Send + Sync + std::fmt::Debug {
     /// Detaches this dataset from any transaction references
     fn detach_from_transaction(&self) {
         // Nothing to do by default

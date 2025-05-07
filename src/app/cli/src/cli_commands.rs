@@ -34,8 +34,22 @@ pub fn get_command(
             AddCommand::builder(
                 c.manifest,
                 c.name,
+                c.dry_run,
                 c.recursive,
                 c.replace,
+                c.stdin,
+                c.visibility
+                    .map(Into::into)
+                    .unwrap_or(tenancy_config.default_dataset_visibility()),
+            )
+            .cast(),
+        ),
+
+        cli::Command::Apply(c) => Box::new(
+            ApplyCommand::builder(
+                c.manifest,
+                c.dry_run,
+                c.recursive,
                 c.stdin,
                 c.visibility
                     .map(Into::into)

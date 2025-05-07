@@ -22,6 +22,17 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
+    async fn prepare(
+        &self,
+        snapshots: Vec<odf::DatasetSnapshot>,
+        options: CreateDatasetUseCaseOptions,
+    ) -> Result<CreateDatasetsFromSnapshotsPlanningResult, CreateDatasetsFromSnapshotsPlanningError>;
+
+    async fn apply(
+        &self,
+        plan: CreateDatasetsPlan,
+    ) -> Result<Vec<CreateDatasetResult>, CreateDatasetFromSnapshotError>;
+
     async fn execute(
         &self,
         snapshot: odf::DatasetSnapshot,
@@ -31,15 +42,64 @@ pub trait CreateDatasetFromSnapshotUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
+pub struct CreateDatasetsFromSnapshotsPlanningResult {
+    pub plan: CreateDatasetsPlan,
+    pub errors: Vec<(odf::DatasetSnapshot, CreateDatasetFromSnapshotError)>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDatasetsPlan {
+    pub steps: Vec<CreateDatasetPlan>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[serde_with::serde_as]
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDatasetPlan {
+    pub owner: odf::AccountID,
+
+    pub id: odf::DatasetID,
+
+    pub alias: odf::DatasetAlias,
+
+    #[serde_as(as = "odf::metadata::serde::yaml::DatasetKindDef")]
+    pub kind: odf::DatasetKind,
+
+    // TODO: Mask in serialized plan
+    pub key: odf::metadata::PrivateKey,
+
+    #[serde_as(as = "Vec<odf::metadata::serde::yaml::MetadataBlockDef>")]
+    pub blocks: Vec<odf::MetadataBlock>,
+
+    pub new_head: odf::Multihash,
+
+    pub options: CreateDatasetUseCaseOptions,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum CreateDatasetsFromSnapshotsPlanningError {
+    #[error(transparent)]
+    CyclicDependency(#[from] CyclicDependencyError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Cyclic dependency detected")]
+pub struct CyclicDependencyError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Narrow down
 #[derive(Error, Debug)]
 pub enum CreateDatasetFromSnapshotError {
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
-
     #[error(transparent)]
     InvalidSnapshot(#[from] odf::dataset::InvalidSnapshotError),
 
@@ -56,14 +116,19 @@ pub enum CreateDatasetFromSnapshotError {
     CASFailed(#[from] Box<DatasetReferenceCASError>),
 
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
     fn from(v: CreateDatasetError) -> Self {

@@ -91,6 +91,7 @@ pub enum PasswordHashingMode {
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     Add(Add),
+    Apply(Apply),
     Complete(Complete),
     Completions(Completions),
     Config(Config),
@@ -169,6 +170,10 @@ Add a dataset from manifest hosted externally (e.g. on GihHub):
 To add dataset from a repository see `kamu pull` command.
 "#)]
 pub struct Add {
+    /// Show the changes to be applied without actually doing them
+    #[arg(long)]
+    pub dry_run: bool,
+
     /// Recursively search for all manifest in the specified directory
     #[arg(long, short = 'r')]
     pub recursive: bool,
@@ -185,7 +190,44 @@ pub struct Add {
     #[arg(long, value_name = "N")]
     pub name: Option<odf::DatasetAlias>,
 
-    /// Changing the visibility of the added dataset
+    /// Visibility of the added dataset
+    #[arg(long, value_name = "VIS", value_enum)]
+    pub visibility: Option<parsers::DatasetVisibility>,
+
+    /// Dataset manifest reference(s) (path, or URL)
+    #[arg()]
+    pub manifest: Vec<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Add a new dataset or modify an existing one
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+**Examples:**
+
+Compare the state of a dataset to a manifest:
+
+    kamu apply --dry-run org.example.data.yaml
+
+Synchronize all objects with the state described in manifests found in the current directory:
+
+    kamu apply --recursive .
+"#)]
+pub struct Apply {
+    /// Show the changes to be applied without actually doing them
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Recursively search for all manifest in the specified directory
+    #[arg(long, short = 'r')]
+    pub recursive: bool,
+
+    /// Read manifests from standard input
+    #[arg(long)]
+    pub stdin: bool,
+
+    /// Visibility of the added dataset
     #[arg(long, value_name = "VIS", value_enum)]
     pub visibility: Option<parsers::DatasetVisibility>,
 

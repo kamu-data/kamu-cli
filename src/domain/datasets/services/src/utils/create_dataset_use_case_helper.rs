@@ -210,7 +210,7 @@ impl CreateDatasetUseCaseHelper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// New type that guarantees a username for multi-tenant mode.
-#[nutype(derive(AsRef))]
+#[nutype(derive(AsRef, Deref))]
 struct CanonicalDatasetAlias(odf::DatasetAlias);
 
 impl CanonicalDatasetAlias {

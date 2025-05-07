@@ -7,15 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{HashSet, LinkedList};
 use std::sync::Arc;
 
+use internal_error::*;
 use kamu::domain::*;
 use kamu_datasets::{
     CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
-    CreateDatasetResult,
     CreateDatasetUseCaseOptions,
+    CreateDatasetsFromSnapshotsPlanningError,
+    CreateDatasetsFromSnapshotsPlanningResult,
     DeleteDatasetUseCase,
 };
 
@@ -39,6 +40,9 @@ pub struct AddCommand {
 
     #[dill::component(explicit)]
     name: Option<odf::DatasetAlias>,
+
+    #[dill::component(explicit)]
+    dry_run: bool,
 
     #[dill::component(explicit)]
     recursive: bool,
@@ -129,70 +133,6 @@ impl AddCommand {
 
         Ok(false)
     }
-
-    pub async fn create_datasets_from_snapshots(
-        &self,
-        snapshots: Vec<odf::DatasetSnapshot>,
-        create_options: CreateDatasetUseCaseOptions,
-    ) -> Vec<(
-        odf::DatasetAlias,
-        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
-    )> {
-        let snapshots_ordered =
-            self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
-
-        let mut ret = Vec::new();
-        for snapshot in snapshots_ordered {
-            let alias = snapshot.name.clone();
-            let res = self
-                .create_dataset_from_snapshot
-                .execute(snapshot, create_options)
-                .await;
-
-            ret.push((alias, res));
-        }
-        ret
-    }
-
-    #[allow(clippy::linkedlist)]
-    fn sort_snapshots_in_dependency_order(
-        &self,
-        mut snapshots: LinkedList<odf::DatasetSnapshot>,
-    ) -> Vec<odf::DatasetSnapshot> {
-        let mut ordered = Vec::with_capacity(snapshots.len());
-        let mut pending: HashSet<odf::DatasetRef> =
-            snapshots.iter().map(|s| s.name.clone().into()).collect();
-        let mut added: HashSet<odf::DatasetAlias> = HashSet::new();
-
-        // TODO: cycle detection
-        while !snapshots.is_empty() {
-            let snapshot = snapshots.pop_front().unwrap();
-
-            use odf::metadata::EnumWithVariants;
-            let transform = snapshot
-                .metadata
-                .iter()
-                .find_map(|e| e.as_variant::<odf::metadata::SetTransform>());
-
-            let has_pending_deps = if let Some(transform) = transform {
-                transform.inputs.iter().any(|input| {
-                    pending.contains(&input.dataset_ref)
-                        && snapshot.name.as_local_ref() != input.dataset_ref // Check for circular dependency
-                })
-            } else {
-                false
-            };
-
-            if !has_pending_deps {
-                pending.remove(&snapshot.name.clone().into());
-                added.insert(snapshot.name.clone());
-                ordered.push(snapshot);
-            } else {
-                snapshots.push_back(snapshot);
-            }
-        }
-        ordered
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,6 +192,7 @@ impl Command for AddCommand {
         }
 
         // Delete existing datasets if we are replacing
+        // TODO: Move into use case?
         if self.replace {
             let mut already_exist = Vec::new();
             for s in &snapshots {
@@ -277,61 +218,91 @@ impl Command for AddCommand {
             }
         };
 
-        let create_options = CreateDatasetUseCaseOptions {
-            dataset_visibility: self.dataset_visibility,
-        };
-        let mut add_results = self
-            .create_datasets_from_snapshots(snapshots, create_options)
-            .await;
-
-        add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
-
-        let mut num_added = 0;
+        let CreateDatasetsFromSnapshotsPlanningResult { plan, errors } = match self
+            .create_dataset_from_snapshot
+            .prepare(
+                snapshots,
+                CreateDatasetUseCaseOptions {
+                    dataset_visibility: self.dataset_visibility,
+                },
+            )
+            .await
+        {
+            Ok(res) => Ok(res),
+            Err(CreateDatasetsFromSnapshotsPlanningError::CyclicDependency(_)) => {
+                Err(CLIError::usage_error("Aborted on cyclic dependency"))
+            }
+            Err(CreateDatasetsFromSnapshotsPlanningError::Internal(err)) => Err(err.into()),
+        }?;
 
         let mut errors_with_contexts = Vec::new();
-
-        for (id, res) in add_results {
-            match res {
-                Ok(_) => {
-                    num_added += 1;
-
-                    if !self.output_config.quiet {
-                        eprintln!("{}: {}", console::style("Added").green(), id);
-                    }
-                }
-                Err(CreateDatasetFromSnapshotError::NameCollision(_)) => {
+        for (snaphot, err) in errors {
+            match err {
+                CreateDatasetFromSnapshotError::NameCollision(_) => {
                     if !self.output_config.quiet {
                         eprintln!(
                             "{}: {}: Already exists",
                             console::style("Skipped").yellow(),
-                            id
+                            snaphot.name,
                         );
                     }
                 }
-                Err(err) => {
-                    errors_with_contexts.push((err, format!("Failed to add dataset {id}")));
+                err => {
+                    errors_with_contexts
+                        .push((err, format!("Failed to add dataset {}", snaphot.name)));
                 }
             }
         }
 
-        if errors_with_contexts.is_empty() {
-            if !self.output_config.quiet {
-                eprintln!(
-                    "{}",
-                    console::style(format!("Added {num_added} dataset(s)"))
-                        .green()
-                        .bold()
-                );
-            }
-
-            Ok(())
-        } else {
-            Err(BatchError::new(
-                format!("Failed to load {} manifest(s)", errors_with_contexts.len()),
+        if !errors_with_contexts.is_empty() {
+            return Err(BatchError::new(
+                format!("Failed to add {} manifest(s)", errors_with_contexts.len()),
                 errors_with_contexts,
             )
-            .into())
+            .into());
         }
+
+        if self.dry_run {
+            let plan = serde_yaml::to_string(&plan).int_err()?;
+            eprintln!(
+                "{}\n{}\n{}",
+                console::style("Execution plan:").yellow().bold(),
+                console::style(&plan).dim(),
+                console::style("Exiting early due to --dry-run")
+                    .yellow()
+                    .bold()
+            );
+            return Ok(());
+        }
+
+        let mut add_results = self
+            .create_dataset_from_snapshot
+            .apply(plan)
+            .await
+            .int_err()?;
+
+        add_results.sort_by(|a, b| a.dataset_handle.alias.cmp(&b.dataset_handle.alias));
+
+        if !self.output_config.quiet {
+            for res in &add_results {
+                eprintln!(
+                    "{}: {}",
+                    console::style("Added").green(),
+                    res.dataset_handle.alias
+                );
+            }
+        }
+
+        if !self.output_config.quiet {
+            eprintln!(
+                "{}",
+                console::style(format!("Added {} dataset(s)", add_results.len()))
+                    .green()
+                    .bold()
+            );
+        }
+
+        Ok(())
     }
 }
 
