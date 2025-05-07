@@ -23,14 +23,14 @@ use kamu_accounts::{
 
 #[derive(Default)]
 struct State {
-    account_dids_by_owner_id: HashMap<odf::AccountID, Vec<odf::AccountID>>,
+    account_dids_by_creator_id: HashMap<odf::AccountID, Vec<odf::AccountID>>,
     did_secret_keys_by_account_id: HashMap<odf::AccountID, DidSecretKey>,
 }
 
 impl State {
     fn new() -> Self {
         Self {
-            account_dids_by_owner_id: HashMap::new(),
+            account_dids_by_creator_id: HashMap::new(),
             did_secret_keys_by_account_id: HashMap::new(),
         }
     }
@@ -62,7 +62,7 @@ impl AccountDidSecretKeyRepository for InMemoryAccountDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
         account_id: &odf::AccountID,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveAccountDidSecretKeyError> {
         let mut state = self.state.lock().unwrap();
@@ -70,21 +70,21 @@ impl AccountDidSecretKeyRepository for InMemoryAccountDidSecretKeyRepository {
             .did_secret_keys_by_account_id
             .insert(account_id.clone(), did_secret_key.clone());
         state
-            .account_dids_by_owner_id
-            .entry(owner_id.clone())
+            .account_dids_by_creator_id
+            .entry(creator_id.clone())
             .or_default()
             .push(account_id.clone());
         Ok(())
     }
 
-    async fn get_did_secret_keys_by_owner_id(
+    async fn get_did_secret_keys_by_creator_id(
         &self,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
     ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByAccountIdError> {
         let state = self.state.lock().unwrap();
         let did_secret_key_ids = state
-            .account_dids_by_owner_id
-            .get(owner_id)
+            .account_dids_by_creator_id
+            .get(creator_id)
             .cloned()
             .unwrap_or_default();
         let did_secret_keys = did_secret_key_ids

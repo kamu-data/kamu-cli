@@ -122,7 +122,7 @@ async fn test_create_account() {
         .get_one::<dyn AccountDidSecretKeyRepository>()
         .unwrap();
 
-    let owner_account_id = account_svc
+    let creator_account_id = account_svc
         .find_account_id_by_name(&AccountName::new_unchecked(WASYA))
         .await
         .unwrap()
@@ -134,7 +134,7 @@ async fn test_create_account() {
             &new_account_name,
             Email::parse("new_email@com").unwrap(),
             "foo".to_string(),
-            &owner_account_id,
+            &creator_account_id,
         )
         .await
         .unwrap();
@@ -146,7 +146,7 @@ async fn test_create_account() {
         .unwrap();
 
     let created_account_did_secret_keys = account_did_secret_key_repo
-        .get_did_secret_keys_by_owner_id(&owner_account_id)
+        .get_did_secret_keys_by_creator_id(&creator_account_id)
         .await
         .unwrap();
 

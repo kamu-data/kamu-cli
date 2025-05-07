@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT dataset_id as \"dataset_id: _\",\n                       secret_key,\n                       secret_nonce,\n                       owner_id as \"owner_id: _\"\n                FROM dataset_did_secret_keys\n                WHERE owner_id = $1\n                ",
+  "query": "\n                SELECT account_id as \"account_id: _\",\n                       secret_key,\n                       secret_nonce,\n                       creator_id as \"creator_id: _\"\n                FROM account_did_secret_keys\n                WHERE creator_id = $1\n                ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "dataset_id: _",
+        "name": "account_id: _",
         "type_info": "Varchar"
       },
       {
@@ -20,7 +20,7 @@
       },
       {
         "ordinal": 3,
-        "name": "owner_id: _",
+        "name": "creator_id: _",
         "type_info": "Varchar"
       }
     ],
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "5f77c8f510f5e6e5685b974d52f6d899bfd85ccfe81172068fa693c3dc4b3ea5"
+  "hash": "40e7bbba1523f755efe4191f829f44b6cd99b25559e73302c9a8d86e9004a8c5"
 }

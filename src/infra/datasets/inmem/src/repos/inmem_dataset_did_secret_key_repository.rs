@@ -23,14 +23,14 @@ use kamu_datasets::{
 
 #[derive(Default)]
 struct State {
-    dataset_dids_by_owner_id: HashMap<odf::AccountID, Vec<odf::DatasetID>>,
+    dataset_dids_by_creator_id: HashMap<odf::AccountID, Vec<odf::DatasetID>>,
     did_secret_keys_by_dataset_id: HashMap<odf::DatasetID, DidSecretKey>,
 }
 
 impl State {
     fn new() -> Self {
         Self {
-            dataset_dids_by_owner_id: HashMap::new(),
+            dataset_dids_by_creator_id: HashMap::new(),
             did_secret_keys_by_dataset_id: HashMap::new(),
         }
     }
@@ -62,7 +62,7 @@ impl DatasetDidSecretKeyRepository for InMemoryDatasetDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
         dataset_id: &odf::DatasetID,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveDatasetDidSecretKeyError> {
         let mut state = self.state.lock().unwrap();
@@ -70,21 +70,21 @@ impl DatasetDidSecretKeyRepository for InMemoryDatasetDidSecretKeyRepository {
             .did_secret_keys_by_dataset_id
             .insert(dataset_id.clone(), did_secret_key.clone());
         state
-            .dataset_dids_by_owner_id
-            .entry(owner_id.clone())
+            .dataset_dids_by_creator_id
+            .entry(creator_id.clone())
             .or_default()
             .push(dataset_id.clone());
         Ok(())
     }
 
-    async fn get_did_secret_keys_by_owner_id(
+    async fn get_did_secret_keys_by_creator_id(
         &self,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
     ) -> Result<Vec<DidSecretKey>, GetDatasetDidSecretKeysByOwnerIdError> {
         let state = self.state.lock().unwrap();
         let did_secret_key_ids = state
-            .dataset_dids_by_owner_id
-            .get(owner_id)
+            .dataset_dids_by_creator_id
+            .get(creator_id)
             .cloned()
             .unwrap_or_default();
         let did_secret_keys = did_secret_key_ids

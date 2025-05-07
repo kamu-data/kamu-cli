@@ -40,7 +40,7 @@ impl DatasetDidSecretKeyRepository for SqliteDatasetDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
         dataset_id: &odf::DatasetID,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveDatasetDidSecretKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -50,17 +50,17 @@ impl DatasetDidSecretKeyRepository for SqliteDatasetDidSecretKeyRepository {
         let did_secret_key_secret_key = did_secret_key.secret_key.clone();
         let did_secret_key_secret_nonce = did_secret_key.secret_nonce.clone();
         let dataset_id = dataset_id.to_string();
-        let owner_id = owner_id.to_string();
+        let creator_id = creator_id.to_string();
 
         sqlx::query!(
             r#"
-                INSERT INTO dataset_did_secret_keys (dataset_id, secret_key, secret_nonce, owner_id)
+                INSERT INTO dataset_did_secret_keys (dataset_id, secret_key, secret_nonce, creator_id)
                     VALUES ($1, $2, $3, $4)
                 "#,
             dataset_id,
             did_secret_key_secret_key,
             did_secret_key_secret_nonce,
-            owner_id,
+            creator_id,
         )
         .execute(connection_mut)
         .await
@@ -69,27 +69,27 @@ impl DatasetDidSecretKeyRepository for SqliteDatasetDidSecretKeyRepository {
         Ok(())
     }
 
-    async fn get_did_secret_keys_by_owner_id(
+    async fn get_did_secret_keys_by_creator_id(
         &self,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
     ) -> Result<Vec<DidSecretKey>, GetDatasetDidSecretKeysByOwnerIdError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let owner_id = owner_id.to_string();
+        let creator_id = creator_id.to_string();
 
         let did_secret_keys = sqlx::query_as!(
             DatasetDidSecretKeyRowModel,
             r#"
                 SELECT  dataset_id as "dataset_id: _",
-                        owner_id as "owner_id: _",
+                        creator_id as "creator_id: _",
                         secret_key,
                         secret_nonce
                 FROM dataset_did_secret_keys
-                WHERE owner_id = $1
+                WHERE creator_id = $1
                 "#,
-            owner_id,
+            creator_id,
         )
         .fetch_all(connection_mut)
         .await

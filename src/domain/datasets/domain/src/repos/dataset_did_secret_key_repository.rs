@@ -18,13 +18,13 @@ pub trait DatasetDidSecretKeyRepository: Send + Sync {
     async fn save_did_secret_key(
         &self,
         dataset_id: &odf::DatasetID,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveDatasetDidSecretKeyError>;
 
-    async fn get_did_secret_keys_by_owner_id(
+    async fn get_did_secret_keys_by_creator_id(
         &self,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
     ) -> Result<Vec<DidSecretKey>, GetDatasetDidSecretKeysByOwnerIdError>;
 }
 
@@ -48,7 +48,7 @@ pub enum GetDatasetDidSecretKeysByOwnerIdError {
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct DatasetDidSecretKeyRowModel {
     pub dataset_id: odf::DatasetID,
-    pub owner_id: odf::AccountID,
+    pub creator_id: odf::AccountID,
     pub secret_key: Vec<u8>,
     pub secret_nonce: Vec<u8>,
 }

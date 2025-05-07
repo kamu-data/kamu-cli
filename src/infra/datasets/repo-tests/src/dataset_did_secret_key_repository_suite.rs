@@ -25,14 +25,14 @@ pub async fn test_insert_and_locate_dataset_did_secret_keys(catalog: &dill::Cata
 
     let account = new_account(&account_repo).await;
     let (dataset_did_signing_key, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let owner_id = account.id.clone();
+    let creator_id = account.id.clone();
     let owner_name = account.account_name.clone();
     let dataset_alias = odf::DatasetName::new_unchecked("foo");
     let created_at = Utc::now().round_subsecs(6);
 
     let entry_foo = DatasetEntry::new(
         dataset_id.clone(),
-        owner_id.clone(),
+        creator_id.clone(),
         owner_name,
         dataset_alias,
         created_at,
@@ -50,12 +50,12 @@ pub async fn test_insert_and_locate_dataset_did_secret_keys(catalog: &dill::Cata
     .unwrap();
 
     dataset_did_secret_key_repo
-        .save_did_secret_key(&dataset_id, &owner_id, &did_secret_key)
+        .save_did_secret_key(&dataset_id, &creator_id, &did_secret_key)
         .await
         .unwrap();
 
     let dataset_did_secret_keys = dataset_did_secret_key_repo
-        .get_did_secret_keys_by_owner_id(&owner_id)
+        .get_did_secret_keys_by_creator_id(&creator_id)
         .await
         .unwrap();
 

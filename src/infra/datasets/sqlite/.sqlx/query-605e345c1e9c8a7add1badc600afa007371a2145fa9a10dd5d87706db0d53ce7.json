@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT  dataset_id as \"dataset_id: _\",\n                        owner_id as \"owner_id: _\",\n                        secret_key,\n                        secret_nonce\n                FROM dataset_did_secret_keys\n                WHERE owner_id = $1\n                ",
+  "query": "\n                SELECT  dataset_id as \"dataset_id: _\",\n                        creator_id as \"creator_id: _\",\n                        secret_key,\n                        secret_nonce\n                FROM dataset_did_secret_keys\n                WHERE creator_id = $1\n                ",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Text"
       },
       {
-        "name": "owner_id: _",
+        "name": "creator_id: _",
         "ordinal": 1,
         "type_info": "Text"
       },
@@ -34,5 +34,5 @@
       false
     ]
   },
-  "hash": "7f8dafd84511f52d35a8a95af991b4bcb3f803766eeec433b3dbb37d4aabf8a4"
+  "hash": "605e345c1e9c8a7add1badc600afa007371a2145fa9a10dd5d87706db0d53ce7"
 }

@@ -15,7 +15,7 @@ use crate::{make_test_account, GITHUB_ACCOUNT_ID_PETYA, GITHUB_ACCOUNT_ID_WASYA}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_did_secret_keys(catalog: &dill::Catalog) {
-    let owner_account = make_test_account(
+    let creator_account = make_test_account(
         "wasya",
         "wasya@example.com",
         kamu_adapter_oauth::PROVIDER_GITHUB,
@@ -43,23 +43,23 @@ pub async fn test_insert_and_locate_did_secret_keys(catalog: &dill::Catalog) {
         .get_one::<dyn AccountDidSecretKeyRepository>()
         .unwrap();
 
-    account_repo.save_account(&owner_account).await.unwrap();
+    account_repo.save_account(&creator_account).await.unwrap();
     account_repo.save_account(&new_account).await.unwrap();
 
     let account_did_secret_keys = account_did_secret_key_repository
-        .get_did_secret_keys_by_owner_id(&owner_account.id)
+        .get_did_secret_keys_by_creator_id(&creator_account.id)
         .await
         .unwrap();
 
     assert_eq!(account_did_secret_keys, vec![]);
 
     account_did_secret_key_repository
-        .save_did_secret_key(&new_account.id, &owner_account.id, &did_secret_key)
+        .save_did_secret_key(&new_account.id, &creator_account.id, &did_secret_key)
         .await
         .unwrap();
 
     let account_did_secret_keys = account_did_secret_key_repository
-        .get_did_secret_keys_by_owner_id(&owner_account.id)
+        .get_did_secret_keys_by_creator_id(&creator_account.id)
         .await
         .unwrap();
 

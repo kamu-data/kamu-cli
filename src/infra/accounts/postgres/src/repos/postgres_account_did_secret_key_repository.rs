@@ -40,7 +40,7 @@ impl AccountDidSecretKeyRepository for PostgresAccountDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
         account_id: &odf::AccountID,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveAccountDidSecretKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -49,13 +49,13 @@ impl AccountDidSecretKeyRepository for PostgresAccountDidSecretKeyRepository {
 
         sqlx::query!(
             r#"
-                INSERT INTO account_did_secret_keys (account_id, secret_key, secret_nonce, owner_id)
+                INSERT INTO account_did_secret_keys (account_id, secret_key, secret_nonce, creator_id)
                     VALUES ($1, $2, $3, $4)
                 "#,
             account_id.to_string(),
             did_secret_key.secret_key,
             did_secret_key.secret_nonce,
-            owner_id.to_string(),
+            creator_id.to_string(),
         )
         .execute(connection_mut)
         .await
@@ -64,9 +64,9 @@ impl AccountDidSecretKeyRepository for PostgresAccountDidSecretKeyRepository {
         Ok(())
     }
 
-    async fn get_did_secret_keys_by_owner_id(
+    async fn get_did_secret_keys_by_creator_id(
         &self,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
     ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByAccountIdError> {
         let mut tr = self.transaction.lock().await;
 
@@ -78,11 +78,11 @@ impl AccountDidSecretKeyRepository for PostgresAccountDidSecretKeyRepository {
                 SELECT account_id as "account_id: _",
                        secret_key,
                        secret_nonce,
-                       owner_id as "owner_id: _"
+                       creator_id as "creator_id: _"
                 FROM account_did_secret_keys
-                WHERE owner_id = $1
+                WHERE creator_id = $1
                 "#,
-            owner_id.to_string(),
+            creator_id.to_string(),
         )
         .fetch_all(connection_mut)
         .await

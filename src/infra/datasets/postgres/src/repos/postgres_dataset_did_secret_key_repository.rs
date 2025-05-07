@@ -40,7 +40,7 @@ impl DatasetDidSecretKeyRepository for PostgresDatasetDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
         dataset_id: &odf::DatasetID,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveDatasetDidSecretKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -49,13 +49,13 @@ impl DatasetDidSecretKeyRepository for PostgresDatasetDidSecretKeyRepository {
 
         sqlx::query!(
             r#"
-                INSERT INTO dataset_did_secret_keys (dataset_id, secret_key, secret_nonce, owner_id)
+                INSERT INTO dataset_did_secret_keys (dataset_id, secret_key, secret_nonce, creator_id)
                     VALUES ($1, $2, $3, $4)
                 "#,
             dataset_id.to_string(),
             did_secret_key.secret_key,
             did_secret_key.secret_nonce,
-            owner_id.to_string(),
+            creator_id.to_string(),
         )
         .execute(connection_mut)
         .await
@@ -64,9 +64,9 @@ impl DatasetDidSecretKeyRepository for PostgresDatasetDidSecretKeyRepository {
         Ok(())
     }
 
-    async fn get_did_secret_keys_by_owner_id(
+    async fn get_did_secret_keys_by_creator_id(
         &self,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
     ) -> Result<Vec<DidSecretKey>, GetDatasetDidSecretKeysByOwnerIdError> {
         let mut tr = self.transaction.lock().await;
 
@@ -78,11 +78,11 @@ impl DatasetDidSecretKeyRepository for PostgresDatasetDidSecretKeyRepository {
                 SELECT dataset_id as "dataset_id: _",
                        secret_key,
                        secret_nonce,
-                       owner_id as "owner_id: _"
+                       creator_id as "creator_id: _"
                 FROM dataset_did_secret_keys
-                WHERE owner_id = $1
+                WHERE creator_id = $1
                 "#,
-            owner_id.to_string(),
+            creator_id.to_string(),
         )
         .fetch_all(connection_mut)
         .await

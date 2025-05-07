@@ -40,7 +40,7 @@ impl AccountDidSecretKeyRepository for SqliteAccountDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
         account_id: &odf::AccountID,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveAccountDidSecretKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -50,17 +50,17 @@ impl AccountDidSecretKeyRepository for SqliteAccountDidSecretKeyRepository {
         let did_secret_key_secret_key = did_secret_key.secret_key.clone();
         let did_secret_key_secret_nonce = did_secret_key.secret_nonce.clone();
         let account_id = account_id.to_string();
-        let owner_id = owner_id.to_string();
+        let creator_id = creator_id.to_string();
 
         sqlx::query!(
             r#"
-                INSERT INTO account_did_secret_keys (account_id, secret_key, secret_nonce, owner_id)
+                INSERT INTO account_did_secret_keys (account_id, secret_key, secret_nonce, creator_id)
                     VALUES ($1, $2, $3, $4)
                 "#,
             account_id,
             did_secret_key_secret_key,
             did_secret_key_secret_nonce,
-            owner_id,
+            creator_id,
         )
         .execute(connection_mut)
         .await
@@ -69,27 +69,27 @@ impl AccountDidSecretKeyRepository for SqliteAccountDidSecretKeyRepository {
         Ok(())
     }
 
-    async fn get_did_secret_keys_by_owner_id(
+    async fn get_did_secret_keys_by_creator_id(
         &self,
-        owner_id: &odf::AccountID,
+        creator_id: &odf::AccountID,
     ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByAccountIdError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let owner_id = owner_id.to_string();
+        let creator_id = creator_id.to_string();
 
         let did_secret_keys = sqlx::query_as!(
             AccountDidSecretKeyRowModel,
             r#"
                 SELECT  account_id as "account_id: _",
-                        owner_id as "owner_id: _",
+                        creator_id as "creator_id: _",
                         secret_key,
                         secret_nonce
                 FROM account_did_secret_keys
-                WHERE owner_id = $1
+                WHERE creator_id = $1
                 "#,
-            owner_id,
+            creator_id,
         )
         .fetch_all(connection_mut)
         .await

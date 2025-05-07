@@ -224,7 +224,7 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
 
     let did_secret_keys = harness
         .dataset_did_secret_key_repo
-        .get_did_secret_keys_by_owner_id(&DEFAULT_ACCOUNT_ID)
+        .get_did_secret_keys_by_creator_id(&DEFAULT_ACCOUNT_ID)
         .await
         .unwrap();
 
