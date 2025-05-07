@@ -12,6 +12,7 @@ use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
 use aes_gcm::aes::Aes256;
 use aes_gcm::{Aes256Gcm, AesGcm, Key};
+use thiserror::Error;
 
 use crate::{EncryptionError, Encryptor, ParseEncryptionKey};
 
@@ -57,7 +58,7 @@ impl Encryptor for AesGcmEncryptor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 struct AesGcmError(aes_gcm::Error);
 
 impl std::fmt::Display for AesGcmError {
@@ -65,5 +66,3 @@ impl std::fmt::Display for AesGcmError {
         write!(f, "AES-GCM error")
     }
 }
-
-impl std::error::Error for AesGcmError {}
