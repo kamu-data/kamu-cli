@@ -105,7 +105,7 @@ impl Web3WalletAuthenticationProvider {
     fn handle_login(
         &self,
         login_request: &LoginRequest,
-    ) -> Result<ChecksumWalletAddress, SignatureVerificationError> {
+    ) -> Result<ChecksumEvmWalletAddress, SignatureVerificationError> {
         let message: siwe::Message = login_request.message.parse()?;
 
         // TODO: Wallet-based auth: verify nonce
@@ -113,7 +113,7 @@ impl Web3WalletAuthenticationProvider {
         self.verify_eip4361_message_format(&message)?;
         self.verify_eip191_message_signature(&message, &login_request.signature)?;
 
-        Ok(ChecksumWalletAddress::from(message.address))
+        Ok(ChecksumEvmWalletAddress::from(message.address))
     }
 }
 
@@ -166,9 +166,9 @@ struct LoginRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[nutype]
-struct ChecksumWalletAddress(String);
+struct ChecksumEvmWalletAddress(String);
 
-impl From<[u8; 20]> for ChecksumWalletAddress {
+impl From<[u8; 20]> for ChecksumEvmWalletAddress {
     fn from(value: [u8; 20]) -> Self {
         Self::new(siwe::eip55(&value))
     }
