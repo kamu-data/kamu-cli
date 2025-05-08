@@ -55,6 +55,7 @@ server-console = { workspace = true }
 kamu = { workspace = true }
 
 kamu-adapter-auth-oso-rebac = { workspace = true }
+kamu-adapter-auth-web3 = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
