@@ -22,17 +22,13 @@ doctest = false
 
 
 [dependencies]
-crypto-utils = { workspace = true }
 database-common = { workspace = true }
 internal-error = { workspace = true }
 kamu-did-secret-keys = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false }
-tokio = { version = "1", default-features = false }
 dill = { version = "0.13", default-features = false }
-futures = { version = "0.3", default-features = false }
 
 
 [dev-dependencies]

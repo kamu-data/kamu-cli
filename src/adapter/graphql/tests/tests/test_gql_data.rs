@@ -216,7 +216,7 @@ async fn test_dataset_tail_schema() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// #[test_group::group(engine, datafusion)]
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_some() {
     let tempdir = tempfile::tempdir().unwrap();

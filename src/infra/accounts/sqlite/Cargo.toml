@@ -22,7 +22,6 @@ doctest = false
 
 
 [dependencies]
-crypto-utils = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 internal-error = { workspace = true }

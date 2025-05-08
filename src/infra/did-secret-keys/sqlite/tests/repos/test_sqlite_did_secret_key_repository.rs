@@ -30,7 +30,6 @@ struct SqliteDidSecretKeyRepositoryHarness {
 
 impl SqliteDidSecretKeyRepositoryHarness {
     pub fn new(sqlite_pool: SqlitePool) -> Self {
-        // Initialize catalog with predefined Postgres pool
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();

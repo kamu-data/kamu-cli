@@ -3078,10 +3078,7 @@ dependencies = [
  "aes-gcm",
  "argon2",
  "internal-error",
- "opendatafabric",
  "password-hash",
- "serde",
- "serde_with",
  "thiserror 2.0.12",
 ]
 
@@ -5971,7 +5968,6 @@ version = "0.235.0"
 dependencies = [
  "async-trait",
  "chrono",
- "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6017,7 +6013,6 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
- "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6040,7 +6035,6 @@ version = "0.235.0"
 dependencies = [
  "argon2",
  "chrono",
- "crypto-utils",
  "database-common",
  "dill",
  "email-utils",
@@ -6098,7 +6092,6 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
- "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6814,7 +6807,6 @@ name = "kamu-datasets-inmem"
 version = "0.235.0"
 dependencies = [
  "async-trait",
- "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6838,7 +6830,6 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bytes",
- "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6861,7 +6852,6 @@ version = "0.235.0"
 dependencies = [
  "bytes",
  "chrono",
- "crypto-utils",
  "database-common",
  "dill",
  "email-utils",
@@ -6931,7 +6921,6 @@ dependencies = [
  "async-trait",
  "bytes",
  "chrono",
- "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
@@ -6953,28 +6942,14 @@ name = "kamu-did-secret-keys"
 version = "0.235.0"
 dependencies = [
  "async-trait",
- "bytes",
- "chrono",
  "crypto-utils",
- "datafusion",
  "dill",
- "futures",
  "internal-error",
- "mockall",
- "object_store",
  "opendatafabric",
- "oso",
- "pathdiff",
  "serde",
  "serde_with",
  "sqlx",
- "strum 0.26.3",
  "thiserror 2.0.12",
- "tokio",
- "tokio-stream",
- "tracing",
- "url",
- "utoipa",
 ]
 
 [[package]]
@@ -6982,12 +6957,9 @@ name = "kamu-did-secret-keys-inmem"
 version = "0.235.0"
 dependencies = [
  "async-trait",
- "chrono",
- "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
- "futures",
  "internal-error",
  "kamu-accounts-inmem",
  "kamu-did-secret-keys",
@@ -7002,14 +6974,10 @@ dependencies = [
 name = "kamu-did-secret-keys-postgres"
 version = "0.235.0"
 dependencies = [
- "async-stream",
  "async-trait",
- "chrono",
- "crypto-utils",
  "database-common",
  "database-common-macros",
  "dill",
- "futures",
  "internal-error",
  "kamu-accounts-postgres",
  "kamu-did-secret-keys",
@@ -7018,8 +6986,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -7038,13 +7004,10 @@ dependencies = [
 name = "kamu-did-secret-keys-sqlite"
 version = "0.235.0"
 dependencies = [
- "async-stream",
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
- "futures",
  "internal-error",
  "kamu-accounts-sqlite",
  "kamu-did-secret-keys",
@@ -7053,7 +7016,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
- "tracing",
 ]
 
 [[package]]
