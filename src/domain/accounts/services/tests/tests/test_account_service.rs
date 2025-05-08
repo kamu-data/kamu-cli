@@ -9,18 +9,16 @@
 
 use std::assert_matches::assert_matches;
 
-use crypto_utils::{DidSecretEncryptionConfig, DidSecretKey, SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY};
 use database_common::NoOpDatabasePlugin;
 use email_utils::Email;
 use kamu_accounts::{
     AccountConfig,
-    AccountDidSecretKeyRepository,
     AccountService,
     AccountServiceExt,
     Password,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -32,6 +30,13 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
+use kamu_did_secret_keys::{
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    DidSecretKeyRepository,
+    SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
+};
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use odf::metadata::{DidKey, DidOdf};
 use odf::AccountName;
 use time_source::SystemTimeSourceDefault;
@@ -119,9 +124,7 @@ async fn test_multi_find() {
 async fn test_create_account() {
     let catalog = make_catalog().await;
     let account_svc = catalog.get_one::<dyn AccountService>().unwrap();
-    let account_did_secret_key_repo = catalog
-        .get_one::<dyn AccountDidSecretKeyRepository>()
-        .unwrap();
+    let did_secret_key_repo = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
 
     let creator_account_id = account_svc
         .find_account_id_by_name(&AccountName::new_unchecked(WASYA))
@@ -146,8 +149,8 @@ async fn test_create_account() {
         .unwrap()
         .unwrap();
 
-    let created_account_did_secret_keys = account_did_secret_key_repo
-        .get_did_secret_keys_by_creator_id(&creator_account_id)
+    let created_account_did_secret_keys = did_secret_key_repo
+        .get_did_secret_keys_by_creator_id(&creator_account_id, None)
         .await
         .unwrap();
 
@@ -206,7 +209,7 @@ async fn make_catalog() -> dill::Catalog {
         .add::<RebacServiceImpl>()
         .add::<InMemoryRebacRepository>()
         .add_value(DidSecretEncryptionConfig::sample())
-        .add::<InMemoryAccountDidSecretKeyRepository>()
+        .add::<InMemoryDidSecretKeyRepository>()
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
         .add::<PredefinedAccountsRegistrator>();

@@ -18,6 +18,7 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::*;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -71,7 +72,7 @@ impl BaseGQLDatasetHarness {
             .add::<InMemoryDatasetEntryRepository>()
             .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<InMemoryDatasetKeyBlockRepository>()
-            .add::<InMemoryDatasetDidSecretKeyRepository>()
+            .add::<InMemoryDidSecretKeyRepository>()
             .add::<DatasetKeyBlockUpdateHandler>()
             .add_value(RunInfoDir::new(run_info_dir));
 

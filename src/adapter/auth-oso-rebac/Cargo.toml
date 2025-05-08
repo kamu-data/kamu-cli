@@ -41,13 +41,14 @@ tokio = { version = "1", default-features = false, features = ["macros"] }
 tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
-crypto-utils = { workspace = true, default-features = false }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-core = { workspace = true, default-features = false, features = ["oso", "testing"] }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
+kamu-did-secret-keys = { workspace = true }
+kamu-did-secret-keys-inmem = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }
 

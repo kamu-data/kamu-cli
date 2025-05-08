@@ -8,11 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod inmem_access_token_repository;
-mod inmem_account_did_secret_key_repository;
 mod inmem_account_repository;
 mod inmem_oauth_device_code_repository;
 
 pub use inmem_access_token_repository::*;
-pub use inmem_account_did_secret_key_repository::*;
 pub use inmem_account_repository::*;
 pub use inmem_oauth_device_code_repository::*;

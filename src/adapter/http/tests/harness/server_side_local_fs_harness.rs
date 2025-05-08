@@ -26,7 +26,6 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
-    InMemoryAccountDidSecretKeyRepository,
     InMemoryAccountRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
@@ -48,13 +47,13 @@ use kamu_core::{
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
-    InMemoryDatasetDidSecretKeyRepository,
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::dataset::DatasetLayout;
 use tempfile::TempDir;
@@ -164,9 +163,8 @@ impl ServerSideLocalFsHarness {
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
-                .add::<InMemoryAccountDidSecretKeyRepository>()
-                .add::<InMemoryDatasetDidSecretKeyRepository>()
-                .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample())
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
                 .add_value(jwt_authentication_config)

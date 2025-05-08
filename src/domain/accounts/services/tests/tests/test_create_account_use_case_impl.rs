@@ -10,7 +10,6 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use crypto_utils::DidSecretEncryptionConfig;
 use database_common::NoOpDatabasePlugin;
 use email_utils::Email;
 use kamu_accounts::{
@@ -19,7 +18,7 @@ use kamu_accounts::{
     CreateAccountUseCase,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
@@ -32,6 +31,8 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use odf::AccountName;
 use time_source::SystemTimeSourceDefault;
 
@@ -110,7 +111,7 @@ impl CreateAccountUseCaseImplHarness {
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
             .add_value(DidSecretEncryptionConfig::sample())
-            .add::<InMemoryAccountDidSecretKeyRepository>()
+            .add::<InMemoryDidSecretKeyRepository>()
             .add_value(DefaultAccountProperties::default())
             .add_value(DefaultDatasetProperties::default())
             .add::<CreateAccountUseCaseImpl>()

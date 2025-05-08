@@ -15,7 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
 use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
-use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
@@ -26,6 +26,8 @@ use kamu_datasets::{
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
@@ -249,10 +251,10 @@ impl DatasetEntryServiceHarness {
             b.bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
 
             b.add::<InMemoryAccountRepository>();
-            b.add::<InMemoryAccountDidSecretKeyRepository>();
+            b.add::<InMemoryDidSecretKeyRepository>();
             b.add::<AccountServiceImpl>();
 
-            b.add_value(crypto_utils::DidSecretEncryptionConfig::sample());
+            b.add_value(DidSecretEncryptionConfig::sample());
 
             b.add_builder(
                 OutboxImmediateImpl::builder()

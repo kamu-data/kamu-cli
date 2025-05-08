@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_dependency_repository;
-mod dataset_did_secret_key_repository;
 mod dataset_entry_repository;
 mod dataset_env_var_repository;
 mod dataset_key_blocks_repository;
@@ -16,7 +15,6 @@ mod dataset_reference_repository;
 mod dataset_statistics_repository;
 
 pub use dataset_dependency_repository::*;
-pub use dataset_did_secret_key_repository::*;
 pub use dataset_entry_repository::*;
 pub use dataset_env_var_repository::*;
 pub use dataset_key_blocks_repository::*;

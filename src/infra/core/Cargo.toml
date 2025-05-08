@@ -46,6 +46,7 @@ testing = [
 # Kamu
 common-macros = { workspace = true }
 container-runtime = { workspace = true }
+crypto-utils = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }

@@ -12,11 +12,9 @@
 mod aes_gcm;
 mod argon2_hash;
 mod encryptor;
-mod entities;
 mod hasher;
 
 pub use aes_gcm::*;
 pub use argon2_hash::*;
 pub use encryptor::*;
-pub use entities::*;
 pub use hasher::*;

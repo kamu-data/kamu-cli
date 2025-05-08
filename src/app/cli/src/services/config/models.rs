@@ -11,12 +11,12 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
-use crypto_utils::DidSecretEncryptionConfig;
 use database_common::DatabaseProvider;
 use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;

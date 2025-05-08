@@ -17,7 +17,7 @@ use kamu::domain::*;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
-use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -34,6 +34,8 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -427,10 +429,9 @@ impl TestHarness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<AccountServiceImpl>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
-                .add::<InMemoryAccountDidSecretKeyRepository>()
-                .add::<InMemoryDatasetDidSecretKeyRepository>()
+                .add::<InMemoryDidSecretKeyRepository>()
                 .add::<InMemoryAccountRepository>()
-                .add_value(crypto_utils::DidSecretEncryptionConfig::sample());
+                .add_value(DidSecretEncryptionConfig::sample());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

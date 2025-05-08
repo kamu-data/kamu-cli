@@ -11,16 +11,12 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
-use crypto_utils::DidSecretEncryptionConfig;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{
-    CreateDatasetFromSnapshotUseCase,
-    DatasetDidSecretKeyRepository,
-    DatasetReferenceRepository,
-};
+use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
+use kamu_did_secret_keys::{DidEntityType, DidSecretEncryptionConfig, DidSecretKeyRepository};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceStub;
 
@@ -224,7 +220,7 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
 
     let did_secret_keys = harness
         .dataset_did_secret_key_repo
-        .get_did_secret_keys_by_creator_id(&DEFAULT_ACCOUNT_ID)
+        .get_did_secret_keys_by_creator_id(&DEFAULT_ACCOUNT_ID, Some(DidEntityType::Dataset))
         .await
         .unwrap();
 
@@ -250,7 +246,7 @@ struct CreateFromSnapshotUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
-    dataset_did_secret_key_repo: Arc<dyn DatasetDidSecretKeyRepository>,
+    dataset_did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
 }
 
 impl CreateFromSnapshotUseCaseHarness {

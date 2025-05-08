@@ -10,18 +10,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crypto_utils::{
-    Argon2Hasher,
-    DidSecretEncryptionConfig,
-    DidSecretKey,
-    Hasher,
-    PasswordHashingMode,
-};
+use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
-    AccountDidSecretKeyRepository,
     AccountPageStream,
     AccountRepository,
     AccountService,
@@ -37,13 +30,19 @@ use kamu_accounts::{
     SearchAccountsByNamePatternFilters,
     PROVIDER_PASSWORD,
 };
+use kamu_did_secret_keys::{
+    DidEntity,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    DidSecretKeyRepository,
+};
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountServiceImpl {
-    account_did_secret_key_repo: Arc<dyn AccountDidSecretKeyRepository>,
+    did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     account_repo: Arc<dyn AccountRepository>,
     time_source: Arc<dyn SystemTimeSource>,
     did_secret_encryption_key: Option<SecretString>,
@@ -58,7 +57,7 @@ pub struct AccountServiceImpl {
 impl AccountServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     fn new(
-        account_did_secret_key_repo: Arc<dyn AccountDidSecretKeyRepository>,
+        did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
         account_repo: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
@@ -66,7 +65,7 @@ impl AccountServiceImpl {
         password_hashing_mode: Option<Arc<PasswordHashingMode>>,
     ) -> Self {
         Self {
-            account_did_secret_key_repo,
+            did_secret_key_repo,
             account_repo,
             time_source,
             did_secret_encryption_key: did_secret_encryption_config
@@ -198,8 +197,12 @@ impl AccountService for AccountServiceImpl {
             )
             .int_err()?;
 
-            self.account_did_secret_key_repo
-                .save_did_secret_key(&account.id, owner_account_id, &did_secret_key)
+            self.did_secret_key_repo
+                .save_did_secret_key(
+                    &DidEntity::new_account(account.id.to_string()),
+                    owner_account_id,
+                    &did_secret_key,
+                )
                 .await
                 .int_err()?;
         }

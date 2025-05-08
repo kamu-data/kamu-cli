@@ -16,7 +16,7 @@ use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
 use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
-use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -32,13 +32,13 @@ use kamu_auth_rebac_services::{
 use kamu_datasets::*;
 use kamu_datasets_inmem::{
     InMemoryDatasetDependencyRepository,
-    InMemoryDatasetDidSecretKeyRepository,
     InMemoryDatasetEntryRepository,
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
@@ -92,9 +92,8 @@ async fn setup_repo() -> RepoFixture {
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
         .add::<InMemoryRebacRepository>()
-        .add::<InMemoryAccountDidSecretKeyRepository>()
-        .add::<InMemoryDatasetDidSecretKeyRepository>()
-        .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
+        .add::<InMemoryDidSecretKeyRepository>()
+        .add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample())
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
         .add_value(PredefinedAccountsConfig::single_tenant())

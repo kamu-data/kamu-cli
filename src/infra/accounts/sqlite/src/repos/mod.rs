@@ -8,11 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod sqlite_access_token_repository;
-mod sqlite_account_did_secret_key_repository;
 mod sqlite_account_repository;
 mod sqlite_oauth_device_code_repository;
 
 pub use sqlite_access_token_repository::*;
-pub use sqlite_account_did_secret_key_repository::*;
 pub use sqlite_account_repository::*;
 pub use sqlite_oauth_device_code_repository::*;

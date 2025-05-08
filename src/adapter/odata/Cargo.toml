@@ -50,7 +50,6 @@ utoipa-axum = { version = "0.2", default-features = false, features = [] }
 
 
 [dev-dependencies]
-crypto-utils = { workspace = true } 
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
@@ -61,6 +60,8 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
+kamu-did-secret-keys = { workspace = true }
+kamu-did-secret-keys-inmem = { workspace = true }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 

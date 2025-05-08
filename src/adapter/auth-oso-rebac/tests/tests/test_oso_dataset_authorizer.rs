@@ -19,7 +19,7 @@ use kamu_accounts::{
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_NAME,
 };
-use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -33,6 +33,7 @@ use kamu_core::TenancyConfig;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
 use kamu_datasets_services::{DatasetEntryServiceImpl, DatasetEntryWriter};
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{
     register_message_dispatcher,
     ConsumerFilter,
@@ -692,8 +693,8 @@ impl DatasetAuthorizerHarness {
                 .add_value(tenancy_config)
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
-                .add::<InMemoryAccountDidSecretKeyRepository>()
-                .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample())
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<LoginPasswordAuthProvider>();

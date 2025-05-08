@@ -1,0 +1,51 @@
+[package]
+name = "kamu-did-secret-keys-sqlite"
+description = "Sqlite-specific implementation of did secret keys domain"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+internal-error = { workspace = true }
+kamu-did-secret-keys = { workspace = true, features = ["sqlx"] }
+odf = { workspace = true, features = ["sqlx-postgres"] }
+
+async-stream = { version = "0.3", default-features = false }
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.13", default-features = false }
+futures = { version = "0.3", default-features = false }
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "macros",
+    "sqlite",
+    "chrono",
+] }
+tracing = { version = "0.1", default-features = false }
+
+
+[dev-dependencies]
+database-common-macros = { workspace = true }
+internal-error = { workspace = true }
+kamu-accounts-sqlite = { workspace = true }
+kamu-did-secret-keys-repo-tests = { workspace = true }
+
+test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

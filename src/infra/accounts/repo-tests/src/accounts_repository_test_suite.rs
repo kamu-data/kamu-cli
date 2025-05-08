@@ -55,13 +55,7 @@ pub async fn test_insert_and_locate_password_account(catalog: &Catalog) {
     let account = Account {
         email: Email::parse("test@example.com").unwrap(),
         display_name: String::from("Wasya Pupkin"),
-        ..make_test_account(
-            "wasya",
-            "wasya@example.com",
-            PROVIDER_PASSWORD,
-            "wasya",
-            None,
-        )
+        ..make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya")
     };
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -113,7 +107,6 @@ pub async fn test_insert_and_locate_github_account(catalog: &Catalog) {
             "wasya@example.com",
             kamu_adapter_oauth::PROVIDER_GITHUB,
             GITHUB_ACCOUNT_ID,
-            None,
         )
     };
 
@@ -164,7 +157,6 @@ pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
             "wasya@example.com",
             kamu_adapter_oauth::PROVIDER_GITHUB,
             GITHUB_ACCOUNT_ID_WASYA,
-            None,
         )
     };
     let account_petya = Account {
@@ -175,7 +167,6 @@ pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
             "petya@example.com",
             kamu_adapter_oauth::PROVIDER_GITHUB,
             GITHUB_ACCOUNT_ID_PETYA,
-            None,
         )
     };
 
@@ -212,13 +203,7 @@ pub async fn test_insert_and_locate_multiple_github_account(catalog: &Catalog) {
 pub async fn test_insert_and_locate_account_without_email(catalog: &Catalog) {
     let account = Account {
         display_name: String::from("Wasya Pupkin"),
-        ..make_test_account(
-            "wasya",
-            "wasya@example.com",
-            PROVIDER_PASSWORD,
-            "wasya",
-            None,
-        )
+        ..make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya")
     };
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -238,26 +223,14 @@ pub async fn test_duplicate_password_account_id(catalog: &Catalog) {
     let id = odf::AccountID::new_generated_ed25519().1;
     let account = Account {
         id: id.clone(),
-        ..make_test_account(
-            "wasya",
-            "wasya@example.com",
-            PROVIDER_PASSWORD,
-            "wasya",
-            None,
-        )
+        ..make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya")
     };
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     account_repo
         .save_account(&Account {
             id, // re-use same id
-            ..make_test_account(
-                "petya",
-                "petya@example.com",
-                PROVIDER_PASSWORD,
-                "petya",
-                None,
-            )
+            ..make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya")
         })
         .await
         .unwrap();
@@ -275,13 +248,7 @@ pub async fn test_duplicate_password_account_id(catalog: &Catalog) {
 pub async fn test_duplicate_password_account_email(catalog: &Catalog) {
     let account = Account {
         email: Email::parse("test@example.com").unwrap(),
-        ..make_test_account(
-            "wasya",
-            "wasya@example.com",
-            PROVIDER_PASSWORD,
-            "wasya",
-            None,
-        )
+        ..make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya")
     };
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -290,7 +257,7 @@ pub async fn test_duplicate_password_account_email(catalog: &Catalog) {
     assert_matches!(
         account_repo.save_account(&Account {
             email: Email::parse("test@example.com").unwrap(),
-            ..make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya", None)
+            ..make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya")
         }).await,
         Err(CreateAccountError::Duplicate(AccountErrorDuplicate{ account_field: field })) if field == AccountDuplicateField::Email
     );
@@ -309,7 +276,6 @@ pub async fn test_duplicate_github_account_id(catalog: &Catalog) {
             "wasya@example.com",
             kamu_adapter_oauth::PROVIDER_GITHUB,
             GITHUB_ACCOUNT_ID,
-            None,
         )
     };
 
@@ -322,7 +288,6 @@ pub async fn test_duplicate_github_account_id(catalog: &Catalog) {
                 "petya@example.com",
                 kamu_adapter_oauth::PROVIDER_GITHUB,
                 "12345",
-                None,
             )
         })
         .await
@@ -346,7 +311,6 @@ pub async fn test_duplicate_github_account_name(catalog: &Catalog) {
             "wasya@example.com",
             kamu_adapter_oauth::PROVIDER_GITHUB,
             GITHUB_ACCOUNT_ID,
-            None,
         )
     };
 
@@ -361,7 +325,6 @@ pub async fn test_duplicate_github_account_name(catalog: &Catalog) {
                 "wasya2@example.com", // different email
                 kamu_adapter_oauth::PROVIDER_GITHUB,
                 "12345",
-                None
             )
         }).await,
         Err(CreateAccountError::Duplicate(AccountErrorDuplicate{ account_field: field })) if field == AccountDuplicateField::Name
@@ -380,7 +343,6 @@ pub async fn test_duplicate_github_account_provider_identity(catalog: &Catalog) 
             "wasya@example.com",
             kamu_adapter_oauth::PROVIDER_GITHUB,
             GITHUB_ACCOUNT_ID,
-            None,
         )
     };
 
@@ -395,7 +357,6 @@ pub async fn test_duplicate_github_account_provider_identity(catalog: &Catalog) 
                 "petya@example.com",
                 kamu_adapter_oauth::PROVIDER_GITHUB,
                 GITHUB_ACCOUNT_ID,
-                None
             )
         }).await,
         Err(CreateAccountError::Duplicate(AccountErrorDuplicate{ account_field: field })) if field == AccountDuplicateField::ProviderIdentityKey
@@ -414,7 +375,6 @@ pub async fn test_duplicate_github_account_email(catalog: &Catalog) {
             "wasya@example.com",
             kamu_adapter_oauth::PROVIDER_GITHUB,
             GITHUB_ACCOUNT_ID,
-            None,
         )
     };
 
@@ -424,7 +384,7 @@ pub async fn test_duplicate_github_account_email(catalog: &Catalog) {
     assert_matches!(
         account_repo.save_account(&Account {
             id: odf::AccountID::new_generated_ed25519().1,
-            ..make_test_account("petya", "wasya@example.com",kamu_adapter_oauth::PROVIDER_GITHUB, "12345", None)
+            ..make_test_account("petya", "wasya@example.com",kamu_adapter_oauth::PROVIDER_GITHUB, "12345")
         }).await,
         Err(CreateAccountError::Duplicate(AccountErrorDuplicate{ account_field: field })) if field == AccountDuplicateField::Email
     );
@@ -549,13 +509,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_email_success(catalog: &Catalog) {
-    let account = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        PROVIDER_PASSWORD,
-        "wasya",
-        None,
-    );
+    let account = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -601,20 +555,8 @@ pub async fn test_update_email_success(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_email_errors(catalog: &Catalog) {
-    let account_1 = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        PROVIDER_PASSWORD,
-        "wasya",
-        None,
-    );
-    let account_2 = make_test_account(
-        "petya",
-        "petya@example.com",
-        PROVIDER_PASSWORD,
-        "petya",
-        None,
-    );
+    let account_1 = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
+    let account_2 = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -646,13 +588,7 @@ pub async fn test_update_email_errors(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_success(catalog: &Catalog) {
-    let account = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        PROVIDER_PASSWORD,
-        "wasya",
-        None,
-    );
+    let account = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -714,13 +650,7 @@ pub async fn test_update_account_success(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_not_found(catalog: &Catalog) {
-    let account = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        PROVIDER_PASSWORD,
-        "wasya",
-        None,
-    );
+    let account = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -740,20 +670,8 @@ pub async fn test_update_account_not_found(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_duplicate_email(catalog: &Catalog) {
-    let account_1 = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        PROVIDER_PASSWORD,
-        "wasya",
-        None,
-    );
-    let account_2 = make_test_account(
-        "petya",
-        "petya@example.com",
-        PROVIDER_PASSWORD,
-        "petya",
-        None,
-    );
+    let account_1 = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
+    let account_2 = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -776,20 +694,8 @@ pub async fn test_update_account_duplicate_email(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_duplicate_name(catalog: &Catalog) {
-    let account_1 = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        PROVIDER_PASSWORD,
-        "wasya",
-        None,
-    );
-    let account_2 = make_test_account(
-        "petya",
-        "petya@example.com",
-        PROVIDER_PASSWORD,
-        "petya",
-        None,
-    );
+    let account_1 = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
+    let account_2 = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -812,20 +718,8 @@ pub async fn test_update_account_duplicate_name(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_update_account_duplicate_provider_identity(catalog: &Catalog) {
-    let account_1 = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        PROVIDER_PASSWORD,
-        "wasya",
-        None,
-    );
-    let account_2 = make_test_account(
-        "petya",
-        "petya@example.com",
-        PROVIDER_PASSWORD,
-        "petya",
-        None,
-    );
+    let account_1 = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
+    let account_2 = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 

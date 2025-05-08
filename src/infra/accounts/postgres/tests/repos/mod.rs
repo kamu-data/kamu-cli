@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod test_postgres_access_token_repository;
-mod test_postgres_account_did_secret_key_repository;
 mod test_postgres_account_repository;
 mod test_postgres_oauth_device_code_repository;
 mod test_postgres_password_hash_repository;

@@ -25,6 +25,7 @@ use kamu_accounts_services::{
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
 };
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
@@ -786,6 +787,7 @@ impl GraphQLAccountsHarness {
             .add::<AccessTokenServiceImpl>()
             .add::<CreateAccountUseCaseImpl>()
             .add::<InMemoryAccessTokenRepository>()
+            .add::<InMemoryDidSecretKeyRepository>()
             .add::<OAuthDeviceCodeServiceImpl>()
             .add::<SystemTimeSourceDefault>()
             .add::<OAuthDeviceCodeGeneratorDefault>()

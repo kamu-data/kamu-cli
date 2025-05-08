@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use crypto_utils::{DidSecretEncryptionConfig, DidSecretKey};
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
@@ -19,7 +18,12 @@ use kamu_datasets::{
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     CreateDatasetUseCaseOptions,
-    DatasetDidSecretKeyRepository,
+};
+use kamu_did_secret_keys::{
+    DidEntity,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    DidSecretKeyRepository,
 };
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
@@ -35,7 +39,7 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
     did_secret_encryption_key: Option<SecretString>,
-    dataset_did_secret_key_repo: Arc<dyn DatasetDidSecretKeyRepository>,
+    did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
 }
 
 #[component(pub)]
@@ -49,7 +53,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
         dataset_registry: Arc<dyn DatasetRegistry>,
         create_helper: Arc<CreateDatasetUseCaseHelper>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
-        dataset_did_secret_key_repo: Arc<dyn DatasetDidSecretKeyRepository>,
+        did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     ) -> Self {
         Self {
             current_account_subject,
@@ -61,7 +65,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
                 .encryption_key
                 .as_ref()
                 .map(|encryption_key| SecretString::from(encryption_key.clone())),
-            dataset_did_secret_key_repo,
+            did_secret_key_repo,
         }
     }
 }
@@ -119,8 +123,12 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             let dataset_did_secret_key =
                 DidSecretKey::try_new(&dataset_did.1, did_secret_encryption_key.expose_secret())
                     .int_err()?;
-            self.dataset_did_secret_key_repo
-                .save_did_secret_key(&dataset_did.0, logged_account_id, &dataset_did_secret_key)
+            self.did_secret_key_repo
+                .save_did_secret_key(
+                    &DidEntity::new_dataset(dataset_did.0.to_string()),
+                    logged_account_id,
+                    &dataset_did_secret_key,
+                )
                 .await
                 .int_err()?;
         }

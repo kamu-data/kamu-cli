@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccountDidSecretKeyRepository, InMemoryAccountRepository};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -50,8 +50,7 @@ pub async fn authentication_catalogs(
         .add_value(DefaultDatasetProperties::default())
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
-        .add::<InMemoryAccountDidSecretKeyRepository>()
-        .add_value(crypto_utils::DidSecretEncryptionConfig::sample())
+        .add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample())
         .add_value(predefined_accounts_config)
         .build();
 

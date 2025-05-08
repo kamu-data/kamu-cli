@@ -353,7 +353,6 @@ impl OAuthDeviceCodeRepositoryTestSuiteHarness {
                 &format!("{account_name}@example.com"),
                 kamu_adapter_oauth::PROVIDER_GITHUB,
                 account_name,
-                None,
             );
 
             assert_matches!(

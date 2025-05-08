@@ -39,20 +39,8 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
-    let account_wasya = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        PROVIDER_PASSWORD,
-        "wasya",
-        None,
-    );
-    let account_petya = make_test_account(
-        "petya",
-        "petya@example.com",
-        PROVIDER_PASSWORD,
-        "petya",
-        None,
-    );
+    let account_wasya = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
+    let account_petya = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
 
     account_repo.save_account(&account_wasya).await.unwrap();
     account_repo.save_account(&account_petya).await.unwrap();
@@ -101,13 +89,7 @@ pub async fn test_modify_password(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
-    let account_petya = make_test_account(
-        "petya",
-        "petya@example.com",
-        PROVIDER_PASSWORD,
-        "petya",
-        None,
-    );
+    let account_petya = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
 
     account_repo.save_account(&account_petya).await.unwrap();
 
