@@ -35,25 +35,11 @@ CREATE SEQUENCE webhook_subscription_event_seq AS BIGINT;
 
 /* ------------------------------ */
 
-CREATE TYPE webhook_subscription_event_type AS ENUM (
-  'SUBSCRIPTION_CREATED',
-  'SUBSCRIPTION_UPDATED',
-  'SUBSCRIPTION_SECRET_ROTATED',
-  'SUBSCRIPTION_ENABLED',
-  'SUBSCRIPTION_PAUSED',
-  'SUBSCRIPTION_RESUMED',
-  'SUBSCRIPTION_MARKED_UNREACHABLE',
-  'SUBSCRIPTION_REACTIVATED',
-  'SUBSCRIPTION_REMOVED'
-);
-
-/* ------------------------------ */
-
 CREATE TABLE webhook_subscription_events (
   event_id BIGINT PRIMARY KEY DEFAULT nextval('webhook_subscription_event_seq'),
   subscription_id UUID NOT NULL REFERENCES webhook_subscriptions(id),
   created_at TIMESTAMPTZ NOT NULL,
-  event_type webhook_subscription_event_type NOT NULL,
+  event_type VARCHAR(50) NOT NULL,
   event_payload JSONB NOT NULL
 );
 

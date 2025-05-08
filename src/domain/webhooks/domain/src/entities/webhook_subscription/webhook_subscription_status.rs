@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(
     feature = "sqlx",
     derive(sqlx::Type),
-    sqlx(type_name = "webhook_subscription_status", rename_all = "snake_case")
+    sqlx(type_name = "webhook_subscription_status", rename_all = "UPPERCASE")
 )]
 pub enum WebhookSubscriptionStatus {
     Unverified,

@@ -21,4 +21,20 @@ pub struct WebhookEvent {
     pub created_at: DateTime<Utc>,
 }
 
+impl WebhookEvent {
+    pub fn new(
+        id: WebhookEventId,
+        event_type: WebhookEventType,
+        payload: serde_json::Value,
+        created_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            event_type,
+            payload,
+            created_at,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

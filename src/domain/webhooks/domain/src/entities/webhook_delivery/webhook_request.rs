@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebhookRequest {
     pub headers: Vec<(http::header::HeaderName, String)>,
     pub started_at: DateTime<Utc>,

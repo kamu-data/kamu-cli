@@ -11,93 +11,65 @@ use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_task_system_sqlite::SqliteTaskEventStore;
+use kamu_webhooks_sqlite::*;
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_empty,
-    harness = SqliteTaskSystemEventStoreHarness
+    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_no_webhook_deliveries_initially,
+    harness = SqliteWebhookDeliveryRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_get_streams,
-    harness = SqliteTaskSystemEventStoreHarness
+    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_save_webhook_delivery_start_and_success_response,
+    harness = SqliteWebhookDeliveryRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_get_events_with_windowing,
-    harness = SqliteTaskSystemEventStoreHarness
+    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_save_webhook_delivery_start_and_failure_response,
+    harness = SqliteWebhookDeliveryRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_get_events_by_tasks,
-    harness = SqliteTaskSystemEventStoreHarness
+    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_filter_webhook_deliveries_by_task_id,
+    harness = SqliteWebhookDeliveryRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_get_dataset_tasks,
-    harness = SqliteTaskSystemEventStoreHarness
+    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_filter_webhook_deliveries_by_webhook_event_or_subscription_id,
+    harness = SqliteWebhookDeliveryRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-database_transactional_test!(
-    storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_single_task,
-    harness = SqliteTaskSystemEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_try_get_queued_multiple_tasks,
-    harness = SqliteTaskSystemEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_get_running_tasks,
-    harness = SqliteTaskSystemEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture = kamu_task_system_repo_tests::test_event_store_concurrent_modification,
-    harness = SqliteTaskSystemEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct SqliteTaskSystemEventStoreHarness {
+struct SqliteWebhookDeliveryRepositoryHarness {
     catalog: Catalog,
 }
 
-impl SqliteTaskSystemEventStoreHarness {
+impl SqliteWebhookDeliveryRepositoryHarness {
     pub fn new(sqlite_pool: SqlitePool) -> Self {
-        // Initialize catalog with predefined SQLite pool
+        // Initialize catalog with predefined Postgres pool
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteTaskEventStore>();
+        catalog_builder.add::<SqliteWebhookSubscriptionEventStore>();
+        catalog_builder.add::<SqliteWebhookEventRepository>();
+        catalog_builder.add::<SqliteWebhookDeliveryRepository>();
 
         Self {
             catalog: catalog_builder.build(),
