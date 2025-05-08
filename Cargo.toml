@@ -90,12 +90,12 @@ members = [
     "src/infra/messaging-outbox/sqlite",
     # Adapters
     "src/adapter/auth-oso-rebac",
+    "src/adapter/auth-web3",
     "src/adapter/flight-sql",
     "src/adapter/graphql",
     "src/adapter/http",
     "src/adapter/oauth",
     "src/adapter/odata",
-    "src/adapter/web3-evm",
     # Apps
     "src/app/cli",
     # E2E
@@ -212,11 +212,12 @@ kamu-messaging-outbox-repo-tests = { version = "0.235.0", path = "src/infra/mess
 
 # Adapters
 kamu-adapter-auth-oso-rebac = { version = "0.235.0", path = "src/adapter/auth-oso-rebac", default-features = false }
+kamu-adapter-auth-web3 = { version = "0.235.0", path = "src/adapter/auth-web3", default-features = false }
 kamu-adapter-flight-sql = { version = "0.235.0", path = "src/adapter/flight-sql", default-features = false }
 kamu-adapter-graphql = { version = "0.235.0", path = "src/adapter/graphql", default-features = false }
 kamu-adapter-http = { version = "0.235.0", path = "src/adapter/http", default-features = false }
-kamu-adapter-odata = { version = "0.235.0", path = "src/adapter/odata", default-features = false }
 kamu-adapter-oauth = { version = "0.235.0", path = "src/adapter/oauth", default-features = false }
+kamu-adapter-odata = { version = "0.235.0", path = "src/adapter/odata", default-features = false }
 
 # E2E
 kamu-cli-e2e-common = { version = "0.235.0", path = "src/e2e/app/cli/common", default-features = false }

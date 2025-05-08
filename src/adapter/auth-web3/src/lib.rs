@@ -16,6 +16,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod evm_wallet_authentication_provider;
+mod dependencies;
+mod web3_wallet_authentication_provider;
 
-pub use evm_wallet_authentication_provider::*;
+pub use dependencies::*;
+pub use web3_wallet_authentication_provider::*;

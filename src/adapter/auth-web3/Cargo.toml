@@ -1,6 +1,6 @@
 [package]
-name = "kamu-adapter-web3-evm"
-description = "EVM adapter"
+name = "kamu-adapter-auth-web3"
+description = "Authorization adapter for Web3 wallets"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -22,11 +22,19 @@ doctest = false
 
 
 [dependencies]
+email-utils = { workspace = true, default-features = false }
 kamu-accounts = { workspace = true, default-features = false }
+kamu-core = { workspace = true, default-features = false }
 odf = { workspace = true, default-features = false }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.13", default-features = false }
+hex = { version = "0.4", default-features = false }
+nutype = { version = "0.6", default-features = false }
+serde = { version = "1", default-features = false }
+serde_json = { version = "1", default-features = false }
+siwe = { version = "0.6", default-features = false }
+thiserror = { version = "2", default-features = false }
 
 
 [dev-dependencies]

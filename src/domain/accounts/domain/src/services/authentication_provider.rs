@@ -73,4 +73,13 @@ pub enum ProviderLoginError {
     ),
 }
 
+impl ProviderLoginError {
+    pub fn invalid_credentials<E>(error: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        Self::InvalidCredentials(InvalidCredentialsError::new(Box::new(error)))
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
