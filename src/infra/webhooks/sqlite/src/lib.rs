@@ -12,6 +12,8 @@ pub use kamu_webhooks as domain;
 
 mod sqlite_webhook_delivery_repository;
 mod sqlite_webhook_event_repository;
+mod sqlite_webhook_subscription_event_store;
 
 pub use sqlite_webhook_delivery_repository::*;
 pub use sqlite_webhook_event_repository::*;
+pub use sqlite_webhook_subscription_event_store::*;

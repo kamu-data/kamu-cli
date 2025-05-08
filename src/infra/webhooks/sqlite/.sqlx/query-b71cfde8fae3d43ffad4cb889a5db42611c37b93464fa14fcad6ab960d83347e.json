@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id as \"id: uuid::Uuid\" FROM webhook_subscriptions\n                WHERE dataset_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b71cfde8fae3d43ffad4cb889a5db42611c37b93464fa14fcad6ab960d83347e"
+}

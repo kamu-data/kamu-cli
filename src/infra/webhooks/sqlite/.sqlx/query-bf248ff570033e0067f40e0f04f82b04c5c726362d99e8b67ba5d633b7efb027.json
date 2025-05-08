@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(id) AS subscriptions_count FROM webhook_subscriptions\n                WHERE dataset_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "subscriptions_count",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bf248ff570033e0067f40e0f04f82b04c5c726362d99e8b67ba5d633b7efb027"
+}

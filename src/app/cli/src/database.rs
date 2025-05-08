@@ -195,7 +195,7 @@ pub fn configure_database_components(
 
             b.add::<kamu_webhooks_sqlite::SqliteWebhookEventRepository>();
             b.add::<kamu_webhooks_sqlite::SqliteWebhookDeliveryRepository>();
-            // b.add::<kamu_webhooks_sqlite::SqliteWebhookSubscriptionEventStore>();
+            b.add::<kamu_webhooks_sqlite::SqliteWebhookSubscriptionEventStore>();
         }
     }
 
