@@ -40,7 +40,13 @@ async fn graphiql_handler() -> impl axum::response::IntoResponse {
     axum::response::Html(
         async_graphql::http::GraphiQLSource::build()
             .endpoint("/graphql")
-            .finish(),
+            .finish()
+            // TODO: FIXME: Remove this hack after upstream issue is fixed
+            // See: https://github.com/async-graphql/async-graphql/issues/1703
+            .replace(
+                "https://unpkg.com/graphiql/",
+                "https://unpkg.com/graphiql@3.9.0/",
+            ),
     )
 }
 

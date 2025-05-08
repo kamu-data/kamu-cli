@@ -42,7 +42,7 @@ regex = { version = "1", default-features = false }
 test-utils = { workspace = true }
 
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "46", default-features = false, features = [] }
+datafusion = { version = "47", default-features = false, features = [] }
 indoc = "2"
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }

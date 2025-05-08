@@ -478,7 +478,7 @@ impl DataWriterDataFusion {
             global: ParquetOptions {
                 writer_version: "1.0".into(),
                 compression: Some("snappy".into()),
-                ..Default::default()
+                ..self.ctx.state().default_table_options().parquet.global
             },
             column_specific_options: HashMap::from([
                 (
@@ -517,6 +517,8 @@ impl DataWriterDataFusion {
             path.extension().is_some(),
             "Ouput file name must have an extension"
         );
+
+        println!("+++++ {:#?}", df.clone().into_parts().0.config());
 
         let res = df
             .write_parquet(

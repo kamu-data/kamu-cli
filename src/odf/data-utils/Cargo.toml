@@ -30,16 +30,11 @@ testing = ["dep:pretty_assertions"]
 odf-metadata = { workspace = true }
 
 async-trait = "0.1"
-arrow = { version = "54", default-features = false }
-arrow-digest = { version = "54", default-features = false }
-arrow-json = { version = "54", default-features = false }
-arrow-schema = { version = "54", default-features = false, features = [
-    "serde",
-] }
-datafusion = { version = "46", default-features = false, features = [
-    "parquet",
-    "serde",
-] }
+arrow = { version = "55", default-features = false }
+arrow-digest = { version = "55", default-features = false }
+arrow-json = { version = "55", default-features = false }
+arrow-schema = { version = "55", default-features = false, features = ["serde"] }
+datafusion = { version = "47", default-features = false, features = ["parquet", "serde"] }
 digest = "0.10"
 hex = "0.4"
 sha3 = "0.10"
