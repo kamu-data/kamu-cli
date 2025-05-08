@@ -314,7 +314,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             );
 
             if output_config.verbosity_level == 0 {
-                eprintln!("{}", err.pretty(false));
+                eprintln!("{}", err.pretty(output_config.show_error_stack_trace));
             }
         }
     }
@@ -1114,6 +1114,7 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
         format,
         trace_file,
         metrics_file,
+        show_error_stack_trace: args.show_error_stack_trace,
     }
 }
 

@@ -30,6 +30,7 @@ pub struct OutputConfig {
     /// Points to the output metrics file if Prometheus metrics dump was
     /// requested
     pub metrics_file: Option<PathBuf>,
+    pub show_error_stack_trace: bool,
 }
 
 impl Default for OutputConfig {
@@ -41,6 +42,7 @@ impl Default for OutputConfig {
             format: OutputFormat::Table,
             trace_file: None,
             metrics_file: None,
+            show_error_stack_trace: false,
         }
     }
 }

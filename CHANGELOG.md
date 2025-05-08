@@ -11,6 +11,9 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+### Added
+- `kamu --show-error-stack-trace`: Added an argument to show stack trace in case of an error during command execution
+
 ## [Unreleased]
 ### Added
 - New REST endpoint `/system/info` and GQL endpoint `buildInfo` that return application version and build details
@@ -298,7 +301,7 @@ Recommendation: for ease of reading, use the following order:
     - flow system no longer uses real datasets
     - HTTP and GQL use real accounts and dataset entries
 - Moved several account-related routines from `AuthenticationService` to `AccountService`, 
-  the authentication services has focus only on JWT token and login flows
+  the authentication services have focus only on JWT token and login flows
 - Upgraded to `datafusion v45` (#1063)
 ### Fixed
 - GQL metadata query now correctly returns dataset aliases for `SetTransform` event in multi-tenant mode
