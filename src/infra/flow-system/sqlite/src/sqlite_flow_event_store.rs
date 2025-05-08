@@ -404,6 +404,65 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
         })
     }
 
+    fn get_events_multi(&self, queries: Vec<FlowID>) -> MultiEventStream<FlowID, FlowEvent> {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+
+            #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+            struct EventRow {
+                pub flow_id: FlowID,
+                pub event_id: i64,
+                pub event_payload: sqlx::types::JsonValue
+            }
+
+            let query_str = format!(
+                r#"
+                SELECT
+                    flow_id as "flow_id: _",
+                    event_id as "event_id: _",
+                    event_payload as "event_payload: _"
+                FROM flow_events
+                    WHERE flow_id IN ({})
+                    ORDER BY event_id ASC
+                "#,
+                sqlite_generate_placeholders_list(
+                    queries.len(),
+                    NonZeroUsize::new(1).unwrap()
+                )
+            );
+
+            let mut query = sqlx::query(&query_str);
+            for task_id in queries {
+                let task_id: i64 = task_id.try_into().unwrap();
+                query = query.bind(task_id);
+            }
+
+            use sqlx::Row;
+
+            let mut query_stream = query
+                .try_map(|row: sqlx::sqlite::SqliteRow| {
+                    let flow_id: u64 = row.get(0);
+                    let event_id: i64 = row.get(1);
+                    let event_payload: sqlx::types::JsonValue = row.get(2);
+
+                    let event = serde_json::from_value::<FlowEvent>(event_payload)
+                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                    Ok((FlowID::new(flow_id), EventID::new(event_id), event))
+                })
+                .fetch(connection_mut)
+                .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((flow_id, event_id, event)) = query_stream.try_next().await? {
+                yield Ok((flow_id, event_id, event));
+            }
+        })
+    }
+
     async fn save_events(
         &self,
         flow_id: &FlowID,
