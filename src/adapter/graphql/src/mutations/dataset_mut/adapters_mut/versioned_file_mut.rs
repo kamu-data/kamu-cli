@@ -257,6 +257,9 @@ impl VersionedFileMut {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
+        use sha3::Digest;
+        use tokio::io::AsyncReadExt;
+
         let upload_svc = from_catalog_n!(ctx, dyn domain::UploadService);
 
         let upload_token: domain::UploadTokenBase64Json =
@@ -282,9 +285,31 @@ impl VersionedFileMut {
             ));
         }
 
-        // Copy data from uploads to storage
-        // TODO: PERF: Should we create file in the final storage directly to avoid
-        // copying?
+        // Compute the object hash
+        // TODO: Hide digest logic into upload service or object repository?
+        let mut stream = upload_svc
+            .upload_token_into_stream(&upload_token.0)
+            .await
+            .int_err()?;
+
+        let mut digest = sha3::Sha3_256::new();
+        let mut buf = [0u8; 2048];
+
+        loop {
+            let read = stream.read(&mut buf).await.int_err()?;
+            if read == 0 {
+                break;
+            }
+            digest.update(&buf[..read]);
+        }
+
+        let digest = digest.finalize();
+        let content_hash =
+            odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest).unwrap();
+
+        // Get the stream again and copy data from uploads to storage using computet
+        // hash TODO: PERF: Should we create file in the final storage directly
+        // to avoid copying?
         let stream = upload_svc
             .upload_token_into_stream(&upload_token.0)
             .await
@@ -292,17 +317,17 @@ impl VersionedFileMut {
 
         let dataset = self.state.resolved_dataset(ctx).await?;
         let data_repo = dataset.as_data_repo();
-        let insert_result = data_repo
+        data_repo
             .insert_stream(
                 stream,
                 odf::storage::InsertOpts {
+                    precomputed_hash: Some(&content_hash),
                     size_hint: Some(upload_token.0.content_length as u64),
                     ..Default::default()
                 },
             )
             .await
             .int_err()?;
-        let content_hash = insert_result.hash;
 
         // Form and write new record
         let entry = VersionedFileEntry::new(
