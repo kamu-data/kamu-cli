@@ -146,13 +146,15 @@ impl WebhookDeliveryRepository for InMemoryWebhookDeliveryRepository {
 
     async fn list_by_subscription_id(
         &self,
-        event_id: WebhookSubscriptionId,
+        subscription_id: WebhookSubscriptionId,
         pagination: PaginationOpts,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError> {
         let state = self.state.read().unwrap();
-        if let Some(all_task_attempt_ids) = state.webhooks_by_subscription_id.get(&event_id) {
+        if let Some(all_task_attempt_ids) = state.webhooks_by_subscription_id.get(&subscription_id)
+        {
             let task_attempt_ids = all_task_attempt_ids
                 .iter()
+                .rev()
                 .skip(pagination.offset)
                 .take(pagination.limit)
                 .copied()

@@ -2,7 +2,7 @@
 
 CREATE TABLE webhook_subscriptions (
     id CHAR(36) PRIMARY KEY NOT NULL,
-    dataset_id VARCHAR(100) NOT NULL,
+    dataset_id VARCHAR(100),
     event_types TEXT NOT NULL, -- Store as a comma-separated string
     status VARCHAR(15) NOT NULL DEFAULT 'UNVERIFIED' CHECK (
         status IN ('UNVERIFIED', 'ENABLED', 'PAUSED', 'UNREACHABLE', 'REMOVED')

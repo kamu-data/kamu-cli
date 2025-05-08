@@ -48,6 +48,7 @@ uuid = { version = "1", default-features = false }
 [dev-dependencies]
 database-common-macros = { workspace = true }
 kamu-webhooks-repo-tests = { workspace = true }
+kamu-task-system-sqlite = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }

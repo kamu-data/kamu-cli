@@ -23,13 +23,13 @@ use sqlx::{FromRow, QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteTaskSystemEventStore {
+pub struct SqliteTaskEventStore {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
 #[component(pub)]
 #[interface(dyn TaskEventStore)]
-impl SqliteTaskSystemEventStore {
+impl SqliteTaskEventStore {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -153,7 +153,7 @@ impl SqliteTaskSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<TaskState> for SqliteTaskSystemEventStore {
+impl EventStore<TaskState> for SqliteTaskEventStore {
     fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<TaskEvent> {
         let task_id: i64 = (*task_id).try_into().unwrap();
         let maybe_from_id = opts.from.map(EventID::into_inner);
@@ -317,7 +317,7 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskEventStore for SqliteTaskSystemEventStore {
+impl TaskEventStore for SqliteTaskEventStore {
     /// Generates new unique task identifier
     async fn new_task_id(&self) -> Result<TaskID, InternalError> {
         let mut tr = self.transaction.lock().await;

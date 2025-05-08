@@ -38,6 +38,7 @@ futures = "0.3"
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 kamu-webhooks-repo-tests = { workspace = true }
+kamu-task-system-inmem = { workspace = true }
 
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
