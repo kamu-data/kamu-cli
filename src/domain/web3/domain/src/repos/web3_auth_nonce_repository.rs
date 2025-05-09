@@ -16,11 +16,11 @@ use crate::{EvmWalletAddress, Web3AuthenticationNonceEntity};
 
 #[async_trait::async_trait]
 pub trait Web3AuthNonceRepository: Send + Sync {
-    async fn set_nonce(&self, entity: Web3AuthenticationNonceEntity) -> Result<(), SetNonceError>;
+    async fn set_nonce(&self, entity: &Web3AuthenticationNonceEntity) -> Result<(), SetNonceError>;
 
     async fn get_nonce(
         &self,
-        wallet: EvmWalletAddress,
+        wallet: &EvmWalletAddress,
     ) -> Result<Web3AuthenticationNonceEntity, SetNonceError>;
 
     async fn cleanup_expired_nonces(&self) -> Result<(), CleanupExpiredNoncesError>;

@@ -14,4 +14,10 @@ use nutype::nutype;
 #[nutype(sanitize(trim), validate(len_char_min = 8), derive(Debug))]
 pub struct Web3AuthenticationNonce(String);
 
+impl Web3AuthenticationNonce {
+    pub fn new() -> Self {
+        Self::try_new(siwe::generate_nonce()).expect("Invalid nonce generated")
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

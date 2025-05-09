@@ -7401,12 +7401,19 @@ dependencies = [
  "chrono",
  "internal-error",
  "nutype",
+ "siwe",
  "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "kamu-web3-services"
 version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "dill",
+ "internal-error",
+ "kamu-web3",
+]
 
 [[package]]
 name = "keccak"
