@@ -153,20 +153,22 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
 pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a JWT
     let login_response = kamu_api_server_client
-     .graphql_api_call(indoc::indoc!(
-        r#"
-        mutation {
-            auth {
-                login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
-                    accessToken,
-                    account {
-                        id
-                    }
-                }
-            }
-        }
-        "#,
-         ))
+     .graphql_api_call(
+      indoc::indoc!(
+          r#"
+          mutation {
+              auth {
+                  login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                      accessToken,
+                      account {
+                          id
+                      }
+                  }
+              }
+          }
+          "#,
+         ),
+         None)
      .await
      .data();
 
@@ -207,6 +209,7 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
             )
             .replace("<account_id>", account_id_str)
             .as_str(),
+            None,
         )
         .await
         .data();

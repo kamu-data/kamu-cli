@@ -11,18 +11,18 @@ use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 
 use crate::prelude::*;
-use crate::queries::{DatasetRequestState, FileVersion, VersionedFileEntry};
+use crate::queries::{FileVersion, VersionedFileEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct VersionedFileMut {
-    state: DatasetRequestState,
+    dataset: domain::ResolvedDataset,
 }
 
 impl VersionedFileMut {
-    pub fn new(state: DatasetRequestState) -> Self {
-        Self { state }
+    pub fn new(dataset: domain::ResolvedDataset) -> Self {
+        Self { dataset }
     }
 
     async fn get_latest_version(&self, ctx: &Context<'_>) -> Result<(FileVersion, odf::Multihash)> {
@@ -31,7 +31,7 @@ impl VersionedFileMut {
         // TODO: Consider retractons / corrections
         let query_res = query_svc
             .tail(
-                &self.state.dataset_handle().as_local_ref(),
+                &self.dataset.get_handle().as_local_ref(),
                 0,
                 1,
                 domain::GetDataOptions::default(),
@@ -61,7 +61,7 @@ impl VersionedFileMut {
         // TODO: Consider retractons / corrections
         let query_res = query_svc
             .tail(
-                &self.state.dataset_handle().as_local_ref(),
+                &self.dataset.get_handle().as_local_ref(),
                 0,
                 1,
                 domain::GetDataOptions::default(),
@@ -78,8 +78,7 @@ impl VersionedFileMut {
         assert_eq!(records.len(), 1);
         let record = records.into_iter().next().unwrap();
 
-        let entry =
-            VersionedFileEntry::from_json(self.state.resolved_dataset(ctx).await?.clone(), record);
+        let entry = VersionedFileEntry::from_json(self.dataset.clone(), record);
 
         Ok(Some(entry))
     }
@@ -100,7 +99,7 @@ impl VersionedFileMut {
 
         let ingest_result = match push_ingest_use_case
             .execute(
-                self.state.resolved_dataset(ctx).await?,
+                &self.dataset,
                 kamu_core::DataSource::Buffer(entry.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -175,8 +174,7 @@ impl VersionedFileMut {
 
         // Upload data object
         // TODO: Link data object to the new block
-        let dataset = self.state.resolved_dataset(ctx).await?;
-        let data_repo = dataset.as_data_repo();
+        let data_repo = self.dataset.as_data_repo();
         let insert_data_res = data_repo
             .insert_bytes(&content, odf::storage::InsertOpts::default())
             .await
@@ -185,7 +183,7 @@ impl VersionedFileMut {
 
         // Form and write a new record
         let entry = VersionedFileEntry::new(
-            dataset.clone(),
+            self.dataset.clone(),
             new_version,
             content_hash.clone(),
             content_type,
@@ -315,8 +313,7 @@ impl VersionedFileMut {
             .await
             .int_err()?;
 
-        let dataset = self.state.resolved_dataset(ctx).await?;
-        let data_repo = dataset.as_data_repo();
+        let data_repo = self.dataset.as_data_repo();
         data_repo
             .insert_stream(
                 stream,
@@ -331,7 +328,7 @@ impl VersionedFileMut {
 
         // Form and write new record
         let entry = VersionedFileEntry::new(
-            dataset.clone(),
+            self.dataset.clone(),
             new_version,
             content_hash.clone(),
             upload_token.0.content_type,

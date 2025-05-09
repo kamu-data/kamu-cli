@@ -670,21 +670,9 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
-            .add::<kamu_adapter_http::platform::UploadServiceLocal>()
-            .add_value(kamu::domain::ServerUrlConfig::new_test(None))
-            .add_value(kamu::domain::FileUploadLimitConfig::new_in_bytes(100))
-            .add_value(kamu::domain::CacheDir::new(cache_dir))
             .build();
 
         let (_catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
-
-        // TODO: Yuck
-        let catalog_authorized = catalog_authorized
-            .builder_chained()
-            .add_value(kamu_adapter_http::AccessToken {
-                token: "<secret>".into(),
-            })
-            .build();
 
         Self {
             base_gql_harness,

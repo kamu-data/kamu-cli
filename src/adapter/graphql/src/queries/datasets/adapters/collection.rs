@@ -11,34 +11,33 @@ use kamu::domain;
 
 use super::{CollectionEntry, CollectionEntryConnection};
 use crate::prelude::*;
-use crate::queries::DatasetRequestStateWithOwner;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct Collection {
-    state: DatasetRequestStateWithOwner,
+    dataset: domain::ResolvedDataset,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Collection {
     #[graphql(skip)]
-    pub fn new(state: DatasetRequestStateWithOwner) -> Self {
-        Self { state }
+    pub fn new(dataset: domain::ResolvedDataset) -> Self {
+        Self { dataset }
     }
 
     /// Latest state projection of the state of collection
     #[tracing::instrument(level = "info", name = Collection_latest, skip_all)]
     pub async fn latest(&self) -> CollectionProjection {
-        CollectionProjection::new(self.state.clone(), None)
+        CollectionProjection::new(self.dataset.clone(), None)
     }
 
     /// State projection of the state of collection at the specified point in
     /// time
     #[tracing::instrument(level = "info", name = Collection_as_of, skip_all)]
     pub async fn as_of(&self, block_hash: Multihash<'static>) -> CollectionProjection {
-        CollectionProjection::new(self.state.clone(), Some(block_hash.into()))
+        CollectionProjection::new(self.dataset.clone(), Some(block_hash.into()))
     }
 }
 
@@ -46,13 +45,13 @@ impl Collection {
 
 #[derive(Debug)]
 pub struct CollectionProjection {
-    state: DatasetRequestStateWithOwner,
+    dataset: domain::ResolvedDataset,
     as_of: Option<odf::Multihash>,
 }
 
 impl CollectionProjection {
-    pub fn new(state: DatasetRequestStateWithOwner, as_of: Option<odf::Multihash>) -> Self {
-        Self { state, as_of }
+    pub fn new(dataset: domain::ResolvedDataset, as_of: Option<odf::Multihash>) -> Self {
+        Self { dataset, as_of }
     }
 }
 
@@ -74,7 +73,7 @@ impl CollectionProjection {
 
         let Some(df) = query_svc
             .get_data(
-                &self.state.dataset_handle().as_local_ref(),
+                &self.dataset.get_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -107,8 +106,7 @@ impl CollectionProjection {
 
         assert_eq!(records.len(), 1);
         let record = records.into_iter().next().unwrap();
-        let entry =
-            CollectionEntry::from_json(self.state.resolved_dataset(ctx).await?.clone(), record);
+        let entry = CollectionEntry::from_json(self.dataset.clone(), record);
 
         Ok(Some(entry))
     }
@@ -132,7 +130,7 @@ impl CollectionProjection {
 
         let df = query_svc
             .get_data(
-                &self.state.dataset_handle().as_local_ref(),
+                &self.dataset.get_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -176,10 +174,9 @@ impl CollectionProjection {
 
         let records = df.collect_json_aos().await.int_err()?;
 
-        let dataset = self.state.resolved_dataset(ctx).await?;
         let nodes = records
             .into_iter()
-            .map(|r| CollectionEntry::from_json(dataset.clone(), r))
+            .map(|r| CollectionEntry::from_json(self.dataset.clone(), r))
             .collect();
 
         Ok(CollectionEntryConnection::new(
@@ -203,7 +200,7 @@ impl CollectionProjection {
 
         let Some(df) = query_svc
             .get_data(
-                &self.state.dataset_handle().as_local_ref(),
+                &self.dataset.get_handle().as_local_ref(),
                 domain::GetDataOptions {
                     block_hash: self.as_of.clone(),
                 },
@@ -237,10 +234,9 @@ impl CollectionProjection {
 
         let records = df.collect_json_aos().await.int_err()?;
 
-        let dataset = self.state.resolved_dataset(ctx).await?;
         let nodes = records
             .into_iter()
-            .map(|r| CollectionEntry::from_json(dataset.clone(), r))
+            .map(|r| CollectionEntry::from_json(self.dataset.clone(), r))
             .collect();
 
         Ok(nodes)

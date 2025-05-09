@@ -143,8 +143,12 @@ impl KamuApiServerClient {
         };
     }
 
-    pub async fn graphql_api_call(&self, query: &str) -> GraphQLResponse {
-        let response = self.graphql_api_call_impl(query).await;
+    pub async fn graphql_api_call(
+        &self,
+        query: &str,
+        variables: Option<serde_json::Value>,
+    ) -> GraphQLResponse {
+        let response = self.graphql_api_call_impl(query, variables).await;
 
         let response_body = response.json::<async_graphql::Response>().await.unwrap();
 
@@ -187,10 +191,15 @@ impl KamuApiServerClient {
         };
     }
 
-    async fn graphql_api_call_impl(&self, query: &str) -> reqwest::Response {
+    async fn graphql_api_call_impl(
+        &self,
+        query: &str,
+        variables: Option<serde_json::Value>,
+    ) -> reqwest::Response {
         let endpoint = self.server_base_url.join("graphql").unwrap();
         let request_data = json!({
-           "query": query
+           "query": query,
+           "variables": variables,
         });
 
         let mut request_builder = self.http_client.post(endpoint).json(&request_data);
@@ -207,7 +216,7 @@ impl KamuApiServerClient {
         query: &str,
         expected_response: Result<&str, &str>,
     ) {
-        let response = self.graphql_api_call_impl(query).await;
+        let response = self.graphql_api_call_impl(query, None).await;
 
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 

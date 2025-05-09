@@ -11,20 +11,20 @@ use kamu::domain;
 use odf::metadata::OperationType as Op;
 
 use crate::prelude::*;
-use crate::queries::{CollectionEntry, DatasetRequestState};
+use crate::queries::CollectionEntry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct CollectionMut {
-    state: DatasetRequestState,
+    dataset: domain::ResolvedDataset,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CollectionMut {
-    pub fn new(state: DatasetRequestState) -> Self {
-        Self { state }
+    pub fn new(dataset: domain::ResolvedDataset) -> Self {
+        Self { dataset }
     }
 
     // Push ingest the new record
@@ -49,7 +49,7 @@ impl CollectionMut {
 
         let ingest_result = match push_ingest_use_case
             .execute(
-                self.state.resolved_dataset(ctx).await?,
+                &self.dataset,
                 kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(ndjson)),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -105,13 +105,11 @@ impl CollectionMut {
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
-        let dataset = self.state.resolved_dataset(ctx).await?;
-
         // Load current state
         // TODO: PERF: Filter paths that are relevant to operations
         let query_res = query_svc
             .get_data(
-                &dataset.get_handle().as_local_ref(),
+                &self.dataset.get_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
             .await
@@ -134,7 +132,7 @@ impl CollectionMut {
                     .await
                     .int_err()?
                     .into_iter()
-                    .map(|record| CollectionEntry::from_json(dataset.clone(), record))
+                    .map(|record| CollectionEntry::from_json(self.dataset.clone(), record))
                     .map(|entry| (entry.path.clone(), entry))
                     .collect()
             }
@@ -148,7 +146,7 @@ impl CollectionMut {
                     diff.push((Op::Retract, existing));
                 }
 
-                let new_entry = CollectionEntry::from_input(dataset.clone(), add.entry);
+                let new_entry = CollectionEntry::from_input(self.dataset.clone(), add.entry);
                 current_entries.insert(new_entry.path.clone(), new_entry.clone());
                 diff.push((Op::Append, new_entry));
             } else if let Some(remove) = op.remove {
@@ -222,7 +220,6 @@ impl CollectionMut {
 impl CollectionMut {
     /// Links new entry to this collection
     #[tracing::instrument(level = "info", name = CollectionMut_add_entry, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn add_entry(
         &self,
         ctx: &Context<'_>,
@@ -242,7 +239,6 @@ impl CollectionMut {
 
     /// Moves or renames an entry
     #[tracing::instrument(level = "info", name = CollectionMut_move_entry, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn move_entry(
         &self,
         ctx: &Context<'_>,
@@ -268,7 +264,6 @@ impl CollectionMut {
 
     /// Remove an entry from this collection
     #[tracing::instrument(level = "info", name = CollectionMut_remove_entry, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn remove_entry(
         &self,
         ctx: &Context<'_>,
@@ -288,7 +283,6 @@ impl CollectionMut {
 
     /// Execute multiple add / move / unlink operations as a single transaction
     #[tracing::instrument(level = "info", name = CollectionMut_update_entries, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn update_entries(
         &self,
         ctx: &Context<'_>,

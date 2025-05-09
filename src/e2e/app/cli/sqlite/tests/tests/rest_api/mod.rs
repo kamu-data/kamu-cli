@@ -10,6 +10,7 @@
 mod test_accounts;
 mod test_auth;
 mod test_dataset;
+mod test_gql_dataset_adapters;
 mod test_gql_query;
 mod test_ingest;
 mod test_odf_core;

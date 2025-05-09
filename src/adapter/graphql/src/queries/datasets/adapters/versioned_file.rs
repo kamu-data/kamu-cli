@@ -11,18 +11,17 @@ use kamu::domain;
 
 use super::{FileVersion, VersionedFileEntry, VersionedFileEntryConnection};
 use crate::prelude::*;
-use crate::queries::DatasetRequestStateWithOwner;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct VersionedFile {
-    state: DatasetRequestStateWithOwner,
+    dataset: domain::ResolvedDataset,
 }
 
 impl VersionedFile {
-    pub fn new(state: DatasetRequestStateWithOwner) -> Self {
-        Self { state }
+    pub fn new(dataset: domain::ResolvedDataset) -> Self {
+        Self { dataset }
     }
 
     pub async fn get_entry(
@@ -36,7 +35,7 @@ impl VersionedFile {
         let query_res = if let Some(block_hash) = as_of_block_hash {
             query_svc
                 .tail(
-                    &self.state.dataset_handle().as_local_ref(),
+                    &self.dataset.get_handle().as_local_ref(),
                     0,
                     1,
                     domain::GetDataOptions {
@@ -49,7 +48,7 @@ impl VersionedFile {
 
             query_svc
                 .get_data(
-                    &self.state.dataset_handle().as_local_ref(),
+                    &self.dataset.get_handle().as_local_ref(),
                     domain::GetDataOptions::default(),
                 )
                 .await
@@ -63,7 +62,7 @@ impl VersionedFile {
         } else {
             query_svc
                 .tail(
-                    &self.state.dataset_handle().as_local_ref(),
+                    &self.dataset.get_handle().as_local_ref(),
                     0,
                     1,
                     domain::GetDataOptions::default(),
@@ -83,7 +82,7 @@ impl VersionedFile {
 
         assert_eq!(records.len(), 1);
         let entry = VersionedFileEntry::from_json(
-            self.state.resolved_dataset(ctx).await?.clone(),
+            self.dataset.clone(),
             records.into_iter().next().unwrap(),
         );
         Ok(Some(entry))
@@ -113,7 +112,7 @@ impl VersionedFile {
 
         let query_res = query_svc
             .get_data(
-                &self.state.dataset_handle().as_local_ref(),
+                &self.dataset.get_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
             .await
@@ -145,10 +144,9 @@ impl VersionedFile {
 
         let records = df.collect_json_aos().await.int_err()?;
 
-        let dataset = self.state.resolved_dataset(ctx).await?;
         let nodes = records
             .into_iter()
-            .map(|r| VersionedFileEntry::from_json(dataset.clone(), r))
+            .map(|r| VersionedFileEntry::from_json(self.dataset.clone(), r))
             .collect();
 
         Ok(VersionedFileEntryConnection::new(

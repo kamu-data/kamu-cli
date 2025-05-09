@@ -18,6 +18,7 @@ Recommendation: for ease of reading, use the following order:
 - New experimental "Collection" dataset archetype that allows organizing other ODF datasets into hierarchical collections similar to directory structure
 ### Changed
 - Upgraded to `datafusion v47.0.0` and latest `arrow`, `object-store`, and `flatbuffers` versions
+- Commands and APIs that query data are now more tolerant to the situation when dataset is empty and doesn't have a schema yet and will return results with empty rows and columns instead of returning errors
 ### Fixed
 - Patched `GQL DatasetFlowTriggers::all_paused` to use similar optimization as account flow views
 

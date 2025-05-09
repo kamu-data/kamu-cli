@@ -301,7 +301,12 @@ impl Dataset {
             return Ok(None);
         }
 
-        Ok(Some(VersionedFile::new(self.dataset_request_state.clone())))
+        Ok(Some(VersionedFile::new(
+            self.dataset_request_state
+                .resolved_dataset(ctx)
+                .await?
+                .clone(),
+        )))
     }
 
     /// Downcast a dataset to a collection interface
@@ -312,7 +317,12 @@ impl Dataset {
             return Ok(None);
         }
 
-        Ok(Some(Collection::new(self.dataset_request_state.clone())))
+        Ok(Some(Collection::new(
+            self.dataset_request_state
+                .resolved_dataset(ctx)
+                .await?
+                .clone(),
+        )))
     }
 }
 

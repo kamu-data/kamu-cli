@@ -19,7 +19,7 @@ use crate::queries::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct DatasetRequestState {
     dataset_handle: odf::DatasetHandle,
     resolved_dataset: OnceCell<ResolvedDataset>,
@@ -131,7 +131,7 @@ impl DatasetRequestState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct DatasetRequestStateWithOwner {
     inner: DatasetRequestState,
     owner: Account,
