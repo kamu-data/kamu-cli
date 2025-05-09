@@ -171,6 +171,7 @@ impl VersionedFileMut {
         // Get latest version and head
         let (latest_version, _) = self.get_latest_version(ctx).await?;
         let new_version = latest_version + 1;
+        let content_length = content.len();
 
         // Upload data object
         // TODO: Link data object to the new block
@@ -186,6 +187,7 @@ impl VersionedFileMut {
             self.dataset.clone(),
             new_version,
             content_hash.clone(),
+            content_length,
             content_type,
             extra_data,
         );
@@ -266,6 +268,7 @@ impl VersionedFileMut {
                 .map_err(|e: domain::UploadTokenBase64JsonDecodeError| {
                     async_graphql::Error::new(e.message)
                 })?;
+        let content_length = upload_token.0.content_length;
 
         // Get latest version and head
         let (latest_version, head) = self.get_latest_version(ctx).await?;
@@ -319,7 +322,7 @@ impl VersionedFileMut {
                 stream,
                 odf::storage::InsertOpts {
                     precomputed_hash: Some(&content_hash),
-                    size_hint: Some(upload_token.0.content_length as u64),
+                    size_hint: Some(content_length as u64),
                     ..Default::default()
                 },
             )
@@ -331,6 +334,7 @@ impl VersionedFileMut {
             self.dataset.clone(),
             new_version,
             content_hash.clone(),
+            content_length,
             upload_token.0.content_type,
             extra_data,
         );
