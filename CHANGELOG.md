@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.236.0] - 2025-05-09
 ### Added
 - New REST endpoint `/system/info` and GQL endpoint `buildInfo` that return application version and build details
 - New experimental "Versioned File" dataset archetype that simplifies using ODF datasets for storing versioned history of binary content
