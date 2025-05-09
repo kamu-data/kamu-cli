@@ -11,5 +11,6 @@
 
 pub mod webhook_delivery_repository_test_suite;
 pub mod webhook_event_repository_test_suite;
+pub mod webhook_subscription_event_store_test_suite;
 
 pub(crate) mod helpers;

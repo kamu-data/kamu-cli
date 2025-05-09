@@ -18,6 +18,7 @@ use kamu_webhooks::{
     WebhookSubscriptionEventStore,
     WebhookSubscriptionId,
     WebhookSubscriptionLabel,
+    WebhookSubscriptionSecret,
 };
 use url::Url;
 
@@ -79,7 +80,7 @@ pub(crate) async fn new_webhook_subscription(catalog: &dill::Catalog) -> Webhook
         WebhookSubscriptionLabel::new("test".to_string()),
         None,
         vec![WebhookEventTypeCatalog::test()],
-        "some-secret".to_string(),
+        WebhookSubscriptionSecret::try_new("some-secret").unwrap(),
     );
 
     webhook_subscription

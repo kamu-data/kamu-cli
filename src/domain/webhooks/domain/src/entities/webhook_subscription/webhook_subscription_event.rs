@@ -11,8 +11,7 @@ use chrono::{DateTime, Utc};
 use enum_variants::*;
 use serde::{Deserialize, Serialize};
 
-use super::WebhookSubscriptionStatus;
-use crate::{WebhookEventType, WebhookSubscriptionId, WebhookSubscriptionLabel};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,7 +37,7 @@ pub struct WebhookSubscriptionEventCreated {
     pub dataset_id: Option<odf::DatasetID>,
     pub event_types: Vec<WebhookEventType>,
     pub target_url: url::Url,
-    pub secret: String,
+    pub secret: WebhookSubscriptionSecret,
     pub label: WebhookSubscriptionLabel,
 }
 
@@ -99,7 +98,7 @@ pub struct WebhookSubscriptionEventUpdated {
 pub struct WebhookSubscriptionEventSecretRotated {
     pub event_time: DateTime<Utc>,
     pub subscription_id: WebhookSubscriptionId,
-    pub new_secret: String,
+    pub new_secret: WebhookSubscriptionSecret,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

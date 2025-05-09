@@ -36,6 +36,7 @@ pub struct WebhookDeliveryRecord {
     pub response_at: Option<DateTime<Utc>>,
 }
 
+#[cfg(feature = "sqlx")]
 impl WebhookDeliveryRecord {
     pub fn serialize_http_headers(
         headers: Vec<(http::HeaderName, String)>,

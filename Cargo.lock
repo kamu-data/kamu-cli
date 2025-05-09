@@ -7274,6 +7274,7 @@ dependencies = [
  "opendatafabric",
  "test-group",
  "test-log",
+ "thiserror 2.0.12",
  "tokio",
 ]
 

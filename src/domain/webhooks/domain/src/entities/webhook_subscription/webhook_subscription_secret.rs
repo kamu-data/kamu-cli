@@ -11,11 +11,11 @@ use nutype::nutype;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Note: empty label is fine
 #[nutype(
     sanitize(trim),
-    derive(Debug, Display, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
+    validate(len_char_min = 1, len_char_max = 128,),
+    derive(Debug, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
 )]
-pub struct WebhookSubscriptionLabel(String);
+pub struct WebhookSubscriptionSecret(String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,3 +9,4 @@
 
 mod test_sqlite_webhook_delivery_repository;
 mod test_sqlite_webhook_event_repository;
+mod test_sqlite_webhook_subscription_event_store;
