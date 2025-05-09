@@ -4,7 +4,7 @@ content:
   users:
     predefined:
       - accountName: kamu
-        isAdmin: true
+        properties: [isAdmin]
         avatarUrl: https://avatars.githubusercontent.com/u/50896974?s=200&v=4
         email: support+kamu@kamu.dev
       - accountName: rijkswaterstaat.nl

@@ -84,6 +84,11 @@ type AccountEdge {
 	node: Account!
 }
 
+type AccountFieldNonUnique implements CreateAccountResult {
+	field: String!
+	message: String!
+}
+
 input AccountFlowFilters {
 	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
@@ -135,12 +140,24 @@ type AccountMut {
 	"""
 	updateEmail(newEmail: String!): UpdateEmailResult!
 	"""
+	Create a new account
+	"""
+	createAccount(accountName: String!, email: String): CreateAccountResult!
+	"""
+	Reset password for selected account. Allowed only for admin users
+	"""
+	modifyPassword(accountName: AccountName!, password: String!): ModifyPasswordResult!
+	"""
 	Access to the mutable flow configurations of this account
 	"""
 	flows: AccountFlowsMut!
 }
 
 scalar AccountName
+
+type AccountNameInvalid implements CreateAccountResult {
+	message: String!
+}
 
 enum AccountType {
 	USER
@@ -647,6 +664,19 @@ type CreateAccessTokenResultDuplicate implements CreateTokenResult {
 
 type CreateAccessTokenResultSuccess implements CreateTokenResult {
 	token: CreatedAccessToken!
+	message: String!
+}
+
+type CreateAccountEmailInvalid implements CreateAccountResult {
+	message: String!
+}
+
+interface CreateAccountResult {
+	message: String!
+}
+
+type CreateAccountSuccess implements CreateAccountResult {
+	account: Account!
 	message: String!
 }
 
@@ -2350,6 +2380,23 @@ type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapsh
 }
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
+	message: String!
+}
+
+type ModifyPasswordAccountNotFound implements ModifyPasswordResult {
+	message: String!
+}
+
+type ModifyPasswordInvalidPassword implements ModifyPasswordResult {
+	reason: String!
+	message: String!
+}
+
+interface ModifyPasswordResult {
+	message: String!
+}
+
+type ModifyPasswordSuccess implements ModifyPasswordResult {
 	message: String!
 }
 

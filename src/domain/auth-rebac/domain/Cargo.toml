@@ -29,6 +29,7 @@ sqlx = ["dep:sqlx"]
 internal-error = { workspace = true }
 kamu-core = { workspace = true }
 odf = { workspace = true }
+serde = "1"
 
 async-trait = "0.1"
 itertools = { version = "0.14", default-features = false }

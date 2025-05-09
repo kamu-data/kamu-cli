@@ -39,6 +39,7 @@ use kamu_datasets_inmem::{
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;
@@ -189,7 +190,10 @@ impl ClientSideHarness {
         b.add::<InMemoryDatasetEntryRepository>();
         b.add::<InMemoryDatasetKeyBlockRepository>();
 
+        b.add::<InMemoryDidSecretKeyRepository>();
+
         b.add::<AccountServiceImpl>();
+        b.add::<CreateAccountUseCaseImpl>();
         b.add::<InMemoryAccountRepository>();
         b.add::<LoginPasswordAuthProvider>();
         b.add::<PredefinedAccountsRegistrator>();
@@ -197,6 +201,7 @@ impl ClientSideHarness {
         b.add::<InMemoryRebacRepository>();
         b.add_value(DefaultAccountProperties::default());
         b.add_value(DefaultDatasetProperties::default());
+        b.add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample());
 
         b.add::<RebacDatasetRegistryFacadeImpl>();
 

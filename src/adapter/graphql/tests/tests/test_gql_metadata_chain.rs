@@ -18,7 +18,12 @@ use kamu_datasets::*;
 use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, expect_anonymous_access_error, BaseGQLDatasetHarness};
+use crate::utils::{
+    authentication_catalogs,
+    expect_anonymous_access_error,
+    BaseGQLDatasetHarness,
+    PredefinedAccountOpts,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -634,7 +639,8 @@ impl GraphQLMetadataChainHarness {
             b.build()
         };
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
+        let (catalog_anonymous, catalog_authorized) =
+            authentication_catalogs(&base_catalog, PredefinedAccountOpts::default()).await;
 
         let did_generator = base_catalog.get_one::<dyn DidGenerator>().unwrap();
 

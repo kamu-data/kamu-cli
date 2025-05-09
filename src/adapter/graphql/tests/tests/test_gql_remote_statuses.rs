@@ -19,7 +19,7 @@ use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
 use url::Url;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +28,8 @@ async fn test_remote_push_statuses() {
     let harness = PushStatusesTestHarness::new();
 
     // Init dataset with no sources
-    let (_, catalog_authorized) = authentication_catalogs(&harness.catalog).await;
+    let (_, catalog_authorized) =
+        authentication_catalogs(&harness.catalog, PredefinedAccountOpts::default()).await;
 
     let create_dataset_from_snapshot = catalog_authorized
         .get_one::<dyn CreateDatasetFromSnapshotUseCase>()

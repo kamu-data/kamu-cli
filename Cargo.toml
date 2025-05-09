@@ -4,6 +4,7 @@ members = [
     "src/utils/async-utils",
     "src/utils/common-macros",
     "src/utils/container-runtime",
+    "src/utils/crypto-utils",
     "src/utils/database-common",
     "src/utils/database-common-macros",
     "src/utils/datafusion-cli",
@@ -19,7 +20,7 @@ members = [
     "src/utils/messaging-outbox",
     "src/utils/multiformats",
     "src/utils/observability",
-    "src/utils/random-names",
+    "src/utils/random-strings",
     "src/utils/repo-tools",
     "src/utils/s3-utils",
     "src/utils/server-console",
@@ -42,6 +43,7 @@ members = [
     "src/domain/auth-rebac/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
+    "src/domain/did-secret-keys",
     "src/domain/flow-system/domain",
     "src/domain/search/domain",
     "src/domain/task-system/domain",
@@ -70,6 +72,11 @@ members = [
     "src/infra/datasets/inmem",
     "src/infra/datasets/postgres",
     "src/infra/datasets/sqlite",
+    ## Did secret keys
+    "src/infra/did-secret-keys/repo-tests",
+    "src/infra/did-secret-keys/inmem",
+    "src/infra/did-secret-keys/postgres",
+    "src/infra/did-secret-keys/sqlite",
     ## Search
     "src/infra/search/openai",
     "src/infra/search/qdrant",
@@ -120,6 +127,7 @@ kamu-cli = { version = "0.235.0", path = "src/app/cli", default-features = false
 async-utils = { version = "0.235.0", path = "src/utils/async-utils", default-features = false }
 common-macros = { version = "0.235.0", path = "src/utils/common-macros", default-features = false }
 container-runtime = { version = "0.235.0", path = "src/utils/container-runtime", default-features = false }
+crypto-utils = { version = "0.235.0", path = "src/utils/crypto-utils", default-features = false }
 database-common = { version = "0.235.0", path = "src/utils/database-common", default-features = false }
 database-common-macros = { version = "0.235.0", path = "src/utils/database-common-macros", default-features = false }
 email-utils = { version = "0.235.0", path = "src/utils/email-utils", default-features = false }
@@ -135,7 +143,7 @@ kamu-datafusion-cli = { version = "0.235.0", path = "src/utils/datafusion-cli", 
 messaging-outbox = { version = "0.235.0", path = "src/utils/messaging-outbox", default-features = false }
 multiformats = { version = "0.235.0", path = "src/utils/multiformats", default-features = false }
 observability = { version = "0.235.0", path = "src/utils/observability", default-features = false }
-random-names = { version = "0.235.0", path = "src/utils/random-names", default-features = false }
+random-strings = { version = "0.235.0", path = "src/utils/random-strings", default-features = false }
 s3-utils = { version = "0.235.0", path = "src/utils/s3-utils", default-features = false }
 server-console = { version = "0.235.0", path = "src/utils/server-console", default-features = false }
 test-utils = { version = "0.235.0", path = "src/utils/test-utils", default-features = false }
@@ -147,6 +155,7 @@ kamu-accounts = { version = "0.235.0", path = "src/domain/accounts/domain", defa
 kamu-auth-rebac = { version = "0.235.0", path = "src/domain/auth-rebac/domain", default-features = false }
 kamu-core = { version = "0.235.0", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.235.0", path = "src/domain/datasets/domain", default-features = false }
+kamu-did-secret-keys = { version = "0.235.0", path = "src/domain/did-secret-keys", default-features = false }
 kamu-flow-system = { version = "0.235.0", path = "src/domain/flow-system/domain", default-features = false }
 kamu-search = { version = "0.235.0", path = "src/domain/search/domain", default-features = false }
 kamu-task-system = { version = "0.235.0", path = "src/domain/task-system/domain", default-features = false }
@@ -190,6 +199,11 @@ kamu-datasets-inmem = { version = "0.235.0", path = "src/infra/datasets/inmem", 
 kamu-datasets-postgres = { version = "0.235.0", path = "src/infra/datasets/postgres", default-features = false }
 kamu-datasets-sqlite = { version = "0.235.0", path = "src/infra/datasets/sqlite", default-features = false }
 kamu-datasets-repo-tests = { version = "0.235.0", path = "src/infra/datasets/repo-tests", default-features = false }
+## Did secret keys
+kamu-did-secret-keys-inmem = { version = "0.235.0", path = "src/infra/did-secret-keys/inmem", default-features = false }
+kamu-did-secret-keys-postgres = { version = "0.235.0", path = "src/infra/did-secret-keys/postgres", default-features = false }
+kamu-did-secret-keys-sqlite = { version = "0.235.0", path = "src/infra/did-secret-keys/sqlite", default-features = false }
+kamu-did-secret-keys-repo-tests = { version = "0.235.0", path = "src/infra/did-secret-keys/repo-tests", default-features = false }
 ## Search
 kamu-search-openai = { version = "0.235.0", path = "src/infra/search/openai", default-features = false }
 kamu-search-qdrant = { version = "0.235.0", path = "src/infra/search/qdrant", default-features = false }

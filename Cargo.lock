@@ -2797,7 +2797,7 @@ dependencies = [
  "dill",
  "libc",
  "once_cell",
- "random-names",
+ "random-strings",
  "regex",
  "serde",
  "tempfile",
@@ -3069,6 +3069,17 @@ dependencies = [
  "generic-array",
  "rand_core 0.6.4",
  "typenum",
+]
+
+[[package]]
+name = "crypto-utils"
+version = "0.235.0"
+dependencies = [
+ "aes-gcm",
+ "argon2",
+ "internal-error",
+ "password-hash",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -5854,6 +5865,7 @@ dependencies = [
  "common-macros",
  "container-runtime",
  "criterion",
+ "crypto-utils",
  "curl",
  "curl-sys",
  "dashmap",
@@ -5893,7 +5905,7 @@ dependencies = [
  "opendatafabric",
  "pretty_assertions",
  "rand 0.8.5",
- "random-names",
+ "random-strings",
  "regex",
  "reqwest",
  "ringbuf",
@@ -5926,11 +5938,13 @@ dependencies = [
  "base32",
  "chrono",
  "crc32fast",
+ "crypto-utils",
  "database-common",
  "email-utils",
  "futures",
  "internal-error",
  "jsonwebtoken",
+ "kamu-auth-rebac",
  "lazy_static",
  "merge",
  "messaging-outbox",
@@ -5938,8 +5952,9 @@ dependencies = [
  "nutype",
  "opendatafabric",
  "rand 0.8.5",
- "random-names",
+ "random-strings",
  "reusable",
+ "secrecy",
  "serde",
  "serde_with",
  "sqlx",
@@ -6038,12 +6053,13 @@ dependencies = [
 name = "kamu-accounts-services"
 version = "0.235.0"
 dependencies = [
- "argon2",
  "async-trait",
  "chrono",
  "common-macros",
+ "crypto-utils",
  "database-common",
  "dill",
+ "email-utils",
  "init-on-startup",
  "internal-error",
  "jsonwebtoken",
@@ -6052,10 +6068,13 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-inmem",
  "messaging-outbox",
  "mockall",
  "opendatafabric",
- "password-hash",
+ "random-strings",
+ "secrecy",
  "serde",
  "serde_json",
  "test-log",
@@ -6110,6 +6129,8 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-inmem",
  "messaging-outbox",
  "opendatafabric",
  "oso",
@@ -6187,6 +6208,8 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-inmem",
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
@@ -6199,6 +6222,7 @@ dependencies = [
  "oop",
  "opendatafabric",
  "pretty_assertions",
+ "random-strings",
  "secrecy",
  "serde",
  "serde_json",
@@ -6254,6 +6278,8 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-inmem",
  "kamu-ingest-datafusion",
  "messaging-outbox",
  "mockall",
@@ -6334,6 +6360,8 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-inmem",
  "messaging-outbox",
  "opendatafabric",
  "pretty_assertions",
@@ -6359,6 +6387,7 @@ dependencies = [
  "itertools 0.14.0",
  "kamu-core",
  "opendatafabric",
+ "serde",
  "sqlx",
  "strum 0.26.3",
  "thiserror 2.0.12",
@@ -6458,6 +6487,7 @@ dependencies = [
  "clap_complete",
  "console",
  "container-runtime",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "datafusion",
@@ -6502,6 +6532,10 @@ dependencies = [
  "kamu-datasets-postgres",
  "kamu-datasets-services",
  "kamu-datasets-sqlite",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-inmem",
+ "kamu-did-secret-keys-postgres",
+ "kamu-did-secret-keys-sqlite",
  "kamu-flow-system-inmem",
  "kamu-flow-system-postgres",
  "kamu-flow-system-services",
@@ -6531,7 +6565,7 @@ dependencies = [
  "pretty_assertions",
  "prettytable-rs",
  "prometheus",
- "random-names",
+ "random-strings",
  "read_input",
  "regex",
  "reqwest",
@@ -6752,10 +6786,10 @@ dependencies = [
 name = "kamu-datasets"
 version = "0.235.0"
 dependencies = [
- "aes-gcm",
  "async-trait",
  "bytes",
  "chrono",
+ "crypto-utils",
  "database-common",
  "futures",
  "internal-error",
@@ -6862,6 +6896,8 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-inmem",
  "messaging-outbox",
  "mockall",
  "nutype",
@@ -6905,6 +6941,87 @@ dependencies = [
  "test-log",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "kamu-did-secret-keys"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "crypto-utils",
+ "dill",
+ "internal-error",
+ "opendatafabric",
+ "serde",
+ "serde_with",
+ "sqlx",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "kamu-did-secret-keys-inmem"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-accounts-inmem",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-repo-tests",
+ "opendatafabric",
+ "test-group",
+ "test-log",
+ "tokio",
+]
+
+[[package]]
+name = "kamu-did-secret-keys-postgres"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-accounts-postgres",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-repo-tests",
+ "opendatafabric",
+ "sqlx",
+ "test-group",
+ "test-log",
+]
+
+[[package]]
+name = "kamu-did-secret-keys-repo-tests"
+version = "0.235.0"
+dependencies = [
+ "chrono",
+ "dill",
+ "email-utils",
+ "kamu-accounts",
+ "kamu-did-secret-keys",
+ "opendatafabric",
+]
+
+[[package]]
+name = "kamu-did-secret-keys-sqlite"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-accounts-sqlite",
+ "kamu-did-secret-keys",
+ "kamu-did-secret-keys-repo-tests",
+ "opendatafabric",
+ "sqlx",
+ "test-group",
+ "test-log",
 ]
 
 [[package]]
@@ -8508,7 +8625,7 @@ dependencies = [
  "opendatafabric-metadata",
  "opendatafabric-storage-lfs",
  "pretty_assertions",
- "random-names",
+ "random-strings",
  "tempfile",
  "thiserror 2.0.12",
  "tokio",
@@ -9677,7 +9794,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "random-names"
+name = "random-strings"
 version = "0.235.0"
 dependencies = [
  "rand 0.8.5",

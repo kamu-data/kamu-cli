@@ -118,6 +118,11 @@ pub trait RebacServiceExt {
         &self,
         account_id: &odf::AccountID,
     ) -> Result<bool, GetPropertiesError>;
+
+    async fn can_provision_accounts(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, GetPropertiesError>;
 }
 
 #[async_trait::async_trait]
@@ -129,6 +134,14 @@ impl<T: RebacService + ?Sized> RebacServiceExt for T {
         let account_properties = self.get_account_properties(account_id).await?;
         Ok(account_properties.is_admin)
     }
+
+    async fn can_provision_accounts(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<bool, GetPropertiesError> {
+        let account_properties = self.get_account_properties(account_id).await?;
+        Ok(account_properties.is_admin || account_properties.can_provision_accounts)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -136,6 +149,7 @@ impl<T: RebacService + ?Sized> RebacServiceExt for T {
 #[derive(Debug, Clone, Default)]
 pub struct AccountProperties {
     pub is_admin: bool,
+    pub can_provision_accounts: bool,
 }
 
 impl AccountProperties {
@@ -143,6 +157,9 @@ impl AccountProperties {
         match name {
             AccountPropertyName::IsAdmin => {
                 self.is_admin = value == PROPERTY_VALUE_BOOLEAN_TRUE;
+            }
+            AccountPropertyName::CanProvisionAccounts => {
+                self.can_provision_accounts = value == PROPERTY_VALUE_BOOLEAN_TRUE;
             }
         };
     }

@@ -27,7 +27,7 @@ use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -611,7 +611,8 @@ impl FlowTriggerHarness {
             b.build()
         };
 
-        let (_, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+        let (_, catalog_authorized) =
+            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
 
         Self {
             base_gql_harness,

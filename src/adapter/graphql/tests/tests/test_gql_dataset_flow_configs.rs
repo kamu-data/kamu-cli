@@ -16,7 +16,12 @@ use kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore;
 use kamu_flow_system_services::FlowConfigurationServiceImpl;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, expect_anonymous_access_error, BaseGQLDatasetHarness};
+use crate::utils::{
+    authentication_catalogs,
+    expect_anonymous_access_error,
+    BaseGQLDatasetHarness,
+    PredefinedAccountOpts,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -570,7 +575,8 @@ impl FlowConfigHarness {
         };
 
         // Init dataset with no sources
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+        let (catalog_anonymous, catalog_authorized) =
+            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
 
         Self {
             base_gql_harness,

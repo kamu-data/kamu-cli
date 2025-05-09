@@ -79,7 +79,7 @@ impl MySqlAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for MySqlAccountRepository {
-    async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -549,6 +549,38 @@ impl PasswordHashRepository for MySqlAccountRepository {
         .execute(connection_mut)
         .await
         .int_err()?;
+
+        Ok(())
+    }
+
+    async fn modify_password_hash(
+        &self,
+        account_name: &odf::AccountName,
+        password_hash: String,
+    ) -> Result<(), ModifyPasswordHashError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts_passwords set password_hash = ?
+                WHERE account_name = ?
+            "#,
+            password_hash,
+            account_name.to_string()
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(ModifyPasswordHashError::AccountNotFound(
+                AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                },
+            ));
+        }
 
         Ok(())
     }

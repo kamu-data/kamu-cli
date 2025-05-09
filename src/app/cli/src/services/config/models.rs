@@ -16,6 +16,7 @@ use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -75,6 +76,9 @@ pub struct CLIConfig {
     /// Uploads configuration
     #[merge(strategy = merge_recursive)]
     pub uploads: Option<UploadsConfig>,
+
+    /// Did secret key encryption configuration
+    pub did_encryption: Option<DidSecretEncryptionConfig>,
 }
 
 impl CLIConfig {
@@ -92,6 +96,7 @@ impl CLIConfig {
             source: None,
             users: None,
             uploads: None,
+            did_encryption: None,
         }
     }
 
@@ -113,6 +118,7 @@ impl CLIConfig {
             source: Some(SourceConfig::sample()),
             users: Some(PredefinedAccountsConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
+            did_encryption: Some(DidSecretEncryptionConfig::sample()),
         }
     }
 }
@@ -132,6 +138,7 @@ impl Default for CLIConfig {
             source: Some(SourceConfig::default()),
             users: Some(PredefinedAccountsConfig::default()),
             uploads: Some(UploadsConfig::default()),
+            did_encryption: Some(DidSecretEncryptionConfig::default()),
         }
     }
 }

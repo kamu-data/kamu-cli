@@ -16,7 +16,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -192,7 +192,8 @@ impl DatasetMetadataHarness {
             b.build()
         };
 
-        let (_, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+        let (_, catalog_authorized) =
+            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
 
         Self {
             base_gql_harness,

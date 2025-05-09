@@ -107,7 +107,7 @@ impl InMemoryAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for InMemoryAccountRepository {
-    async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut guard = self.state.lock().unwrap();
         if guard.accounts_by_id.contains_key(&account.id) {
             return Err(CreateAccountError::Duplicate(AccountErrorDuplicate {
@@ -402,6 +402,29 @@ impl PasswordHashRepository for InMemoryAccountRepository {
         guard
             .password_hash_by_account_name
             .insert(account_name.clone(), password_hash);
+        Ok(())
+    }
+
+    async fn modify_password_hash(
+        &self,
+        account_name: &odf::AccountName,
+        password_hash: String,
+    ) -> Result<(), ModifyPasswordHashError> {
+        let mut writable_state = self.state.lock().unwrap();
+
+        let maybe_existing_password = writable_state
+            .password_hash_by_account_name
+            .get_mut(account_name);
+
+        let Some(existing_password) = maybe_existing_password else {
+            return Err(ModifyPasswordHashError::AccountNotFound(
+                AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                },
+            ));
+        };
+
+        *existing_password = password_hash;
         Ok(())
     }
 

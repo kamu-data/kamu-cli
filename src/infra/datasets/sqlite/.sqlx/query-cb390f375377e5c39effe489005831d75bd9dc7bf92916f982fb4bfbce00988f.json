@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                INSERT INTO dataset_did_secret_keys (dataset_id, secret_key, secret_nonce, creator_id)\n                    VALUES ($1, $2, $3, $4)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "cb390f375377e5c39effe489005831d75bd9dc7bf92916f982fb4bfbce00988f"
+}

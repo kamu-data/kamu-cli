@@ -26,6 +26,8 @@ use kamu_datasets_inmem::{
 use kamu_datasets_services::testing::FakeConnectingDatasetEntryWriter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -652,6 +654,8 @@ impl DependencyGraphHarness {
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceImpl>()
+        .add::<InMemoryDidSecretKeyRepository>()
+        .add_value(DidSecretEncryptionConfig::sample())
         .add::<InMemoryDatasetDependencyRepository>()
         .add::<DependencyGraphImmediateListener>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()

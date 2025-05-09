@@ -84,7 +84,7 @@ impl Command for SystemE2ECommand {
                     );
                     let account = (&account_config).into();
 
-                    self.account_repo.create_account(&account).await.int_err()?;
+                    self.account_repo.save_account(&account).await.int_err()?;
 
                     if account_config.provider == PROVIDER_PASSWORD {
                         self.login_password_auth_provider

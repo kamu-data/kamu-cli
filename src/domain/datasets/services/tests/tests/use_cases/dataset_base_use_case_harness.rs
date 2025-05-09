@@ -22,6 +22,8 @@ use kamu_datasets_inmem::*;
 use kamu_datasets_services::testing::TestDatasetOutboxListener;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::*;
 use time_source::*;
 
@@ -63,6 +65,8 @@ impl DatasetBaseUseCaseHarness {
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
                 .add::<DatasetAliasUpdateHandler>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
@@ -117,10 +121,7 @@ impl DatasetBaseUseCaseHarness {
         };
 
         let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-        account_repo
-            .create_account(&Account::dummy())
-            .await
-            .unwrap();
+        account_repo.save_account(&Account::dummy()).await.unwrap();
 
         Self {
             _temp_dir: temp_dir,

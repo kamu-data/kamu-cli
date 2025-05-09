@@ -25,6 +25,7 @@ use kamu_datasets::CreateDatasetUseCase;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -376,7 +377,9 @@ impl ServerHarness {
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<AccountServiceImpl>()
-                .add::<InMemoryAccountRepository>();
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add::<InMemoryAccountRepository>()
+                .add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -386,7 +389,7 @@ impl ServerHarness {
         base_catalog
             .get_one::<dyn AccountRepository>()
             .unwrap()
-            .create_account(&Account::dummy())
+            .save_account(&Account::dummy())
             .await
             .unwrap();
 

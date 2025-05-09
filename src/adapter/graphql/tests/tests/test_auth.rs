@@ -24,7 +24,7 @@ use kamu_accounts_services::AccessTokenServiceImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 
-use crate::utils::authentication_catalogs;
+use crate::utils::{authentication_catalogs, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -371,7 +371,8 @@ impl AuthGQLHarness {
             b.build()
         };
 
-        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+        let (catalog_anonymous, catalog_authorized) =
+            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
 
         Self {
             catalog_anonymous,

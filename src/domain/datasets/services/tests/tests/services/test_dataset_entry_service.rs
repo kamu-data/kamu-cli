@@ -26,6 +26,8 @@ use kamu_datasets::{
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
@@ -57,13 +59,13 @@ async fn test_indexes_datasets_correctly() {
     let (_, owner_account_id_1) = odf::AccountID::new_generated_ed25519();
     harness
         .account_repo
-        .create_account(&Account::test(owner_account_id_1.clone(), "user1"))
+        .save_account(&Account::test(owner_account_id_1.clone(), "user1"))
         .await
         .unwrap();
     let (_, owner_account_id_2) = odf::AccountID::new_generated_ed25519();
     harness
         .account_repo
-        .create_account(&Account::test(owner_account_id_2.clone(), "user2"))
+        .save_account(&Account::test(owner_account_id_2.clone(), "user2"))
         .await
         .unwrap();
 
@@ -249,7 +251,10 @@ impl DatasetEntryServiceHarness {
             b.bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
 
             b.add::<InMemoryAccountRepository>();
+            b.add::<InMemoryDidSecretKeyRepository>();
             b.add::<AccountServiceImpl>();
+
+            b.add_value(DidSecretEncryptionConfig::sample());
 
             b.add_builder(
                 OutboxImmediateImpl::builder()

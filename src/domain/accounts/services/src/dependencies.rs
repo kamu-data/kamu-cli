@@ -24,6 +24,8 @@ pub fn register_dependencies(
     catalog_builder.add::<LoginPasswordAuthProvider>();
     catalog_builder.add::<PredefinedAccountsRegistrator>();
 
+    catalog_builder.add::<CreateAccountUseCaseImpl>();
+
     if needs_indexing {
         catalog_builder.add::<OAuthDeviceCodeServiceImpl>();
 

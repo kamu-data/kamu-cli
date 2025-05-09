@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::str::FromStr;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -139,13 +140,13 @@ impl DatasetPropertyName {
     pub fn allows_anonymous_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
         let value = boolean_property_value(allows);
 
-        (DatasetPropertyName::AllowsAnonymousRead, value.into())
+        (DatasetPropertyName::AllowsAnonymousRead, value)
     }
 
     pub fn allows_public_read<'a>(allows: bool) -> (Self, PropertyValue<'a>) {
         let value = boolean_property_value(allows);
 
-        (DatasetPropertyName::AllowsPublicRead, value.into())
+        (DatasetPropertyName::AllowsPublicRead, value)
     }
 }
 
@@ -158,10 +159,24 @@ impl From<DatasetPropertyName> for PropertyName {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::EnumString, strum::Display,
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    strum::EnumString,
+    strum::Display,
+    Serialize,
+    Deserialize,
 )]
+#[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "snake_case")]
 pub enum AccountPropertyName {
+    CanProvisionAccounts,
+    #[serde(rename = "admin")]
     IsAdmin,
 }
 
@@ -169,7 +184,13 @@ impl AccountPropertyName {
     pub fn is_admin<'a>(yes: bool) -> (Self, PropertyValue<'a>) {
         let value = boolean_property_value(yes);
 
-        (AccountPropertyName::IsAdmin, value.into())
+        (AccountPropertyName::IsAdmin, value)
+    }
+
+    pub fn can_provision_accounts<'a>(yes: bool) -> (Self, PropertyValue<'a>) {
+        let value = boolean_property_value(yes);
+
+        (AccountPropertyName::CanProvisionAccounts, value)
     }
 }
 
@@ -202,11 +223,11 @@ impl TryFrom<PropertyRowModel> for (PropertyName, PropertyValue<'static>) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn boolean_property_value(value: bool) -> &'static str {
+pub fn boolean_property_value<'a>(value: bool) -> PropertyValue<'a> {
     if value {
-        PROPERTY_VALUE_BOOLEAN_TRUE
+        PROPERTY_VALUE_BOOLEAN_TRUE.into()
     } else {
-        PROPERTY_VALUE_BOOLEAN_FALSE
+        PROPERTY_VALUE_BOOLEAN_FALSE.into()
     }
 }
 

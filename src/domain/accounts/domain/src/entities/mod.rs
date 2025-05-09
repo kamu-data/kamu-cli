@@ -11,10 +11,12 @@ mod access_token;
 mod account;
 mod current_account_subject;
 mod device_token;
+mod password;
 mod predefined_accounts_config;
 
 pub use access_token::*;
 pub use account::*;
 pub use current_account_subject::*;
 pub use device_token::*;
+pub use password::*;
 pub use predefined_accounts_config::*;

@@ -34,6 +34,8 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
+use kamu_did_secret_keys::DidSecretEncryptionConfig;
+use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -427,7 +429,9 @@ impl TestHarness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<AccountServiceImpl>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
-                .add::<InMemoryAccountRepository>();
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add::<InMemoryAccountRepository>()
+                .add_value(DidSecretEncryptionConfig::sample());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

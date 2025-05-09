@@ -273,7 +273,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
                 // Register account in the repository
                 self.account_repository
-                    .create_account(&new_account)
+                    .save_account(&new_account)
                     .await
                     .map_err(|e| match e {
                         CreateAccountError::Duplicate(_) => LoginError::DuplicateCredentials,

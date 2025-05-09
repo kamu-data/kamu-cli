@@ -1,0 +1,62 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use email_utils::Email;
+use internal_error::ResultIntoInternal;
+use kamu_accounts::{Account, AccountService, CreateAccountError, CreateAccountUseCase, Password};
+use random_strings::AllowedSymbols;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn CreateAccountUseCase)]
+pub struct CreateAccountUseCaseImpl {
+    account_service: Arc<dyn AccountService>,
+}
+
+#[async_trait::async_trait]
+impl CreateAccountUseCase for CreateAccountUseCaseImpl {
+    async fn execute(
+        &self,
+        creator_account: &Account,
+        account_name: &odf::AccountName,
+        email_maybe: Option<Email>,
+    ) -> Result<Account, CreateAccountError> {
+        let email = email_maybe.unwrap_or({
+            let email_str = if let Some(parent_account_parts) =
+                creator_account.email.to_string().split_once('@')
+            {
+                format!(
+                    "{}+{}@{}",
+                    parent_account_parts.0, account_name, parent_account_parts.1
+                )
+            } else {
+                format!("{account_name}@example.com")
+            };
+
+            Email::parse(&email_str).int_err()?
+        });
+
+        let random_password =
+            random_strings::get_random_string(None, 10, &AllowedSymbols::AsciiSymbols);
+
+        self.account_service
+            .create_account(
+                account_name,
+                email,
+                Password::try_new(&random_password).unwrap(),
+                &creator_account.id,
+            )
+            .await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
