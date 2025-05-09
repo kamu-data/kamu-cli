@@ -24,13 +24,13 @@ impl AuthWeb3Mut {
     ) -> Result<NonceResponse> {
         let authentication_service = from_catalog_n!(ctx, dyn kamu_web3::Web3NonceService);
 
-        let nonce = authentication_service
+        let nonce_entity = authentication_service
             .create_nonce(account.into())
             .await
             .int_err()?;
 
         Ok(NonceResponse {
-            value: nonce.into_inner(),
+            value: nonce_entity.nonce.into_inner(),
         })
     }
 }

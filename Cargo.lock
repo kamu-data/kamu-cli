@@ -6563,6 +6563,7 @@ dependencies = [
  "kamu-task-system-postgres",
  "kamu-task-system-services",
  "kamu-task-system-sqlite",
+ "kamu-web3-services",
  "lazy_static",
  "libc",
  "merge",
