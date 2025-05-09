@@ -20,6 +20,7 @@ Recommendation: for ease of reading, use the following order:
 - Upgraded to `datafusion v47.0.0` and latest `arrow`, `object-store`, and `flatbuffers` versions
 - Commands and APIs that query data are now more tolerant to the situation when dataset is empty and doesn't have a schema yet and will return results with empty rows and columns instead of returning errors
 ### Fixed
+- Crash on push/pull over TLS connection (#1231)
 - Patched `GQL DatasetFlowTriggers::all_paused` to use similar optimization as account flow views
 
 ## [0.235.0] - 2025-04-24

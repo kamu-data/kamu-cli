@@ -29,7 +29,7 @@ regex = { version = "1", default-features = false, features = [
     "unicode",
 ] }
 reqwest = { version = "0.12", default-features = false, features = [
-    "rustls-tls",
+    "rustls-tls-webpki-roots",
     "blocking",
     "json",
 ] }

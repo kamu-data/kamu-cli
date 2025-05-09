@@ -29,7 +29,6 @@ kamu-auth-rebac = { workspace = true, features = ["sqlx"] }
 async-trait = "0.1"
 dill = { version = "0.13", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio-rustls",
     "macros",
     "sqlite",
     "chrono",

@@ -33,7 +33,7 @@ default = ["ingest-evm", "ingest-mqtt", "query-extensions-json"]
 
 ingest-evm = ["kamu/ingest-evm"]
 ingest-ftp = ["kamu/ingest-ftp"]
-ingest-mqtt = ["kamu/ingest-mqtt"]
+ingest-mqtt = ["kamu/ingest-mqtt", "dep:rumqttc"]
 query-extensions-json = ["kamu/query-extensions-json"]
 web-ui = ["rust-embed"]
 
@@ -105,6 +105,25 @@ kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
 kamu-search-qdrant = { workspace = true }
 
+# Top-level TLS and runtime configurations
+# TODO: Include alloy, aws-smithy
+# TODO: Unify deps around either ring or aws-lc-rs
+# TODO: Unify deps around either using webpki or native certs
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls-webpki-roots",
+] }
+rustls = { version = "0.23", default-features = false, features = [
+    "aws-lc-rs",
+] }
+rumqttc = { optional = true, version = "0.24", default-features = false, features = [
+    "use-rustls",
+] }
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls-aws-lc-rs",
+] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
 clap = "4"
@@ -124,7 +143,6 @@ async-graphql = { version = "7", default-features = false }
 async-graphql-axum = "7"
 axum = { version = "0.8", features = ["ws"] }
 http = "1"
-reqwest = { version = "0.12", default-features = false }
 serde_json = "1"
 tonic = { version = "0.12", default-features = false }
 tower = "0.5"
@@ -165,7 +183,14 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "47", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
+datafusion = { version = "47", default-features = false, features = [
+    "crypto_expressions",
+    "encoding_expressions",
+    "parquet",
+    "regex_expressions",
+    "unicode_expressions",
+    "compression",
+] }
 dill = { version = "0.13", default-features = false }
 dirs = "6"
 fs_extra = "1.3"
