@@ -33,6 +33,7 @@ bytes = { version = "1", default-features = false }
 dill = { version = "0.13", default-features = false }
 futures = "0.3"
 sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
     "macros",
     "postgres",
     "chrono",

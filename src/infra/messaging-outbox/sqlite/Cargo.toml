@@ -32,6 +32,7 @@ dill = { version = "0.13", default-features = false }
 futures = "0.3"
 indoc = "2"
 sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
     "macros",
     "sqlite",
     "chrono",
