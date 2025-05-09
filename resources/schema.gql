@@ -3524,6 +3524,10 @@ type VersionedFileEntry {
 	"""
 	contentType: String!
 	"""
+	Size of the content in bytes
+	"""
+	contentLength: Int!
+	"""
 	Multihash of the file content
 	"""
 	contentHash: Multihash!

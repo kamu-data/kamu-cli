@@ -255,6 +255,7 @@ impl DatasetsMut {
                     [
                         "version INT".to_string(),
                         "content_hash STRING".to_string(),
+                        "content_length BIGINT".to_string(),
                         "content_type STRING".to_string(),
                     ]
                     .into_iter()

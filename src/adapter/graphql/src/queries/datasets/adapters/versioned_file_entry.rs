@@ -34,6 +34,9 @@ pub struct VersionedFileEntry {
     /// Media type of the file content
     pub content_type: String,
 
+    /// Size of the content in bytes
+    pub content_length: usize,
+
     /// Multihash of the file content
     pub content_hash: Multihash<'static>,
 
@@ -51,6 +54,7 @@ impl VersionedFileEntry {
         dataset: ResolvedDataset,
         version: FileVersion,
         content_hash: odf::Multihash,
+        content_length: usize,
         content_type: Option<impl Into<MediaType>>,
         extra_data: Option<serde_json::Value>,
     ) -> Self {
@@ -62,6 +66,7 @@ impl VersionedFileEntry {
             system_time: now,
             event_time: now,
             version,
+            content_length,
             content_type: content_type
                 .map(Into::into)
                 .unwrap_or_else(|| Self::DEFAULT_CONTENT_TYPE.to_owned())
@@ -102,6 +107,15 @@ impl VersionedFileEntry {
         // Parse core columns
         let version =
             FileVersion::try_from(record.remove("version").unwrap().as_i64().unwrap()).unwrap();
+        // TODO: Restrict after migration
+        let content_length = usize::try_from(
+            record
+                .remove("content_length")
+                .unwrap()
+                .as_i64()
+                .unwrap_or_default(),
+        )
+        .unwrap();
         let content_type = record
             .remove("content_type")
             .unwrap()
@@ -119,6 +133,7 @@ impl VersionedFileEntry {
             system_time,
             event_time,
             version,
+            content_length,
             content_type,
             content_hash,
             extra_data: record.into(),
@@ -129,6 +144,7 @@ impl VersionedFileEntry {
         let mut record = self.extra_data.clone();
         record["version"] = self.version.into();
         record["content_hash"] = self.content_hash.to_string().into();
+        record["content_length"] = self.content_length.into();
         record["content_type"] = self.content_type.clone().into();
         record
     }
