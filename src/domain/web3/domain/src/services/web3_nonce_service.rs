@@ -9,15 +9,26 @@
 
 use internal_error::InternalError;
 
+use crate::{EvmWalletAddress, Web3AuthenticationNonce};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Chunkers are responsible for splitting large text into optimal sets of
-/// tokens to generate embeddings from.
 #[async_trait::async_trait]
-pub trait EmbeddingsChunker: Send + Sync {
-    /// Given sections of a single document splits them into chinks of optimal
-    /// size which will be encoded into embedding vectors
-    async fn chunk(&self, content: Vec<String>) -> Result<Vec<String>, InternalError>;
+pub trait Web3NonceService: Send + Sync {
+    async fn create_nonce(
+        &self,
+        wallet_address: EvmWalletAddress,
+    ) -> Result<Web3AuthenticationNonce, CreateNonceError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum CreateNonceError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

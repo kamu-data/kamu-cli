@@ -9,6 +9,7 @@
 
 use kamu_accounts::{CreateAccessTokenError, RevokeTokenError};
 
+use crate::mutations::AuthWeb3Mut;
 use crate::prelude::*;
 use crate::queries::{Account, CreateAccessTokenResultSuccess, CreatedAccessToken};
 use crate::utils::{check_access_token_valid, check_logged_account_id_match};
@@ -20,6 +21,11 @@ pub(crate) struct AuthMut;
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AuthMut {
+    /// Web3-related functionality group
+    async fn web3(&self) -> AuthWeb3Mut {
+        AuthWeb3Mut
+    }
+
     #[tracing::instrument(level = "info", name = AuthMut_login, skip_all, fields(%login_method))]
     async fn login(
         &self,

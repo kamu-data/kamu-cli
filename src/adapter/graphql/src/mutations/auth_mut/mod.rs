@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod auth_mut;
+mod auth_web3_mut;
 
 pub(crate) use auth_mut::*;
+pub(crate) use auth_web3_mut::*;

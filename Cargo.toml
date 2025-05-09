@@ -45,6 +45,7 @@ members = [
     "src/domain/flow-system/domain",
     "src/domain/search/domain",
     "src/domain/task-system/domain",
+    "src/domain/web3/domain",
     # Domain service layer
     "src/domain/accounts/services",
     "src/domain/auth-rebac/services",
@@ -151,6 +152,7 @@ kamu-datasets = { version = "0.235.0", path = "src/domain/datasets/domain", defa
 kamu-flow-system = { version = "0.235.0", path = "src/domain/flow-system/domain", default-features = false }
 kamu-search = { version = "0.235.0", path = "src/domain/search/domain", default-features = false }
 kamu-task-system = { version = "0.235.0", path = "src/domain/task-system/domain", default-features = false }
+kamu-web3 = { version = "0.235.0", path = "src/domain/web3/domain", default-features = false }
 
 ## Open Data Fabric
 odf = { version = "0.235.0", path = "src/odf/odf", default-features = false, package = "opendatafabric" }
