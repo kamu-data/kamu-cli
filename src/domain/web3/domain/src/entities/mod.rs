@@ -9,6 +9,8 @@
 
 mod evm_wallet_address;
 mod web3_auth_nonce;
+mod web3_auth_nonce_entity;
 
 pub use evm_wallet_address::*;
 pub use web3_auth_nonce::*;
+pub use web3_auth_nonce_entity::*;

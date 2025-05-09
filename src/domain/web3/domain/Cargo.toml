@@ -30,6 +30,7 @@ internal-error = { workspace = true }
 
 alloy-primitives = { version = "1.1", default-features = false }
 async-trait = { version = "0.1", default-features = false }
+chrono = "0.4"
 nutype = { version = "0.6", default-features = false }
 thiserror = { version = "2", default-features = false }
 

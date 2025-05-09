@@ -7,10 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod entities;
-mod repos;
-mod services;
+mod web3_auth_nonce_repository;
 
-pub use entities::*;
-pub use repos::*;
-pub use services::*;
+pub use web3_auth_nonce_repository::*;
