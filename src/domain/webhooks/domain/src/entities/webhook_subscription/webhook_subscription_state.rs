@@ -22,11 +22,15 @@ pub struct WebhookSubscriptionState {
     dataset_id: Option<odf::DatasetID>,
     status: WebhookSubscriptionStatus,
     event_types: Vec<WebhookEventType>,
-    secret: String,
+    secret: WebhookSubscriptionSecret,
     created_at: DateTime<Utc>,
 }
 
 impl WebhookSubscriptionState {
+    pub fn id(&self) -> WebhookSubscriptionId {
+        self.id
+    }
+
     pub fn status(&self) -> WebhookSubscriptionStatus {
         self.status
     }

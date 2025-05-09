@@ -19,14 +19,13 @@ pub struct WebhookSubscription(
 );
 
 impl WebhookSubscription {
-    /// Creates a new webhook subscription
     pub fn new(
         subscription_id: WebhookSubscriptionId,
         target_url: url::Url,
         label: WebhookSubscriptionLabel,
         dataset_id: Option<odf::DatasetID>,
         event_types: Vec<WebhookEventType>,
-        secret: String,
+        secret: WebhookSubscriptionSecret,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -43,6 +42,79 @@ impl WebhookSubscription {
             )
             .unwrap(),
         )
+    }
+
+    pub fn enable(&mut self) {
+        self.apply(WebhookSubscriptionEventEnabled {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+        })
+        .unwrap();
+    }
+
+    pub fn pause(&mut self) {
+        self.apply(WebhookSubscriptionEventPaused {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+        })
+        .unwrap();
+    }
+
+    pub fn resume(&mut self) {
+        self.apply(WebhookSubscriptionEventResumed {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+        })
+        .unwrap();
+    }
+
+    pub fn mark_unreachable(&mut self) {
+        self.apply(WebhookSubscriptionEventMarkedUnreachable {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+        })
+        .unwrap();
+    }
+
+    pub fn reactivate(&mut self) {
+        self.apply(WebhookSubscriptionEventReactivated {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+        })
+        .unwrap();
+    }
+
+    pub fn modify(
+        &mut self,
+        target_url: url::Url,
+        label: WebhookSubscriptionLabel,
+        event_types: Vec<WebhookEventType>,
+    ) {
+        self.apply(WebhookSubscriptionEventUpdated {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+            new_target_url: target_url,
+            new_label: label,
+            new_event_types: event_types,
+        })
+        .unwrap();
+    }
+
+    pub fn rotate_secret(&mut self, new_secret: WebhookSubscriptionSecret) {
+        self.apply(WebhookSubscriptionEventSecretRotated {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+            new_secret,
+        })
+        .unwrap();
+    }
+
+    pub fn remove(&mut self) {
+        self.apply(WebhookSubscriptionEventRemoved {
+            event_time: chrono::Utc::now(),
+            subscription_id: self.id(),
+        })
+        .unwrap();
     }
 }
 

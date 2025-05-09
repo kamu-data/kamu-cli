@@ -10,11 +10,13 @@
 mod webhook_subscription_event;
 mod webhook_subscription_id;
 mod webhook_subscription_label;
+mod webhook_subscription_secret;
 mod webhook_subscription_state;
 mod webhook_subscription_status;
 
 pub use webhook_subscription_event::*;
 pub use webhook_subscription_id::*;
 pub use webhook_subscription_label::*;
+pub use webhook_subscription_secret::*;
 pub use webhook_subscription_state::*;
 pub use webhook_subscription_status::*;

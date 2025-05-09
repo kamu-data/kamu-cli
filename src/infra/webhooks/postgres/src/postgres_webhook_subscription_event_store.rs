@@ -463,7 +463,7 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         let records = sqlx::query!(
             r#"
             SELECT id FROM webhook_subscriptions
-                WHERE dataset_id = $1 AND event_types @> $2 and status != 'REMOVED'::webhook_subscription_status
+                WHERE dataset_id = $1 AND event_types::text[] @> $2::text[] and status != 'REMOVED'::webhook_subscription_status
             "#,
             dataset_id,
             &vec![event_type],

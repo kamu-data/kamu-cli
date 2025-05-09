@@ -12,6 +12,7 @@ use std::collections::hash_map::HashMap;
 use dill::*;
 use event_sourcing::*;
 use kamu_webhooks::*;
+use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,10 +55,44 @@ impl InMemoryWebhookSubscriptionEventStore {
         }
     }
 
-    fn update_index(state: &mut State, event: &WebhookSubscriptionEvent) {
+    fn update_index(
+        state: &mut State,
+        event: &WebhookSubscriptionEvent,
+    ) -> Result<(), InternalError> {
         match event {
             WebhookSubscriptionEvent::Created(e) => {
                 if let Some(dataset_id) = &e.dataset_id {
+                    if state
+                        .webhook_subscriptions_by_dataset
+                        .get(dataset_id)
+                        .map(|ids| {
+                            ids.iter().any(|id| {
+                                state
+                                    .webhook_subscription_data
+                                    .get(id)
+                                    .map(|subscription| subscription.label() == &e.label)
+                                    .unwrap_or(false)
+                            })
+                        })
+                        .unwrap_or(false)
+                    {
+                        #[derive(Error, Debug)]
+                        #[error(
+                            "Webhook subscription label `{label}` is not unique for dataset \
+                             `{dataset_id}`"
+                        )]
+                        struct NonUniqueLabelError {
+                            label: WebhookSubscriptionLabel,
+                            dataset_id: odf::DatasetID,
+                        }
+
+                        return Err(NonUniqueLabelError {
+                            label: e.label.clone(),
+                            dataset_id: dataset_id.clone(),
+                        }
+                        .int_err());
+                    }
+
                     state
                         .webhook_subscriptions_by_dataset
                         .entry(dataset_id.clone())
@@ -79,6 +114,7 @@ impl InMemoryWebhookSubscriptionEventStore {
                     .insert(e.subscription_id, subscription);
             }
 
+            // TODO: non-unique labels in edit event
             _ => {
                 if let Some(subscription) = state
                     .webhook_subscription_data
@@ -104,6 +140,8 @@ impl InMemoryWebhookSubscriptionEventStore {
                 }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -137,7 +175,7 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventSt
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
             for event in &events {
-                Self::update_index(&mut g, event);
+                Self::update_index(&mut g, event)?;
             }
         }
 
