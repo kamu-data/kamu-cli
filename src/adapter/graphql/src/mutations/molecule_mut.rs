@@ -68,7 +68,7 @@ impl MoleculeMut {
         }
 
         // Resolve projects dataset
-        let projects_dataset = Molecule::get_projects_dataset(ctx).await?;
+        let projects_dataset = Molecule::get_projects_dataset(ctx, true).await?;
 
         // Check for conflicts
         let query_res = query_svc
@@ -236,7 +236,7 @@ impl MoleculeMut {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = Molecule::get_projects_dataset(ctx).await?;
+        let projects_dataset = Molecule::get_projects_dataset(ctx, false).await?;
 
         // Query data
         let query_res = query_svc

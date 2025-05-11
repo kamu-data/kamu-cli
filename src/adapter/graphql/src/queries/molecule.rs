@@ -169,15 +169,42 @@ impl Molecule {
         }
     }
 
-    pub async fn get_projects_dataset(ctx: &Context<'_>) -> Result<domain::ResolvedDataset> {
+    pub async fn get_projects_dataset(
+        ctx: &Context<'_>,
+        create_if_not_exist: bool,
+    ) -> Result<domain::ResolvedDataset> {
         let dataset_reg = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
 
-        let projects_dataset = dataset_reg
+        match dataset_reg
             .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
             .await
-            .int_err()?;
+        {
+            Ok(ds) => Ok(ds),
+            Err(odf::DatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
+                let create_dataset_use_case =
+                    from_catalog_n!(ctx, dyn kamu_datasets::CreateDatasetFromSnapshotUseCase);
 
-        Ok(projects_dataset)
+                let snapshot = Self::dataset_snapshot_projects(odf::DatasetAlias::new(
+                    None,
+                    odf::DatasetName::new_unchecked("projects"),
+                ));
+
+                let create_res = create_dataset_use_case
+                    .execute(
+                        snapshot,
+                        kamu_datasets::CreateDatasetUseCaseOptions {
+                            dataset_visibility: odf::DatasetVisibility::Private,
+                        },
+                    )
+                    .await
+                    .int_err()?;
+
+                Ok(dataset_reg
+                    .get_dataset_by_handle(&create_res.dataset_handle)
+                    .await)
+            }
+            Err(err) => Err(err.int_err().into()),
+        }
     }
 }
 
@@ -200,7 +227,7 @@ impl Molecule {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(ctx).await?;
+        let projects_dataset = Self::get_projects_dataset(ctx, false).await?;
 
         // Query data
         let query_res = query_svc
@@ -251,7 +278,7 @@ impl Molecule {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(ctx).await?;
+        let projects_dataset = Self::get_projects_dataset(ctx, false).await?;
 
         // Query data
         let query_res = query_svc

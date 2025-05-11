@@ -335,10 +335,7 @@ async fn test_molecule_data_room_operations() {
         .build()
         .await;
 
-    // Setup `projects` dataset
-    harness.create_projects_dataset().await;
-
-    // Create project
+    // Create project (projects dataset is auto-created)
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
@@ -519,10 +516,7 @@ async fn test_molecule_announcements_operations() {
         .build()
         .await;
 
-    // Setup `projects` dataset
-    harness.create_projects_dataset().await;
-
-    // Create project
+    // Create project (projects dataset is auto-created)
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
