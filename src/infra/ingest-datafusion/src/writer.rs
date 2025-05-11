@@ -518,8 +518,6 @@ impl DataWriterDataFusion {
             "Ouput file name must have an extension"
         );
 
-        println!("+++++ {:#?}", df.clone().into_parts().0.config());
-
         let res = df
             .write_parquet(
                 path.as_os_str().to_str().unwrap(),
