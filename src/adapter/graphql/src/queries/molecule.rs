@@ -18,6 +18,8 @@ use crate::queries::{Account, Dataset};
 
 pub struct Molecule;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl Molecule {
     pub fn dataset_snapshot_projects(alias: odf::DatasetAlias) -> odf::metadata::DatasetSnapshot {
         odf::DatasetSnapshot {
@@ -116,9 +118,11 @@ impl Molecule {
                             [
                                 "op INT",
                                 "announcement_id STRING",
-                                "title STRING",
+                                "headline STRING",
                                 "body STRING",
                                 "attachments Array<STRING>",
+                                "molecule_access_level STRING",
+                                "molecule_change_by STRING",
                             ]
                             .into_iter()
                             .map(str::to_string)
@@ -135,7 +139,7 @@ impl Molecule {
                 }
                 .into(),
                 odf::metadata::SetInfo {
-                    description: Some("Projects announcements".into()),
+                    description: Some("Project announcements".into()),
                     keywords: Some(vec![
                         "DeSci".to_string(),
                         "BioTech".to_string(),
@@ -150,7 +154,7 @@ impl Molecule {
                             path: "README.md".into(),
                             content: indoc::indoc!(
                                 r#"
-                                # Projects announcements
+                                # Project announcements
 
                                 TODO
                                 "#
@@ -164,7 +168,20 @@ impl Molecule {
             ],
         }
     }
+
+    pub async fn get_projects_dataset(ctx: &Context<'_>) -> Result<domain::ResolvedDataset> {
+        let dataset_reg = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
+
+        let projects_dataset = dataset_reg
+            .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
+            .await
+            .int_err()?;
+
+        Ok(projects_dataset)
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
@@ -180,14 +197,10 @@ impl Molecule {
     ) -> Result<Option<MoleculeProject>> {
         use datafusion::logical_expr::{col, lit};
 
-        let (dataset_reg, query_svc) =
-            from_catalog_n!(ctx, dyn domain::DatasetRegistry, dyn domain::QueryService);
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = dataset_reg
-            .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
-            .await
-            .int_err()?;
+        let projects_dataset = Self::get_projects_dataset(ctx).await?;
 
         // Query data
         let query_res = query_svc
@@ -235,14 +248,10 @@ impl Molecule {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PROJECTS_PER_PAGE);
 
-        let (dataset_reg, query_svc) =
-            from_catalog_n!(ctx, dyn domain::DatasetRegistry, dyn domain::QueryService);
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = dataset_reg
-            .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
-            .await
-            .int_err()?;
+        let projects_dataset = Self::get_projects_dataset(ctx).await?;
 
         // Query data
         let query_res = query_svc

@@ -36,7 +36,6 @@ impl MoleculeMut {
 
         let (
             subject,
-            dataset_reg,
             query_svc,
             account_repo,
             login_pass_provider,
@@ -46,7 +45,6 @@ impl MoleculeMut {
         ) = from_catalog_n!(
             ctx,
             CurrentAccountSubject,
-            dyn domain::DatasetRegistry,
             dyn domain::QueryService,
             dyn kamu_accounts::AccountRepository,
             kamu_accounts_services::LoginPasswordAuthProvider,
@@ -70,10 +68,7 @@ impl MoleculeMut {
         }
 
         // Resolve projects dataset
-        let projects_dataset = dataset_reg
-            .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
-            .await
-            .int_err()?;
+        let projects_dataset = Molecule::get_projects_dataset(ctx).await?;
 
         // Check for conflicts
         let query_res = query_svc
@@ -228,6 +223,176 @@ impl MoleculeMut {
             project,
         }))
     }
+
+    /// Looks up the project
+    #[tracing::instrument(level = "info", name = MoleculeMut_project, skip_all, fields(?ipnft_uid))]
+    async fn project(
+        &self,
+        ctx: &Context<'_>,
+        ipnft_uid: String,
+    ) -> Result<Option<MoleculeProjectMut>> {
+        use datafusion::logical_expr::{col, lit};
+
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
+        // Resolve projects dataset
+        let projects_dataset = Molecule::get_projects_dataset(ctx).await?;
+
+        // Query data
+        let query_res = query_svc
+            .get_data(
+                &projects_dataset.get_handle().as_local_ref(),
+                domain::GetDataOptions::default(),
+            )
+            .await
+            .int_err()?;
+
+        let Some(df) = query_res.df else {
+            return Ok(None);
+        };
+
+        let df = df.filter(col("ipnft_uid").eq(lit(ipnft_uid))).int_err()?;
+
+        let df = odf::utils::data::changelog::project(
+            df,
+            &["account_id".to_string()],
+            &odf::metadata::DatasetVocabulary::default(),
+        )
+        .int_err()?;
+
+        let records = df.collect_json_aos().await.int_err()?;
+        if records.is_empty() {
+            return Ok(None);
+        }
+
+        assert_eq!(records.len(), 1);
+        let entry = MoleculeProjectMut::from_json(records.into_iter().next().unwrap());
+
+        Ok(Some(entry))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[expect(dead_code)]
+pub struct MoleculeProjectMut {
+    pub account_id: odf::AccountID,
+    pub data_room_dataset_id: odf::DatasetID,
+    pub announcements_dataset_id: odf::DatasetID,
+}
+
+impl MoleculeProjectMut {
+    pub fn from_json(record: serde_json::Value) -> Self {
+        let serde_json::Value::Object(record) = record else {
+            unreachable!()
+        };
+
+        let account_id =
+            odf::AccountID::from_did_str(record["account_id"].as_str().unwrap()).unwrap();
+
+        let data_room_dataset_id =
+            odf::DatasetID::from_did_str(record["data_room_dataset_id"].as_str().unwrap()).unwrap();
+
+        let announcements_dataset_id =
+            odf::DatasetID::from_did_str(record["announcements_dataset_id"].as_str().unwrap())
+                .unwrap();
+
+        Self {
+            account_id,
+            data_room_dataset_id,
+            announcements_dataset_id,
+        }
+    }
+}
+
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[Object]
+impl MoleculeProjectMut {
+    /// Creates an announcement record for the project
+    #[tracing::instrument(level = "info", name = MoleculeProjectMut_create_announcement, skip_all)]
+    async fn create_announcement(
+        &self,
+        ctx: &Context<'_>,
+        headline: String,
+        body: String,
+        #[graphql(desc = "List of dataset DIDs to link")] attachments: Option<Vec<String>>,
+        molecule_access_level: String,
+        molecule_change_by: String,
+    ) -> Result<CreateAnnouncementResult> {
+        let (dataset_reg, push_ingest_use_case) = from_catalog_n!(
+            ctx,
+            dyn domain::DatasetRegistry,
+            dyn domain::PushIngestDataUseCase
+        );
+
+        // Validate attachment links
+        let attachments = attachments.unwrap_or_default();
+        for att in &attachments {
+            let did = match odf::DatasetID::from_did_str(att) {
+                Ok(did) => did,
+                Err(err) => {
+                    return Ok(CreateAnnouncementResult::InvalidAttachment(
+                        CreateAnnouncementErrorInvalidAttachment {
+                            message: err.to_string(),
+                        },
+                    ))
+                }
+            };
+
+            if dataset_reg
+                .try_resolve_dataset_handle_by_ref(&did.as_local_ref())
+                .await?
+                .is_none()
+            {
+                return Ok(CreateAnnouncementResult::InvalidAttachment(
+                    CreateAnnouncementErrorInvalidAttachment {
+                        message: format!("Dataset {did} not found"),
+                    },
+                ));
+            }
+        }
+
+        let dataset = dataset_reg
+            .get_dataset_by_id(&self.announcements_dataset_id)
+            .await
+            .int_err()?;
+
+        let announcement_id = uuid::Uuid::new_v4();
+
+        let record = serde_json::json!({
+            "op": u8::from(odf::metadata::OperationType::Append),
+            "announcement_id": announcement_id.to_string(),
+            "headline": headline,
+            "body": body,
+            "attachments": attachments,
+            "molecule_access_level": molecule_access_level,
+            "molecule_change_by": molecule_change_by,
+        });
+
+        push_ingest_use_case
+            .execute(
+                &dataset,
+                kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(
+                    record.to_string().into_bytes(),
+                )),
+                kamu_core::PushIngestDataUseCaseOptions {
+                    source_name: None,
+                    source_event_time: None,
+                    is_ingest_from_upload: false,
+                    media_type: Some(kamu_core::MediaType::NDJSON.to_owned()),
+                    expected_head: None,
+                },
+                None,
+            )
+            .await
+            .int_err()?;
+
+        Ok(CreateAnnouncementResult::Success(
+            CreateAnnouncementSuccess {
+                announcement_id: announcement_id.to_string(),
+            },
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -272,6 +437,46 @@ impl CreateProjectErrorConflict {
             "Conflict with existing project {} ({})",
             self.project.ipnft_uid, self.project.ipt_symbol,
         )
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
+pub enum CreateAnnouncementResult {
+    Success(CreateAnnouncementSuccess),
+    InvalidAttachment(CreateAnnouncementErrorInvalidAttachment),
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CreateAnnouncementSuccess {
+    /// ID of the newly-created announcement
+    pub announcement_id: String,
+}
+#[ComplexObject]
+impl CreateAnnouncementSuccess {
+    async fn is_success(&self) -> bool {
+        true
+    }
+    async fn message(&self) -> String {
+        String::new()
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CreateAnnouncementErrorInvalidAttachment {
+    message: String,
+}
+#[ComplexObject]
+impl CreateAnnouncementErrorInvalidAttachment {
+    async fn is_success(&self) -> bool {
+        false
     }
 }
 

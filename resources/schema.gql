@@ -650,6 +650,25 @@ type CreateAccessTokenResultSuccess implements CreateTokenResult {
 	message: String!
 }
 
+type CreateAnnouncementErrorInvalidAttachment implements CreateAnnouncementResult {
+	message: String!
+	isSuccess: Boolean!
+}
+
+interface CreateAnnouncementResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateAnnouncementSuccess implements CreateAnnouncementResult {
+	"""
+	ID of the newly-created announcement
+	"""
+	announcementId: String!
+	isSuccess: Boolean!
+	message: String!
+}
+
 interface CreateDatasetFromSnapshotResult {
 	message: String!
 }
@@ -2383,6 +2402,10 @@ type Molecule {
 
 type MoleculeMut {
 	createProject(ipnftAddress: String!, ipnftTokenId: Int!, ipnftUid: String!, iptSymbol: String!, iptAddress: String!): CreateProjectResult!
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProjectMut
 }
 
 type MoleculeProject {
@@ -2446,6 +2469,18 @@ type MoleculeProjectConnection {
 
 type MoleculeProjectEdge {
 	node: MoleculeProject!
+}
+
+type MoleculeProjectMut {
+	"""
+	Creates an announcement record for the project
+	"""
+	createAnnouncement(		headline: String!,		body: String!,
+		"""
+		List of dataset DIDs to link
+		"""
+		attachments: [String!],		moleculeAccessLevel: String!,		moleculeChangeBy: String!
+	): CreateAnnouncementResult!
 }
 
 """

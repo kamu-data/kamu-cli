@@ -21,6 +21,61 @@ use crate::utils::{authentication_catalogs_ext, BaseGQLDatasetHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const CREATE_PROJECT: &str = indoc!(
+    r#"
+    mutation (
+        $ipnftAddress: String!,
+        $ipnftTokenId: Int!,
+        $ipnftUid: String!,
+        $iptAddress: String!,
+        $iptSymbol: String!,
+    ) {
+        molecule {
+            createProject(
+                ipnftAddress: $ipnftAddress,
+                ipnftTokenId: $ipnftTokenId,
+                ipnftUid: $ipnftUid,
+                iptAddress: $iptAddress,
+                iptSymbol: $iptSymbol,
+            ) {
+                isSuccess
+                message
+                __typename
+                ... on CreateProjectSuccess {
+                    project {
+                        account { id accountName }
+                        ipnftUid
+                        dataRoom { id alias }
+                        announcements { id alias }
+                    }
+                }
+            }
+        }
+    }
+    "#
+);
+
+const CREATE_VERSIONED_FILE: &str = indoc!(
+    r#"
+    mutation ($datasetAlias: DatasetAlias!) {
+        datasets {
+            createVersionedFile(
+                datasetAlias: $datasetAlias,
+                datasetVisibility: PRIVATE,
+            ) {
+                ... on CreateDatasetResultSuccess {
+                    dataset {
+                        id
+                    }
+                }
+            }
+        }
+    }
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_molecule_provision_project() {
     let harness = GraphQLDatasetsHarness::builder()
@@ -58,40 +113,6 @@ async fn test_molecule_provision_project() {
     );
 
     // Create first project
-    const CREATE_PROJECT: &str = indoc!(
-        r#"
-        mutation (
-            $ipnftAddress: String!,
-            $ipnftTokenId: Int!,
-            $ipnftUid: String!,
-            $iptAddress: String!,
-            $iptSymbol: String!,
-        ) {
-            molecule {
-                createProject(
-                    ipnftAddress: $ipnftAddress,
-                    ipnftTokenId: $ipnftTokenId,
-                    ipnftUid: $ipnftUid,
-                    iptAddress: $iptAddress,
-                    iptSymbol: $iptSymbol,
-                ) {
-                    isSuccess
-                    message
-                    __typename
-                    ... on CreateProjectSuccess {
-                        project {
-                            account { id accountName }
-                            ipnftUid
-                            dataRoom { id alias }
-                            announcements { id alias }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    );
-
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
@@ -264,31 +285,87 @@ async fn test_molecule_provision_project() {
         }),
     );
 
+    // Create another project
+    // Ensure errors on ipnftUid collision
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": 10,
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
+                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc3",
+                "iptSymbol": "vitaslow",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["createProject"]["isSuccess"],
+        json!(true),
+    );
+
+    // Both projects appear in the list
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(LIST_PROJECTS))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
+        json!([
+            {
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "iptSymbol": "vitafast",
+            },
+            {
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
+                "iptSymbol": "vitaslow",
+            }
+        ]),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_data_room_operations() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Setup `projects` dataset
+    harness.create_projects_dataset().await;
+
+    // Create project
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": 9,
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc2",
+                "iptSymbol": "vitafast",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let res = &res.data.into_json().unwrap()["molecule"]["createProject"];
+    let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
+    let data_room_did = res["project"]["dataRoom"]["id"].as_str().unwrap();
+
+    // Create versioned file
     // Molecule account can create new dataset in project org
     let res = harness
         .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                mutation ($datasetAlias: DatasetAlias!) {
-                    datasets {
-                        createVersionedFile(
-                            datasetAlias: $datasetAlias,
-                            datasetVisibility: PRIVATE,
-                        ) {
-                            ... on CreateDatasetResultSuccess {
-                                dataset {
-                                    id
-                                }
-                            }
-                        }
-                    }
-                }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                // TODO: Need ability  to create datasets with target AccountID
-                "datasetAlias": format!("{project_account_name}/test-file"),
-            }))),
+            async_graphql::Request::new(CREATE_VERSIONED_FILE).variables(
+                async_graphql::Variables::from_json(json!({
+                    // TODO: Need ability  to create datasets with target AccountID
+                    "datasetAlias": format!("{project_account_name}/test-file"),
+                })),
+            ),
         )
         .await;
 
@@ -431,45 +508,318 @@ async fn test_molecule_provision_project() {
             },
         }),
     );
+}
 
-    // Create another project
-    // Ensure errors on ipnftUid collision
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_announcements_operations() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Setup `projects` dataset
+    harness.create_projects_dataset().await;
+
+    // Create project
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 10,
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc3",
-                "iptSymbol": "vitaslow",
+                "ipnftTokenId": 9,
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc2",
+                "iptSymbol": "vitafast",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let res = &res.data.into_json().unwrap()["molecule"]["createProject"];
+    let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
+    let announcements_did = res["project"]["announcements"]["id"].as_str().unwrap();
+
+    // Announcements are empty
+    const LIST_ANNOUNCEMENTS: &str = indoc!(
+        r#"
+        query ($datasetId: DatasetID!) {
+            datasets {
+                byId(datasetId: $datasetId) {
+                    data {
+                        tail(dataFormat: JSON_AOS) {
+                            ... on DataQueryResultSuccess {
+                                data { content }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(LIST_ANNOUNCEMENTS).variables(
+            async_graphql::Variables::from_json(json!({
+                "datasetId": announcements_did,
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let content = res.data.into_json().unwrap()["datasets"]["byId"]["data"]["tail"]["data"]
+        ["content"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let content: serde_json::Value = serde_json::from_str(&content).unwrap();
+    pretty_assertions::assert_eq!(content, json!([]));
+
+    // Create a few versioned files to use as attachments
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(CREATE_VERSIONED_FILE).variables(
+                async_graphql::Variables::from_json(json!({
+                    // TODO: Need ability  to create datasets with target AccountID
+                    "datasetAlias": format!("{project_account_name}/test-file-1"),
+                })),
+            ),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let test_file_1 = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]
+        ["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(CREATE_VERSIONED_FILE).variables(
+                async_graphql::Variables::from_json(json!({
+                    // TODO: Need ability  to create datasets with target AccountID
+                    "datasetAlias": format!("{project_account_name}/test-file-2"),
+                })),
+            ),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let test_file_2 = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]
+        ["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Create an announcement without attachments
+    const CREATE_ANNOUNCEMENT: &str = indoc!(
+        r#"
+        mutation (
+            $ipnftUid: String!,
+            $headline: String!,
+            $body: String!,
+            $attachments: [String!],
+            $moleculeAccessLevel: String!,
+            $moleculeChangeBy: String!,
+        ) {
+            molecule {
+                project(ipnftUid: $ipnftUid) {
+                    createAnnouncement(
+                        headline: $headline,
+                        body: $body,
+                        attachments: $attachments,
+                        moleculeAccessLevel: $moleculeAccessLevel,
+                        moleculeChangeBy: $moleculeChangeBy,
+                    ) {
+                        isSuccess
+                        message
+                    }
+                }
+            }
+        }
+        "#
+    );
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "headline": "Test announcement 1",
+                "body": "Blah blah",
+                "moleculeAccessLevel": "ipt-holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["createProject"]["isSuccess"],
-        json!(true),
+        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
     );
 
-    // Both projects appear in the list
+    // Create an announcement with one attachment
     let res = harness
-        .execute_authorized_query(async_graphql::Request::new(LIST_PROJECTS))
+        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "headline": "Test announcement 2",
+                "body": "Blah blah",
+                "attachments": [test_file_1],
+                "moleculeAccessLevel": "ipt-holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            })),
+        ))
         .await;
 
     assert!(res.is_ok(), "{res:#?}");
     pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
-        json!([
-            {
+        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Create an announcement with two attachments
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
+            async_graphql::Variables::from_json(json!({
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "iptSymbol": "vitafast",
-            },
-            {
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
-                "iptSymbol": "vitaslow",
-            }
-        ]),
+                "headline": "Test announcement 3",
+                "body": "Blah blah",
+                "attachments": [test_file_1, test_file_2],
+                "moleculeAccessLevel": "ipt-holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Create an announcement with invalid attachment DID
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "headline": "Test announcement 3",
+                "body": "Blah blah",
+                "attachments": ["x"],
+                "moleculeAccessLevel": "ipt-holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
+        json!({
+            "isSuccess": false,
+            "message": "Value 'x' is not a valid did:odf",
+        })
+    );
+
+    // Create an announcement with attachment DID that does not exist
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "headline": "Test announcement 3",
+                "body": "Blah blah",
+                "attachments": [odf::DatasetID::new_seeded_ed25519(b"does-not-exist").to_string()],
+                "moleculeAccessLevel": "ipt-holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
+        json!({
+            "isSuccess": false,
+            "message": "Dataset did:odf:fed011ba79f25e520298ba6945dd6197083a366364bef178d5899b100c434748d88e5 not found",
+        })
+    );
+
+    // Announcements are listed as expected
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(LIST_ANNOUNCEMENTS).variables(
+            async_graphql::Variables::from_json(json!({
+                "datasetId": announcements_did,
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let content = res.data.into_json().unwrap()["datasets"]["byId"]["data"]["tail"]["data"]
+        ["content"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let mut content: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let any = "<any>";
+    content.as_array_mut().unwrap().iter_mut().for_each(|r| {
+        let obj = r.as_object_mut().unwrap();
+        obj["system_time"] = any.to_string().into();
+        obj["event_time"] = any.to_string().into();
+        obj["announcement_id"] = any.to_string().into();
+    });
+    pretty_assertions::assert_eq!(
+        content,
+        json!(
+            [
+                {
+                    "molecule_access_level": "ipt-holders",
+                    "announcement_id": any,
+                    "attachments": [],
+                    "body": "Blah blah",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "event_time": any,
+                    "headline": "Test announcement 1",
+                    "offset": 0,
+                    "op": 0,
+                    "system_time": any,
+                },
+                {
+                    "molecule_access_level": "ipt-holders",
+                    "announcement_id": any,
+                    "attachments": [test_file_1],
+                    "body": "Blah blah",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "event_time": any,
+                    "headline": "Test announcement 2",
+                    "offset": 1,
+                    "op": 0,
+                    "system_time": any,
+                },
+                {
+                    "molecule_access_level": "ipt-holders",
+                    "announcement_id": any,
+                    "attachments": [test_file_1, test_file_2],
+                    "body": "Blah blah",
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+                    "event_time": any,
+                    "headline": "Test announcement 3",
+                    "offset": 2,
+                    "op": 0,
+                    "system_time": any,
+                },
+            ]
+        )
     );
 }
 
