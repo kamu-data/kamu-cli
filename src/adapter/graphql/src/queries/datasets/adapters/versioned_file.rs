@@ -24,6 +24,46 @@ impl VersionedFile {
         Self { dataset }
     }
 
+    pub fn dataset_shapshot(
+        alias: odf::DatasetAlias,
+        extra_columns: Vec<ColumnInput>,
+        extra_events: Vec<odf::MetadataEvent>,
+    ) -> odf::DatasetSnapshot {
+        let push_source = odf::metadata::AddPushSource {
+            source_name: "default".into(),
+            read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
+                schema: Some(
+                    [
+                        "version INT",
+                        "content_hash STRING",
+                        "content_length BIGINT",
+                        "content_type STRING",
+                    ]
+                    .into_iter()
+                    .map(str::to_string)
+                    .chain(
+                        extra_columns
+                            .into_iter()
+                            .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
+                    )
+                    .collect(),
+                ),
+                ..Default::default()
+            }),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
+        };
+
+        odf::DatasetSnapshot {
+            name: alias,
+            kind: odf::DatasetKind::Root,
+            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
+                .into_iter()
+                .chain(extra_events)
+                .collect(),
+        }
+    }
+
     pub async fn get_entry(
         &self,
         ctx: &Context<'_>,

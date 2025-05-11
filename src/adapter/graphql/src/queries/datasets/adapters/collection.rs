@@ -19,6 +19,47 @@ pub struct Collection {
     dataset: domain::ResolvedDataset,
 }
 
+impl Collection {
+    pub fn dataset_shapshot(
+        alias: odf::DatasetAlias,
+        extra_columns: Vec<ColumnInput>,
+        extra_events: Vec<odf::MetadataEvent>,
+    ) -> odf::DatasetSnapshot {
+        let push_source = odf::metadata::AddPushSource {
+            source_name: "default".into(),
+            read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
+                schema: Some(
+                    ["op INT", "path STRING", "ref STRING"]
+                        .into_iter()
+                        .map(str::to_string)
+                        .chain(
+                            extra_columns
+                                .into_iter()
+                                .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
+                        )
+                        .collect(),
+                ),
+                ..Default::default()
+            }),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::ChangelogStream(
+                odf::metadata::MergeStrategyChangelogStream {
+                    primary_key: vec!["path".to_string()],
+                },
+            ),
+        };
+
+        odf::DatasetSnapshot {
+            name: alias,
+            kind: odf::DatasetKind::Root,
+            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
+                .into_iter()
+                .chain(extra_events)
+                .collect(),
+        }
+    }
+}
+
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Collection {
@@ -170,7 +211,11 @@ impl CollectionProjection {
         .int_err()?;
 
         let total_count = df.clone().count().await.int_err()?;
-        let df = df.sort(vec![col("path").sort(true, false)]).int_err()?;
+        let df = df
+            .sort(vec![col("path").sort(true, false)])
+            .int_err()?
+            .limit(page * per_page, Some(per_page))
+            .int_err()?;
 
         let records = df.collect_json_aos().await.int_err()?;
 

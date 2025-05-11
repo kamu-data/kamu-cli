@@ -37,6 +37,7 @@ odf = { workspace = true, default-features = false, features = [
 event-sourcing = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-accounts-services = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
@@ -59,6 +60,7 @@ datafusion = { version = "47", default-features = false, features = ["serde"] }
 dill = { version = "0.13", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 humansize = { version = "2", default-features = false }
+indoc = "2"
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
@@ -76,6 +78,7 @@ kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
@@ -89,7 +92,6 @@ odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }
 
 bon = { version = "3", default-features = false }
-indoc = "2"
 oop = "0.0.2"
 pretty_assertions = { version = "1" }
 tempfile = "3"

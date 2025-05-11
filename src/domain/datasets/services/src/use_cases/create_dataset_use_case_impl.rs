@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
+use internal_error::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::ResolvedDataset;
 use kamu_datasets::{
@@ -28,6 +29,9 @@ use crate::utils::CreateDatasetUseCaseHelper;
 pub struct CreateDatasetUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
+
+    // TODO: Rebac is here temporarily - using Lazy to avoid modifying all tests
+    rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
 }
 
 #[common_macros::method_names_consts]
@@ -41,27 +45,24 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
         // There must be a logged-in user
-        let (logged_account_id, logged_account_name) = match self.current_account_subject.as_ref() {
+        let subject = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(subj) => subj,
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
             }
-            CurrentAccountSubject::Logged(l) => (&l.account_id, &l.account_name),
         };
 
-        // Adjust alias for current tenancy configuration
-        let canonical_alias = self
+        // Resolve target account and full alias of the dataset
+        let (canonical_alias, target_account_id) = self
             .create_helper
-            .canonical_dataset_alias(dataset_alias, logged_account_name);
-
-        // Verify that we can create a dataset with this alias
-        self.create_helper
-            .validate_canonical_dataset_alias_account_name(&canonical_alias, logged_account_name)?;
+            .resolve_alias_target(dataset_alias, subject)
+            .await?;
 
         // Dataset entry goes first, this guarantees name collision check
         self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
-                logged_account_id,
+                &target_account_id,
                 canonical_alias.as_ref(),
                 seed_block.event.dataset_kind,
             )
@@ -81,12 +82,30 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             )
             .await?;
 
+        // TODO: HACK: SEC: When creating a dataaset under another account we currently
+        // give subject a "maintainer" role on it. In future this should be refactored
+        // into organization-level permissions.
+        //
+        // See: https://github.com/kamu-data/kamu-node/issues/233
+        if target_account_id != subject.account_id {
+            self.rebac_svc
+                .get()
+                .int_err()?
+                .set_account_dataset_relation(
+                    &subject.account_id,
+                    kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
+                    &store_result.dataset_id,
+                )
+                .await
+                .int_err()?;
+        }
+
         // Notify interested parties the dataset was created
         self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
                 canonical_alias.dataset_name(),
-                logged_account_id,
+                &target_account_id,
                 options.dataset_visibility,
             )
             .await?;

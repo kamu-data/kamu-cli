@@ -17,6 +17,7 @@ mod dataset_mut;
 mod datasets_mut;
 mod flows_mut;
 mod metadata_chain_mut;
+mod molecule_mut;
 
 pub(crate) use account_mut::*;
 pub(crate) use accounts_mut::*;
@@ -27,3 +28,4 @@ pub(crate) use dataset_mut::*;
 pub(crate) use datasets_mut::*;
 pub(crate) use flows_mut::*;
 pub(crate) use metadata_chain_mut::*;
+pub(crate) use molecule_mut::*;

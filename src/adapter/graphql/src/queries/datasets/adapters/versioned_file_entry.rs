@@ -22,10 +22,10 @@ pub struct VersionedFileEntry {
     #[graphql(skip)]
     dataset: ResolvedDataset,
 
-    /// Time when this version was created
+    /// System time when this version was created/updated
     pub system_time: DateTime<Utc>,
 
-    /// Time when this version was created
+    /// Event time when this version was created/updated
     pub event_time: DateTime<Utc>,
 
     /// File version

@@ -678,6 +678,23 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 	message: String!
 }
 
+type CreateProjectErrorConflict implements CreateProjectResult {
+	project: MoleculeProject!
+	isSuccess: Boolean!
+	message: String!
+}
+
+interface CreateProjectResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateProjectSuccess implements CreateProjectResult {
+	project: MoleculeProject!
+	isSuccess: Boolean!
+	message: String!
+}
+
 interface CreateTokenResult {
 	message: String!
 }
@@ -2353,6 +2370,84 @@ type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetF
 	message: String!
 }
 
+type Molecule {
+	"""
+	Looks up the project
+	"""
+	project(ipnftUid: String!): MoleculeProject
+	"""
+	List the registered projects
+	"""
+	projects(page: Int, perPage: Int): MoleculeProjectConnection!
+}
+
+type MoleculeMut {
+	createProject(ipnftAddress: String!, ipnftTokenId: Int!, ipnftUid: String!, iptSymbol: String!, iptAddress: String!): CreateProjectResult!
+}
+
+type MoleculeProject {
+	"""
+	System time when this version was created/updated
+	"""
+	systemTime: DateTime!
+	"""
+	Event time when this version was created/updated
+	"""
+	eventTime: DateTime!
+	"""
+	Address of the IPNFT contract
+	"""
+	ipnftAddress: String!
+	"""
+	Token ID withing the IPNFT contract
+	"""
+	ipnftTokenId: Int!
+	"""
+	Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
+	"""
+	ipnftUid: String!
+	"""
+	Address of the associated IPT contract
+	"""
+	iptAddress: String!
+	"""
+	Symbolic name of the IPT token
+	"""
+	iptSymbol: String!
+	"""
+	Project's organizational account
+	"""
+	account: Account!
+	"""
+	Project's data room dataset
+	"""
+	dataRoom: Dataset!
+	"""
+	Project's announcements dataset
+	"""
+	announcements: Dataset!
+}
+
+type MoleculeProjectConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeProject!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeProjectEdge!]!
+}
+
+type MoleculeProjectEdge {
+	node: MoleculeProject!
+}
+
 """
 MQTT quality of service class.
 
@@ -2403,6 +2498,10 @@ type Mutation {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: AccountsMut!
+	"""
+	Temporary: Molecule-specific functionality group
+	"""
+	molecule: MoleculeMut!
 }
 
 union NameLookupResult = Account
@@ -2572,6 +2671,10 @@ type Query {
 	Admin-related functionality group
 	"""
 	admin: Admin!
+	"""
+	Temporary: Molecule-specific functionality group
+	"""
+	molecule: Molecule!
 }
 
 enum QueryDialect {
@@ -3508,11 +3611,11 @@ type VersionedFileContentDownload {
 
 type VersionedFileEntry {
 	"""
-	Time when this version was created
+	System time when this version was created/updated
 	"""
 	systemTime: DateTime!
 	"""
-	Time when this version was created
+	Event time when this version was created/updated
 	"""
 	eventTime: DateTime!
 	"""

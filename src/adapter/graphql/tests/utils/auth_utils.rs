@@ -19,6 +19,7 @@ use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,
     DefaultDatasetProperties,
+    RebacDatasetLifecycleMessageConsumer,
     RebacServiceImpl,
 };
 
@@ -27,23 +28,31 @@ use kamu_auth_rebac_services::{
 pub async fn authentication_catalogs(
     base_catalog: &dill::Catalog,
 ) -> (dill::Catalog, dill::Catalog) {
-    let current_account_subject = CurrentAccountSubject::new_test();
+    authentication_catalogs_ext(base_catalog, None).await
+}
+
+pub async fn authentication_catalogs_ext(
+    base_catalog: &dill::Catalog,
+    subject: Option<CurrentAccountSubject>,
+) -> (dill::Catalog, dill::Catalog) {
+    let current_account_subject = subject.unwrap_or_else(CurrentAccountSubject::new_test);
     let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
-    if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
-        predefined_accounts_config
-            .predefined
-            .push(AccountConfig::test_config_from_name(
-                logged_account.account_name.clone(),
-            ));
-    } else {
+    let CurrentAccountSubject::Logged(logged_account) = &current_account_subject else {
         unreachable!();
-    }
+    };
+
+    predefined_accounts_config
+        .predefined
+        .push(AccountConfig::test_config_from_subject(
+            logged_account.clone(),
+        ));
 
     let base_auth_catalog = dill::CatalogBuilder::new_chained(base_catalog)
         .add::<LoginPasswordAuthProvider>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
+        .add::<RebacDatasetLifecycleMessageConsumer>()
         .add::<InMemoryRebacRepository>()
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())

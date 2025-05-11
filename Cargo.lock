@@ -6180,6 +6180,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
+ "kamu-adapter-auth-oso-rebac",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",

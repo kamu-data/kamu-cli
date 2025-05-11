@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DatasetRegistry, DidGenerator, ResolvedDataset};
 use kamu_datasets::{
@@ -33,6 +33,9 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
+
+    // TODO: Rebac is here temporarily - using Lazy to avoid modifying all tests
+    rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
 }
 
 #[common_macros::method_names_consts]
@@ -45,11 +48,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         // There must be a logged-in user
-        let (logged_account_id, logged_account_name) = match self.current_account_subject.as_ref() {
+        let subject = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(subj) => subj,
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
             }
-            CurrentAccountSubject::Logged(l) => (&l.account_id, &l.account_name),
         };
 
         // Validate / resolve metadata events from the snapshot
@@ -59,14 +62,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         )
         .await?;
 
-        // Adjust alias for current tenancy configuration
-        let canonical_alias = self
+        // Resolve target account and full alias of the dataset
+        let (canonical_alias, target_account_id) = self
             .create_helper
-            .canonical_dataset_alias(&snapshot.name, logged_account_name);
-
-        // Verify that we can create a dataset with this alias
-        self.create_helper
-            .validate_canonical_dataset_alias_account_name(&canonical_alias, logged_account_name)?;
+            .resolve_alias_target(&snapshot.name, subject)
+            .await?;
 
         // Make a seed block
         let system_time = self.system_time_source.now();
@@ -80,7 +80,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
-                logged_account_id,
+                &target_account_id,
                 canonical_alias.as_ref(),
                 snapshot.kind,
             )
@@ -102,12 +102,30 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .await
         .int_err()?;
 
+        // TODO: HACK: SEC: When creating a dataaset under another account we currently
+        // give subject a "maintainer" role on it. In future this should be refactored
+        // into organization-level permissions.
+        //
+        // See: https://github.com/kamu-data/kamu-node/issues/233
+        if target_account_id != subject.account_id {
+            self.rebac_svc
+                .get()
+                .int_err()?
+                .set_account_dataset_relation(
+                    &subject.account_id,
+                    kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
+                    &store_result.dataset_id,
+                )
+                .await
+                .int_err()?;
+        }
+
         // Notify interested parties the dataset was created
         self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
                 canonical_alias.dataset_name(),
-                logged_account_id,
+                &target_account_id,
                 options.dataset_visibility,
             )
             .await?;
