@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Dependency graph is less sensitive to requests that come too early, before dataset node is created
+
 ## [0.236.0] - 2025-05-09
 ### Added
 - New REST endpoint `/system/info` and GQL endpoint `buildInfo` that return application version and build details

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{auth, DatasetRegistry, DependencyGraphService};
 use kamu_datasets::{
@@ -47,7 +47,6 @@ impl DeleteDatasetUseCaseImpl {
             .dependency_graph_service
             .get_downstream_dependencies(&dataset_handle.id)
             .await
-            .int_err()?
             .collect()
             .await;
 

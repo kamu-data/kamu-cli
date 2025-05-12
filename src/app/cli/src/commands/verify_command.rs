@@ -184,7 +184,6 @@ impl VerifyCommand {
                 .dependency_graph_service
                 .get_upstream_dependencies(&hdl.id)
                 .await
-                .unwrap()
                 .collect()
                 .await;
 
