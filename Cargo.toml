@@ -216,6 +216,9 @@ kamu-messaging-outbox-inmem = { version = "0.235.0", path = "src/infra/messaging
 kamu-messaging-outbox-postgres = { version = "0.235.0", path = "src/infra/messaging-outbox/postgres", default-features = false }
 kamu-messaging-outbox-sqlite = { version = "0.235.0", path = "src/infra/messaging-outbox/sqlite", default-features = false }
 kamu-messaging-outbox-repo-tests = { version = "0.235.0", path = "src/infra/messaging-outbox/repo-tests", default-features = false }
+## Web3
+kamu-auth-web3-inmem = { version = "0.235.0", path = "src/infra/auth-web3/inmem", default-features = false }
+kamu-auth-web3-repo-tests = { version = "0.235.0", path = "src/infra/auth-web3/repo-tests", default-features = false }
 
 # Adapters
 kamu-adapter-auth-oso-rebac = { version = "0.235.0", path = "src/adapter/auth-oso-rebac", default-features = false }

@@ -48,7 +48,7 @@ impl Web3AuthNonceRepository for InMemoryWeb3AuthNonceRepository {
 
         writable_state
             .nonce_by_wallet
-            .insert(entity.wallet_address.clone(), (*entity).clone());
+            .insert(entity.wallet_address, (*entity).clone());
 
         Ok(())
     }
@@ -62,9 +62,7 @@ impl Web3AuthNonceRepository for InMemoryWeb3AuthNonceRepository {
         if let Some(nonce_entity) = readable_state.nonce_by_wallet.get(wallet) {
             Ok(nonce_entity.clone())
         } else {
-            Err(GetNonceError::NotFound {
-                wallet: wallet.clone(),
-            })
+            Err(GetNonceError::NotFound { wallet: *wallet })
         }
     }
 

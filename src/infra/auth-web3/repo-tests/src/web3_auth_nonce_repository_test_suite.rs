@@ -22,14 +22,14 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
 
     {
         let nonce_entity = Web3AuthenticationNonceEntity {
-            wallet_address: EvmWalletAddress::random(),
+            wallet_address,
             nonce: Web3AuthenticationNonce::new(),
-            expired_at: expired_at.clone(),
+            expired_at,
         };
 
         pretty_assertions::assert_eq!(
             Err(GetNonceError::NotFound {
-                wallet: wallet_address.clone()
+                wallet: wallet_address
             }),
             harness
                 .web3_auth_nonce_repo
@@ -53,7 +53,7 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
     }
     {
         let updated_nonce_entity = Web3AuthenticationNonceEntity {
-            wallet_address: wallet_address.clone(),
+            wallet_address,
             nonce: Web3AuthenticationNonce::new(),
             expired_at: expired_at + Duration::minutes(15),
         };
@@ -83,51 +83,77 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
 
     let now = Utc::now();
 
-    let expired_nonce = Web3AuthenticationNonceEntity {
+    let nonce_1_expired = Web3AuthenticationNonceEntity {
         wallet_address: EvmWalletAddress::random(),
         nonce: Web3AuthenticationNonce::new(),
         expired_at: now - Duration::seconds(1),
     };
-    let valid_nonce = Web3AuthenticationNonceEntity {
+    let nonce_2 = Web3AuthenticationNonceEntity {
         wallet_address: EvmWalletAddress::random(),
         nonce: Web3AuthenticationNonce::new(),
         expired_at: now + Duration::minutes(15),
     };
 
-    pretty_assertions::assert_eq!(
-        Ok(()),
-        harness.web3_auth_nonce_repo.set_nonce(&expired_nonce).await,
-    );
-    pretty_assertions::assert_eq!(
-        Ok(()),
-        harness.web3_auth_nonce_repo.set_nonce(&valid_nonce).await,
-    );
+    {
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            harness
+                .web3_auth_nonce_repo
+                .set_nonce(&nonce_1_expired)
+                .await,
+        );
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            harness.web3_auth_nonce_repo.set_nonce(&nonce_2).await,
+        );
 
-    pretty_assertions::assert_eq!(
-        Ok(()),
-        harness
-            .web3_auth_nonce_repo
-            .cleanup_expired_nonces(now)
-            .await,
-    );
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            harness
+                .web3_auth_nonce_repo
+                .cleanup_expired_nonces(now)
+                .await,
+        );
 
-    pretty_assertions::assert_eq!(
-        Err(GetNonceError::NotFound {
-            wallet: expired_nonce.wallet_address.clone()
-        }),
-        harness
-            .web3_auth_nonce_repo
-            .get_nonce(&expired_nonce.wallet_address)
-            .await
-    );
-    pretty_assertions::assert_eq!(
-        Ok(&valid_nonce),
-        harness
-            .web3_auth_nonce_repo
-            .get_nonce(&valid_nonce.wallet_address)
-            .await
-            .as_ref()
-    );
+        pretty_assertions::assert_eq!(
+            Err(GetNonceError::NotFound {
+                wallet: nonce_1_expired.wallet_address
+            }),
+            harness
+                .web3_auth_nonce_repo
+                .get_nonce(&nonce_1_expired.wallet_address)
+                .await
+        );
+        pretty_assertions::assert_eq!(
+            Ok(&nonce_2),
+            harness
+                .web3_auth_nonce_repo
+                .get_nonce(&nonce_2.wallet_address)
+                .await
+                .as_ref()
+        );
+    }
+    {
+        let now_plus_20_minutes = now + Duration::minutes(20);
+
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            harness
+                .web3_auth_nonce_repo
+                .cleanup_expired_nonces(now_plus_20_minutes)
+                .await,
+        );
+
+        pretty_assertions::assert_eq!(
+            Err(GetNonceError::NotFound {
+                wallet: nonce_1_expired.wallet_address
+            }),
+            harness
+                .web3_auth_nonce_repo
+                .get_nonce(&nonce_1_expired.wallet_address)
+                .await
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
