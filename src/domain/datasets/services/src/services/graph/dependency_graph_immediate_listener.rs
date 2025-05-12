@@ -12,13 +12,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::{
-    DatasetRegistry,
-    DatasetRegistryExt,
-    DependencyGraphService,
-    GetDependenciesError,
-    ResolvedDataset,
-};
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, DependencyGraphService, ResolvedDataset};
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetDependencyRepository,
@@ -79,18 +73,13 @@ impl DependencyGraphImmediateListener {
         };
 
         // Extract current dependencies known by the graph
-        let existing_upstream_ids: HashSet<_> = match self
+        use futures::StreamExt;
+        let existing_upstream_ids: HashSet<_> = self
             .dependency_graph_service
             .get_upstream_dependencies(&message.dataset_id)
             .await
-        {
-            Ok(dependencies) => {
-                use futures::StreamExt;
-                dependencies.collect().await
-            }
-            Err(GetDependenciesError::DatasetNotFound(_)) => HashSet::new(),
-            Err(GetDependenciesError::Internal(e)) => return Err(e),
-        };
+            .collect()
+            .await;
 
         // No real changes => Nothing to do
         if new_upstream_ids == existing_upstream_ids {

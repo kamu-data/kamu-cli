@@ -763,7 +763,6 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             .dependency_graph_service
             .get_upstream_dependencies(dataset_id)
             .await
-            .int_err()?
             .collect::<Vec<_>>()
             .await;
 

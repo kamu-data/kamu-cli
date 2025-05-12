@@ -174,7 +174,6 @@ impl FlowSchedulingHelper {
             .dependency_graph_service
             .get_downstream_dependencies(&fk_dataset.dataset_id)
             .await
-            .int_err()?
             .collect()
             .await;
 
