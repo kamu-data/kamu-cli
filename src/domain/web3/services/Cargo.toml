@@ -26,11 +26,14 @@ default = []
 
 
 [dependencies]
-# todo remove?
+common-macros = { workspace = true }
+init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-web3 = { workspace = true }
+time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.13", default-features = false }
+tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]

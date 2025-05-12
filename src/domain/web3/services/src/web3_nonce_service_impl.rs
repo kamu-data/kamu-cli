@@ -9,22 +9,24 @@
 
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
-use kamu_web3::{
-    CreateNonceError,
-    EvmWalletAddress,
-    Web3AuthNonceRepository,
-    Web3AuthenticationNonce,
-    Web3AuthenticationNonceEntity,
-    Web3NonceService,
-};
+use init_on_startup::{InitOnStartup, InitOnStartupMeta};
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_web3::*;
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn Web3NonceService)]
+#[dill::interface(dyn InitOnStartup)]
+#[dill::meta(InitOnStartupMeta {
+    job_name: JOB_KAMU_WEB_3_NONCE_SERVICE,
+    depends_on: &[],
+    requires_transaction: true,
+})]
 pub struct Web3NonceServiceImpl {
     nonce_repo: Arc<dyn Web3AuthNonceRepository>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +46,18 @@ impl Web3NonceService for Web3NonceServiceImpl {
         self.nonce_repo.set_nonce(&entity).await.int_err()?;
 
         Ok(entity)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl InitOnStartup for Web3NonceServiceImpl {
+    #[tracing::instrument(level = "debug", skip_all, name = Web3NonceServiceImpl_run_initialization)]
+    async fn run_initialization(&self) -> Result<(), InternalError> {
+        let now = self.time_source.now();
+
+        self.nonce_repo.cleanup_expired_nonces(now).await.int_err()
     }
 }
 
