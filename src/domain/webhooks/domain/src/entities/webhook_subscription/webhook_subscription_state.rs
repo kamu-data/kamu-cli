@@ -35,6 +35,10 @@ impl WebhookSubscriptionState {
         self.status
     }
 
+    pub fn target_url(&self) -> &url::Url {
+        &self.target_url
+    }
+
     pub fn label(&self) -> &WebhookSubscriptionLabel {
         &self.label
     }
@@ -153,7 +157,7 @@ impl Projection for WebhookSubscriptionState {
                         }
                     }
 
-                    E::Updated(WebhookSubscriptionEventUpdated {
+                    E::Modified(WebhookSubscriptionEventModified {
                         new_target_url,
                         new_label,
                         new_event_types,

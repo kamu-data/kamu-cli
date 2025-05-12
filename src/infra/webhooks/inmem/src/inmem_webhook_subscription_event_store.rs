@@ -62,36 +62,7 @@ impl InMemoryWebhookSubscriptionEventStore {
         match event {
             WebhookSubscriptionEvent::Created(e) => {
                 if let Some(dataset_id) = &e.dataset_id {
-                    if state
-                        .webhook_subscriptions_by_dataset
-                        .get(dataset_id)
-                        .map(|ids| {
-                            ids.iter().any(|id| {
-                                state
-                                    .webhook_subscription_data
-                                    .get(id)
-                                    .map(|subscription| subscription.label() == &e.label)
-                                    .unwrap_or(false)
-                            })
-                        })
-                        .unwrap_or(false)
-                    {
-                        #[derive(Error, Debug)]
-                        #[error(
-                            "Webhook subscription label `{label}` is not unique for dataset \
-                             `{dataset_id}`"
-                        )]
-                        struct NonUniqueLabelError {
-                            label: WebhookSubscriptionLabel,
-                            dataset_id: odf::DatasetID,
-                        }
-
-                        return Err(NonUniqueLabelError {
-                            label: e.label.clone(),
-                            dataset_id: dataset_id.clone(),
-                        }
-                        .int_err());
-                    }
+                    Self::check_unique_label_within_dataset(state, dataset_id, &e.label)?;
 
                     state
                         .webhook_subscriptions_by_dataset
@@ -114,34 +85,77 @@ impl InMemoryWebhookSubscriptionEventStore {
                     .insert(e.subscription_id, subscription);
             }
 
-            // TODO: non-unique labels in edit event
-            _ => {
-                if let Some(subscription) = state
-                    .webhook_subscription_data
-                    .get_mut(event.subscription_id())
+            WebhookSubscriptionEvent::Modified(e) => {
+                if let Some(subscription) =
+                    state.webhook_subscription_data.get(event.subscription_id())
                 {
-                    subscription.apply(event.clone()).unwrap();
-
-                    if subscription.status() == WebhookSubscriptionStatus::Removed {
-                        if let Some(dataset_id) = subscription.dataset_id() {
-                            if let Some(ids) =
-                                state.webhook_subscriptions_by_dataset.get_mut(dataset_id)
-                            {
-                                ids.retain(|id| id != event.subscription_id());
-                            }
-                        }
+                    if let Some(dataset_id) = subscription.dataset_id() {
+                        Self::check_unique_label_within_dataset(state, dataset_id, &e.new_label)?;
                     }
-                } else {
-                    panic!(
-                        "WebhookSubscriptionEvent {} for unknown subscription {}",
-                        event.typename(),
-                        event.subscription_id()
-                    );
                 }
+                Self::update_subscription_state(state, event);
+            }
+
+            _ => Self::update_subscription_state(state, event),
+        }
+
+        Ok(())
+    }
+
+    fn check_unique_label_within_dataset(
+        state: &State,
+        dataset_id: &odf::DatasetID,
+        label: &WebhookSubscriptionLabel,
+    ) -> Result<(), InternalError> {
+        if let Some(ids) = state.webhook_subscriptions_by_dataset.get(dataset_id) {
+            if ids.iter().any(|id| {
+                state
+                    .webhook_subscription_data
+                    .get(id)
+                    .map(|subscription| subscription.label() == label)
+                    .unwrap_or(false)
+            }) {
+                #[derive(Error, Debug)]
+                #[error(
+                    "Webhook subscription label `{label}` is not unique for dataset `{dataset_id}`"
+                )]
+                struct NonUniqueLabelError {
+                    label: WebhookSubscriptionLabel,
+                    dataset_id: odf::DatasetID,
+                }
+
+                return Err(NonUniqueLabelError {
+                    label: label.clone(),
+                    dataset_id: dataset_id.clone(),
+                }
+                .int_err());
             }
         }
 
         Ok(())
+    }
+
+    fn update_subscription_state(state: &mut State, event: &WebhookSubscriptionEvent) {
+        if let Some(subscription) = state
+            .webhook_subscription_data
+            .get_mut(event.subscription_id())
+        {
+            subscription.apply(event.clone()).unwrap();
+
+            if subscription.status() == WebhookSubscriptionStatus::Removed {
+                if let Some(dataset_id) = subscription.dataset_id() {
+                    if let Some(ids) = state.webhook_subscriptions_by_dataset.get_mut(dataset_id) {
+                        ids.retain(|id| id != event.subscription_id());
+                    }
+                }
+            }
+        } else {
+            panic!(
+                "WebhookSubscriptionEvent {} for unknown subscription {}",
+                event.typename(),
+                event.subscription_id()
+            );
+        }
     }
 }
 

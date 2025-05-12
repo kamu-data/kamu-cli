@@ -143,7 +143,7 @@ impl SqliteWebhookSubscriptionEventStore {
         let mut updated_label = None;
         let mut updated_event_types = None;
         for event in events {
-            if let WebhookSubscriptionEvent::Updated(e) = event {
+            if let WebhookSubscriptionEvent::Modified(e) = event {
                 updated_label = Some(e.new_label.clone());
                 updated_event_types = Some(e.new_event_types.clone());
             }
@@ -425,7 +425,7 @@ impl WebhookSubscriptionEventStore for SqliteWebhookSubscriptionEventStore {
         let result = sqlx::query!(
             r#"
             SELECT COUNT(id) AS subscriptions_count FROM webhook_subscriptions
-                WHERE dataset_id = $1
+                WHERE dataset_id = $1 AND status != 'REMOVED'
             "#,
             dataset_id,
         )
@@ -449,7 +449,7 @@ impl WebhookSubscriptionEventStore for SqliteWebhookSubscriptionEventStore {
         let records = sqlx::query!(
             r#"
             SELECT id as "id: uuid::Uuid" FROM webhook_subscriptions
-                WHERE dataset_id = $1
+                WHERE dataset_id = $1 AND status != 'REMOVED'
             "#,
             dataset_id,
         )
@@ -477,7 +477,7 @@ impl WebhookSubscriptionEventStore for SqliteWebhookSubscriptionEventStore {
         let record = sqlx::query!(
             r#"
             SELECT id as "id: uuid::Uuid" FROM webhook_subscriptions
-                WHERE dataset_id = $1 AND label = $2
+                WHERE dataset_id = $1 AND label = $2 AND status != 'REMOVED'
             "#,
             dataset_id,
             label,

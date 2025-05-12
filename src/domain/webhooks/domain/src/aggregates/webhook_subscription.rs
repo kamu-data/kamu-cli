@@ -90,7 +90,7 @@ impl WebhookSubscription {
         label: WebhookSubscriptionLabel,
         event_types: Vec<WebhookEventType>,
     ) {
-        self.apply(WebhookSubscriptionEventUpdated {
+        self.apply(WebhookSubscriptionEventModified {
             event_time: chrono::Utc::now(),
             subscription_id: self.id(),
             new_target_url: target_url,

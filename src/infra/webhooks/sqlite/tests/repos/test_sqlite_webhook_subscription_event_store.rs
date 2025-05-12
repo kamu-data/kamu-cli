@@ -41,7 +41,39 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_modifying_subscription,
+    harness = SqliteWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_non_unique_labels,
+    harness = SqliteWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_non_unique_labels_on_modify,
+    harness = SqliteWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_same_dataset_different_event_types,
+    harness = SqliteWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_removed_subscription_filters_out,
     harness = SqliteWebhookSubscriptionEventStoreHarness
 );
 

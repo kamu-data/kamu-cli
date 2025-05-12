@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT id FROM webhook_subscriptions\n                WHERE dataset_id = $1 AND label = $2\n            ",
+  "query": "\n            SELECT id FROM webhook_subscriptions\n                WHERE dataset_id = $1 AND label = $2 AND status != 'REMOVED'::webhook_subscription_status\n            ",
   "describe": {
     "columns": [
       {
@@ -19,5 +19,5 @@
       false
     ]
   },
-  "hash": "01454733290ad9641a299d86ed66b93598e04a969c774c2f0644f4ea60d76f90"
+  "hash": "92c949459fa5a21c95834ce564a618792e018e0ba9fae35453c698a3e3b1b2ff"
 }

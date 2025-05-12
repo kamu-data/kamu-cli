@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT COUNT(id) AS subscriptions_count FROM webhook_subscriptions\n                WHERE dataset_id = $1\n            ",
+  "query": "\n            SELECT COUNT(id) AS subscriptions_count FROM webhook_subscriptions\n                WHERE dataset_id = $1 AND status != 'REMOVED'\n            ",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "bf248ff570033e0067f40e0f04f82b04c5c726362d99e8b67ba5d633b7efb027"
+  "hash": "79625d959aee1ed6c4634b80e28f0650b45b3b8cdaec76d5380ac35bf8aa7f5b"
 }

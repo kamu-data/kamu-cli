@@ -221,6 +221,18 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
     assert_matches!(events_2[2], WebhookSubscriptionEvent::Paused(_));
 
     let res = event_store
+        .get_events_multi(vec![subscription_id_1, subscription_id_2])
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!(res.len(), 5);
+    assert_matches!(res[0], (id, _, WebhookSubscriptionEvent::Created(_)) if id == subscription_id_1);
+    assert_matches!(res[1], (id, _, WebhookSubscriptionEvent::Enabled(_)) if id == subscription_id_1);
+    assert_matches!(res[2], (id, _, WebhookSubscriptionEvent::Created(_)) if id == subscription_id_2);
+    assert_matches!(res[3], (id, _, WebhookSubscriptionEvent::Enabled(_)) if id == subscription_id_2);
+    assert_matches!(res[4], (id, _, WebhookSubscriptionEvent::Paused(_)) if id == subscription_id_2);
+
+    let res = event_store
         .count_subscriptions_by_dataset(&dataset_id)
         .await;
     assert_matches!(res, Ok(count) if count == 2);
@@ -273,6 +285,46 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_modifying_subscription(catalog: &dill::Catalog) {
+    let event_store = catalog
+        .get_one::<dyn WebhookSubscriptionEventStore>()
+        .unwrap();
+
+    let subscription_id = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
+
+    let mut subscription = WebhookSubscription::new(
+        subscription_id,
+        Url::parse("https://example.com").unwrap(),
+        WebhookSubscriptionLabel::new("test-label"),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        WebhookSubscriptionSecret::try_new("secret").unwrap(),
+    );
+    subscription.save(event_store.as_ref()).await.unwrap();
+
+    subscription.modify(
+        Url::parse("https://example.com/modified").unwrap(),
+        WebhookSubscriptionLabel::new("modified-label"),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+    );
+    subscription.save(event_store.as_ref()).await.unwrap();
+
+    let res = event_store
+        .get_events(&subscription_id, GetEventsOpts::default())
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(__, e)| e)
+        .collect::<Vec<_>>();
+    assert_eq!(res.len(), 2);
+    assert_matches!(res[0], WebhookSubscriptionEvent::Created(_));
+    assert_matches!(res[1], WebhookSubscriptionEvent::Modified(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
     let event_store = catalog
         .get_one::<dyn WebhookSubscriptionEventStore>()
@@ -319,10 +371,193 @@ pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO
-// - encrypt secret!
+pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
+    let event_store = catalog
+        .get_one::<dyn WebhookSubscriptionEventStore>()
+        .unwrap();
 
-// - test multiple event types filtered properly for same dataset
-// - test non-unique labels in edit event
-// - test get_events_multi
-// - test removed subscriptions are filtered out
+    let subscription_id_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_2_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_2_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+
+    let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"dummy-1");
+    let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"dummy-2");
+
+    let mut subscription_1 = WebhookSubscription::new(
+        subscription_id_1,
+        Url::parse("https://example.com/1").unwrap(),
+        WebhookSubscriptionLabel::new("test-label"),
+        Some(dataset_id_1.clone()),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
+    );
+    subscription_1.save(event_store.as_ref()).await.unwrap();
+
+    let mut subscription_2_1 = WebhookSubscription::new(
+        subscription_id_2_1,
+        Url::parse("https://example.com/2/1").unwrap(),
+        WebhookSubscriptionLabel::new("test-label"), // same label, but different dataset
+        Some(dataset_id_2.clone()),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
+    );
+    subscription_2_1.save(event_store.as_ref()).await.unwrap();
+
+    let mut subscription_2_2 = WebhookSubscription::new(
+        subscription_id_2_2,
+        Url::parse("https://example.com/2/2").unwrap(),
+        WebhookSubscriptionLabel::new("test-label-2"),
+        Some(dataset_id_2.clone()),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
+    );
+    subscription_2_2.save(event_store.as_ref()).await.unwrap();
+
+    subscription_2_2.modify(
+        subscription_2_2.target_url().clone(),
+        WebhookSubscriptionLabel::new("test-label"), // same label in the same dataset
+        subscription_2_2.event_types().to_vec(),
+    );
+    let res = subscription_2_2.save(event_store.as_ref()).await;
+    assert_matches!(res, Err(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
+    let event_store = catalog
+        .get_one::<dyn WebhookSubscriptionEventStore>()
+        .unwrap();
+
+    let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"dummy-1");
+    let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"dummy-2");
+
+    let subscription_id_1_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_1_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_2_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_2_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+
+    let mut subscription_1_1 = WebhookSubscription::new(
+        subscription_id_1_1,
+        Url::parse("https://example.com/1/1").unwrap(),
+        WebhookSubscriptionLabel::new("test-label-1"),
+        Some(dataset_id_1.clone()),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        WebhookSubscriptionSecret::try_new("secret_1_1").unwrap(),
+    );
+    subscription_1_1.save(event_store.as_ref()).await.unwrap();
+
+    let mut subscription_1_2 = WebhookSubscription::new(
+        subscription_id_1_2,
+        Url::parse("https://example.com/1/2").unwrap(),
+        WebhookSubscriptionLabel::new("test-label-2"),
+        Some(dataset_id_1.clone()),
+        vec![WebhookEventTypeCatalog::test()],
+        WebhookSubscriptionSecret::try_new("secret_1_2").unwrap(),
+    );
+    subscription_1_2.save(event_store.as_ref()).await.unwrap();
+
+    let mut subscription_2_1 = WebhookSubscription::new(
+        subscription_id_2_1,
+        Url::parse("https://example.com/2/1").unwrap(),
+        WebhookSubscriptionLabel::new("test-label-1"),
+        Some(dataset_id_2.clone()),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
+    );
+    subscription_2_1.save(event_store.as_ref()).await.unwrap();
+
+    let mut subscription_2_2 = WebhookSubscription::new(
+        subscription_id_2_2,
+        Url::parse("https://example.com/2/2").unwrap(),
+        WebhookSubscriptionLabel::new("test-label-2"),
+        Some(dataset_id_2.clone()),
+        vec![WebhookEventTypeCatalog::test()],
+        WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
+    );
+    subscription_2_2.save(event_store.as_ref()).await.unwrap();
+
+    let res = event_store
+        .list_subscription_ids_by_dataset_and_event_type(
+            &dataset_id_1,
+            WebhookEventTypeCatalog::dataset_head_updated(),
+        )
+        .await;
+    assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_1_1);
+
+    let res = event_store
+        .list_subscription_ids_by_dataset_and_event_type(
+            &dataset_id_1,
+            WebhookEventTypeCatalog::test(),
+        )
+        .await;
+    assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_1_2);
+
+    let res = event_store
+        .list_subscription_ids_by_dataset_and_event_type(
+            &dataset_id_2,
+            WebhookEventTypeCatalog::dataset_head_updated(),
+        )
+        .await;
+    assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_2_1);
+
+    let res = event_store
+        .list_subscription_ids_by_dataset_and_event_type(
+            &dataset_id_2,
+            WebhookEventTypeCatalog::test(),
+        )
+        .await;
+    assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_2_2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_removed_subscription_filters_out(catalog: &dill::Catalog) {
+    let event_store = catalog
+        .get_one::<dyn WebhookSubscriptionEventStore>()
+        .unwrap();
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
+    let subscription_id = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+
+    let mut subscription = WebhookSubscription::new(
+        subscription_id,
+        Url::parse("https://example.com").unwrap(),
+        WebhookSubscriptionLabel::new("test-label"),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        WebhookSubscriptionSecret::try_new("secret").unwrap(),
+    );
+    subscription.save(event_store.as_ref()).await.unwrap();
+
+    subscription.remove();
+    subscription.save(event_store.as_ref()).await.unwrap();
+
+    let res = event_store
+        .count_subscriptions_by_dataset(&dataset_id)
+        .await;
+    assert_matches!(res, Ok(count) if count == 0);
+
+    let res = event_store
+        .list_subscription_ids_by_dataset(&dataset_id)
+        .await;
+    assert_matches!(res, Ok(ids) if ids.is_empty());
+
+    let res = event_store
+        .find_subscription_id_by_dataset_and_label(
+            &dataset_id,
+            &WebhookSubscriptionLabel::new("test-label"),
+        )
+        .await;
+    assert_matches!(res, Ok(id) if id.is_none());
+
+    let res = event_store
+        .list_subscription_ids_by_dataset_and_event_type(
+            &dataset_id,
+            WebhookEventTypeCatalog::dataset_head_updated(),
+        )
+        .await;
+    assert_matches!(res, Ok(ids) if ids.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

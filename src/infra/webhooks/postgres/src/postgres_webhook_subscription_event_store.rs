@@ -137,7 +137,7 @@ impl PostgresWebhookSubscriptionEventStore {
         let mut updated_label = None;
         let mut updated_event_types = None;
         for event in events {
-            if let WebhookSubscriptionEvent::Updated(e) = event {
+            if let WebhookSubscriptionEvent::Modified(e) = event {
                 updated_label = Some(e.new_label.clone());
                 updated_event_types = Some(e.new_event_types.clone());
             }
@@ -385,7 +385,9 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         let result = sqlx::query!(
             r#"
             SELECT COUNT(id) AS subscriptions_count FROM webhook_subscriptions
-                WHERE dataset_id = $1
+                WHERE
+                    dataset_id = $1
+                    AND status != 'REMOVED'::webhook_subscription_status
             "#,
             dataset_id,
         )
@@ -409,7 +411,9 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         let records = sqlx::query!(
             r#"
             SELECT id FROM webhook_subscriptions
-                WHERE dataset_id = $1
+                WHERE
+                    dataset_id = $1
+                    AND status != 'REMOVED'::webhook_subscription_status
             "#,
             dataset_id,
         )
@@ -437,7 +441,7 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         let record = sqlx::query!(
             r#"
             SELECT id FROM webhook_subscriptions
-                WHERE dataset_id = $1 AND label = $2
+                WHERE dataset_id = $1 AND label = $2 AND status != 'REMOVED'::webhook_subscription_status
             "#,
             dataset_id,
             label,
@@ -463,7 +467,8 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         let records = sqlx::query!(
             r#"
             SELECT id FROM webhook_subscriptions
-                WHERE dataset_id = $1 AND event_types::text[] @> $2::text[] and status != 'REMOVED'::webhook_subscription_status
+                WHERE dataset_id = $1 AND event_types::text[] @> $2::text[] and
+                    status != 'REMOVED'::webhook_subscription_status
             "#,
             dataset_id,
             &vec![event_type],
