@@ -1,6 +1,6 @@
 [package]
-name = "kamu-web3"
-description = "Domain model of the Web3 subsystem"
+name = "kamu-auth-web3"
+description = "Domain model of the Web3 authentication"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

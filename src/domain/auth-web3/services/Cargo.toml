@@ -1,6 +1,6 @@
 [package]
-name = "kamu-web3-services"
-description = "Service layer of the Web3 subsystem"
+name = "kamu-auth-web3-services"
+description = "Service layer of the Web3 authentication"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -29,7 +29,7 @@ default = []
 common-macros = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-kamu-web3 = { workspace = true }
+kamu-auth-web3 = { workspace = true }
 time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

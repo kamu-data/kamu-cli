@@ -6227,6 +6227,7 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
+ "kamu-auth-web3",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -6238,7 +6239,6 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
- "kamu-web3",
  "messaging-outbox",
  "observability",
  "oop",
@@ -6487,6 +6487,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-web3"
+version = "0.235.0"
+dependencies = [
+ "alloy-primitives 1.1.0",
+ "async-trait",
+ "chrono",
+ "internal-error",
+ "nutype",
+ "siwe",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "kamu-auth-web3-services"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "common-macros",
+ "dill",
+ "init-on-startup",
+ "internal-error",
+ "kamu-auth-web3",
+ "time-source",
+ "tracing",
+]
+
+[[package]]
 name = "kamu-cli"
 version = "0.235.0"
 dependencies = [
@@ -6541,6 +6568,7 @@ dependencies = [
  "kamu-auth-rebac-postgres",
  "kamu-auth-rebac-services",
  "kamu-auth-rebac-sqlite",
+ "kamu-auth-web3-services",
  "kamu-cli-puppet",
  "kamu-datafusion-cli",
  "kamu-datasets",
@@ -6563,7 +6591,6 @@ dependencies = [
  "kamu-task-system-postgres",
  "kamu-task-system-services",
  "kamu-task-system-sqlite",
- "kamu-web3-services",
  "lazy_static",
  "libc",
  "merge",
@@ -7391,33 +7418,6 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
-]
-
-[[package]]
-name = "kamu-web3"
-version = "0.235.0"
-dependencies = [
- "alloy-primitives 1.1.0",
- "async-trait",
- "chrono",
- "internal-error",
- "nutype",
- "siwe",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "kamu-web3-services"
-version = "0.235.0"
-dependencies = [
- "async-trait",
- "common-macros",
- "dill",
- "init-on-startup",
- "internal-error",
- "kamu-web3",
- "time-source",
- "tracing",
 ]
 
 [[package]]

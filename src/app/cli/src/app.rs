@@ -530,7 +530,7 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxAgentMetrics>();
 
     kamu_adapter_auth_web3::register_dependencies(&mut b);
-    kamu_web3_services::register_dependencies(&mut b);
+    kamu_auth_web3_services::register_dependencies(&mut b);
 
     explore::register_dependencies(&mut b);
 

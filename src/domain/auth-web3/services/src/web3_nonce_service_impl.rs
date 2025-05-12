@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_web3::*;
+use kamu_auth_web3::*;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

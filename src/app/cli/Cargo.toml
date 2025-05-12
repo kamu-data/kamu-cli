@@ -106,7 +106,7 @@ kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
 kamu-search-qdrant = { workspace = true }
 
-kamu-web3-services = { workspace = true }
+kamu-auth-web3-services = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
