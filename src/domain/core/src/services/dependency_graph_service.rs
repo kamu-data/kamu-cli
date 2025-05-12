@@ -19,13 +19,13 @@ pub trait DependencyGraphService: Sync + Send {
     async fn get_downstream_dependencies(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DependencyDatasetIDStream, GetDependenciesError>;
+    ) -> DependencyDatasetIDStream;
 
     /// Iterates over 1st level of dataset's upstream dependencies
     async fn get_upstream_dependencies(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DependencyDatasetIDStream, GetDependenciesError>;
+    ) -> DependencyDatasetIDStream;
 
     /// Iterates over all levels of dataset's upstream dependencies
     /// and return reversed result including passed parameters

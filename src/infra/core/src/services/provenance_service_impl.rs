@@ -62,7 +62,6 @@ impl ProvenanceServiceImpl {
             .dependency_graph_service
             .get_upstream_dependencies(target.get_id())
             .await
-            .int_err()?
             .collect::<Vec<_>>()
             .await;
 
