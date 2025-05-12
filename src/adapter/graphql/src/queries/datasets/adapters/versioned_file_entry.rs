@@ -111,8 +111,8 @@ impl VersionedFileEntry {
         let content_length = usize::try_from(
             record
                 .remove("content_length")
-                .unwrap()
-                .as_i64()
+                .unwrap_or_default()
+                .as_u64()
                 .unwrap_or_default(),
         )
         .unwrap();
