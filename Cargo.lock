@@ -7450,7 +7450,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-webhooks-repo-tests"
-version = "0.235.0"
+version = "0.236.0"
 dependencies = [
  "chrono",
  "database-common",
