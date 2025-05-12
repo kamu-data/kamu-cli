@@ -13,7 +13,7 @@ use crate::{EvmWalletAddress, Web3AuthenticationNonce};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Web3AuthenticationNonceEntity {
     pub wallet_address: EvmWalletAddress,
     pub nonce: Web3AuthenticationNonce,

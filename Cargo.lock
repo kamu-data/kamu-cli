@@ -6500,6 +6500,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-web3-inmem"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dill",
+ "kamu-auth-web3",
+ "tokio",
+]
+
+[[package]]
 name = "kamu-auth-web3-services"
 version = "0.235.0"
 dependencies = [

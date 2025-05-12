@@ -1,0 +1,33 @@
+[package]
+name = "kamu-auth-web3-inmem"
+description = "In-memory implementation of the Web3 authentication domain"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+kamu-auth-web3 = { workspace = true }
+
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.13", default-features = false }
+tokio = { version = "1", default-features = false, features = ["sync"] }
+
+
+[dev-dependencies]

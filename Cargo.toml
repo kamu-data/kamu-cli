@@ -90,6 +90,8 @@ members = [
     "src/infra/messaging-outbox/inmem",
     "src/infra/messaging-outbox/postgres",
     "src/infra/messaging-outbox/sqlite",
+    ## Web3
+    "src/infra/auth-web3/inmem",
     # Adapters
     "src/adapter/auth-oso-rebac",
     "src/adapter/auth-web3",

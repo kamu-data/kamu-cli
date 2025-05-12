@@ -22,7 +22,7 @@ pub trait Web3AuthNonceRepository: Send + Sync {
     async fn get_nonce(
         &self,
         wallet: &EvmWalletAddress,
-    ) -> Result<Web3AuthenticationNonceEntity, SetNonceError>;
+    ) -> Result<Web3AuthenticationNonceEntity, GetNonceError>;
 
     async fn cleanup_expired_nonces(
         &self,

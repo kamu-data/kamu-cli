@@ -11,7 +11,7 @@ use nutype::nutype;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(sanitize(trim), validate(len_char_min = 8), derive(Debug))]
+#[nutype(sanitize(trim), validate(len_char_min = 8), derive(Debug, Clone))]
 pub struct Web3AuthenticationNonce(String);
 
 impl Web3AuthenticationNonce {
