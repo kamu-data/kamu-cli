@@ -43,22 +43,36 @@ pub async fn dataset_tail_handler(
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
-    let df = query_svc
-        .tail(&dataset_ref, params.skip, params.limit)
+    // TODO: Support `asOfBlockHash` parameter
+    let res = query_svc
+        .tail(
+            &dataset_ref,
+            params.skip,
+            params.limit,
+            GetDataOptions::default(),
+        )
         .await
         .map_err(|e| match e {
             QueryError::DatasetNotFound(e) => ApiError::not_found(e),
             QueryError::DatasetBlockNotFound(_) | QueryError::BadQuery(_) => e.int_err().api_err(),
-            QueryError::DatasetSchemaNotAvailable(e) => ApiError::no_content(e),
             QueryError::Access(_) => ApiError::not_found_without_reason(),
             QueryError::Internal(e) => e.api_err(),
         })?;
 
-    let schema = params
-        .schema_format
-        .map(|fmt| Schema::new(df.schema().inner().clone(), fmt));
+    let schema = params.schema_format.map(|fmt| {
+        Schema::new(
+            match &res.df {
+                None => datafusion::arrow::datatypes::Schema::empty().into(),
+                Some(df) => df.schema().inner().clone(),
+            },
+            fmt,
+        )
+    });
 
-    let record_batches = df.collect().await.int_err().api_err()?;
+    let record_batches = match res.df {
+        None => Vec::new(),
+        Some(df) => df.collect().await.int_err().api_err()?,
+    };
     let json = super::query_types::serialize_data(&record_batches, params.data_format).api_err()?;
     let data = serde_json::value::RawValue::from_string(json).unwrap();
 

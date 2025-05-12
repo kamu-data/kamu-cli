@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub mod changelog;
 pub mod dataframe_ext;
 pub mod format;
 pub mod hash;

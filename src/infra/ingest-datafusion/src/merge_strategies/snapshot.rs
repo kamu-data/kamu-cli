@@ -86,37 +86,7 @@ impl MergeStrategySnapshot {
     /// +--------+----+------+------------+--------+
     /// ```
     pub fn project(&self, ledger: DataFrameExt) -> Result<DataFrameExt, InternalError> {
-        // TODO: PERF: Re-assess implementation as it may be sub-optimal
-        let rank_col = "__rank";
-
-        let state = ledger
-            .window(vec![datafusion::functions_window::row_number::row_number()
-                .partition_by(
-                    self.primary_key
-                        .iter()
-                        .map(|name| col(Column::from_name(name)))
-                        .collect(),
-                )
-                .order_by(vec![
-                    col(Column::from_name(&self.vocab.offset_column)).sort(false, false)
-                ])
-                .build()
-                .int_err()?
-                .alias(rank_col)])
-            .int_err()?
-            .filter(
-                col(Column::from_name(rank_col)).eq(lit(1)).and(
-                    // TODO: Cast to `u8` after Spark is updated
-                    // See: https://github.com/kamu-data/kamu-cli/issues/445
-                    col(Column::from_name(&self.vocab.operation_type_column))
-                        .not_eq(lit(Op::Retract as i32)),
-                ),
-            )
-            .int_err()?
-            .without_columns(&[rank_col])
-            .int_err()?;
-
-        Ok(state)
+        odf::utils::data::changelog::project(ledger, &self.primary_key, &self.vocab).int_err()
     }
 
     /// Returns a filter like:

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use database_common::NoOpDatabasePlugin;
 use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::ServerUrlConfig;
+use kamu::domain::{FileUploadLimitConfig, ServerUrlConfig, TenancyConfig, UploadContext};
 use kamu_accounts::{
     JwtAuthenticationConfig,
     JwtTokenIssuer,
@@ -33,14 +33,13 @@ use kamu_accounts_services::{
     OAuthDeviceCodeServiceImpl,
     PredefinedAccountsRegistrator,
 };
-use kamu_adapter_http::platform::{FileUploadLimitConfig, UploadContext, UploadServiceS3};
+use kamu_adapter_http::platform::UploadServiceS3;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_core::TenancyConfig;
 use messaging_outbox::DummyOutboxImpl;
 use s3_utils::S3Context;
 use serde_json::json;

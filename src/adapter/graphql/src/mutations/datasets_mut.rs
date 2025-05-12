@@ -22,6 +22,45 @@ pub struct DatasetsMut;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl DatasetsMut {
+    fn parse_metadata_events(
+        &self,
+        events: Vec<String>,
+        events_format: Option<MetadataManifestFormat>,
+    ) -> Result<Vec<odf::metadata::MetadataEvent>, Result<CreateDatasetFromSnapshotResult, GqlError>>
+    {
+        let mut res = Vec::new();
+        match events_format.unwrap_or(MetadataManifestFormat::Yaml) {
+            MetadataManifestFormat::Yaml => {
+                let de = odf::metadata::serde::yaml::YamlMetadataEventDeserializer;
+                for event in events {
+                    match de.read_manifest(event.as_bytes()) {
+                        Ok(event) => res.push(event),
+                        Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
+                            return Err(Ok(CreateDatasetFromSnapshotResult::Malformed(
+                                MetadataManifestMalformed {
+                                    message: e.to_string(),
+                                },
+                            )))
+                        }
+                        Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
+                            return Err(Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(
+                                e.into(),
+                            )))
+                        }
+                        Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
+                            return Err(Err(e.int_err().into()))
+                        }
+                    }
+                }
+            }
+        };
+        Ok(res)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl DatasetsMut {
@@ -185,6 +224,141 @@ impl DatasetsMut {
         };
 
         Ok(result)
+    }
+
+    /// Creates new versioned file dataset.
+    /// Can include schema for extra columns and dataset metadata events (e.g.
+    /// adding description and readme).
+    #[tracing::instrument(level = "info", name = DatasetsMut_create_versioned_file, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn create_versioned_file(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Dataset alias (may include target account)")] dataset_alias: DatasetAlias<
+            '_,
+        >,
+        #[graphql(desc = "Additional user-defined columns")] extra_columns: Option<
+            Vec<ColumnInput>,
+        >,
+        #[graphql(desc = "Extra metadata events (e.g. to populate readme)")] extra_events: Option<
+            Vec<String>,
+        >,
+        #[graphql(desc = "How extra events are represented")] extra_events_format: Option<
+            MetadataManifestFormat,
+        >,
+        #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
+    ) -> Result<CreateDatasetFromSnapshotResult> {
+        let push_source = odf::metadata::AddPushSource {
+            source_name: "default".into(),
+            read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
+                schema: Some(
+                    [
+                        "version INT".to_string(),
+                        "content_hash STRING".to_string(),
+                        "content_type STRING".to_string(),
+                    ]
+                    .into_iter()
+                    .chain(
+                        extra_columns
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
+                    )
+                    .collect(),
+                ),
+                ..Default::default()
+            }),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
+        };
+
+        let extra_events_parsed = match self
+            .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
+        {
+            Ok(res) => res,
+            Err(Ok(err)) => return Ok(err),
+            Err(Err(err)) => return Err(err),
+        };
+
+        let snapshot = odf::DatasetSnapshot {
+            name: dataset_alias.into(),
+            kind: odf::DatasetKind::Root,
+            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
+                .into_iter()
+                .chain(extra_events_parsed.into_iter())
+                .collect(),
+        };
+
+        self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
+            .await
+    }
+
+    /// Creates a new collection dataset.
+    /// Can include schema for extra columns, dataset metadata, and initial
+    /// collection entries.
+    #[tracing::instrument(level = "info", name = DatasetsMut_create_collection, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn create_collection(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Dataset alias (may include target account)")] dataset_alias: DatasetAlias<
+            '_,
+        >,
+        #[graphql(desc = "Additional user-defined columns")] extra_columns: Option<
+            Vec<ColumnInput>,
+        >,
+        #[graphql(desc = "Extra metadata events (e.g. to populate readme)")] extra_events: Option<
+            Vec<String>,
+        >,
+        #[graphql(desc = "How extra events are represented")] extra_events_format: Option<
+            MetadataManifestFormat,
+        >,
+        #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
+    ) -> Result<CreateDatasetFromSnapshotResult> {
+        let push_source = odf::metadata::AddPushSource {
+            source_name: "default".into(),
+            read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
+                schema: Some(
+                    ["op INT", "path STRING", "ref STRING"]
+                        .into_iter()
+                        .map(str::to_string)
+                        .chain(
+                            extra_columns
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
+                        )
+                        .collect(),
+                ),
+                ..Default::default()
+            }),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::ChangelogStream(
+                odf::metadata::MergeStrategyChangelogStream {
+                    primary_key: vec!["path".to_string()],
+                },
+            ),
+        };
+
+        let extra_events_parsed = match self
+            .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
+        {
+            Ok(res) => res,
+            Err(Ok(err)) => return Ok(err),
+            Err(Err(err)) => return Err(err),
+        };
+
+        let snapshot = odf::DatasetSnapshot {
+            name: dataset_alias.into(),
+            kind: odf::DatasetKind::Root,
+            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
+                .into_iter()
+                .chain(extra_events_parsed.into_iter())
+                .collect(),
+        };
+
+        self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
+            .await
     }
 }
 

@@ -15,10 +15,9 @@ use console::style as s;
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
-use kamu::domain::TenancyConfig;
+use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordLoginCredentials;
-use kamu_adapter_http::platform::FileUploadLimitConfig;
 use kamu_adapter_oauth::*;
 use kamu_datasets::DatasetEnvVarsConfig;
 use tracing::Instrument;
@@ -155,13 +154,17 @@ impl Command for APIServerRunCommand {
                 s(format!("http://{}", api_server.local_addr())).bold(),
             );
             eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+        }
 
-            if self.get_token {
+        if self.get_token {
+            if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
                 eprintln!(
                     "{} {}",
-                    s("JWT token:").green().bold(),
+                    s("Access token:").green().bold(),
                     s(access_token).dim()
                 );
+            } else {
+                tracing::warn!("Access token: {access_token}");
             }
         }
 

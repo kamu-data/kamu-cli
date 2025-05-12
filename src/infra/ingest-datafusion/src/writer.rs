@@ -51,7 +51,7 @@ impl DataWriterDataFusion {
         source_name: Option<&str>,
     ) -> Result<Self, ScanMetadataError> {
         let metadata_state =
-            DataWriterMetadataState::build(target.clone(), block_ref, source_name).await?;
+            DataWriterMetadataState::build(target.clone(), block_ref, source_name, None).await?;
 
         Ok(Self::from_metadata_state(ctx, target, metadata_state))
     }
@@ -517,8 +517,6 @@ impl DataWriterDataFusion {
             path.extension().is_some(),
             "Ouput file name must have an extension"
         );
-
-        println!("+++++ {:#?}", df.clone().into_parts().0.config());
 
         let res = df
             .write_parquet(

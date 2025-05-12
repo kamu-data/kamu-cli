@@ -17,9 +17,9 @@ use crate::prelude::*;
 
 #[derive(SimpleObject)]
 pub struct DataQueryResultSuccess {
-    pub schema: Option<DataSchema>,
+    pub schema: DataSchema,
     pub data: DataBatch,
-    pub datasets: Option<Vec<DatasetState>>,
+    pub datasets: Vec<DatasetState>,
     pub limit: u64,
 }
 
@@ -48,34 +48,21 @@ impl DataQueryResult {
             domain::QueryError::DatasetNotFound(e) => Ok(Self::invalid_sql(e.to_string())),
             domain::QueryError::DatasetBlockNotFound(e) => Ok(Self::invalid_sql(e.to_string())),
             domain::QueryError::BadQuery(e) => Ok(Self::invalid_sql(e.to_string())),
-            domain::QueryError::DatasetSchemaNotAvailable(_) => {
-                // NOTE: This error must be handled on upper level to return empty collection
-                unreachable!()
-            }
             domain::QueryError::Access(e) => Err(e.into()),
             domain::QueryError::Internal(e) => Err(e.into()),
         }
     }
 
     pub fn success(
-        schema: Option<DataSchema>,
+        schema: DataSchema,
         data: DataBatch,
-        datasets: Option<Vec<DatasetState>>,
+        datasets: Vec<DatasetState>,
         limit: u64,
     ) -> DataQueryResult {
         DataQueryResult::Success(DataQueryResultSuccess {
             schema,
             data,
             datasets,
-            limit,
-        })
-    }
-
-    pub fn no_schema_yet(format: DataBatchFormat, limit: u64) -> DataQueryResult {
-        DataQueryResult::Success(DataQueryResultSuccess {
-            schema: None,
-            data: DataBatch::empty(format),
-            datasets: None,
             limit,
         })
     }

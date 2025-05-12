@@ -49,7 +49,7 @@ tracing = "0.1"
 version = "0.8"
 default-features = false
 features = [
-    "runtime-tokio-rustls",
+    "runtime-tokio",
     "macros",
     "mysql",
     "postgres",

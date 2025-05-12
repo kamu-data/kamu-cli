@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt::{self, Display, Formatter};
 use std::sync::Arc;
 
 use internal_error::InternalError;
@@ -154,14 +153,16 @@ pub enum PushIngestError {
 
 pub enum DataSource {
     Url(url::Url),
+    Buffer(bytes::Bytes),
     Stream(Box<dyn AsyncRead + Send + Unpin>),
 }
 
-impl Display for DataSource {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl std::fmt::Debug for DataSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DataSource::Url(url) => write!(f, "{url}"),
-            DataSource::Stream(_) => write!(f, "Stream data source"),
+            Self::Url(v) => f.debug_tuple("Url").field(&v.as_str()).finish(),
+            Self::Buffer(_) => f.debug_tuple("Buffer").finish_non_exhaustive(),
+            Self::Stream(_) => f.debug_tuple("Stream").finish_non_exhaustive(),
         }
     }
 }

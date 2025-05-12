@@ -46,7 +46,8 @@ pub trait QueryService: Send + Sync {
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
-    ) -> Result<DataFrameExt, QueryError>;
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
     /// [DataFrame] that can be used to get schema and data, and the state
@@ -75,13 +76,26 @@ pub trait QueryService: Send + Sync {
     // number of files we collect to construct the dataframe.
     //
     /// Returns a [DataFrame] representing the contents of an entire dataset
-    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrameExt, QueryError>;
+    async fn get_data(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError>;
 
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default)]
+pub struct GetDataOptions {
+    /// Last block hash of an input dataset that should be used for query
+    /// execution. This is used to achieve full reproducibility of queries
+    /// as no matter what updates happen in the datasets - the query will
+    /// only consider a specific subset of the data ledger.
+    pub block_hash: Option<odf::Multihash>,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct QueryOptions {
@@ -155,6 +169,24 @@ pub struct QueryStateDataset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+pub struct GetDataResponse {
+    /// A [`DataFrameExt`] that can be used to read schema and access the data.
+    /// `None` when dataset schema was not yet defined. Note that the data
+    /// frames are "lazy". They are a representation of a logical query
+    /// plan. The actual query is executed only when you pull the resulting
+    /// data from it.
+    pub df: Option<DataFrameExt>,
+
+    /// Handle of the resolved dataset
+    pub dataset_handle: odf::DatasetHandle,
+
+    /// Last block hash that was considered during the query planning
+    pub block_hash: odf::Multihash,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EngineDesc {
     /// A short name of the engine, e.g. "Spark", "Flink", "Datafusion"
@@ -211,13 +243,6 @@ pub enum QueryError {
         #[from]
         #[backtrace]
         DatasetBlockNotFoundError,
-    ),
-
-    #[error(transparent)]
-    DatasetSchemaNotAvailable(
-        #[from]
-        #[backtrace]
-        DatasetSchemaNotAvailableError,
     ),
 
     #[error(transparent)]
@@ -411,14 +436,6 @@ pub enum BadQueryErrorSource {
     Single(datafusion::error::DataFusionError),
     Shared(Arc<datafusion::error::DataFusionError>),
     Collection(Vec<datafusion::error::DataFusionError>),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset schema is not yet available: {dataset_ref}")]
-pub struct DatasetSchemaNotAvailableError {
-    pub dataset_ref: odf::DatasetRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

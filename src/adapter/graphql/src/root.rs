@@ -113,7 +113,7 @@ pub fn schema() -> Schema {
         .finish()
 }
 
-/// Returns schema preconfigured schema without tracing extensions
+/// Returns schema preconfigured schema without apollo tracing extension
 pub fn schema_quiet() -> Schema {
-    schema_builder().finish()
+    schema_builder().extension(Tracing).finish()
 }

@@ -338,8 +338,19 @@ impl QueryServiceImpl {
         &self,
         dataset_ref: &odf::DatasetRef,
         last_records_to_consider: Option<u64>,
-    ) -> Result<(ResolvedDataset, DataFrameExt), QueryError> {
+        head: Option<odf::Multihash>,
+    ) -> Result<(ResolvedDataset, odf::Multihash, Option<DataFrameExt>), QueryError> {
         let resolved_dataset = self.resolve_dataset(dataset_ref).await?;
+
+        let head = if let Some(head) = head {
+            head
+        } else {
+            resolved_dataset
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?
+        };
 
         let ctx = self
             .session_context(QueryOptions {
@@ -347,7 +358,7 @@ impl QueryServiceImpl {
                     resolved_dataset.get_id().clone(),
                     QueryOptionsDataset {
                         alias: resolved_dataset.get_alias().to_string(),
-                        block_hash: None,
+                        block_hash: Some(head.clone()),
                         hints: DatasetQueryHints {
                             handle: Some(resolved_dataset.get_handle().clone()),
                             last_records_to_consider,
@@ -364,7 +375,11 @@ impl QueryServiceImpl {
             ))
             .await?;
 
-        Ok((resolved_dataset, df.into()))
+        if df.schema().fields().is_empty() {
+            Ok((resolved_dataset, head, None))
+        } else {
+            Ok((resolved_dataset, head, Some(df.into())))
+        }
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -520,17 +535,22 @@ impl QueryService for QueryServiceImpl {
         dataset_ref: &odf::DatasetRef,
         skip: u64,
         limit: u64,
-    ) -> Result<DataFrameExt, QueryError> {
-        let (resolved_dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        let (resolved_dataset, head, df) = self
+            .single_dataset(dataset_ref, Some(skip + limit), options.block_hash)
+            .await?;
 
         // Our custom catalog provider resolves schemas lazily, so the dataset will be
         // found even if it's empty and its schema will be empty, but we decide not to
-        // propagate this special case to the users and return an error instead
-        if df.schema().fields().is_empty() {
-            Err(DatasetSchemaNotAvailableError {
-                dataset_ref: dataset_ref.clone(),
-            })?;
-        }
+        // propagate this special case to the users and return `None` instead
+        let Some(df) = df else {
+            return Ok(GetDataResponse {
+                df: None,
+                dataset_handle: resolved_dataset.take_handle(),
+                block_hash: head,
+            });
+        };
 
         use odf::dataset::MetadataChainExt;
         let vocab: odf::metadata::DatasetVocabulary = resolved_dataset
@@ -554,7 +574,11 @@ impl QueryService for QueryServiceImpl {
                 col(Column::from_name(&vocab.offset_column)).sort(true, false)
             ])?;
 
-        Ok(df)
+        Ok(GetDataResponse {
+            df: Some(df),
+            dataset_handle: resolved_dataset.take_handle(),
+            block_hash: head,
+        })
     }
 
     #[tracing::instrument(level = "info", name = QueryServiceImpl_sql_statement, skip_all)]
@@ -594,10 +618,21 @@ impl QueryService for QueryServiceImpl {
     }
 
     #[tracing::instrument(level = "info", name = QueryServiceImpl_get_data, skip_all, fields(%dataset_ref))]
-    async fn get_data(&self, dataset_ref: &odf::DatasetRef) -> Result<DataFrameExt, QueryError> {
+    async fn get_data(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
         // TODO: PERF: Limit push-down opportunity
-        let (_dataset, df) = self.single_dataset(dataset_ref, None).await?;
-        Ok(df)
+        let (resolved_dataset, head, df) = self
+            .single_dataset(dataset_ref, None, options.block_hash)
+            .await?;
+
+        Ok(GetDataResponse {
+            df,
+            dataset_handle: resolved_dataset.take_handle(),
+            block_hash: head,
+        })
     }
 
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError> {

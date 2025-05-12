@@ -45,6 +45,7 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
                     source_event_time: options.source_event_time,
                     auto_create_push_source: options.is_ingest_from_upload,
                     schema_inference: SchemaInferenceOpts::default(),
+                    expected_head: options.expected_head,
                 },
             )
             .await?;
@@ -74,7 +75,11 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
                     },
                 )
                 .await
-                .int_err()?;
+                .map_err(|e| {
+                    PushIngestDataError::Execution(
+                        odf::dataset::CommitError::MetadataAppendError(e.into()).into(),
+                    )
+                })?;
 
             self.outbox
                 .post_message(

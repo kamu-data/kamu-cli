@@ -294,7 +294,7 @@ impl TestHarness {
     }
 
     async fn build_metadata_state(&self, target: ResolvedDataset) -> DataWriterMetadataState {
-        DataWriterMetadataState::build(target, &odf::BlockRef::Head, None)
+        DataWriterMetadataState::build(target, &odf::BlockRef::Head, None, None)
             .await
             .unwrap()
     }

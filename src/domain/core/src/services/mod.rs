@@ -42,6 +42,7 @@ pub mod resource_loader;
 pub mod search_service_remote;
 pub mod server_url_config;
 pub mod sync_service;
+pub mod upload_service;
 pub mod verification_service;
 
 pub use dataset_changes_service::*;
@@ -64,4 +65,5 @@ pub use resource_loader::*;
 pub use search_service_remote::*;
 pub use server_url_config::*;
 pub use sync_service::*;
+pub use upload_service::*;
 pub use verification_service::*;

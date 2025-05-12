@@ -29,10 +29,14 @@ pub struct DataSchema {
 }
 
 impl DataSchema {
+    pub fn empty(format: DataSchemaFormat) -> Self {
+        Self::from_arrow_schema(&datafusion::arrow::datatypes::Schema::empty(), format)
+    }
+
     pub fn from_arrow_schema(
         schema: &datafusion::arrow::datatypes::Schema,
         format: DataSchemaFormat,
-    ) -> DataSchema {
+    ) -> Self {
         match format {
             DataSchemaFormat::ArrowJson => {
                 let mut buf = Vec::new();
@@ -53,7 +57,7 @@ impl DataSchema {
     pub fn from_parquet_schema(
         schema: &datafusion::parquet::schema::types::Type,
         format: DataSchemaFormat,
-    ) -> DataSchema {
+    ) -> Self {
         let mut buf = Vec::new();
 
         match format {
@@ -65,7 +69,7 @@ impl DataSchema {
             }
             _ => unreachable!(),
         }
-        DataSchema {
+        Self {
             format,
             content: String::from_utf8(buf).unwrap(),
         }
@@ -97,6 +101,27 @@ impl DataSchema {
             content: String::from_utf8(buf).unwrap(),
         })
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Input types
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a dataset column
+#[derive(InputObject)]
+pub struct ColumnInput {
+    /// Column name
+    pub name: String,
+
+    /// Column data type
+    #[graphql(name = "type")]
+    pub data_type: DataTypeInput,
+}
+
+#[derive(InputObject)]
+pub struct DataTypeInput {
+    /// Defines type using DDL syntax
+    pub ddl: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -50,9 +50,11 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
             .dependency_graph_service
             .get_downstream_dependencies(dataset_id)
             .await
-            .int_err()?
             .collect::<Vec<_>>()
             .await;
+        if downstream_dependency_ids.is_empty() {
+            return Ok(Vec::new());
+        }
 
         let mut downstream_dependencies = Vec::with_capacity(downstream_dependency_ids.len());
 

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use arrow::array::RecordBatch;
+use arrow::array::{Array, ArrowPrimitiveType, AsArray, RecordBatch};
 use datafusion::catalog::TableProvider;
 use datafusion::common::DFSchema;
 use datafusion::config::{CsvOptions, JsonOptions, TableParquetOptions};
@@ -121,6 +121,11 @@ impl DataFrameExt {
         self.0.select_columns(columns).map(Self)
     }
 
+    #[tracing::instrument(level = "info", name = "DataFrame::show", skip_all)]
+    pub async fn show(self) -> Result<(), DataFusionError> {
+        self.0.show().await
+    }
+
     pub fn sort(self, expr: Vec<SortExpr>) -> Result<Self, DataFusionError> {
         self.0.sort(expr).map(Self)
     }
@@ -195,6 +200,56 @@ impl DataFrameExt {
             .collect();
 
         self.select(columns)
+    }
+
+    /// Collects and serializes records into Json array-of-structures format
+    pub async fn collect_json_aos(self) -> Result<Vec<serde_json::Value>> {
+        use crate::data::format::{JsonArrayOfStructsWriter, RecordsWriter as _};
+
+        let record_batches = self.collect().await?;
+
+        let mut json = Vec::new();
+        let mut writer = JsonArrayOfStructsWriter::new(&mut json);
+        writer.write_batches(&record_batches).unwrap();
+        writer.finish().unwrap();
+
+        let serde_json::Value::Array(records) = serde_json::from_slice(&json).unwrap() else {
+            unreachable!()
+        };
+
+        Ok(records)
+    }
+
+    /// Given a data frame with a zero or one row and one column extracts the
+    /// typed scalar value
+    pub async fn collect_scalar<T: ArrowPrimitiveType>(self) -> Result<Option<T::Native>> {
+        let batches = self.collect().await?;
+        if batches.is_empty() {
+            return Ok(None);
+        }
+        if batches.len() > 1 || batches[0].num_rows() > 1 || batches[0].num_columns() != 1 {
+            return Err(DataFusionError::Internal(format!(
+                "collect_scalar expected 1x1 result shape but got {}x{}",
+                batches[0].num_rows(),
+                batches[0].num_columns()
+            )));
+        }
+
+        let batch = batches.into_iter().next().unwrap();
+
+        let Some(column) = batch.column(0).as_primitive_opt::<T>() else {
+            return Err(DataFusionError::Internal(format!(
+                "collect_scalar expected column type {} but got {}",
+                T::DATA_TYPE,
+                batch.column(0).data_type()
+            )));
+        };
+
+        if column.is_null(0) {
+            Ok(None)
+        } else {
+            Ok(Some(column.value(0)))
+        }
     }
 }
 

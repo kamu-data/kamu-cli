@@ -64,7 +64,7 @@ impl SetWatermarkPlanner for SetWatermarkPlannerImpl {
         }
 
         let metadata_state =
-            DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None)
+            DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None, None)
                 .await
                 .int_err()?;
 

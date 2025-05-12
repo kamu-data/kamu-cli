@@ -10,6 +10,8 @@
 mod access_token;
 mod account;
 mod auth;
+mod base64;
+mod collection_path;
 mod data_batch;
 mod data_query;
 mod data_schema;
@@ -26,6 +28,7 @@ mod event_id;
 mod flow_configuration;
 mod flow_scalars;
 mod flow_trigger;
+mod key_value;
 mod metadata;
 mod multihash;
 mod odf_generated;
@@ -37,6 +40,8 @@ mod task_status_outcome;
 pub(crate) use access_token::*;
 pub(crate) use account::*;
 pub(crate) use auth::*;
+pub(crate) use base64::*;
+pub(crate) use collection_path::*;
 pub(crate) use data_batch::*;
 pub(crate) use data_query::*;
 pub(crate) use data_schema::*;
@@ -53,6 +58,7 @@ pub(crate) use event_id::*;
 pub(crate) use flow_configuration::*;
 pub(crate) use flow_scalars::*;
 pub(crate) use flow_trigger::*;
+pub(crate) use key_value::*;
 pub(crate) use metadata::*;
 pub(crate) use multihash::*;
 pub(crate) use odf_generated::*;
@@ -137,6 +143,12 @@ macro_rules! __simple_string_scalar_general {
     ($name: ident, $source_type: ty) => {
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name<'a>(std::borrow::Cow<'a, $source_type>);
+
+        impl<'a> AsRef<$source_type> for $name<'a> {
+            fn as_ref(&self) -> &$source_type {
+                self.0.as_ref()
+            }
+        }
 
         impl From<$source_type> for $name<'_> {
             fn from(value: $source_type) -> Self {

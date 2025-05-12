@@ -17,9 +17,8 @@ use std::sync::Arc;
 use console::style as s;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
-use kamu::domain::TenancyConfig;
+use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::PredefinedAccountsConfig;
-use kamu_adapter_http::platform::FileUploadLimitConfig;
 use kamu_datasets::DatasetEnvVarsConfig;
 
 use super::{CLIError, Command};

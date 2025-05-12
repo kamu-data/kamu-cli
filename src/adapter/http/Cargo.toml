@@ -69,7 +69,6 @@ headers = { version = "0.4", default-features = false }
 http = "1"
 indoc = "2"
 reqwest = { version = "0.12", default-features = false, features = [
-    "rustls-tls",
     "multipart",
     "json",
     "stream",
@@ -90,10 +89,7 @@ tokio-util = { version = "0.7", default-features = false, features = [
     "compat",
     "io",
 ] }
-tokio-tungstenite = { version = "0.26", features = [
-    "rustls-tls-native-roots",
-    "url",
-] }
+tokio-tungstenite = { version = "0.26", features = ["url"] }
 tower = "0.5"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }

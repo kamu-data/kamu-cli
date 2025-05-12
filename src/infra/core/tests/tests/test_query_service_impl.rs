@@ -363,10 +363,13 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
 
     // Within last block
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let df = query_svc.tail(&dataset_ref, 1, 1).await.unwrap();
+    let res = query_svc
+        .tail(&dataset_ref, 1, 1, GetDataOptions::default())
+        .await
+        .unwrap();
 
     odf::utils::testing::assert_data_eq(
-        df,
+        res.df.unwrap(),
         indoc::indoc!(
             r#"
             +--------+------+
@@ -380,10 +383,13 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     .await;
 
     // Crosses block boundary
-    let df = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
+    let res = query_svc
+        .tail(&dataset_ref, 1, 2, GetDataOptions::default())
+        .await
+        .unwrap();
 
     odf::utils::testing::assert_data_eq(
-        df,
+        res.df.unwrap(),
         indoc::indoc!(
             r#"
             +--------+------+
@@ -430,8 +436,16 @@ async fn test_dataset_tail_empty_dataset() {
     let (_, dataset_alias) = create_empty_dataset(&catalog, "foo").await;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let res = query_svc.tail(&dataset_alias.as_local_ref(), 0, 10).await;
-    assert_matches!(res, Err(QueryError::DatasetSchemaNotAvailable(_)));
+    let res = query_svc
+        .tail(
+            &dataset_alias.as_local_ref(),
+            0,
+            10,
+            GetDataOptions::default(),
+        )
+        .await
+        .unwrap();
+    assert_matches!(res.df, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -441,7 +455,12 @@ async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: 
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let result = query_svc
-        .tail(&target.get_alias().as_local_ref(), 1, 1)
+        .tail(
+            &target.get_alias().as_local_ref(),
+            1,
+            1,
+            GetDataOptions::default(),
+        )
         .await;
     assert_matches!(result, Err(QueryError::Access(_)));
 }

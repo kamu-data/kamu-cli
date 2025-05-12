@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::{Int32Array, UInt8Array};
 use datafusion::arrow::datatypes::DataType;
-use kamu::domain::QueryService;
+use kamu::domain::{GetDataOptions, QueryService};
 
 use super::{CLIError, Command};
 use crate::output::*;
@@ -37,14 +37,27 @@ pub struct TailCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for TailCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        let df = self
+        let res = self
             .query_svc
-            .tail(&self.dataset_ref, self.skip, self.limit)
+            .tail(
+                &self.dataset_ref,
+                self.skip,
+                self.limit,
+                GetDataOptions::default(),
+            )
             .await
             .map_err(CLIError::failure)?;
 
+        let (schema, record_batches) = match res.df {
+            None => (datafusion::arrow::datatypes::Schema::empty(), Vec::new()),
+            Some(df) => (
+                df.schema().as_arrow().clone(),
+                df.collect().await.map_err(CLIError::failure)?,
+            ),
+        };
+
         let mut writer = self.output_cfg.get_records_writer(
-            df.schema().as_arrow(),
+            &schema,
             RecordsFormat::default().with_column_formats(vec![
                 // TODO: `RecordsFormat` should allow specifying column formats by name, not
                 // only positionally
@@ -78,7 +91,6 @@ impl Command for TailCommand {
             ]),
         );
 
-        let record_batches = df.collect().await.map_err(CLIError::failure)?;
         writer.write_batches(&record_batches)?;
         writer.finish()?;
         Ok(())

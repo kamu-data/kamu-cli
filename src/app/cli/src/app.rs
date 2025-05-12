@@ -21,7 +21,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_adapter_http::platform::{FileUploadLimitConfig, UploadServiceLocal};
+use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system_inmem::domain::{
     FlowConfigurationUpdatedMessage,

@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use kamu::domain::{ExportFormat, ExportOptions, ExportService, QueryService};
+use kamu::domain::{ExportFormat, ExportOptions, ExportService, GetDataOptions, QueryService};
 
 use crate::{CLIError, Command};
 
@@ -41,11 +41,21 @@ pub struct ExportCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ExportCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        let df = self
+        let res = self
             .query_service
-            .get_data(&self.dataset_ref)
+            .get_data(&self.dataset_ref, GetDataOptions::default())
             .await
             .map_err(CLIError::failure)?;
+
+        let Some(df) = res.df else {
+            if !self.quiet {
+                eprintln!(
+                    "{}",
+                    console::style("Dataset is empty and has no schema").yellow(),
+                );
+            }
+            return Ok(());
+        };
 
         let mut default_path: PathBuf = PathBuf::new();
         default_path.push(self.dataset_ref.to_string());

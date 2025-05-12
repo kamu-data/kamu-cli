@@ -317,15 +317,23 @@ async fn test_pull_derivative(kamu: KamuCliPuppet) {
     )
     .await;
 
-    kamu.assert_failure_command_execution(
+    kamu.assert_success_command_execution(
         [
             "tail",
             dataset_derivative_name.as_str(),
             "--output-format",
             "table",
         ],
-        None,
-        Some(["Error: Dataset schema is not yet available: leaderboard"]),
+        Some(indoc::indoc!(
+            r#"
+            ┌┐
+            ││
+            ├┤
+            ││
+            └┘
+            "#
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 

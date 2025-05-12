@@ -55,7 +55,7 @@ pub async fn test_create_account_and_modify_password(
     let owner_account_info = kamu_api_server_client.account().me().await.unwrap();
 
     let result = kamu_api_server_client
-        .graphql_api_call(&create_account_query(&owner_account_info.id, "foo"))
+        .graphql_api_call(&create_account_query(&owner_account_info.id, "foo"), None)
         .await;
 
     assert!(result.is_err());

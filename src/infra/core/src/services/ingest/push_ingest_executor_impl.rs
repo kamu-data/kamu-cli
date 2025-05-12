@@ -206,6 +206,13 @@ impl PushIngestExecutorImpl {
                     _ => Err(format!("Unsupported source: {url}").int_err().into()),
                 }
             }
+            DataSource::Buffer(buf) => {
+                // Save buffer to a file so datafusion can read it
+                // TODO: We likely can avoid this and build a DataFrame directly
+                tracing::info!(path = ?temp_path, "Copying buffer into a temp file");
+                tokio::fs::write(&temp_path, buf).await.int_err()?;
+                Ok(temp_path)
+            }
             DataSource::Stream(stream) => {
                 // Save stream to a file so datafusion can read it
                 // TODO: We likely can avoid this and build a DataFrame directly
@@ -304,7 +311,7 @@ impl PushIngestExecutorImpl {
 
 #[async_trait::async_trait]
 impl PushIngestExecutor for PushIngestExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), %data_source))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?data_source))]
     async fn execute_ingest(
         &self,
         target: ResolvedDataset,

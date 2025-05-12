@@ -330,6 +330,11 @@ type AuthMut {
 	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
 }
 
+"""
+Base64-encoded binary data (url-safe, no padding)
+"""
+scalar Base64Usnp
+
 input BatchingInput {
 	minRecordsToAwait: Int!
 	maxBatchingInterval: TimeDeltaInput!
@@ -385,6 +390,201 @@ type Checkpoint {
 type CliProtocolDesc {
 	pullCommand: String!
 	pushCommand: String!
+}
+
+type Collection {
+	"""
+	Latest state projection of the state of collection
+	"""
+	latest: CollectionProjection!
+	"""
+	State projection of the state of collection at the specified point in
+	time
+	"""
+	asOf(blockHash: Multihash!): CollectionProjection!
+}
+
+type CollectionEntry {
+	"""
+	Time when this version was created
+	"""
+	systemTime: DateTime!
+	"""
+	Time when this version was created
+	"""
+	eventTime: DateTime!
+	"""
+	File system-like path
+	Rooted, separated by forward slashes, with elements URL-encoded
+	(e.g. `/foo%20bar/baz`)
+	"""
+	path: CollectionPath!
+	"""
+	DID of the linked dataset
+	"""
+	ref: DatasetID!
+	"""
+	Extra data associated with this entry
+	"""
+	extraData: JSON!
+	"""
+	Resolves the reference to linked dataset
+	"""
+	asDataset: Dataset
+}
+
+type CollectionEntryConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [CollectionEntry!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [CollectionEntryEdge!]!
+}
+
+type CollectionEntryEdge {
+	node: CollectionEntry!
+}
+
+input CollectionEntryInput {
+	"""
+	Entry path
+	"""
+	path: CollectionPath!
+	"""
+	DID of the linked dataset
+	"""
+	ref: DatasetID!
+	"""
+	Json object containing extra column values
+	"""
+	extraData: JSON
+}
+
+type CollectionMut {
+	"""
+	Links new entry to this collection
+	"""
+	addEntry(entry: CollectionEntryInput!, expectedHead: Multihash): CollectionUpdateResult!
+	"""
+	Moves or renames an entry
+	"""
+	moveEntry(pathFrom: CollectionPath!, pathTo: CollectionPath!, extraData: JSON, expectedHead: Multihash): CollectionUpdateResult!
+	"""
+	Remove an entry from this collection
+	"""
+	removeEntry(path: CollectionPath!, expectedHead: Multihash): CollectionUpdateResult!
+	"""
+	Execute multiple add / move / unlink operations as a single transaction
+	"""
+	updateEntries(operations: [CollectionUpdateInput!]!, expectedHead: Multihash): CollectionUpdateResult!
+}
+
+"""
+Collection entry paths are similar to HTTP path components. They are rooted (start with `/`), separated by forward slashes, with elements URL-encoded (e.g. `/foo%20bar/baz`)
+"""
+scalar CollectionPath
+
+type CollectionProjection {
+	"""
+	Returns an entry at the specified path
+	"""
+	entry(path: CollectionPath!): CollectionEntry
+	"""
+	Returns the state of entries as they existed at specified point in time
+	"""
+	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int): CollectionEntryConnection!
+	"""
+	Find entries that link to specified DIDs
+	"""
+	entriesByRef(refs: [DatasetID!]!): [CollectionEntry!]!
+}
+
+type CollectionUpdateErrorCasFailed implements CollectionUpdateResult {
+	expectedHead: Multihash!
+	actualHead: Multihash!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CollectionUpdateErrorNotFound implements CollectionUpdateResult {
+	path: CollectionPath!
+	isSuccess: Boolean!
+	message: String!
+}
+
+input CollectionUpdateInput {
+	"""
+	Inserts new entry under specified path. If an entry at the target path
+	already exists it will be retracted.
+	"""
+	add: CollectionUpdateInputAdd
+	"""
+	Retracts and appends an entry under the new path. Returns error if from
+	path does not exist. If an entry at the target path already exists it
+	will be retracted. Use this to update extra data by specifying same
+	source and target paths.
+	"""
+	move: CollectionUpdateInputMove
+	"""
+	Removes the collection entry. Does nothing if entry does not exist.
+	"""
+	remove: CollectionUpdateInputRemove
+}
+
+input CollectionUpdateInputAdd {
+	entry: CollectionEntryInput!
+}
+
+input CollectionUpdateInputMove {
+	pathFrom: CollectionPath!
+	pathTo: CollectionPath!
+	"""
+	Optionally update the extra data
+	"""
+	extraData: JSON
+}
+
+input CollectionUpdateInputRemove {
+	path: CollectionPath!
+}
+
+interface CollectionUpdateResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CollectionUpdateSuccess implements CollectionUpdateResult {
+	oldHead: Multihash!
+	newHead: Multihash!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CollectionUpdateUpToDate implements CollectionUpdateResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+"""
+Defines a dataset column
+"""
+input ColumnInput {
+	"""
+	Column name
+	"""
+	name: String!
+	"""
+	Column data type
+	"""
+	type: DataTypeInput!
 }
 
 interface CommitResult {
@@ -581,9 +781,9 @@ enum DataQueryResultErrorKind {
 }
 
 type DataQueryResultSuccess {
-	schema: DataSchema
+	schema: DataSchema!
 	data: DataBatch!
-	datasets: [DatasetState!]
+	datasets: [DatasetState!]!
 	limit: Int!
 }
 
@@ -622,6 +822,13 @@ type DataSlice {
 	size: Int!
 }
 
+input DataTypeInput {
+	"""
+	Defines type using DDL syntax
+	"""
+	ddl: String!
+}
+
 type Dataset {
 	"""
 	Unique identifier of the dataset
@@ -649,6 +856,10 @@ type Dataset {
 	Returns the visibility of dataset
 	"""
 	visibility: DatasetVisibilityOutput!
+	"""
+	Quck access to `head` block hash
+	"""
+	head: Multihash!
 	"""
 	Access to the data of the dataset
 	"""
@@ -689,6 +900,14 @@ type Dataset {
 	Various endpoints for interacting with data
 	"""
 	endpoints: DatasetEndpoints!
+	"""
+	Downcast a dataset to a versioned file interface
+	"""
+	asVersionedFile: VersionedFile
+	"""
+	Downcast a dataset to a collection interface
+	"""
+	asCollection: Collection
 }
 
 enum DatasetAccessRole {
@@ -1009,6 +1228,14 @@ type DatasetMut {
 	Set visibility for the dataset
 	"""
 	setVisibility(visibility: DatasetVisibilityInput!): SetDatasetVisibilityResult!
+	"""
+	Downcast a dataset to a versioned file interface
+	"""
+	asVersionedFile: VersionedFileMut
+	"""
+	Downcast a dataset to a collection interface
+	"""
+	asCollection: CollectionMut
 }
 
 scalar DatasetName
@@ -1094,6 +1321,60 @@ type DatasetsMut {
 	Creates a new dataset from provided DatasetSnapshot manifest
 	"""
 	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!, datasetVisibility: DatasetVisibility!): CreateDatasetFromSnapshotResult!
+	"""
+	Creates new versioned file dataset.
+	Can include schema for extra columns and dataset metadata events (e.g.
+	adding description and readme).
+	"""
+	createVersionedFile(
+		"""
+		Dataset alias (may include target account)
+		"""
+		datasetAlias: DatasetAlias!,
+		"""
+		Additional user-defined columns
+		"""
+		extraColumns: [ColumnInput!],
+		"""
+		Extra metadata events (e.g. to populate readme)
+		"""
+		extraEvents: [String!],
+		"""
+		How extra events are represented
+		"""
+		extraEventsFormat: MetadataManifestFormat,
+		"""
+		Visibility of the dataset
+		"""
+		datasetVisibility: DatasetVisibility!
+	): CreateDatasetFromSnapshotResult!
+	"""
+	Creates a new collection dataset.
+	Can include schema for extra columns, dataset metadata, and initial
+	collection entries.
+	"""
+	createCollection(
+		"""
+		Dataset alias (may include target account)
+		"""
+		datasetAlias: DatasetAlias!,
+		"""
+		Additional user-defined columns
+		"""
+		extraColumns: [ColumnInput!],
+		"""
+		Extra metadata events (e.g. to populate readme)
+		"""
+		extraEvents: [String!],
+		"""
+		How extra events are represented
+		"""
+		extraEventsFormat: MetadataManifestFormat,
+		"""
+		Visibility of the dataset
+		"""
+		datasetVisibility: DatasetVisibility!
+	): CreateDatasetFromSnapshotResult!
 }
 
 """
@@ -1874,12 +2155,25 @@ input InitiatorFilterInput @oneOf {
 }
 
 
+"""
+A scalar that can represent any JSON value.
+"""
+scalar JSON
+
 type JdbcDesc {
 	url: String!
 }
 
 type KafkaProtocolDesc {
 	url: String!
+}
+
+"""
+Represents base64-encoded binary data using standard encoding
+"""
+type KeyValue {
+	key: String!
+	value: String!
 }
 
 type LinkProtocolDesc {
@@ -2967,6 +3261,28 @@ type SqlQueryStep {
 	query: String!
 }
 
+type StartUploadVersionErrorTooLarge implements StartUploadVersionResult {
+	uploadSize: Int!
+	uploadLimit: Int!
+	isSuccess: Boolean!
+	message: String!
+}
+
+interface StartUploadVersionResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type StartUploadVersionSuccess implements StartUploadVersionResult {
+	url: String!
+	method: String!
+	useMultipart: Boolean!
+	headers: [KeyValue!]!
+	uploadToken: String!
+	isSuccess: Boolean!
+	message: String!
+}
+
 
 type Task {
 	"""
@@ -3158,6 +3474,32 @@ interface UpdateReadmeResult {
 	message: String!
 }
 
+type UpdateVersionErrorCasFailed implements UpdateVersionResult {
+	expectedHead: Multihash!
+	actualHead: Multihash!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult {
+	message: String!
+	isSuccess: Boolean!
+}
+
+interface UpdateVersionResult {
+	isSuccess: Boolean!
+	message: String!
+}
+
+type UpdateVersionSuccess implements UpdateVersionResult {
+	newVersion: Int!
+	oldHead: Multihash!
+	newHead: Multihash!
+	contentHash: Multihash!
+	isSuccess: Boolean!
+	message: String!
+}
+
 interface UpsertDatasetEnvVarResult {
 	message: String!
 }
@@ -3174,6 +3516,168 @@ type UpsertDatasetEnvVarResultUpdated implements UpsertDatasetEnvVarResult {
 
 type UpsertDatasetEnvVarUpToDate implements UpsertDatasetEnvVarResult {
 	message: String!
+}
+
+type VersionedFile {
+	"""
+	Returns list of versions in reverse chronological order
+	"""
+	versions(
+		"""
+		Upper version bound (inclusive)
+		"""
+		maxVersion: Int,		page: Int,		perPage: Int
+	): VersionedFileEntryConnection!
+	"""
+	Returns the latest version entry, if any
+	"""
+	latest: VersionedFileEntry
+	"""
+	Returns the specified entry by block or version number
+	"""
+	asOf(version: Int, blockHash: Multihash): VersionedFileEntry
+}
+
+type VersionedFileContentDownload {
+	"""
+	Direct download URL
+	"""
+	url: String!
+	"""
+	Headers to include in request
+	"""
+	headers: [KeyValue!]!
+	"""
+	Download URL expiration timestamp
+	"""
+	expiresAt: DateTime
+}
+
+type VersionedFileEntry {
+	"""
+	Time when this version was created
+	"""
+	systemTime: DateTime!
+	"""
+	Time when this version was created
+	"""
+	eventTime: DateTime!
+	"""
+	File version
+	"""
+	version: Int!
+	"""
+	Media type of the file content
+	"""
+	contentType: String!
+	"""
+	Multihash of the file content
+	"""
+	contentHash: Multihash!
+	"""
+	Extra data associated with this file version
+	"""
+	extraData: JSON!
+	"""
+	Returns encoded content in-band. Should be used for small files only and
+	will retrurn error if called on large data.
+	"""
+	content: Base64Usnp!
+	"""
+	Returns a direct download URL
+	"""
+	contentUrl: VersionedFileContentDownload!
+}
+
+type VersionedFileEntryConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [VersionedFileEntry!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [VersionedFileEntryEdge!]!
+}
+
+type VersionedFileEntryEdge {
+	node: VersionedFileEntry!
+}
+
+type VersionedFileMut {
+	"""
+	Uploads new version of content in-band. Can be used for very small files
+	only.
+	"""
+	uploadNewVersion(
+		"""
+		Base64-encoded file content (url-safe, no padding)
+		"""
+		content: Base64Usnp!,
+		"""
+		Media type of content (e.g. application/pdf)
+		"""
+		contentType: String,
+		"""
+		Json object containing values of extra columns
+		"""
+		extraData: JSON,
+		"""
+		Expected head block hash to prevent concurrent updates
+		"""
+		expectedHead: Multihash
+	): UpdateVersionResult!
+	"""
+	Returns a pre-signed URL and upload token for direct uploads of large
+	files
+	"""
+	startUploadNewVersion(
+		"""
+		Size of the file being uploaded
+		"""
+		contentLength: Int!,
+		"""
+		Media type of content (e.g. application/pdf)
+		"""
+		contentType: String
+	): StartUploadVersionResult!
+	"""
+	Finalizes the content upload by incoporating the content into the
+	dataset as a new version
+	"""
+	finishUploadNewVersion(
+		"""
+		Token received when starting the upload
+		"""
+		uploadToken: String!,
+		"""
+		Json object containing values of extra columns
+		"""
+		extraData: JSON,
+		"""
+		Expected head block hash to prevent concurrent updates
+		"""
+		expectedHead: Multihash
+	): UpdateVersionResult!
+	"""
+	Creating a new version with that has updated values of extra columns but
+	with the file content unchanged
+	"""
+	updateExtraData(
+		"""
+		Json object containing values of extra columns
+		"""
+		extraData: JSON!,
+		"""
+		Expected head block hash to prevent concurrent updates
+		"""
+		expectedHead: Multihash
+	): UpdateVersionResult!
 }
 
 type ViewAccessToken {

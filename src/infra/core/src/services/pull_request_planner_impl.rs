@@ -158,7 +158,8 @@ impl PullRequestPlannerImpl {
 
         let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
-        match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None).await {
+        match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None, None).await
+        {
             Ok(metadata_state) => Ok(PullIngestItem {
                 depth: pi.depth,
                 target,
@@ -762,7 +763,6 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             .dependency_graph_service
             .get_upstream_dependencies(dataset_id)
             .await
-            .int_err()?
             .collect::<Vec<_>>()
             .await;
 

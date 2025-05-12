@@ -15,12 +15,16 @@ use http::HeaderMap;
 use http_common::*;
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::services::upload_service::{
+    UploadService,
+    UploadTokenBase64Json,
+    UploadTokenIntoStreamError,
+};
 use kamu_core::*;
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
 use crate::axum_utils::ensure_authenticated_account;
-use crate::platform::{UploadService, UploadTokenBase64Json, UploadTokenIntoStreamError};
 use crate::DatasetAliasInPath;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -136,6 +140,7 @@ pub async fn dataset_ingest_handler(
                 source_event_time,
                 is_ingest_from_upload,
                 media_type,
+                expected_head: None,
             },
             None,
         )

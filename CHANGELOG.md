@@ -12,11 +12,19 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Fixed
+- Dependency graph is less sensitive to requests that come too early, before dataset node is created
+
+## [0.236.0] - 2025-05-09
 ### Added
 - New REST endpoint `/system/info` and GQL endpoint `buildInfo` that return application version and build details
+- New experimental "Versioned File" dataset archetype that simplifies using ODF datasets for storing versioned history of binary content
+- New experimental "Collection" dataset archetype that allows organizing other ODF datasets into hierarchical collections similar to directory structure
 ### Changed
 - Upgraded to `datafusion v47.0.0` and latest `arrow`, `object-store`, and `flatbuffers` versions
+- Commands and APIs that query data are now more tolerant to the situation when dataset is empty and doesn't have a schema yet and will return results with empty rows and columns instead of returning errors
 ### Fixed
+- Crash on push/pull over TLS connection (#1231)
 - Patched `GQL DatasetFlowTriggers::all_paused` to use similar optimization as account flow views
 
 ## [0.235.0] - 2025-04-24

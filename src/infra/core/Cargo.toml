@@ -56,10 +56,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true, default-features = false, features = [
-    "lfs",
-    "s3"
-] }
+odf = { workspace = true, default-features = false, features = ["lfs", "s3"] }
 random-strings = { workspace = true }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
@@ -76,7 +73,6 @@ serde_yaml = "0.9"
 flate2 = "1" # GZip decoder
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
-    "rustls-tls",
     "stream",
     "gzip",
     "brotli",
@@ -139,7 +135,8 @@ curl = { optional = true, version = "0.4", features = [
 curl-sys = { optional = true, version = "0.4" }
 datafusion-ethers = { optional = true, version = "47" }
 datafusion-functions-json = { optional = true, version = "0.47" }
-rumqttc = { optional = true, version = "0.24" }
+rumqttc = { optional = true, version = "0.24", default-features = false, features = [
+] }
 mockall = { optional = true, version = "0.13", default-features = false }
 oop = { optional = true, version = "0.0.2" }
 lazy_static = { version = "1" }
@@ -151,16 +148,24 @@ libc = "0.2" # For getting uid:gid
 
 [dev-dependencies]
 kamu = { workspace = true, default-features = false, features = ["testing"] }
-kamu-accounts = { workspace = true, default-features = false, features = ["testing"] }
-kamu-core = { workspace = true, default-features = false, features = ["testing"] }
+kamu-accounts = { workspace = true, default-features = false, features = [
+    "testing",
+] }
+kamu-core = { workspace = true, default-features = false, features = [
+    "testing",
+] }
 kamu-datasets-inmem = { workspace = true, default-features = false }
-kamu-datasets-services = { workspace = true, default-features = false, features = ["testing"] }
+kamu-datasets-services = { workspace = true, default-features = false, features = [
+    "testing",
+] }
 odf = { workspace = true, default-features = false, features = ["testing"] }
 test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.5", features = ["async_tokio"] }
-datafusion = { version = "47", default-features = false, features = ["parquet"] }
+datafusion = { version = "47", default-features = false, features = [
+    "parquet",
+] }
 filetime = "0.2"
 fs_extra = "1.3"
 indoc = "2"

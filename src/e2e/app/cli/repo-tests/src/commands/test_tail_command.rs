@@ -21,10 +21,18 @@ pub async fn test_tail(kamu: KamuCliPuppet) {
         .await
         .success();
 
-    kamu.assert_failure_command_execution(
+    kamu.assert_success_command_execution(
         ["tail", "player-scores", "--output-format", "table"],
-        None,
-        Some(["Error: Dataset schema is not yet available: player-scores"]),
+        Some(indoc::indoc!(
+            r#"
+            ┌┐
+            ││
+            ├┤
+            ││
+            └┘
+            "#
+        )),
+        None::<Vec<&str>>,
     )
     .await;
 

@@ -397,7 +397,11 @@ impl AuthApi<'_> {
     }
 
     async fn login(&mut self, login_request: &str) -> AccessToken {
-        let login_response = self.client.graphql_api_call(login_request).await.data();
+        let login_response = self
+            .client
+            .graphql_api_call(login_request, None)
+            .await
+            .data();
         let login_node = &login_response["auth"]["login"];
 
         let access_token = login_node["accessToken"]
@@ -515,6 +519,7 @@ impl DatasetApi<'_> {
                 )
                 .replace("<dataset_alias>", &format!("{dataset_alias}"))
                 .as_str(),
+                None,
             )
             .await
             .data();
@@ -587,6 +592,7 @@ impl DatasetApi<'_> {
                 .replace("<snapshot>", dataset_snapshot_yaml)
                 .replace("<dataset_visibility_value>", dataset_visibility_value)
                 .as_str(),
+                None,
             )
             .await
             .data();
@@ -649,6 +655,7 @@ impl DatasetApi<'_> {
                 )
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
+                None,
             )
             .await;
 
@@ -710,6 +717,7 @@ impl DatasetApi<'_> {
                 )
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
+                None,
             )
             .await;
 
@@ -774,6 +782,7 @@ impl DatasetApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .replace("<dataset_visibility>", visibility)
                 .as_str(),
+                None,
             )
             .await;
 
@@ -842,6 +851,7 @@ impl DatasetApi<'_> {
                 )
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
+                None,
             )
             .await
             .data();
@@ -887,6 +897,7 @@ impl DatasetApi<'_> {
                 )
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
+                None,
             )
             .await
             .data();
@@ -957,6 +968,7 @@ impl DatasetApi<'_> {
                 )
                 .replace("<account_name>", account_name)
                 .as_str(),
+                None,
             )
             .await
             .data();
@@ -1022,6 +1034,7 @@ impl DatasetApi<'_> {
                     dataset_id.as_did_str().to_stack_string().as_str(),
                 )
                 .as_str(),
+                None,
             )
             .await
             .data();
@@ -1126,6 +1139,7 @@ impl DatasetCollaborationApi<'_> {
                 )
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .as_str(),
+                None,
             )
             .await;
 
@@ -1210,6 +1224,7 @@ impl DatasetCollaborationApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .replace("<account_id>", &account_id.as_did_str().to_stack_string())
                 .replace("<role>", role),
+                None,
             )
             .await;
 
@@ -1266,6 +1281,7 @@ impl DatasetCollaborationApi<'_> {
                         .intersperse(",".to_string())
                         .collect::<String>(),
                 ),
+                None,
             )
             .await;
 
@@ -1541,6 +1557,7 @@ impl FlowApi<'_> {
                     &format!("{dataset_flow_type:?}").to_case(Case::UpperSnake),
                 )
                 .as_str(),
+                None,
             )
             .await
             .data();
@@ -1595,6 +1612,7 @@ impl FlowApi<'_> {
                     )
                     .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                     .as_str(),
+                    None,
                 )
                 .await
                 .data();
@@ -1736,6 +1754,7 @@ impl OdfQuery<'_> {
                 )
                 .replace("<query>", query)
                 .as_str(),
+                None,
             )
             .await
             .data();
@@ -1944,6 +1963,7 @@ impl SearchApi<'_> {
                 )
                 .replace("<query>", query)
                 .as_str(),
+                None,
             )
             .await
             .data();

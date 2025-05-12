@@ -9,15 +9,11 @@
 
 use chrono::{DateTime, TimeZone, Utc};
 use indoc::indoc;
+use kamu::domain::upload_service::{FileUploadLimitConfig, UploadToken, UploadTokenBase64Json};
 use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
-use kamu_adapter_http::platform::{
-    FileUploadLimitConfig,
-    UploadServiceLocal,
-    UploadToken,
-    UploadTokenBase64Json,
-};
+use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_datasets::CreateDatasetResult;
 use serde_json::json;
 use url::Url;
