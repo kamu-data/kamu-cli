@@ -24,9 +24,8 @@ use thiserror::Error;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const PROVIDER_WEB3_WALLET: &str = "web3-wallet";
-pub const EIP_4361_EXPECTED_STATEMENT: &str = "By signing, you are proving you own this wallet \
-                                               and logging in. This does not initiate a \
-                                               transaction or cost any fees.";
+pub const EIP_4361_EXPECTED_STATEMENT: &str =
+    "By signing, you confirm wallet ownership and log in. No transaction or fees are involved.";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
