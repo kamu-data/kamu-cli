@@ -92,6 +92,7 @@ members = [
     "src/infra/messaging-outbox/sqlite",
     ## Web3
     "src/infra/auth-web3/inmem",
+    "src/infra/auth-web3/repo-tests",
     # Adapters
     "src/adapter/auth-oso-rebac",
     "src/adapter/auth-web3",

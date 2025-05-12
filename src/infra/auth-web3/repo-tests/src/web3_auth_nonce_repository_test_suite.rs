@@ -1,0 +1,149 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use chrono::{Duration, TimeZone, Utc};
+use kamu_auth_web3::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
+    let harness = Web3AuthNonceRepositoryTestSuiteHarness::new(catalog);
+
+    let expired_at = Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap();
+    let wallet_address = EvmWalletAddress::random();
+
+    {
+        let nonce_entity = Web3AuthenticationNonceEntity {
+            wallet_address: EvmWalletAddress::random(),
+            nonce: Web3AuthenticationNonce::new(),
+            expired_at: expired_at.clone(),
+        };
+
+        pretty_assertions::assert_eq!(
+            Err(GetNonceError::NotFound {
+                wallet: wallet_address.clone()
+            }),
+            harness
+                .web3_auth_nonce_repo
+                .get_nonce(&wallet_address)
+                .await
+        );
+
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            harness.web3_auth_nonce_repo.set_nonce(&nonce_entity).await,
+        );
+
+        pretty_assertions::assert_eq!(
+            Ok(&nonce_entity),
+            harness
+                .web3_auth_nonce_repo
+                .get_nonce(&wallet_address)
+                .await
+                .as_ref()
+        );
+    }
+    {
+        let updated_nonce_entity = Web3AuthenticationNonceEntity {
+            wallet_address: wallet_address.clone(),
+            nonce: Web3AuthenticationNonce::new(),
+            expired_at: expired_at + Duration::minutes(15),
+        };
+
+        pretty_assertions::assert_eq!(
+            Ok(()),
+            harness
+                .web3_auth_nonce_repo
+                .set_nonce(&updated_nonce_entity)
+                .await,
+        );
+
+        pretty_assertions::assert_eq!(
+            Ok(updated_nonce_entity),
+            harness
+                .web3_auth_nonce_repo
+                .get_nonce(&wallet_address)
+                .await
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
+    let harness = Web3AuthNonceRepositoryTestSuiteHarness::new(catalog);
+
+    let now = Utc::now();
+
+    let expired_nonce = Web3AuthenticationNonceEntity {
+        wallet_address: EvmWalletAddress::random(),
+        nonce: Web3AuthenticationNonce::new(),
+        expired_at: now - Duration::seconds(1),
+    };
+    let valid_nonce = Web3AuthenticationNonceEntity {
+        wallet_address: EvmWalletAddress::random(),
+        nonce: Web3AuthenticationNonce::new(),
+        expired_at: now + Duration::minutes(15),
+    };
+
+    pretty_assertions::assert_eq!(
+        Ok(()),
+        harness.web3_auth_nonce_repo.set_nonce(&expired_nonce).await,
+    );
+    pretty_assertions::assert_eq!(
+        Ok(()),
+        harness.web3_auth_nonce_repo.set_nonce(&valid_nonce).await,
+    );
+
+    pretty_assertions::assert_eq!(
+        Ok(()),
+        harness
+            .web3_auth_nonce_repo
+            .cleanup_expired_nonces(now)
+            .await,
+    );
+
+    pretty_assertions::assert_eq!(
+        Err(GetNonceError::NotFound {
+            wallet: expired_nonce.wallet_address.clone()
+        }),
+        harness
+            .web3_auth_nonce_repo
+            .get_nonce(&expired_nonce.wallet_address)
+            .await
+    );
+    pretty_assertions::assert_eq!(
+        Ok(&valid_nonce),
+        harness
+            .web3_auth_nonce_repo
+            .get_nonce(&valid_nonce.wallet_address)
+            .await
+            .as_ref()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct Web3AuthNonceRepositoryTestSuiteHarness {
+    pub web3_auth_nonce_repo: Arc<dyn Web3AuthNonceRepository>,
+}
+
+impl Web3AuthNonceRepositoryTestSuiteHarness {
+    pub fn new(catalog: &dill::Catalog) -> Self {
+        Self {
+            web3_auth_nonce_repo: catalog.get_one().unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

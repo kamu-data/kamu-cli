@@ -382,6 +382,7 @@ dependencies = [
  "cfg-if",
  "const-hex",
  "derive_more 2.0.1",
+ "getrandom 0.3.2",
  "itoa",
  "paste",
  "ruint",
@@ -6508,6 +6509,16 @@ dependencies = [
  "dill",
  "kamu-auth-web3",
  "tokio",
+]
+
+[[package]]
+name = "kamu-auth-web3-repo-tests"
+version = "0.235.0"
+dependencies = [
+ "chrono",
+ "dill",
+ "kamu-auth-web3",
+ "pretty_assertions",
 ]
 
 [[package]]

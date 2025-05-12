@@ -40,6 +40,14 @@ pub enum SetNonceError {
     Internal(#[from] InternalError),
 }
 
+impl PartialEq for SetNonceError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -51,12 +59,30 @@ pub enum GetNonceError {
     Internal(#[from] InternalError),
 }
 
+impl PartialEq for GetNonceError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::NotFound { wallet: a }, Self::NotFound { wallet: b }) => a == b,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum CleanupExpiredNoncesError {
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl PartialEq for CleanupExpiredNoncesError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

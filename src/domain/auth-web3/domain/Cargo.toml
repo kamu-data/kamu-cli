@@ -23,6 +23,7 @@ doctest = false
 
 [features]
 default = []
+getrandom = ["alloy-primitives/getrandom"]
 
 
 [dependencies]
