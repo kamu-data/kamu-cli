@@ -15,13 +15,13 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteWeb3AuthNonceRepository {
+pub struct SqliteWeb3AuthEip4361NonceRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
 #[dill::component(pub)]
 #[dill::interface(dyn Web3AuthEip4361NonceRepository)]
-impl SqliteWeb3AuthNonceRepository {
+impl SqliteWeb3AuthEip4361NonceRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -32,7 +32,7 @@ impl SqliteWeb3AuthNonceRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Web3AuthEip4361NonceRepository for SqliteWeb3AuthNonceRepository {
+impl Web3AuthEip4361NonceRepository for SqliteWeb3AuthEip4361NonceRepository {
     async fn set_nonce(&self, entity: &Web3AuthEip4361NonceEntity) -> Result<(), SetNonceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;

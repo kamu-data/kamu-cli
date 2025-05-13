@@ -45,7 +45,7 @@ impl SqliteWeb3AuthNonceRepositoryHarness {
 
         b.add_value(pg_pool);
         b.add::<database_common::SqliteTransactionManager>();
-        b.add::<kamu_auth_web3_sqlite::SqliteWeb3AuthNonceRepository>();
+        b.add::<kamu_auth_web3_sqlite::SqliteWeb3AuthEip4361NonceRepository>();
 
         Self { catalog: b.build() }
     }
