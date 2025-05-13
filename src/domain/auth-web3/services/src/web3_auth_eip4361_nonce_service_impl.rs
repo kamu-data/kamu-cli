@@ -54,6 +54,15 @@ impl Web3AuthEip4361NonceService for Web3AuthEip4361NonceServiceImpl {
 
         Ok(entity)
     }
+
+    async fn consume_nonce(
+        &self,
+        wallet_address: &EvmWalletAddress,
+    ) -> Result<(), ConsumeNonceError> {
+        let now = self.time_source.now();
+
+        self.nonce_repo.consume_nonce(wallet_address, now).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

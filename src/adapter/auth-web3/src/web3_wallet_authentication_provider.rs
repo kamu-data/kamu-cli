@@ -10,12 +10,14 @@
 use std::sync::Arc;
 
 use email_utils::Email;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{
     AccountType,
     AuthenticationProvider,
     ProviderLoginError,
     ProviderLoginResponse,
 };
+use kamu_auth_web3::{ConsumeNonceError, EvmWalletAddress};
 use kamu_core::ServerUrlConfig;
 use nutype::nutype;
 use serde::Deserialize;
@@ -33,6 +35,7 @@ pub const EIP_4361_EXPECTED_STATEMENT: &str =
 #[dill::interface(dyn AuthenticationProvider)]
 pub struct Web3WalletAuthenticationProvider {
     server_url_config: Arc<ServerUrlConfig>,
+    nonce_service: Arc<dyn kamu_auth_web3::Web3AuthEip4361NonceService>,
 }
 
 impl Web3WalletAuthenticationProvider {
@@ -101,13 +104,14 @@ impl Web3WalletAuthenticationProvider {
         Ok(())
     }
 
-    fn handle_login(
+    async fn handle_login(
         &self,
         login_request: &LoginRequest,
     ) -> Result<ChecksumEvmWalletAddress, SignatureVerificationError> {
         let message: siwe::Message = login_request.message.parse()?;
+        let wallet_address = EvmWalletAddress::new(message.address);
 
-        // TODO: Wallet-based auth: verify nonce
+        self.nonce_service.consume_nonce(&wallet_address).await?;
 
         self.verify_eip4361_message_format(&message)?;
         self.verify_eip191_message_signature(&message, &login_request.signature)?;
@@ -139,7 +143,7 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
         let request = serde_json::from_str::<LoginRequest>(login_credentials_json.as_str())
             .map_err(ProviderLoginError::invalid_credentials)?;
 
-        let wallet_address = self.handle_login(&request)?.into_inner();
+        let wallet_address = self.handle_login(&request).await?.into_inner();
 
         Ok(ProviderLoginResponse {
             account_name: odf::AccountName::new_unchecked(&wallet_address),
@@ -182,6 +186,9 @@ enum SignatureVerificationError {
     #[error("Parse error: {0}")]
     MessageParseError(#[from] siwe::ParseError),
 
+    #[error("Nonce not found")]
+    NonceNotFound,
+
     #[error(transparent)]
     MissingMessageField(#[from] MissingMessageFieldError),
 
@@ -199,6 +206,20 @@ enum SignatureVerificationError {
 
     #[error("Verification error: {0}")]
     VerificationError(#[from] siwe::VerificationError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<ConsumeNonceError> for SignatureVerificationError {
+    fn from(e: ConsumeNonceError) -> Self {
+        use ConsumeNonceError as E;
+
+        match e {
+            E::NotFound(_) => Self::NonceNotFound,
+            E::Internal(_) => Self::Internal(e.int_err()),
+        }
+    }
 }
 
 impl From<SignatureVerificationError> for ProviderLoginError {
