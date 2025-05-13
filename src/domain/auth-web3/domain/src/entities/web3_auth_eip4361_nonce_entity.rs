@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{EvmWalletAddress, EvmWalletAddressConvertor, Web3AuthenticationEip4361Nonce};
+use crate::{EvmWalletAddress, Web3AuthenticationEip4361Nonce};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,7 +36,7 @@ impl TryFrom<Web3AuthEip4361NonceEntityRowModel> for Web3AuthEip4361NonceEntity 
         use internal_error::ResultIntoInternal;
 
         Ok(Self {
-            wallet_address: EvmWalletAddressConvertor::parse_checksummed(&v.wallet_address)
+            wallet_address: crate::EvmWalletAddressConvertor::parse_checksummed(&v.wallet_address)
                 .int_err()?,
             nonce: v.nonce.try_into().int_err()?,
             expires_at: v.expires_at,

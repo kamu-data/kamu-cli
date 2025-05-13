@@ -6496,6 +6496,7 @@ dependencies = [
  "chrono",
  "internal-error",
  "nutype",
+ "pretty_assertions",
  "siwe",
  "sqlx",
  "thiserror 2.0.12",

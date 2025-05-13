@@ -43,3 +43,4 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
 ] }
 
 [dev-dependencies]
+pretty_assertions = { version = "1" }

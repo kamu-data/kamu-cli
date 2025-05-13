@@ -13,7 +13,6 @@ pub type EvmWalletAddress = alloy_primitives::Address;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Wallet-based auth: tests
 pub struct EvmWalletAddressConvertor {}
 
 impl EvmWalletAddressConvertor {
