@@ -94,6 +94,7 @@ members = [
     "src/infra/auth-web3/inmem",
     "src/infra/auth-web3/postgres",
     "src/infra/auth-web3/repo-tests",
+    "src/infra/auth-web3/sqlite",
     # Adapters
     "src/adapter/auth-oso-rebac",
     "src/adapter/auth-web3",
@@ -221,6 +222,7 @@ kamu-messaging-outbox-repo-tests = { version = "0.235.0", path = "src/infra/mess
 kamu-auth-web3-inmem = { version = "0.235.0", path = "src/infra/auth-web3/inmem", default-features = false }
 kamu-auth-web3-postgres = { version = "0.235.0", path = "src/infra/auth-web3/postgres", default-features = false }
 kamu-auth-web3-repo-tests = { version = "0.235.0", path = "src/infra/auth-web3/repo-tests", default-features = false }
+kamu-auth-web3-sqlite = { version = "0.235.0", path = "src/infra/auth-web3/sqlite", default-features = false }
 
 # Adapters
 kamu-adapter-auth-oso-rebac = { version = "0.235.0", path = "src/adapter/auth-oso-rebac", default-features = false }

@@ -17,9 +17,11 @@ MYSQL_CRATES := \
 	./src/e2e/app/cli/mysql \
 	./src/infra/accounts/mysql \
 
-SQLITE_CRATES := ./src/infra/accounts/sqlite \
+SQLITE_CRATES := \
 	./src/e2e/app/cli/sqlite \
+	./src/infra/accounts/sqlite \
 	./src/infra/auth-rebac/sqlite \
+	./src/infra/auth-web3/sqlite \
 	./src/infra/datasets/sqlite \
 	./src/infra/flow-system/sqlite \
 	./src/infra/messaging-outbox/sqlite \

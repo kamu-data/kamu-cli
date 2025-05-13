@@ -12,32 +12,32 @@ use database_common_macros::database_transactional_test;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
+    storage = sqlite,
     fixture = kamu_auth_web3_repo_tests::test_set_and_get_nonce,
-    harness = PostgresWeb3AuthNonceRepositoryHarness
+    harness = SqliteWeb3AuthNonceRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
+    storage = sqlite,
     fixture = kamu_auth_web3_repo_tests::test_cleanup_expired_nonces,
-    harness = PostgresWeb3AuthNonceRepositoryHarness
+    harness = SqliteWeb3AuthNonceRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct PostgresWeb3AuthNonceRepositoryHarness {
+struct SqliteWeb3AuthNonceRepositoryHarness {
     catalog: dill::Catalog,
 }
 
-impl PostgresWeb3AuthNonceRepositoryHarness {
-    pub fn new(pg_pool: sqlx::PgPool) -> Self {
+impl SqliteWeb3AuthNonceRepositoryHarness {
+    pub fn new(pg_pool: sqlx::SqlitePool) -> Self {
         let mut b = dill::CatalogBuilder::new();
 
         b.add_value(pg_pool);
-        b.add::<database_common::PostgresTransactionManager>();
-        b.add::<kamu_auth_web3_postgres::PostgresWeb3AuthNonceRepository>();
+        b.add::<database_common::SqliteTransactionManager>();
+        b.add::<kamu_auth_web3_sqlite::SqliteWeb3AuthNonceRepository>();
 
         Self { catalog: b.build() }
     }
