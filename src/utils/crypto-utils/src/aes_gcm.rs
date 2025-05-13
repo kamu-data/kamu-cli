@@ -59,10 +59,5 @@ impl Encryptor for AesGcmEncryptor {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("AES-GCM error")]
 struct AesGcmError(aes_gcm::Error);
-
-impl std::fmt::Display for AesGcmError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "AES-GCM error")
-    }
-}
