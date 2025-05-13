@@ -45,7 +45,7 @@ impl PostgresWeb3AuthNonceRepositoryHarness {
 
         b.add_value(pg_pool);
         b.add::<database_common::PostgresTransactionManager>();
-        b.add::<kamu_auth_web3_postgres::PostgresWeb3AuthNonceRepository>();
+        b.add::<kamu_auth_web3_postgres::PostgresWeb3AuthEip4361NonceRepository>();
 
         Self { catalog: b.build() }
     }

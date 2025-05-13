@@ -15,13 +15,13 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresWeb3AuthNonceRepository {
+pub struct PostgresWeb3AuthEip4361NonceRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 #[dill::component(pub)]
 #[dill::interface(dyn Web3AuthEip4361NonceRepository)]
-impl PostgresWeb3AuthNonceRepository {
+impl PostgresWeb3AuthEip4361NonceRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -32,7 +32,7 @@ impl PostgresWeb3AuthNonceRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Web3AuthEip4361NonceRepository for PostgresWeb3AuthNonceRepository {
+impl Web3AuthEip4361NonceRepository for PostgresWeb3AuthEip4361NonceRepository {
     async fn set_nonce(&self, entity: &Web3AuthEip4361NonceEntity) -> Result<(), SetNonceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
