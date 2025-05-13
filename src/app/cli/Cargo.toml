@@ -106,7 +106,10 @@ kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
 kamu-search-qdrant = { workspace = true }
 
+kamu-auth-web3-inmem = { workspace = true }
+kamu-auth-web3-postgres = { workspace = true }
 kamu-auth-web3-services = { workspace = true }
+kamu-auth-web3-sqlite = { workspace = true }
 
 # Top-level TLS configuration
 # TODO: Include alloy, aws-smithy

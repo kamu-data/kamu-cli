@@ -6150,7 +6150,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-web3"
-version = "0.235.0"
+version = "0.236.0"
 dependencies = [
  "async-trait",
  "dill",
@@ -6491,7 +6491,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3"
-version = "0.235.0"
+version = "0.236.0"
 dependencies = [
  "alloy-primitives 1.1.0",
  "async-trait",
@@ -6506,7 +6506,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-inmem"
-version = "0.235.0"
+version = "0.236.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6521,7 +6521,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-postgres"
-version = "0.235.0"
+version = "0.236.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6539,7 +6539,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-repo-tests"
-version = "0.235.0"
+version = "0.236.0"
 dependencies = [
  "chrono",
  "dill",
@@ -6549,7 +6549,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-services"
-version = "0.235.0"
+version = "0.236.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6564,7 +6564,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-auth-web3-sqlite"
-version = "0.235.0"
+version = "0.236.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6635,7 +6635,10 @@ dependencies = [
  "kamu-auth-rebac-postgres",
  "kamu-auth-rebac-services",
  "kamu-auth-rebac-sqlite",
+ "kamu-auth-web3-inmem",
+ "kamu-auth-web3-postgres",
  "kamu-auth-web3-services",
+ "kamu-auth-web3-sqlite",
  "kamu-cli-puppet",
  "kamu-datafusion-cli",
  "kamu-datasets",
