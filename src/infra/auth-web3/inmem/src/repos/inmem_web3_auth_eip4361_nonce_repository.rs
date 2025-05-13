@@ -29,7 +29,7 @@ pub struct InMemoryWeb3AuthNonceRepository {
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn Web3AuthNonceRepository)]
+#[dill::interface(dyn Web3AuthEip4361NonceRepository)]
 #[dill::scope(dill::Singleton)]
 impl InMemoryWeb3AuthNonceRepository {
     pub fn new() -> Self {

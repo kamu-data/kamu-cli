@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod dependencies;
-mod web3_nonce_service_impl;
+mod web3_auth_eip4361_nonce_service_impl;
 
 pub use dependencies::*;
-pub use web3_nonce_service_impl::*;
+pub use web3_auth_eip4361_nonce_service_impl::*;

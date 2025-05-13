@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod evm_wallet_address;
-mod web3_auth_nonce;
-mod web3_auth_nonce_entity;
+mod web3_auth_eip4361_nonce;
+mod web3_auth_eip4361_nonce_entity;
 
 pub use evm_wallet_address::*;
-pub use web3_auth_nonce::*;
-pub use web3_auth_nonce_entity::*;
+pub use web3_auth_eip4361_nonce::*;
+pub use web3_auth_eip4361_nonce_entity::*;

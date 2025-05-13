@@ -25,7 +25,7 @@ pub const WEB3_AUTH_EIP_4361_EXPIRES_IN_15_MINUTES: Duration = Duration::minutes
 #[dill::interface(dyn Web3AuthEip4361NonceService)]
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
-    job_name: JOB_KAMU_WEB_3_NONCE_SERVICE,
+    job_name: JOB_KAMU_WEB3_AUTH_EIP4361_NONCE_SERVICE,
     depends_on: &[],
     requires_transaction: true,
 })]
@@ -60,7 +60,7 @@ impl Web3AuthEip4361NonceService for Web3AuthEip4361NonceServiceImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl InitOnStartup for Web3AuthEip4361NonceServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, name = Web3NonceServiceImpl_run_initialization)]
+    #[tracing::instrument(level = "debug", skip_all, name = Web3AuthEip4361NonceServiceImpl_run_initialization)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         let now = self.time_source.now();
 

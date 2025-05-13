@@ -7,6 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod web3_nonce_service;
+mod web3_auth_eip4361_nonce_service;
 
-pub use web3_nonce_service::*;
+pub use web3_auth_eip4361_nonce_service::*;

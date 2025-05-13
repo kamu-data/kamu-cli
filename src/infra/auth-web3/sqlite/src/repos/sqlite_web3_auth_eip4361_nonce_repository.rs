@@ -20,7 +20,7 @@ pub struct SqliteWeb3AuthNonceRepository {
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn Web3AuthNonceRepository)]
+#[dill::interface(dyn Web3AuthEip4361NonceRepository)]
 impl SqliteWeb3AuthNonceRepository {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
