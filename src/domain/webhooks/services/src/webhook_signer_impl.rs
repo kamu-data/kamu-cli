@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use kamu_webhooks::{WebhookRFC9421Headers, WebhookSigner, WebhookSubscriptionSecret};
 
-use crate::{HEADER_CONTENT_DIGEST, HEADER_WEBHOOK_TIMESTAMP};
+use crate::{HEADER_CONTENT_DIGEST, HEADER_WEBHOOK_TIMESTAMP, KAMU_WEBHOOK_KEY_ID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,15 +109,18 @@ impl WebhookSignerImpl {
         general_purpose::STANDARD.encode(tag)
     }
 
-    fn compute_digest(payload: &[u8]) -> String {
+    fn compute_content_digest(payload: &[u8]) -> String {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(payload);
-        let result = hasher.finalize();
-        format!("SHA-256={}", general_purpose::STANDARD.encode(result))
+        let digest = hasher.finalize();
+
+        let b64 = general_purpose::STANDARD.encode(digest);
+
+        format!("sha-256=:{}:", b64)
     }
 
-    pub fn generate_rfc9421_headers(
+    fn generate_rfc9421_headers_impl(
         secret: &[u8],
         method: &http::Method,
         uri: &http::Uri,
@@ -126,7 +129,7 @@ impl WebhookSignerImpl {
     ) -> WebhookRFC9421Headers {
         let mut headers = http::HeaderMap::new();
 
-        let digest_value = Self::compute_digest(payload_bytes);
+        let digest_value = Self::compute_content_digest(payload_bytes);
         headers.insert(HEADER_CONTENT_DIGEST, digest_value.parse().unwrap());
 
         headers.insert(
@@ -135,7 +138,7 @@ impl WebhookSignerImpl {
         );
 
         let sig_input = SignatureInput {
-            key_id: String::from("default"),
+            key_id: String::from(KAMU_WEBHOOK_KEY_ID),
             algorithm: "hmac-sha256",
             headers: vec![
                 SigningField::Derived(SIGNING_FIELD_METHOD),
@@ -178,7 +181,7 @@ impl WebhookSigner for WebhookSignerImpl {
 
         let secret = secret.as_ref().as_bytes();
 
-        Self::generate_rfc9421_headers(
+        Self::generate_rfc9421_headers_impl(
             secret,
             &http::Method::POST,
             &uri,

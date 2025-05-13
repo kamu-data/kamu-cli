@@ -36,7 +36,7 @@ base64 = { version = "0.22", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.13", default-features = false }
 http = { version = "1", default-features = false }
-reqwest = { version = "0.12", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots"] }
 ring = { version = "0.17", default-features = false}
 serde_json = { version = "1", default-features = false }
 sha2 = { version = "0.10", default-features = false }
@@ -45,3 +45,7 @@ url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
 
 [dev-dependencies]
+kamu-webhooks-inmem = { workspace = true }
+
+test-log = { version = "0.2", default-features = false }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
