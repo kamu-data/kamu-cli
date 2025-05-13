@@ -21,7 +21,7 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
     let wallet_address = EvmWalletAddress::random();
 
     {
-        let nonce_entity = Web3AuthenticationNonceEntity {
+        let nonce_entity = Web3AuthenticationEip4361NonceEntity {
             wallet_address,
             nonce: Web3AuthenticationEip4361Nonce::new(),
             expires_at: t0,
@@ -52,7 +52,7 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
         );
     }
     {
-        let updated_nonce_entity = Web3AuthenticationNonceEntity {
+        let updated_nonce_entity = Web3AuthenticationEip4361NonceEntity {
             wallet_address,
             nonce: Web3AuthenticationEip4361Nonce::new(),
             expires_at: t0 + Duration::minutes(15),
@@ -83,12 +83,12 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
 
     let t0 = Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap();
 
-    let nonce_1_expired = Web3AuthenticationNonceEntity {
+    let nonce_1_expired = Web3AuthenticationEip4361NonceEntity {
         wallet_address: EvmWalletAddress::random(),
         nonce: Web3AuthenticationEip4361Nonce::new(),
         expires_at: t0 - Duration::seconds(1),
     };
-    let nonce_2 = Web3AuthenticationNonceEntity {
+    let nonce_2 = Web3AuthenticationEip4361NonceEntity {
         wallet_address: EvmWalletAddress::random(),
         nonce: Web3AuthenticationEip4361Nonce::new(),
         expires_at: t0 + Duration::minutes(15),

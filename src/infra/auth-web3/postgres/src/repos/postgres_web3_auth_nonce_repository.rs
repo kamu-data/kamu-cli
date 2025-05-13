@@ -33,7 +33,10 @@ impl PostgresWeb3AuthNonceRepository {
 
 #[async_trait::async_trait]
 impl Web3AuthNonceRepository for PostgresWeb3AuthNonceRepository {
-    async fn set_nonce(&self, entity: &Web3AuthenticationNonceEntity) -> Result<(), SetNonceError> {
+    async fn set_nonce(
+        &self,
+        entity: &Web3AuthenticationEip4361NonceEntity,
+    ) -> Result<(), SetNonceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -59,12 +62,12 @@ impl Web3AuthNonceRepository for PostgresWeb3AuthNonceRepository {
     async fn get_nonce(
         &self,
         wallet: &EvmWalletAddress,
-    ) -> Result<Web3AuthenticationNonceEntity, GetNonceError> {
+    ) -> Result<Web3AuthenticationEip4361NonceEntity, GetNonceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let maybe_nonce_row = sqlx::query_as!(
-            Web3AuthenticationNonceEntityRowModel,
+            Web3AuthenticationEip4361NonceEntityRowModel,
             r#"
             SELECT wallet_address,
                    nonce,

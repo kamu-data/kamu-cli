@@ -14,7 +14,7 @@ use crate::{EvmWalletAddress, EvmWalletAddressConvertor, Web3AuthenticationEip43
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Web3AuthenticationNonceEntity {
+pub struct Web3AuthenticationEip4361NonceEntity {
     pub wallet_address: EvmWalletAddress,
     pub nonce: Web3AuthenticationEip4361Nonce,
     pub expires_at: DateTime<Utc>,
@@ -22,17 +22,19 @@ pub struct Web3AuthenticationNonceEntity {
 
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow)]
-pub struct Web3AuthenticationNonceEntityRowModel {
+pub struct Web3AuthenticationEip4361NonceEntityRowModel {
     pub wallet_address: String,
     pub nonce: String,
     pub expires_at: DateTime<Utc>,
 }
 
 #[cfg(feature = "sqlx")]
-impl TryFrom<Web3AuthenticationNonceEntityRowModel> for Web3AuthenticationNonceEntity {
+impl TryFrom<Web3AuthenticationEip4361NonceEntityRowModel>
+    for Web3AuthenticationEip4361NonceEntity
+{
     type Error = internal_error::InternalError;
 
-    fn try_from(v: Web3AuthenticationNonceEntityRowModel) -> Result<Self, Self::Error> {
+    fn try_from(v: Web3AuthenticationEip4361NonceEntityRowModel) -> Result<Self, Self::Error> {
         use internal_error::ResultIntoInternal;
 
         Ok(Self {

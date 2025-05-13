@@ -19,7 +19,7 @@ use crate::domain::*;
 
 #[derive(Default)]
 struct State {
-    nonce_by_wallet: HashMap<EvmWalletAddress, Web3AuthenticationNonceEntity>,
+    nonce_by_wallet: HashMap<EvmWalletAddress, Web3AuthenticationEip4361NonceEntity>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +43,10 @@ impl InMemoryWeb3AuthNonceRepository {
 
 #[async_trait::async_trait]
 impl Web3AuthNonceRepository for InMemoryWeb3AuthNonceRepository {
-    async fn set_nonce(&self, entity: &Web3AuthenticationNonceEntity) -> Result<(), SetNonceError> {
+    async fn set_nonce(
+        &self,
+        entity: &Web3AuthenticationEip4361NonceEntity,
+    ) -> Result<(), SetNonceError> {
         let mut writable_state = self.state.write().await;
 
         writable_state
@@ -56,7 +59,7 @@ impl Web3AuthNonceRepository for InMemoryWeb3AuthNonceRepository {
     async fn get_nonce(
         &self,
         wallet: &EvmWalletAddress,
-    ) -> Result<Web3AuthenticationNonceEntity, GetNonceError> {
+    ) -> Result<Web3AuthenticationEip4361NonceEntity, GetNonceError> {
         let readable_state = self.state.read().await;
 
         if let Some(nonce_entity) = readable_state.nonce_by_wallet.get(wallet) {
