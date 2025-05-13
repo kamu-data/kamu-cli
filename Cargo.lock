@@ -6549,6 +6549,7 @@ name = "kamu-auth-web3-services"
 version = "0.235.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "common-macros",
  "dill",
  "init-on-startup",

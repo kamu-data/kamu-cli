@@ -9,10 +9,15 @@
 
 use std::sync::Arc;
 
+use chrono::Duration;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_web3::*;
 use time_source::SystemTimeSource;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const WEB3_AUTH_EIP_4361_EXPIRES_IN_15_MINUTES: Duration = Duration::minutes(15);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,10 +42,12 @@ impl Web3NonceService for Web3NonceServiceImpl {
         &self,
         wallet_address: EvmWalletAddress,
     ) -> Result<Web3AuthenticationNonceEntity, CreateNonceError> {
+        let now = self.time_source.now();
+
         let entity = Web3AuthenticationNonceEntity {
             wallet_address,
             nonce: Web3AuthenticationNonce::new(),
-            expired_at: Default::default(),
+            expires_at: now + WEB3_AUTH_EIP_4361_EXPIRES_IN_15_MINUTES,
         };
 
         self.nonce_repo.set_nonce(&entity).await.int_err()?;

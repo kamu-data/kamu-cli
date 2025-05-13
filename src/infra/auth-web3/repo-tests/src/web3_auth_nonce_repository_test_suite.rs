@@ -17,14 +17,14 @@ use kamu_auth_web3::*;
 pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
     let harness = Web3AuthNonceRepositoryTestSuiteHarness::new(catalog);
 
-    let expired_at = Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap();
+    let t0 = Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap();
     let wallet_address = EvmWalletAddress::random();
 
     {
         let nonce_entity = Web3AuthenticationNonceEntity {
             wallet_address,
             nonce: Web3AuthenticationNonce::new(),
-            expired_at,
+            expires_at: t0,
         };
 
         pretty_assertions::assert_eq!(
@@ -55,7 +55,7 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
         let updated_nonce_entity = Web3AuthenticationNonceEntity {
             wallet_address,
             nonce: Web3AuthenticationNonce::new(),
-            expired_at: expired_at + Duration::minutes(15),
+            expires_at: t0 + Duration::minutes(15),
         };
 
         pretty_assertions::assert_eq!(
@@ -86,12 +86,12 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
     let nonce_1_expired = Web3AuthenticationNonceEntity {
         wallet_address: EvmWalletAddress::random(),
         nonce: Web3AuthenticationNonce::new(),
-        expired_at: t0 - Duration::seconds(1),
+        expires_at: t0 - Duration::seconds(1),
     };
     let nonce_2 = Web3AuthenticationNonceEntity {
         wallet_address: EvmWalletAddress::random(),
         nonce: Web3AuthenticationNonce::new(),
-        expired_at: t0 + Duration::minutes(15),
+        expires_at: t0 + Duration::minutes(15),
     };
 
     {

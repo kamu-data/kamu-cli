@@ -47,7 +47,7 @@ impl Web3AuthNonceRepository for PostgresWeb3AuthNonceRepository {
             "#,
             EvmWalletAddressConvertor::checksummed_string(&entity.wallet_address),
             entity.nonce.as_ref(),
-            entity.expired_at
+            entity.expires_at
         )
         .execute(connection_mut)
         .await

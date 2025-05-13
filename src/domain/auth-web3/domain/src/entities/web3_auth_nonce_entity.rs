@@ -17,7 +17,7 @@ use crate::{EvmWalletAddress, EvmWalletAddressConvertor, Web3AuthenticationNonce
 pub struct Web3AuthenticationNonceEntity {
     pub wallet_address: EvmWalletAddress,
     pub nonce: Web3AuthenticationNonce,
-    pub expired_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
 }
 
 #[cfg(feature = "sqlx")]
@@ -39,7 +39,7 @@ impl TryFrom<Web3AuthenticationNonceEntityRowModel> for Web3AuthenticationNonceE
             wallet_address: EvmWalletAddressConvertor::parse_checksummed(&v.wallet_address)
                 .int_err()?,
             nonce: v.nonce.try_into().int_err()?,
-            expired_at: v.expires_at,
+            expires_at: v.expires_at,
         })
     }
 }

@@ -74,7 +74,7 @@ impl Web3AuthNonceRepository for InMemoryWeb3AuthNonceRepository {
 
         writable_state
             .nonce_by_wallet
-            .retain(|_, nonce_entity| nonce_entity.expired_at > now);
+            .retain(|_, nonce_entity| nonce_entity.expires_at > now);
 
         Ok(())
     }
