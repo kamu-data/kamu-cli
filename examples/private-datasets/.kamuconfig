@@ -4,7 +4,7 @@ content:
   users:
     predefined:
       - accountName: admin
-        properties: [isAdmin]
+        properties: [admin]
         email: admin@private.datasets
       - accountName: alice
         avatarUrl: https://cdn-icons-png.flaticon.com/512/3665/3665909.png
