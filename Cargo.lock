@@ -7266,7 +7266,6 @@ dependencies = [
  "internal-error",
  "kamu-core",
  "messaging-outbox",
- "nutype",
  "opendatafabric",
  "rand 0.8.5",
  "serde",
