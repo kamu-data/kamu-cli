@@ -15,7 +15,7 @@ use dill::*;
 use engine::TransformRequestExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
-use random_strings::{get_random_string, AllowedSymbols};
+use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
 use super::build_preliminary_request_ext;
@@ -277,7 +277,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
 
             let step = VerifyTransformStep {
                 request: TransformRequestExt {
-                    operation_id: get_random_string(None, 10, &AllowedSymbols::Alphanumeric),
+                    operation_id: get_random_name(None, 10),
                     dataset_handle: target.get_handle().clone(),
                     block_ref: odf::BlockRef::Head,
                     head: block_t.prev_block_hash.unwrap().clone(),

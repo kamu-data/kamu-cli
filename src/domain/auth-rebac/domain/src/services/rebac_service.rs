@@ -13,6 +13,7 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
+    boolean_property_value,
     AccountPropertyName,
     AccountToDatasetRelation,
     DatasetPropertyName,
@@ -162,6 +163,15 @@ impl AccountProperties {
                 self.can_provision_accounts = value == PROPERTY_VALUE_BOOLEAN_TRUE;
             }
         };
+    }
+
+    pub fn as_property_value<'a>(&self, name: AccountPropertyName) -> PropertyValue<'a> {
+        let value = match name {
+            AccountPropertyName::IsAdmin => self.is_admin,
+            AccountPropertyName::CanProvisionAccounts => self.can_provision_accounts,
+        };
+
+        boolean_property_value(value)
     }
 }
 

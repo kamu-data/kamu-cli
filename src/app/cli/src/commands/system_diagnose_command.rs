@@ -26,7 +26,7 @@ use kamu::domain::{
     VerifyDatasetUseCase,
 };
 use kamu::utils::docker_images::BUSYBOX;
-use random_strings::{get_random_string, AllowedSymbols};
+use random_strings::get_random_name;
 use thiserror::Error;
 
 use super::{CLIError, Command};
@@ -264,11 +264,7 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
-            container_name: Some(get_random_string(
-                Some("kamu-check-rootless-run-"),
-                10,
-                &AllowedSymbols::Alphanumeric,
-            )),
+            container_name: Some(get_random_name(Some("kamu-check-rootless-run-"), 10)),
             ..RunArgs::default()
         };
 
@@ -310,11 +306,7 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
         let _ = OwnedFile::new(file_path);
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
-            container_name: Some(get_random_string(
-                Some("kamu-check-volume-mount-"),
-                10,
-                &AllowedSymbols::Alphanumeric,
-            )),
+            container_name: Some(get_random_name(Some("kamu-check-volume-mount-"), 10)),
             ..RunArgs::default()
         };
 

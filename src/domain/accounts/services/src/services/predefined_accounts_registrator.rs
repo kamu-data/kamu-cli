@@ -14,6 +14,7 @@ use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
 use kamu_auth_rebac::{boolean_property_value, AccountPropertyName, RebacService};
+use kamu_auth_rebac_services::DefaultAccountProperties;
 use odf::AccountID;
 
 use crate::LoginPasswordAuthProvider;
@@ -26,6 +27,7 @@ pub struct PredefinedAccountsRegistrator {
     login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
     account_repository: Arc<dyn AccountRepository>,
     rebac_service: Arc<dyn RebacService>,
+    default_account_properties: Arc<DefaultAccountProperties>,
 }
 
 #[component(pub)]
@@ -41,12 +43,14 @@ impl PredefinedAccountsRegistrator {
         login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
         account_repository: Arc<dyn AccountRepository>,
         rebac_service: Arc<dyn RebacService>,
+        default_account_properties: Arc<DefaultAccountProperties>,
     ) -> Self {
         Self {
             predefined_accounts_config,
             login_password_auth_provider,
             account_repository,
             rebac_service,
+            default_account_properties,
         }
     }
 
@@ -55,24 +59,17 @@ impl PredefinedAccountsRegistrator {
         account_id: &AccountID,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
-        let default_account_properties = vec![
-            AccountPropertyName::is_admin(false),
-            AccountPropertyName::can_provision_accounts(false),
-        ];
-
-        let predefined_properties =
-            if let Some(account_properties) = account_config.properties.as_ref() {
-                account_properties.clone()
-            } else {
-                Vec::new()
-            };
-
         // TODO: Revisit if batch property setting will be implemented
-        for (name, default_value) in default_account_properties {
-            let value = if predefined_properties.contains(&name) {
+        for name in [
+            AccountPropertyName::IsAdmin,
+            AccountPropertyName::CanProvisionAccounts,
+        ] {
+            let value = if let Some(predefined_properties) = &account_config.properties
+                && predefined_properties.contains(&name)
+            {
                 boolean_property_value(true)
             } else {
-                default_value
+                self.default_account_properties.as_property_value(name)
             };
 
             self.rebac_service

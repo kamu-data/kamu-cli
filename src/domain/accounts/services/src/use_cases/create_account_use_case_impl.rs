@@ -31,16 +31,11 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         email_maybe: Option<Email>,
     ) -> Result<Account, CreateAccountError> {
         let email = email_maybe.unwrap_or({
-            let email_str = if let Some(parent_account_parts) =
-                creator_account.email.to_string().split_once('@')
-            {
-                format!(
-                    "{}+{}@{}",
-                    parent_account_parts.0, account_name, parent_account_parts.1
-                )
-            } else {
-                format!("{account_name}@example.com")
-            };
+            let parent_host = creator_account.email.host();
+            let email_str = format!(
+                "{}+{}@{}",
+                creator_account.account_name, account_name, parent_host
+            );
 
             Email::parse(&email_str).int_err()?
         });

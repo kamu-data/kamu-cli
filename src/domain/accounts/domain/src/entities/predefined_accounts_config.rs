@@ -132,13 +132,7 @@ impl AccountConfig {
     }
 
     pub fn set_properties(mut self, properties: Vec<AccountPropertyName>) -> Self {
-        for property in properties {
-            let existing_properties = self.properties.get_or_insert_with(Vec::new);
-
-            if !existing_properties.contains(&property) {
-                existing_properties.push(property);
-            }
-        }
+        self.properties = Some(properties);
         self
     }
 

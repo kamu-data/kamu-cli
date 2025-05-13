@@ -21,7 +21,7 @@ use kamu_core::{
     TransformPreliminaryRequestExt,
     VerifyTransformPlanError,
 };
-use random_strings::{get_random_string, AllowedSymbols};
+use random_strings::get_random_name;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,7 +96,7 @@ pub async fn build_preliminary_request_ext(
 
     // Build preliminary transform request
     Ok(TransformPreliminaryRequestExt {
-        operation_id: get_random_string(None, 10, &AllowedSymbols::Alphanumeric),
+        operation_id: get_random_name(None, 10),
         dataset_handle: target.get_handle().clone(),
         block_ref,
         head,

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use kamu_core::*;
-use random_strings::{get_random_string, AllowedSymbols};
+use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +143,7 @@ impl PushIngestPlanner for PushIngestPlannerImpl {
             )),
         }?;
 
-        let operation_id = get_random_string(None, 10, &AllowedSymbols::Alphanumeric);
+        let operation_id = get_random_name(None, 10);
         let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
 
         Ok(PushIngestPlan {

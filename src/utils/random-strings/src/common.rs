@@ -10,6 +10,10 @@
 use rand::distributions::{Alphanumeric, Uniform};
 use rand::prelude::Distribution;
 
+pub fn get_random_name(prefix_maybe: Option<&str>, random_length: usize) -> String {
+    get_random_string(prefix_maybe, random_length, &AllowedSymbols::Alphanumeric)
+}
+
 pub fn get_random_string(
     prefix_maybe: Option<&str>,
     random_length: usize,
