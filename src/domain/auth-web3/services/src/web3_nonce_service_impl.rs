@@ -30,7 +30,7 @@ pub const WEB3_AUTH_EIP_4361_EXPIRES_IN_15_MINUTES: Duration = Duration::minutes
     requires_transaction: true,
 })]
 pub struct Web3NonceServiceImpl {
-    nonce_repo: Arc<dyn Web3AuthNonceRepository>,
+    nonce_repo: Arc<dyn Web3AuthEip4361NonceRepository>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 

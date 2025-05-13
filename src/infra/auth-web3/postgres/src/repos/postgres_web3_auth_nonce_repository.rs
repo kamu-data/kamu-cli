@@ -32,7 +32,7 @@ impl PostgresWeb3AuthNonceRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Web3AuthNonceRepository for PostgresWeb3AuthNonceRepository {
+impl Web3AuthEip4361NonceRepository for PostgresWeb3AuthNonceRepository {
     async fn set_nonce(&self, entity: &Web3AuthEip4361NonceEntity) -> Result<(), SetNonceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;

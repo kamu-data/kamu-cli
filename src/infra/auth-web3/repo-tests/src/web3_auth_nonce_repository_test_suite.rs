@@ -31,24 +31,14 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
             Err(GetNonceError::NotFound {
                 wallet: wallet_address
             }),
-            harness
-                .web3_auth_nonce_repo
-                .get_nonce(&wallet_address)
-                .await
+            harness.nonce_repo.get_nonce(&wallet_address).await
         );
 
-        pretty_assertions::assert_eq!(
-            Ok(()),
-            harness.web3_auth_nonce_repo.set_nonce(&nonce_entity).await,
-        );
+        pretty_assertions::assert_eq!(Ok(()), harness.nonce_repo.set_nonce(&nonce_entity).await,);
 
         pretty_assertions::assert_eq!(
             Ok(&nonce_entity),
-            harness
-                .web3_auth_nonce_repo
-                .get_nonce(&wallet_address)
-                .await
-                .as_ref()
+            harness.nonce_repo.get_nonce(&wallet_address).await.as_ref()
         );
     }
     {
@@ -60,18 +50,12 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
 
         pretty_assertions::assert_eq!(
             Ok(()),
-            harness
-                .web3_auth_nonce_repo
-                .set_nonce(&updated_nonce_entity)
-                .await,
+            harness.nonce_repo.set_nonce(&updated_nonce_entity).await,
         );
 
         pretty_assertions::assert_eq!(
             Ok(updated_nonce_entity),
-            harness
-                .web3_auth_nonce_repo
-                .get_nonce(&wallet_address)
-                .await
+            harness.nonce_repo.get_nonce(&wallet_address).await
         );
     }
 }
@@ -95,39 +79,24 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
     };
 
     {
-        pretty_assertions::assert_eq!(
-            Ok(()),
-            harness
-                .web3_auth_nonce_repo
-                .set_nonce(&nonce_1_expired)
-                .await,
-        );
-        pretty_assertions::assert_eq!(
-            Ok(()),
-            harness.web3_auth_nonce_repo.set_nonce(&nonce_2).await,
-        );
+        pretty_assertions::assert_eq!(Ok(()), harness.nonce_repo.set_nonce(&nonce_1_expired).await,);
+        pretty_assertions::assert_eq!(Ok(()), harness.nonce_repo.set_nonce(&nonce_2).await,);
 
-        pretty_assertions::assert_eq!(
-            Ok(()),
-            harness
-                .web3_auth_nonce_repo
-                .cleanup_expired_nonces(t0)
-                .await,
-        );
+        pretty_assertions::assert_eq!(Ok(()), harness.nonce_repo.cleanup_expired_nonces(t0).await,);
 
         pretty_assertions::assert_eq!(
             Err(GetNonceError::NotFound {
                 wallet: nonce_1_expired.wallet_address
             }),
             harness
-                .web3_auth_nonce_repo
+                .nonce_repo
                 .get_nonce(&nonce_1_expired.wallet_address)
                 .await
         );
         pretty_assertions::assert_eq!(
             Ok(&nonce_2),
             harness
-                .web3_auth_nonce_repo
+                .nonce_repo
                 .get_nonce(&nonce_2.wallet_address)
                 .await
                 .as_ref()
@@ -136,20 +105,14 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
     {
         let t1 = t0 + Duration::minutes(20);
 
-        pretty_assertions::assert_eq!(
-            Ok(()),
-            harness
-                .web3_auth_nonce_repo
-                .cleanup_expired_nonces(t1)
-                .await,
-        );
+        pretty_assertions::assert_eq!(Ok(()), harness.nonce_repo.cleanup_expired_nonces(t1).await,);
 
         pretty_assertions::assert_eq!(
             Err(GetNonceError::NotFound {
                 wallet: nonce_1_expired.wallet_address
             }),
             harness
-                .web3_auth_nonce_repo
+                .nonce_repo
                 .get_nonce(&nonce_1_expired.wallet_address)
                 .await
         );
@@ -161,13 +124,13 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Web3AuthNonceRepositoryTestSuiteHarness {
-    pub web3_auth_nonce_repo: Arc<dyn Web3AuthNonceRepository>,
+    pub nonce_repo: Arc<dyn Web3AuthEip4361NonceRepository>,
 }
 
 impl Web3AuthNonceRepositoryTestSuiteHarness {
     pub fn new(catalog: &dill::Catalog) -> Self {
         Self {
-            web3_auth_nonce_repo: catalog.get_one().unwrap(),
+            nonce_repo: catalog.get_one().unwrap(),
         }
     }
 }

@@ -32,7 +32,7 @@ impl SqliteWeb3AuthNonceRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Web3AuthNonceRepository for SqliteWeb3AuthNonceRepository {
+impl Web3AuthEip4361NonceRepository for SqliteWeb3AuthNonceRepository {
     async fn set_nonce(&self, entity: &Web3AuthEip4361NonceEntity) -> Result<(), SetNonceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;

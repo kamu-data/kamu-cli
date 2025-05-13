@@ -42,7 +42,7 @@ impl InMemoryWeb3AuthNonceRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Web3AuthNonceRepository for InMemoryWeb3AuthNonceRepository {
+impl Web3AuthEip4361NonceRepository for InMemoryWeb3AuthNonceRepository {
     async fn set_nonce(&self, entity: &Web3AuthEip4361NonceEntity) -> Result<(), SetNonceError> {
         let mut writable_state = self.state.write().await;
 
