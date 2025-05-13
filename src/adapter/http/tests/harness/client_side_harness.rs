@@ -20,7 +20,11 @@ use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryOAuthDeviceCodeRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
+    InMemoryOAuthDeviceCodeRepository,
+};
 use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -39,7 +43,6 @@ use kamu_datasets_inmem::{
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;
@@ -201,7 +204,7 @@ impl ClientSideHarness {
         b.add::<InMemoryRebacRepository>();
         b.add_value(DefaultAccountProperties::default());
         b.add_value(DefaultDatasetProperties::default());
-        b.add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample());
+        b.add_value(DidSecretEncryptionConfig::sample());
 
         b.add::<RebacDatasetRegistryFacadeImpl>();
 

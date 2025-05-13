@@ -17,7 +17,11 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     DUMMY_EMAIL_ADDRESS,
 };
-use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryOAuthDeviceCodeRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccessTokenRepository,
+    InMemoryDidSecretKeyRepository,
+    InMemoryOAuthDeviceCodeRepository,
+};
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
@@ -25,7 +29,6 @@ use kamu_accounts_services::{
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
 };
-use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 

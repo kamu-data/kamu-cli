@@ -50,7 +50,7 @@ pub async fn authentication_catalogs(
         .add_value(DefaultDatasetProperties::default())
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
-        .add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample())
+        .add_value(DidSecretEncryptionConfig::sample())
         .add_value(predefined_accounts_config)
         .build();
 

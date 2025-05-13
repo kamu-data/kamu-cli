@@ -7,35 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PostgresTransactionManager;
+use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_postgres::PostgresAccountRepository;
-use kamu_did_secret_keys_postgres::PostgresDidSecretKeyRepository;
-use sqlx::PgPool;
+use kamu_accounts_sqlite::{SqliteAccountRepository, SqliteDidSecretKeyRepository};
+use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
-    fixture = kamu_did_secret_keys_repo_tests::test_insert_and_locate_did_secret_keys,
-    harness = PostgresDidSecretKeyRepositoryHarness
+    storage = sqlite,
+    fixture =
+        kamu_accounts_repo_tests::did_secret_key_repository::test_insert_and_locate_did_secret_keys,
+    harness = SqliteDidSecretKeyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct PostgresDidSecretKeyRepositoryHarness {
+struct SqliteDidSecretKeyRepositoryHarness {
     catalog: Catalog,
 }
 
-impl PostgresDidSecretKeyRepositoryHarness {
-    pub fn new(pg_pool: PgPool) -> Self {
-        // Initialize catalog with predefined Postgres pool
+impl SqliteDidSecretKeyRepositoryHarness {
+    pub fn new(sqlite_pool: SqlitePool) -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add_value(pg_pool);
-        catalog_builder.add::<PostgresTransactionManager>();
-        catalog_builder.add::<PostgresDidSecretKeyRepository>();
-        catalog_builder.add::<PostgresAccountRepository>();
+        catalog_builder.add_value(sqlite_pool);
+        catalog_builder.add::<SqliteTransactionManager>();
+        catalog_builder.add::<SqliteDidSecretKeyRepository>();
+        catalog_builder.add::<SqliteAccountRepository>();
 
         Self {
             catalog: catalog_builder.build(),

@@ -11,12 +11,16 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
-use kamu_accounts::DEFAULT_ACCOUNT_ID;
+use kamu_accounts::{
+    DidEntityType,
+    DidSecretEncryptionConfig,
+    DidSecretKeyRepository,
+    DEFAULT_ACCOUNT_ID,
+};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
-use kamu_did_secret_keys::{DidEntityType, DidSecretEncryptionConfig, DidSecretKeyRepository};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceStub;
 

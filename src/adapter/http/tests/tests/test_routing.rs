@@ -15,8 +15,8 @@ use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
-use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -38,7 +38,6 @@ use kamu_datasets_inmem::{
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
@@ -93,7 +92,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<RebacServiceImpl>()
         .add::<InMemoryRebacRepository>()
         .add::<InMemoryDidSecretKeyRepository>()
-        .add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample())
+        .add_value(DidSecretEncryptionConfig::sample())
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
         .add_value(PredefinedAccountsConfig::single_tenant())

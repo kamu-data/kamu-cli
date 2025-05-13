@@ -18,14 +18,13 @@ use kamu::domain::auth::DatasetAction;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::CreateDatasetUseCase;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::DummyOutboxImpl;
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
@@ -379,7 +378,7 @@ impl ServerHarness {
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add::<InMemoryAccountRepository>()
-                .add_value(kamu_did_secret_keys::DidSecretEncryptionConfig::sample());
+                .add_value(DidSecretEncryptionConfig::sample());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

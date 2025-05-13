@@ -16,8 +16,8 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -34,8 +34,6 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_did_secret_keys::DidSecretEncryptionConfig;
-use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};

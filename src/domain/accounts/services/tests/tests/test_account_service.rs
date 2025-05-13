@@ -15,10 +15,14 @@ use kamu_accounts::{
     AccountConfig,
     AccountService,
     AccountServiceExt,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    DidSecretKeyRepository,
     Password,
     PredefinedAccountsConfig,
+    SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -30,13 +34,6 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_did_secret_keys::{
-    DidSecretEncryptionConfig,
-    DidSecretKey,
-    DidSecretKeyRepository,
-    SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
-};
-use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use odf::metadata::{DidKey, DidOdf};
 use odf::AccountName;
 use time_source::SystemTimeSourceDefault;

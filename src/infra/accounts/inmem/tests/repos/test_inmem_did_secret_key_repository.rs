@@ -7,34 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_sqlite::SqliteAccountRepository;
-use kamu_did_secret_keys_sqlite::SqliteDidSecretKeyRepository;
-use sqlx::SqlitePool;
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = sqlite,
-    fixture = kamu_did_secret_keys_repo_tests::test_insert_and_locate_did_secret_keys,
-    harness = SqliteDidSecretKeyRepositoryHarness
+    storage = inmem,
+    fixture =
+        kamu_accounts_repo_tests::did_secret_key_repository::test_insert_and_locate_did_secret_keys,
+    harness = InMemoryDidSecretKeyRepositoryHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct SqliteDidSecretKeyRepositoryHarness {
+struct InMemoryDidSecretKeyRepositoryHarness {
     catalog: Catalog,
 }
 
-impl SqliteDidSecretKeyRepositoryHarness {
-    pub fn new(sqlite_pool: SqlitePool) -> Self {
+impl InMemoryDidSecretKeyRepositoryHarness {
+    pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add_value(sqlite_pool);
-        catalog_builder.add::<SqliteTransactionManager>();
-        catalog_builder.add::<SqliteDidSecretKeyRepository>();
-        catalog_builder.add::<SqliteAccountRepository>();
+        catalog_builder.add::<InMemoryDidSecretKeyRepository>();
+        catalog_builder.add::<InMemoryAccountRepository>();
 
         Self {
             catalog: catalog_builder.build(),

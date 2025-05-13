@@ -11,19 +11,19 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{
+    CurrentAccountSubject,
+    DidEntity,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    DidSecretKeyRepository,
+};
 use kamu_core::{DatasetRegistry, DidGenerator, ResolvedDataset};
 use kamu_datasets::{
     CreateDatasetFromSnapshotError,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetResult,
     CreateDatasetUseCaseOptions,
-};
-use kamu_did_secret_keys::{
-    DidEntity,
-    DidSecretEncryptionConfig,
-    DidSecretKey,
-    DidSecretKeyRepository,
 };
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;

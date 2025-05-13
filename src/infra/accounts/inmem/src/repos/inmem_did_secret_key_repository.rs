@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use kamu_did_secret_keys::{
+use kamu_accounts::{
     DidEntity,
     DidEntityType,
     DidSecretKey,

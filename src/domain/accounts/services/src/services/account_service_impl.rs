@@ -13,29 +13,7 @@ use std::sync::Arc;
 use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{
-    Account,
-    AccountPageStream,
-    AccountRepository,
-    AccountService,
-    AccountType,
-    CreateAccountError,
-    FindAccountIdByNameError,
-    GetAccountByIdError,
-    GetAccountByNameError,
-    GetAccountMapError,
-    ModifyPasswordError,
-    Password,
-    PasswordHashRepository,
-    SearchAccountsByNamePatternFilters,
-    PROVIDER_PASSWORD,
-};
-use kamu_did_secret_keys::{
-    DidEntity,
-    DidSecretEncryptionConfig,
-    DidSecretKey,
-    DidSecretKeyRepository,
-};
+use kamu_accounts::*;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 

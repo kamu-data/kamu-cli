@@ -29,7 +29,6 @@ email-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
-kamu-did-secret-keys = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
@@ -53,7 +52,6 @@ uuid = { version = "1", default-features = false }
 kamu-accounts = { workspace = true, default-features = false, features = ["testing"] }
 kamu-auth-rebac-services = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
-kamu-did-secret-keys-inmem = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
 
 mockall = "0.13"

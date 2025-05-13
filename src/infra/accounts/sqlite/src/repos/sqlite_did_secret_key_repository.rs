@@ -9,7 +9,7 @@
 
 use database_common::{TransactionRef, TransactionRefT};
 use internal_error::ResultIntoInternal;
-use kamu_did_secret_keys::{
+use kamu_accounts::{
     DidEntity,
     DidEntityType,
     DidSecretKey,

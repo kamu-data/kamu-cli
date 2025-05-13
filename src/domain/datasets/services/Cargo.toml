@@ -38,7 +38,6 @@ kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
-kamu-did-secret-keys = { workspace = true }
 messaging-outbox = { workspace = true }
 mockall = { optional = true, version = "0.13" }
 odf = { workspace = true, features = ["http", "lfs", "s3"] }
@@ -75,7 +74,6 @@ kamu-core = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
-kamu-did-secret-keys-inmem = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 
 indoc = "2"

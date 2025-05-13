@@ -6068,8 +6068,6 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-inmem",
  "messaging-outbox",
  "mockall",
  "opendatafabric",
@@ -6129,8 +6127,6 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-inmem",
  "messaging-outbox",
  "opendatafabric",
  "oso",
@@ -6208,8 +6204,6 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-inmem",
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
@@ -6278,8 +6272,6 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-inmem",
  "kamu-ingest-datafusion",
  "messaging-outbox",
  "mockall",
@@ -6360,8 +6352,6 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-inmem",
  "messaging-outbox",
  "opendatafabric",
  "pretty_assertions",
@@ -6532,10 +6522,6 @@ dependencies = [
  "kamu-datasets-postgres",
  "kamu-datasets-services",
  "kamu-datasets-sqlite",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-inmem",
- "kamu-did-secret-keys-postgres",
- "kamu-did-secret-keys-sqlite",
  "kamu-flow-system-inmem",
  "kamu-flow-system-postgres",
  "kamu-flow-system-services",
@@ -6900,8 +6886,6 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-inmem",
  "messaging-outbox",
  "mockall",
  "nutype",
@@ -6945,87 +6929,6 @@ dependencies = [
  "test-log",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "kamu-did-secret-keys"
-version = "0.236.0"
-dependencies = [
- "async-trait",
- "crypto-utils",
- "dill",
- "internal-error",
- "opendatafabric",
- "serde",
- "serde_with",
- "sqlx",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "kamu-did-secret-keys-inmem"
-version = "0.236.0"
-dependencies = [
- "async-trait",
- "database-common",
- "database-common-macros",
- "dill",
- "internal-error",
- "kamu-accounts-inmem",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-repo-tests",
- "opendatafabric",
- "test-group",
- "test-log",
- "tokio",
-]
-
-[[package]]
-name = "kamu-did-secret-keys-postgres"
-version = "0.236.0"
-dependencies = [
- "async-trait",
- "database-common",
- "database-common-macros",
- "dill",
- "internal-error",
- "kamu-accounts-postgres",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-repo-tests",
- "opendatafabric",
- "sqlx",
- "test-group",
- "test-log",
-]
-
-[[package]]
-name = "kamu-did-secret-keys-repo-tests"
-version = "0.236.0"
-dependencies = [
- "chrono",
- "dill",
- "email-utils",
- "kamu-accounts",
- "kamu-did-secret-keys",
- "opendatafabric",
-]
-
-[[package]]
-name = "kamu-did-secret-keys-sqlite"
-version = "0.236.0"
-dependencies = [
- "async-trait",
- "database-common",
- "database-common-macros",
- "dill",
- "internal-error",
- "kamu-accounts-sqlite",
- "kamu-did-secret-keys",
- "kamu-did-secret-keys-repo-tests",
- "opendatafabric",
- "sqlx",
- "test-group",
- "test-log",
 ]
 
 [[package]]

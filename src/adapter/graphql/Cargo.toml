@@ -81,8 +81,6 @@ kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
-kamu-did-secret-keys = { workspace = true }
-kamu-did-secret-keys-inmem = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }

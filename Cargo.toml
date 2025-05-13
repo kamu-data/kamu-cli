@@ -43,7 +43,6 @@ members = [
     "src/domain/auth-rebac/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
-    "src/domain/did-secret-keys",
     "src/domain/flow-system/domain",
     "src/domain/search/domain",
     "src/domain/task-system/domain",
@@ -72,11 +71,6 @@ members = [
     "src/infra/datasets/inmem",
     "src/infra/datasets/postgres",
     "src/infra/datasets/sqlite",
-    ## Did secret keys
-    "src/infra/did-secret-keys/repo-tests",
-    "src/infra/did-secret-keys/inmem",
-    "src/infra/did-secret-keys/postgres",
-    "src/infra/did-secret-keys/sqlite",
     ## Search
     "src/infra/search/openai",
     "src/infra/search/qdrant",
@@ -155,7 +149,6 @@ kamu-accounts = { version = "0.236.0", path = "src/domain/accounts/domain", defa
 kamu-auth-rebac = { version = "0.236.0", path = "src/domain/auth-rebac/domain", default-features = false }
 kamu-core = { version = "0.236.0", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.236.0", path = "src/domain/datasets/domain", default-features = false }
-kamu-did-secret-keys = { version = "0.236.0", path = "src/domain/did-secret-keys", default-features = false }
 kamu-flow-system = { version = "0.236.0", path = "src/domain/flow-system/domain", default-features = false }
 kamu-search = { version = "0.236.0", path = "src/domain/search/domain", default-features = false }
 kamu-task-system = { version = "0.236.0", path = "src/domain/task-system/domain", default-features = false }
@@ -199,11 +192,6 @@ kamu-datasets-inmem = { version = "0.236.0", path = "src/infra/datasets/inmem", 
 kamu-datasets-postgres = { version = "0.236.0", path = "src/infra/datasets/postgres", default-features = false }
 kamu-datasets-sqlite = { version = "0.236.0", path = "src/infra/datasets/sqlite", default-features = false }
 kamu-datasets-repo-tests = { version = "0.236.0", path = "src/infra/datasets/repo-tests", default-features = false }
-## Did secret keys
-kamu-did-secret-keys-inmem = { version = "0.236.0", path = "src/infra/did-secret-keys/inmem", default-features = false }
-kamu-did-secret-keys-postgres = { version = "0.236.0", path = "src/infra/did-secret-keys/postgres", default-features = false }
-kamu-did-secret-keys-sqlite = { version = "0.236.0", path = "src/infra/did-secret-keys/sqlite", default-features = false }
-kamu-did-secret-keys-repo-tests = { version = "0.236.0", path = "src/infra/did-secret-keys/repo-tests", default-features = false }
 ## Search
 kamu-search-openai = { version = "0.236.0", path = "src/infra/search/openai", default-features = false }
 kamu-search-qdrant = { version = "0.236.0", path = "src/infra/search/qdrant", default-features = false }

@@ -60,8 +60,6 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
-kamu-did-secret-keys = { workspace = true }
-kamu-did-secret-keys-inmem = { workspace = true }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
@@ -22,8 +22,6 @@ use kamu_datasets_inmem::*;
 use kamu_datasets_services::testing::TestDatasetOutboxListener;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_did_secret_keys::DidSecretEncryptionConfig;
-use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::*;
 use time_source::*;
 

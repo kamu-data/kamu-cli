@@ -9,8 +9,10 @@
 
 use chrono::{SubsecRound, Utc};
 use email_utils::Email;
-use kamu_accounts::{Account, AccountRepository, AccountType};
-use kamu_did_secret_keys::{
+use kamu_accounts::{
+    Account,
+    AccountRepository,
+    AccountType,
     DidEntity,
     DidEntityType,
     DidSecretKey,

@@ -16,7 +16,6 @@ use duration_string::DurationString;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_did_secret_keys::DidSecretEncryptionConfig;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;

@@ -14,7 +14,8 @@ use dill::*;
 use futures::{future, StreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::DatasetRegistrySoloUnitBridge;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig};
+use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
@@ -26,8 +27,6 @@ use kamu_datasets_inmem::{
 use kamu_datasets_services::testing::FakeConnectingDatasetEntryWriter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use kamu_did_secret_keys::DidSecretEncryptionConfig;
-use kamu_did_secret_keys_inmem::InMemoryDidSecretKeyRepository;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
