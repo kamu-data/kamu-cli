@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_core::{
     DatasetNodeNotFoundError,
     DatasetRegistry,
@@ -315,14 +315,21 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     async fn get_downstream_dependencies(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DependencyDatasetIDStream, GetDependenciesError> {
+    ) -> DependencyDatasetIDStream {
         let downstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
 
-            let node_index = state
-                .get_dataset_node(dataset_id)
-                .map_err(GetDependenciesError::DatasetNotFound)?;
+            // Try to get node index, but don't panic if not found
+            let node_index = match state.get_dataset_node(dataset_id) {
+                Ok(node_index) => node_index,
+                Err(DatasetNodeNotFoundError { .. }) => {
+                    // Don't panic if dataset not found, just stream empty collection
+                    tracing::debug!(%dataset_id, "Dataset not found in dependency graph. Empty dependencies list returned");
+                    return Box::pin(tokio_stream::empty());
+                }
+            };
 
+            // Dataset found, so we can safely get downstream dependencies
             state
                 .datasets_graph
                 .neighbors_directed(node_index, Direction::Outgoing)
@@ -336,7 +343,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
                 .collect()
         };
 
-        Ok(Box::pin(tokio_stream::iter(downstream_node_datasets)))
+        Box::pin(tokio_stream::iter(downstream_node_datasets))
     }
 
     /// Iterates over 1st level of dataset's upstream dependencies
@@ -344,14 +351,21 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
     async fn get_upstream_dependencies(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DependencyDatasetIDStream, GetDependenciesError> {
+    ) -> DependencyDatasetIDStream {
         let upstream_node_datasets: Vec<_> = {
             let state = self.state.read().await;
 
-            let node_index = state
-                .get_dataset_node(dataset_id)
-                .map_err(GetDependenciesError::DatasetNotFound)?;
+            // Try to get node index, but don't panic if not found
+            let node_index = match state.get_dataset_node(dataset_id) {
+                Ok(node_index) => node_index,
+                Err(DatasetNodeNotFoundError { .. }) => {
+                    // Don't panic if dataset not found, just stream empty collection
+                    tracing::debug!(%dataset_id, "Dataset not found in dependency graph. Empty dependencies list returned");
+                    return Box::pin(tokio_stream::empty());
+                }
+            };
 
+            // Dataset found, so we can safely get upstream dependencies
             state
                 .datasets_graph
                 .neighbors_directed(node_index, Direction::Incoming)
@@ -365,7 +379,7 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
                 .collect()
         };
 
-        Ok(Box::pin(tokio_stream::iter(upstream_node_datasets)))
+        Box::pin(tokio_stream::iter(upstream_node_datasets))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?order))]
@@ -424,10 +438,16 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DependencyGraphServiceImpl {
             DatasetLifecycleMessage::Deleted(deleted) => {
                 let mut state = self.state.write().await;
 
-                let node_index = state.get_dataset_node(&deleted.dataset_id).int_err()?;
-
-                state.datasets_graph.remove_node(node_index);
-                state.dataset_node_indices.remove(&deleted.dataset_id);
+                match state.get_dataset_node(&deleted.dataset_id) {
+                    Ok(node_index) => {
+                        state.datasets_graph.remove_node(node_index);
+                        state.dataset_node_indices.remove(&deleted.dataset_id);
+                    }
+                    Err(DatasetNodeNotFoundError { .. }) => {
+                        // Don't panic if dataset not found, just ignore
+                        tracing::debug!(%deleted.dataset_id, "Dataset not found in dependency graph. No delete action taken");
+                    }
+                }
 
                 Ok(())
             }

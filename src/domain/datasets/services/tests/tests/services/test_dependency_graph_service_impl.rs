@@ -761,8 +761,6 @@ impl DependencyGraphHarness {
             .dependency_graph_service
             .get_downstream_dependencies(&dataset_id)
             .await
-            .int_err()
-            .unwrap()
             .collect()
             .await;
 
@@ -834,8 +832,6 @@ impl DependencyGraphHarness {
             .dependency_graph_service
             .get_upstream_dependencies(&dataset_id)
             .await
-            .int_err()
-            .unwrap()
             .collect()
             .await;
 
