@@ -46,7 +46,7 @@ impl Web3NonceService for Web3NonceServiceImpl {
 
         let entity = Web3AuthenticationNonceEntity {
             wallet_address,
-            nonce: Web3AuthenticationNonce::new(),
+            nonce: Web3AuthenticationEip4361Nonce::new(),
             expires_at: now + WEB3_AUTH_EIP_4361_EXPIRES_IN_15_MINUTES,
         };
 

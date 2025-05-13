@@ -16,9 +16,9 @@ use nutype::nutype;
     validate(len_char_min = 8),
     derive(AsRef, Clone, Debug, PartialEq, TryFrom)
 )]
-pub struct Web3AuthenticationNonce(String);
+pub struct Web3AuthenticationEip4361Nonce(String);
 
-impl Web3AuthenticationNonce {
+impl Web3AuthenticationEip4361Nonce {
     pub fn new() -> Self {
         Self::try_new(siwe::generate_nonce()).expect("Invalid nonce generated")
     }

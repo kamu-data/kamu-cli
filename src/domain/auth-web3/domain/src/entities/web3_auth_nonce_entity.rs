@@ -9,14 +9,14 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{EvmWalletAddress, EvmWalletAddressConvertor, Web3AuthenticationNonce};
+use crate::{EvmWalletAddress, EvmWalletAddressConvertor, Web3AuthenticationEip4361Nonce};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Web3AuthenticationNonceEntity {
     pub wallet_address: EvmWalletAddress,
-    pub nonce: Web3AuthenticationNonce,
+    pub nonce: Web3AuthenticationEip4361Nonce,
     pub expires_at: DateTime<Utc>,
 }
 
