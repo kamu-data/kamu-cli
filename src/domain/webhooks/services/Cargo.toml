@@ -1,0 +1,39 @@
+[package]
+name = "kamu-webhooks-services"
+description = "Service layer of webhooks domain"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
+odf = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-task-system-services = { workspace = true }
+kamu-webhooks = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.13", default-features = false }
+serde_json = { version = "1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+uuid = { version = "1", default-features = false }
+
+[dev-dependencies]

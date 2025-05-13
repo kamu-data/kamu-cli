@@ -453,10 +453,10 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         Ok(record.map(|record| WebhookSubscriptionId::new(record.id)))
     }
 
-    async fn list_subscription_ids_by_dataset_and_event_type(
+    async fn list_enabled_subscription_ids_by_dataset_and_event_type(
         &self,
         dataset_id: &odf::DatasetID,
-        event_type: WebhookEventType,
+        event_type: &WebhookEventType,
     ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -467,8 +467,9 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         let records = sqlx::query!(
             r#"
             SELECT id FROM webhook_subscriptions
-                WHERE dataset_id = $1 AND event_types::text[] @> $2::text[] and
-                    status != 'REMOVED'::webhook_subscription_status
+                WHERE dataset_id = $1 AND
+                    status = 'ENABLED'::webhook_subscription_status AND
+                    event_types::text[] @> $2::text[]
             "#,
             dataset_id,
             &vec![event_type],

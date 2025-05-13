@@ -489,10 +489,10 @@ impl WebhookSubscriptionEventStore for SqliteWebhookSubscriptionEventStore {
         Ok(record.map(|record| WebhookSubscriptionId::new(record.id)))
     }
 
-    async fn list_subscription_ids_by_dataset_and_event_type(
+    async fn list_enabled_subscription_ids_by_dataset_and_event_type(
         &self,
         dataset_id: &odf::DatasetID,
-        event_type: WebhookEventType,
+        event_type: &WebhookEventType,
     ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -503,7 +503,9 @@ impl WebhookSubscriptionEventStore for SqliteWebhookSubscriptionEventStore {
         let records = sqlx::query!(
             r#"
             SELECT id as "id: uuid::Uuid" FROM webhook_subscriptions
-                WHERE dataset_id = $1 AND event_types LIKE '%' || $2 || '%' AND status != 'REMOVED'
+                WHERE dataset_id = $1 AND
+                      status = 'ENABLED' AND
+                      event_types LIKE '%' || $2 || '%'
             "#,
             dataset_id,
             event_type,

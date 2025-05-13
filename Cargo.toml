@@ -54,6 +54,7 @@ members = [
     "src/domain/flow-system/services",
     "src/domain/search/services",
     "src/domain/task-system/services",
+    "src/domain/webhooks/services",
     # Infra
     "src/infra/core",
     "src/infra/ingest-datafusion",
@@ -179,6 +180,8 @@ kamu-datasets-services = { version = "0.237.0", path = "src/domain/datasets/serv
 kamu-flow-system-services = { version = "0.237.0", path = "src/domain/flow-system/services", default-features = false }
 kamu-search-services = { version = "0.237.0", path = "src/domain/search/services", default-features = false }
 kamu-task-system-services = { version = "0.237.0", path = "src/domain/task-system/services", default-features = false }
+kamu-webhooks-services = { version = "0.237.0", path = "src/domain/webhooks/services", default-features = false }
+
 
 # Infra
 kamu = { version = "0.237.0", path = "src/infra/core", default-features = false }

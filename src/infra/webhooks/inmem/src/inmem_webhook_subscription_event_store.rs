@@ -250,10 +250,10 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
         Ok(maybe_subscription_id)
     }
 
-    async fn list_subscription_ids_by_dataset_and_event_type(
+    async fn list_enabled_subscription_ids_by_dataset_and_event_type(
         &self,
         dataset_id: &odf::DatasetID,
-        event_type: WebhookEventType,
+        event_type: &WebhookEventType,
     ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -265,7 +265,10 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
                         .filter(|id| {
                             g.webhook_subscription_data
                                 .get(id)
-                                .map(|data| data.event_types().contains(&event_type))
+                                .map(|data| {
+                                    data.status() == WebhookSubscriptionStatus::Enabled
+                                        && data.event_types().contains(event_type)
+                                })
                                 .unwrap_or(false)
                         })
                         .copied()

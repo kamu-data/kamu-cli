@@ -38,10 +38,10 @@ pub trait WebhookSubscriptionEventStore: EventStore<WebhookSubscriptionState> {
         label: &WebhookSubscriptionLabel,
     ) -> Result<Option<WebhookSubscriptionId>, FindWebhookSubscriptionError>;
 
-    async fn list_subscription_ids_by_dataset_and_event_type(
+    async fn list_enabled_subscription_ids_by_dataset_and_event_type(
         &self,
         dataset_id: &odf::DatasetID,
-        event_type: WebhookEventType,
+        event_type: &WebhookEventType,
     ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError>;
 
     // TODO: dataset removal reaction?

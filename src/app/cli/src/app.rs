@@ -582,6 +582,8 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
 
     kamu_flow_system_services::register_dependencies(&mut b);
 
+    kamu_webhooks_services::register_dependencies(&mut b);
+
     b.add::<UploadServiceLocal>();
 
     register_message_dispatcher::<FlowProgressMessage>(

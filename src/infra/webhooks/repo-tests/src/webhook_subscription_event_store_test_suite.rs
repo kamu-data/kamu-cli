@@ -52,9 +52,9 @@ pub async fn test_no_events_initially(catalog: &dill::Catalog) {
     assert_matches!(res, Ok(id) if id.is_none());
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_head_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.is_empty());
@@ -135,17 +135,17 @@ pub async fn test_store_single_aggregate(catalog: &dill::Catalog) {
     assert_matches!(res, Ok(id) if id.is_none());
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_head_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id);
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            WebhookEventTypeCatalog::test(),
+            &WebhookEventTypeCatalog::test(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.is_empty());
@@ -160,12 +160,11 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
 
     let subscription_id_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
     let subscription_id_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_3 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
 
     let target_url_2 = Url::parse("https://example.com/2").unwrap();
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
-
-    let secret_2 = WebhookSubscriptionSecret::try_new("secret_2").unwrap();
 
     let mut subscription_1 = WebhookSubscription::new(
         subscription_id_1,
@@ -184,14 +183,27 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         WebhookSubscriptionLabel::new("label-2"),
         Some(dataset_id.clone()),
         vec![WebhookEventTypeCatalog::dataset_head_updated()],
-        secret_2.clone(),
+        WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
     );
     subscription_2.enable();
     subscription_2.pause();
+    subscription_2.resume();
     subscription_2.save(event_store.as_ref()).await.unwrap();
 
+    let mut subscription_3 = WebhookSubscription::new(
+        subscription_id_3,
+        Url::parse("https://example.com/3").unwrap(),
+        WebhookSubscriptionLabel::new("label-3"),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        WebhookSubscriptionSecret::try_new("secret_3").unwrap(),
+    );
+    subscription_3.enable();
+    subscription_3.pause();
+    subscription_3.save(event_store.as_ref()).await.unwrap();
+
     let len = event_store.len().await.unwrap();
-    assert_eq!(len, 5);
+    assert_eq!(len, 9);
 
     let events_1 = event_store
         .get_events(&subscription_id_1, GetEventsOpts::default())
@@ -215,32 +227,60 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         .map(|(__, e)| e)
         .collect::<Vec<_>>();
 
-    assert_eq!(events_2.len(), 3);
+    assert_eq!(events_2.len(), 4);
     assert_matches!(events_2[0], WebhookSubscriptionEvent::Created(_));
     assert_matches!(events_2[1], WebhookSubscriptionEvent::Enabled(_));
     assert_matches!(events_2[2], WebhookSubscriptionEvent::Paused(_));
+    assert_matches!(events_2[3], WebhookSubscriptionEvent::Resumed(_));
+
+    let events_3 = event_store
+        .get_events(&subscription_id_3, GetEventsOpts::default())
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(__, e)| e)
+        .collect::<Vec<_>>();
+
+    assert_eq!(events_3.len(), 3);
+    assert_matches!(events_3[0], WebhookSubscriptionEvent::Created(_));
+    assert_matches!(events_3[1], WebhookSubscriptionEvent::Enabled(_));
+    assert_matches!(events_3[2], WebhookSubscriptionEvent::Paused(_));
 
     let res = event_store
-        .get_events_multi(vec![subscription_id_1, subscription_id_2])
+        .get_events_multi(vec![
+            subscription_id_1,
+            subscription_id_2,
+            subscription_id_3,
+        ])
         .try_collect::<Vec<_>>()
         .await
         .unwrap();
-    assert_eq!(res.len(), 5);
+    assert_eq!(res.len(), 9);
     assert_matches!(res[0], (id, _, WebhookSubscriptionEvent::Created(_)) if id == subscription_id_1);
     assert_matches!(res[1], (id, _, WebhookSubscriptionEvent::Enabled(_)) if id == subscription_id_1);
     assert_matches!(res[2], (id, _, WebhookSubscriptionEvent::Created(_)) if id == subscription_id_2);
     assert_matches!(res[3], (id, _, WebhookSubscriptionEvent::Enabled(_)) if id == subscription_id_2);
     assert_matches!(res[4], (id, _, WebhookSubscriptionEvent::Paused(_)) if id == subscription_id_2);
+    assert_matches!(res[5], (id, _, WebhookSubscriptionEvent::Resumed(_)) if id == subscription_id_2);
+    assert_matches!(res[6], (id, _, WebhookSubscriptionEvent::Created(_)) if id == subscription_id_3);
+    assert_matches!(res[7], (id, _, WebhookSubscriptionEvent::Enabled(_)) if id == subscription_id_3);
+    assert_matches!(res[8], (id, _, WebhookSubscriptionEvent::Paused(_)) if id == subscription_id_3);
 
     let res = event_store
         .count_subscriptions_by_dataset(&dataset_id)
         .await;
-    assert_matches!(res, Ok(count) if count == 2);
+    assert_matches!(res, Ok(count) if count == 3);
 
     let res = event_store
         .list_subscription_ids_by_dataset(&dataset_id)
         .await;
-    assert_matches!(res, Ok(ids) if ids.len() == 2 && ids[0] == subscription_id_1 && ids[1] == subscription_id_2);
+    assert_matches!(res, Ok(ids)
+     if ids.len() == 3 &&
+        ids[0] == subscription_id_1 &&
+        ids[1] == subscription_id_2 &&
+        ids[2] == subscription_id_3
+    );
 
     let res = event_store
         .find_subscription_id_by_dataset_and_label(
@@ -261,23 +301,32 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
     let res = event_store
         .find_subscription_id_by_dataset_and_label(
             &dataset_id,
+            &WebhookSubscriptionLabel::new("label-3"),
+        )
+        .await;
+    assert_matches!(res, Ok(id) if id.is_some() && id.unwrap() == subscription_id_3);
+
+    let res = event_store
+        .find_subscription_id_by_dataset_and_label(
+            &dataset_id,
             &WebhookSubscriptionLabel::new("wrong-label"),
         )
         .await;
     assert_matches!(res, Ok(id) if id.is_none());
 
+    // Note: subscription_3 is paused, so it won't be returned
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_head_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 2 && ids[0] == subscription_id_1 && ids[1] == subscription_id_2);
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            WebhookEventTypeCatalog::test(),
+            &WebhookEventTypeCatalog::test(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.is_empty());
@@ -445,6 +494,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::dataset_head_updated()],
         WebhookSubscriptionSecret::try_new("secret_1_1").unwrap(),
     );
+    subscription_1_1.enable();
     subscription_1_1.save(event_store.as_ref()).await.unwrap();
 
     let mut subscription_1_2 = WebhookSubscription::new(
@@ -455,6 +505,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::test()],
         WebhookSubscriptionSecret::try_new("secret_1_2").unwrap(),
     );
+    subscription_1_2.enable();
     subscription_1_2.save(event_store.as_ref()).await.unwrap();
 
     let mut subscription_2_1 = WebhookSubscription::new(
@@ -465,6 +516,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::dataset_head_updated()],
         WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
     );
+    subscription_2_1.enable();
     subscription_2_1.save(event_store.as_ref()).await.unwrap();
 
     let mut subscription_2_2 = WebhookSubscription::new(
@@ -475,36 +527,37 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::test()],
         WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
     );
+    subscription_2_2.enable();
     subscription_2_2.save(event_store.as_ref()).await.unwrap();
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id_1,
-            WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_head_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_1_1);
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id_1,
-            WebhookEventTypeCatalog::test(),
+            &WebhookEventTypeCatalog::test(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_1_2);
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id_2,
-            WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_head_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_2_1);
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id_2,
-            WebhookEventTypeCatalog::test(),
+            &WebhookEventTypeCatalog::test(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_2_2);
@@ -552,9 +605,9 @@ pub async fn test_removed_subscription_filters_out(catalog: &dill::Catalog) {
     assert_matches!(res, Ok(id) if id.is_none());
 
     let res = event_store
-        .list_subscription_ids_by_dataset_and_event_type(
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_head_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.is_empty());

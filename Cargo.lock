@@ -6539,6 +6539,7 @@ dependencies = [
  "kamu-task-system-sqlite",
  "kamu-webhooks-inmem",
  "kamu-webhooks-postgres",
+ "kamu-webhooks-services",
  "kamu-webhooks-sqlite",
  "lazy_static",
  "libc",
@@ -7462,6 +7463,24 @@ dependencies = [
  "opendatafabric",
  "serde_json",
  "url",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-webhooks-services"
+version = "0.236.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dill",
+ "internal-error",
+ "kamu-datasets",
+ "kamu-task-system-services",
+ "kamu-webhooks",
+ "messaging-outbox",
+ "opendatafabric",
+ "serde_json",
+ "tracing",
  "uuid",
 ]
 
