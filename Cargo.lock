@@ -6516,6 +6516,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-auth-web3-postgres"
+version = "0.235.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-auth-web3",
+ "kamu-auth-web3-repo-tests",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+]
+
+[[package]]
 name = "kamu-auth-web3-repo-tests"
 version = "0.235.0"
 dependencies = [
