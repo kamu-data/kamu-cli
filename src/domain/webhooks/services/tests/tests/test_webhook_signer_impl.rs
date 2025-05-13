@@ -21,7 +21,6 @@ async fn test_sign_dataset_head_updated_webhook() {
       "version": "1",
       "datasetId": odf::DatasetID::new_seeded_ed25519(b"test_dataset_id").to_string(),
       "ownerAccountId": odf::AccountID::new_seeded_ed25519(b"test_account_id").to_string(),
-      "ref": "head",
       "oldHash": odf::Multihash::from_digest_sha3_256(b"old_hash").to_string(),
       "newHash": odf::Multihash::from_digest_sha3_256(b"new_hash").to_string(),
     });
@@ -44,7 +43,7 @@ async fn test_sign_dataset_head_updated_webhook() {
 
     assert_eq!(
         headers.signature,
-        "sig1=:sQfLgWwLrVB7cRe071PcIrLs1Kw+fx+D60vG0Na0XWY=:"
+        "sig1=:l2U6vPJEuO8hfthfn7ehDxMf1rmezdDx0fQnzVPEZG8=:"
     );
 
     assert_eq!(
@@ -55,7 +54,7 @@ async fn test_sign_dataset_head_updated_webhook() {
 
     assert_eq!(
         headers.content_digest,
-        "sha-256=:qQIdsPYp6kMdlqkbaI3hxF1Rm4kwCwbN+oJR8pLWrTE=:"
+        "sha-256=:+0rGAWtiwvcbKAG9HxOVmT3HqXfrJjrglo6gxs6pw7s=:"
     );
 }
 

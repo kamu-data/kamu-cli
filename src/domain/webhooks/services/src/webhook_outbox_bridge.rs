@@ -71,7 +71,6 @@ impl WebhookOutboxBridge {
             "version": WEBHOOK_DATASET_HEAD_UPDATED_VERSION,
             "datasetId": msg.dataset_id.to_string(),
             "ownerAccountId": dataset_entry.owner_id.to_string(),
-            "ref": msg.block_ref.to_string(),
             "newHash": msg.new_block_hash.to_string(),
         });
 
@@ -151,6 +150,12 @@ impl MessageConsumerT<DatasetReferenceMessage> for WebhookOutboxBridge {
 
         match message {
             DatasetReferenceMessage::Updated(msg) => {
+                // Ignore updates that are not for HEAD
+                if msg.block_ref != odf::BlockRef::Head {
+                    tracing::debug!(?msg, "Ignoring non-HEAD dataset reference update");
+                    return Ok(());
+                }
+
                 // Form event payload
                 let payload = self.build_dataset_head_updated_payload(msg).await?;
 

@@ -117,7 +117,7 @@ impl WebhookSignerImpl {
 
         let b64 = general_purpose::STANDARD.encode(digest);
 
-        format!("sha-256=:{}:", b64)
+        format!("sha-256=:{b64}:")
     }
 
     fn generate_rfc9421_headers_impl(

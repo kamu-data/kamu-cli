@@ -50,7 +50,6 @@ async fn test_send_webhook() {
           "version": "1",
           "datasetId": odf::DatasetID::new_seeded_ed25519(b"test_dataset_id").to_string(),
           "ownerAccountId": odf::AccountID::new_seeded_ed25519(b"test_account_id").to_string(),
-          "ref": "head",
           "oldHash": odf::Multihash::from_digest_sha3_256(b"old_hash").to_string(),
           "newHash": odf::Multihash::from_digest_sha3_256(b"new_hash").to_string(),
         }),
