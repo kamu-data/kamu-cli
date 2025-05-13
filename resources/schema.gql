@@ -307,10 +307,18 @@ type Auth {
 }
 
 type AuthMut {
+	"""
+	Web3-related functionality group
+	"""
+	web3: AuthWeb3Mut!
 	login(loginMethod: String!, loginCredentialsJson: String!, deviceCode: DeviceCode): LoginResponse!
 	accountDetails(accessToken: String!): Account!
 	createAccessToken(accountId: AccountID!, tokenName: String!): CreateTokenResult!
 	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
+}
+
+type AuthWeb3Mut {
+	eip4361AuthNonce(account: EvmWalletAddress!): Eip4361AuthNonceResponse!
 }
 
 """
@@ -1420,6 +1428,10 @@ type DisablePushSource {
 	sourceName: String!
 }
 
+type Eip4361AuthNonceResponse {
+	value: String!
+}
+
 type EngineDesc {
 	"""
 	A short name of the engine, e.g. "Spark", "Flink".
@@ -1496,6 +1508,8 @@ See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.
 type EventTimeSourceFromSystemTime {
 	dummy: String
 }
+
+scalar EvmWalletAddress
 
 """
 Indicates that derivative transformation has been performed.

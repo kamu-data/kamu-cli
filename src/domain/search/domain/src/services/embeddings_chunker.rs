@@ -11,7 +11,7 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Chunkers are repsonsible for splitting large text into optimal sets of
+/// Chunkers are responsible for splitting large text into optimal sets of
 /// tokens to generate embeddings from.
 #[async_trait::async_trait]
 pub trait EmbeddingsChunker: Send + Sync {

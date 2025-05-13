@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod device_code;
+mod evm_wallet_address;
 
 pub use device_code::*;
+pub use evm_wallet_address::*;
