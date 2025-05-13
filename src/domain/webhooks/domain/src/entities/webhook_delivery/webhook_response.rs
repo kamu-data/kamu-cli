@@ -14,7 +14,7 @@ use chrono::{DateTime, Utc};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebhookResponse {
     pub status_code: http::StatusCode,
-    pub headers: Vec<(http::header::HeaderName, String)>,
+    pub headers: http::HeaderMap,
     pub body: String,
     pub finished_at: DateTime<Utc>,
 }
@@ -22,7 +22,7 @@ pub struct WebhookResponse {
 impl WebhookResponse {
     pub fn new(
         status_code: http::StatusCode,
-        headers: Vec<(http::header::HeaderName, String)>,
+        headers: http::HeaderMap,
         body: String,
         finished_at: DateTime<Utc>,
     ) -> Self {

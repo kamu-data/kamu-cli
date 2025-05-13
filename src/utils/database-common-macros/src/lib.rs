@@ -231,6 +231,50 @@ impl Parse for CatalogItem2 {
     }
 }
 
+struct CatalogItem3 {
+    item1_name: Ident,
+    item1_type: Type,
+    item2_name: Ident,
+    item2_type: Type,
+    item3_name: Ident,
+    item3_type: Type,
+}
+
+impl Parse for CatalogItem3 {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let item1_name: Ident = input.parse()?;
+
+        input.parse::<Token![:]>()?;
+
+        let item1_type: Type = input.parse()?;
+
+        input.parse::<Token![,]>()?;
+
+        let item2_name: Ident = input.parse()?;
+
+        input.parse::<Token![:]>()?;
+
+        let item2_type: Type = input.parse()?;
+
+        input.parse::<Token![,]>()?;
+
+        let item3_name: Ident = input.parse()?;
+
+        input.parse::<Token![:]>()?;
+
+        let item3_type: Type = input.parse()?;
+
+        Ok(Self {
+            item1_name,
+            item1_type,
+            item2_name,
+            item2_type,
+            item3_name,
+            item3_type,
+        })
+    }
+}
+
 #[proc_macro_attribute]
 /// Encrusting the method with a transactional Catalog.
 /// The structure must contain the Catalog as a field
@@ -335,6 +379,49 @@ pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStrea
             use tracing::Instrument;
             ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
                 .transactional_with2(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type| async move {
+                    #method_body
+                })
+                .instrument(tracing::debug_span!(stringify!(#method_name)))
+                .await
+        }
+    };
+
+    TokenStream::from(updated_method)
+}
+
+#[proc_macro_attribute]
+/// Encrusting the method with a transactional Catalog.
+/// The structure must contain the Catalog as a field
+///
+/// # Examples
+/// ```compile_fail
+/// // `service` request from a transactional Catalog
+/// #[transactional_method3(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>, service3: Arc<dyn Service3>)]
+/// async fn set_system_flow_schedule(&self) {
+///     // `service1`, `service2`, and `service3` are available inside the method body
+/// }
+/// ```
+pub fn transactional_method3(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let CatalogItem3 {
+        item1_name: catalog_item1_name,
+        item1_type: catalog_item1_type,
+        item2_name: catalog_item2_name,
+        item2_type: catalog_item2_type,
+        item3_name: catalog_item3_name,
+        item3_type: catalog_item3_type,
+    } = parse_macro_input!(attr as CatalogItem3);
+    let input = parse_macro_input!(item as ItemFn);
+
+    let method_signature = &input.sig;
+    let method_name = &method_signature.ident;
+    let method_body = &input.block;
+    let method_visibility = &input.vis;
+
+    let updated_method = quote! {
+        #method_visibility #method_signature {
+            use tracing::Instrument;
+            ::database_common::DatabaseTransactionRunner::new(self.catalog.clone())
+                .transactional_with3(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type| async move {
                     #method_body
                 })
                 .instrument(tracing::debug_span!(stringify!(#method_name)))

@@ -7,15 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use nutype::nutype;
+use internal_error::InternalError;
+use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(
-    sanitize(trim, uppercase),
-    validate(not_empty),
-    derive(Debug, Display, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
-)]
-pub struct WebhookEventType(String);
+#[async_trait::async_trait]
+pub trait WebhookSender: Send + Sync {
+    async fn send_webhook(
+        &self,
+        task_attempt_id: ts::TaskAttemptID,
+        webhook_subscription_id: uuid::Uuid,
+        webhook_event_id: uuid::Uuid,
+    ) -> Result<(), InternalError>;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

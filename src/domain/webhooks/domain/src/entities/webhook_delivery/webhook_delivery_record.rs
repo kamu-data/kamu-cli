@@ -39,11 +39,11 @@ pub struct WebhookDeliveryRecord {
 #[cfg(feature = "sqlx")]
 impl WebhookDeliveryRecord {
     pub fn serialize_http_headers(
-        headers: Vec<(http::HeaderName, String)>,
+        headers: &http::HeaderMap,
     ) -> Result<serde_json::Value, InternalError> {
         let serialized_headers: Vec<(String, String)> = headers
-            .into_iter()
-            .map(|(k, v)| (k.as_str().to_string(), v))
+            .iter()
+            .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap().to_string()))
             .collect();
 
         serde_json::to_value(serialized_headers).map_err(ErrorIntoInternal::int_err)
@@ -51,17 +51,19 @@ impl WebhookDeliveryRecord {
 
     pub fn deserialize_http_headers(
         headers: serde_json::Value,
-    ) -> Result<Vec<(http::HeaderName, String)>, InternalError> {
+    ) -> Result<http::HeaderMap, InternalError> {
         let deserialized_headers: Vec<(String, String)> =
             serde_json::from_value(headers).map_err(ErrorIntoInternal::int_err)?;
 
         use std::str::FromStr;
 
-        let mut res_headers = Vec::new();
+        let mut res_headers = http::HeaderMap::new();
         for (header_name, value) in deserialized_headers {
             let http_header = http::header::HeaderName::from_str(&header_name)
                 .map_err(ErrorIntoInternal::int_err)?;
-            res_headers.push((http_header, value));
+            let http_header_value =
+                http::header::HeaderValue::from_str(&value).map_err(ErrorIntoInternal::int_err)?;
+            res_headers.insert(http_header, http_header_value);
         }
 
         Ok(res_headers)

@@ -49,7 +49,7 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
         let subscription_id = delivery.webhook_subscription_id.as_ref();
 
         let request_headers =
-            WebhookDeliveryRecord::serialize_http_headers(delivery.request.headers)
+            WebhookDeliveryRecord::serialize_http_headers(&delivery.request.headers)
                 .map_err(|e| CreateWebhookDeliveryError::Internal(e.int_err()))?;
 
         let requested_at = delivery.request.started_at;
@@ -92,7 +92,7 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
         let task_id: i64 = task_attempt_id.task_id.try_into().unwrap();
         let task_attempt_number: i32 = i32::try_from(task_attempt_id.attempt_number).unwrap();
 
-        let response_headers = WebhookDeliveryRecord::serialize_http_headers(response.headers)
+        let response_headers = WebhookDeliveryRecord::serialize_http_headers(&response.headers)
             .map_err(|e| UpdateWebhookDeliveryError::Internal(e.int_err()))?;
 
         sqlx::query!(

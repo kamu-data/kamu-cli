@@ -53,10 +53,10 @@ pub async fn test_save_webhook_delivery_start_and_success_response(catalog: &Cat
 
     webhook_delivery.set_response(WebhookResponse {
         status_code: http::StatusCode::OK,
-        headers: vec![(
-            http::header::HeaderName::from_bytes(b"x-client-debug-Id").unwrap(),
-            String::from("12345"),
-        )],
+        headers: http::HeaderMap::from_iter([(
+            http::HeaderName::from_static("x-client-debug-id"),
+            http::HeaderValue::from_static("12345"),
+        )]),
         body: String::from("{ status: \"Success\" }"),
         finished_at: Utc::now().round_subsecs(6),
     });
@@ -89,10 +89,10 @@ pub async fn test_save_webhook_delivery_start_and_failure_response(catalog: &Cat
 
     webhook_delivery.set_response(WebhookResponse {
         status_code: http::StatusCode::INTERNAL_SERVER_ERROR,
-        headers: vec![(
-            http::header::HeaderName::from_bytes(b"x-client-debug-Id").unwrap(),
-            String::from("12345"),
-        )],
+        headers: http::HeaderMap::from_iter([(
+            http::HeaderName::from_static("x-client-debug-id"),
+            http::HeaderValue::from_static("12345"),
+        )]),
         body: String::from("{ status: \"Internal Error\" }"),
         finished_at: Utc::now().round_subsecs(6),
     });
@@ -262,16 +262,16 @@ fn new_delivery(
         webhook_subscription_id,
         webhook_event_id,
         WebhookRequest::new(
-            vec![
+            http::HeaderMap::from_iter([
                 (
                     http::header::HeaderName::from_static("content-type"),
-                    "application/json".to_string(),
+                    http::HeaderValue::from_static("application/json"),
                 ),
                 (
                     http::header::HeaderName::from_bytes(b"x-webhook-event-Id").unwrap(),
-                    webhook_event_id.to_string(),
+                    http::HeaderValue::from_str(&webhook_event_id.to_string()).unwrap(),
                 ),
-            ],
+            ]),
             Utc::now().round_subsecs(6),
         ),
     )

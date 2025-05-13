@@ -39,7 +39,7 @@ http = { version = "1", default-features = false }
 nutype = { version = "0.6", default-features = false, features = ["serde"] }
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false }
 url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 

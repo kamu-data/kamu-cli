@@ -18,12 +18,7 @@ use kamu_datasets::{
     DatasetReferenceMessageUpdated,
     MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
 };
-use kamu_task_system_services::domain::{
-    LogicalPlan,
-    LogicalPlanProbe,
-    TaskMetadata,
-    TaskScheduler,
-};
+use kamu_task_system::{LogicalPlan, LogicalPlanSendWebhook, TaskScheduler};
 use kamu_webhooks::*;
 use messaging_outbox::*;
 use serde_json::json;
@@ -89,6 +84,8 @@ impl WebhookOutboxBridge {
             }
         }
 
+        tracing::debug!(?payload, "Formed payload for dataset head updated event");
+
         Ok(payload)
     }
 
@@ -113,15 +110,15 @@ impl WebhookOutboxBridge {
         subscription_id: WebhookSubscriptionId,
         event_id: WebhookEventId,
     ) -> Result<(), InternalError> {
-        let mut task_metadata = TaskMetadata::default();
-        task_metadata.set_property("webhook.subscription_id", subscription_id.to_string());
-        task_metadata.set_property("webhook.event_id", event_id.to_string());
-
         let task = self
             .task_scheduler
             .create_task(
-                LogicalPlan::Probe(LogicalPlanProbe::default()), // TODO: replace with actual plan,
-                Some(task_metadata),
+                LogicalPlan::SendWebhook(LogicalPlanSendWebhook {
+                    dataset_id: None,
+                    webhook_subscription_id: subscription_id.into_inner(),
+                    webhook_event_id: event_id.into_inner(),
+                }),
+                None,
             )
             .await
             .int_err()?;

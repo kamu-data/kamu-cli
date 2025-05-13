@@ -32,6 +32,17 @@ pub struct TaskState {
 }
 
 impl TaskState {
+    /// Computes next attempt identifier
+    pub fn next_attempt_id(&self) -> TaskAttemptID {
+        assert!(self.status() != TaskStatus::Finished);
+
+        let attempt_number = u32::try_from(self.attempts.len()).unwrap() + 1;
+        TaskAttemptID {
+            task_id: self.task_id,
+            attempt_number,
+        }
+    }
+
     /// Computes the time when task recently started running, if it did
     pub fn ran_at(&self) -> Option<DateTime<Utc>> {
         self.attempts.last().map(|a| a.started_at)

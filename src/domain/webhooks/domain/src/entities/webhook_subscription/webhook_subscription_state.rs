@@ -50,6 +50,10 @@ impl WebhookSubscriptionState {
     pub fn event_types(&self) -> &[WebhookEventType] {
         &self.event_types
     }
+
+    pub fn secret(&self) -> &WebhookSubscriptionSecret {
+        &self.secret
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

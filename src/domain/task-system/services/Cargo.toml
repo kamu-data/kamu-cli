@@ -32,6 +32,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 time-source = { workspace = true }
 kamu-task-system = { workspace = true }
+kamu-webhooks  = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

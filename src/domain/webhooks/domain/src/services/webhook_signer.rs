@@ -7,15 +7,29 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use nutype::nutype;
+use chrono::{DateTime, Utc};
+
+use crate::WebhookSubscriptionSecret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(
-    sanitize(trim, uppercase),
-    validate(not_empty),
-    derive(Debug, Display, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
-)]
-pub struct WebhookEventType(String);
+pub trait WebhookSigner: Send + Sync {
+    fn generate_rfc9421_headers(
+        &self,
+        secret: &WebhookSubscriptionSecret,
+        timestamp: DateTime<Utc>,
+        payload: &[u8],
+        target_url: &url::Url,
+    ) -> WebhookRFC9421Headers;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct WebhookRFC9421Headers {
+    pub signature: String,
+    pub signature_input: String,
+    pub content_digest: String,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

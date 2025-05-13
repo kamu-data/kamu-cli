@@ -51,7 +51,7 @@ impl WebhookDeliveryRepository for SqliteWebhookDeliveryRepository {
         let subscription_id = delivery.webhook_subscription_id.as_ref();
 
         let request_headers =
-            WebhookDeliveryRecord::serialize_http_headers(delivery.request.headers)
+            WebhookDeliveryRecord::serialize_http_headers(&delivery.request.headers)
                 .map_err(|e| CreateWebhookDeliveryError::Internal(e.int_err()))?;
 
         let requested_at = delivery.request.started_at;
@@ -96,7 +96,7 @@ impl WebhookDeliveryRepository for SqliteWebhookDeliveryRepository {
 
         let response_status = i16::try_from(response.status_code.as_u16()).unwrap();
 
-        let response_headers = WebhookDeliveryRecord::serialize_http_headers(response.headers)
+        let response_headers = WebhookDeliveryRecord::serialize_http_headers(&response.headers)
             .map_err(|e| UpdateWebhookDeliveryError::Internal(e.int_err()))?;
 
         sqlx::query!(

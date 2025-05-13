@@ -159,7 +159,7 @@ impl TaskAgentImpl {
             .transactional_with(
                 |task_definition_planner: Arc<dyn TaskDefinitionPlanner>| async move {
                     task_definition_planner
-                        .prepare_task_definition(&task.logical_plan)
+                        .prepare_task_definition(task.next_attempt_id(), &task.logical_plan)
                         .await
                 },
             )

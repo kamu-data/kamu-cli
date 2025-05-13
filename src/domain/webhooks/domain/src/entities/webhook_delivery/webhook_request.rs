@@ -13,17 +13,14 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebhookRequest {
-    pub headers: Vec<(http::header::HeaderName, String)>,
+    pub headers: http::HeaderMap,
     pub started_at: DateTime<Utc>,
 }
 
 impl WebhookRequest {
-    pub fn new<I>(headers: I, started_at: DateTime<Utc>) -> Self
-    where
-        I: IntoIterator<Item = (http::header::HeaderName, String)>,
-    {
+    pub fn new(headers: http::HeaderMap, started_at: DateTime<Utc>) -> Self {
         Self {
-            headers: headers.into_iter().collect(),
+            headers,
             started_at,
         }
     }

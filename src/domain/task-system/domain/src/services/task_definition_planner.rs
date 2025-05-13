@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_core::{CompactionPlan, PullOptions, PullPlanIterationJob, ResetPlan, ResolvedDataset};
 
-use crate::{LogicalPlan, LogicalPlanProbe};
+use crate::{LogicalPlan, LogicalPlanProbe, TaskAttemptID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,6 +18,7 @@ use crate::{LogicalPlan, LogicalPlanProbe};
 pub trait TaskDefinitionPlanner: Send + Sync {
     async fn prepare_task_definition(
         &self,
+        attempt_id: TaskAttemptID,
         logical_plan: &LogicalPlan,
     ) -> Result<TaskDefinition, InternalError>;
 }
@@ -30,6 +31,7 @@ pub enum TaskDefinition {
     Update(TaskDefinitionUpdate),
     Reset(TaskDefinitionReset),
     HardCompact(TaskDefinitionHardCompact),
+    SendWebhook(TaskDefinitionSendWebhook),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,6 +63,15 @@ pub struct TaskDefinitionReset {
 pub struct TaskDefinitionHardCompact {
     pub target: ResolvedDataset,
     pub compaction_plan: CompactionPlan,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct TaskDefinitionSendWebhook {
+    pub attempt_id: TaskAttemptID,
+    pub webhook_subscription_id: uuid::Uuid,
+    pub webhook_event_id: uuid::Uuid,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
