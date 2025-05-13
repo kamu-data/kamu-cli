@@ -62,7 +62,29 @@ impl Web3AuthEip4361NonceRepository for InMemoryWeb3AuthNonceRepository {
         if let Some(nonce_entity) = readable_state.nonce_by_wallet.get(wallet) {
             Ok(nonce_entity.clone())
         } else {
-            Err(GetNonceError::NotFound { wallet: *wallet })
+            Err(GetNonceError::NotFound(WalletNotFoundError {
+                wallet: *wallet,
+            }))
+        }
+    }
+
+    async fn consume_nonce(
+        &self,
+        wallet: &EvmWalletAddress,
+        now: DateTime<Utc>,
+    ) -> Result<(), ConsumeNonceError> {
+        use std::collections::hash_map::Entry;
+
+        let mut writable_state = self.state.write().await;
+
+        match writable_state.nonce_by_wallet.entry(*wallet) {
+            Entry::Occupied(entry) if now <= entry.get().expires_at => {
+                entry.remove();
+                Ok(())
+            }
+            _ => Err(ConsumeNonceError::NotFound(WalletNotFoundError {
+                wallet: *wallet,
+            })),
         }
     }
 
@@ -74,7 +96,7 @@ impl Web3AuthEip4361NonceRepository for InMemoryWeb3AuthNonceRepository {
 
         writable_state
             .nonce_by_wallet
-            .retain(|_, nonce_entity| nonce_entity.expires_at > now);
+            .retain(|_, nonce_entity| now <= nonce_entity.expires_at);
 
         Ok(())
     }

@@ -24,6 +24,12 @@ pub trait Web3AuthEip4361NonceRepository: Send + Sync {
         wallet: &EvmWalletAddress,
     ) -> Result<Web3AuthEip4361NonceEntity, GetNonceError>;
 
+    async fn consume_nonce(
+        &self,
+        wallet: &EvmWalletAddress,
+        now: DateTime<Utc>,
+    ) -> Result<(), ConsumeNonceError>;
+
     async fn cleanup_expired_nonces(
         &self,
         now: DateTime<Utc>,
@@ -50,10 +56,16 @@ impl PartialEq for SetNonceError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Error, Debug, PartialEq)]
+#[error("nonce not found for wallet: {wallet}")]
+pub struct WalletNotFoundError {
+    pub wallet: EvmWalletAddress,
+}
+
 #[derive(Error, Debug)]
 pub enum GetNonceError {
-    #[error("nonce not found for wallet: {wallet}")]
-    NotFound { wallet: EvmWalletAddress },
+    #[error(transparent)]
+    NotFound(#[from] WalletNotFoundError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -62,7 +74,28 @@ pub enum GetNonceError {
 impl PartialEq for GetNonceError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::NotFound { wallet: a }, Self::NotFound { wallet: b }) => a == b,
+            (Self::NotFound(a), Self::NotFound(b)) => a == b,
+            (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
+            (_, _) => false,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum ConsumeNonceError {
+    #[error(transparent)]
+    NotFound(#[from] WalletNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl PartialEq for ConsumeNonceError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::NotFound(a), Self::NotFound(b)) => a == b,
             (Self::Internal(a), Self::Internal(b)) => a.reason().eq(&b.reason()),
             (_, _) => false,
         }

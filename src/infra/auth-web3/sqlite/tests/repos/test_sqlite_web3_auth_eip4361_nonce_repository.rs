@@ -21,6 +21,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = kamu_auth_web3_repo_tests::test_consume_nonce,
+    harness = SqliteWeb3AuthNonceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = kamu_auth_web3_repo_tests::test_cleanup_expired_nonces,
     harness = SqliteWeb3AuthNonceRepositoryHarness
 );

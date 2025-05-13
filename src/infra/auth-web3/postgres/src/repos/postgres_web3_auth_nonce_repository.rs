@@ -83,7 +83,40 @@ impl Web3AuthEip4361NonceRepository for PostgresWeb3AuthNonceRepository {
 
             Ok(nonce_row)
         } else {
-            Err(GetNonceError::NotFound { wallet: *wallet })
+            Err(GetNonceError::NotFound(WalletNotFoundError {
+                wallet: *wallet,
+            }))
+        }
+    }
+
+    async fn consume_nonce(
+        &self,
+        wallet: &EvmWalletAddress,
+        now: DateTime<Utc>,
+    ) -> Result<(), ConsumeNonceError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let delete_result = sqlx::query!(
+            r#"
+            DELETE
+            FROM web3_auth_eip4361_nonces
+            WHERE wallet_address = $1
+              AND expires_at > $2;
+            "#,
+            EvmWalletAddressConvertor::checksummed_string(wallet),
+            now
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        if delete_result.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(ConsumeNonceError::NotFound(WalletNotFoundError {
+                wallet: *wallet,
+            }))
         }
     }
 

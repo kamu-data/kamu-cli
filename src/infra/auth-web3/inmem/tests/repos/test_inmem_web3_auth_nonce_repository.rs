@@ -21,6 +21,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_auth_web3_repo_tests::test_consume_nonce,
+    harness = InMemoryWeb3AuthNonceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = kamu_auth_web3_repo_tests::test_cleanup_expired_nonces,
     harness = InMemoryWeb3AuthNonceRepositoryHarness
 );
