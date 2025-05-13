@@ -42,7 +42,7 @@ struct InMemoryWeb3AuthNonceRepositoryHarness {
 impl InMemoryWeb3AuthNonceRepositoryHarness {
     pub fn new() -> Self {
         let mut b = dill::CatalogBuilder::new();
-        b.add::<kamu_auth_web3_inmem::InMemoryWeb3AuthNonceRepository>();
+        b.add::<kamu_auth_web3_inmem::InMemoryWeb3AuthEip4361NonceRepository>();
 
         Self { catalog: b.build() }
     }

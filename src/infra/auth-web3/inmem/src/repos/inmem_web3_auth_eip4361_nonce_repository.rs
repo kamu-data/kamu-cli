@@ -24,14 +24,14 @@ struct State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryWeb3AuthNonceRepository {
+pub struct InMemoryWeb3AuthEip4361NonceRepository {
     state: Arc<RwLock<State>>,
 }
 
 #[dill::component(pub)]
 #[dill::interface(dyn Web3AuthEip4361NonceRepository)]
 #[dill::scope(dill::Singleton)]
-impl InMemoryWeb3AuthNonceRepository {
+impl InMemoryWeb3AuthEip4361NonceRepository {
     pub fn new() -> Self {
         Self {
             state: Arc::new(RwLock::new(State::default())),
@@ -42,7 +42,7 @@ impl InMemoryWeb3AuthNonceRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Web3AuthEip4361NonceRepository for InMemoryWeb3AuthNonceRepository {
+impl Web3AuthEip4361NonceRepository for InMemoryWeb3AuthEip4361NonceRepository {
     async fn set_nonce(&self, entity: &Web3AuthEip4361NonceEntity) -> Result<(), SetNonceError> {
         let mut writable_state = self.state.write().await;
 
