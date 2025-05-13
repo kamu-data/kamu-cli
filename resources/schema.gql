@@ -318,7 +318,7 @@ type AuthMut {
 }
 
 type AuthWeb3Mut {
-	nonce(account: EvmWalletAddress!): NonceResponse!
+	eip4361AuthNonce(account: EvmWalletAddress!): Eip4361AuthNonceResponse!
 }
 
 """
@@ -1428,6 +1428,10 @@ type DisablePushSource {
 	sourceName: String!
 }
 
+type Eip4361AuthNonceResponse {
+	value: String!
+}
+
 type EngineDesc {
 	"""
 	A short name of the engine, e.g. "Spark", "Flink".
@@ -2439,10 +2443,6 @@ type NameLookupResultEdge {
 
 type NoChanges implements CommitResult & UpdateReadmeResult {
 	message: String!
-}
-
-type NonceResponse {
-	value: String!
 }
 
 type OdataProtocolDesc {

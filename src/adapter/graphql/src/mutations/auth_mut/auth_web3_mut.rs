@@ -16,12 +16,12 @@ pub(crate) struct AuthWeb3Mut;
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AuthWeb3Mut {
-    #[tracing::instrument(level = "info", name = AuthWeb3Mut_nonce, skip_all, fields(%account))]
-    async fn nonce(
+    #[tracing::instrument(level = "info", name = AuthWeb3Mut_eip4361_auth_nonce, skip_all, fields(%account))]
+    async fn eip4361_auth_nonce(
         &self,
         ctx: &Context<'_>,
         account: EvmWalletAddress<'_>,
-    ) -> Result<NonceResponse> {
+    ) -> Result<Eip4361AuthNonceResponse> {
         let authentication_service = from_catalog_n!(ctx, dyn kamu_auth_web3::Web3NonceService);
 
         let nonce_entity = authentication_service
@@ -29,7 +29,7 @@ impl AuthWeb3Mut {
             .await
             .int_err()?;
 
-        Ok(NonceResponse {
+        Ok(Eip4361AuthNonceResponse {
             value: nonce_entity.nonce.into_inner(),
         })
     }
@@ -38,7 +38,7 @@ impl AuthWeb3Mut {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
-pub(crate) struct NonceResponse {
+pub(crate) struct Eip4361AuthNonceResponse {
     value: String,
 }
 
