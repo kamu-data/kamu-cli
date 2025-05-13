@@ -3,11 +3,27 @@ ODF_METADATA_CRATE_DIR=./src/odf/metadata
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
-POSTGRES_CRATES := ./src/infra/accounts/postgres ./src/infra/auth-rebac/postgres ./src/infra/datasets/postgres ./src/infra/flow-system/postgres ./src/infra/messaging-outbox/postgres ./src/infra/task-system/postgres ./src/e2e/app/cli/postgres
+POSTGRES_CRATES := \
+	./src/e2e/app/cli/postgres \
+	./src/infra/accounts/postgres \
+	./src/infra/auth-rebac/postgres \
+	./src/infra/auth-web3/postgres \
+	./src/infra/datasets/postgres \
+	./src/infra/flow-system/postgres \
+	./src/infra/messaging-outbox/postgres \
+	./src/infra/task-system/postgres \
 
-MYSQL_CRATES := ./src/infra/accounts/mysql ./src/e2e/app/cli/mysql
+MYSQL_CRATES := \
+	./src/e2e/app/cli/mysql \
+	./src/infra/accounts/mysql \
 
-SQLITE_CRATES := ./src/infra/accounts/sqlite ./src/infra/auth-rebac/sqlite ./src/infra/datasets/sqlite ./src/infra/task-system/sqlite ./src/infra/flow-system/sqlite ./src/infra/messaging-outbox/sqlite ./src/e2e/app/cli/sqlite
+SQLITE_CRATES := ./src/infra/accounts/sqlite \
+	./src/e2e/app/cli/sqlite \
+	./src/infra/auth-rebac/sqlite \
+	./src/infra/datasets/sqlite \
+	./src/infra/flow-system/sqlite \
+	./src/infra/messaging-outbox/sqlite \
+	./src/infra/task-system/sqlite \
 
 ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
 MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
@@ -144,6 +160,18 @@ sqlx-local-clean-sqlite:
 .PHONY: sqlx-prepare
 sqlx-prepare:
 	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare);)
+
+.PHONY: sqlx-prepare-postgres
+sqlx-prepare-postgres:
+	$(foreach crate,$(POSTGRES_CRATES),(cd $(crate) && cargo sqlx prepare);)
+
+.PHONY: sqlx-prepare-mariadb
+sqlx-prepare-mariadb:
+	$(foreach crate,$(MYSQL_CRATES),(cd $(crate) && cargo sqlx prepare);)
+
+.PHONY: sqlx-prepare-sqlite
+sqlx-prepare-sqlite:
+	$(foreach crate,$(SQLITE_CRATES),(cd $(crate) && cargo sqlx prepare);)
 
 ###############################################################################
 # Sqlx: add migration

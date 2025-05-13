@@ -12,3 +12,22 @@
 pub type EvmWalletAddress = alloy_primitives::Address;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Wallet-based auth: tests
+pub struct EvmWalletAddressConvertor {}
+
+impl EvmWalletAddressConvertor {
+    const NO_CHAIN_ID: Option<u64> = None;
+
+    pub fn parse_checksummed<S: AsRef<str>>(
+        value: S,
+    ) -> Result<EvmWalletAddress, alloy_primitives::AddressError> {
+        EvmWalletAddress::parse_checksummed(value, Self::NO_CHAIN_ID)
+    }
+
+    pub fn checksummed_string(wallet: &EvmWalletAddress) -> String {
+        wallet.to_checksum(Self::NO_CHAIN_ID)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

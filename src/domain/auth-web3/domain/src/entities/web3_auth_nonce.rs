@@ -14,7 +14,7 @@ use nutype::nutype;
 #[nutype(
     sanitize(trim),
     validate(len_char_min = 8),
-    derive(Debug, Clone, PartialEq)
+    derive(AsRef, Clone, Debug, PartialEq, TryFrom)
 )]
 pub struct Web3AuthenticationNonce(String);
 

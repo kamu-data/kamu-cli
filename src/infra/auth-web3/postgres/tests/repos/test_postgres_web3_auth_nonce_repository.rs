@@ -36,8 +36,9 @@ impl PostgresWeb3AuthNonceRepositoryHarness {
     pub fn new(pg_pool: PgPool) -> Self {
         let mut b = dill::CatalogBuilder::new();
 
-        b.add::<kamu_auth_web3_postgres::PostgresWeb3AuthNonceRepository>();
         b.add_value(pg_pool);
+        b.add::<database_common::PostgresTransactionManager>();
+        b.add::<kamu_auth_web3_postgres::PostgresWeb3AuthNonceRepository>();
 
         Self { catalog: b.build() }
     }

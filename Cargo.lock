@@ -6497,6 +6497,7 @@ dependencies = [
  "internal-error",
  "nutype",
  "siwe",
+ "sqlx",
  "thiserror 2.0.12",
 ]
 

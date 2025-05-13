@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{EvmWalletAddress, Web3AuthenticationNonce};
+use crate::{EvmWalletAddress, EvmWalletAddressConvertor, Web3AuthenticationNonce};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,6 +18,30 @@ pub struct Web3AuthenticationNonceEntity {
     pub wallet_address: EvmWalletAddress,
     pub nonce: Web3AuthenticationNonce,
     pub expired_at: DateTime<Utc>,
+}
+
+#[cfg(feature = "sqlx")]
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct Web3AuthenticationNonceEntityRowModel {
+    pub wallet_address: String,
+    pub nonce: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[cfg(feature = "sqlx")]
+impl TryFrom<Web3AuthenticationNonceEntityRowModel> for Web3AuthenticationNonceEntity {
+    type Error = internal_error::InternalError;
+
+    fn try_from(v: Web3AuthenticationNonceEntityRowModel) -> Result<Self, Self::Error> {
+        use internal_error::ResultIntoInternal;
+
+        Ok(Self {
+            wallet_address: EvmWalletAddressConvertor::parse_checksummed(&v.wallet_address)
+                .int_err()?,
+            nonce: v.nonce.try_into().int_err()?,
+            expired_at: v.expires_at,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

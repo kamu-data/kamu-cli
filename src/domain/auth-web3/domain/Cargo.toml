@@ -24,6 +24,7 @@ doctest = false
 [features]
 default = []
 getrandom = ["alloy-primitives/getrandom"]
+sqlx = ["dep:sqlx"]
 
 
 [dependencies]
@@ -36,5 +37,9 @@ nutype = { version = "0.6", default-features = false }
 siwe = { version = "0.6", default-features = false }
 thiserror = { version = "2", default-features = false }
 
+# Optional
+sqlx = { optional = true, version = "0.8", default-features = false, features = [
+    "macros",
+] }
 
 [dev-dependencies]

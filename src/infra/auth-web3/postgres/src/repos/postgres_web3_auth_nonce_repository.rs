@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use database_common::{TransactionRef, TransactionRefT};
+use internal_error::ResultIntoInternal;
 
 use crate::domain::*;
 
@@ -33,21 +34,79 @@ impl PostgresWeb3AuthNonceRepository {
 #[async_trait::async_trait]
 impl Web3AuthNonceRepository for PostgresWeb3AuthNonceRepository {
     async fn set_nonce(&self, entity: &Web3AuthenticationNonceEntity) -> Result<(), SetNonceError> {
-        todo!()
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        sqlx::query!(
+            r#"
+            INSERT INTO web3_auth_eip4361_nonces(wallet_address, nonce, expires_at)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (wallet_address) DO UPDATE
+                SET nonce      = excluded.nonce,
+                    expires_at = excluded.expires_at
+            "#,
+            EvmWalletAddressConvertor::checksummed_string(&entity.wallet_address),
+            entity.nonce.as_ref(),
+            entity.expired_at
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
     }
 
     async fn get_nonce(
         &self,
         wallet: &EvmWalletAddress,
     ) -> Result<Web3AuthenticationNonceEntity, GetNonceError> {
-        todo!()
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_nonce_row = sqlx::query_as!(
+            Web3AuthenticationNonceEntityRowModel,
+            r#"
+            SELECT wallet_address,
+                   nonce,
+                   expires_at
+            FROM web3_auth_eip4361_nonces
+            WHERE wallet_address = $1
+            "#,
+            EvmWalletAddressConvertor::checksummed_string(wallet)
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        if let Some(nonce_row_row_model) = maybe_nonce_row {
+            let nonce_row = nonce_row_row_model.try_into()?;
+
+            Ok(nonce_row)
+        } else {
+            Err(GetNonceError::NotFound { wallet: *wallet })
+        }
     }
 
     async fn cleanup_expired_nonces(
         &self,
         now: DateTime<Utc>,
     ) -> Result<(), CleanupExpiredNoncesError> {
-        todo!()
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        sqlx::query!(
+            r#"
+            DELETE
+            FROM web3_auth_eip4361_nonces
+            WHERE expires_at <= $1
+            "#,
+            now
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
     }
 }
 

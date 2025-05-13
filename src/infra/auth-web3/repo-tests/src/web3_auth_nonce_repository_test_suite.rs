@@ -81,17 +81,17 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
 pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
     let harness = Web3AuthNonceRepositoryTestSuiteHarness::new(catalog);
 
-    let now = Utc::now();
+    let t0 = Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap();
 
     let nonce_1_expired = Web3AuthenticationNonceEntity {
         wallet_address: EvmWalletAddress::random(),
         nonce: Web3AuthenticationNonce::new(),
-        expired_at: now - Duration::seconds(1),
+        expired_at: t0 - Duration::seconds(1),
     };
     let nonce_2 = Web3AuthenticationNonceEntity {
         wallet_address: EvmWalletAddress::random(),
         nonce: Web3AuthenticationNonce::new(),
-        expired_at: now + Duration::minutes(15),
+        expired_at: t0 + Duration::minutes(15),
     };
 
     {
@@ -111,7 +111,7 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
             Ok(()),
             harness
                 .web3_auth_nonce_repo
-                .cleanup_expired_nonces(now)
+                .cleanup_expired_nonces(t0)
                 .await,
         );
 
@@ -134,13 +134,13 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
         );
     }
     {
-        let now_plus_20_minutes = now + Duration::minutes(20);
+        let t1 = t0 + Duration::minutes(20);
 
         pretty_assertions::assert_eq!(
             Ok(()),
             harness
                 .web3_auth_nonce_repo
-                .cleanup_expired_nonces(now_plus_20_minutes)
+                .cleanup_expired_nonces(t1)
                 .await,
         );
 
