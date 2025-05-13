@@ -37,7 +37,7 @@ pub struct Web3NonceServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Web3NonceService for Web3NonceServiceImpl {
+impl Web3AuthEip4361NonceService for Web3NonceServiceImpl {
     async fn create_nonce(
         &self,
         wallet_address: EvmWalletAddress,

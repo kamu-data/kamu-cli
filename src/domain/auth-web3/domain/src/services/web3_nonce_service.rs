@@ -14,7 +14,7 @@ use crate::{EvmWalletAddress, Web3AuthEip4361NonceEntity};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait Web3NonceService: Send + Sync {
+pub trait Web3AuthEip4361NonceService: Send + Sync {
     async fn create_nonce(
         &self,
         wallet_address: EvmWalletAddress,
