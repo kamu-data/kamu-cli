@@ -41,10 +41,10 @@ impl Web3NonceService for Web3NonceServiceImpl {
     async fn create_nonce(
         &self,
         wallet_address: EvmWalletAddress,
-    ) -> Result<Web3AuthenticationEip4361NonceEntity, CreateNonceError> {
+    ) -> Result<Web3AuthEip4361NonceEntity, CreateNonceError> {
         let now = self.time_source.now();
 
-        let entity = Web3AuthenticationEip4361NonceEntity {
+        let entity = Web3AuthEip4361NonceEntity {
             wallet_address,
             nonce: Web3AuthenticationEip4361Nonce::new(),
             expires_at: now + WEB3_AUTH_EIP_4361_EXPIRES_IN_15_MINUTES,

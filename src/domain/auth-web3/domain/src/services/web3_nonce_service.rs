@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{EvmWalletAddress, Web3AuthenticationEip4361NonceEntity};
+use crate::{EvmWalletAddress, Web3AuthEip4361NonceEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +18,7 @@ pub trait Web3NonceService: Send + Sync {
     async fn create_nonce(
         &self,
         wallet_address: EvmWalletAddress,
-    ) -> Result<Web3AuthenticationEip4361NonceEntity, CreateNonceError>;
+    ) -> Result<Web3AuthEip4361NonceEntity, CreateNonceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

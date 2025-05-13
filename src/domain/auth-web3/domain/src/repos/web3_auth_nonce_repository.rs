@@ -11,21 +11,18 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{EvmWalletAddress, Web3AuthenticationEip4361NonceEntity};
+use crate::{EvmWalletAddress, Web3AuthEip4361NonceEntity};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait Web3AuthNonceRepository: Send + Sync {
-    async fn set_nonce(
-        &self,
-        entity: &Web3AuthenticationEip4361NonceEntity,
-    ) -> Result<(), SetNonceError>;
+    async fn set_nonce(&self, entity: &Web3AuthEip4361NonceEntity) -> Result<(), SetNonceError>;
 
     async fn get_nonce(
         &self,
         wallet: &EvmWalletAddress,
-    ) -> Result<Web3AuthenticationEip4361NonceEntity, GetNonceError>;
+    ) -> Result<Web3AuthEip4361NonceEntity, GetNonceError>;
 
     async fn cleanup_expired_nonces(
         &self,

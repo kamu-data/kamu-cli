@@ -33,10 +33,7 @@ impl SqliteWeb3AuthNonceRepository {
 
 #[async_trait::async_trait]
 impl Web3AuthNonceRepository for SqliteWeb3AuthNonceRepository {
-    async fn set_nonce(
-        &self,
-        entity: &Web3AuthenticationEip4361NonceEntity,
-    ) -> Result<(), SetNonceError> {
+    async fn set_nonce(&self, entity: &Web3AuthEip4361NonceEntity) -> Result<(), SetNonceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -65,14 +62,14 @@ impl Web3AuthNonceRepository for SqliteWeb3AuthNonceRepository {
     async fn get_nonce(
         &self,
         wallet: &EvmWalletAddress,
-    ) -> Result<Web3AuthenticationEip4361NonceEntity, GetNonceError> {
+    ) -> Result<Web3AuthEip4361NonceEntity, GetNonceError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let wallet_address = EvmWalletAddressConvertor::checksummed_string(wallet);
 
         let maybe_nonce_row = sqlx::query_as!(
-            Web3AuthenticationEip4361NonceEntityRowModel,
+            Web3AuthEip4361NonceEntityRowModel,
             r#"
             SELECT wallet_address,
                    nonce,
