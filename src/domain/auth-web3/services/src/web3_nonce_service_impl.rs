@@ -22,14 +22,14 @@ pub const WEB3_AUTH_EIP_4361_EXPIRES_IN_15_MINUTES: Duration = Duration::minutes
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn Web3NonceService)]
+#[dill::interface(dyn Web3AuthEip4361NonceService)]
 #[dill::interface(dyn InitOnStartup)]
 #[dill::meta(InitOnStartupMeta {
     job_name: JOB_KAMU_WEB_3_NONCE_SERVICE,
     depends_on: &[],
     requires_transaction: true,
 })]
-pub struct Web3NonceServiceImpl {
+pub struct Web3AuthEip4361NonceServiceImpl {
     nonce_repo: Arc<dyn Web3AuthEip4361NonceRepository>,
     time_source: Arc<dyn SystemTimeSource>,
 }
@@ -37,7 +37,7 @@ pub struct Web3NonceServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Web3AuthEip4361NonceService for Web3NonceServiceImpl {
+impl Web3AuthEip4361NonceService for Web3AuthEip4361NonceServiceImpl {
     async fn create_nonce(
         &self,
         wallet_address: EvmWalletAddress,
@@ -59,7 +59,7 @@ impl Web3AuthEip4361NonceService for Web3NonceServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl InitOnStartup for Web3NonceServiceImpl {
+impl InitOnStartup for Web3AuthEip4361NonceServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, name = Web3NonceServiceImpl_run_initialization)]
     async fn run_initialization(&self) -> Result<(), InternalError> {
         let now = self.time_source.now();
