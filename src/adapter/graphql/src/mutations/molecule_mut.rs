@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{AccountServiceExt as _, CurrentAccountSubject};
 use kamu_core::DatasetRegistryExt;
 
 use crate::prelude::*;
@@ -37,8 +37,8 @@ impl MoleculeMut {
         let (
             subject,
             query_svc,
-            account_repo,
-            login_pass_provider,
+            account_svc,
+            create_account_use_case,
             create_dataset_use_case,
             rebac_svc,
             push_ingest_use_case,
@@ -46,8 +46,8 @@ impl MoleculeMut {
             ctx,
             CurrentAccountSubject,
             dyn domain::QueryService,
-            dyn kamu_accounts::AccountRepository,
-            kamu_accounts_services::LoginPasswordAuthProvider,
+            dyn kamu_accounts::AccountService,
+            dyn kamu_accounts::CreateAccountUseCase,
             dyn kamu_datasets::CreateDatasetFromSnapshotUseCase,
             dyn kamu_auth_rebac::RebacService,
             dyn domain::PushIngestDataUseCase
@@ -105,37 +105,29 @@ impl MoleculeMut {
             }
         }
 
-        // Create account
-        // TODO: Preserve PK
-        let (_key, project_account_id) = odf::AccountID::new_generated_ed25519();
+        // Create project account
+        let molecule_account = account_svc
+            .account_by_id(subject.account_id())
+            .await?
+            .unwrap();
+
         let project_account_name: odf::AccountName =
             format!("molecule.{ipt_symbol}").parse().int_err()?;
 
-        let project_account = kamu_accounts::Account {
-            id: project_account_id,
-            account_name: project_account_name.clone(),
-            email: format!("support+{project_account_name}@kamu.dev")
-                .parse()
-                .unwrap(),
-            display_name: project_account_name.to_string(),
-            account_type: kamu_accounts::AccountType::Organization,
-            avatar_url: Some(
-                "https://avatars.githubusercontent.com/u/37688345?s=200&amp;v=4".into(),
-            ),
-            registered_at: chrono::Utc::now(),
-            provider: kamu_accounts::PROVIDER_PASSWORD.into(),
-            provider_identity_key: project_account_name.to_string(),
-        };
+        let project_email = format!("support+{project_account_name}@kamu.dev")
+            .parse()
+            .unwrap();
 
-        account_repo
-            .save_account(&project_account)
+        // TODO: Set avatar and display name?
+        // https://avatars.githubusercontent.com/u/37688345?s=200&amp;v=4
+        let project_account = create_account_use_case
+            .execute(
+                &molecule_account,
+                &project_account_name,
+                Some(project_email),
+            )
             .await
             .int_err()?;
-
-        // TODO: Generate random password
-        login_pass_provider
-            .save_password(&project_account.account_name, "molecule".into())
-            .await?;
 
         // Create `data-room` dataset
         let snapshot = Molecule::dataset_snapshot_data_room(odf::DatasetAlias::new(

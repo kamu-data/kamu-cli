@@ -12,6 +12,7 @@ use bon::bon;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
+use kamu_accounts_services::CreateAccountUseCaseImpl;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_services::*;
@@ -844,6 +845,7 @@ impl GraphQLDatasetsHarness {
         std::fs::create_dir(&cache_dir).unwrap();
 
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
+            .add::<CreateAccountUseCaseImpl>()
             .add::<RenameDatasetUseCaseImpl>()
             .add::<DeleteDatasetUseCaseImpl>()
             .add_value(kamu::EngineConfigDatafusionEmbeddedBatchQuery::default())
