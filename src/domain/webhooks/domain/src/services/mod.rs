@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod webhook_delivery_worker;
+mod webhook_event_builder;
 mod webhook_signer;
 
 pub use webhook_delivery_worker::*;
+pub use webhook_event_builder::*;
 pub use webhook_signer::*;

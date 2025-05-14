@@ -9,28 +9,17 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use dill::*;
 use internal_error::InternalError;
-use kamu_datasets::{
-    DatasetEntryService,
-    DatasetReferenceMessage,
-    DatasetReferenceMessageUpdated,
-    MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
-};
+use kamu_datasets::{DatasetReferenceMessage, MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE};
 use kamu_task_system::{LogicalPlan, LogicalPlanDeliverWebhook, TaskScheduler};
 use kamu_webhooks::*;
 use messaging_outbox::*;
-use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_OUTBOX_BRIDGE: &str =
     "dev.kamu.domain.webhooks.WebhookOutboxBridge";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const WEBHOOK_DATASET_HEAD_UPDATED_VERSION: &str = "1";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,46 +35,36 @@ const WEBHOOK_DATASET_HEAD_UPDATED_VERSION: &str = "1";
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct WebhookOutboxBridge {
-    dataset_entry_svc: Arc<dyn DatasetEntryService>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    webhook_event_repo: Arc<dyn WebhookEventRepository>,
+    webhook_event_builder: Arc<dyn WebhookEventBuilder>,
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl WebhookOutboxBridge {
-    async fn build_dataset_head_updated_payload(
+    async fn schedule_dataset_webhook_event_delivery(
         &self,
-        msg: &DatasetReferenceMessageUpdated,
-    ) -> Result<serde_json::Value, InternalError> {
-        // Find out who is the owner of the dataset
-        let dataset_entry = self
-            .dataset_entry_svc
-            .get_entry(&msg.dataset_id)
-            .await
-            .int_err()?;
+        dataset_id: &odf::DatasetID,
+        event: WebhookEvent,
+    ) -> Result<(), InternalError> {
+        // Match subscriptions for this event type
+        let subscription_ids = self
+            .list_enabled_webhook_subscriptions_for_dataset_event(dataset_id, &event.event_type)
+            .await?;
+        tracing::debug!(
+            len = subscription_ids.len(),
+            ?subscription_ids,
+            "Found subscriptions for dataset reference updated event"
+        );
 
-        // Form event payload
-        let mut payload = json!({
-            "version": WEBHOOK_DATASET_HEAD_UPDATED_VERSION,
-            "datasetId": msg.dataset_id.to_string(),
-            "ownerAccountId": dataset_entry.owner_id.to_string(),
-            "newHash": msg.new_block_hash.to_string(),
-        });
-
-        // Add optional fields
-        if let Some(prev_block_hash) = msg.maybe_prev_block_hash.as_ref() {
-            if let serde_json::Value::Object(ref mut map) = payload {
-                map.insert("oldHash".to_string(), json!(prev_block_hash.to_string()));
-            } else {
-                unreachable!("Expected a JSON object");
-            }
+        // Schedule webhook delivery tasks for each subscription
+        for subscription_id in subscription_ids {
+            self.schedule_webhook_delivery_task(subscription_id, event.id)
+                .await?;
         }
 
-        tracing::debug!(?payload, "Formed payload for dataset head updated event");
-
-        Ok(payload)
+        Ok(())
     }
 
     async fn list_enabled_webhook_subscriptions_for_dataset_event(
@@ -156,33 +135,17 @@ impl MessageConsumerT<DatasetReferenceMessage> for WebhookOutboxBridge {
                     return Ok(());
                 }
 
-                // Form event payload
-                let payload = self.build_dataset_head_updated_payload(msg).await?;
-
-                // Create and register a webhook event
-                let event_id = WebhookEventId::new(uuid::Uuid::new_v4());
-                let event = WebhookEvent::new(
-                    event_id,
-                    WebhookEventTypeCatalog::dataset_head_updated(),
-                    payload,
-                    Utc::now(),
-                );
-                self.webhook_event_repo
-                    .create_event(&event)
+                // Build the event
+                let event = self
+                    .webhook_event_builder
+                    .build_dataset_head_updated(msg)
                     .await
                     .int_err()?;
 
-                // Match subscriptions and schedule individual delivery tasks
-                let subscription_ids = self
-                    .list_enabled_webhook_subscriptions_for_dataset_event(
-                        &msg.dataset_id,
-                        &event.event_type,
-                    )
-                    .await?;
-                for subscription_id in subscription_ids {
-                    self.schedule_webhook_delivery_task(subscription_id, event_id)
-                        .await?;
-                }
+                // Schedule the delivery of the event to all subscriptions
+                self.schedule_dataset_webhook_event_delivery(&msg.dataset_id, event)
+                    .await
+                    .int_err()?;
 
                 Ok(())
             }

@@ -7,17 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
+use internal_error::InternalError;
+use kamu_datasets::DatasetReferenceMessageUpdated;
 
-use crate::*;
+use crate::WebhookEvent;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<WebhookOutboxBridge>();
-    catalog_builder.add::<WebhookEventBuilderImpl>();
-    catalog_builder.add::<WebhookDeliveryWorkerImpl>();
-    catalog_builder.add::<WebhookSignerImpl>();
+#[async_trait::async_trait]
+pub trait WebhookEventBuilder: Send + Sync {
+    async fn build_dataset_head_updated(
+        &self,
+        event: &DatasetReferenceMessageUpdated,
+    ) -> Result<WebhookEvent, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

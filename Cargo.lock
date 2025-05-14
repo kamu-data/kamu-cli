@@ -7391,6 +7391,7 @@ dependencies = [
  "event-sourcing",
  "http 1.3.1",
  "internal-error",
+ "kamu-datasets",
  "kamu-task-system",
  "nutype",
  "opendatafabric",
