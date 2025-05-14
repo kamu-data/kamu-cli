@@ -26,8 +26,8 @@ pub enum LogicalPlan {
     HardCompactDataset(LogicalPlanHardCompactDataset),
     /// Perform a dataset resetting
     ResetDataset(LogicalPlanResetDataset),
-    /// Send a webhook
-    SendWebhook(LogicalPlanSendWebhook),
+    /// Deliver a webhook
+    DeliverWebhook(LogicalPlanDeliverWebhook),
 }
 
 impl LogicalPlan {
@@ -38,7 +38,7 @@ impl LogicalPlan {
             LogicalPlan::Probe(p) => p.dataset_id.as_ref(),
             LogicalPlan::HardCompactDataset(hard_compaction) => Some(&hard_compaction.dataset_id),
             LogicalPlan::ResetDataset(reset) => Some(&reset.dataset_id),
-            LogicalPlan::SendWebhook(webhook) => webhook.dataset_id.as_ref(),
+            LogicalPlan::DeliverWebhook(webhook) => webhook.dataset_id.as_ref(),
         }
     }
 }
@@ -91,7 +91,7 @@ pub struct LogicalPlanResetDataset {
 
 /// A task that can be used for testing the scheduling system
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct LogicalPlanSendWebhook {
+pub struct LogicalPlanDeliverWebhook {
     pub dataset_id: Option<odf::DatasetID>,
     pub webhook_subscription_id: uuid::Uuid,
     pub webhook_event_id: uuid::Uuid,
@@ -107,6 +107,6 @@ impl_enum_variant!(LogicalPlan::ResetDataset(LogicalPlanResetDataset));
 impl_enum_variant!(LogicalPlan::HardCompactDataset(
     LogicalPlanHardCompactDataset
 ));
-impl_enum_variant!(LogicalPlan::SendWebhook(LogicalPlanSendWebhook));
+impl_enum_variant!(LogicalPlan::DeliverWebhook(LogicalPlanDeliverWebhook));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

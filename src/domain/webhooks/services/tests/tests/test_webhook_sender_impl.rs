@@ -16,7 +16,7 @@ use kamu_webhooks_inmem::{
     InMemoryWebhookEventRepository,
     InMemoryWebhookSubscriptionEventStore,
 };
-use kamu_webhooks_services::{WebhookSenderImpl, WebhookSignerImpl};
+use kamu_webhooks_services::{WebhookDeliveryWorkerImpl, WebhookSignerImpl};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +25,7 @@ use url::Url;
 #[test_log::test(tokio::test)]
 async fn test_send_webhook() {
     let mut b = dill::CatalogBuilder::new();
-    b.add::<WebhookSenderImpl>()
+    b.add::<WebhookDeliveryWorkerImpl>()
         .add::<WebhookSignerImpl>()
         .add::<InMemoryWebhookSubscriptionEventStore>()
         .add::<InMemoryWebhookDeliveryRepository>()
@@ -75,9 +75,9 @@ async fn test_send_webhook() {
         .await
         .unwrap();
 
-    let webhook_sender = catalog.get_one::<dyn WebhookSender>().unwrap();
+    let webhook_sender = catalog.get_one::<dyn WebhookDeliveryWorker>().unwrap();
     webhook_sender
-        .send_webhook(
+        .deliver_webhook(
             task_attempt_id,
             webhook_subscription_id.into_inner(),
             webhook_event_id.into_inner(),

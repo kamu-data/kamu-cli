@@ -31,7 +31,7 @@ pub enum TaskDefinition {
     Update(TaskDefinitionUpdate),
     Reset(TaskDefinitionReset),
     HardCompact(TaskDefinitionHardCompact),
-    SendWebhook(TaskDefinitionSendWebhook),
+    DeliverWebhook(TaskDefinitionDeliverWebhook),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +68,7 @@ pub struct TaskDefinitionHardCompact {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct TaskDefinitionSendWebhook {
+pub struct TaskDefinitionDeliverWebhook {
     pub attempt_id: TaskAttemptID,
     pub webhook_subscription_id: uuid::Uuid,
     pub webhook_event_id: uuid::Uuid,

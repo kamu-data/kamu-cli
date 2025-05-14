@@ -19,7 +19,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct WebhookSenderImpl {
+pub struct WebhookDeliveryWorkerImpl {
     catalog: dill::Catalog,
     webhook_signer: Arc<dyn WebhookSigner>,
     client: reqwest::Client,
@@ -28,8 +28,8 @@ pub struct WebhookSenderImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn WebhookSender)]
-impl WebhookSenderImpl {
+#[interface(dyn WebhookDeliveryWorker)]
+impl WebhookDeliveryWorkerImpl {
     pub fn new(catalog: dill::Catalog, webhook_signer: Arc<dyn WebhookSigner>) -> Self {
         Self {
             catalog,
@@ -231,8 +231,8 @@ impl WebhookSenderImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl WebhookSender for WebhookSenderImpl {
-    async fn send_webhook(
+impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
+    async fn deliver_webhook(
         &self,
         task_attempt_id: ts::TaskAttemptID,
         webhook_subscription_id: uuid::Uuid,

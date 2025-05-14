@@ -15,7 +15,7 @@ use crate::*;
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<WebhookOutboxBridge>();
-    catalog_builder.add::<WebhookSenderImpl>();
+    catalog_builder.add::<WebhookDeliveryWorkerImpl>();
     catalog_builder.add::<WebhookSignerImpl>();
 }
 

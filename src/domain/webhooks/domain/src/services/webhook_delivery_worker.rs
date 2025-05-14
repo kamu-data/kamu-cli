@@ -13,8 +13,8 @@ use kamu_task_system as ts;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait WebhookSender: Send + Sync {
-    async fn send_webhook(
+pub trait WebhookDeliveryWorker: Send + Sync {
+    async fn deliver_webhook(
         &self,
         task_attempt_id: ts::TaskAttemptID,
         webhook_subscription_id: uuid::Uuid,

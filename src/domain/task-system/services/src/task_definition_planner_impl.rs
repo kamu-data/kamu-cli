@@ -175,12 +175,12 @@ impl TaskDefinitionPlannerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
-    async fn plan_send_webhook(
+    async fn plan_deliver_webhook(
         &self,
         attempt_id: TaskAttemptID,
-        args: &LogicalPlanSendWebhook,
+        args: &LogicalPlanDeliverWebhook,
     ) -> TaskDefinition {
-        TaskDefinition::SendWebhook(TaskDefinitionSendWebhook {
+        TaskDefinition::DeliverWebhook(TaskDefinitionDeliverWebhook {
             attempt_id,
             webhook_subscription_id: args.webhook_subscription_id,
             webhook_event_id: args.webhook_event_id,
@@ -206,7 +206,9 @@ impl TaskDefinitionPlanner for TaskDefinitionPlannerImpl {
             LogicalPlan::HardCompactDataset(compaction) => {
                 self.plan_hard_compaction(compaction).await?
             }
-            LogicalPlan::SendWebhook(webhook) => self.plan_send_webhook(attempt_id, webhook).await,
+            LogicalPlan::DeliverWebhook(webhook) => {
+                self.plan_deliver_webhook(attempt_id, webhook).await
+            }
         };
 
         Ok(task_definition)

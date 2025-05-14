@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod webhook_sender;
+mod webhook_delivery_worker;
 mod webhook_signer;
 
-pub use webhook_sender::*;
+pub use webhook_delivery_worker::*;
 pub use webhook_signer::*;

@@ -18,7 +18,7 @@ use kamu_datasets::{
     DatasetReferenceMessageUpdated,
     MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
 };
-use kamu_task_system::{LogicalPlan, LogicalPlanSendWebhook, TaskScheduler};
+use kamu_task_system::{LogicalPlan, LogicalPlanDeliverWebhook, TaskScheduler};
 use kamu_webhooks::*;
 use messaging_outbox::*;
 use serde_json::json;
@@ -104,7 +104,7 @@ impl WebhookOutboxBridge {
         Ok(subscriptions)
     }
 
-    async fn schedule_webhook_task(
+    async fn schedule_webhook_delivery_task(
         &self,
         subscription_id: WebhookSubscriptionId,
         event_id: WebhookEventId,
@@ -112,7 +112,7 @@ impl WebhookOutboxBridge {
         let task = self
             .task_scheduler
             .create_task(
-                LogicalPlan::SendWebhook(LogicalPlanSendWebhook {
+                LogicalPlan::DeliverWebhook(LogicalPlanDeliverWebhook {
                     dataset_id: None,
                     webhook_subscription_id: subscription_id.into_inner(),
                     webhook_event_id: event_id.into_inner(),
@@ -122,7 +122,7 @@ impl WebhookOutboxBridge {
             .await
             .int_err()?;
 
-        tracing::debug!(task_id = ?task.task_id, %event_id, %subscription_id, "Scheduled webhook task");
+        tracing::debug!(task_id = ?task.task_id, %event_id, %subscription_id, "Scheduled webhook delivery task");
 
         Ok(())
     }
@@ -180,7 +180,7 @@ impl MessageConsumerT<DatasetReferenceMessage> for WebhookOutboxBridge {
                     )
                     .await?;
                 for subscription_id in subscription_ids {
-                    self.schedule_webhook_task(subscription_id, event_id)
+                    self.schedule_webhook_delivery_task(subscription_id, event_id)
                         .await?;
                 }
 
