@@ -16,8 +16,8 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -427,7 +427,9 @@ impl TestHarness {
                 .add::<LoginPasswordAuthProvider>()
                 .add::<AccountServiceImpl>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
-                .add::<InMemoryAccountRepository>();
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add::<InMemoryAccountRepository>()
+                .add_value(DidSecretEncryptionConfig::sample());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

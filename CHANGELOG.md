@@ -12,6 +12,11 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- GQL api:
+  - New `createAccount` method to create new account, method is available only for admins and user's with `can_provision_accounts` rebac properties.
+  - New `modifyPassword` method to change password for existing account, method is available only for admins.
+- New repository `DidSecretKeysRepository` where stored all encrypted private parts of created accounts and datasets.
 ### Fixed
 - Dependency graph is less sensitive to requests that come too early, before dataset node is created
 

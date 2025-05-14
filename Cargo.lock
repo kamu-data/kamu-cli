@@ -2797,7 +2797,7 @@ dependencies = [
  "dill",
  "libc",
  "once_cell",
- "random-names",
+ "random-strings",
  "regex",
  "serde",
  "tempfile",
@@ -3069,6 +3069,17 @@ dependencies = [
  "generic-array",
  "rand_core 0.6.4",
  "typenum",
+]
+
+[[package]]
+name = "crypto-utils"
+version = "0.236.0"
+dependencies = [
+ "aes-gcm",
+ "argon2",
+ "internal-error",
+ "password-hash",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -5854,6 +5865,7 @@ dependencies = [
  "common-macros",
  "container-runtime",
  "criterion",
+ "crypto-utils",
  "curl",
  "curl-sys",
  "dashmap",
@@ -5893,7 +5905,7 @@ dependencies = [
  "opendatafabric",
  "pretty_assertions",
  "rand 0.8.5",
- "random-names",
+ "random-strings",
  "regex",
  "reqwest",
  "ringbuf",
@@ -5926,11 +5938,13 @@ dependencies = [
  "base32",
  "chrono",
  "crc32fast",
+ "crypto-utils",
  "database-common",
  "email-utils",
  "futures",
  "internal-error",
  "jsonwebtoken",
+ "kamu-auth-rebac",
  "lazy_static",
  "merge",
  "messaging-outbox",
@@ -5938,8 +5952,9 @@ dependencies = [
  "nutype",
  "opendatafabric",
  "rand 0.8.5",
- "random-names",
+ "random-strings",
  "reusable",
+ "secrecy",
  "serde",
  "serde_with",
  "sqlx",
@@ -6038,12 +6053,13 @@ dependencies = [
 name = "kamu-accounts-services"
 version = "0.236.0"
 dependencies = [
- "argon2",
  "async-trait",
  "chrono",
  "common-macros",
+ "crypto-utils",
  "database-common",
  "dill",
+ "email-utils",
  "init-on-startup",
  "internal-error",
  "jsonwebtoken",
@@ -6055,7 +6071,8 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "opendatafabric",
- "password-hash",
+ "random-strings",
+ "secrecy",
  "serde",
  "serde_json",
  "test-log",
@@ -6199,6 +6216,7 @@ dependencies = [
  "oop",
  "opendatafabric",
  "pretty_assertions",
+ "random-strings",
  "secrecy",
  "serde",
  "serde_json",
@@ -6359,6 +6377,7 @@ dependencies = [
  "itertools 0.14.0",
  "kamu-core",
  "opendatafabric",
+ "serde",
  "sqlx",
  "strum 0.26.3",
  "thiserror 2.0.12",
@@ -6458,6 +6477,7 @@ dependencies = [
  "clap_complete",
  "console",
  "container-runtime",
+ "crypto-utils",
  "database-common",
  "database-common-macros",
  "datafusion",
@@ -6531,7 +6551,7 @@ dependencies = [
  "pretty_assertions",
  "prettytable-rs",
  "prometheus",
- "random-names",
+ "random-strings",
  "read_input",
  "regex",
  "reqwest",
@@ -6756,10 +6776,10 @@ dependencies = [
 name = "kamu-datasets"
 version = "0.236.0"
 dependencies = [
- "aes-gcm",
  "async-trait",
  "bytes",
  "chrono",
+ "crypto-utils",
  "database-common",
  "futures",
  "internal-error",
@@ -8512,7 +8532,7 @@ dependencies = [
  "opendatafabric-metadata",
  "opendatafabric-storage-lfs",
  "pretty_assertions",
- "random-names",
+ "random-strings",
  "tempfile",
  "thiserror 2.0.12",
  "tokio",
@@ -9681,7 +9701,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "random-names"
+name = "random-strings"
 version = "0.236.0"
 dependencies = [
  "rand 0.8.5",

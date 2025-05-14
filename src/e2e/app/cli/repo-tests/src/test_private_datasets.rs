@@ -42,7 +42,7 @@ pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
         predefined:
           # Special:
           - accountName: admin
-            isAdmin: true
+            properties: [admin]
             email: admin@example.com
 
           # By names:

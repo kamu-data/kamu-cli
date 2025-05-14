@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
@@ -63,6 +63,8 @@ impl DatasetBaseUseCaseHarness {
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDatasetEntryRepository>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
                 .add::<DatasetAliasUpdateHandler>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
@@ -117,10 +119,7 @@ impl DatasetBaseUseCaseHarness {
         };
 
         let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-        account_repo
-            .create_account(&Account::dummy())
-            .await
-            .unwrap();
+        account_repo.save_account(&Account::dummy()).await.unwrap();
 
         Self {
             _temp_dir: temp_dir,

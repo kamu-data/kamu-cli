@@ -10,10 +10,9 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
+use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use password_hash::rand_core::OsRng;
-use password_hash::{PasswordHash, PasswordVerifier, SaltString};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::*;
@@ -57,18 +56,8 @@ impl LoginPasswordAuthProvider {
         // so spawn a blocking task
         let password_hash = tokio::task::spawn_blocking(move || {
             tracing::info_span!("Generate password hash").in_scope(|| {
-                // Generate random salt string
-                let salt = SaltString::generate(&mut OsRng);
-
-                // Setup Argon2 matching the hashing mode
-                let argon2 = Self::setup_argon2(hashing_mode);
-
-                // Hash password to PHC string
-                use argon2::PasswordHasher;
-                argon2
-                    .hash_password(password.as_bytes(), &salt)
-                    .unwrap()
-                    .to_string()
+                let argon2_hasher = Argon2Hasher::new(hashing_mode);
+                argon2_hasher.hash(password.as_bytes())
             })
         })
         .await
@@ -81,27 +70,6 @@ impl LoginPasswordAuthProvider {
             .int_err()?;
 
         Ok(())
-    }
-
-    fn setup_argon2<'a>(password_hashing_mode: PasswordHashingMode) -> argon2::Argon2<'a> {
-        use argon2::*;
-        match password_hashing_mode {
-            // Use default Argon2 settings in production
-            PasswordHashingMode::Default => Argon2::default(),
-
-            // Use minimal Argon2 settings in test mode
-            PasswordHashingMode::Minimal => Argon2::new(
-                Algorithm::default(),
-                Version::default(),
-                Params::new(
-                    Params::MIN_M_COST,
-                    Params::MIN_T_COST,
-                    Params::MIN_P_COST,
-                    None,
-                )
-                .expect("Settings for testing hashing mode must be fine"),
-            ),
-        }
     }
 }
 
@@ -164,18 +132,17 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         // so spawn a blocking task
         tokio::task::spawn_blocking(move || {
             tracing::info_span!("Verify password hash").in_scope(|| {
-                let password_hash = PasswordHash::new(password_hash.as_str()).unwrap();
+                let argon2_hasher = Argon2Hasher::new(hashing_mode);
+                if !argon2_hasher.verify(
+                    password_login_credentials.password.as_bytes(),
+                    password_hash.as_str(),
+                ) {
+                    return Err(ProviderLoginError::RejectedCredentials(
+                        RejectedCredentialsError {},
+                    ));
+                }
 
-                // Setup Argon2 matching the hashing mode
-                let argon2 = Self::setup_argon2(hashing_mode);
-                argon2
-                    .verify_password(
-                        password_login_credentials.password.as_bytes(),
-                        &password_hash,
-                    )
-                    .map_err(|_| {
-                        ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
-                    })
+                Ok(())
             })
         })
         .await
@@ -205,14 +172,6 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
 pub struct PasswordLoginCredentials {
     pub login: String,
     pub password: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone)]
-pub enum PasswordHashingMode {
-    Default,
-    Minimal,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

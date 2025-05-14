@@ -14,7 +14,8 @@ use dill::*;
 use futures::{future, StreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::DatasetRegistrySoloUnitBridge;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig};
+use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
@@ -652,6 +653,8 @@ impl DependencyGraphHarness {
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<DependencyGraphServiceImpl>()
+        .add::<InMemoryDidSecretKeyRepository>()
+        .add_value(DidSecretEncryptionConfig::sample())
         .add::<InMemoryDatasetDependencyRepository>()
         .add::<DependencyGraphImmediateListener>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()

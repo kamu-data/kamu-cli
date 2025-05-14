@@ -14,6 +14,8 @@ pub use kamu_accounts as domain;
 
 mod dependencies;
 mod services;
+mod use_cases;
 
 pub use dependencies::*;
 pub use services::*;
+pub use use_cases::*;

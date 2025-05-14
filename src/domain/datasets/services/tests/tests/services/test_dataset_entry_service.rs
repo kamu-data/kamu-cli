@@ -14,8 +14,8 @@ use std::sync::{Arc, RwLock};
 use chrono::{DateTime, TimeZone, Utc};
 use dill::{CatalogBuilder, Component};
 use init_on_startup::InitOnStartup;
-use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject};
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject, DidSecretEncryptionConfig};
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
@@ -57,13 +57,13 @@ async fn test_indexes_datasets_correctly() {
     let (_, owner_account_id_1) = odf::AccountID::new_generated_ed25519();
     harness
         .account_repo
-        .create_account(&Account::test(owner_account_id_1.clone(), "user1"))
+        .save_account(&Account::test(owner_account_id_1.clone(), "user1"))
         .await
         .unwrap();
     let (_, owner_account_id_2) = odf::AccountID::new_generated_ed25519();
     harness
         .account_repo
-        .create_account(&Account::test(owner_account_id_2.clone(), "user2"))
+        .save_account(&Account::test(owner_account_id_2.clone(), "user2"))
         .await
         .unwrap();
 
@@ -249,7 +249,10 @@ impl DatasetEntryServiceHarness {
             b.bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
 
             b.add::<InMemoryAccountRepository>();
+            b.add::<InMemoryDidSecretKeyRepository>();
             b.add::<AccountServiceImpl>();
+
+            b.add_value(DidSecretEncryptionConfig::sample());
 
             b.add_builder(
                 OutboxImmediateImpl::builder()

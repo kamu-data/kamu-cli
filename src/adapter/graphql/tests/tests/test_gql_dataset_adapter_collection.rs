@@ -14,7 +14,7 @@ use kamu_core::*;
 use kamu_datasets_services::*;
 use serde_json::json;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -672,7 +672,8 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .build();
 
-        let (_catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog).await;
+        let (_catalog_anonymous, catalog_authorized) =
+            authentication_catalogs(&base_catalog, PredefinedAccountOpts::default()).await;
 
         Self {
             base_gql_harness,

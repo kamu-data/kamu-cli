@@ -15,6 +15,7 @@ mod accounts_repository_test_utils;
 
 mod access_token_repository_test_suite;
 mod accounts_repository_test_suite;
+mod did_secret_key_repository_suite;
 mod oauth_device_code_repository_test_suite;
 mod password_hash_repository_test_suite;
 
@@ -25,4 +26,7 @@ pub(crate) use accounts_repository_test_utils::*;
 pub use password_hash_repository_test_suite::*;
 pub mod oauth_device_code_repository {
     pub use super::oauth_device_code_repository_test_suite::*;
+}
+pub mod did_secret_key_repository {
+    pub use super::did_secret_key_repository_suite::*;
 }

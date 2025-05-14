@@ -33,6 +33,7 @@ odf = { workspace = true, default-features = false, features = [
     "lfs",
     "s3",
 ] }
+random-strings = { workspace = true }
 
 event-sourcing = { workspace = true }
 kamu = { workspace = true }

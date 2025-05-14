@@ -20,7 +20,7 @@ use crate::Account;
 
 #[async_trait::async_trait]
 pub trait AccountRepository: Send + Sync {
-    async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError>;
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError>;
 
     async fn get_account_by_id(
         &self,

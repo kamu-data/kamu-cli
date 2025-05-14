@@ -15,8 +15,8 @@ use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use kamu::domain::*;
-use kamu_accounts::{CurrentAccountSubject, PredefinedAccountsConfig};
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -91,6 +91,8 @@ async fn setup_repo() -> RepoFixture {
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
         .add::<InMemoryRebacRepository>()
+        .add::<InMemoryDidSecretKeyRepository>()
+        .add_value(DidSecretEncryptionConfig::sample())
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
         .add_value(PredefinedAccountsConfig::single_tenant())

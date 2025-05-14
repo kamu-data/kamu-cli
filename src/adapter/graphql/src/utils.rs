@@ -10,6 +10,7 @@
 use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
+use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_core::auth;
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
@@ -219,6 +220,27 @@ pub(crate) fn check_logged_account_name_match(
 pub(crate) fn logged_account(ctx: &Context<'_>) -> bool {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
     matches!(*current_account_subject, CurrentAccountSubject::Logged(_))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn ensure_account_can_provision_accounts(
+    ctx: &Context<'_>,
+    account_id: &odf::AccountID,
+) -> Result<(), GqlError> {
+    let rebac_service = from_catalog_n!(ctx, dyn RebacService);
+
+    if !rebac_service
+        .can_provision_accounts(account_id)
+        .await
+        .int_err()?
+    {
+        return Err(GqlError::Gql(async_graphql::Error::new(
+            "Account does not have permission to provision accounts",
+        )));
+    }
+
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
