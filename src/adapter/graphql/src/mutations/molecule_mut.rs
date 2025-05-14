@@ -22,15 +22,14 @@ pub(crate) struct MoleculeMut;
 #[Object]
 impl MoleculeMut {
     #[graphql(guard = "LoggedInGuard::new()")]
-    #[tracing::instrument(level = "info", name = MoleculeMut_create_project, skip_all, fields(?ipt_symbol, ?ipnft_uid))]
+    #[tracing::instrument(level = "info", name = MoleculeMut_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
     async fn create_project(
         &self,
         ctx: &Context<'_>,
+        ipnft_symbol: String,
+        ipnft_uid: String,
         ipnft_address: String,
         ipnft_token_id: usize,
-        ipnft_uid: String,
-        ipt_symbol: String,
-        ipt_address: String,
     ) -> Result<CreateProjectResult> {
         use datafusion::logical_expr::{col, lit};
 
@@ -84,8 +83,7 @@ impl MoleculeMut {
                 .filter(
                     col("ipnft_uid")
                         .eq(lit(&ipnft_uid))
-                        .or(col("ipt_address").eq(lit(&ipt_address)))
-                        .or(col("ipt_symbol").eq(lit(&ipt_symbol))),
+                        .or(col("ipnft_symbol").eq(lit(&ipnft_symbol))),
                 )
                 .int_err()?;
 
@@ -112,7 +110,7 @@ impl MoleculeMut {
             .unwrap();
 
         let project_account_name: odf::AccountName =
-            format!("molecule.{ipt_symbol}").parse().int_err()?;
+            format!("molecule.{ipnft_symbol}").parse().int_err()?;
 
         let project_email = format!("support+{project_account_name}@kamu.dev")
             .parse()
@@ -184,11 +182,10 @@ impl MoleculeMut {
             account_id: project_account.id,
             system_time: now,
             event_time: now,
+            ipnft_symbol,
             ipnft_address,
             ipnft_token_id,
             ipnft_uid,
-            ipt_address,
-            ipt_symbol,
             data_room_dataset_id: data_room_create_res.dataset_handle.id,
             announcements_dataset_id: announcements_create_res.dataset_handle.id,
         };
@@ -427,7 +424,7 @@ impl CreateProjectErrorConflict {
     async fn message(&self) -> String {
         format!(
             "Conflict with existing project {} ({})",
-            self.project.ipnft_uid, self.project.ipt_symbol,
+            self.project.ipnft_symbol, self.project.ipnft_uid,
         )
     }
 }

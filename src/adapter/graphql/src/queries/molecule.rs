@@ -33,11 +33,10 @@ impl Molecule {
                             [
                                 "op INT",
                                 "account_id STRING",
+                                "ipnft_symbol STRING",
+                                "ipnft_uid STRING",
                                 "ipnft_address STRING",
                                 "ipnft_token_id BIGINT",
-                                "ipnft_uid STRING",
-                                "ipt_address STRING",
-                                "ipt_symbol STRING",
                                 "data_room_dataset_id STRING",
                                 "announcements_dataset_id STRING",
                             ]
@@ -302,7 +301,7 @@ impl Molecule {
 
         let total_count = df.clone().count().await.int_err()?;
         let df = df
-            .sort(vec![col("ipt_symbol").sort(true, false)])
+            .sort(vec![col("ipnft_symbol").sort(true, false)])
             .int_err()?
             .limit(page * per_page, Some(per_page))
             .int_err()?;
@@ -337,20 +336,17 @@ pub struct MoleculeProject {
     /// Event time when this version was created/updated
     pub event_time: DateTime<Utc>,
 
+    /// Symbolic name of the project
+    pub ipnft_symbol: String,
+
+    /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
+    pub ipnft_uid: String,
+
     /// Address of the IPNFT contract
     pub ipnft_address: String,
 
     /// Token ID withing the IPNFT contract
     pub ipnft_token_id: usize,
-
-    /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
-    pub ipnft_uid: String,
-
-    /// Address of the associated IPT contract
-    pub ipt_address: String,
-
-    /// Symbolic name of the IPT token
-    pub ipt_symbol: String,
 
     #[graphql(skip)]
     pub data_room_dataset_id: odf::DatasetID,
@@ -397,14 +393,12 @@ impl MoleculeProject {
             odf::AccountID::from_did_str(record.remove("account_id").unwrap().as_str().unwrap())
                 .unwrap();
 
-        let ipnft_address = record
-            .remove("ipnft_address")
+        let ipnft_symbol = record
+            .remove("ipnft_symbol")
             .unwrap()
             .as_str()
             .unwrap()
             .to_string();
-
-        let ipnft_token_id = record.remove("ipnft_token_id").unwrap().as_i64().unwrap();
 
         let ipnft_uid = record
             .remove("ipnft_uid")
@@ -413,19 +407,14 @@ impl MoleculeProject {
             .unwrap()
             .to_string();
 
-        let ipt_address = record
-            .remove("ipt_address")
+        let ipnft_address = record
+            .remove("ipnft_address")
             .unwrap()
             .as_str()
             .unwrap()
             .to_string();
 
-        let ipt_symbol = record
-            .remove("ipt_symbol")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
+        let ipnft_token_id = record.remove("ipnft_token_id").unwrap().as_i64().unwrap();
 
         let data_room_dataset_id = odf::DatasetID::from_did_str(
             record
@@ -449,11 +438,10 @@ impl MoleculeProject {
             account_id,
             system_time,
             event_time,
+            ipnft_symbol,
+            ipnft_uid,
             ipnft_address,
             ipnft_token_id: usize::try_from(ipnft_token_id).unwrap(),
-            ipnft_uid,
-            ipt_address,
-            ipt_symbol,
             data_room_dataset_id,
             announcements_dataset_id,
         }
@@ -462,11 +450,10 @@ impl MoleculeProject {
     pub fn to_record_data(&self) -> serde_json::Value {
         let mut r = serde_json::Value::Object(Default::default());
         r["account_id"] = self.account_id.as_did_str().to_string().into();
+        r["ipnft_symbol"] = self.ipnft_symbol.clone().into();
+        r["ipnft_uid"] = self.ipnft_uid.clone().into();
         r["ipnft_address"] = self.ipnft_address.clone().into();
         r["ipnft_token_id"] = self.ipnft_token_id.into();
-        r["ipnft_uid"] = self.ipnft_uid.clone().into();
-        r["ipt_address"] = self.ipt_address.clone().into();
-        r["ipt_symbol"] = self.ipt_symbol.clone().into();
         r["data_room_dataset_id"] = self.data_room_dataset_id.as_did_str().to_string().into();
         r["announcements_dataset_id"] = self
             .announcements_dataset_id

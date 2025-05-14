@@ -25,19 +25,17 @@ use crate::utils::{authentication_catalogs_ext, BaseGQLDatasetHarness, Predefine
 const CREATE_PROJECT: &str = indoc!(
     r#"
     mutation (
+        $ipnftSymbol: String!,
+        $ipnftUid: String!,
         $ipnftAddress: String!,
         $ipnftTokenId: Int!,
-        $ipnftUid: String!,
-        $iptAddress: String!,
-        $iptSymbol: String!,
     ) {
         molecule {
             createProject(
+                ipnftSymbol: $ipnftSymbol,
+                ipnftUid: $ipnftUid,
                 ipnftAddress: $ipnftAddress,
                 ipnftTokenId: $ipnftTokenId,
-                ipnftUid: $ipnftUid,
-                iptAddress: $iptAddress,
-                iptSymbol: $iptSymbol,
             ) {
                 isSuccess
                 message
@@ -94,8 +92,8 @@ async fn test_molecule_provision_project() {
             molecule {
                 projects(page: 0, perPage: 100) {
                     nodes {
+                        ipnftSymbol
                         ipnftUid
-                        iptSymbol
                     }
                 }
             }
@@ -117,11 +115,10 @@ async fn test_molecule_provision_project() {
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
                 "ipnftTokenId": 9,
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                "iptSymbol": "vitafast",
             })),
         ))
         .await;
@@ -167,22 +164,17 @@ async fn test_molecule_provision_project() {
                     molecule {
                         project(ipnftUid: $ipnftUid) {
                             account { id accountName }
+                            ipnftSymbol
+                            ipnftUid
                             ipnftAddress
                             ipnftTokenId
-                            ipnftUid
-                            iptAddress
-                            iptSymbol
                         }
                     }
                 }
                 "#
             ))
             .variables(async_graphql::Variables::from_json(json!({
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 9,
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                "iptSymbol": "vitafast",
             }))),
         )
         .await;
@@ -195,11 +187,10 @@ async fn test_molecule_provision_project() {
                 "id": project_account_id,
                 "accountName": project_account_name,
             },
+            "ipnftSymbol": "vitafast",
+            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
             "ipnftTokenId": 9,
-            "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-            "iptSymbol": "vitafast",
         }),
     );
 
@@ -212,8 +203,8 @@ async fn test_molecule_provision_project() {
     pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
         json!([{
+            "ipnftSymbol": "vitafast",
             "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            "iptSymbol": "vitafast",
         }]),
     );
 
@@ -221,11 +212,10 @@ async fn test_molecule_provision_project() {
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitaslow",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
                 "ipnftTokenId": 9,
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc3",
-                "iptSymbol": "vitaslow",
             })),
         ))
         .await;
@@ -235,20 +225,19 @@ async fn test_molecule_provision_project() {
         res.data.into_json().unwrap()["molecule"]["createProject"],
         json!({
             "isSuccess": false,
-            "message": "Conflict with existing project 0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9 (vitafast)",
+            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
             "__typename": "CreateProjectErrorConflict",
         }),
     );
 
-    // Ensure errors on iptSymbol collision
+    // Ensure errors on ipnftSymbol collision
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_1",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
                 "ipnftTokenId": 1,
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_1",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc3",
-                "iptSymbol": "vitafast",
             })),
         ))
         .await;
@@ -258,30 +247,7 @@ async fn test_molecule_provision_project() {
         res.data.into_json().unwrap()["molecule"]["createProject"],
         json!({
             "isSuccess": false,
-            "message": "Conflict with existing project 0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9 (vitafast)",
-            "__typename": "CreateProjectErrorConflict",
-        }),
-    );
-
-    // Ensure errors on iptAddress collision
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 1,
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_1",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                "iptSymbol": "vitaslow",
-            })),
-        ))
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["createProject"],
-        json!({
-            "isSuccess": false,
-            "message": "Conflict with existing project 0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9 (vitafast)",
+            "message": "Conflict with existing project vitafast (0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9)",
             "__typename": "CreateProjectErrorConflict",
         }),
     );
@@ -291,11 +257,10 @@ async fn test_molecule_provision_project() {
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitaslow",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
                 "ipnftTokenId": 10,
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc3",
-                "iptSymbol": "vitaslow",
             })),
         ))
         .await;
@@ -316,12 +281,12 @@ async fn test_molecule_provision_project() {
         res.data.into_json().unwrap()["molecule"]["projects"]["nodes"],
         json!([
             {
+                "ipnftSymbol": "vitafast",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "iptSymbol": "vitafast",
             },
             {
+                "ipnftSymbol": "vitaslow",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
-                "iptSymbol": "vitaslow",
             }
         ]),
     );
@@ -340,11 +305,10 @@ async fn test_molecule_data_room_operations() {
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
                 "ipnftTokenId": 9,
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                "iptSymbol": "vitafast",
             })),
         ))
         .await;
@@ -521,11 +485,10 @@ async fn test_molecule_announcements_operations() {
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
                 "ipnftTokenId": 9,
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-                "iptAddress": "0xdaD88677CA87a7815728C72D74B4ff4982d54Fc2",
-                "iptSymbol": "vitafast",
             })),
         ))
         .await;
@@ -643,7 +606,7 @@ async fn test_molecule_announcements_operations() {
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "headline": "Test announcement 1",
                 "body": "Blah blah",
-                "moleculeAccessLevel": "ipt-holders",
+                "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
@@ -666,7 +629,7 @@ async fn test_molecule_announcements_operations() {
                 "headline": "Test announcement 2",
                 "body": "Blah blah",
                 "attachments": [test_file_1],
-                "moleculeAccessLevel": "ipt-holders",
+                "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
@@ -689,7 +652,7 @@ async fn test_molecule_announcements_operations() {
                 "headline": "Test announcement 3",
                 "body": "Blah blah",
                 "attachments": [test_file_1, test_file_2],
-                "moleculeAccessLevel": "ipt-holders",
+                "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
@@ -712,7 +675,7 @@ async fn test_molecule_announcements_operations() {
                 "headline": "Test announcement 3",
                 "body": "Blah blah",
                 "attachments": ["x"],
-                "moleculeAccessLevel": "ipt-holders",
+                "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
@@ -735,7 +698,7 @@ async fn test_molecule_announcements_operations() {
                 "headline": "Test announcement 3",
                 "body": "Blah blah",
                 "attachments": [odf::DatasetID::new_seeded_ed25519(b"does-not-exist").to_string()],
-                "moleculeAccessLevel": "ipt-holders",
+                "moleculeAccessLevel": "holders",
                 "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
             })),
         ))
@@ -778,7 +741,7 @@ async fn test_molecule_announcements_operations() {
         json!(
             [
                 {
-                    "molecule_access_level": "ipt-holders",
+                    "molecule_access_level": "holders",
                     "announcement_id": any,
                     "attachments": [],
                     "body": "Blah blah",
@@ -790,7 +753,7 @@ async fn test_molecule_announcements_operations() {
                     "system_time": any,
                 },
                 {
-                    "molecule_access_level": "ipt-holders",
+                    "molecule_access_level": "holders",
                     "announcement_id": any,
                     "attachments": [test_file_1],
                     "body": "Blah blah",
@@ -802,7 +765,7 @@ async fn test_molecule_announcements_operations() {
                     "system_time": any,
                 },
                 {
-                    "molecule_access_level": "ipt-holders",
+                    "molecule_access_level": "holders",
                     "announcement_id": any,
                     "attachments": [test_file_1, test_file_2],
                     "body": "Blah blah",
