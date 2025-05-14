@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE\n            FROM accounts\n            WHERE account_name = $1\n            RETURNING id AS \"id: odf::AccountID\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: odf::AccountID",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5f7ad0cac5621c65c9685eca985360fc31d9faa67c0e7e5cd52eeab5f698cf56"
+}

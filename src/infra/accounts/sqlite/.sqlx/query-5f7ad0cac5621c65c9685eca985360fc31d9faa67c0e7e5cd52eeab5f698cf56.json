@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM accounts\n            WHERE account_name = $1\n            RETURNING id AS \"id: odf::AccountID\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: odf::AccountID",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5f7ad0cac5621c65c9685eca985360fc31d9faa67c0e7e5cd52eeab5f698cf56"
+}

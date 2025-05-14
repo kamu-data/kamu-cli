@@ -11,7 +11,7 @@ use std::fmt::Display;
 
 use database_common::{EntityPageListing, EntityPageStream, EntityPageStreamer, PaginationOpts};
 use email_utils::Email;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use thiserror::Error;
 
 use crate::Account;
@@ -70,7 +70,7 @@ pub trait AccountRepository: Send + Sync {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError>;
+    ) -> Result<odf::AccountID, DeleteAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

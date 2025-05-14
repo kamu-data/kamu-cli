@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            DELETE\n            FROM accounts\n            WHERE account_name = ?\n            RETURNING id AS \"id: odf::AccountID\"\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7b9c4c717d08e708306d840a33cec8a00311cb648f3447f9158383bfa265d358"
+}

@@ -487,9 +487,34 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn delete_account_by_name(
         &self,
-        _account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError> {
-        todo!()
+        account_name: &odf::AccountName,
+    ) -> Result<odf::AccountID, DeleteAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_name_str = account_name.as_str();
+
+        let maybe_deleted_account_id = sqlx::query!(
+            r#"
+            DELETE
+            FROM accounts
+            WHERE account_name = $1
+            RETURNING id AS "id: odf::AccountID"
+            "#,
+            account_name_str
+        )
+        .fetch_optional(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        if let Some(deleted_account_id) = maybe_deleted_account_id {
+            Ok(deleted_account_id.id)
+        } else {
+            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
+                account_name: account_name.clone(),
+            }))
+        }
     }
 }
 

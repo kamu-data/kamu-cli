@@ -463,9 +463,33 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn delete_account_by_name(
         &self,
-        _account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError> {
-        todo!()
+        account_name: &odf::AccountName,
+    ) -> Result<odf::AccountID, DeleteAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        // MySQL does not support RETURNING, but MariaDB does
+        let maybe_deleted_account_id = sqlx::query!(
+            r#"
+            DELETE
+            FROM accounts
+            WHERE account_name = ?
+            RETURNING id AS "id: odf::AccountID"
+            "#,
+            account_name.as_str()
+        )
+        .fetch_optional(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        if let Some(deleted_account_id) = maybe_deleted_account_id {
+            Ok(deleted_account_id.get(0))
+        } else {
+            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
+                account_name: account_name.clone(),
+            }))
+        }
     }
 }
 
