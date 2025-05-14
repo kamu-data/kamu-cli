@@ -71,7 +71,6 @@ pub trait AccountService: Sync + Send {
         account_name: &odf::AccountName,
         email: email_utils::Email,
         password: Password,
-        owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError>;
 
     async fn modify_password(

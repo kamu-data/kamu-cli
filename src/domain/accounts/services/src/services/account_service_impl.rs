@@ -151,11 +151,10 @@ impl AccountService for AccountServiceImpl {
         account_name: &odf::AccountName,
         email: email_utils::Email,
         password: Password,
-        owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError> {
-        let account_did = odf::AccountID::new_generated_ed25519();
+        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
         let account = Account {
-            id: account_did.1,
+            id: account_id,
             account_name: account_name.clone(),
             email,
             display_name: account_name.to_string(),
@@ -170,7 +169,7 @@ impl AccountService for AccountServiceImpl {
 
         if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
             let did_secret_key = DidSecretKey::try_new(
-                &account_did.0.into(),
+                &account_key.into(),
                 did_secret_encryption_key.expose_secret(),
             )
             .int_err()?;
@@ -178,7 +177,6 @@ impl AccountService for AccountServiceImpl {
             self.did_secret_key_repo
                 .save_did_secret_key(
                     &DidEntity::new_account(account.id.to_string()),
-                    owner_account_id,
                     &did_secret_key,
                 )
                 .await

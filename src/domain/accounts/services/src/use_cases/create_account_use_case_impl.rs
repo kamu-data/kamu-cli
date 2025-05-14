@@ -48,7 +48,6 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
                 account_name,
                 email,
                 Password::try_new(&random_password).unwrap(),
-                &creator_account.id,
             )
             .await
     }
