@@ -7,19 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<WebhookDeliveryScheduler>();
-    catalog_builder.add::<WebhookEventBuilderImpl>();
-    catalog_builder.add::<WebhookDeliveryWorkerImpl>();
-    catalog_builder.add::<WebhookSignerImpl>();
-    catalog_builder.add::<WebhookSenderImpl>();
-    catalog_builder.add::<WebhookSecretGeneratorImpl>();
+#[async_trait::async_trait]
+pub trait WebhookSecretGenerator: Send + Sync {
+    async fn generate_secret(&self) -> String;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
