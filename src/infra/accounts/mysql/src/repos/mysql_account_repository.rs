@@ -460,6 +460,13 @@ impl AccountRepository for MySqlAccountRepository {
             }
         })
     }
+
+    async fn delete_account_by_name(
+        &self,
+        _account_name: &odf::AccountName,
+    ) -> Result<(), DeleteAccountError> {
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -484,6 +484,13 @@ impl AccountRepository for SqliteAccountRepository {
             }
         })
     }
+
+    async fn delete_account_by_name(
+        &self,
+        _account_name: &odf::AccountName,
+    ) -> Result<(), DeleteAccountError> {
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

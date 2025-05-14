@@ -129,9 +129,7 @@ impl AccountMut {
 
         match delete_account_use_case.execute(account_name.as_ref()).await {
             Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),
-            Err(E::AccountNotFound { .. }) => {
-                Ok(DeleteAccountResult::AccountNotFound(Default::default()))
-            }
+            Err(E::NotFound(_)) => Ok(DeleteAccountResult::AccountNotFound(Default::default())),
             Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
     }

@@ -25,6 +25,7 @@ pub fn register_dependencies(
     catalog_builder.add::<PredefinedAccountsRegistrator>();
 
     catalog_builder.add::<CreateAccountUseCaseImpl>();
+    catalog_builder.add::<DeleteAccountUseCaseImpl>();
 
     if needs_indexing {
         catalog_builder.add::<OAuthDeviceCodeServiceImpl>();

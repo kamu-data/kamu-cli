@@ -66,6 +66,11 @@ pub trait AccountRepository: Send + Sync {
         account_id: &odf::AccountID,
         new_email: Email,
     ) -> Result<(), UpdateAccountError>;
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), DeleteAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -246,6 +251,17 @@ pub enum UpdateAccountError {
 
     #[error(transparent)]
     Duplicate(AccountErrorDuplicate),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum DeleteAccountError {
+    #[error(transparent)]
+    NotFound(AccountNotFoundByIdError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

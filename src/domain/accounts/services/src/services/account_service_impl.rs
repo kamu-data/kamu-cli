@@ -220,6 +220,13 @@ impl AccountService for AccountServiceImpl {
 
         Ok(())
     }
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), DeleteAccountError> {
+        self.account_repo.delete_account_by_name(account_name).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
