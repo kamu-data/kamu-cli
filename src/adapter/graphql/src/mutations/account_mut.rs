@@ -67,15 +67,11 @@ impl AccountMut {
     async fn create_account(
         &self,
         ctx: &Context<'_>,
-        account_name: String,
+        account_name: AccountName<'_>,
         email: Option<String>,
     ) -> Result<CreateAccountResult> {
         ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
-        let Ok(account_name) = odf::AccountName::from_str(&account_name) else {
-            return Ok(CreateAccountResult::InvalidAccountName(
-                AccountNameInvalid::default(),
-            ));
-        };
+
         let Ok(email) = email.map(|e| Email::parse(&e)).transpose() else {
             return Ok(CreateAccountResult::InvalidEmail(
                 CreateAccountEmailInvalid::default(),
@@ -84,7 +80,7 @@ impl AccountMut {
 
         let create_account_use_case = from_catalog_n!(ctx, dyn CreateAccountUseCase);
         match create_account_use_case
-            .execute(&self.account, &account_name, email)
+            .execute(&self.account, account_name.as_ref(), email)
             .await
         {
             Ok(created_account) => Ok(CreateAccountResult::Success(CreateAccountSuccess {
@@ -137,21 +133,15 @@ impl AccountMut {
     async fn delete_account_by_name(
         &self,
         ctx: &Context<'_>,
-        account_name: String,
+        account_name: AccountName<'_>,
     ) -> Result<DeleteAccountResult> {
         ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
-
-        let Ok(account_name) = odf::AccountName::from_str(&account_name) else {
-            return Ok(DeleteAccountResult::InvalidAccountName(
-                AccountNameInvalid::default(),
-            ));
-        };
 
         let delete_account_use_case = from_catalog_n!(ctx, dyn DeleteAccountUseCase);
 
         use DeleteAccountError as E;
 
-        match delete_account_use_case.execute(&account_name).await {
+        match delete_account_use_case.execute(account_name.as_ref()).await {
             Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),
             Err(E::AccountNotFound { .. }) => {
                 Ok(DeleteAccountResult::AccountNotFound(Default::default()))
@@ -231,7 +221,6 @@ impl Default for UpdateEmailNonUnique {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateAccountResult {
     Success(CreateAccountSuccess),
-    InvalidAccountName(AccountNameInvalid),
     InvalidEmail(CreateAccountEmailInvalid),
     NonUniqueAccountField(AccountFieldNonUnique),
 }
@@ -248,21 +237,6 @@ pub struct CreateAccountSuccess {
 impl CreateAccountSuccess {
     pub async fn message(&self) -> String {
         "Account created".to_string()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug)]
-pub struct AccountNameInvalid {
-    message: String,
-}
-
-impl Default for AccountNameInvalid {
-    fn default() -> Self {
-        Self {
-            message: "Invalid account name".to_string(),
-        }
     }
 }
 
@@ -360,7 +334,6 @@ impl ModifyPasswordInvalidPassword {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum DeleteAccountResult {
     Success(DeleteAccountSuccess),
-    InvalidAccountName(AccountNameInvalid),
     AccountNotFound(AccountNotFound),
 }
 
