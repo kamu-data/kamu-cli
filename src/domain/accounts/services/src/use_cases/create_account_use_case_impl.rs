@@ -30,7 +30,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         account_name: &odf::AccountName,
         email_maybe: Option<Email>,
     ) -> Result<Account, CreateAccountError> {
-        let email = email_maybe.unwrap_or({
+        let email = email_maybe.unwrap_or_else(|| {
             let parent_host = creator_account.email.host();
             let email_str = format!(
                 "{}+{}@{}",
