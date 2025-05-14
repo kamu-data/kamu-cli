@@ -7,18 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
+use internal_error::InternalError;
 
-use crate::*;
+use crate::WebhookResponse;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<WebhookOutboxBridge>();
-    catalog_builder.add::<WebhookEventBuilderImpl>();
-    catalog_builder.add::<WebhookDeliveryWorkerImpl>();
-    catalog_builder.add::<WebhookSignerImpl>();
-    catalog_builder.add::<WebhookSenderImpl>();
+#[async_trait::async_trait]
+pub trait WebhookSender: Send + Sync {
+    async fn send_webhook(
+        &self,
+        target_url: url::Url,
+        payload_bytes: bytes::Bytes,
+        headers: http::HeaderMap,
+    ) -> Result<WebhookResponse, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

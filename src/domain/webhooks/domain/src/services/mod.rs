@@ -9,8 +9,10 @@
 
 mod webhook_delivery_worker;
 mod webhook_event_builder;
+mod webhook_sender;
 mod webhook_signer;
 
 pub use webhook_delivery_worker::*;
 pub use webhook_event_builder::*;
+pub use webhook_sender::*;
 pub use webhook_signer::*;

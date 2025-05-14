@@ -7385,6 +7385,7 @@ name = "kamu-webhooks"
 version = "0.237.0"
 dependencies = [
  "async-trait",
+ "bytes",
  "chrono",
  "database-common",
  "enum-variants",
@@ -7474,6 +7475,7 @@ version = "0.236.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
+ "bytes",
  "chrono",
  "database-common",
  "database-common-macros",

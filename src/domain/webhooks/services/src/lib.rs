@@ -17,6 +17,7 @@ mod webhook_delivery_worker_impl;
 mod webhook_event_builder_impl;
 mod webhook_headers;
 mod webhook_outbox_bridge;
+mod webhook_sender_impl;
 mod webhook_signer_impl;
 
 pub use dependencies::*;
@@ -24,4 +25,5 @@ pub use webhook_delivery_worker_impl::*;
 pub use webhook_event_builder_impl::*;
 pub use webhook_headers::*;
 pub use webhook_outbox_bridge::*;
+pub use webhook_sender_impl::*;
 pub use webhook_signer_impl::*;

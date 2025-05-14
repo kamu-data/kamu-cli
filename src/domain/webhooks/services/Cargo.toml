@@ -33,6 +33,7 @@ kamu-webhooks = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.22", default-features = false }
+bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.13", default-features = false }
 http = { version = "1", default-features = false }

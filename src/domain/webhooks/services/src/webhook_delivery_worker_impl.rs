@@ -19,30 +19,17 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
+#[interface(dyn WebhookDeliveryWorker)]
 pub struct WebhookDeliveryWorkerImpl {
     catalog: dill::Catalog,
     webhook_signer: Arc<dyn WebhookSigner>,
-    client: reqwest::Client,
+    webhook_sender: Arc<dyn WebhookSender>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn WebhookDeliveryWorker)]
 impl WebhookDeliveryWorkerImpl {
-    pub fn new(catalog: dill::Catalog, webhook_signer: Arc<dyn WebhookSigner>) -> Self {
-        Self {
-            catalog,
-            webhook_signer,
-            client: reqwest::Client::builder()
-                // TODO: externalize configuration of the timeout
-                .timeout(std::time::Duration::from_secs(10))
-                .user_agent(KAMU_WEBHOOK_USER_AGENT)
-                .build()
-                .expect("Failed to build HTTP client"),
-        }
-    }
-
     #[tracing::instrument(
         level="debug",
         skip_all,
@@ -76,7 +63,8 @@ impl WebhookDeliveryWorkerImpl {
         .await
         .int_err()?;
 
-        let payload_bytes = serde_json::to_vec(&event.payload).int_err()?;
+        let payload_raw_bytes = serde_json::to_vec(&event.payload).int_err()?;
+        let payload_bytes = bytes::Bytes::from(payload_raw_bytes);
 
         let created_at = Utc::now();
 
@@ -173,44 +161,6 @@ impl WebhookDeliveryWorkerImpl {
         Ok(headers)
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn send_webhook_to_subscription_target(
-        &self,
-        delivery_data: WebhookDeliveryData,
-    ) -> Result<WebhookResponse, internal_error::InternalError> {
-        let mut request = self
-            .client
-            .post(delivery_data.target_url)
-            .body(delivery_data.payload_bytes);
-
-        for (name, value) in &delivery_data.headers {
-            request = request.header(name, value);
-        }
-
-        tracing::debug!(?request, "Sending webhook request");
-        let response = request.send().await.int_err()?;
-
-        let status_code = response.status();
-        let response_headers = response.headers().clone();
-        let response_body = response.text().await.unwrap_or_default();
-
-        tracing::debug!(
-            status_code = %status_code,
-            response_headers = ?response_headers,
-            response_body = %response_body,
-            "Webhook response received"
-        );
-
-        let webhook_response = WebhookResponse {
-            status_code,
-            headers: response_headers,
-            body: response_body,
-            finished_at: Utc::now(),
-        };
-
-        Ok(webhook_response)
-    }
-
     #[tracing::instrument(level = "debug", skip_all, fields(
         task_id = %task_attempt_id.task_id,
         attempt_number = %task_attempt_id.attempt_number,
@@ -247,7 +197,12 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
             .await?;
 
         let webhook_response = self
-            .send_webhook_to_subscription_target(delivery_data)
+            .webhook_sender
+            .send_webhook(
+                delivery_data.target_url,
+                delivery_data.payload_bytes,
+                delivery_data.headers,
+            )
             .await
             .int_err()?;
 
@@ -263,7 +218,7 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
 struct WebhookDeliveryData {
     target_url: url::Url,
     headers: http::HeaderMap,
-    payload_bytes: Vec<u8>,
+    payload_bytes: bytes::Bytes,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
