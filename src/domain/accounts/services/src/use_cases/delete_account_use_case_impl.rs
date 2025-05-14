@@ -17,16 +17,25 @@ use kamu_accounts::*;
 #[dill::interface(dyn DeleteAccountUseCase)]
 pub struct DeleteAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
+    outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
 #[async_trait::async_trait]
 impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
     async fn execute(&self, account_name: &odf::AccountName) -> Result<(), DeleteAccountError> {
-        self.account_service
+        let deleted_account_id = self
+            .account_service
             .delete_account_by_name(account_name)
             .await?;
 
-        // TODO: notify other domains
+        use messaging_outbox::OutboxExt;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+                AccountLifecycleMessage::deleted(deleted_account_id),
+            )
+            .await?;
 
         Ok(())
     }
