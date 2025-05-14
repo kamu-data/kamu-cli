@@ -65,7 +65,7 @@ impl WebhookEventRepository for PostgresWebhookEventRepository {
 
     async fn get_event_by_id(
         &self,
-        event_id: WebhookEventId,
+        event_id: WebhookEventID,
     ) -> Result<WebhookEvent, GetWebhookEventError> {
         let mut tr = self.transaction.lock().await;
 
@@ -85,7 +85,7 @@ impl WebhookEventRepository for PostgresWebhookEventRepository {
 
         if let Some(record) = record {
             Ok(WebhookEvent {
-                id: WebhookEventId::new(record.id),
+                id: WebhookEventID::new(record.id),
                 event_type: WebhookEventType::try_new(record.event_type).unwrap(),
                 payload: record.payload,
                 created_at: record.created_at,
@@ -122,7 +122,7 @@ impl WebhookEventRepository for PostgresWebhookEventRepository {
         let events = records
             .into_iter()
             .map(|record| WebhookEvent {
-                id: WebhookEventId::new(record.id),
+                id: WebhookEventID::new(record.id),
                 event_type: WebhookEventType::try_new(record.event_type).unwrap(),
                 payload: record.payload,
                 created_at: record.created_at,

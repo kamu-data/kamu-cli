@@ -20,7 +20,7 @@ pub async fn test_no_webhook_events_initially(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn WebhookEventRepository>().unwrap();
 
     let get_res = repo
-        .get_event_by_id(WebhookEventId::new(uuid::Uuid::new_v4()))
+        .get_event_by_id(WebhookEventID::new(uuid::Uuid::new_v4()))
         .await;
     assert_matches!(get_res, Err(GetWebhookEventError::NotFound(_)));
 
@@ -40,7 +40,7 @@ pub async fn test_create_single_webhook_event(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn WebhookEventRepository>().unwrap();
 
     let webhook_event = WebhookEvent {
-        id: WebhookEventId::new(uuid::Uuid::new_v4()),
+        id: WebhookEventID::new(uuid::Uuid::new_v4()),
         event_type: WebhookEventTypeCatalog::test(),
         payload: serde_json::to_value("test_payload").unwrap(),
         created_at: chrono::Utc::now().round_subsecs(6),
@@ -68,14 +68,14 @@ pub async fn test_create_multiple_webhook_events(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn WebhookEventRepository>().unwrap();
 
     let webhook_event_1 = WebhookEvent {
-        id: WebhookEventId::new(uuid::Uuid::new_v4()),
+        id: WebhookEventID::new(uuid::Uuid::new_v4()),
         event_type: WebhookEventTypeCatalog::test(),
         payload: serde_json::to_value("test_payload_1").unwrap(),
         created_at: chrono::Utc::now().round_subsecs(6),
     };
 
     let webhook_event_2 = WebhookEvent {
-        id: WebhookEventId::new(uuid::Uuid::new_v4()),
+        id: WebhookEventID::new(uuid::Uuid::new_v4()),
         event_type: WebhookEventTypeCatalog::test(),
         payload: serde_json::to_value("test_payload_2").unwrap(),
         created_at: chrono::Utc::now().round_subsecs(6),
@@ -109,7 +109,7 @@ pub async fn test_create_duplicate_webhook_events(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn WebhookEventRepository>().unwrap();
 
     let webhook_event = WebhookEvent {
-        id: WebhookEventId::new(uuid::Uuid::new_v4()),
+        id: WebhookEventID::new(uuid::Uuid::new_v4()),
         event_type: WebhookEventTypeCatalog::test(),
         payload: serde_json::to_value("test_payload").unwrap(),
         created_at: chrono::Utc::now().round_subsecs(6),
@@ -135,7 +135,7 @@ pub async fn test_webhook_events_pagination(catalog: &Catalog) {
     let mut webhook_events = Vec::new();
     for i in 0..10 {
         let webhook_event = WebhookEvent {
-            id: WebhookEventId::new(uuid::Uuid::new_v4()),
+            id: WebhookEventID::new(uuid::Uuid::new_v4()),
             event_type: WebhookEventTypeCatalog::test(),
             payload: serde_json::to_value(format!("test_payload_{i}")).unwrap(),
             created_at: chrono::Utc::now().round_subsecs(6),

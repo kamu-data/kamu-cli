@@ -6211,6 +6211,7 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
+ "kamu-webhooks",
  "messaging-outbox",
  "observability",
  "oop",

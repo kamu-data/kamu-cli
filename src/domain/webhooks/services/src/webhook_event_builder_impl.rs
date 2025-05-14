@@ -17,7 +17,7 @@ use kamu_webhooks::{
     ResultIntoInternal,
     WebhookEvent,
     WebhookEventBuilder,
-    WebhookEventId,
+    WebhookEventID,
     WebhookEventRepository,
     WebhookEventTypeCatalog,
 };
@@ -72,7 +72,7 @@ impl WebhookEventBuilder for WebhookEventBuilderImpl {
         tracing::debug!(?payload, "Formed payload for dataset head updated event");
 
         // Create and register a webhook event
-        let event_id = WebhookEventId::new(uuid::Uuid::new_v4());
+        let event_id = WebhookEventID::new(uuid::Uuid::new_v4());
         let event = WebhookEvent::new(
             event_id,
             WebhookEventTypeCatalog::dataset_ref_updated(),

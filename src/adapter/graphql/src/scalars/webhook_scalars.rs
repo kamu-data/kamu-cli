@@ -7,22 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use nutype::nutype;
+use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(derive(
-    Debug,
-    Display,
-    AsRef,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize
-))]
-pub struct WebhookSubscriptionID(uuid::Uuid);
+simple_scalar!(WebhookSubscriptionID, kamu_webhooks::WebhookSubscriptionID);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+#[graphql(remote = "kamu_webhooks::WebhookSubscriptionStatus")]
+pub enum WebhookSubscriptionStatus {
+    Unverified,
+    Enabled,
+    Paused,
+    Unreachable,
+    Removed,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

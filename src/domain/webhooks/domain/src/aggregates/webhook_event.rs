@@ -9,13 +9,13 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{WebhookEventId, WebhookEventType};
+use crate::{WebhookEventID, WebhookEventType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebhookEvent {
-    pub id: WebhookEventId,
+    pub id: WebhookEventID,
     pub event_type: WebhookEventType,
     pub payload: serde_json::Value,
     pub created_at: DateTime<Utc>,
@@ -23,7 +23,7 @@ pub struct WebhookEvent {
 
 impl WebhookEvent {
     pub fn new(
-        id: WebhookEventId,
+        id: WebhookEventID,
         event_type: WebhookEventType,
         payload: serde_json::Value,
         created_at: DateTime<Utc>,

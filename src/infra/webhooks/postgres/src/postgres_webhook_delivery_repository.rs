@@ -204,7 +204,7 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
 
     async fn list_by_event_id(
         &self,
-        event_id: WebhookEventId,
+        event_id: WebhookEventID,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError> {
         let mut tr = self.transaction.lock().await;
 
@@ -247,7 +247,7 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
 
     async fn list_by_subscription_id(
         &self,
-        event_id: WebhookSubscriptionId,
+        event_id: WebhookSubscriptionID,
         pagination: PaginationOpts,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError> {
         let mut tr = self.transaction.lock().await;

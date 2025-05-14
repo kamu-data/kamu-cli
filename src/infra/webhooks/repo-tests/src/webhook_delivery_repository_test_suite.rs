@@ -254,8 +254,8 @@ pub async fn test_filter_webhook_deliveries_by_webhook_event_or_subscription_id(
 
 fn new_delivery(
     task_attempt_id: ts::TaskAttemptID,
-    webhook_subscription_id: WebhookSubscriptionId,
-    webhook_event_id: WebhookEventId,
+    webhook_subscription_id: WebhookSubscriptionID,
+    webhook_event_id: WebhookEventID,
 ) -> WebhookDelivery {
     WebhookDelivery::new(
         task_attempt_id,

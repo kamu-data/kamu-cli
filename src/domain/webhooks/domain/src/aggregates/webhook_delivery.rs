@@ -10,15 +10,15 @@
 use chrono::Duration;
 use kamu_task_system as ts;
 
-use crate::{WebhookEventId, WebhookRequest, WebhookResponse, WebhookSubscriptionId};
+use crate::{WebhookEventID, WebhookRequest, WebhookResponse, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct WebhookDelivery {
     pub task_attempt_id: ts::TaskAttemptID,
-    pub webhook_subscription_id: WebhookSubscriptionId,
-    pub webhook_event_id: WebhookEventId,
+    pub webhook_subscription_id: WebhookSubscriptionID,
+    pub webhook_event_id: WebhookEventID,
 
     pub request: WebhookRequest,
     pub response: Option<WebhookResponse>,
@@ -27,8 +27,8 @@ pub struct WebhookDelivery {
 impl WebhookDelivery {
     pub fn new(
         task_attempt_id: ts::TaskAttemptID,
-        webhook_subscription_id: WebhookSubscriptionId,
-        webhook_event_id: WebhookEventId,
+        webhook_subscription_id: WebhookSubscriptionID,
+        webhook_event_id: WebhookEventID,
         request: WebhookRequest,
     ) -> Self {
         Self {

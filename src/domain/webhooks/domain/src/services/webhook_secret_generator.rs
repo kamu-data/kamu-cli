@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::WebhookSubscriptionSecret;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
 pub trait WebhookSecretGenerator: Send + Sync {
-    async fn generate_secret(&self) -> String;
+    fn generate_secret(&self) -> WebhookSubscriptionSecret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

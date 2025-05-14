@@ -36,6 +36,7 @@ mod os_path;
 mod pagination;
 mod task_id;
 mod task_status_outcome;
+mod webhook_scalars;
 
 pub(crate) use access_token::*;
 pub(crate) use account::*;
@@ -67,6 +68,7 @@ pub(crate) use os_path::*;
 pub use pagination::*;
 pub(crate) use task_id::*;
 pub(crate) use task_status_outcome::*;
+pub(crate) use webhook_scalars::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

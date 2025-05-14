@@ -231,7 +231,7 @@ impl PostgresWebhookSubscriptionEventStore {
 impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventStore {
     fn get_events(
         &self,
-        subscription_id: &WebhookSubscriptionId,
+        subscription_id: &WebhookSubscriptionID,
         opts: GetEventsOpts,
     ) -> EventStream<WebhookSubscriptionEvent> {
         let subscription_id = *subscription_id.as_ref();
@@ -273,8 +273,8 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
 
     fn get_events_multi(
         &self,
-        queries: Vec<WebhookSubscriptionId>,
-    ) -> MultiEventStream<WebhookSubscriptionId, WebhookSubscriptionEvent> {
+        queries: Vec<WebhookSubscriptionID>,
+    ) -> MultiEventStream<WebhookSubscriptionID, WebhookSubscriptionEvent> {
         let subscription_ids: Vec<uuid::Uuid> = queries.iter().map(|id| *id.as_ref()).collect();
 
         Box::pin(async_stream::stream! {
@@ -296,7 +296,7 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
                 let event = serde_json::from_value::<WebhookSubscriptionEvent>(event_row.event_payload)
                     .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
-                Ok((WebhookSubscriptionId::new(event_row.subscription_id),
+                Ok((WebhookSubscriptionID::new(event_row.subscription_id),
                     EventID::new(event_row.event_id),
                     event))
             })
@@ -311,7 +311,7 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
 
     async fn save_events(
         &self,
-        subscription_id: &WebhookSubscriptionId,
+        subscription_id: &WebhookSubscriptionID,
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<WebhookSubscriptionEvent>,
     ) -> Result<EventID, SaveEventsError> {
@@ -402,7 +402,7 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
     async fn list_subscription_ids_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError> {
+    ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -423,7 +423,7 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
 
         Ok(records
             .into_iter()
-            .map(|record| WebhookSubscriptionId::new(record.id))
+            .map(|record| WebhookSubscriptionID::new(record.id))
             .collect())
     }
 
@@ -431,7 +431,7 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         &self,
         dataset_id: &odf::DatasetID,
         label: &WebhookSubscriptionLabel,
-    ) -> Result<Option<WebhookSubscriptionId>, FindWebhookSubscriptionError> {
+    ) -> Result<Option<WebhookSubscriptionID>, FindWebhookSubscriptionError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -450,14 +450,14 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
         .await
         .int_err()?;
 
-        Ok(record.map(|record| WebhookSubscriptionId::new(record.id)))
+        Ok(record.map(|record| WebhookSubscriptionID::new(record.id)))
     }
 
     async fn list_enabled_subscription_ids_by_dataset_and_event_type(
         &self,
         dataset_id: &odf::DatasetID,
         event_type: &WebhookEventType,
-    ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError> {
+    ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -480,7 +480,7 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
 
         Ok(records
             .into_iter()
-            .map(|record| WebhookSubscriptionId::new(record.id))
+            .map(|record| WebhookSubscriptionID::new(record.id))
             .collect())
     }
 }

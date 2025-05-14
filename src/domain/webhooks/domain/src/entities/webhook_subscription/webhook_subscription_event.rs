@@ -33,7 +33,7 @@ pub enum WebhookSubscriptionEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventCreated {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
     pub dataset_id: Option<odf::DatasetID>,
     pub event_types: Vec<WebhookEventType>,
     pub target_url: url::Url,
@@ -46,7 +46,7 @@ pub struct WebhookSubscriptionEventCreated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventEnabled {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +54,7 @@ pub struct WebhookSubscriptionEventEnabled {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventPaused {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +62,7 @@ pub struct WebhookSubscriptionEventPaused {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventResumed {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,7 +70,7 @@ pub struct WebhookSubscriptionEventResumed {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventMarkedUnreachable {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,7 +78,7 @@ pub struct WebhookSubscriptionEventMarkedUnreachable {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventReactivated {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ pub struct WebhookSubscriptionEventReactivated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventModified {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
     pub new_target_url: url::Url,
     pub new_label: WebhookSubscriptionLabel,
     pub new_event_types: Vec<WebhookEventType>,
@@ -97,7 +97,7 @@ pub struct WebhookSubscriptionEventModified {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventSecretRotated {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
     pub new_secret: WebhookSubscriptionSecret,
 }
 
@@ -106,7 +106,7 @@ pub struct WebhookSubscriptionEventSecretRotated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WebhookSubscriptionEventRemoved {
     pub event_time: DateTime<Utc>,
-    pub subscription_id: WebhookSubscriptionId,
+    pub subscription_id: WebhookSubscriptionID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,7 +126,7 @@ impl WebhookSubscriptionEvent {
         }
     }
 
-    pub fn subscription_id(&self) -> &WebhookSubscriptionId {
+    pub fn subscription_id(&self) -> &WebhookSubscriptionID {
         match self {
             Self::Created(e) => &e.subscription_id,
             Self::Enabled(e) => &e.subscription_id,

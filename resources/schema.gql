@@ -712,6 +712,22 @@ interface CreateTokenResult {
 	message: String!
 }
 
+input CreateWebhookSubscriptionInput {
+	datasetId: DatasetID
+	targetUrl: String!
+	eventTypes: [String!]!
+	label: String!
+}
+
+interface CreateWebhookSubscriptionResult {
+	message: String!
+}
+
+type CreateWebhookSubscriptionResultSuccess implements CreateWebhookSubscriptionResult {
+	secret: String!
+	message: String!
+}
+
 type CreatedAccessToken {
 	"""
 	Unique identifier of the access token
@@ -2450,6 +2466,13 @@ type Mutation {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: AccountsMut!
+	"""
+	Webhook-related functionality group
+	
+	Webhooks are used to send notifications about events happening in the
+	system. This groups deals with their management and subscriptions.
+	"""
+	webhooks: WebhooksMut!
 }
 
 union NameLookupResult = Account
@@ -2517,6 +2540,15 @@ type PageBasedInfo {
 	stays the same
 	"""
 	totalPages: Int
+}
+
+interface PauseWebhookSubscriptionResult {
+	message: String!
+}
+
+type PauseWebhookSubscriptionResultSuccess implements PauseWebhookSubscriptionResult {
+	paused: Boolean!
+	message: String!
 }
 
 type PostgreSqlDesl {
@@ -2607,6 +2639,13 @@ type Query {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: Accounts!
+	"""
+	Webhook-related functionality group
+	
+	Webhooks are used to send notifications about events happening in the
+	system. This groups deals with their management and subscriptions.
+	"""
+	webhooks: Webhooks!
 	"""
 	Search-related functionality group
 	"""
@@ -2850,6 +2889,15 @@ type ReadStepParquet {
 	schema: [String!]
 }
 
+interface RemoveWebhookSubscriptionResult {
+	message: String!
+}
+
+type RemoveWebhookSubscriptionResultSuccess implements RemoveWebhookSubscriptionResult {
+	removed: Boolean!
+	message: String!
+}
+
 interface RenameResult {
 	message: String!
 }
@@ -2896,6 +2944,15 @@ type RestProtocolDesc {
 	tailUrl: String!
 	queryUrl: String!
 	pushUrl: String!
+}
+
+interface ResumeWebhookSubscriptionResult {
+	message: String!
+}
+
+type ResumeWebhookSubscriptionResultSuccess implements ResumeWebhookSubscriptionResult {
+	resumed: Boolean!
+	message: String!
 }
 
 interface RevokeResult {
@@ -3512,6 +3569,21 @@ type UpdateVersionSuccess implements UpdateVersionResult {
 	message: String!
 }
 
+input UpdateWebhookSubscriptionInput {
+	targetUrl: String!
+	eventTypes: [String!]!
+	label: String!
+}
+
+interface UpdateWebhookSubscriptionResult {
+	message: String!
+}
+
+type UpdateWebhookSubscriptionResultSuccess implements UpdateWebhookSubscriptionResult {
+	updated: Boolean!
+	message: String!
+}
+
 interface UpsertDatasetEnvVarResult {
 	message: String!
 }
@@ -3757,6 +3829,95 @@ type ViewDatasetEnvVarEdge {
 
 type WebSocketProtocolDesc {
 	url: String!
+}
+
+type WebhookSubscription {
+	"""
+	Unique identifier of the webhook subscription
+	"""
+	id: WebhookSubscriptionID!
+	"""
+	Optional label for the subscription. Maybe an empty string.
+	"""
+	label: String!
+	"""
+	Associated dataset ID
+	Not present for system subscriptions
+	"""
+	datasetId: DatasetID
+	"""
+	Target URL for the webhook
+	"""
+	targetUrl: String!
+	"""
+	List of events that trigger the webhook
+	"""
+	events: [String!]!
+	"""
+	Status of the subscription
+	"""
+	status: WebhookSubscriptionStatus!
+}
+
+type WebhookSubscriptionEventTypeUnknown implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	eventType: String!
+	message: String!
+}
+
+scalar WebhookSubscriptionID
+
+type WebhookSubscriptionLabelNotUnique implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	label: String!
+	message: String!
+}
+
+type WebhookSubscriptionNotFound implements UpdateWebhookSubscriptionResult & PauseWebhookSubscriptionResult & ResumeWebhookSubscriptionResult & RemoveWebhookSubscriptionResult {
+	subscriptionId: WebhookSubscriptionID!
+	message: String!
+}
+
+enum WebhookSubscriptionStatus {
+	UNVERIFIED
+	ENABLED
+	PAUSED
+	UNREACHABLE
+	REMOVED
+}
+
+type WebhookSubscriptionTargetUrlInvalid implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	targetUrl: String!
+	message: String!
+}
+
+type WebhookSubscriptions {
+	byDataset(datasetId: DatasetID!): [WebhookSubscription!]!
+	byId(subscriptionId: WebhookSubscriptionID!): WebhookSubscription
+}
+
+type WebhookSubscriptionsMut {
+	createSubscription(input: CreateWebhookSubscriptionInput!): CreateWebhookSubscriptionResult!
+	updateSubscription(subscriptionId: WebhookSubscriptionID!, input: UpdateWebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
+	pauseSubscription(subscriptionId: WebhookSubscriptionID!): PauseWebhookSubscriptionResult!
+	resumeSubscription(subscriptionId: WebhookSubscriptionID!): ResumeWebhookSubscriptionResult!
+	removeSubscription(subscriptionId: WebhookSubscriptionID!): RemoveWebhookSubscriptionResult!
+}
+
+type Webhooks {
+	"""
+	List of supported event types
+	"""
+	eventTypes: [String!]!
+	"""
+	Access to the webhook subscriptions methods
+	"""
+	subscriptions: WebhookSubscriptions!
+}
+
+type WebhooksMut {
+	"""
+	Access to the mutable webhook subscriptions methods
+	"""
+	subscriptions: WebhookSubscriptionsMut!
 }
 
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT

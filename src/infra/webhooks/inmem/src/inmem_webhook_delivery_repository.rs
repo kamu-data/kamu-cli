@@ -27,8 +27,8 @@ pub struct InMemoryWebhookDeliveryRepository {
 struct State {
     webhook_deliveries: HashMap<ts::TaskAttemptID, WebhookDelivery>,
     webhooks_by_task_id: HashMap<ts::TaskID, Vec<ts::TaskAttemptID>>,
-    webhooks_by_event_id: HashMap<WebhookEventId, Vec<ts::TaskAttemptID>>,
-    webhooks_by_subscription_id: HashMap<WebhookSubscriptionId, Vec<ts::TaskAttemptID>>,
+    webhooks_by_event_id: HashMap<WebhookEventID, Vec<ts::TaskAttemptID>>,
+    webhooks_by_subscription_id: HashMap<WebhookSubscriptionID, Vec<ts::TaskAttemptID>>,
 }
 
 impl State {
@@ -134,7 +134,7 @@ impl WebhookDeliveryRepository for InMemoryWebhookDeliveryRepository {
 
     async fn list_by_event_id(
         &self,
-        event_id: WebhookEventId,
+        event_id: WebhookEventID,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError> {
         let state = self.state.read().unwrap();
         if let Some(task_attempt_ids) = state.webhooks_by_event_id.get(&event_id) {
@@ -146,7 +146,7 @@ impl WebhookDeliveryRepository for InMemoryWebhookDeliveryRepository {
 
     async fn list_by_subscription_id(
         &self,
-        subscription_id: WebhookSubscriptionId,
+        subscription_id: WebhookSubscriptionID,
         pagination: PaginationOpts,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError> {
         let state = self.state.read().unwrap();

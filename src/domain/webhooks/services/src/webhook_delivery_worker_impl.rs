@@ -48,8 +48,8 @@ impl WebhookDeliveryWorkerImpl {
     async fn prepare_delivery(
         &self,
         task_attempt_id: ts::TaskAttemptID,
-        webhook_subscription_id: WebhookSubscriptionId,
-        webhook_event_id: WebhookEventId,
+        webhook_subscription_id: WebhookSubscriptionID,
+        webhook_event_id: WebhookEventID,
     ) -> Result<WebhookDeliveryData, InternalError> {
         let event = webhook_event_repo
             .get_event_by_id(webhook_event_id)
@@ -191,8 +191,8 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
         let delivery_data = self
             .prepare_delivery(
                 task_attempt_id,
-                WebhookSubscriptionId::new(webhook_subscription_id),
-                WebhookEventId::new(webhook_event_id),
+                WebhookSubscriptionID::new(webhook_subscription_id),
+                WebhookEventID::new(webhook_event_id),
             )
             .await?;
 

@@ -13,10 +13,10 @@ use kamu_task_system as ts;
 
 use crate::{
     WebhookDelivery,
-    WebhookEventId,
+    WebhookEventID,
     WebhookRequest,
     WebhookResponse,
-    WebhookSubscriptionId,
+    WebhookSubscriptionID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,8 +98,8 @@ impl WebhookDeliveryRecord {
                 ts::TaskID::try_from(self.task_id).unwrap(),
                 u32::try_from(self.attempt_number).unwrap(),
             ),
-            webhook_subscription_id: WebhookSubscriptionId::new(self.subscription_id),
-            webhook_event_id: WebhookEventId::new(self.event_id),
+            webhook_subscription_id: WebhookSubscriptionID::new(self.subscription_id),
+            webhook_event_id: WebhookEventID::new(self.event_id),
             request,
             response,
         })

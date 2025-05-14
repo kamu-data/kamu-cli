@@ -85,7 +85,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for WebhookDatasetRemovalHandler 
                 for subscription in subscriptions {
                     let mut subscription = subscription.int_err()?;
 
-                    subscription.remove();
+                    subscription.remove().int_err()?;
                     subscription
                         .save(self.webhook_subscription_event_store.as_ref())
                         .await

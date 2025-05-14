@@ -45,6 +45,7 @@ kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-search = { workspace = true }
+kamu-webhooks = { workspace = true }
 
 async-graphql = { version = "7", default-features = false, features = [
     "chrono",

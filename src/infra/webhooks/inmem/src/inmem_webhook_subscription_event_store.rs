@@ -25,8 +25,8 @@ pub struct InMemoryWebhookSubscriptionEventStore {
 #[derive(Default)]
 struct State {
     events: Vec<WebhookSubscriptionEvent>,
-    webhook_subscriptions_by_dataset: HashMap<odf::DatasetID, Vec<WebhookSubscriptionId>>,
-    webhook_subscription_data: HashMap<WebhookSubscriptionId, WebhookSubscription>,
+    webhook_subscriptions_by_dataset: HashMap<odf::DatasetID, Vec<WebhookSubscriptionID>>,
+    webhook_subscription_data: HashMap<WebhookSubscriptionID, WebhookSubscription>,
 }
 
 impl EventStoreState<WebhookSubscriptionState> for State {
@@ -169,7 +169,7 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventSt
 
     fn get_events(
         &self,
-        subscription_id: &WebhookSubscriptionId,
+        subscription_id: &WebhookSubscriptionID,
         opts: GetEventsOpts,
     ) -> EventStream<WebhookSubscriptionEvent> {
         self.inner.get_events(subscription_id, opts)
@@ -177,7 +177,7 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventSt
 
     async fn save_events(
         &self,
-        subscription_id: &WebhookSubscriptionId,
+        subscription_id: &WebhookSubscriptionID,
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<WebhookSubscriptionEvent>,
     ) -> Result<EventID, SaveEventsError> {
@@ -218,7 +218,7 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
     async fn list_subscription_ids_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError> {
+    ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
         Ok(g.webhook_subscriptions_by_dataset
@@ -231,7 +231,7 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
         &self,
         dataset_id: &odf::DatasetID,
         label: &WebhookSubscriptionLabel,
-    ) -> Result<Option<WebhookSubscriptionId>, FindWebhookSubscriptionError> {
+    ) -> Result<Option<WebhookSubscriptionID>, FindWebhookSubscriptionError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
         let maybe_subscription_id =
@@ -254,7 +254,7 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
         &self,
         dataset_id: &odf::DatasetID,
         event_type: &WebhookEventType,
-    ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError> {
+    ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
         let maybe_subscription_ids =

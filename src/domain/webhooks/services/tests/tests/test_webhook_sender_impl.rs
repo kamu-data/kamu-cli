@@ -43,7 +43,7 @@ async fn test_send_webhook() {
 
     let task_attempt_id = ts::TaskAttemptID::new(ts::TaskID::new(153), 0);
 
-    let webhook_event_id = WebhookEventId::new(uuid::Uuid::new_v4());
+    let webhook_event_id = WebhookEventID::new(uuid::Uuid::new_v4());
     let webhook_event = WebhookEvent::new(
         webhook_event_id,
         WebhookEventTypeCatalog::dataset_ref_updated(),
@@ -62,7 +62,7 @@ async fn test_send_webhook() {
         .await
         .unwrap();
 
-    let webhook_subscription_id = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let webhook_subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let mut webhook_subscription = WebhookSubscription::new(
         webhook_subscription_id,

@@ -7,22 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use nutype::nutype;
+use async_graphql::Object;
+
+use crate::mutations::WebhookSubscriptionsMut;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(derive(
-    Debug,
-    Display,
-    AsRef,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize
-))]
-pub struct WebhookSubscriptionID(uuid::Uuid);
+pub struct WebhooksMut;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[Object]
+impl WebhooksMut {
+    /// Access to the mutable webhook subscriptions methods
+    async fn subscriptions(&self) -> WebhookSubscriptionsMut {
+        WebhookSubscriptionsMut
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

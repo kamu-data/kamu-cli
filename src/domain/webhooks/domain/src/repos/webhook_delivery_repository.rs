@@ -12,7 +12,7 @@ use internal_error::InternalError;
 use kamu_task_system as ts;
 use thiserror::Error;
 
-use crate::{WebhookDelivery, WebhookEventId, WebhookResponse, WebhookSubscriptionId};
+use crate::{WebhookDelivery, WebhookEventID, WebhookResponse, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,12 +38,12 @@ pub trait WebhookDeliveryRepository: Send + Sync {
 
     async fn list_by_event_id(
         &self,
-        event_id: WebhookEventId,
+        event_id: WebhookEventID,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError>;
 
     async fn list_by_subscription_id(
         &self,
-        event_id: WebhookSubscriptionId,
+        event_id: WebhookSubscriptionID,
         pagination: PaginationOpts,
     ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError>;
 }

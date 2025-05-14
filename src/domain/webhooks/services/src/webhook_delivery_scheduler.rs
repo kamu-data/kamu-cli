@@ -61,7 +61,7 @@ impl WebhookDeliveryScheduler {
         &self,
         dataset_id: &odf::DatasetID,
         event_type: &WebhookEventType,
-    ) -> Result<Vec<WebhookSubscriptionId>, InternalError> {
+    ) -> Result<Vec<WebhookSubscriptionID>, InternalError> {
         let subscription_ids = self
             .webhook_subscription_event_store
             .list_enabled_subscription_ids_by_dataset_and_event_type(dataset_id, event_type)
@@ -82,8 +82,8 @@ impl WebhookDeliveryScheduler {
 
     async fn schedule_webhook_delivery_task(
         &self,
-        subscription_id: WebhookSubscriptionId,
-        event_id: WebhookEventId,
+        subscription_id: WebhookSubscriptionID,
+        event_id: WebhookEventID,
     ) -> Result<(), InternalError> {
         let task = self
             .task_scheduler

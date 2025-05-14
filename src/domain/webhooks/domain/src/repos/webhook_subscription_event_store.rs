@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use crate::{
     WebhookEventType,
-    WebhookSubscriptionId,
+    WebhookSubscriptionID,
     WebhookSubscriptionLabel,
     WebhookSubscriptionState,
 };
@@ -30,19 +30,19 @@ pub trait WebhookSubscriptionEventStore: EventStore<WebhookSubscriptionState> {
     async fn list_subscription_ids_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError>;
+    ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError>;
 
     async fn find_subscription_id_by_dataset_and_label(
         &self,
         dataset_id: &odf::DatasetID,
         label: &WebhookSubscriptionLabel,
-    ) -> Result<Option<WebhookSubscriptionId>, FindWebhookSubscriptionError>;
+    ) -> Result<Option<WebhookSubscriptionID>, FindWebhookSubscriptionError>;
 
     async fn list_enabled_subscription_ids_by_dataset_and_event_type(
         &self,
         dataset_id: &odf::DatasetID,
         event_type: &WebhookEventType,
-    ) -> Result<Vec<WebhookSubscriptionId>, ListWebhookSubscriptionsError>;
+    ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError>;
 
     // TODO: dataset removal reaction?
     // TODO: system subscriptions?

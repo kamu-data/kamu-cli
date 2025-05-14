@@ -25,7 +25,7 @@ pub struct InMemoryWebhookEventRepository {
 #[derive(Default)]
 struct State {
     webhook_events: Vec<WebhookEvent>,
-    webhook_events_by_id: HashMap<WebhookEventId, WebhookEvent>,
+    webhook_events_by_id: HashMap<WebhookEventID, WebhookEvent>,
 }
 
 impl State {
@@ -72,7 +72,7 @@ impl WebhookEventRepository for InMemoryWebhookEventRepository {
 
     async fn get_event_by_id(
         &self,
-        event_id: WebhookEventId,
+        event_id: WebhookEventID,
     ) -> Result<WebhookEvent, GetWebhookEventError> {
         let guard = self.state.read().unwrap();
 

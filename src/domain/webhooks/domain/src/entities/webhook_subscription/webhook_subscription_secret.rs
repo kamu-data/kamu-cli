@@ -14,7 +14,7 @@ use nutype::nutype;
 #[nutype(
     sanitize(trim),
     validate(len_char_min = 1, len_char_max = 128,),
-    derive(Debug, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
+    derive(Debug, Display, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
 )]
 pub struct WebhookSubscriptionSecret(String);
 

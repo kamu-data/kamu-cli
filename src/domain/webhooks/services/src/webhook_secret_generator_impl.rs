@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::{component, interface};
-use kamu_webhooks::WebhookSecretGenerator;
+use kamu_webhooks::{WebhookSecretGenerator, WebhookSubscriptionSecret};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,14 +18,16 @@ pub struct WebhookSecretGeneratorImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
 impl WebhookSecretGenerator for WebhookSecretGeneratorImpl {
-    async fn generate_secret(&self) -> String {
+    fn generate_secret(&self) -> WebhookSubscriptionSecret {
         use rand::RngCore;
 
         let mut bytes = [0u8; 32]; // 32 bytes = 256 bits
         rand::rngs::OsRng.fill_bytes(&mut bytes);
-        hex::encode(bytes)
+        let raw_secret = hex::encode(bytes);
+
+        WebhookSubscriptionSecret::try_new(raw_secret)
+            .expect("Failed to create WebhookSubscriptionSecret")
     }
 }
 

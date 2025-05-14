@@ -51,6 +51,14 @@ impl Query {
         Accounts
     }
 
+    /// Webhook-related functionality group
+    ///
+    /// Webhooks are used to send notifications about events happening in the
+    /// system. This groups deals with their management and subscriptions.
+    async fn webhooks(&self) -> Webhooks {
+        Webhooks
+    }
+
     /// Search-related functionality group
     async fn search(&self) -> Search {
         Search
@@ -94,6 +102,14 @@ impl Mutation {
     /// system. This groups deals with their identities and permissions.
     async fn accounts(&self) -> AccountsMut {
         AccountsMut
+    }
+
+    /// Webhook-related functionality group
+    ///
+    /// Webhooks are used to send notifications about events happening in the
+    /// system. This groups deals with their management and subscriptions.
+    async fn webhooks(&self) -> WebhooksMut {
+        WebhooksMut
     }
 }
 

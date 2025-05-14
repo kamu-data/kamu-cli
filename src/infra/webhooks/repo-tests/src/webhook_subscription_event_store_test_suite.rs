@@ -23,7 +23,7 @@ pub async fn test_no_events_initially(catalog: &dill::Catalog) {
     let len = event_store.len().await.unwrap();
     assert_eq!(len, 0);
 
-    let non_existent_id = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let non_existent_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let res = event_store
         .get_events(&non_existent_id, GetEventsOpts::default())
@@ -67,7 +67,7 @@ pub async fn test_store_single_aggregate(catalog: &dill::Catalog) {
         .get_one::<dyn WebhookSubscriptionEventStore>()
         .unwrap();
 
-    let subscription_id = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
 
@@ -81,9 +81,9 @@ pub async fn test_store_single_aggregate(catalog: &dill::Catalog) {
     );
     subscription.save(event_store.as_ref()).await.unwrap();
 
-    subscription.enable();
-    subscription.pause();
-    subscription.resume();
+    subscription.enable().unwrap();
+    subscription.pause().unwrap();
+    subscription.resume().unwrap();
 
     subscription.save(event_store.as_ref()).await.unwrap();
 
@@ -158,9 +158,9 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         .get_one::<dyn WebhookSubscriptionEventStore>()
         .unwrap();
 
-    let subscription_id_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_3 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_3 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let target_url_2 = Url::parse("https://example.com/2").unwrap();
 
@@ -174,7 +174,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
     );
-    subscription_1.enable();
+    subscription_1.enable().unwrap();
     subscription_1.save(event_store.as_ref()).await.unwrap();
 
     let mut subscription_2 = WebhookSubscription::new(
@@ -185,9 +185,9 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
     );
-    subscription_2.enable();
-    subscription_2.pause();
-    subscription_2.resume();
+    subscription_2.enable().unwrap();
+    subscription_2.pause().unwrap();
+    subscription_2.resume().unwrap();
     subscription_2.save(event_store.as_ref()).await.unwrap();
 
     let mut subscription_3 = WebhookSubscription::new(
@@ -198,8 +198,8 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_3").unwrap(),
     );
-    subscription_3.enable();
-    subscription_3.pause();
+    subscription_3.enable().unwrap();
+    subscription_3.pause().unwrap();
     subscription_3.save(event_store.as_ref()).await.unwrap();
 
     let len = event_store.len().await.unwrap();
@@ -339,7 +339,7 @@ pub async fn test_modifying_subscription(catalog: &dill::Catalog) {
         .get_one::<dyn WebhookSubscriptionEventStore>()
         .unwrap();
 
-    let subscription_id = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
 
     let mut subscription = WebhookSubscription::new(
@@ -352,11 +352,13 @@ pub async fn test_modifying_subscription(catalog: &dill::Catalog) {
     );
     subscription.save(event_store.as_ref()).await.unwrap();
 
-    subscription.modify(
-        Url::parse("https://example.com/modified").unwrap(),
-        WebhookSubscriptionLabel::new("modified-label"),
-        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-    );
+    subscription
+        .modify(
+            Url::parse("https://example.com/modified").unwrap(),
+            WebhookSubscriptionLabel::new("modified-label"),
+            vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        )
+        .unwrap();
     subscription.save(event_store.as_ref()).await.unwrap();
 
     let res = event_store
@@ -379,9 +381,9 @@ pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
         .get_one::<dyn WebhookSubscriptionEventStore>()
         .unwrap();
 
-    let subscription_id_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_2_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_2_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2_2 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"dummy-1");
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"dummy-2");
@@ -425,9 +427,9 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
         .get_one::<dyn WebhookSubscriptionEventStore>()
         .unwrap();
 
-    let subscription_id_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_2_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_2_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2_2 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"dummy-1");
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"dummy-2");
@@ -462,11 +464,13 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
     );
     subscription_2_2.save(event_store.as_ref()).await.unwrap();
 
-    subscription_2_2.modify(
-        subscription_2_2.target_url().clone(),
-        WebhookSubscriptionLabel::new("test-label"), // same label in the same dataset
-        subscription_2_2.event_types().to_vec(),
-    );
+    subscription_2_2
+        .modify(
+            subscription_2_2.target_url().clone(),
+            WebhookSubscriptionLabel::new("test-label"), // same label in the same dataset
+            subscription_2_2.event_types().to_vec(),
+        )
+        .unwrap();
     let res = subscription_2_2.save(event_store.as_ref()).await;
     assert_matches!(res, Err(_));
 }
@@ -481,10 +485,10 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"dummy-1");
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"dummy-2");
 
-    let subscription_id_1_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_1_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_2_1 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
-    let subscription_id_2_2 = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id_1_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_1_2 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2_1 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id_2_2 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let mut subscription_1_1 = WebhookSubscription::new(
         subscription_id_1_1,
@@ -494,7 +498,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_1_1").unwrap(),
     );
-    subscription_1_1.enable();
+    subscription_1_1.enable().unwrap();
     subscription_1_1.save(event_store.as_ref()).await.unwrap();
 
     let mut subscription_1_2 = WebhookSubscription::new(
@@ -505,7 +509,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::test()],
         WebhookSubscriptionSecret::try_new("secret_1_2").unwrap(),
     );
-    subscription_1_2.enable();
+    subscription_1_2.enable().unwrap();
     subscription_1_2.save(event_store.as_ref()).await.unwrap();
 
     let mut subscription_2_1 = WebhookSubscription::new(
@@ -516,7 +520,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
     );
-    subscription_2_1.enable();
+    subscription_2_1.enable().unwrap();
     subscription_2_1.save(event_store.as_ref()).await.unwrap();
 
     let mut subscription_2_2 = WebhookSubscription::new(
@@ -527,7 +531,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         vec![WebhookEventTypeCatalog::test()],
         WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
     );
-    subscription_2_2.enable();
+    subscription_2_2.enable().unwrap();
     subscription_2_2.save(event_store.as_ref()).await.unwrap();
 
     let res = event_store
@@ -571,7 +575,7 @@ pub async fn test_removed_subscription_filters_out(catalog: &dill::Catalog) {
         .unwrap();
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
-    let subscription_id = WebhookSubscriptionId::new(uuid::Uuid::new_v4());
+    let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     let mut subscription = WebhookSubscription::new(
         subscription_id,
@@ -583,7 +587,7 @@ pub async fn test_removed_subscription_filters_out(catalog: &dill::Catalog) {
     );
     subscription.save(event_store.as_ref()).await.unwrap();
 
-    subscription.remove();
+    subscription.remove().unwrap();
     subscription.save(event_store.as_ref()).await.unwrap();
 
     let res = event_store
