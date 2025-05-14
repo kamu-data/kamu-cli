@@ -11,6 +11,7 @@ use bon::bon;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
@@ -71,6 +72,7 @@ impl BaseGQLDatasetHarness {
             .add::<InMemoryDatasetEntryRepository>()
             .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<InMemoryDatasetKeyBlockRepository>()
+            .add::<InMemoryDidSecretKeyRepository>()
             .add::<DatasetKeyBlockUpdateHandler>()
             .add_value(RunInfoDir::new(run_info_dir));
 

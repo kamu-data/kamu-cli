@@ -4,6 +4,7 @@ members = [
     "src/utils/async-utils",
     "src/utils/common-macros",
     "src/utils/container-runtime",
+    "src/utils/crypto-utils",
     "src/utils/database-common",
     "src/utils/database-common-macros",
     "src/utils/datafusion-cli",
@@ -19,7 +20,7 @@ members = [
     "src/utils/messaging-outbox",
     "src/utils/multiformats",
     "src/utils/observability",
-    "src/utils/random-names",
+    "src/utils/random-strings",
     "src/utils/repo-tools",
     "src/utils/s3-utils",
     "src/utils/server-console",
@@ -120,6 +121,7 @@ kamu-cli = { version = "0.236.0", path = "src/app/cli", default-features = false
 async-utils = { version = "0.236.0", path = "src/utils/async-utils", default-features = false }
 common-macros = { version = "0.236.0", path = "src/utils/common-macros", default-features = false }
 container-runtime = { version = "0.236.0", path = "src/utils/container-runtime", default-features = false }
+crypto-utils = { version = "0.236.0", path = "src/utils/crypto-utils", default-features = false }
 database-common = { version = "0.236.0", path = "src/utils/database-common", default-features = false }
 database-common-macros = { version = "0.236.0", path = "src/utils/database-common-macros", default-features = false }
 email-utils = { version = "0.236.0", path = "src/utils/email-utils", default-features = false }
@@ -135,7 +137,7 @@ kamu-datafusion-cli = { version = "0.236.0", path = "src/utils/datafusion-cli", 
 messaging-outbox = { version = "0.236.0", path = "src/utils/messaging-outbox", default-features = false }
 multiformats = { version = "0.236.0", path = "src/utils/multiformats", default-features = false }
 observability = { version = "0.236.0", path = "src/utils/observability", default-features = false }
-random-names = { version = "0.236.0", path = "src/utils/random-names", default-features = false }
+random-strings = { version = "0.236.0", path = "src/utils/random-strings", default-features = false }
 s3-utils = { version = "0.236.0", path = "src/utils/s3-utils", default-features = false }
 server-console = { version = "0.236.0", path = "src/utils/server-console", default-features = false }
 test-utils = { version = "0.236.0", path = "src/utils/test-utils", default-features = false }

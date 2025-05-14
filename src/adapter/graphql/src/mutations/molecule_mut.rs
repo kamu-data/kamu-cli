@@ -128,7 +128,7 @@ impl MoleculeMut {
         };
 
         account_repo
-            .create_account(&project_account)
+            .save_account(&project_account)
             .await
             .int_err()?;
 

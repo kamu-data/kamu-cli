@@ -26,7 +26,7 @@ use kamu::domain::{
     VerifyDatasetUseCase,
 };
 use kamu::utils::docker_images::BUSYBOX;
-use random_names::get_random_name;
+use random_strings::get_random_name;
 use thiserror::Error;
 
 use super::{CLIError, Command};

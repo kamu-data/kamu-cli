@@ -16,7 +16,7 @@ use dill::{component, interface};
 use file_utils::OwnedFile;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use random_names::get_random_name;
+use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 use url::Url;
 

@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT entity_id as \"entity_id: _\",\n                       entity_type as \"entity_type: _\",\n                       secret_key,\n                       secret_nonce\n                FROM did_secret_keys\n                WHERE creator_id = $1\n                    AND ($2::did_entity_type IS NULL OR entity_type = $2)\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id: _",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "entity_type: _",
+        "type_info": {
+          "Custom": {
+            "name": "did_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "secret_key",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "secret_nonce",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        {
+          "Custom": {
+            "name": "did_entity_type",
+            "kind": {
+              "Enum": [
+                "account",
+                "dataset"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0d191d1d1634637467d89009b944718819e2d60ba6e05277407922b9a0c5707d"
+}

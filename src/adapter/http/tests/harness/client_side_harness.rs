@@ -20,7 +20,11 @@ use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryOAuthDeviceCodeRepository};
+use kamu_accounts_inmem::{
+    InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
+    InMemoryOAuthDeviceCodeRepository,
+};
 use kamu_accounts_services::*;
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -189,7 +193,10 @@ impl ClientSideHarness {
         b.add::<InMemoryDatasetEntryRepository>();
         b.add::<InMemoryDatasetKeyBlockRepository>();
 
+        b.add::<InMemoryDidSecretKeyRepository>();
+
         b.add::<AccountServiceImpl>();
+        b.add::<CreateAccountUseCaseImpl>();
         b.add::<InMemoryAccountRepository>();
         b.add::<LoginPasswordAuthProvider>();
         b.add::<PredefinedAccountsRegistrator>();
@@ -197,6 +204,7 @@ impl ClientSideHarness {
         b.add::<InMemoryRebacRepository>();
         b.add_value(DefaultAccountProperties::default());
         b.add_value(DefaultDatasetProperties::default());
+        b.add_value(DidSecretEncryptionConfig::sample());
 
         b.add::<RebacDatasetRegistryFacadeImpl>();
 

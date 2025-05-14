@@ -29,11 +29,13 @@ testing = ["dep:mockall", "odf/testing"]
 
 [dependencies]
 database-common = { workspace = true }
+crypto-utils = { workspace = true }
 email-utils = { workspace = true }
 internal-error = { workspace = true }
+kamu-auth-rebac = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
-random-names = { workspace = true }
+random-strings = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 base32 = { version = "0.5" }
@@ -47,6 +49,7 @@ mockall = { optional = true, version = "0.13" }
 nutype = { version = "0.6", default-features = false }
 rand = "0.8"
 reusable = "0.1"
+secrecy = "0.10"
 serde = "1"
 serde_with = { version = "3", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }

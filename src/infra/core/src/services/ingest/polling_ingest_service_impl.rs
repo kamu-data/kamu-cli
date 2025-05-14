@@ -19,7 +19,7 @@ use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::metadata::serde::yaml::Manifest;
 use odf::utils::data::DataFrameExt;
-use random_names::get_random_name;
+use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
 use super::*;

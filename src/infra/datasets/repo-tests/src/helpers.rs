@@ -41,7 +41,7 @@ pub(crate) async fn new_account_with_name(
         provider: "unit-test-provider".to_string(),
         provider_identity_key: account_name.to_string(),
     };
-    let create_res = account_repo.create_account(&account).await;
+    let create_res = account_repo.save_account(&account).await;
 
     assert_matches!(create_res, Ok(_));
 
@@ -83,10 +83,7 @@ pub(crate) fn new_dataset_entry(owner: &Account, dataset_kind: odf::DatasetKind)
 
 pub(crate) async fn init_test_account(catalog: &Catalog) -> (odf::AccountID, odf::AccountName) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-    account_repo
-        .create_account(&Account::dummy())
-        .await
-        .unwrap();
+    account_repo.save_account(&Account::dummy()).await.unwrap();
 
     (DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
 }

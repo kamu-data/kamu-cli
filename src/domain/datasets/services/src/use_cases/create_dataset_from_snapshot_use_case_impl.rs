@@ -11,7 +11,13 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{
+    CurrentAccountSubject,
+    DidEntity,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    DidSecretKeyRepository,
+};
 use kamu_core::{DatasetRegistry, DidGenerator, ResolvedDataset};
 use kamu_datasets::{
     CreateDatasetFromSnapshotError,
@@ -19,23 +25,54 @@ use kamu_datasets::{
     CreateDatasetResult,
     CreateDatasetUseCaseOptions,
 };
+use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 
 use crate::utils::CreateDatasetUseCaseHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn CreateDatasetFromSnapshotUseCase)]
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     system_time_source: Arc<dyn SystemTimeSource>,
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
+    did_secret_encryption_key: Option<SecretString>,
+    did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
 
     // TODO: Rebac is here temporarily - using Lazy to avoid modifying all tests
     rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
+}
+
+#[component(pub)]
+#[interface(dyn CreateDatasetFromSnapshotUseCase)]
+impl CreateDatasetFromSnapshotUseCaseImpl {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(
+        current_account_subject: Arc<CurrentAccountSubject>,
+        system_time_source: Arc<dyn SystemTimeSource>,
+        did_generator: Arc<dyn DidGenerator>,
+        dataset_registry: Arc<dyn DatasetRegistry>,
+        create_helper: Arc<CreateDatasetUseCaseHelper>,
+        did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
+        did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
+        rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
+    ) -> Self {
+        Self {
+            current_account_subject,
+            system_time_source,
+            did_generator,
+            dataset_registry,
+            create_helper,
+            did_secret_encryption_key: did_secret_encryption_config
+                .encryption_key
+                .as_ref()
+                .map(|encryption_key| SecretString::from(encryption_key.clone())),
+            did_secret_key_repo,
+            rebac_svc,
+        }
+    }
 }
 
 #[common_macros::method_names_consts]
@@ -68,13 +105,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             .resolve_alias_target(&snapshot.name, subject)
             .await?;
 
+        let dataset_did = self.did_generator.generate_dataset_id();
         // Make a seed block
         let system_time = self.system_time_source.now();
-        let seed_block = odf::dataset::make_seed_block(
-            self.did_generator.generate_dataset_id().0,
-            snapshot.kind,
-            system_time,
-        );
+        let seed_block =
+            odf::dataset::make_seed_block(dataset_did.0.clone(), snapshot.kind, system_time);
 
         // Dataset entry goes first, this guarantees name collision check
         self.create_helper
@@ -85,6 +120,23 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 snapshot.kind,
             )
             .await?;
+
+        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
+            let dataset_did_secret_key =
+                DidSecretKey::try_new(&dataset_did.1, did_secret_encryption_key.expose_secret())
+                    .int_err()?;
+
+            // Note: subject and target might be two different accounts, but we use subject
+            // here as the creator of the key
+            self.did_secret_key_repo
+                .save_did_secret_key(
+                    &DidEntity::new_dataset(dataset_did.0.to_string()),
+                    &subject.account_id,
+                    &dataset_did_secret_key,
+                )
+                .await
+                .int_err()?;
+        }
 
         // Make storage level dataset (no HEAD yet)
         let store_result = self

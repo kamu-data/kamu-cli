@@ -17,7 +17,7 @@ use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_services::*;
 use serde_json::json;
 
-use crate::utils::{authentication_catalogs_ext, BaseGQLDatasetHarness};
+use crate::utils::{authentication_catalogs_ext, BaseGQLDatasetHarness, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -866,6 +866,10 @@ impl GraphQLDatasetsHarness {
                 account_id: molecule_account_id.clone(),
                 account_name: "molecule".parse().unwrap(),
             })),
+            PredefinedAccountOpts {
+                is_admin: false,
+                can_provision_accounts: true,
+            },
         )
         .await;
 

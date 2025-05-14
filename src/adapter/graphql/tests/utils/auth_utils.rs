@@ -15,6 +15,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
+use kamu_auth_rebac::AccountPropertyName;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,
@@ -27,13 +28,15 @@ use kamu_auth_rebac_services::{
 
 pub async fn authentication_catalogs(
     base_catalog: &dill::Catalog,
+    predefined_account_opts: PredefinedAccountOpts,
 ) -> (dill::Catalog, dill::Catalog) {
-    authentication_catalogs_ext(base_catalog, None).await
+    authentication_catalogs_ext(base_catalog, None, predefined_account_opts).await
 }
 
 pub async fn authentication_catalogs_ext(
     base_catalog: &dill::Catalog,
     subject: Option<CurrentAccountSubject>,
+    predefined_account_opts: PredefinedAccountOpts,
 ) -> (dill::Catalog, dill::Catalog) {
     let current_account_subject = subject.unwrap_or_else(CurrentAccountSubject::new_test);
     let mut predefined_accounts_config = PredefinedAccountsConfig::new();
@@ -42,11 +45,10 @@ pub async fn authentication_catalogs_ext(
         unreachable!();
     };
 
-    predefined_accounts_config
-        .predefined
-        .push(AccountConfig::test_config_from_subject(
-            logged_account.clone(),
-        ));
+    predefined_accounts_config.predefined.push(
+        AccountConfig::test_config_from_subject(logged_account.clone())
+            .set_properties(predefined_account_opts.into()),
+    );
 
     let base_auth_catalog = dill::CatalogBuilder::new_chained(base_catalog)
         .add::<LoginPasswordAuthProvider>()
@@ -58,6 +60,7 @@ pub async fn authentication_catalogs_ext(
         .add_value(DefaultDatasetProperties::default())
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
+        .add_value(DidSecretEncryptionConfig::sample())
         .add_value(predefined_accounts_config)
         .build();
 
@@ -93,3 +96,22 @@ pub fn expect_anonymous_access_error(response: async_graphql::Response) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Default)]
+pub struct PredefinedAccountOpts {
+    pub is_admin: bool,
+    pub can_provision_accounts: bool,
+}
+
+impl From<PredefinedAccountOpts> for Vec<AccountPropertyName> {
+    fn from(value: PredefinedAccountOpts) -> Self {
+        let mut result = Vec::new();
+        if value.is_admin {
+            result.push(AccountPropertyName::IsAdmin);
+        }
+        if value.can_provision_accounts {
+            result.push(AccountPropertyName::CanProvisionAccounts);
+        }
+        result
+    }
+}

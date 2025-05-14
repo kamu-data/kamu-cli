@@ -28,7 +28,7 @@ testing = ["dep:pretty_assertions"]
 async-utils = { workspace = true }
 internal-error = { workspace = true }
 odf-metadata = { workspace = true }
-random-names = { workspace = true }
+random-strings = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
