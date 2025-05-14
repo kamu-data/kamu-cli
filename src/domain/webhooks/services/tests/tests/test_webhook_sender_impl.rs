@@ -16,7 +16,7 @@ use kamu_webhooks_inmem::{
     InMemoryWebhookEventRepository,
     InMemoryWebhookSubscriptionEventStore,
 };
-use kamu_webhooks_services::{WebhookDeliveryWorkerImpl, WebhookSignerImpl};
+use kamu_webhooks_services::{WebhookDeliveryWorkerImpl, WebhookSenderImpl, WebhookSignerImpl};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,6 +27,7 @@ async fn test_send_webhook() {
     let mut b = dill::CatalogBuilder::new();
     b.add::<WebhookDeliveryWorkerImpl>()
         .add::<WebhookSignerImpl>()
+        .add::<WebhookSenderImpl>()
         .add::<InMemoryWebhookSubscriptionEventStore>()
         .add::<InMemoryWebhookDeliveryRepository>()
         .add::<InMemoryWebhookEventRepository>();
