@@ -21,7 +21,6 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(feature = "sqlx")]
 #[derive(sqlx::FromRow)]
 pub struct WebhookDeliveryRecord {
     pub task_id: i64,
@@ -36,7 +35,6 @@ pub struct WebhookDeliveryRecord {
     pub response_at: Option<DateTime<Utc>>,
 }
 
-#[cfg(feature = "sqlx")]
 impl WebhookDeliveryRecord {
     pub fn serialize_http_headers(
         headers: &http::HeaderMap,

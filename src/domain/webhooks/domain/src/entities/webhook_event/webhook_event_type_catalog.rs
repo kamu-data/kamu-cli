@@ -16,18 +16,18 @@ pub struct WebhookEventTypeCatalog;
 impl WebhookEventTypeCatalog {
     pub const TEST: &str = "TEST";
 
-    pub const DATASET_HEAD_UPDATED: &str = "DATASET.HEAD.UPDATED";
+    pub const DATASET_REF_UPDATED: &str = "DATASET.REF.UPDATED";
 
     pub fn test() -> WebhookEventType {
         WebhookEventType::try_new(Self::TEST).unwrap()
     }
 
-    pub fn dataset_head_updated() -> WebhookEventType {
-        WebhookEventType::try_new(Self::DATASET_HEAD_UPDATED).unwrap()
+    pub fn dataset_ref_updated() -> WebhookEventType {
+        WebhookEventType::try_new(Self::DATASET_REF_UPDATED).unwrap()
     }
 
     pub fn all_non_test() -> Vec<WebhookEventType> {
-        vec![Self::dataset_head_updated()]
+        vec![Self::dataset_ref_updated()]
     }
 }
 

@@ -16,7 +16,7 @@ use crate::WebhookEvent;
 
 #[async_trait::async_trait]
 pub trait WebhookEventBuilder: Send + Sync {
-    async fn build_dataset_head_updated(
+    async fn build_dataset_ref_updated(
         &self,
         event: &DatasetReferenceMessageUpdated,
     ) -> Result<WebhookEvent, InternalError>;

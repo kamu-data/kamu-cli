@@ -85,7 +85,7 @@ impl WebhookDeliveryWorkerImpl {
             &event,
             &payload_bytes,
             created_at,
-            task_attempt_id.attempt_number,
+            task_attempt_id.attempt_number + 1, // human readable version
         )?;
 
         tracing::debug!(?headers, "Webhook delivery headers generated");

@@ -52,11 +52,6 @@ impl WebhookOutboxBridge {
         let subscription_ids = self
             .list_enabled_webhook_subscriptions_for_dataset_event(dataset_id, &event.event_type)
             .await?;
-        tracing::debug!(
-            len = subscription_ids.len(),
-            ?subscription_ids,
-            "Found subscriptions for dataset reference updated event"
-        );
 
         // Schedule webhook delivery tasks for each subscription
         for subscription_id in subscription_ids {
@@ -72,7 +67,7 @@ impl WebhookOutboxBridge {
         dataset_id: &odf::DatasetID,
         event_type: &WebhookEventType,
     ) -> Result<Vec<WebhookSubscriptionId>, InternalError> {
-        let subscriptions = self
+        let subscription_ids = self
             .webhook_subscription_event_store
             .list_enabled_subscription_ids_by_dataset_and_event_type(dataset_id, event_type)
             .await
@@ -80,7 +75,14 @@ impl WebhookOutboxBridge {
                 ListWebhookSubscriptionsError::Internal(e) => e,
             })?;
 
-        Ok(subscriptions)
+        tracing::debug!(
+            len = subscription_ids.len(),
+            ?subscription_ids,
+            %event_type,
+            "Found subscriptions for dataset event"
+        );
+
+        Ok(subscription_ids)
     }
 
     async fn schedule_webhook_delivery_task(
@@ -129,16 +131,10 @@ impl MessageConsumerT<DatasetReferenceMessage> for WebhookOutboxBridge {
 
         match message {
             DatasetReferenceMessage::Updated(msg) => {
-                // Ignore updates that are not for HEAD
-                if msg.block_ref != odf::BlockRef::Head {
-                    tracing::debug!(?msg, "Ignoring non-HEAD dataset reference update");
-                    return Ok(());
-                }
-
                 // Build the event
                 let event = self
                     .webhook_event_builder
-                    .build_dataset_head_updated(msg)
+                    .build_dataset_ref_updated(msg)
                     .await
                     .int_err()?;
 

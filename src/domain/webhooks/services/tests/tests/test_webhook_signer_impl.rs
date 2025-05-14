@@ -14,13 +14,14 @@ use kamu_webhooks_services::WebhookSignerImpl;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_sign_dataset_head_updated_webhook() {
+async fn test_sign_dataset_ref_updated_webhook() {
     let webhook_signer = WebhookSignerImpl::new();
 
     let payload = serde_json::json!({
       "version": "1",
       "datasetId": odf::DatasetID::new_seeded_ed25519(b"test_dataset_id").to_string(),
       "ownerAccountId": odf::AccountID::new_seeded_ed25519(b"test_account_id").to_string(),
+      "blockRef": "head",
       "oldHash": odf::Multihash::from_digest_sha3_256(b"old_hash").to_string(),
       "newHash": odf::Multihash::from_digest_sha3_256(b"new_hash").to_string(),
     });
@@ -43,7 +44,7 @@ async fn test_sign_dataset_head_updated_webhook() {
 
     assert_eq!(
         headers.signature,
-        "sig1=:l2U6vPJEuO8hfthfn7ehDxMf1rmezdDx0fQnzVPEZG8=:"
+        "sig1=:coS90CuAAmr2mVsp2/k9rm8q2D8KCPT2uJmlKcYTgZE=:"
     );
 
     assert_eq!(
@@ -54,7 +55,7 @@ async fn test_sign_dataset_head_updated_webhook() {
 
     assert_eq!(
         headers.content_digest,
-        "sha-256=:+0rGAWtiwvcbKAG9HxOVmT3HqXfrJjrglo6gxs6pw7s=:"
+        "sha-256=:BA2bN3rMDmEBxxu0hmTrkJjzPOVTtU1Co6fM1L+8tDg=:"
     );
 }
 

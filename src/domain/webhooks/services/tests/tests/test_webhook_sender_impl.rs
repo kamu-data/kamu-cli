@@ -45,11 +45,12 @@ async fn test_send_webhook() {
     let webhook_event_id = WebhookEventId::new(uuid::Uuid::new_v4());
     let webhook_event = WebhookEvent::new(
         webhook_event_id,
-        WebhookEventTypeCatalog::dataset_head_updated(),
+        WebhookEventTypeCatalog::dataset_ref_updated(),
         serde_json::json!({
           "version": "1",
           "datasetId": odf::DatasetID::new_seeded_ed25519(b"test_dataset_id").to_string(),
           "ownerAccountId": odf::AccountID::new_seeded_ed25519(b"test_account_id").to_string(),
+          "blockRef": "head",
           "oldHash": odf::Multihash::from_digest_sha3_256(b"old_hash").to_string(),
           "newHash": odf::Multihash::from_digest_sha3_256(b"new_hash").to_string(),
         }),

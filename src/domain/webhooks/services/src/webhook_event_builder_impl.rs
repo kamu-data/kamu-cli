@@ -25,7 +25,7 @@ use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const WEBHOOK_DATASET_HEAD_UPDATED_VERSION: &str = "1";
+const WEBHOOK_DATASET_REF_UPDATED_VERSION: &str = "1";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,7 +40,7 @@ pub struct WebhookEventBuilderImpl {
 
 #[async_trait::async_trait]
 impl WebhookEventBuilder for WebhookEventBuilderImpl {
-    async fn build_dataset_head_updated(
+    async fn build_dataset_ref_updated(
         &self,
         event: &DatasetReferenceMessageUpdated,
     ) -> Result<WebhookEvent, InternalError> {
@@ -53,9 +53,10 @@ impl WebhookEventBuilder for WebhookEventBuilderImpl {
 
         // Form event payload
         let mut payload = json!({
-            "version": WEBHOOK_DATASET_HEAD_UPDATED_VERSION,
+            "version": WEBHOOK_DATASET_REF_UPDATED_VERSION,
             "datasetId": event.dataset_id.to_string(),
             "ownerAccountId": dataset_entry.owner_id.to_string(),
+            "blockRef": event.block_ref.to_string(),
             "newHash": event.new_block_hash.to_string(),
         });
 
@@ -74,7 +75,7 @@ impl WebhookEventBuilder for WebhookEventBuilderImpl {
         let event_id = WebhookEventId::new(uuid::Uuid::new_v4());
         let event = WebhookEvent::new(
             event_id,
-            WebhookEventTypeCatalog::dataset_head_updated(),
+            WebhookEventTypeCatalog::dataset_ref_updated(),
             payload,
             Utc::now(),
         );

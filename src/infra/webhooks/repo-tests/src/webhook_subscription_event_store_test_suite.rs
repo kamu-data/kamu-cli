@@ -54,7 +54,7 @@ pub async fn test_no_events_initially(catalog: &dill::Catalog) {
     let res = event_store
         .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            &WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.is_empty());
@@ -76,7 +76,7 @@ pub async fn test_store_single_aggregate(catalog: &dill::Catalog) {
         Url::parse("https://example.com").unwrap(),
         WebhookSubscriptionLabel::new("test-label"),
         Some(dataset_id.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret").unwrap(),
     );
     subscription.save(event_store.as_ref()).await.unwrap();
@@ -137,7 +137,7 @@ pub async fn test_store_single_aggregate(catalog: &dill::Catalog) {
     let res = event_store
         .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            &WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id);
@@ -171,7 +171,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         Url::parse("https://example.com/1").unwrap(),
         WebhookSubscriptionLabel::new("label-1"),
         Some(dataset_id.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
     );
     subscription_1.enable();
@@ -182,7 +182,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         target_url_2,
         WebhookSubscriptionLabel::new("label-2"),
         Some(dataset_id.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_2").unwrap(),
     );
     subscription_2.enable();
@@ -195,7 +195,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
         Url::parse("https://example.com/3").unwrap(),
         WebhookSubscriptionLabel::new("label-3"),
         Some(dataset_id.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_3").unwrap(),
     );
     subscription_3.enable();
@@ -318,7 +318,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
     let res = event_store
         .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            &WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 2 && ids[0] == subscription_id_1 && ids[1] == subscription_id_2);
@@ -347,7 +347,7 @@ pub async fn test_modifying_subscription(catalog: &dill::Catalog) {
         Url::parse("https://example.com").unwrap(),
         WebhookSubscriptionLabel::new("test-label"),
         Some(dataset_id.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret").unwrap(),
     );
     subscription.save(event_store.as_ref()).await.unwrap();
@@ -355,7 +355,7 @@ pub async fn test_modifying_subscription(catalog: &dill::Catalog) {
     subscription.modify(
         Url::parse("https://example.com/modified").unwrap(),
         WebhookSubscriptionLabel::new("modified-label"),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
     );
     subscription.save(event_store.as_ref()).await.unwrap();
 
@@ -391,7 +391,7 @@ pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
         Url::parse("https://example.com/1").unwrap(),
         WebhookSubscriptionLabel::new("test-label"),
         Some(dataset_id_1.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
     );
     subscription_1.save(event_store.as_ref()).await.unwrap();
@@ -401,7 +401,7 @@ pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
         Url::parse("https://example.com/2/1").unwrap(),
         WebhookSubscriptionLabel::new("test-label"), // same label, but different dataset
         Some(dataset_id_2.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
     );
     subscription_2_1.save(event_store.as_ref()).await.unwrap();
@@ -411,7 +411,7 @@ pub async fn test_non_unique_labels(catalog: &dill::Catalog) {
         Url::parse("https://example.com/2/2").unwrap(),
         WebhookSubscriptionLabel::new("test-label"), // same label in the same dataset
         Some(dataset_id_2.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
     );
     let res = subscription_2_2.save(event_store.as_ref()).await;
@@ -437,7 +437,7 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
         Url::parse("https://example.com/1").unwrap(),
         WebhookSubscriptionLabel::new("test-label"),
         Some(dataset_id_1.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_1").unwrap(),
     );
     subscription_1.save(event_store.as_ref()).await.unwrap();
@@ -447,7 +447,7 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
         Url::parse("https://example.com/2/1").unwrap(),
         WebhookSubscriptionLabel::new("test-label"), // same label, but different dataset
         Some(dataset_id_2.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
     );
     subscription_2_1.save(event_store.as_ref()).await.unwrap();
@@ -457,7 +457,7 @@ pub async fn test_non_unique_labels_on_modify(catalog: &dill::Catalog) {
         Url::parse("https://example.com/2/2").unwrap(),
         WebhookSubscriptionLabel::new("test-label-2"),
         Some(dataset_id_2.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_2_2").unwrap(),
     );
     subscription_2_2.save(event_store.as_ref()).await.unwrap();
@@ -491,7 +491,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         Url::parse("https://example.com/1/1").unwrap(),
         WebhookSubscriptionLabel::new("test-label-1"),
         Some(dataset_id_1.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_1_1").unwrap(),
     );
     subscription_1_1.enable();
@@ -513,7 +513,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
         Url::parse("https://example.com/2/1").unwrap(),
         WebhookSubscriptionLabel::new("test-label-1"),
         Some(dataset_id_2.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret_2_1").unwrap(),
     );
     subscription_2_1.enable();
@@ -533,7 +533,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
     let res = event_store
         .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id_1,
-            &WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_1_1);
@@ -549,7 +549,7 @@ pub async fn test_same_dataset_different_event_types(catalog: &dill::Catalog) {
     let res = event_store
         .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id_2,
-            &WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.len() == 1 && ids[0] == subscription_id_2_1);
@@ -578,7 +578,7 @@ pub async fn test_removed_subscription_filters_out(catalog: &dill::Catalog) {
         Url::parse("https://example.com").unwrap(),
         WebhookSubscriptionLabel::new("test-label"),
         Some(dataset_id.clone()),
-        vec![WebhookEventTypeCatalog::dataset_head_updated()],
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
         WebhookSubscriptionSecret::try_new("secret").unwrap(),
     );
     subscription.save(event_store.as_ref()).await.unwrap();
@@ -607,7 +607,7 @@ pub async fn test_removed_subscription_filters_out(catalog: &dill::Catalog) {
     let res = event_store
         .list_enabled_subscription_ids_by_dataset_and_event_type(
             &dataset_id,
-            &WebhookEventTypeCatalog::dataset_head_updated(),
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.is_empty());
