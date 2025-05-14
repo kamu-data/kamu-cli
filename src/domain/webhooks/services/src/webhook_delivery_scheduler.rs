@@ -18,8 +18,8 @@ use messaging_outbox::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_OUTBOX_BRIDGE: &str =
-    "dev.kamu.domain.webhooks.WebhookOutboxBridge";
+pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_DELIVERY_SCHEDULER: &str =
+    "dev.kamu.domain.webhooks.WebhookDeliveryScheduler";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +34,7 @@ pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_OUTBOX_BRIDGE: &str =
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
-pub struct WebhookOutboxBridge {
+pub struct WebhookDeliveryScheduler {
     task_scheduler: Arc<dyn TaskScheduler>,
     webhook_event_builder: Arc<dyn WebhookEventBuilder>,
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
@@ -42,7 +42,7 @@ pub struct WebhookOutboxBridge {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl WebhookOutboxBridge {
+impl WebhookDeliveryScheduler {
     async fn schedule_dataset_webhook_event_delivery(
         &self,
         dataset_id: &odf::DatasetID,
@@ -111,12 +111,12 @@ impl WebhookOutboxBridge {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for WebhookOutboxBridge {}
+impl MessageConsumer for WebhookDeliveryScheduler {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetReferenceMessage> for WebhookOutboxBridge {
+impl MessageConsumerT<DatasetReferenceMessage> for WebhookDeliveryScheduler {
     #[tracing::instrument(
         level = "debug",
         skip_all,
