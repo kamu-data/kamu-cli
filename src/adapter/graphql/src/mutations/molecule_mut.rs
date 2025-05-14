@@ -116,16 +116,27 @@ impl MoleculeMut {
             .parse()
             .unwrap();
 
-        // TODO: Set avatar and display name?
-        // https://avatars.githubusercontent.com/u/37688345?s=200&amp;v=4
-        let project_account = create_account_use_case
-            .execute(
-                &molecule_account,
-                &project_account_name,
-                Some(project_email),
-            )
+        // TODO: Remove tolerance to accounts that already exist after we have account
+        // deletion api? Reusing existing accounts may be a security threat via
+        // name squatting.
+        let project_account = if let Some(acc) = account_svc
+            .account_by_name(&project_account_name)
             .await
-            .int_err()?;
+            .int_err()?
+        {
+            acc
+        } else {
+            // TODO: Set avatar and display name?
+            // https://avatars.githubusercontent.com/u/37688345?s=200&amp;v=4
+            create_account_use_case
+                .execute(
+                    &molecule_account,
+                    &project_account_name,
+                    Some(project_email),
+                )
+                .await
+                .int_err()?
+        };
 
         // Create `data-room` dataset
         let snapshot = Molecule::dataset_snapshot_data_room(odf::DatasetAlias::new(
