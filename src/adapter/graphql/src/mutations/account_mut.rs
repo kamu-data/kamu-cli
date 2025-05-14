@@ -141,12 +141,31 @@ impl AccountMut {
         }
     }
 
+    /// Deleting an account
+    async fn delete_account(
+        &self,
+        ctx: &Context<'_>,
+        account_name: String,
+    ) -> Result<DeleteAccountResult> {
+        ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
+
+        let Ok(_account_name) = odf::AccountName::from_str(&account_name) else {
+            return Ok(DeleteAccountResult::InvalidAccountName(
+                AccountNameInvalid::default(),
+            ));
+        };
+
+        todo!()
+    }
+
     /// Access to the mutable flow configurations of this account
     async fn flows(&self) -> AccountFlowsMut {
         AccountFlowsMut::new(self.account.clone())
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// UpdateEmailResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
@@ -202,6 +221,8 @@ impl Default for UpdateEmailNonUnique {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CreateAccountResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
@@ -274,6 +295,8 @@ impl Default for CreateAccountEmailInvalid {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ModifyPasswordResult
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
@@ -324,6 +347,32 @@ pub struct ModifyPasswordInvalidPassword {
 impl ModifyPasswordInvalidPassword {
     pub async fn message(&self) -> String {
         self.reason.clone()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DeleteAccountResult
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum DeleteAccountResult {
+    Success(DeleteAccountSuccess),
+    InvalidAccountName(AccountNameInvalid),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct DeleteAccountSuccess {
+    pub account: AccountView,
+}
+
+#[ComplexObject]
+impl DeleteAccountSuccess {
+    pub async fn message(&self) -> String {
+        "Account deleted".to_string()
     }
 }
 
