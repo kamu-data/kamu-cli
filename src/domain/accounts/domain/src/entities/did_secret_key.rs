@@ -11,8 +11,6 @@ use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
 use internal_error::ResultIntoInternal;
 use odf::metadata::PrivateKey;
 
-use crate::DidEntityType;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -52,7 +50,7 @@ impl DidSecretKey {
 #[cfg(feature = "sqlx")]
 #[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
 pub struct DidSecretKeyRowModel {
-    pub entity_type: DidEntityType,
+    pub entity_type: crate::DidEntityType,
     pub entity_id: String,
     pub secret_key: Vec<u8>,
     pub secret_nonce: Vec<u8>,
