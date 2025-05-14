@@ -261,10 +261,21 @@ pub enum UpdateAccountError {
 #[derive(Debug, Error)]
 pub enum DeleteAccountError {
     #[error(transparent)]
-    NotFound(AccountNotFoundByIdError),
+    NotFound(AccountNotFoundByNameError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl From<GetAccountByNameError> for DeleteAccountError {
+    fn from(e: GetAccountByNameError) -> Self {
+        use GetAccountByNameError as E;
+
+        match e {
+            E::NotFound(e) => Self::NotFound(e),
+            e @ E::Internal(_) => Self::Internal(e.int_err()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

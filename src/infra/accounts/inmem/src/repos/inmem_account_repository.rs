@@ -357,6 +357,13 @@ impl AccountRepository for InMemoryAccountRepository {
 
         Box::pin(futures::stream::iter(found_accounts))
     }
+
+    async fn delete_account_by_name(
+        &self,
+        _account_name: &odf::AccountName,
+    ) -> Result<(), DeleteAccountError> {
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
