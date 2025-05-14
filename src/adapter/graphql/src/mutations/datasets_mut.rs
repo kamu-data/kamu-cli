@@ -313,14 +313,20 @@ impl DatasetsMut {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
 pub enum CreateDatasetResult<'a> {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision<'a>),
 }
 
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
 pub enum CreateDatasetFromSnapshotResult<'a> {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision<'a>),
@@ -342,7 +348,10 @@ pub struct CreateDatasetResultSuccess {
 
 #[ComplexObject]
 impl CreateDatasetResultSuccess {
-    async fn message(&self) -> String {
+    pub async fn is_success(&self) -> bool {
+        true
+    }
+    pub async fn message(&self) -> String {
         "Success".to_string()
     }
 }
@@ -358,7 +367,10 @@ pub struct CreateDatasetResultNameCollision<'a> {
 
 #[ComplexObject]
 impl CreateDatasetResultNameCollision<'_> {
-    async fn message(&self) -> String {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+    pub async fn message(&self) -> String {
         format!("Dataset with name '{}' already exists", self.dataset_name)
     }
 }
@@ -366,8 +378,16 @@ impl CreateDatasetResultNameCollision<'_> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
+#[graphql(complex)]
 pub struct CreateDatasetResultInvalidSnapshot {
     pub message: String,
+}
+
+#[ComplexObject]
+impl CreateDatasetResultInvalidSnapshot {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -382,7 +402,10 @@ pub struct CreateDatasetResultMissingInputs {
 
 #[ComplexObject]
 impl CreateDatasetResultMissingInputs {
-    async fn message(&self) -> String {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+    pub async fn message(&self) -> String {
         format!(
             "Dataset is referencing non-existing inputs: {}",
             self.missing_inputs.join(", ")

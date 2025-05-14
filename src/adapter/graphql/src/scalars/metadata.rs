@@ -62,8 +62,16 @@ pub enum MetadataManifestFormat {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
+#[graphql(complex)]
 pub struct MetadataManifestMalformed {
     pub message: String,
+}
+
+#[ComplexObject]
+impl MetadataManifestMalformed {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +85,9 @@ pub struct MetadataManifestUnsupportedVersion {
 
 #[Object]
 impl MetadataManifestUnsupportedVersion {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
     pub async fn message(&self) -> String {
         format!(
             "Unsupported manifest version {}, supported range is [{}, {}]",

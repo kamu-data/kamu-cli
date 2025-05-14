@@ -700,30 +700,36 @@ type CreateAnnouncementSuccess implements CreateAnnouncementResult {
 }
 
 interface CreateDatasetFromSnapshotResult {
+	isSuccess: Boolean!
 	message: String!
 }
 
 interface CreateDatasetResult {
+	isSuccess: Boolean!
 	message: String!
 }
 
 type CreateDatasetResultInvalidSnapshot implements CreateDatasetFromSnapshotResult {
 	message: String!
+	isSuccess: Boolean!
 }
 
 type CreateDatasetResultMissingInputs implements CreateDatasetFromSnapshotResult {
 	missingInputs: [String!]!
+	isSuccess: Boolean!
 	message: String!
 }
 
 type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
 	accountName: AccountName
 	datasetName: DatasetName!
+	isSuccess: Boolean!
 	message: String!
 }
 
 type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
 	dataset: Dataset!
+	isSuccess: Boolean!
 	message: String!
 }
 
@@ -2413,9 +2419,11 @@ enum MetadataManifestFormat {
 
 type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapshotResult {
 	message: String!
+	isSuccess: Boolean!
 }
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
+	isSuccess: Boolean!
 	message: String!
 }
 
