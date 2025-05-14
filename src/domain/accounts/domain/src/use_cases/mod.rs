@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod create_account_use_case;
+mod delete_account_use_case;
 
 pub use create_account_use_case::*;
+pub use delete_account_use_case::*;

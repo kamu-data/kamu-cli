@@ -10,16 +10,7 @@
 use std::str::FromStr;
 
 use email_utils::Email;
-use kamu_accounts::{
-    Account,
-    AccountRepository,
-    AccountService,
-    CreateAccountError,
-    CreateAccountUseCase,
-    ModifyPasswordError,
-    Password,
-    UpdateAccountError,
-};
+use kamu_accounts::*;
 
 use super::AccountFlowsMut;
 use crate::prelude::*;
@@ -66,8 +57,9 @@ impl AccountMut {
             Err(UpdateAccountError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
                 UpdateEmailNonUnique::default(),
             )),
-            Err(UpdateAccountError::NotFound(e)) => Err(e.int_err().into()),
-            Err(UpdateAccountError::Internal(e)) => Err(e.into()),
+            Err(e @ (UpdateAccountError::NotFound(_) | UpdateAccountError::Internal(_))) => {
+                Err(e.int_err().into())
+            }
         }
     }
 
@@ -103,11 +95,11 @@ impl AccountMut {
                     field: err.account_field.to_string(),
                 }),
             ),
-            Err(CreateAccountError::Internal(e)) => Err(e.into()),
+            Err(e @ CreateAccountError::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
-    /// Reset password for selected account. Allowed only for admin users
+    /// Reset password for a selected account. Allowed only for admin users
     #[graphql(guard = "AdminGuard::new()")]
     async fn modify_password(
         &self,
@@ -135,27 +127,37 @@ impl AccountMut {
                 ModifyPasswordSuccess::default(),
             )),
             Err(ModifyPasswordError::AccountNotFound(_)) => Ok(
-                ModifyPasswordResult::AccountNotFound(ModifyPasswordAccountNotFound::default()),
+                ModifyPasswordResult::AccountNotFound(AccountNotFound::default()),
             ),
-            Err(ModifyPasswordError::Internal(e)) => Err(e.into()),
+            Err(e @ ModifyPasswordError::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
-    /// Deleting an account
-    async fn delete_account(
+    /// Deleting an account by name
+    async fn delete_account_by_name(
         &self,
         ctx: &Context<'_>,
         account_name: String,
     ) -> Result<DeleteAccountResult> {
         ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
 
-        let Ok(_account_name) = odf::AccountName::from_str(&account_name) else {
+        let Ok(account_name) = odf::AccountName::from_str(&account_name) else {
             return Ok(DeleteAccountResult::InvalidAccountName(
                 AccountNameInvalid::default(),
             ));
         };
 
-        todo!()
+        let delete_account_use_case = from_catalog_n!(ctx, dyn DeleteAccountUseCase);
+
+        use DeleteAccountError as E;
+
+        match delete_account_use_case.execute(&account_name).await {
+            Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),
+            Err(E::AccountNotFound { .. }) => {
+                Ok(DeleteAccountResult::AccountNotFound(Default::default()))
+            }
+            Err(e @ E::Internal(_)) => Err(e.int_err().into()),
+        }
     }
 
     /// Access to the mutable flow configurations of this account
@@ -302,7 +304,7 @@ impl Default for CreateAccountEmailInvalid {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum ModifyPasswordResult {
     Success(ModifyPasswordSuccess),
-    AccountNotFound(ModifyPasswordAccountNotFound),
+    AccountNotFound(AccountNotFound),
     InvalidPassword(ModifyPasswordInvalidPassword),
 }
 
@@ -323,11 +325,11 @@ impl Default for ModifyPasswordSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct ModifyPasswordAccountNotFound {
+pub struct AccountNotFound {
     pub message: String,
 }
 
-impl Default for ModifyPasswordAccountNotFound {
+impl Default for AccountNotFound {
     fn default() -> Self {
         Self {
             message: "Account not found".to_string(),
@@ -345,8 +347,8 @@ pub struct ModifyPasswordInvalidPassword {
 
 #[ComplexObject]
 impl ModifyPasswordInvalidPassword {
-    pub async fn message(&self) -> String {
-        self.reason.clone()
+    pub async fn message(&self) -> &String {
+        &self.reason
     }
 }
 
@@ -359,20 +361,21 @@ impl ModifyPasswordInvalidPassword {
 pub enum DeleteAccountResult {
     Success(DeleteAccountSuccess),
     InvalidAccountName(AccountNameInvalid),
+    AccountNotFound(AccountNotFound),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-#[graphql(complex)]
 pub struct DeleteAccountSuccess {
-    pub account: AccountView,
+    message: String,
 }
 
-#[ComplexObject]
-impl DeleteAccountSuccess {
-    pub async fn message(&self) -> String {
-        "Account deleted".to_string()
+impl Default for DeleteAccountSuccess {
+    fn default() -> Self {
+        Self {
+            message: "Account deleted".to_string(),
+        }
     }
 }
 
