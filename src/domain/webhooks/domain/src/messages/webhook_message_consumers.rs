@@ -7,20 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<WebhookDeliveryScheduler>();
-    catalog_builder.add::<WebhookEventBuilderImpl>();
-    catalog_builder.add::<WebhookDeliveryWorkerImpl>();
-    catalog_builder.add::<WebhookSignerImpl>();
-    catalog_builder.add::<WebhookSenderImpl>();
-    catalog_builder.add::<WebhookSecretGeneratorImpl>();
-    catalog_builder.add::<WebhookDatasetRemovalHandler>();
-}
+pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_DELIVERY_SCHEDULER: &str =
+    "dev.kamu.domain.webhooks.WebhookDeliveryScheduler";
+
+pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_DATASET_REMOVAL_HANDLER: &str =
+    "dev.kamu.domain.webhooks.WebhookDatasetRemovalHandler";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

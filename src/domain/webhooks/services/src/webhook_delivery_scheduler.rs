@@ -11,15 +11,10 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::InternalError;
-use kamu_datasets::{DatasetReferenceMessage, MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE};
+use kamu_datasets::{DatasetReferenceMessage, MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE};
 use kamu_task_system::{LogicalPlan, LogicalPlanDeliverWebhook, TaskScheduler};
 use kamu_webhooks::*;
 use messaging_outbox::*;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_DELIVERY_SCHEDULER: &str =
-    "dev.kamu.domain.webhooks.WebhookDeliveryScheduler";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,9 +22,9 @@ pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_DELIVERY_SCHEDULER: &str =
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<DatasetReferenceMessage>)]
 #[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
+    consumer_name: MESSAGE_CONSUMER_KAMU_WEBHOOK_DELIVERY_SCHEDULER,
     feeding_producers: &[
-        MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
+        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,

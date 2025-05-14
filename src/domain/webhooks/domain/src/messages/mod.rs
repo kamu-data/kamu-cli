@@ -7,19 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+mod webhook_message_consumers;
 
-// Re-exports
-pub use event_sourcing::*;
-
-mod aggregates;
-mod entities;
-mod messages;
-mod repos;
-mod services;
-
-pub use aggregates::*;
-pub use entities::*;
-pub use messages::*;
-pub use repos::*;
-pub use services::*;
+pub use webhook_message_consumers::*;
