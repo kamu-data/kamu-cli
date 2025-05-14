@@ -148,6 +148,10 @@ type AccountMut {
 	"""
 	modifyPassword(accountName: AccountName!, password: String!): ModifyPasswordResult!
 	"""
+	Deleting an account
+	"""
+	deleteAccount(accountName: String!): DeleteAccountResult!
+	"""
 	Access to the mutable flow configurations of this account
 	"""
 	flows: AccountFlowsMut!
@@ -155,7 +159,7 @@ type AccountMut {
 
 scalar AccountName
 
-type AccountNameInvalid implements CreateAccountResult {
+type AccountNameInvalid implements CreateAccountResult & DeleteAccountResult {
 	message: String!
 }
 
@@ -1383,6 +1387,15 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+
+interface DeleteAccountResult {
+	message: String!
+}
+
+type DeleteAccountSuccess implements DeleteAccountResult {
+	account: Account!
+	message: String!
+}
 
 interface DeleteDatasetEnvVarResult {
 	message: String!
