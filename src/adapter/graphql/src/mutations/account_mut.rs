@@ -7,9 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
-
-use email_utils::Email;
 use kamu_accounts::*;
 
 use super::AccountFlowsMut;
@@ -38,17 +35,11 @@ impl AccountMut {
     pub async fn update_email(
         &self,
         ctx: &Context<'_>,
-        new_email: String,
+        new_email: Email<'_>,
     ) -> Result<UpdateEmailResult> {
-        let Ok(new_email) = Email::parse(&new_email) else {
-            return Ok(UpdateEmailResult::InvalidEmail(
-                UpdateEmailInvalid::default(),
-            ));
-        };
-
         let account_repo = from_catalog_n!(ctx, dyn AccountRepository);
         match account_repo
-            .update_account_email(&self.account.id, new_email.clone())
+            .update_account_email(&self.account.id, new_email.clone().into())
             .await
         {
             Ok(_) => Ok(UpdateEmailResult::Success(UpdateEmailSuccess {
@@ -68,19 +59,14 @@ impl AccountMut {
         &self,
         ctx: &Context<'_>,
         account_name: AccountName<'_>,
-        email: Option<String>,
+        email: Option<Email<'_>>,
     ) -> Result<CreateAccountResult> {
         ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
 
-        let Ok(email) = email.map(|e| Email::parse(&e)).transpose() else {
-            return Ok(CreateAccountResult::InvalidEmail(
-                CreateAccountEmailInvalid::default(),
-            ));
-        };
-
         let create_account_use_case = from_catalog_n!(ctx, dyn CreateAccountUseCase);
+
         match create_account_use_case
-            .execute(&self.account, account_name.as_ref(), email)
+            .execute(&self.account, account_name.as_ref(), email.map(Into::into))
             .await
         {
             Ok(created_account) => Ok(CreateAccountResult::Success(CreateAccountSuccess {
@@ -164,7 +150,6 @@ impl AccountMut {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum UpdateEmailResult {
     Success(UpdateEmailSuccess),
-    InvalidEmail(UpdateEmailInvalid),
     NonUniqueEmail(UpdateEmailNonUnique),
 }
 
@@ -180,21 +165,6 @@ pub struct UpdateEmailSuccess {
 impl UpdateEmailSuccess {
     pub async fn message(&self) -> String {
         "Success".to_string()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug)]
-pub struct UpdateEmailInvalid {
-    message: String,
-}
-
-impl Default for UpdateEmailInvalid {
-    fn default() -> Self {
-        Self {
-            message: "Invalid email".to_string(),
-        }
     }
 }
 
