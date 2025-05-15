@@ -7,8 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use std::num::NonZeroUsize;
+
+use chrono::{DateTime, Utc};
+use database_common::{
+    sqlite_generate_placeholders_list,
+    PaginationOpts,
+    TransactionRef,
+    TransactionRefT,
+};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
@@ -16,13 +23,13 @@ use sqlx::{FromRow, QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteTaskSystemEventStore {
+pub struct SqliteTaskEventStore {
     transaction: TransactionRefT<sqlx::Sqlite>,
 }
 
 #[component(pub)]
 #[interface(dyn TaskEventStore)]
-impl SqliteTaskSystemEventStore {
+impl SqliteTaskEventStore {
     pub fn new(transaction: TransactionRef) -> Self {
         Self {
             transaction: transaction.into(),
@@ -42,8 +49,8 @@ impl SqliteTaskSystemEventStore {
 
         sqlx::query!(
             r#"
-            INSERT INTO tasks (task_id, dataset_id, task_status, last_event_id)
-                VALUES ($1, $2, 'queued', NULL)
+            INSERT INTO tasks (task_id, dataset_id, task_status, next_attempt_at, last_event_id)
+                VALUES ($1, $2, 'queued', NULL, NULL)
             "#,
             task_id,
             maybe_dataset_id,
@@ -70,21 +77,23 @@ impl SqliteTaskSystemEventStore {
         let last_event = events.last().expect("Non empty event list expected");
 
         let event_task_id: i64 = (last_event.task_id()).try_into().unwrap();
+        let next_attempt_at = last_event.next_attempt_at();
         let latest_status = last_event.new_status();
 
         let affected_rows_count =
             sqlx::query!(
                 r#"
                 UPDATE tasks
-                    SET task_status = $2, last_event_id = $3
+                    SET task_status = $2, next_attempt_at = $3, last_event_id = $4
                     WHERE task_id = $1 AND (
-                        last_event_id IS NULL AND CAST($4 as INT8) IS NULL OR
-                        last_event_id IS NOT NULL AND CAST($4 as INT8) IS NOT NULL AND last_event_id = $4
+                        last_event_id IS NULL AND CAST($5 as INT8) IS NULL OR
+                        last_event_id IS NOT NULL AND CAST($5 as INT8) IS NOT NULL AND last_event_id = $5
                     )
                     RETURNING task_id
                 "#,
                 event_task_id,
                 latest_status,
+                next_attempt_at,
                 last_event_id,
                 maybe_prev_stored_event_id,
             )
@@ -144,7 +153,7 @@ impl SqliteTaskSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<TaskState> for SqliteTaskSystemEventStore {
+impl EventStore<TaskState> for SqliteTaskEventStore {
     fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<TaskEvent> {
         let task_id: i64 = (*task_id).try_into().unwrap();
         let maybe_from_id = opts.from.map(EventID::into_inner);
@@ -157,14 +166,13 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
                 .await?;
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-            #[allow(dead_code)]
-            pub struct EventModel {
+            struct EventRow {
                 pub event_id: i64,
                 pub event_payload: sqlx::types::JsonValue
             }
 
             let mut query_stream = sqlx::query_as!(
-                EventModel,
+                EventRow,
                 r#"
                 SELECT event_id as "event_id: _", event_payload as "event_payload: _" FROM task_events
                     WHERE task_id = $1
@@ -187,6 +195,65 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
 
             while let Some((event_id, event)) = query_stream.try_next().await? {
                 yield Ok((event_id, event));
+            }
+        })
+    }
+
+    fn get_events_multi(&self, queries: Vec<TaskID>) -> MultiEventStream<TaskID, TaskEvent> {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+
+            #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
+            struct EventRow {
+                pub task_d: TaskID,
+                pub event_id: i64,
+                pub event_payload: sqlx::types::JsonValue
+            }
+
+            let query_str = format!(
+                r#"
+                SELECT
+                    task_id as "task_id: _",
+                    event_id as "event_id: _",
+                    event_payload as "event_payload: _"
+                FROM task_events
+                    WHERE task_id IN ({})
+                    ORDER BY event_id ASC
+                "#,
+                sqlite_generate_placeholders_list(
+                    queries.len(),
+                    NonZeroUsize::new(1).unwrap()
+                )
+            );
+
+            let mut query = sqlx::query(&query_str);
+            for task_id in queries {
+                let task_id: i64 = task_id.try_into().unwrap();
+                query = query.bind(task_id);
+            }
+
+            use sqlx::Row;
+
+            let mut query_stream = query
+                .try_map(|row: sqlx::sqlite::SqliteRow| {
+                    let task_id: u64 = row.get(0);
+                    let event_id: i64 = row.get(1);
+                    let event_payload: sqlx::types::JsonValue = row.get(2);
+
+                    let event = serde_json::from_value::<TaskEvent>(event_payload)
+                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                    Ok((TaskID::new(task_id), EventID::new(event_id), event))
+                })
+                .fetch(connection_mut)
+                .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((task_id, event_id, event)) = query_stream.try_next().await? {
+                yield Ok((task_id, event_id, event));
             }
         })
     }
@@ -250,7 +317,7 @@ impl EventStore<TaskState> for SqliteTaskSystemEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskEventStore for SqliteTaskSystemEventStore {
+impl TaskEventStore for SqliteTaskEventStore {
     /// Generates new unique task identifier
     async fn new_task_id(&self) -> Result<TaskID, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -278,18 +345,25 @@ impl TaskEventStore for SqliteTaskSystemEventStore {
         Ok(TaskID::try_from(result.task_id).unwrap())
     }
 
-    /// Attempts to get the earliest queued task, if any
-    async fn try_get_queued_task(&self) -> Result<Option<TaskID>, InternalError> {
+    async fn try_get_queued_task(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<TaskID>, InternalError> {
         let mut tr = self.transaction.lock().await;
+
         let connection_mut = tr.connection_mut().await?;
+
+        let now_str = now.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
 
         let maybe_task_id = sqlx::query!(
             r#"
             SELECT task_id FROM tasks
-                WHERE task_status = 'queued'
-                ORDER BY task_id ASC
-                LIMIT 1
+            WHERE task_status IN ('queued', 'retrying')
+                AND next_attempt_at <= ?
+            ORDER BY next_attempt_at ASC, task_id ASC
+            LIMIT 1;
             "#,
+            now_str,
         )
         .try_map(|event_row| {
             let task_id = event_row.task_id;

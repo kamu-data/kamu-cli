@@ -1323,13 +1323,19 @@ impl Default for FlowAgentConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TaskAgentConfig {
-    pub task_checking_interval_secs: Option<i64>,
+    pub checking_interval_secs: Option<u32>,
+    pub max_retries: Option<u32>,
+    pub min_retry_delay_secs: Option<u32>,
+    pub retry_backoff_type: Option<TaskRetryBackoffType>,
 }
 
 impl TaskAgentConfig {
     pub fn new() -> Self {
         Self {
-            task_checking_interval_secs: None,
+            checking_interval_secs: None,
+            max_retries: None,
+            min_retry_delay_secs: None,
+            retry_backoff_type: None,
         }
     }
 
@@ -1341,9 +1347,23 @@ impl TaskAgentConfig {
 impl Default for TaskAgentConfig {
     fn default() -> Self {
         Self {
-            task_checking_interval_secs: Some(1),
+            checking_interval_secs: Some(1),
+            max_retries: Some(2),
+            min_retry_delay_secs: Some(10),
+            retry_backoff_type: Some(TaskRetryBackoffType::Exponential),
         }
     }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub enum TaskRetryBackoffType {
+    Fixed,
+    Linear,
+    Exponential,
+    ExponentialWithJitter,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

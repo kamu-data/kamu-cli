@@ -24,6 +24,7 @@ impl Task {
         task_id: TaskID,
         logical_plan: LogicalPlan,
         metadata: Option<TaskMetadata>,
+        retry_policy: TaskRetryPolicy,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -33,6 +34,7 @@ impl Task {
                     task_id,
                     logical_plan,
                     metadata,
+                    retry_policy,
                 },
             )
             .unwrap(),
@@ -50,12 +52,12 @@ impl Task {
 
     /// Task is queued or running and cancellation was not already requested
     pub fn can_cancel(&self) -> bool {
-        matches!(self.status(), TaskStatus::Queued | TaskStatus::Running if !self.cancellation_requested)
+        matches!(self.status(), TaskStatus::Queued | TaskStatus::Running if self.timing.cancellation_requested_at.is_none())
     }
 
     /// Set cancellation flag (if not already set)
     pub fn cancel(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<TaskState>> {
-        if self.cancellation_requested {
+        if self.timing.cancellation_requested_at.is_some() {
             return Ok(());
         }
 
@@ -72,10 +74,19 @@ impl Task {
         now: DateTime<Utc>,
         outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<TaskState>> {
+        // Compute if there will be a next attempt and when
+        let next_attempt_at = if outcome.is_failed() {
+            self.retry_policy
+                .next_attempt_at(u32::try_from(self.attempts.len()).unwrap(), now)
+        } else {
+            None
+        };
+
         let event = TaskEventFinished {
             event_time: now,
             task_id: self.task_id,
             outcome,
+            next_attempt_at,
         };
         self.apply(event)
     }

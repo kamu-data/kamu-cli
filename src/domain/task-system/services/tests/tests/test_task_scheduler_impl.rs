@@ -10,14 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu_task_system::{
-    LogicalPlan,
-    LogicalPlanProbe,
-    TaskMetadata,
-    TaskScheduler,
-    TaskState,
-    TaskStatus,
-};
+use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use time_source::SystemTimeSourceStub;
@@ -44,15 +37,15 @@ async fn test_creates_task() {
         .unwrap();
 
     assert_matches!(task_state_actual, TaskState {
-        outcome: None,
-        cancellation_requested: false,
+        attempts,
         logical_plan,
         metadata,
-        ran_at: None,
-        cancellation_requested_at: None,
-        finished_at: None,
+        timing: TaskTimingRecords {
+            cancellation_requested_at: None,
+            ..
+        },
         ..
-    } if logical_plan == logical_plan_expected && metadata == metadata_expected );
+    } if attempts.is_empty() && logical_plan == logical_plan_expected && metadata == metadata_expected );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,7 +178,11 @@ async fn test_task_cancellation() {
 fn create_task_scheduler() -> impl TaskScheduler {
     let task_event_store = Arc::new(InMemoryTaskEventStore::new());
     let time_source = Arc::new(SystemTimeSourceStub::new());
-    TaskSchedulerImpl::new(task_event_store, time_source)
+    TaskSchedulerImpl::new(
+        task_event_store,
+        time_source,
+        Arc::new(TaskSchedulerConfig::new(TaskRetryPolicy::default())),
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
