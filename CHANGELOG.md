@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.237.0] - 2025-05-14
 ### Added
 - GQL api:
   - New `createAccount` method to create new account, method is available only for admins and user's with `can_provision_accounts` rebac properties.
