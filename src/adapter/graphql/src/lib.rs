@@ -23,3 +23,7 @@ pub use root::*;
 
 pub mod guards;
 pub use guards::*;
+
+pub mod molecule {
+    pub use crate::queries::molecule::Molecule;
+}

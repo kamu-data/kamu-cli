@@ -14,7 +14,7 @@ use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use super::DUMMY_EMAIL_ADDRESS;
+use super::{LoggedAccount, DUMMY_EMAIL_ADDRESS};
 use crate::{
     AccountDisplayName,
     AccountType,
@@ -105,10 +105,29 @@ impl AccountConfig {
     // TODO: Do not use the method outside of tests
     // #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_name(account_name: odf::AccountName) -> Self {
-        let email = Email::parse(&format!("{}@example.com", account_name.as_str())).unwrap();
+        let email = Email::parse(&format!("{account_name}@example.com")).unwrap();
         Self {
             id: None,
             account_name,
+            password: None,
+            email,
+            display_name: None,
+            account_type: Self::default_account_type(),
+            provider: Self::default_provider(),
+            avatar_url: None,
+            registered_at: Self::default_registered_at(),
+            properties: None,
+            treat_datasets_as_public: false,
+        }
+    }
+
+    // TODO: Do not use the method outside of tests
+    // #[cfg(any(feature = "testing", test))]
+    pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
+        let email = Email::parse(&format!("{}@example.com", subject.account_name)).unwrap();
+        Self {
+            id: Some(subject.account_id),
+            account_name: subject.account_name,
             password: None,
             email,
             display_name: None,

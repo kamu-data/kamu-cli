@@ -33,6 +33,14 @@ impl Email {
     }
 }
 
+impl std::str::FromStr for Email {
+    type Err = InvalidEmailError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s)
+    }
+}
+
 impl AsRef<str> for Email {
     fn as_ref(&self) -> &str {
         &self.0

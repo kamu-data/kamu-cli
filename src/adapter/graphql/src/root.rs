@@ -65,6 +65,11 @@ impl Query {
     async fn admin(&self) -> Admin {
         Admin
     }
+
+    /// Temporary: Molecule-specific functionality group
+    async fn molecule(&self) -> Molecule {
+        Molecule
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,6 +99,11 @@ impl Mutation {
     /// system. This groups deals with their identities and permissions.
     async fn accounts(&self) -> AccountsMut {
         AccountsMut
+    }
+
+    /// Temporary: Molecule-specific functionality group
+    async fn molecule(&self) -> MoleculeMut {
+        MoleculeMut
     }
 }
 

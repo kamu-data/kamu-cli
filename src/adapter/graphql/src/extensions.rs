@@ -50,7 +50,7 @@ impl async_graphql::extensions::Extension for TracingExtension {
                     "Unhandled error",
                 );
             } else if let Some(source) = err.source::<odf::AccessError>() {
-                tracing::error!(
+                tracing::warn!(
                     error = ?source,
                     error_msg = %ErrorMessageFormatter(source),
                     error_backtrace = %ErrorBacktraceFormatter(source),
