@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_core::{CompactionPlan, PullOptions, PullPlanIterationJob, ResetPlan, ResolvedDataset};
 
-use crate::{LogicalPlan, LogicalPlanProbe, TaskAttemptID};
+use crate::{LogicalPlan, LogicalPlanProbe, TaskID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +18,7 @@ use crate::{LogicalPlan, LogicalPlanProbe, TaskAttemptID};
 pub trait TaskDefinitionPlanner: Send + Sync {
     async fn prepare_task_definition(
         &self,
-        attempt_id: TaskAttemptID,
+        task_id: TaskID,
         logical_plan: &LogicalPlan,
     ) -> Result<TaskDefinition, InternalError>;
 }
@@ -69,7 +69,7 @@ pub struct TaskDefinitionHardCompact {
 
 #[derive(Debug)]
 pub struct TaskDefinitionDeliverWebhook {
-    pub attempt_id: TaskAttemptID,
+    pub task_id: TaskID,
     pub webhook_subscription_id: uuid::Uuid,
     pub webhook_event_id: uuid::Uuid,
 }

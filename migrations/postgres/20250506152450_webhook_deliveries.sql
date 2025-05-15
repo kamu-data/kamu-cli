@@ -2,7 +2,6 @@
 
 CREATE TABLE webhook_deliveries (
     task_id BIGINT NOT NULL REFERENCES tasks(task_id),
-    attempt_number INT NOT NULL,
     event_id UUID NOT NULL REFERENCES webhook_events(id) ON DELETE CASCADE,
     subscription_id UUID NOT NULL REFERENCES webhook_subscriptions(id),
     request_headers JSONB NOT NULL,
@@ -12,7 +11,7 @@ CREATE TABLE webhook_deliveries (
     response_headers JSONB,
     response_at TIMESTAMPTZ,
 
-    PRIMARY KEY (task_id, attempt_number)
+    PRIMARY KEY (task_id)
 );
 
 CREATE INDEX idx_webhook_deliveries_event_id

@@ -32,7 +32,7 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_pre_run_requeues_running_tasks() {
-    let harness = TaskAgentHarness::new(None, MockOutbox::new(), MockTaskRunner::new());
+    let harness = TaskAgentHarness::new(MockOutbox::new(), MockTaskRunner::new());
 
     // Schedule 3 tasks
     let task_id_1 = harness
@@ -90,7 +90,7 @@ async fn test_run_single_task() {
     );
 
     // Schedule the only task
-    let harness = TaskAgentHarness::new(None, mock_outbox, mock_task_runner);
+    let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
     let task_id = harness
         .schedule_probe_task(LogicalPlanProbe::default())
         .await;
@@ -123,7 +123,7 @@ async fn test_run_two_of_three_tasks() {
     );
 
     // Schedule 3 tasks
-    let harness = TaskAgentHarness::new(None, mock_outbox, mock_task_runner);
+    let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
     let task_id_1 = harness
         .schedule_probe_task(LogicalPlanProbe::default())
         .await;
@@ -157,60 +157,6 @@ async fn test_run_two_of_three_tasks() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_failures_are_retried_with_policy() {
-    let mut mock_outbox = MockOutbox::new();
-    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
-    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
-    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
-
-    let custom_probe_plan = LogicalPlanProbe {
-        dataset_id: None,
-        busy_time: None,
-        end_with_outcome: Some(TaskOutcome::Failed(TaskError::Empty)),
-    };
-
-    let mut mock_task_runner = MockTaskRunner::new();
-    TaskAgentHarness::add_run_probe_plan_expectations(
-        &mut mock_task_runner,
-        custom_probe_plan.clone(),
-        3, // 3 attempts
-    );
-
-    // Make harness with custom retry policy
-    let harness = TaskAgentHarness::new(
-        Some(TaskSchedulerConfig {
-            task_retry_policy: TaskRetryPolicy::new(2, 1, TaskRetryBackoffType::Fixed),
-        }),
-        mock_outbox,
-        mock_task_runner,
-    );
-
-    // Schedule a task
-    let task_id = harness.schedule_probe_task(custom_probe_plan).await;
-
-    // Task must be in Queued state before run
-    let task = harness.get_task(task_id).await;
-    assert_eq!(task.status(), TaskStatus::Queued);
-
-    // Round 1... expect retrying after
-    harness.task_agent.run_single_task().await.unwrap();
-    let task = harness.get_task(task_id).await;
-    assert_eq!(task.status(), TaskStatus::Retrying);
-
-    // Round 2... still expect retrying after
-    harness.task_agent.run_single_task().await.unwrap();
-    let task = harness.get_task(task_id).await;
-    assert_eq!(task.status(), TaskStatus::Retrying);
-
-    // Round 3.. now it should fail
-    harness.task_agent.run_single_task().await.unwrap();
-    let task = harness.get_task(task_id).await;
-    assert_eq!(task.status(), TaskStatus::Finished);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 struct TaskAgentHarness {
     _tempdir: TempDir,
     catalog: Catalog,
@@ -219,11 +165,7 @@ struct TaskAgentHarness {
 }
 
 impl TaskAgentHarness {
-    pub fn new(
-        maybe_task_scheduler_config: Option<TaskSchedulerConfig>,
-        mock_outbox: MockOutbox,
-        mock_task_runner: MockTaskRunner,
-    ) -> Self {
+    pub fn new(mock_outbox: MockOutbox, mock_task_runner: MockTaskRunner) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -231,8 +173,6 @@ impl TaskAgentHarness {
 
         let repos_dir = tempdir.path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();
-
-        let task_scheduler_config = maybe_task_scheduler_config.unwrap_or_default();
 
         let mut b = CatalogBuilder::new();
         b.add::<TaskAgentImpl>()
@@ -270,7 +210,6 @@ impl TaskAgentHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_value(TaskAgentConfig::new(chrono::Duration::seconds(1)))
-            .add_value(task_scheduler_config)
             .add_value(DatasetEnvVarsConfig::sample());
 
         NoOpDatabasePlugin::init_database_components(&mut b);

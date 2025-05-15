@@ -24,7 +24,6 @@ use crate::{
 #[derive(sqlx::FromRow)]
 pub struct WebhookDeliveryRecord {
     pub task_id: i64,
-    pub attempt_number: i32,
     pub event_id: uuid::Uuid,
     pub subscription_id: uuid::Uuid,
     pub request_headers: serde_json::Value,
@@ -94,10 +93,7 @@ impl WebhookDeliveryRecord {
         };
 
         Ok(WebhookDelivery {
-            task_attempt_id: ts::TaskAttemptID::new(
-                ts::TaskID::try_from(self.task_id).unwrap(),
-                u32::try_from(self.attempt_number).unwrap(),
-            ),
+            task_id: ts::TaskID::try_from(self.task_id).unwrap(),
             webhook_subscription_id: WebhookSubscriptionID::new(self.subscription_id),
             webhook_event_id: WebhookEventID::new(self.event_id),
             request,

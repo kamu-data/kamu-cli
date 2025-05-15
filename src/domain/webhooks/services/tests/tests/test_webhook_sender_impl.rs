@@ -41,7 +41,7 @@ async fn test_send_webhook() {
         .get_one::<dyn WebhookSubscriptionEventStore>()
         .unwrap();
 
-    let task_attempt_id = ts::TaskAttemptID::new(ts::TaskID::new(153), 0);
+    let task_id = ts::TaskID::new(153);
 
     let webhook_event_id = WebhookEventID::new(uuid::Uuid::new_v4());
     let webhook_event = WebhookEvent::new(
@@ -80,7 +80,7 @@ async fn test_send_webhook() {
     let webhook_sender = catalog.get_one::<dyn WebhookDeliveryWorker>().unwrap();
     webhook_sender
         .deliver_webhook(
-            task_attempt_id,
+            task_id,
             webhook_subscription_id.into_inner(),
             webhook_event_id.into_inner(),
         )

@@ -37,15 +37,17 @@ async fn test_creates_task() {
         .unwrap();
 
     assert_matches!(task_state_actual, TaskState {
-        attempts,
+        outcome: None,
         logical_plan,
         metadata,
         timing: TaskTimingRecords {
             cancellation_requested_at: None,
+            ran_at: None,
+            finished_at: None,
             ..
         },
         ..
-    } if attempts.is_empty() && logical_plan == logical_plan_expected && metadata == metadata_expected );
+    } if logical_plan == logical_plan_expected && metadata == metadata_expected );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,11 +180,7 @@ async fn test_task_cancellation() {
 fn create_task_scheduler() -> impl TaskScheduler {
     let task_event_store = Arc::new(InMemoryTaskEventStore::new());
     let time_source = Arc::new(SystemTimeSourceStub::new());
-    TaskSchedulerImpl::new(
-        task_event_store,
-        time_source,
-        Arc::new(TaskSchedulerConfig::new(TaskRetryPolicy::default())),
-    )
+    TaskSchedulerImpl::new(task_event_store, time_source)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

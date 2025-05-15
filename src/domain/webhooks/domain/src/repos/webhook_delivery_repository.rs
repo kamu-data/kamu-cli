@@ -22,19 +22,14 @@ pub trait WebhookDeliveryRepository: Send + Sync {
 
     async fn update_response(
         &self,
-        task_attempt_id: ts::TaskAttemptID,
+        task_id: ts::TaskID,
         response: WebhookResponse,
     ) -> Result<(), UpdateWebhookDeliveryError>;
 
-    async fn get_by_task_attempt_id(
-        &self,
-        task_attempt_id: ts::TaskAttemptID,
-    ) -> Result<Option<WebhookDelivery>, GetWebhookDeliveryError>;
-
-    async fn list_by_task_id(
+    async fn get_by_task_id(
         &self,
         task_id: ts::TaskID,
-    ) -> Result<Vec<WebhookDelivery>, ListWebhookDeliveriesError>;
+    ) -> Result<Option<WebhookDelivery>, GetWebhookDeliveryError>;
 
     async fn list_by_event_id(
         &self,
@@ -105,17 +100,17 @@ pub enum ListWebhookDeliveriesError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Webhook delivery task attempt '{}#{}' not found", task_attempt_id.task_id, task_attempt_id.attempt_number)]
+#[error("Webhook delivery task '{}' not found", task_id)]
 pub struct WebhookDeliveryNotFoundError {
-    pub task_attempt_id: ts::TaskAttemptID,
+    pub task_id: ts::TaskID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Webhook delivery for task attempt '{}#{}' already exists", task_attempt_id.task_id, task_attempt_id.attempt_number)]
+#[error("Webhook delivery for task '{}' already exists", task_id)]
 pub struct WebhookDeliveryAlreadyExistsError {
-    pub task_attempt_id: ts::TaskAttemptID,
+    pub task_id: ts::TaskID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

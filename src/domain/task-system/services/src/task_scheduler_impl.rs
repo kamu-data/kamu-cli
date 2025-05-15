@@ -18,7 +18,6 @@ use time_source::SystemTimeSource;
 pub struct TaskSchedulerImpl {
     task_event_store: Arc<dyn TaskEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
-    scheduler_config: Arc<TaskSchedulerConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,12 +28,10 @@ impl TaskSchedulerImpl {
     pub fn new(
         task_event_store: Arc<dyn TaskEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
-        scheduler_config: Arc<TaskSchedulerConfig>,
     ) -> Self {
         Self {
             task_event_store,
             time_source,
-            scheduler_config,
         }
     }
 }
@@ -55,7 +52,6 @@ impl TaskScheduler for TaskSchedulerImpl {
             self.task_event_store.new_task_id().await?,
             logical_plan,
             metadata,
-            self.scheduler_config.task_retry_policy,
         );
         task.save(self.task_event_store.as_ref()).await.int_err()?;
 
@@ -88,11 +84,7 @@ impl TaskScheduler for TaskSchedulerImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn try_take(&self) -> Result<Option<Task>, TakeTaskError> {
         // Try reading just 1 earliest queued task
-        let Some(task_id) = self
-            .task_event_store
-            .try_get_queued_task(self.time_source.now())
-            .await?
-        else {
+        let Some(task_id) = self.task_event_store.try_get_queued_task().await? else {
             // No queued tasks yet..
             return Ok(None);
         };

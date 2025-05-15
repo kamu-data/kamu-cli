@@ -34,7 +34,6 @@ pub(crate) async fn new_task(catalog: &dill::Catalog) -> ts::TaskID {
         task_id,
         ts::LogicalPlan::Probe(ts::LogicalPlanProbe::default()),
         None,
-        ts::TaskRetryPolicy::default(),
     );
 
     task.save(task_event_store.as_ref()).await.unwrap();

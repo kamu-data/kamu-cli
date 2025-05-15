@@ -3517,14 +3517,6 @@ type Task {
 	Time when task has reached a final outcome
 	"""
 	finishedAt: DateTime
-	"""
-	Time when next run attempt is planned
-	"""
-	nextAttemptAt: DateTime
-	"""
-	Number of attempts to run this task
-	"""
-	runAttempts: Int!
 }
 
 scalar TaskID
@@ -3559,10 +3551,6 @@ enum TaskStatus {
 	Task is being executed
 	"""
 	RUNNING
-	"""
-	Task has failed and is scheduled for retry
-	"""
-	RETRYING
 	"""
 	Task has reached a certain final outcome (see [`TaskOutcome`])
 	"""

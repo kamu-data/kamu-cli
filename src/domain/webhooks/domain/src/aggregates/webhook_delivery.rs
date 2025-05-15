@@ -16,7 +16,7 @@ use crate::{WebhookEventID, WebhookRequest, WebhookResponse, WebhookSubscription
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct WebhookDelivery {
-    pub task_attempt_id: ts::TaskAttemptID,
+    pub task_id: ts::TaskID,
     pub webhook_subscription_id: WebhookSubscriptionID,
     pub webhook_event_id: WebhookEventID,
 
@@ -26,13 +26,13 @@ pub struct WebhookDelivery {
 
 impl WebhookDelivery {
     pub fn new(
-        task_attempt_id: ts::TaskAttemptID,
+        task_id: ts::TaskID,
         webhook_subscription_id: WebhookSubscriptionID,
         webhook_event_id: WebhookEventID,
         request: WebhookRequest,
     ) -> Self {
         Self {
-            task_attempt_id,
+            task_id,
             webhook_subscription_id,
             webhook_event_id,
             request,

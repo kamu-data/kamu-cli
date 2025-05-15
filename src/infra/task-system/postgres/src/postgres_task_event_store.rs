@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
@@ -42,8 +41,8 @@ impl PostgresTaskEventStore {
 
         sqlx::query!(
             r#"
-            INSERT INTO tasks (task_id, dataset_id, task_status, next_attempt_at, last_event_id)
-                VALUES ($1, $2, 'queued'::task_status_type, NULL, NULL)
+            INSERT INTO tasks (task_id, dataset_id, task_status, last_event_id)
+                VALUES ($1, $2, 'queued'::task_status_type, NULL)
             "#,
             task_id,
             maybe_dataset_id.map(ToString::to_string),
@@ -70,23 +69,21 @@ impl PostgresTaskEventStore {
         let last_event = events.last().expect("Non empty event list expected");
 
         let event_task_id: i64 = (last_event.task_id()).try_into().unwrap();
-        let next_attempt_at = last_event.next_attempt_at();
         let latest_status = last_event.new_status();
 
         let affected_rows_count =
             sqlx::query!(
                 r#"
                 UPDATE tasks
-                    SET task_status = $2, next_attempt_at = $3, last_event_id = $4
+                    SET task_status = $2, last_event_id = $3
                     WHERE task_id = $1 AND (
-                        last_event_id IS NULL AND CAST($5 as BIGINT) IS NULL OR
-                        last_event_id IS NOT NULL AND CAST($5 as BIGINT) IS NOT NULL AND last_event_id = $5
+                        last_event_id IS NULL AND CAST($4 as BIGINT) IS NULL OR
+                        last_event_id IS NOT NULL AND CAST($4 as BIGINT) IS NOT NULL AND last_event_id = $4
                     )
                     RETURNING task_id
                 "#,
                 event_task_id,
                 latest_status as TaskStatus,
-                next_attempt_at,
                 last_event_id,
                 maybe_prev_stored_event_id,
             )
@@ -297,24 +294,17 @@ impl TaskEventStore for PostgresTaskEventStore {
         Ok(TaskID::try_from(task_id).unwrap())
     }
 
-    async fn try_get_queued_task(
-        &self,
-        now: DateTime<Utc>,
-    ) -> Result<Option<TaskID>, InternalError> {
+    async fn try_get_queued_task(&self) -> Result<Option<TaskID>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let maybe_task_id = sqlx::query!(
             r#"
             SELECT task_id FROM tasks
-                WHERE task_status IN ('queued', 'retrying')
-                    AND next_attempt_at <= $1
-            ORDER BY
-                next_attempt_at ASC,
-                task_id ASC
-            LIMIT 1
+                WHERE task_status = 'queued'::task_status_type
+                ORDER BY task_id ASC
+                LIMIT 1
             "#,
-            now,
         )
         .try_map(|event_row| {
             let task_id = event_row.task_id;

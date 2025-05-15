@@ -16,7 +16,7 @@ use kamu_task_system as ts;
 pub trait WebhookDeliveryWorker: Send + Sync {
     async fn deliver_webhook(
         &self,
-        task_attempt_id: ts::TaskAttemptID,
+        task_id: ts::TaskID,
         webhook_subscription_id: uuid::Uuid,
         webhook_event_id: uuid::Uuid,
     ) -> Result<(), InternalError>;

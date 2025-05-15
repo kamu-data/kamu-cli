@@ -321,7 +321,7 @@ impl TaskRunnerImpl {
         match self
             .webhook_sender
             .deliver_webhook(
-                task_webhook.attempt_id,
+                task_webhook.task_id,
                 task_webhook.webhook_subscription_id,
                 task_webhook.webhook_event_id,
             )

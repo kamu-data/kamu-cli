@@ -42,14 +42,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_filter_webhook_deliveries_by_task_id,
-    harness = SqliteWebhookDeliveryRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
     fixture = kamu_webhooks_repo_tests::webhook_delivery_repository_test_suite::test_filter_webhook_deliveries_by_webhook_event_or_subscription_id,
     harness = SqliteWebhookDeliveryRepositoryHarness
 );

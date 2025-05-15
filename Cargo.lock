@@ -7269,7 +7269,6 @@ dependencies = [
  "kamu-core",
  "messaging-outbox",
  "opendatafabric",
- "rand 0.8.5",
  "serde",
  "sqlx",
  "thiserror 2.0.12",
@@ -7282,7 +7281,6 @@ name = "kamu-task-system-inmem"
 version = "0.237.0"
 dependencies = [
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -7301,7 +7299,6 @@ version = "0.237.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "chrono",
  "database-common",
  "database-common-macros",
  "dill",

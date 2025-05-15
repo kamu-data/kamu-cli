@@ -26,7 +26,6 @@ async fn test_task_agg_create_new() {
         event_store.new_task_id().await.unwrap(),
         LogicalPlanProbe::default().into(),
         Some(metadata.clone()),
-        TaskRetryPolicy::default(),
     );
 
     assert_eq!(event_store.len().await.unwrap(), 0);
@@ -58,7 +57,6 @@ async fn test_task_save_load_update() {
         task_id,
         LogicalPlanProbe::default().into(),
         None,
-        TaskRetryPolicy::default(),
     );
     task.save(&event_store).await.unwrap();
 
@@ -111,7 +109,6 @@ async fn test_task_load_multi() {
             task_id,
             LogicalPlanProbe::default().into(),
             None,
-            TaskRetryPolicy::default(),
         );
         task.save(&event_store).await.unwrap();
         task.run(Utc::now()).unwrap();
@@ -146,7 +143,6 @@ async fn test_task_agg_illegal_transition() {
         event_store.new_task_id().await.unwrap(),
         LogicalPlanProbe::default().into(),
         None,
-        TaskRetryPolicy::default(),
     );
     task.run(Utc::now()).unwrap();
     task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
@@ -165,7 +161,6 @@ async fn test_task_requeue() {
         event_store.new_task_id().await.unwrap(),
         LogicalPlanProbe::default().into(),
         None,
-        TaskRetryPolicy::default(),
     );
     task.run(Utc::now()).unwrap();
     task.save(&event_store).await.unwrap();
@@ -174,123 +169,6 @@ async fn test_task_requeue() {
     task.requeue(Utc::now()).unwrap();
     task.save(&event_store).await.unwrap();
     assert_eq!(task.status(), TaskStatus::Queued);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_task_retries() {
-    let event_store = InMemoryTaskEventStore::new();
-
-    let mut task = Task::new(
-        Utc::now(),
-        event_store.new_task_id().await.unwrap(),
-        LogicalPlanProbe::default().into(),
-        None,
-        TaskRetryPolicy::new(2, 10, TaskRetryBackoffType::Fixed),
-    );
-
-    // Run 1
-    task.run(Utc::now()).unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Running);
-    assert!(task.timing.next_attempt_at.is_none());
-    assert!(task.outcome().is_none());
-
-    // Finish 1, retrying
-    task.finish(Utc::now(), TaskOutcome::Failed(TaskError::Empty))
-        .unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Retrying);
-    assert!(task.timing.next_attempt_at.is_some());
-    assert!(task.outcome().is_none());
-
-    // Run 2
-    task.run(Utc::now()).unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Running);
-    assert!(task.timing.next_attempt_at.is_none());
-    assert!(task.outcome().is_none());
-
-    // Finish 2, retrying
-    task.finish(Utc::now(), TaskOutcome::Failed(TaskError::Empty))
-        .unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Retrying);
-    assert!(task.timing.next_attempt_at.is_some());
-    assert!(task.outcome().is_none());
-
-    // Run 3
-    task.run(Utc::now()).unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Running);
-    assert!(task.timing.next_attempt_at.is_none());
-    assert!(task.outcome().is_none());
-
-    // Finish 3, failed
-    task.finish(Utc::now(), TaskOutcome::Failed(TaskError::Empty))
-        .unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Finished);
-    assert!(task.timing.next_attempt_at.is_none());
-    assert_eq!(
-        task.outcome(),
-        Some(TaskOutcome::Failed(TaskError::Empty)).as_ref()
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_task_requeued_when_retrying() {
-    let event_store = InMemoryTaskEventStore::new();
-
-    let mut task = Task::new(
-        Utc::now(),
-        event_store.new_task_id().await.unwrap(),
-        LogicalPlanProbe::default().into(),
-        None,
-        TaskRetryPolicy::new(2, 10, TaskRetryBackoffType::Fixed),
-    );
-
-    // Run 1
-    task.run(Utc::now()).unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Running);
-    assert!(task.timing.next_attempt_at.is_none());
-    assert!(task.outcome().is_none());
-
-    // Finish 1, retrying
-    task.finish(Utc::now(), TaskOutcome::Failed(TaskError::Empty))
-        .unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Retrying);
-    assert!(task.timing.next_attempt_at.is_some());
-    assert!(task.outcome().is_none());
-
-    // Run 2
-    task.run(Utc::now()).unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Running);
-    assert!(task.timing.next_attempt_at.is_none());
-    assert!(task.outcome().is_none());
-
-    // Requeue
-    task.requeue(Utc::now()).unwrap();
-    task.save(&event_store).await.unwrap();
-
-    assert_eq!(task.status(), TaskStatus::Retrying);
-    assert!(task.timing.next_attempt_at.is_some());
-    assert!(task.outcome().is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

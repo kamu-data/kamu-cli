@@ -34,8 +34,7 @@ impl WebhookDeliveryWorkerImpl {
         level="debug",
         skip_all,
         fields(
-            task_id = %task_attempt_id.task_id,
-            attempt_number = %task_attempt_id.attempt_number,
+            task_id = %task_id,
             webhook_subscription_id = %webhook_subscription_id,
             webhook_event_id = %webhook_event_id
         )
@@ -47,7 +46,7 @@ impl WebhookDeliveryWorkerImpl {
     )]
     async fn prepare_delivery(
         &self,
-        task_attempt_id: ts::TaskAttemptID,
+        task_id: ts::TaskID,
         webhook_subscription_id: WebhookSubscriptionID,
         webhook_event_id: WebhookEventID,
     ) -> Result<WebhookDeliveryData, InternalError> {
@@ -68,18 +67,12 @@ impl WebhookDeliveryWorkerImpl {
 
         let created_at = Utc::now();
 
-        let headers = self.generate_headers(
-            &subscription,
-            &event,
-            &payload_bytes,
-            created_at,
-            task_attempt_id.attempt_number + 1, // human readable version
-        )?;
+        let headers = self.generate_headers(&subscription, &event, &payload_bytes, created_at)?;
 
         tracing::debug!(?headers, "Webhook delivery headers generated");
 
         let delivery = WebhookDelivery::new(
-            task_attempt_id,
+            task_id,
             subscription.id(),
             event.id,
             WebhookRequest {
@@ -103,7 +96,6 @@ impl WebhookDeliveryWorkerImpl {
         event: &WebhookEvent,
         payload_bytes: &[u8],
         created_at: DateTime<Utc>,
-        attempt_number: u32,
     ) -> Result<http::HeaderMap, InternalError> {
         let rfc9421_headers = self.webhook_signer.generate_rfc9421_headers(
             subscription.secret(),
@@ -155,24 +147,21 @@ impl WebhookDeliveryWorkerImpl {
         );
         headers.insert(
             http::header::HeaderName::from_static(HEADER_WEBHOOK_DELIVERY_ATTEMPT),
-            http::HeaderValue::from_str(&attempt_number.to_string()).int_err()?,
+            http::HeaderValue::from_str("1").int_err()?,
         );
 
         Ok(headers)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(
-        task_id = %task_attempt_id.task_id,
-        attempt_number = %task_attempt_id.attempt_number,
-    ))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%task_id))]
     #[transactional_method1(webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>)]
     async fn write_delivery_response(
         &self,
-        task_attempt_id: ts::TaskAttemptID,
+        task_id: ts::TaskID,
         webhook_response: WebhookResponse,
     ) -> Result<(), InternalError> {
         webhook_delivery_repo
-            .update_response(task_attempt_id, webhook_response)
+            .update_response(task_id, webhook_response)
             .await
             .int_err()
     }
@@ -184,13 +173,13 @@ impl WebhookDeliveryWorkerImpl {
 impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
     async fn deliver_webhook(
         &self,
-        task_attempt_id: ts::TaskAttemptID,
+        task_id: ts::TaskID,
         webhook_subscription_id: uuid::Uuid,
         webhook_event_id: uuid::Uuid,
     ) -> Result<(), internal_error::InternalError> {
         let delivery_data = self
             .prepare_delivery(
-                task_attempt_id,
+                task_id,
                 WebhookSubscriptionID::new(webhook_subscription_id),
                 WebhookEventID::new(webhook_event_id),
             )
@@ -206,7 +195,7 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
             .await
             .int_err()?;
 
-        self.write_delivery_response(task_attempt_id, webhook_response)
+        self.write_delivery_response(task_id, webhook_response)
             .await?;
 
         Ok(())

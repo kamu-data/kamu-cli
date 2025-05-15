@@ -28,11 +28,7 @@ use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use kamu_task_system::{
-    TaskProgressMessage,
-    TaskSchedulerConfig,
-    MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-};
+use kamu_task_system::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
@@ -122,7 +118,6 @@ impl FlowHarness {
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<TaskSchedulerImpl>()
-            .add_value(TaskSchedulerConfig::default())
             .add::<InMemoryTaskEventStore>()
             .add::<DatabaseTransactionRunner>()
             .add::<FakeDatasetEntryService>();

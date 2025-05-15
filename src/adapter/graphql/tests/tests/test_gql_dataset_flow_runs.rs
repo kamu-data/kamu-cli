@@ -34,7 +34,7 @@ use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
-use kamu_task_system::{self as ts, TaskSchedulerConfig};
+use kamu_task_system::{self as ts};
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt};
@@ -3091,7 +3091,6 @@ impl FlowRunsHarness {
                     Duration::seconds(1),
                     Duration::minutes(1),
                 ))
-                .add_value(TaskSchedulerConfig::default())
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>();
 

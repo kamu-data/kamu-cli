@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                task_id,\n                attempt_number,\n                event_id,\n                subscription_id,\n                request_headers,\n                requested_at,\n                response_code,\n                response_body,\n                response_headers,\n                response_at\n            FROM webhook_deliveries\n                WHERE event_id = $1\n            ",
+  "query": "\n            SELECT\n                task_id,\n                event_id,\n                subscription_id,\n                request_headers,\n                requested_at,\n                response_code,\n                response_body,\n                response_headers,\n                response_at\n            FROM webhook_deliveries\n                WHERE event_id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -10,46 +10,41 @@
       },
       {
         "ordinal": 1,
-        "name": "attempt_number",
-        "type_info": "Int4"
-      },
-      {
-        "ordinal": 2,
         "name": "event_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 3,
+        "ordinal": 2,
         "name": "subscription_id",
         "type_info": "Uuid"
       },
       {
-        "ordinal": 4,
+        "ordinal": 3,
         "name": "request_headers",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 5,
+        "ordinal": 4,
         "name": "requested_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 6,
+        "ordinal": 5,
         "name": "response_code",
         "type_info": "Int2"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "response_body",
         "type_info": "Text"
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "response_headers",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "response_at",
         "type_info": "Timestamptz"
       }
@@ -65,12 +60,11 @@
       false,
       false,
       false,
-      false,
       true,
       true,
       true,
       true
     ]
   },
-  "hash": "9c5a8fa2981be40c3df15b250b4f2fd8676e1e5b82b6eb683251b6dee9fd9864"
+  "hash": "82dff946173e5c8b44664e421a121ed47f4cc8377a825342f3e9f1c81167e1f1"
 }
