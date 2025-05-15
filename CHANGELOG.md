@@ -11,6 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Refactor:
+  - Remove password logic from `AccountService` level
+
 ## [0.237.0] - 2025-05-14
 ### Added
 - GQL api:
