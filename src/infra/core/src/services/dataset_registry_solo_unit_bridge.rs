@@ -73,9 +73,28 @@ impl DatasetRegistrySoloUnitBridge {
             .unwrap();
         let seed = seed_visitor
             .into_event()
-            .unwrap_or_else(|| panic!("No Seed event in the dataset"));
+            .expect("No Seed event in the dataset");
 
         seed.dataset_kind
+    }
+
+    async fn resolve_dataset_handle_by_id(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<odf::DatasetHandle, odf::DatasetRefUnresolvedError> {
+        let dataset = self
+            .dataset_storage_unit
+            .get_stored_dataset_by_id(dataset_id)
+            .await
+            .map_err(odf::DatasetRefUnresolvedError::from)?;
+        let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
+        let dataset_kind = self.read_dataset_kind(dataset.as_ref()).await;
+
+        Ok(odf::DatasetHandle::new(
+            dataset_id.clone(),
+            dataset_alias,
+            dataset_kind,
+        ))
     }
 }
 
@@ -104,20 +123,7 @@ impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
                     },
                 ))
             }
-            odf::DatasetRef::ID(dataset_id) => {
-                let dataset = self
-                    .dataset_storage_unit
-                    .get_stored_dataset_by_id(dataset_id)
-                    .await
-                    .map_err(odf::DatasetRefUnresolvedError::from)?;
-                let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
-                let dataset_kind = self.read_dataset_kind(dataset.as_ref()).await;
-                Ok(odf::DatasetHandle::new(
-                    dataset_id.clone(),
-                    dataset_alias,
-                    dataset_kind,
-                ))
-            }
+            odf::DatasetRef::ID(dataset_id) => self.resolve_dataset_handle_by_id(dataset_id).await,
         }
     }
 }
@@ -129,11 +135,12 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
             use futures::TryStreamExt;
             let mut dataset_ids_stream = self.dataset_storage_unit.stored_dataset_ids();
             while let Some(dataset_id) = dataset_ids_stream.try_next().await? {
-                let dataset = self.dataset_storage_unit.get_stored_dataset_by_id(&dataset_id).await.int_err()?;
-                let dataset_alias = odf::dataset::read_dataset_alias(dataset.as_ref()).await?;
-                let dataset_kind = self.read_dataset_kind(dataset.as_ref()).await;
+                let dataset_handle = self
+                    .resolve_dataset_handle_by_id(&dataset_id)
+                    .await
+                    .int_err()?;
 
-                yield odf::DatasetHandle::new(dataset_id, dataset_alias, dataset_kind);
+                yield dataset_handle;
             }
         })
     }
@@ -158,6 +165,44 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
                     }
                 }
 
+            }
+        })
+    }
+
+    fn all_dataset_handles_by_owner_id(
+        &self,
+        owner_id: &odf::AccountID,
+    ) -> odf::dataset::DatasetHandleStream<'_> {
+        let owner_id = owner_id.clone();
+
+        Box::pin(async_stream::try_stream! {
+            use futures::TryStreamExt;
+            let mut dataset_ids_stream = self.dataset_storage_unit.stored_dataset_ids();
+            while let Some(dataset_id) = dataset_ids_stream.try_next().await? {
+                let dataset_handle = self
+                    .resolve_dataset_handle_by_id(&dataset_id)
+                    .await
+                    .int_err()?;
+
+                let maybe_owned_dataset_handle = match self.tenancy_config.as_ref() {
+                    TenancyConfig::SingleTenant => Some(dataset_handle),
+                    TenancyConfig::MultiTenant => match self.current_account_subject.as_ref() {
+                        CurrentAccountSubject::Anonymous(_) => {
+                            panic!("Logged subject only");
+                        }
+                        CurrentAccountSubject::Logged(l) => {
+                            if l.account_id == owner_id {
+                                Some(dataset_handle)
+                            } else {
+                                None
+                            }
+                        }
+                    },
+                };
+
+                if let Some(dataset_handle) = maybe_owned_dataset_handle {
+                    yield dataset_handle;
+                }
             }
         })
     }
