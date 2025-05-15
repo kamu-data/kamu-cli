@@ -168,6 +168,7 @@ impl AccountService for AccountServiceImpl {
         self.account_repo.save_account(&account).await?;
 
         if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
+            let account_id = account.id.as_did_str().to_stack_string();
             let did_secret_key = DidSecretKey::try_new(
                 &account_key.into(),
                 did_secret_encryption_key.expose_secret(),
@@ -176,7 +177,7 @@ impl AccountService for AccountServiceImpl {
 
             self.did_secret_key_repo
                 .save_did_secret_key(
-                    &DidEntity::new_account(account.id.to_string()),
+                    &DidEntity::new_account(account_id.as_str()),
                     &did_secret_key,
                 )
                 .await
@@ -192,7 +193,7 @@ impl AccountService for AccountServiceImpl {
         .int_err()?;
 
         self.password_hash_repository
-            .save_password_hash(account_name, password_hash)
+            .save_password_hash(&account.id, &account.account_name, password_hash)
             .await
             .int_err()?;
 

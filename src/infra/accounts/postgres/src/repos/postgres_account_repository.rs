@@ -542,6 +542,7 @@ impl ExpensiveAccountRepository for PostgresAccountRepository {
 impl PasswordHashRepository for PostgresAccountRepository {
     async fn save_password_hash(
         &self,
+        account_id: &odf::AccountID,
         account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
@@ -549,13 +550,16 @@ impl PasswordHashRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        let account_id = account_id.as_did_str().to_stack_string();
+
         sqlx::query!(
             r#"
-            INSERT INTO accounts_passwords (account_name, password_hash)
-                VALUES ($1, $2)
+            INSERT INTO accounts_passwords (account_name, password_hash, account_id)
+            VALUES ($1, $2, $3)
             "#,
-            account_name.to_string(),
-            password_hash
+            account_name.as_str(),
+            password_hash,
+            account_id.as_str()
         )
         .execute(connection_mut)
         .await

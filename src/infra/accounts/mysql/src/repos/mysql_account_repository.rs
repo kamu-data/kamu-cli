@@ -571,6 +571,7 @@ impl ExpensiveAccountRepository for MySqlAccountRepository {
 impl PasswordHashRepository for MySqlAccountRepository {
     async fn save_password_hash(
         &self,
+        account_id: &odf::AccountID,
         account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
@@ -580,13 +581,16 @@ impl PasswordHashRepository for MySqlAccountRepository {
 
         // TODO: duplicates are prevented with unique indices, but handle error
 
+        let account_id = account_id.as_did_str().to_stack_string();
+
         sqlx::query!(
             r#"
-            INSERT INTO accounts_passwords (account_name, password_hash)
-                VALUES (?, ?)
+            INSERT INTO accounts_passwords (account_name, password_hash, account_id)
+            VALUES (?, ?, ?)
             "#,
-            account_name.to_string(),
-            password_hash
+            account_name.as_str(),
+            password_hash,
+            account_id.as_str()
         )
         .execute(connection_mut)
         .await

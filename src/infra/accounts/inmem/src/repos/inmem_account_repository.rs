@@ -418,6 +418,7 @@ impl ExpensiveAccountRepository for InMemoryAccountRepository {
 impl PasswordHashRepository for InMemoryAccountRepository {
     async fn save_password_hash(
         &self,
+        _account_id: &odf::AccountID,
         account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {

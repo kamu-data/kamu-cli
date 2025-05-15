@@ -135,7 +135,6 @@ async fn test_create_account() {
             &new_account_name,
             Email::parse("new_email@com").unwrap(),
             Password::try_new("foo_password").unwrap(),
-            &creator_account_id,
         )
         .await
         .unwrap();
