@@ -46,8 +46,11 @@ impl AccountLifecycleMessage {
         })
     }
 
-    pub fn deleted(account_id: odf::AccountID) -> Self {
-        Self::Deleted(AccountLifecycleMessageDeleted { account_id })
+    pub fn deleted(account_id: odf::AccountID, display_name: AccountDisplayName) -> Self {
+        Self::Deleted(AccountLifecycleMessageDeleted {
+            account_id,
+            display_name,
+        })
     }
 }
 
@@ -80,6 +83,9 @@ pub struct AccountLifecycleMessageCreated {
 pub struct AccountLifecycleMessageDeleted {
     /// The unique identifier of the account
     pub account_id: odf::AccountID,
+
+    /// The display name of the account
+    pub display_name: AccountDisplayName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
