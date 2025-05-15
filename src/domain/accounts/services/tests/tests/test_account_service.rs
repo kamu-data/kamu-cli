@@ -18,7 +18,6 @@ use kamu_accounts::{
     DidSecretEncryptionConfig,
     DidSecretKey,
     DidSecretKeyRepository,
-    Password,
     PredefinedAccountsConfig,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
@@ -134,7 +133,6 @@ async fn test_create_account() {
         .create_account(
             &new_account_name,
             Email::parse("new_email@com").unwrap(),
-            Password::try_new("foo_password").unwrap(),
             &creator_account_id,
         )
         .await

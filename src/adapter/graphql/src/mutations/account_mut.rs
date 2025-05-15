@@ -13,10 +13,10 @@ use email_utils::Email;
 use kamu_accounts::{
     Account,
     AccountRepository,
-    AccountService,
     CreateAccountError,
     CreateAccountUseCase,
     ModifyPasswordError,
+    ModifyPasswordUseCase,
     Password,
     UpdateAccountError,
 };
@@ -115,7 +115,6 @@ impl AccountMut {
         account_name: AccountName<'_>,
         password: String,
     ) -> Result<ModifyPasswordResult> {
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
         let password = match Password::try_new(password.as_str()) {
             Ok(pass) => pass,
             Err(err) => {
@@ -127,8 +126,10 @@ impl AccountMut {
             }
         };
 
-        match account_service
-            .modify_password(&account_name, password)
+        let modify_password_use_case = from_catalog_n!(ctx, dyn ModifyPasswordUseCase);
+
+        match modify_password_use_case
+            .execute(&account_name, password)
             .await
         {
             Ok(_) => Ok(ModifyPasswordResult::Success(

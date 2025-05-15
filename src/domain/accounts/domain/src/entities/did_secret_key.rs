@@ -11,6 +11,7 @@ use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
 use internal_error::ResultIntoInternal;
 use odf::metadata::PrivateKey;
 
+#[cfg(feature = "sqlx")]
 use crate::DidEntityType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

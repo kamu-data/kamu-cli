@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::*;
@@ -24,8 +23,6 @@ pub struct AccountServiceImpl {
     account_repo: Arc<dyn AccountRepository>,
     time_source: Arc<dyn SystemTimeSource>,
     did_secret_encryption_key: Option<SecretString>,
-    password_hash_repository: Arc<dyn PasswordHashRepository>,
-    password_hashing_mode: PasswordHashingMode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,8 +36,6 @@ impl AccountServiceImpl {
         account_repo: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
-        password_hash_repository: Arc<dyn PasswordHashRepository>,
-        password_hashing_mode: Option<Arc<PasswordHashingMode>>,
     ) -> Self {
         Self {
             did_secret_key_repo,
@@ -50,9 +45,6 @@ impl AccountServiceImpl {
                 .encryption_key
                 .as_ref()
                 .map(|encryption_key| SecretString::from(encryption_key.clone())),
-            password_hash_repository,
-            password_hashing_mode: password_hashing_mode
-                .map_or(PasswordHashingMode::Default, |mode| *mode),
         }
     }
 }
@@ -150,7 +142,6 @@ impl AccountService for AccountServiceImpl {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        password: Password,
         owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError> {
         let account_did = odf::AccountID::new_generated_ed25519();
@@ -185,40 +176,7 @@ impl AccountService for AccountServiceImpl {
                 .int_err()?;
         }
 
-        let hashing_mode = self.password_hashing_mode;
-        let password_hash = tokio::task::spawn_blocking(move || {
-            let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(password.as_bytes())
-        })
-        .await
-        .int_err()?;
-
-        self.password_hash_repository
-            .save_password_hash(account_name, password_hash)
-            .await
-            .int_err()?;
-
         Ok(account)
-    }
-
-    async fn modify_password(
-        &self,
-        account_name: &odf::AccountName,
-        password: Password,
-    ) -> Result<(), ModifyPasswordError> {
-        let hashing_mode = self.password_hashing_mode;
-        let password_hash = tokio::task::spawn_blocking(move || {
-            let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(password.as_bytes())
-        })
-        .await
-        .int_err()?;
-
-        self.password_hash_repository
-            .modify_password_hash(account_name, password_hash)
-            .await?;
-
-        Ok(())
     }
 }
 

@@ -197,6 +197,7 @@ impl ClientSideHarness {
 
         b.add::<AccountServiceImpl>();
         b.add::<CreateAccountUseCaseImpl>();
+        b.add::<ModifyPasswordUseCaseImpl>();
         b.add::<InMemoryAccountRepository>();
         b.add::<LoginPasswordAuthProvider>();
         b.add::<PredefinedAccountsRegistrator>();
