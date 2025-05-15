@@ -488,19 +488,29 @@ impl AccountRepository for SqliteAccountRepository {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<odf::AccountID, DeleteAccountError> {
+    ) -> Result<Account, DeleteAccountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
         let account_name_str = account_name.as_str();
 
-        let maybe_deleted_account_id = sqlx::query!(
+        let maybe_deleted_account = sqlx::query_as!(
+            AccountRowModel,
             r#"
             DELETE
             FROM accounts
             WHERE account_name = $1
-            RETURNING id AS "id: odf::AccountID"
+            RETURNING
+                id as "id: _",
+                account_name,
+                email,
+                display_name,
+                account_type as "account_type: AccountType",
+                avatar_url,
+                registered_at as "registered_at: _",
+                provider,
+                provider_identity_key
             "#,
             account_name_str
         )
@@ -508,8 +518,8 @@ impl AccountRepository for SqliteAccountRepository {
         .await
         .int_err()?;
 
-        if let Some(deleted_account_id) = maybe_deleted_account_id {
-            Ok(deleted_account_id.id)
+        if let Some(deleted_account) = maybe_deleted_account {
+            Ok(deleted_account.into())
         } else {
             Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
                 account_name: account_name.clone(),

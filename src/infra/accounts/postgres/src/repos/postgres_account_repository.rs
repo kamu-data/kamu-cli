@@ -437,17 +437,27 @@ impl AccountRepository for PostgresAccountRepository {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<odf::AccountID, DeleteAccountError> {
+    ) -> Result<Account, DeleteAccountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let maybe_deleted_account_id = sqlx::query!(
+        let maybe_deleted_account = sqlx::query_as!(
+            AccountRowModel,
             r#"
             DELETE
             FROM accounts
             WHERE account_name = $1
-            RETURNING id AS "id: odf::AccountID"
+            RETURNING
+                id AS "id: odf::AccountID",
+                account_name,
+                email,
+                display_name,
+                account_type AS "account_type: AccountType",
+                avatar_url,
+                registered_at,
+                provider,
+                provider_identity_key
             "#,
             account_name.as_str()
         )
@@ -455,8 +465,8 @@ impl AccountRepository for PostgresAccountRepository {
         .await
         .int_err()?;
 
-        if let Some(deleted_account_id) = maybe_deleted_account_id {
-            Ok(deleted_account_id.id)
+        if let Some(deleted_account) = maybe_deleted_account {
+            Ok(deleted_account.into())
         } else {
             Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
                 account_name: account_name.clone(),

@@ -1,0 +1,68 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM accounts\n            WHERE account_name = $1\n            RETURNING\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at as \"registered_at: _\",\n                provider,\n                provider_identity_key\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "email",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_type: AccountType",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "avatar_url",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "registered_at: _",
+        "ordinal": 6,
+        "type_info": "Null"
+      },
+      {
+        "name": "provider",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "provider_identity_key",
+        "ordinal": 8,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8929981528415b01285e93877a413876c2c89da33d2c030bb73ee89df7ceb9af"
+}

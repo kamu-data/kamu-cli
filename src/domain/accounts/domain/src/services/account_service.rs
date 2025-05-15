@@ -82,7 +82,7 @@ pub trait AccountService: Sync + Send {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<odf::AccountID, DeleteAccountError>;
+    ) -> Result<Account, DeleteAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

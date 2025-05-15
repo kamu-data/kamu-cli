@@ -464,18 +464,29 @@ impl AccountRepository for MySqlAccountRepository {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<odf::AccountID, DeleteAccountError> {
+    ) -> Result<Account, DeleteAccountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        // MySQL does not support RETURNING, but MariaDB does
-        let maybe_deleted_account_id = sqlx::query!(
+        // - MySQL does not support RETURNING, but MariaDB does.
+        // - sqlx::query_as!() cannot recognize AccountRowModel in case of deletion, so
+        //   we don't use it.
+        let maybe_deleted_account = sqlx::query!(
             r#"
             DELETE
             FROM accounts
             WHERE account_name = ?
-            RETURNING id AS "id: odf::AccountID"
+            RETURNING
+                id as "id: _",
+                account_name,
+                email,
+                display_name,
+                account_type as "account_type: AccountType",
+                avatar_url,
+                registered_at,
+                provider,
+                provider_identity_key
             "#,
             account_name.as_str()
         )
@@ -483,8 +494,8 @@ impl AccountRepository for MySqlAccountRepository {
         .await
         .int_err()?;
 
-        if let Some(deleted_account_id) = maybe_deleted_account_id {
-            Ok(deleted_account_id.get(0))
+        if let Some(deleted_account) = maybe_deleted_account {
+            Ok(Self::map_account_row(&deleted_account))
         } else {
             Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
                 account_name: account_name.clone(),

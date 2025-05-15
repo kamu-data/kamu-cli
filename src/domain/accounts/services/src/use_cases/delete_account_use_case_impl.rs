@@ -23,7 +23,7 @@ pub struct DeleteAccountUseCaseImpl {
 #[async_trait::async_trait]
 impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
     async fn execute(&self, account_name: &odf::AccountName) -> Result<(), DeleteAccountError> {
-        let deleted_account_id = self
+        let deleted_account = self
             .account_service
             .delete_account_by_name(account_name)
             .await?;
