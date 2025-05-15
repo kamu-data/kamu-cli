@@ -428,7 +428,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
-    fn all_dataset_handles_by_owner(
+    fn all_dataset_handles_by_owner_name(
         &self,
         owner_name: &odf::AccountName,
     ) -> odf::dataset::DatasetHandleStream {

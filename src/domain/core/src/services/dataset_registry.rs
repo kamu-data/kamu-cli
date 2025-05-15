@@ -18,7 +18,7 @@ use crate::ResolvedDataset;
 pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
     fn all_dataset_handles(&self) -> odf::dataset::DatasetHandleStream<'_>;
 
-    fn all_dataset_handles_by_owner(
+    fn all_dataset_handles_by_owner_name(
         &self,
         owner_name: &odf::AccountName,
     ) -> odf::dataset::DatasetHandleStream<'_>;

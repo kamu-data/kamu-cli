@@ -145,7 +145,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
         })
     }
 
-    fn all_dataset_handles_by_owner(
+    fn all_dataset_handles_by_owner_name(
         &self,
         owner_name: &odf::AccountName,
     ) -> odf::dataset::DatasetHandleStream<'_> {
