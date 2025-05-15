@@ -3,7 +3,7 @@ ODF_METADATA_CRATE_DIR=./src/odf/metadata
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
-POSTGRES_CRATES := ./src/infra/accounts/postgres ./src/infra/auth-rebac/postgres ./src/infra/datasets/postgres ./src/infra/task-system/postgres ./src/infra/flow-system/postgres ./src/infra/messaging-outbox/postgres ./src/infra/task-system/postgres ./src/e2e/app/cli/postgres
+POSTGRES_CRATES := ./src/infra/accounts/postgres ./src/infra/auth-rebac/postgres ./src/infra/datasets/postgres ./src/infra/task-system/postgres ./src/infra/flow-system/postgres ./src/infra/messaging-outbox/postgres ./src/e2e/app/cli/postgres
 
 MYSQL_CRATES := ./src/infra/accounts/mysql ./src/e2e/app/cli/mysql
 
