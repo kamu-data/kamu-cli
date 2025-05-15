@@ -1,6 +1,6 @@
 /* ------------------------------ */
 
--- Create a temporary table
+-- Create a new table
 CREATE TABLE access_tokens_new
 (
     id           VARCHAR(36)  NOT NULL PRIMARY KEY,
@@ -29,10 +29,10 @@ SELECT id,
        account_id
 FROM access_tokens;
 
--- Deleting the old main table
+-- Deleting the old table
 DROP TABLE access_tokens;
 
--- Turning the temporary table into a new main table
+-- Turning the new table into a main table
 ALTER TABLE access_tokens_new
     RENAME TO access_tokens;
 
