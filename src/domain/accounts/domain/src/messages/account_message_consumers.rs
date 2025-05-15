@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod access_token_messages;
-mod account_lifecycle_message;
-mod account_message_consumers;
-mod account_message_producers;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub use access_token_messages::*;
-pub use account_lifecycle_message::*;
-pub use account_message_consumers::*;
-pub use account_message_producers::*;
+pub const MESSAGE_CONSUMER_KAMU_ACCOUNTS_SERVICE: &str = "dev.kamu.domain.accounts.AccountsService";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
