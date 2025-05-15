@@ -21,6 +21,11 @@ pub trait DidSecretKeyRepository: Send + Sync {
         entity: &DidEntity,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveDidSecretKeyError>;
+
+    async fn delete_did_secret_key(
+        &self,
+        entity: &DidEntity,
+    ) -> Result<(), DeleteDidSecretKeyError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,9 +37,20 @@ pub enum SaveDidSecretKeyError {
 }
 
 #[derive(Error, Debug)]
-pub enum GetDidSecretKeysByCreatorIdError {
+pub enum DeleteDidSecretKeyError {
+    #[error("Entity's DID secret key not found: '{entity:?}'")]
+    NotFound { entity: DidEntity<'static> },
+
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl DeleteDidSecretKeyError {
+    pub fn not_found(entity: &DidEntity) -> Self {
+        Self::NotFound {
+            entity: entity.clone().into_owned(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

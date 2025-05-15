@@ -9,7 +9,7 @@
 
 use database_common::{TransactionRef, TransactionRefT};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{DidEntity, DidSecretKey, DidSecretKeyRepository, SaveDidSecretKeyError};
+use kamu_accounts::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,6 +52,35 @@ impl DidSecretKeyRepository for SqliteDidSecretKeyRepository {
         .execute(connection_mut)
         .await
         .int_err()?;
+
+        Ok(())
+    }
+
+    async fn delete_did_secret_key(
+        &self,
+        entity: &DidEntity,
+    ) -> Result<(), DeleteDidSecretKeyError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let delete_result = sqlx::query!(
+            r#"
+            DELETE
+            FROM did_secret_keys
+            WHERE entity_type = $1
+              AND entity_id = $2
+            "#,
+            entity.entity_type,
+            entity.entity_id,
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        if delete_result.rows_affected() == 0 {
+            return Err(DeleteDidSecretKeyError::not_found(entity));
+        }
 
         Ok(())
     }

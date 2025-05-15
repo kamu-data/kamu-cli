@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use kamu_accounts::{DidEntity, DidSecretKey, DidSecretKeyRepository, SaveDidSecretKeyError};
+use kamu_accounts::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,6 +64,22 @@ impl DidSecretKeyRepository for InMemoryDidSecretKeyRepository {
             .insert(entity.clone().into_owned(), did_secret_key.clone());
 
         Ok(())
+    }
+
+    async fn delete_did_secret_key(
+        &self,
+        entity: &DidEntity,
+    ) -> Result<(), DeleteDidSecretKeyError> {
+        let mut state = self.state.lock().unwrap();
+
+        let entity = entity.clone().into_owned();
+        let has_deleted = state.did_secret_keys_by_entity.remove(&entity).is_some();
+
+        if has_deleted {
+            Ok(())
+        } else {
+            Err(DeleteDidSecretKeyError::NotFound { entity })
+        }
     }
 }
 
