@@ -26,6 +26,7 @@ use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AuthenticationServiceImpl,
     CreateAccountUseCaseImpl,
+    ModifyPasswordUseCaseImpl,
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
 };
@@ -789,6 +790,7 @@ impl GraphQLAccountsHarness {
             .add::<AuthenticationServiceImpl>()
             .add::<AccessTokenServiceImpl>()
             .add::<CreateAccountUseCaseImpl>()
+            .add::<ModifyPasswordUseCaseImpl>()
             .add::<InMemoryAccessTokenRepository>()
             .add::<InMemoryDidSecretKeyRepository>()
             .add::<OAuthDeviceCodeServiceImpl>()

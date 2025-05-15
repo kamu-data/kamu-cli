@@ -42,7 +42,7 @@ const WASYA: &str = "wasya";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_create_account_use_cae() {
+async fn test_create_account_use_case() {
     let harness = CreateAccountUseCaseImplHarness::new().await;
     let creator_account_id = harness
         .account_service

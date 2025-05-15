@@ -10,36 +10,25 @@
 use std::sync::Arc;
 
 use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
-use email_utils::Email;
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{
-    Account,
-    AccountService,
-    CreateAccountError,
-    CreateAccountUseCase,
-    PasswordHashRepository,
-};
-use random_strings::AllowedSymbols;
+use kamu_accounts::{ModifyPasswordError, ModifyPasswordUseCase, Password, PasswordHashRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct CreateAccountUseCaseImpl {
-    account_service: Arc<dyn AccountService>,
+pub struct ModifyPasswordUseCaseImpl {
     password_hash_repository: Arc<dyn PasswordHashRepository>,
     password_hashing_mode: PasswordHashingMode,
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn CreateAccountUseCase)]
-impl CreateAccountUseCaseImpl {
+#[dill::interface(dyn ModifyPasswordUseCase)]
+impl ModifyPasswordUseCaseImpl {
     #[allow(clippy::needless_pass_by_value)]
     fn new(
-        account_service: Arc<dyn AccountService>,
         password_hash_repository: Arc<dyn PasswordHashRepository>,
         password_hashing_mode: Option<Arc<PasswordHashingMode>>,
     ) -> Self {
         Self {
-            account_service,
             password_hash_repository,
             password_hashing_mode: password_hashing_mode
                 .map_or(PasswordHashingMode::Default, |mode| *mode),
@@ -50,46 +39,25 @@ impl CreateAccountUseCaseImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl CreateAccountUseCase for CreateAccountUseCaseImpl {
+impl ModifyPasswordUseCase for ModifyPasswordUseCaseImpl {
     async fn execute(
         &self,
-        creator_account: &Account,
         account_name: &odf::AccountName,
-        email_maybe: Option<Email>,
-    ) -> Result<Account, CreateAccountError> {
-        let email = email_maybe.unwrap_or({
-            let parent_host = creator_account.email.host();
-            let email_str = format!(
-                "{}+{}@{}",
-                creator_account.account_name, account_name, parent_host
-            );
-
-            Email::parse(&email_str).int_err()?
-        });
-
-        let random_password =
-            random_strings::get_random_string(None, 10, &AllowedSymbols::AsciiSymbols);
-
-        let created_account = self
-            .account_service
-            .create_account(account_name, email, &creator_account.id)
-            .await?;
-
-        // Save account password
+        password: Password,
+    ) -> Result<(), ModifyPasswordError> {
         let hashing_mode = self.password_hashing_mode;
         let password_hash = tokio::task::spawn_blocking(move || {
             let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(random_password.as_bytes())
+            argon2_hasher.hash(password.as_bytes())
         })
         .await
         .int_err()?;
 
         self.password_hash_repository
-            .save_password_hash(account_name, password_hash)
-            .await
-            .int_err()?;
+            .modify_password_hash(account_name, password_hash)
+            .await?;
 
-        Ok(created_account)
+        Ok(())
     }
 }
 
