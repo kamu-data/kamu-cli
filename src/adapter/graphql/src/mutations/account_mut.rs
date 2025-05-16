@@ -55,6 +55,7 @@ impl AccountMut {
     }
 
     /// Reset password for a selected account. Allowed only for admin users
+    #[tracing::instrument(level = "info", name = AccountMut_modify_password, skip_all, fields(%account_name))]
     #[graphql(guard = "AdminGuard")]
     async fn modify_password(
         &self,
@@ -89,6 +90,7 @@ impl AccountMut {
     }
 
     /// Delete a selected account. Allowed only for admin users
+    #[tracing::instrument(level = "info", name = AccountMut_delete, skip_all)]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
         // NOTE: DeleteAccountUseCase handles access verification
 
