@@ -140,12 +140,12 @@ async fn test_create_account() {
         .unwrap()
         .unwrap();
 
-    let created_account_did_secret_keys = did_secret_key_repo
+    let created_account_did_secret_key = did_secret_key_repo
         .get_did_secret_key(&DidEntity::new_account(created_account_id.to_string()))
         .await
         .unwrap();
 
-    let did_private_key = created_account_did_secret_keys
+    let did_private_key = created_account_did_secret_key
         .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key.unwrap())
         .unwrap();
 
