@@ -57,4 +57,5 @@ kamu-accounts-inmem = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
 
 mockall = "0.13"
+pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

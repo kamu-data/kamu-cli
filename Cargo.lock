@@ -6072,6 +6072,7 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "opendatafabric",
+ "pretty_assertions",
  "random-strings",
  "secrecy",
  "serde",
