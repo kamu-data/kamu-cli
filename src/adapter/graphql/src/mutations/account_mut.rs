@@ -11,7 +11,6 @@ use kamu_accounts::*;
 
 use super::AccountFlowsMut;
 use crate::prelude::*;
-use crate::queries::Account as AccountView;
 use crate::utils::ensure_account_can_provision_accounts;
 use crate::AdminGuard;
 
@@ -51,33 +50,6 @@ impl AccountMut {
             Err(e @ (UpdateAccountError::NotFound(_) | UpdateAccountError::Internal(_))) => {
                 Err(e.int_err().into())
             }
-        }
-    }
-
-    /// Create a new account
-    async fn create_account(
-        &self,
-        ctx: &Context<'_>,
-        account_name: AccountName<'_>,
-        email: Option<Email<'_>>,
-    ) -> Result<CreateAccountResult> {
-        ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
-
-        let create_account_use_case = from_catalog_n!(ctx, dyn CreateAccountUseCase);
-
-        match create_account_use_case
-            .execute(&self.account, account_name.as_ref(), email.map(Into::into))
-            .await
-        {
-            Ok(created_account) => Ok(CreateAccountResult::Success(CreateAccountSuccess {
-                account: AccountView::from_account(created_account),
-            })),
-            Err(CreateAccountError::Duplicate(err)) => Ok(
-                CreateAccountResult::NonUniqueAccountField(AccountFieldNonUnique {
-                    field: err.account_field.to_string(),
-                }),
-            ),
-            Err(e @ CreateAccountError::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
@@ -177,63 +149,6 @@ impl Default for UpdateEmailNonUnique {
     fn default() -> Self {
         Self {
             message: "Non-unique email".to_string(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// CreateAccountResult
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-pub enum CreateAccountResult {
-    Success(CreateAccountSuccess),
-    InvalidEmail(CreateAccountEmailInvalid),
-    NonUniqueAccountField(AccountFieldNonUnique),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub struct CreateAccountSuccess {
-    pub account: AccountView,
-}
-
-#[ComplexObject]
-impl CreateAccountSuccess {
-    pub async fn message(&self) -> String {
-        "Account created".to_string()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, SimpleObject)]
-#[graphql(complex)]
-pub struct AccountFieldNonUnique {
-    field: String,
-}
-
-#[ComplexObject]
-impl AccountFieldNonUnique {
-    pub async fn message(&self) -> String {
-        format!("Non-unique account field '{}'", self.field)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug)]
-pub struct CreateAccountEmailInvalid {
-    message: String,
-}
-
-impl Default for CreateAccountEmailInvalid {
-    fn default() -> Self {
-        Self {
-            message: "Invalid email".to_string(),
         }
     }
 }
