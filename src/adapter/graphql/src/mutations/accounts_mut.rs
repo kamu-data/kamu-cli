@@ -19,7 +19,6 @@ use kamu_accounts::{
 use crate::mutations::AccountMut;
 use crate::prelude::*;
 use crate::queries;
-use crate::utils::{check_logged_account_id_match, check_logged_account_name_match};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +34,7 @@ impl AccountsMut {
         ctx: &Context<'_>,
         account_id: AccountID<'_>,
     ) -> Result<Option<AccountMut>> {
-        check_logged_account_id_match(ctx, &account_id)?;
+        // NOTE: AccountMut' methods handle access verification
 
         let account_service = from_catalog_n!(ctx, dyn AccountService);
 
@@ -50,7 +49,7 @@ impl AccountsMut {
         ctx: &Context<'_>,
         account_name: AccountName<'_>,
     ) -> Result<Option<AccountMut>> {
-        check_logged_account_name_match(ctx, &account_name)?;
+        // NOTE: AccountMut' methods handle access verification
 
         let account_service = from_catalog_n!(ctx, dyn AccountService);
 
@@ -59,6 +58,7 @@ impl AccountsMut {
     }
 
     /// Create a new account
+    #[tracing::instrument(level = "info", name = AccountsMut_create_account, skip_all, fields(%account_name, ?email))]
     #[graphql(guard = "LoggedInGuard.and(CanProvisionAccountsGuard)")]
     async fn create_account(
         &self,

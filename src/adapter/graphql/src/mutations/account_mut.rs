@@ -11,7 +11,7 @@ use kamu_accounts::*;
 
 use super::AccountFlowsMut;
 use crate::prelude::*;
-use crate::AdminGuard;
+use crate::{utils, AdminGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,6 +35,8 @@ impl AccountMut {
         ctx: &Context<'_>,
         new_email: Email<'_>,
     ) -> Result<UpdateEmailResult> {
+        utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
+
         let account_repo = from_catalog_n!(ctx, dyn AccountRepository);
         match account_repo
             .update_account_email(&self.account.id, new_email.clone().into())
@@ -88,6 +90,8 @@ impl AccountMut {
 
     /// Delete a selected account. Allowed only for admin users
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
+        // NOTE: DeleteAccountUseCase handles access verification
+
         let delete_account_use_case = from_catalog_n!(ctx, dyn DeleteAccountUseCase);
 
         use DeleteAccountByNameError as E;
@@ -107,8 +111,11 @@ impl AccountMut {
     }
 
     /// Access to the mutable flow configurations of this account
-    async fn flows(&self) -> AccountFlowsMut {
-        AccountFlowsMut::new(self.account.clone())
+    #[expect(clippy::unused_async)]
+    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlowsMut> {
+        utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
+
+        Ok(AccountFlowsMut::new(&self.account))
     }
 }
 

@@ -14,7 +14,7 @@ use kamu_core::auth;
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
 
-use crate::prelude::{AccessTokenID, AccountID, AccountName};
+use crate::prelude::{AccessTokenID, AccountID};
 use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,12 +195,12 @@ pub(crate) async fn check_access_token_valid(
 
 pub(crate) fn check_logged_account_name_match(
     ctx: &Context<'_>,
-    account_name: &AccountName,
+    account_name: &odf::AccountName,
 ) -> Result<(), GqlError> {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_name == **account_name {
+        if logged_account.account_name == *account_name {
             return Ok(());
         }
     };
