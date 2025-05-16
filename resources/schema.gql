@@ -3852,7 +3852,7 @@ type WebhookSubscription {
 	"""
 	List of events that trigger the webhook
 	"""
-	events: [String!]!
+	eventTypes: [String!]!
 	"""
 	Status of the subscription
 	"""

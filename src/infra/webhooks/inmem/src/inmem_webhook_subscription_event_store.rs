@@ -26,7 +26,7 @@ pub struct InMemoryWebhookSubscriptionEventStore {
 struct State {
     events: Vec<WebhookSubscriptionEvent>,
     webhook_subscriptions_by_dataset: HashMap<odf::DatasetID, Vec<WebhookSubscriptionID>>,
-    webhook_subscription_data: HashMap<WebhookSubscriptionID, WebhookSubscription>,
+    webhook_subscription_data: HashMap<WebhookSubscriptionID, WebhookSubscriptionState>,
 }
 
 impl EventStoreState<WebhookSubscriptionState> for State {
@@ -71,18 +71,12 @@ impl InMemoryWebhookSubscriptionEventStore {
                         .push(e.subscription_id);
                 }
 
-                let subscription = WebhookSubscription::new(
-                    e.subscription_id,
-                    e.target_url.clone(),
-                    e.label.clone(),
-                    e.dataset_id.clone(),
-                    e.event_types.clone(),
-                    e.secret.clone(),
-                );
+                let subscription_state =
+                    WebhookSubscriptionState::apply(None, event.clone()).unwrap();
 
                 state
                     .webhook_subscription_data
-                    .insert(e.subscription_id, subscription);
+                    .insert(e.subscription_id, subscription_state);
             }
 
             WebhookSubscriptionEvent::Modified(e) => {
@@ -136,14 +130,16 @@ impl InMemoryWebhookSubscriptionEventStore {
     }
 
     fn update_subscription_state(state: &mut State, event: &WebhookSubscriptionEvent) {
-        if let Some(subscription) = state
+        if let Some(subscription_state) = state
             .webhook_subscription_data
             .get_mut(event.subscription_id())
         {
-            subscription.apply(event.clone()).unwrap();
+            *subscription_state =
+                WebhookSubscriptionState::apply(Some(subscription_state.clone()), event.clone())
+                    .unwrap();
 
-            if subscription.status() == WebhookSubscriptionStatus::Removed {
-                if let Some(dataset_id) = subscription.dataset_id() {
+            if subscription_state.status() == WebhookSubscriptionStatus::Removed {
+                if let Some(dataset_id) = subscription_state.dataset_id() {
                     if let Some(ids) = state.webhook_subscriptions_by_dataset.get_mut(dataset_id) {
                         ids.retain(|id| id != event.subscription_id());
                     }

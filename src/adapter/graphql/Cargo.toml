@@ -86,6 +86,9 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
+kamu-webhooks = { workspace = true, features = ["testing"] }
+kamu-webhooks-inmem = { workspace = true }
+kamu-webhooks-services = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }

@@ -51,7 +51,7 @@ impl WebhookSubscription {
     }
 
     /// List of events that trigger the webhook
-    async fn events(&self) -> Vec<String> {
+    async fn event_types(&self) -> Vec<String> {
         self.state
             .event_types()
             .iter()
