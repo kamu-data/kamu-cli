@@ -32,17 +32,17 @@ impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
             return Err(DeleteAccountByNameError::SelfDeletion);
         }
 
-        let can_provision_accounts = {
+        let is_admin = {
             use internal_error::ResultIntoInternal;
             use kamu_auth_rebac::RebacServiceExt;
 
             self.rebac_service
-                .can_provision_accounts(self.current_account_subject.account_id())
+                .is_account_admin(self.current_account_subject.account_id())
                 .await
                 .int_err()?
         };
 
-        if !can_provision_accounts {
+        if !is_admin {
             return Err(DeleteAccountByNameError::Access(
                 odf::AccessError::Unauthenticated(
                     AccountDeletionNotAuthorizedError {
