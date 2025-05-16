@@ -138,15 +138,19 @@ type AccountMut {
 	"""
 	Update account email
 	"""
-	updateEmail(newEmail: String!): UpdateEmailResult!
+	updateEmail(newEmail: Email!): UpdateEmailResult!
 	"""
 	Create a new account
 	"""
-	createAccount(accountName: String!, email: String): CreateAccountResult!
+	createAccount(accountName: AccountName!, email: Email): CreateAccountResult!
 	"""
-	Reset password for selected account. Allowed only for admin users
+	Reset password for a selected account. Allowed only for admin users
 	"""
 	modifyPassword(accountName: AccountName!, password: String!): ModifyPasswordResult!
+	"""
+	Deleting an account by name
+	"""
+	deleteAccountByName(accountName: AccountName!): DeleteAccountResult!
 	"""
 	Access to the mutable flow configurations of this account
 	"""
@@ -155,7 +159,7 @@ type AccountMut {
 
 scalar AccountName
 
-type AccountNameInvalid implements CreateAccountResult {
+type AccountNotFound implements ModifyPasswordResult & DeleteAccountResult {
 	message: String!
 }
 
@@ -1384,6 +1388,14 @@ The input/output is a string in RFC3339 format.
 """
 scalar DateTime
 
+interface DeleteAccountResult {
+	message: String!
+}
+
+type DeleteAccountSuccess implements DeleteAccountResult {
+	message: String!
+}
+
 interface DeleteDatasetEnvVarResult {
 	message: String!
 }
@@ -1449,6 +1461,8 @@ type DisablePushSource {
 	"""
 	sourceName: String!
 }
+
+scalar Email
 
 type EngineDesc {
 	"""
@@ -2380,10 +2394,6 @@ type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapsh
 }
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
-	message: String!
-}
-
-type ModifyPasswordAccountNotFound implements ModifyPasswordResult {
 	message: String!
 }
 
@@ -3450,10 +3460,6 @@ interface UnsetRoleResult {
 }
 
 type UnsetRoleResultSuccess implements UnsetRoleResult {
-	message: String!
-}
-
-type UpdateEmailInvalid implements UpdateEmailResult {
 	message: String!
 }
 

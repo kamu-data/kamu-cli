@@ -18,6 +18,7 @@ use crate::{
     AccountNotFoundByNameError,
     AccountPageStream,
     CreateAccountError,
+    DeleteAccountError,
     GetAccountByIdError,
     ModifyPasswordHashError,
     Password,
@@ -70,7 +71,6 @@ pub trait AccountService: Sync + Send {
         account_name: &odf::AccountName,
         email: email_utils::Email,
         password: Password,
-        owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError>;
 
     async fn modify_password(
@@ -78,6 +78,11 @@ pub trait AccountService: Sync + Send {
         account_name: &odf::AccountName,
         password: Password,
     ) -> Result<(), ModifyPasswordError>;
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<Account, DeleteAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

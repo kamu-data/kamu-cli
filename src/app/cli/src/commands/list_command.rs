@@ -182,10 +182,10 @@ impl ListCommand {
             TenancyConfig::MultiTenant => match &self.related_account.target_account {
                 accounts::TargetAccountSelection::Current => self
                     .dataset_registry
-                    .all_dataset_handles_by_owner(&self.current_account.account_name),
+                    .all_dataset_handles_by_owner_name(&self.current_account.account_name),
                 accounts::TargetAccountSelection::Specific {
                     account_name: user_name,
-                } => self.dataset_registry.all_dataset_handles_by_owner(
+                } => self.dataset_registry.all_dataset_handles_by_owner_name(
                     &odf::AccountName::from_str(user_name.as_str()).unwrap(),
                 ),
                 accounts::TargetAccountSelection::AllUsers => {

@@ -90,12 +90,10 @@ impl Datasets {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let account_name = account_ref.account_name_internal();
-
         use futures::TryStreamExt;
 
         let account_owned_datasets_stream =
-            dataset_registry.all_dataset_handles_by_owner(account_name);
+            dataset_registry.all_dataset_handles_by_owner_id(account_ref.account_id_internal());
         let readable_dataset_handles_stream = dataset_action_authorizer
             .filtered_datasets_stream(account_owned_datasets_stream, auth::DatasetAction::Read);
         let mut accessible_datasets_handles = readable_dataset_handles_stream

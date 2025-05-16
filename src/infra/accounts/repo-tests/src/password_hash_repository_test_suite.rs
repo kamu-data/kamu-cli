@@ -55,12 +55,20 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     let hash_petya = make_password_hash(PASSWORD_PETYA, &salt_petya);
 
     password_hash_repo
-        .save_password_hash(&account_wasya.account_name, hash_wasya.to_string())
+        .save_password_hash(
+            &account_wasya.id,
+            &account_wasya.account_name,
+            hash_wasya.to_string(),
+        )
         .await
         .unwrap();
 
     password_hash_repo
-        .save_password_hash(&account_petya.account_name, hash_petya.to_string())
+        .save_password_hash(
+            &account_petya.id,
+            &account_petya.account_name,
+            hash_petya.to_string(),
+        )
         .await
         .unwrap();
 
@@ -98,7 +106,11 @@ pub async fn test_modify_password(catalog: &Catalog) {
     let hash_petya = make_password_hash(password_petya, &salt);
 
     password_hash_repo
-        .save_password_hash(&account_petya.account_name, hash_petya.to_string())
+        .save_password_hash(
+            &account_petya.id,
+            &account_petya.account_name,
+            hash_petya.to_string(),
+        )
         .await
         .unwrap();
 

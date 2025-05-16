@@ -8,8 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use database_common_macros::database_transactional_test;
-use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,18 +21,15 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct InMemoryDidSecretKeyRepositoryHarness {
-    catalog: Catalog,
+    catalog: dill::Catalog,
 }
 
 impl InMemoryDidSecretKeyRepositoryHarness {
     pub fn new() -> Self {
-        let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add::<InMemoryDidSecretKeyRepository>();
-        catalog_builder.add::<InMemoryAccountRepository>();
+        let mut b = dill::CatalogBuilder::new();
+        b.add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>();
 
-        Self {
-            catalog: catalog_builder.build(),
-        }
+        Self { catalog: b.build() }
     }
 }
 

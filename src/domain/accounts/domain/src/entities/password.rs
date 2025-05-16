@@ -45,7 +45,7 @@ impl std::fmt::Display for PasswordValidationError {
 }
 
 fn validate_password(password: &str) -> Result<(), PasswordValidationError> {
-    if password.chars().count() < MIN_PASSWORD_LENGTH {
+    if password.len() < MIN_PASSWORD_LENGTH {
         return Err(PasswordValidationError::TooShort);
     }
     if !password.is_ascii() {
@@ -53,3 +53,5 @@ fn validate_password(password: &str) -> Result<(), PasswordValidationError> {
     }
     Ok(())
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

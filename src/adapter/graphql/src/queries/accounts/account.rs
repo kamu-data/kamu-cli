@@ -142,6 +142,11 @@ impl Account {
         &self.account_name
     }
 
+    #[graphql(skip)]
+    pub(crate) fn account_id_internal(&self) -> &odf::AccountID {
+        &self.account_id
+    }
+
     /// Unique and stable identifier of this account
     async fn id(&self) -> &AccountID {
         &self.account_id

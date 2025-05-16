@@ -71,7 +71,7 @@ impl ServiceContext for ODataServiceContext {
         let authorizer: Arc<dyn DatasetActionAuthorizer> = self.catalog.get_one().unwrap();
 
         let dataset_handles = if let Some(account_name) = &self.account_name {
-            registry.all_dataset_handles_by_owner(account_name)
+            registry.all_dataset_handles_by_owner_name(account_name)
         } else {
             registry.all_dataset_handles()
         };

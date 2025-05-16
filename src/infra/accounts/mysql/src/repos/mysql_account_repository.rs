@@ -460,6 +460,48 @@ impl AccountRepository for MySqlAccountRepository {
             }
         })
     }
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<Account, DeleteAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        // - MySQL does not support RETURNING, but MariaDB does.
+        // - sqlx::query_as!() cannot recognize AccountRowModel in case of deletion, so
+        //   we don't use it.
+        let maybe_deleted_account = sqlx::query!(
+            r#"
+            DELETE
+            FROM accounts
+            WHERE account_name = ?
+            RETURNING
+                id as "id: _",
+                account_name,
+                email,
+                display_name,
+                account_type as "account_type: AccountType",
+                avatar_url,
+                registered_at,
+                provider,
+                provider_identity_key
+            "#,
+            account_name.as_str()
+        )
+        .fetch_optional(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        if let Some(deleted_account) = maybe_deleted_account {
+            Ok(Self::map_account_row(&deleted_account))
+        } else {
+            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
+                account_name: account_name.clone(),
+            }))
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -529,6 +571,7 @@ impl ExpensiveAccountRepository for MySqlAccountRepository {
 impl PasswordHashRepository for MySqlAccountRepository {
     async fn save_password_hash(
         &self,
+        account_id: &odf::AccountID,
         account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
@@ -538,13 +581,16 @@ impl PasswordHashRepository for MySqlAccountRepository {
 
         // TODO: duplicates are prevented with unique indices, but handle error
 
+        let account_id = account_id.as_did_str().to_stack_string();
+
         sqlx::query!(
             r#"
-            INSERT INTO accounts_passwords (account_name, password_hash)
-                VALUES (?, ?)
+            INSERT INTO accounts_passwords (account_name, password_hash, account_id)
+            VALUES (?, ?, ?)
             "#,
-            account_name.to_string(),
-            password_hash
+            account_name.as_str(),
+            password_hash,
+            account_id.as_str()
         )
         .execute(connection_mut)
         .await

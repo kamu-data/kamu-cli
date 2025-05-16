@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
 use crate::{DatasetUnresolvedIdError, GetStoredDatasetError};
@@ -41,7 +41,7 @@ impl From<GetStoredDatasetError> for DatasetRefUnresolvedError {
     fn from(value: GetStoredDatasetError) -> Self {
         match value {
             GetStoredDatasetError::UnresolvedId(e) => Self::NotFound(e.into()),
-            GetStoredDatasetError::Internal(e) => Self::Internal(e),
+            e @ GetStoredDatasetError::Internal(_) => Self::Internal(e.int_err()),
         }
     }
 }

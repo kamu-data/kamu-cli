@@ -381,18 +381,13 @@ async fn test_update_email_bad_email() {
         )
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
-        value!({
-            "accounts": {
-                "byId": {
-                    "updateEmail": {
-                        "message": "Invalid email",
-                    }
-                }
-            }
-        })
+    pretty_assertions::assert_eq!(
+        ["Failed to parse \"Email\": wasya#example.com is not a valid email"],
+        *res.errors
+            .iter()
+            .map(|e| e.message.clone())
+            .collect::<Vec<_>>(),
+        "{res:?}"
     );
 }
 

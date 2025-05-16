@@ -16,15 +16,15 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountFlowTriggersMut {
-    account: Account,
+pub struct AccountFlowTriggersMut<'a> {
+    account: &'a Account,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl AccountFlowTriggersMut {
+impl<'a> AccountFlowTriggersMut<'a> {
     #[graphql(skip)]
-    pub fn new(account: Account) -> Self {
+    pub fn new(account: &'a Account) -> Self {
         Self { account }
     }
 

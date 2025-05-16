@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM did_secret_keys\n            WHERE entity_type = $1\n              AND entity_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "cde662ddf9b785a84285123169b8d8dd32f3e5d03882ce40039600cc08982d69"
+}

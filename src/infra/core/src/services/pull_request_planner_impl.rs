@@ -378,7 +378,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         use futures::TryStreamExt;
         let requests: Vec<_> = self
             .dataset_registry
-            .all_dataset_handles_by_owner(self.current_account_subject.account_name())
+            .all_dataset_handles_by_owner_name(self.current_account_subject.account_name())
             .map_ok(|hdl| PullRequest::local(hdl.as_local_ref()))
             .try_collect()
             .await?;

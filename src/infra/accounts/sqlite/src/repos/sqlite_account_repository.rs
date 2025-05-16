@@ -484,6 +484,48 @@ impl AccountRepository for SqliteAccountRepository {
             }
         })
     }
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<Account, DeleteAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_name_str = account_name.as_str();
+
+        let maybe_deleted_account = sqlx::query_as!(
+            AccountRowModel,
+            r#"
+            DELETE
+            FROM accounts
+            WHERE account_name = $1
+            RETURNING
+                id as "id: _",
+                account_name,
+                email,
+                display_name,
+                account_type as "account_type: AccountType",
+                avatar_url,
+                registered_at as "registered_at: _",
+                provider,
+                provider_identity_key
+            "#,
+            account_name_str
+        )
+        .fetch_optional(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        if let Some(deleted_account) = maybe_deleted_account {
+            Ok(deleted_account.into())
+        } else {
+            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
+                account_name: account_name.clone(),
+            }))
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -553,6 +595,7 @@ impl ExpensiveAccountRepository for SqliteAccountRepository {
 impl PasswordHashRepository for SqliteAccountRepository {
     async fn save_password_hash(
         &self,
+        account_id: &odf::AccountID,
         account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
@@ -562,14 +605,18 @@ impl PasswordHashRepository for SqliteAccountRepository {
 
         // TODO: duplicates are prevented with unique indices, but handle error
 
-        let account_name = account_name.to_string();
+        let account_name = account_name.as_str();
+        let account_id_stack = account_id.as_did_str().to_stack_string();
+        let account_id = account_id_stack.as_str();
+
         sqlx::query!(
             r#"
-            INSERT INTO accounts_passwords (account_name, password_hash)
-                VALUES ($1, $2)
+            INSERT INTO accounts_passwords (account_name, password_hash, account_id)
+            VALUES ($1, $2, $3)
             "#,
             account_name,
-            password_hash
+            password_hash,
+            account_id
         )
         .execute(connection_mut)
         .await

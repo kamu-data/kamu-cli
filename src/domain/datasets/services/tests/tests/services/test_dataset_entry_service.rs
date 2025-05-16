@@ -207,7 +207,7 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user() {
 
     let resolve_dataset_result = harness
         .dataset_registry
-        .all_dataset_handles_by_owner(&odf::AccountName::new_unchecked("foo"));
+        .all_dataset_handles_by_owner_name(&odf::AccountName::new_unchecked("foo"));
 
     let list_dataset: Vec<_> = resolve_dataset_result.try_collect().await.unwrap();
 

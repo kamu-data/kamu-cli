@@ -10,24 +10,23 @@
 #![feature(error_generic_member_access)]
 #![feature(let_chains)]
 
-pub mod dtos;
-pub use dtos::*;
+// Re-exports
+pub use ed25519_dalek::SigningKey;
 
-pub mod formats;
-pub use formats::*;
-
-pub mod errors;
-pub use errors::*;
-
-pub mod identity;
-pub use identity::*;
-
-pub mod serde;
+pub mod engine;
 
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
-pub mod engine;
+pub mod dtos;
+pub mod errors;
+pub mod formats;
+pub mod identity;
+pub mod serde;
 
 pub mod metadata;
+pub use dtos::*;
+pub use errors::*;
+pub use formats::*;
+pub use identity::*;
 pub use metadata::*;

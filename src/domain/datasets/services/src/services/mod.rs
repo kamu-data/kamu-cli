@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_account_deletion_handler;
 mod dataset_alias_update_handler;
 mod entry;
 mod env;
@@ -16,6 +17,7 @@ mod odf;
 mod refs;
 mod statistics;
 
+pub use dataset_account_deletion_handler::*;
 pub use dataset_alias_update_handler::*;
 pub use entry::*;
 pub use env::*;

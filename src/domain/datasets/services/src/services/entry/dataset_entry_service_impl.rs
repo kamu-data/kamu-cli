@@ -428,7 +428,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
-    fn all_dataset_handles_by_owner(
+    fn all_dataset_handles_by_owner_name(
         &self,
         owner_name: &odf::AccountName,
     ) -> odf::dataset::DatasetHandleStream {
@@ -457,6 +457,21 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                     list: Vec::new(),
                     total_count: 0,
                 })
+            },
+        )
+    }
+
+    fn all_dataset_handles_by_owner_id(
+        &self,
+        owner_id: &odf::AccountID,
+    ) -> odf::dataset::DatasetHandleStream<'_> {
+        let owner_id = owner_id.clone();
+
+        EntityPageStreamer::default().into_stream(
+            move || async { Ok(owner_id) },
+            move |owner_id, pagination| async move {
+                self.list_all_dataset_handles_by_owner_id(&owner_id, pagination)
+                    .await
             },
         )
     }
