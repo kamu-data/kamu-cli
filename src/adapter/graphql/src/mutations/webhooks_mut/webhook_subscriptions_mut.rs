@@ -8,55 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{ComplexObject, InputObject, Interface, Object, SimpleObject};
-use kamu_webhooks::LoadError;
 
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WebhookSubscriptionsMut;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl WebhookSubscriptionsMut {
-    async fn resolve_subscription(
-        ctx: &Context<'_>,
-        subscription_id: WebhookSubscriptionID,
-    ) -> Result<Option<kamu_webhooks::WebhookSubscription>> {
-        let subscription_event_store =
-            from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionEventStore);
-
-        match kamu_webhooks::WebhookSubscription::load(
-            subscription_id.into(),
-            subscription_event_store.as_ref(),
-        )
-        .await
-        {
-            Ok(subscription) => Ok(Some(subscription)),
-            Err(LoadError::NotFound(_)) => Ok(None),
-            Err(LoadError::ProjectionError(e)) => Err(GqlError::Internal(e.int_err())),
-            Err(LoadError::Internal(e)) => Err(GqlError::Internal(e)),
-        }
-    }
-
-    async fn check_label_is_unique(
-        ctx: &Context<'_>,
-        dataset_id: &odf::DatasetID,
-        label: &kamu_webhooks::WebhookSubscriptionLabel,
-    ) -> Result<bool> {
-        let subscription_event_store =
-            from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionEventStore);
-
-        let maybe_subscription_id = subscription_event_store
-            .find_subscription_id_by_dataset_and_label(dataset_id, label)
-            .await
-            .map_err(|e: kamu_webhooks::FindWebhookSubscriptionError| match e {
-                kamu_webhooks::FindWebhookSubscriptionError::Internal(e) => GqlError::Internal(e),
-            })?;
-
-        Ok(maybe_subscription_id.is_none())
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,9 +25,6 @@ impl WebhookSubscriptionsMut {
         ctx: &Context<'_>,
         input: CreateWebhookSubscriptionInput,
     ) -> Result<CreateWebhookSubscriptionResult> {
-        // TODO: security checks
-        // TODO: check dataset exists
-
         let create_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::CreateWebhookSubscriptionUseCase);
 
@@ -83,7 +37,7 @@ impl WebhookSubscriptionsMut {
                     .into_iter()
                     .map(|et| kamu_webhooks::WebhookEventType::try_new(et.0).unwrap())
                     .collect::<Vec<_>>(),
-                input.label,
+                kamu_webhooks::WebhookSubscriptionLabel::new(&input.label),
             )
             .await
         {
@@ -102,17 +56,15 @@ impl WebhookSubscriptionsMut {
                 ))
             }
 
-            Err(kamu_webhooks::CreateWebhookSubscriptionError::NoEventTypesProvided) => {
+            Err(kamu_webhooks::CreateWebhookSubscriptionError::NoEventTypesProvided(_)) => {
                 Ok(CreateWebhookSubscriptionResult::NoEventTypesProvided(
                     WebhookSubscriptionNoEventTypesProvided { num_event_types: 0 },
                 ))
             }
 
-            Err(kamu_webhooks::CreateWebhookSubscriptionError::DuplicateLabel(label)) => {
+            Err(kamu_webhooks::CreateWebhookSubscriptionError::DuplicateLabel(_)) => {
                 Ok(CreateWebhookSubscriptionResult::DuplicateLabel(
-                    WebhookSubscriptionDuplicateLabel {
-                        label: label.to_string(),
-                    },
+                    WebhookSubscriptionDuplicateLabel { label: input.label },
                 ))
             }
 
@@ -128,47 +80,55 @@ impl WebhookSubscriptionsMut {
         subscription_id: WebhookSubscriptionID,
         input: UpdateWebhookSubscriptionInput,
     ) -> Result<UpdateWebhookSubscriptionResult> {
-        // TODO: security checks
+        let update_webhook_subscription_use_case =
+            from_catalog_n!(ctx, dyn kamu_webhooks::UpdateWebhookSubscriptionUseCase);
 
-        let maybe_subscription = Self::resolve_subscription(ctx, subscription_id).await?;
-        if let Some(mut subscription) = maybe_subscription {
-            let label = kamu_webhooks::WebhookSubscriptionLabel::new(&input.label);
-            if let Some(dataset_id) = subscription.dataset_id() {
-                if !Self::check_label_is_unique(ctx, dataset_id, &label).await? {
-                    return Ok(UpdateWebhookSubscriptionResult::DuplicateLabel(
-                        WebhookSubscriptionDuplicateLabel {
-                            label: label.to_string(),
-                        },
-                    ));
-                }
+        match update_webhook_subscription_use_case
+            .execute(
+                subscription_id.into(),
+                input.target_url.0,
+                input
+                    .event_types
+                    .into_iter()
+                    .map(|et| kamu_webhooks::WebhookEventType::try_new(et.0).unwrap())
+                    .collect::<Vec<_>>(),
+                kamu_webhooks::WebhookSubscriptionLabel::new(&input.label),
+            )
+            .await
+        {
+            Ok(_) => Ok(UpdateWebhookSubscriptionResult::Success(
+                UpdateWebhookSubscriptionResultSuccess { updated: true },
+            )),
+
+            Err(kamu_webhooks::UpdateWebhookSubscriptionError::NotFound(_)) => {
+                Ok(UpdateWebhookSubscriptionResult::NotFound(
+                    WebhookSubscriptionNotFound { subscription_id },
+                ))
             }
 
-            // TODO: check label is unique for system subscriptions
+            Err(e @ kamu_webhooks::UpdateWebhookSubscriptionError::InvalidTargetUrl(_)) => {
+                Ok(UpdateWebhookSubscriptionResult::InvalidTargetUrl(
+                    WebhookSubscriptionInvalidTargetUrl {
+                        inner_message: e.to_string(),
+                    },
+                ))
+            }
 
-            let event_types = input
-                .event_types
-                .into_iter()
-                .map(|et| kamu_webhooks::WebhookEventType::try_new(et.0).unwrap())
-                .collect::<Vec<_>>();
+            Err(kamu_webhooks::UpdateWebhookSubscriptionError::NoEventTypesProvided(_)) => {
+                Ok(UpdateWebhookSubscriptionResult::NoEventTypesProvided(
+                    WebhookSubscriptionNoEventTypesProvided { num_event_types: 0 },
+                ))
+            }
 
-            subscription
-                .modify(input.target_url.0, label, event_types)
-                .map_err(|e| GqlError::Internal(e.int_err()))?;
+            Err(kamu_webhooks::UpdateWebhookSubscriptionError::DuplicateLabel(_)) => {
+                Ok(UpdateWebhookSubscriptionResult::DuplicateLabel(
+                    WebhookSubscriptionDuplicateLabel { label: input.label },
+                ))
+            }
 
-            let subscription_event_store =
-                from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionEventStore);
-            subscription
-                .save(subscription_event_store.as_ref())
-                .await
-                .map_err(|e| GqlError::Internal(e.int_err()))?;
-
-            Ok(UpdateWebhookSubscriptionResult::Success(
-                UpdateWebhookSubscriptionResultSuccess { updated: true },
-            ))
-        } else {
-            Ok(UpdateWebhookSubscriptionResult::NotFound(
-                WebhookSubscriptionNotFound { subscription_id },
-            ))
+            Err(kamu_webhooks::UpdateWebhookSubscriptionError::Internal(e)) => {
+                Err(GqlError::Internal(e))
+            }
         }
     }
 
@@ -177,21 +137,26 @@ impl WebhookSubscriptionsMut {
         ctx: &Context<'_>,
         subscription_id: WebhookSubscriptionID,
     ) -> Result<PauseWebhookSubscriptionResult> {
-        // TODO: security checks
+        let pause_webhook_subscription_use_case =
+            from_catalog_n!(ctx, dyn kamu_webhooks::PauseWebhookSubscriptionUseCase);
 
-        let maybe_subscription = Self::resolve_subscription(ctx, subscription_id).await?;
-        if let Some(mut subscription) = maybe_subscription {
-            subscription
-                .pause()
-                .map_err(|e| GqlError::Internal(e.int_err()))?;
-
-            Ok(PauseWebhookSubscriptionResult::Success(
+        match pause_webhook_subscription_use_case
+            .execute(subscription_id.into())
+            .await
+        {
+            Ok(_) => Ok(PauseWebhookSubscriptionResult::Success(
                 PauseWebhookSubscriptionResultSuccess { paused: true },
-            ))
-        } else {
-            Ok(PauseWebhookSubscriptionResult::NotFound(
-                WebhookSubscriptionNotFound { subscription_id },
-            ))
+            )),
+
+            Err(kamu_webhooks::PauseWebhookSubscriptionError::NotFound(_)) => {
+                Ok(PauseWebhookSubscriptionResult::NotFound(
+                    WebhookSubscriptionNotFound { subscription_id },
+                ))
+            }
+
+            Err(kamu_webhooks::PauseWebhookSubscriptionError::Internal(e)) => {
+                Err(GqlError::Internal(e))
+            }
         }
     }
 
@@ -200,21 +165,26 @@ impl WebhookSubscriptionsMut {
         ctx: &Context<'_>,
         subscription_id: WebhookSubscriptionID,
     ) -> Result<ResumeWebhookSubscriptionResult> {
-        // TODO: security checks
+        let resume_webhook_subscription_use_case =
+            from_catalog_n!(ctx, dyn kamu_webhooks::ResumeWebhookSubscriptionUseCase);
 
-        let maybe_subscription = Self::resolve_subscription(ctx, subscription_id).await?;
-        if let Some(mut subscription) = maybe_subscription {
-            subscription
-                .resume()
-                .map_err(|e| GqlError::Internal(e.int_err()))?;
-
-            Ok(ResumeWebhookSubscriptionResult::Success(
+        match resume_webhook_subscription_use_case
+            .execute(subscription_id.into())
+            .await
+        {
+            Ok(_) => Ok(ResumeWebhookSubscriptionResult::Success(
                 ResumeWebhookSubscriptionResultSuccess { resumed: true },
-            ))
-        } else {
-            Ok(ResumeWebhookSubscriptionResult::NotFound(
-                WebhookSubscriptionNotFound { subscription_id },
-            ))
+            )),
+
+            Err(kamu_webhooks::ResumeWebhookSubscriptionError::NotFound(_)) => {
+                Ok(ResumeWebhookSubscriptionResult::NotFound(
+                    WebhookSubscriptionNotFound { subscription_id },
+                ))
+            }
+
+            Err(kamu_webhooks::ResumeWebhookSubscriptionError::Internal(e)) => {
+                Err(GqlError::Internal(e))
+            }
         }
     }
 
@@ -223,21 +193,26 @@ impl WebhookSubscriptionsMut {
         ctx: &Context<'_>,
         subscription_id: WebhookSubscriptionID,
     ) -> Result<RemoveWebhookSubscriptionResult> {
-        // TODO: security checks
+        let remove_webhook_subscription_use_case =
+            from_catalog_n!(ctx, dyn kamu_webhooks::RemoveWebhookSubscriptionUseCase);
 
-        let maybe_subscription = Self::resolve_subscription(ctx, subscription_id).await?;
-        if let Some(mut subscription) = maybe_subscription {
-            subscription
-                .remove()
-                .map_err(|e| GqlError::Internal(e.int_err()))?;
-
-            Ok(RemoveWebhookSubscriptionResult::Success(
+        match remove_webhook_subscription_use_case
+            .execute(subscription_id.into())
+            .await
+        {
+            Ok(_) => Ok(RemoveWebhookSubscriptionResult::Success(
                 RemoveWebhookSubscriptionResultSuccess { removed: true },
-            ))
-        } else {
-            Ok(RemoveWebhookSubscriptionResult::NotFound(
-                WebhookSubscriptionNotFound { subscription_id },
-            ))
+            )),
+
+            Err(kamu_webhooks::RemoveWebhookSubscriptionError::NotFound(_)) => {
+                Ok(RemoveWebhookSubscriptionResult::NotFound(
+                    WebhookSubscriptionNotFound { subscription_id },
+                ))
+            }
+
+            Err(kamu_webhooks::RemoveWebhookSubscriptionError::Internal(e)) => {
+                Err(GqlError::Internal(e))
+            }
         }
     }
 }

@@ -8,5 +8,14 @@
 // by the Apache License, Version 2.0.
 
 mod create_webhook_subscription_use_case_impl;
+pub(crate) mod helpers;
+mod pause_webhook_subscription_use_case_impl;
+mod remove_webhook_subscription_use_case_impl;
+mod resume_webhook_subscription_use_case_impl;
+mod update_webhook_subscription_use_case_impl;
 
 pub use create_webhook_subscription_use_case_impl::*;
+pub use pause_webhook_subscription_use_case_impl::*;
+pub use remove_webhook_subscription_use_case_impl::*;
+pub use resume_webhook_subscription_use_case_impl::*;
+pub use update_webhook_subscription_use_case_impl::*;

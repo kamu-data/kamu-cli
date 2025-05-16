@@ -21,61 +21,6 @@ pub struct CreateWebhookSubscriptionUseCaseImpl {
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
 }
 
-impl CreateWebhookSubscriptionUseCaseImpl {
-    fn validate_target_url(
-        &self,
-        target_url: &url::Url,
-    ) -> Result<(), CreateWebhookSubscriptionError> {
-        if target_url.scheme() != "https" {
-            return Err(CreateWebhookSubscriptionError::InvalidTargetUrl(
-                target_url.clone(),
-            ));
-        }
-
-        match target_url.host_str() {
-            Some("localhost" | "127.0.0.1" | "::1") => Err(
-                CreateWebhookSubscriptionError::InvalidTargetUrl(target_url.clone()),
-            ),
-            _ => Ok(()),
-        }
-    }
-
-    fn validate_event_types(
-        &self,
-        event_types: &[WebhookEventType],
-    ) -> Result<(), CreateWebhookSubscriptionError> {
-        if event_types.is_empty() {
-            return Err(CreateWebhookSubscriptionError::NoEventTypesProvided);
-        }
-
-        Ok(())
-    }
-
-    async fn check_label_is_unique(
-        &self,
-        dataset_id: &odf::DatasetID,
-        label: &WebhookSubscriptionLabel,
-    ) -> Result<(), CreateWebhookSubscriptionError> {
-        let maybe_subscription_id = self
-            .subscription_event_store
-            .find_subscription_id_by_dataset_and_label(dataset_id, label)
-            .await
-            .map_err(|e: kamu_webhooks::FindWebhookSubscriptionError| match e {
-                FindWebhookSubscriptionError::Internal(e) => {
-                    CreateWebhookSubscriptionError::Internal(e)
-                }
-            })?;
-
-        if maybe_subscription_id.is_some() {
-            return Err(CreateWebhookSubscriptionError::DuplicateLabel(
-                label.to_string(),
-            ));
-        }
-
-        Ok(())
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts]
@@ -92,14 +37,30 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
         dataset_id: Option<odf::DatasetID>,
         target_url: url::Url,
         event_types: Vec<WebhookEventType>,
-        label: String,
+        label: WebhookSubscriptionLabel,
     ) -> Result<CreateWebhookSubscriptionResult, CreateWebhookSubscriptionError> {
-        self.validate_target_url(&target_url)?;
-        self.validate_event_types(&event_types)?;
+        // TODO: check dataset exists
+        // TODO: security checks
+
+        use super::helpers::*;
+        validate_webhook_target_url(&target_url)?;
+        validate_webhook_event_types(&event_types)?;
 
         if let Some(dataset_id) = &dataset_id {
-            let label = kamu_webhooks::WebhookSubscriptionLabel::new(label);
-            self.check_label_is_unique(dataset_id, &label).await?;
+            validate_webhook_subscription_label_unique_in_dataset(
+                self.subscription_event_store.as_ref(),
+                dataset_id,
+                &label,
+            )
+            .await
+            .map_err(|e| match e {
+                ValidateWebhookSubscriptionLabelError::DuplicateLabel(e) => {
+                    CreateWebhookSubscriptionError::DuplicateLabel(e)
+                }
+                ValidateWebhookSubscriptionLabelError::Internal(e) => {
+                    CreateWebhookSubscriptionError::Internal(e)
+                }
+            })?;
 
             let secret = self.webhook_secret_generator.generate_secret();
 
