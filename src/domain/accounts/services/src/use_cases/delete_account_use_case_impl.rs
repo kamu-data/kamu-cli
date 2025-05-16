@@ -33,7 +33,11 @@ impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-                AccountLifecycleMessage::deleted(deleted_account.id, deleted_account.display_name),
+                AccountLifecycleMessage::deleted(
+                    deleted_account.id,
+                    deleted_account.email,
+                    deleted_account.display_name,
+                ),
             )
             .await?;
 

@@ -42,9 +42,14 @@ impl AccountLifecycleMessage {
         })
     }
 
-    pub fn deleted(account_id: odf::AccountID, display_name: AccountDisplayName) -> Self {
+    pub fn deleted(
+        account_id: odf::AccountID,
+        email: Email,
+        display_name: AccountDisplayName,
+    ) -> Self {
         Self::Deleted(AccountLifecycleMessageDeleted {
             account_id,
+            email,
             display_name,
         })
     }
@@ -79,6 +84,9 @@ pub struct AccountLifecycleMessageCreated {
 pub struct AccountLifecycleMessageDeleted {
     /// The unique identifier of the account
     pub account_id: odf::AccountID,
+
+    /// The email address associated with the account
+    pub email: Email,
 
     /// The display name of the account
     pub display_name: AccountDisplayName,
