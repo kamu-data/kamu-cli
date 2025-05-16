@@ -11,7 +11,6 @@ use kamu_accounts::*;
 
 use super::AccountFlowsMut;
 use crate::prelude::*;
-use crate::utils::ensure_account_can_provision_accounts;
 use crate::AdminGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +53,7 @@ impl AccountMut {
     }
 
     /// Reset password for a selected account. Allowed only for admin users
-    #[graphql(guard = "AdminGuard::new()")]
+    #[graphql(guard = "AdminGuard")]
     async fn modify_password(
         &self,
         ctx: &Context<'_>,
@@ -87,20 +86,21 @@ impl AccountMut {
         }
     }
 
-    /// Deleting an account by name
-    async fn delete_account_by_name(
-        &self,
-        ctx: &Context<'_>,
-        account_name: AccountName<'_>,
-    ) -> Result<DeleteAccountResult> {
-        ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
-
+    /// Delete a selected account. Allowed only for admin users
+    async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
         let delete_account_use_case = from_catalog_n!(ctx, dyn DeleteAccountUseCase);
 
-        use DeleteAccountError as E;
+        use DeleteAccountByNameError as E;
 
-        match delete_account_use_case.execute(account_name.as_ref()).await {
+        match delete_account_use_case
+            .execute(&self.account.account_name)
+            .await
+        {
             Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),
+            Err(E::SelfDeletion) => Ok(DeleteAccountResult::SelfDeletionIsForbidden(
+                Default::default(),
+            )),
+            Err(E::Access(access_error)) => Err(access_error.into()),
             Err(E::NotFound(_)) => Ok(DeleteAccountResult::AccountNotFound(Default::default())),
             Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
@@ -217,7 +217,23 @@ impl ModifyPasswordInvalidPassword {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum DeleteAccountResult {
     Success(DeleteAccountSuccess),
+    SelfDeletionIsForbidden(SelfDeletionIsForbidden),
     AccountNotFound(AccountNotFound),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct SelfDeletionIsForbidden {
+    message: String,
+}
+
+impl Default for SelfDeletionIsForbidden {
+    fn default() -> Self {
+        Self {
+            message: "Self-deletion is prohibited".to_string(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,13 +16,44 @@ use kamu_accounts::*;
 #[dill::component]
 #[dill::interface(dyn DeleteAccountUseCase)]
 pub struct DeleteAccountUseCaseImpl {
+    current_account_subject: Arc<CurrentAccountSubject>,
+    rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
 #[async_trait::async_trait]
 impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
-    async fn execute(&self, account_name: &odf::AccountName) -> Result<(), DeleteAccountError> {
+    async fn execute(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), DeleteAccountByNameError> {
+        if self.current_account_subject.account_name() == account_name {
+            return Err(DeleteAccountByNameError::SelfDeletion);
+        }
+
+        let can_provision_accounts = {
+            use internal_error::ResultIntoInternal;
+            use kamu_auth_rebac::RebacServiceExt;
+
+            self.rebac_service
+                .can_provision_accounts(self.current_account_subject.account_id())
+                .await
+                .int_err()?
+        };
+
+        if !can_provision_accounts {
+            return Err(DeleteAccountByNameError::Access(
+                odf::AccessError::Unauthenticated(
+                    AccountDeletionNotAuthorizedError {
+                        subject_account: self.current_account_subject.account_name().clone(),
+                        object_account: account_name.clone(),
+                    }
+                    .into(),
+                ),
+            ));
+        }
+
         let deleted_account = self
             .account_service
             .delete_account_by_name(account_name)
