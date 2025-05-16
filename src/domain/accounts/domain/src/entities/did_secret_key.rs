@@ -13,6 +13,7 @@ use odf::metadata::PrivateKey;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DidSecretKey {
     pub secret_key: Vec<u8>,
@@ -42,27 +43,6 @@ impl DidSecretKey {
         Ok(PrivateKey::from_bytes(
             decrypted_bytes.as_slice().try_into().int_err()?,
         ))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg(feature = "sqlx")]
-#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
-pub struct DidSecretKeyRowModel {
-    pub entity_type: crate::DidEntityType,
-    pub entity_id: String,
-    pub secret_key: Vec<u8>,
-    pub secret_nonce: Vec<u8>,
-}
-
-#[cfg(feature = "sqlx")]
-impl From<DidSecretKeyRowModel> for DidSecretKey {
-    fn from(row_model: DidSecretKeyRowModel) -> Self {
-        Self {
-            secret_key: row_model.secret_key,
-            secret_nonce: row_model.secret_nonce,
-        }
     }
 }
 

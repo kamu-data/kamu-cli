@@ -66,6 +66,21 @@ impl DidSecretKeyRepository for InMemoryDidSecretKeyRepository {
         Ok(())
     }
 
+    async fn get_did_secret_key(
+        &self,
+        entity: &DidEntity,
+    ) -> Result<DidSecretKey, GetDidSecretKeyError> {
+        let state = self.state.lock().unwrap();
+
+        let entity = entity.clone().into_owned();
+
+        if let Some(did_secret_key) = state.did_secret_keys_by_entity.get(&entity) {
+            Ok(did_secret_key.clone())
+        } else {
+            Err(GetDidSecretKeyError::NotFound(entity.into()))
+        }
+    }
+
     async fn delete_did_secret_key(
         &self,
         entity: &DidEntity,
@@ -78,7 +93,7 @@ impl DidSecretKeyRepository for InMemoryDidSecretKeyRepository {
         if has_deleted {
             Ok(())
         } else {
-            Err(DeleteDidSecretKeyError::NotFound { entity })
+            Err(DeleteDidSecretKeyError::NotFound(entity.into()))
         }
     }
 }

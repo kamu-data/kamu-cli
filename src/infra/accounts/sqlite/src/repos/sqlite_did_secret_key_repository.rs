@@ -56,6 +56,35 @@ impl DidSecretKeyRepository for SqliteDidSecretKeyRepository {
         Ok(())
     }
 
+    async fn get_did_secret_key(
+        &self,
+        entity: &DidEntity,
+    ) -> Result<DidSecretKey, GetDidSecretKeyError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_secret_key = sqlx::query_as!(
+            DidSecretKey,
+            r#"
+            SELECT secret_key, secret_nonce
+            FROM did_secret_keys
+            WHERE entity_type = $1
+              AND entity_id = $2
+            "#,
+            entity.entity_type,
+            entity.entity_id,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        if let Some(secret_key) = maybe_secret_key {
+            Ok(secret_key)
+        } else {
+            Err(DidSecretKeyNotFoundError::new(entity).into())
+        }
+    }
+
     async fn delete_did_secret_key(
         &self,
         entity: &DidEntity,
@@ -78,11 +107,11 @@ impl DidSecretKeyRepository for SqliteDidSecretKeyRepository {
         .await
         .int_err()?;
 
-        if delete_result.rows_affected() == 0 {
-            return Err(DeleteDidSecretKeyError::not_found(entity));
+        if delete_result.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(DidSecretKeyNotFoundError::new(entity).into())
         }
-
-        Ok(())
     }
 }
 
