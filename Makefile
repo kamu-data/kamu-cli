@@ -6,12 +6,10 @@ TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 POSTGRES_CRATES := \
 	./src/e2e/app/cli/postgres \
 	./src/infra/accounts/postgres \
-	./src/infra/accounts/postgres \
 	./src/infra/auth-rebac/postgres \
 	./src/infra/datasets/postgres \
 	./src/infra/flow-system/postgres \
 	./src/infra/messaging-outbox/postgres \
-	./src/infra/task-system/postgres \
 	./src/infra/task-system/postgres \
 
 MYSQL_CRATES := \
@@ -20,7 +18,6 @@ MYSQL_CRATES := \
 
 SQLITE_CRATES := \
 	./src/e2e/app/cli/sqlite \
-	./src/infra/accounts/sqlite \
 	./src/infra/accounts/sqlite \
 	./src/infra/auth-rebac/sqlite \
 	./src/infra/datasets/sqlite \
