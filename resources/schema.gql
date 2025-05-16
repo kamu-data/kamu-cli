@@ -714,8 +714,8 @@ interface CreateTokenResult {
 
 input CreateWebhookSubscriptionInput {
 	datasetId: DatasetID
-	targetUrl: String!
-	eventTypes: [String!]!
+	targetUrl: URL!
+	eventTypes: [WebhookEventType!]!
 	label: String!
 }
 
@@ -724,6 +724,7 @@ interface CreateWebhookSubscriptionResult {
 }
 
 type CreateWebhookSubscriptionResultSuccess implements CreateWebhookSubscriptionResult {
+	subscriptionId: String!
 	secret: String!
 	message: String!
 }
@@ -3514,6 +3515,8 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	message: String!
 }
 
+scalar URL
+
 interface UnsetRoleResult {
 	message: String!
 }
@@ -3570,8 +3573,8 @@ type UpdateVersionSuccess implements UpdateVersionResult {
 }
 
 input UpdateWebhookSubscriptionInput {
-	targetUrl: String!
-	eventTypes: [String!]!
+	targetUrl: URL!
+	eventTypes: [WebhookEventType!]!
 	label: String!
 }
 
@@ -3831,6 +3834,8 @@ type WebSocketProtocolDesc {
 	url: String!
 }
 
+scalar WebhookEventType
+
 type WebhookSubscription {
 	"""
 	Unique identifier of the webhook subscription
@@ -3859,15 +3864,20 @@ type WebhookSubscription {
 	status: WebhookSubscriptionStatus!
 }
 
-type WebhookSubscriptionEventTypeUnknown implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
-	eventType: String!
+type WebhookSubscriptionDuplicateLabel implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	label: String!
 	message: String!
 }
 
 scalar WebhookSubscriptionID
 
-type WebhookSubscriptionLabelNotUnique implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
-	label: String!
+type WebhookSubscriptionInvalidTargetUrl implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	innerMessage: String!
+	message: String!
+}
+
+type WebhookSubscriptionNoEventTypesProvided implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	numEventTypes: Int!
 	message: String!
 }
 
@@ -3882,11 +3892,6 @@ enum WebhookSubscriptionStatus {
 	PAUSED
 	UNREACHABLE
 	REMOVED
-}
-
-type WebhookSubscriptionTargetUrlInvalid implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
-	targetUrl: String!
-	message: String!
 }
 
 type WebhookSubscriptions {

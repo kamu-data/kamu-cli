@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use async_graphql::value;
+use async_graphql::{value, PathSegment};
 use indoc::indoc;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
@@ -20,10 +20,42 @@ use kamu_webhooks::{
     WebhookSubscriptionSecret,
 };
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_services::CreateWebhookSubscriptionUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 
 use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const FIXED_SECRET: &str = "6923bdb993ca8290d0705dd13a31956f2853a1de15860ba8418293028bb1d17a";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_list_expected_event_types() {
+    let harness = WebhookSubscriptiuonsHarness::new(MockWebhookSecretGenerator::new()).await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptiuonsHarness::event_types_query())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "webhooks": {
+                "eventTypes": [
+                    kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED
+                ]
+            }
+        })
+    );
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +65,6 @@ async fn test_create_and_see_subscription() {
     let foo_dataset_alias =
         odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
 
-    const FIXED_SECRET: &str = "6923bdb993ca8290d0705dd13a31956f2853a1de15860ba8418293028bb1d17a";
     let mock_secret_generator =
         WebhookSubscriptiuonsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
 
@@ -50,7 +81,7 @@ async fn test_create_and_see_subscription() {
             .variables(async_graphql::Variables::from_json(json!({
                 "datasetId": create_result.dataset_handle.id.to_string(),
                 "targetUrl": "https://example.com/webhook",
-                "eventTypes": ["DATASET.REF.UPDATED"],
+                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
                 "label": "My Webhook Subscription",
             })))
             .data(harness.catalog_authorized.clone()),
@@ -58,6 +89,12 @@ async fn test_create_and_see_subscription() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
+    let subscription_id = res.data.clone().into_json().unwrap()["webhooks"]["subscriptions"]
+        ["createSubscription"]["subscriptionId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
     assert_eq!(
         res.data,
         value!({
@@ -66,6 +103,7 @@ async fn test_create_and_see_subscription() {
                     "createSubscription": {
                         "__typename": "CreateWebhookSubscriptionResultSuccess",
                         "message": "Success",
+                        "subscriptionId": subscription_id,
                         "secret": FIXED_SECRET
                     }
                 }
@@ -95,13 +133,308 @@ async fn test_create_and_see_subscription() {
                     "byDataset": [
                         {
                             "__typename": "WebhookSubscription",
+                            "id": subscription_id,
                             "datasetId": create_result.dataset_handle.id.to_string(),
                             "targetUrl": "https://example.com/webhook",
-                            "eventTypes": ["DATASET.REF.UPDATED"],
+                            "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
                             "label": "My Webhook Subscription",
                             "status": "ENABLED",
                         }
                     ]
+                }
+            }
+        })
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptiuonsHarness::subscription_by_id_query())
+                .variables(async_graphql::Variables::from_json(json!({
+                    "subscriptionId": subscription_id.clone(),
+                })))
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "webhooks": {
+                "subscriptions": {
+                    "byId": {
+                        "__typename": "WebhookSubscription",
+                        "id": subscription_id,
+                        "datasetId": create_result.dataset_handle.id.to_string(),
+                        "targetUrl": "https://example.com/webhook",
+                        "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                        "label": "My Webhook Subscription",
+                        "status": "ENABLED",
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_completely_invalid_target_urls() {
+    let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
+    let foo_dataset_alias =
+        odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
+
+    let mock_secret_generator =
+        WebhookSubscriptiuonsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
+
+    let harness = WebhookSubscriptiuonsHarness::new(mock_secret_generator).await;
+
+    let create_result = harness.create_root_dataset(foo_dataset_alias).await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let invalid_urls = ["", "123", "http://"];
+
+    for invalid_url in invalid_urls {
+        let res = schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": invalid_url,
+                    "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                    "label": "My Webhook Subscription",
+                })))
+                .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+
+        assert!(res.is_err(), "{res:?}");
+
+        let errors = res.errors;
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].message.contains("Invalid URL"),);
+
+        assert_eq!(
+            errors[0].path,
+            &[
+                PathSegment::Field("webhooks".into()),
+                PathSegment::Field("subscriptions".into()),
+                PathSegment::Field("createSubscription".into()),
+            ],
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_target_url_non_https_or_localhost() {
+    let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
+    let foo_dataset_alias =
+        odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
+
+    let mock_secret_generator =
+        WebhookSubscriptiuonsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
+
+    let harness = WebhookSubscriptiuonsHarness::new(mock_secret_generator).await;
+
+    let create_result = harness.create_root_dataset(foo_dataset_alias).await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let invalid_urls = [
+        "http://example.com/webhook",
+        "https://localhost:8080/webhook",
+        "https://127.0.0.1/webhook",
+    ];
+
+    for invalid_url in invalid_urls {
+        let res = schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": invalid_url,
+                    "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                    "label": "My Webhook Subscription",
+                })))
+                .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+
+        assert!(res.is_ok(), "{res:?}");
+        assert_eq!(
+            res.data,
+            value!({
+                "webhooks": {
+                    "subscriptions": {
+                        "createSubscription": {
+                            "__typename": "WebhookSubscriptionInvalidTargetUrl",
+                            "message": format!("Expecting https:// target URLs with host not pointing to 'localhost': {invalid_url}"),
+                        }
+                    }
+                }
+            })
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_bad_event_type() {
+    let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
+    let foo_dataset_alias =
+        odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
+
+    let mock_secret_generator =
+        WebhookSubscriptiuonsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
+
+    let harness = WebhookSubscriptiuonsHarness::new(mock_secret_generator).await;
+
+    let create_result = harness.create_root_dataset(foo_dataset_alias).await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "targetUrl": "https://example.com/webhook",
+                "eventTypes": ["BAD.EVENT.TYPE"],
+                "label": "My Webhook Subscription",
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_err(), "{res:?}");
+
+    let errors = res.errors;
+    assert_eq!(errors.len(), 1);
+    assert!(errors[0].message.contains("Invalid value 'BAD.EVENT.TYPE'"),);
+
+    assert_eq!(
+        errors[0].path,
+        &[
+            PathSegment::Field("webhooks".into()),
+            PathSegment::Field("subscriptions".into()),
+            PathSegment::Field("createSubscription".into()),
+        ],
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_no_event_types() {
+    let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
+    let foo_dataset_alias =
+        odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
+
+    let mock_secret_generator =
+        WebhookSubscriptiuonsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
+
+    let harness = WebhookSubscriptiuonsHarness::new(mock_secret_generator).await;
+
+    let create_result = harness.create_root_dataset(foo_dataset_alias).await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "targetUrl": "https://example.com/webhook",
+                "eventTypes": [],
+                "label": "My Webhook Subscription",
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "webhooks": {
+                "subscriptions": {
+                    "createSubscription": {
+                        "__typename": "WebhookSubscriptionNoEventTypesProvided",
+                        "message": "At least one event type must be provided",
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_duplicate_labels() {
+    let foo_dataset_name = odf::DatasetName::new_unchecked("foo");
+    let foo_dataset_alias =
+        odf::DatasetAlias::new(Some(DEFAULT_ACCOUNT_NAME.clone()), foo_dataset_name.clone());
+
+    let mock_secret_generator =
+        WebhookSubscriptiuonsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
+
+    let harness = WebhookSubscriptiuonsHarness::new(mock_secret_generator).await;
+
+    let create_result = harness.create_root_dataset(foo_dataset_alias).await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "targetUrl": "https://example.com/webhook/1",
+                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                "label": "My Webhook Subscription",
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "targetUrl": "https://example.com/webhook/2",
+                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                "label": "My Webhook Subscription",
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.data,
+        value!({
+            "webhooks": {
+                "subscriptions": {
+                    "createSubscription": {
+                        "__typename": "WebhookSubscriptionDuplicateLabel",
+                        "message": "Label 'My Webhook Subscription' is not unique",
+                    }
                 }
             }
         })
@@ -124,6 +457,7 @@ impl WebhookSubscriptiuonsHarness {
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
+            b.add::<CreateWebhookSubscriptionUseCaseImpl>();
             b.add_value(mock_secret_generator);
             b.bind::<dyn WebhookSecretGenerator, MockWebhookSecretGenerator>();
             b.add::<InMemoryWebhookSubscriptionEventStore>();
@@ -184,10 +518,23 @@ impl WebhookSubscriptiuonsHarness {
                             __typename
                             message
                             ... on CreateWebhookSubscriptionResultSuccess {
+                                subscriptionId
                                 secret
                             }
                         }
                     }
+                }
+            }
+          "#
+        )
+    }
+
+    fn event_types_query() -> &'static str {
+        indoc!(
+            r#"
+            query {
+                webhooks {
+                    eventTypes
                 }
             }
           "#
@@ -202,6 +549,29 @@ impl WebhookSubscriptiuonsHarness {
                     subscriptions {
                         byDataset(datasetId: $datasetId) {
                             __typename
+                            id
+                            datasetId
+                            targetUrl
+                            eventTypes
+                            label
+                            status
+                        }
+                    }
+                }
+            }
+          "#
+        )
+    }
+
+    fn subscription_by_id_query() -> &'static str {
+        indoc!(
+            r#"
+            query($subscriptionId: WebhookSubscriptionID!) {
+                webhooks {
+                    subscriptions {
+                        byId(subscriptionId: $subscriptionId) {
+                            __typename
+                            id
                             datasetId
                             targetUrl
                             eventTypes

@@ -56,32 +56,6 @@ impl WebhookSubscriptionsMut {
 
         Ok(maybe_subscription_id.is_none())
     }
-
-    fn convert_event_types(
-        event_types: &[String],
-    ) -> std::result::Result<
-        Vec<kamu_webhooks::WebhookEventType>,
-        WebhookSubscriptionEventTypeUnknown,
-    > {
-        let mut res_event_types = Vec::with_capacity(event_types.len());
-        for event_type in event_types {
-            let Ok(event_type) = kamu_webhooks::WebhookEventType::try_new(event_type) else {
-                return Err(WebhookSubscriptionEventTypeUnknown {
-                    event_type: event_type.to_string(),
-                });
-            };
-
-            if !kamu_webhooks::WebhookEventTypeCatalog::is_valid_type(&event_type) {
-                return Err(WebhookSubscriptionEventTypeUnknown {
-                    event_type: event_type.to_string(),
-                });
-            }
-
-            res_event_types.push(event_type);
-        }
-
-        Ok(res_event_types)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,65 +68,58 @@ impl WebhookSubscriptionsMut {
         ctx: &Context<'_>,
         input: CreateWebhookSubscriptionInput,
     ) -> Result<CreateWebhookSubscriptionResult> {
-        let subscription_event_store =
-            from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionEventStore);
+        // TODO: security checks
+        // TODO: check dataset exists
 
-        let Ok(target_url) = url::Url::parse(&input.target_url) else {
-            return Ok(CreateWebhookSubscriptionResult::TargetUrlInvalid(
-                WebhookSubscriptionTargetUrlInvalid {
-                    target_url: input.target_url.clone(),
+        let create_webhook_subscription_use_case =
+            from_catalog_n!(ctx, dyn kamu_webhooks::CreateWebhookSubscriptionUseCase);
+
+        match create_webhook_subscription_use_case
+            .execute(
+                input.dataset_id.map(Into::into),
+                input.target_url.0.clone(),
+                input
+                    .event_types
+                    .into_iter()
+                    .map(|et| kamu_webhooks::WebhookEventType::try_new(et.0).unwrap())
+                    .collect::<Vec<_>>(),
+                input.label,
+            )
+            .await
+        {
+            Ok(res) => Ok(CreateWebhookSubscriptionResult::Success(
+                CreateWebhookSubscriptionResultSuccess {
+                    subscription_id: res.subscription_id.to_string(),
+                    secret: res.secret.to_string(),
                 },
-            ));
-        };
+            )),
 
-        let event_types = match Self::convert_event_types(&input.event_types) {
-            Ok(event_types) => event_types,
-            Err(e) => {
-                return Ok(CreateWebhookSubscriptionResult::EventTypeUnknown(e));
+            Err(e @ kamu_webhooks::CreateWebhookSubscriptionError::InvalidTargetUrl(_)) => {
+                Ok(CreateWebhookSubscriptionResult::InvalidTargetUrl(
+                    WebhookSubscriptionInvalidTargetUrl {
+                        inner_message: e.to_string(),
+                    },
+                ))
             }
-        };
 
-        if let Some(dataset_id) = &input.dataset_id {
-            let label = kamu_webhooks::WebhookSubscriptionLabel::new(&input.label);
-            if !Self::check_label_is_unique(ctx, dataset_id, &label).await? {
-                return Ok(CreateWebhookSubscriptionResult::LabelNotUnique(
-                    WebhookSubscriptionLabelNotUnique {
+            Err(kamu_webhooks::CreateWebhookSubscriptionError::NoEventTypesProvided) => {
+                Ok(CreateWebhookSubscriptionResult::NoEventTypesProvided(
+                    WebhookSubscriptionNoEventTypesProvided { num_event_types: 0 },
+                ))
+            }
+
+            Err(kamu_webhooks::CreateWebhookSubscriptionError::DuplicateLabel(label)) => {
+                Ok(CreateWebhookSubscriptionResult::DuplicateLabel(
+                    WebhookSubscriptionDuplicateLabel {
                         label: label.to_string(),
                     },
-                ));
+                ))
             }
 
-            let secret_generator = from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSecretGenerator);
-            let secret = secret_generator.generate_secret();
-
-            let subscription_id = kamu_webhooks::WebhookSubscriptionID::new(uuid::Uuid::new_v4());
-
-            let mut subscription = kamu_webhooks::WebhookSubscription::new(
-                subscription_id,
-                target_url,
-                label,
-                Some(dataset_id.clone().into()),
-                event_types,
-                secret.clone(),
-            );
-            subscription
-                .enable()
-                .map_err(|e| GqlError::Internal(e.int_err()))?;
-
-            subscription
-                .save(subscription_event_store.as_ref())
-                .await
-                .map_err(|e| GqlError::Internal(e.int_err()))?;
-
-            return Ok(CreateWebhookSubscriptionResult::Success(
-                CreateWebhookSubscriptionResultSuccess {
-                    secret: secret.to_string(),
-                },
-            ));
+            Err(kamu_webhooks::CreateWebhookSubscriptionError::Internal(e)) => {
+                Err(GqlError::Internal(e))
+            }
         }
-
-        // TODO system subscription
-        unimplemented!()
     }
 
     async fn update_subscription(
@@ -161,13 +128,15 @@ impl WebhookSubscriptionsMut {
         subscription_id: WebhookSubscriptionID,
         input: UpdateWebhookSubscriptionInput,
     ) -> Result<UpdateWebhookSubscriptionResult> {
+        // TODO: security checks
+
         let maybe_subscription = Self::resolve_subscription(ctx, subscription_id).await?;
         if let Some(mut subscription) = maybe_subscription {
             let label = kamu_webhooks::WebhookSubscriptionLabel::new(&input.label);
             if let Some(dataset_id) = subscription.dataset_id() {
                 if !Self::check_label_is_unique(ctx, dataset_id, &label).await? {
-                    return Ok(UpdateWebhookSubscriptionResult::LabelNotUnique(
-                        WebhookSubscriptionLabelNotUnique {
+                    return Ok(UpdateWebhookSubscriptionResult::DuplicateLabel(
+                        WebhookSubscriptionDuplicateLabel {
                             label: label.to_string(),
                         },
                     ));
@@ -176,23 +145,14 @@ impl WebhookSubscriptionsMut {
 
             // TODO: check label is unique for system subscriptions
 
-            let Ok(target_url) = url::Url::parse(&input.target_url) else {
-                return Ok(UpdateWebhookSubscriptionResult::TargetUrlInvalid(
-                    WebhookSubscriptionTargetUrlInvalid {
-                        target_url: input.target_url.clone(),
-                    },
-                ));
-            };
-
-            let event_types = match Self::convert_event_types(&input.event_types) {
-                Ok(event_types) => event_types,
-                Err(e) => {
-                    return Ok(UpdateWebhookSubscriptionResult::EventTypeUnknown(e));
-                }
-            };
+            let event_types = input
+                .event_types
+                .into_iter()
+                .map(|et| kamu_webhooks::WebhookEventType::try_new(et.0).unwrap())
+                .collect::<Vec<_>>();
 
             subscription
-                .modify(target_url, label, event_types)
+                .modify(input.target_url.0, label, event_types)
                 .map_err(|e| GqlError::Internal(e.int_err()))?;
 
             let subscription_event_store =
@@ -217,6 +177,8 @@ impl WebhookSubscriptionsMut {
         ctx: &Context<'_>,
         subscription_id: WebhookSubscriptionID,
     ) -> Result<PauseWebhookSubscriptionResult> {
+        // TODO: security checks
+
         let maybe_subscription = Self::resolve_subscription(ctx, subscription_id).await?;
         if let Some(mut subscription) = maybe_subscription {
             subscription
@@ -238,6 +200,8 @@ impl WebhookSubscriptionsMut {
         ctx: &Context<'_>,
         subscription_id: WebhookSubscriptionID,
     ) -> Result<ResumeWebhookSubscriptionResult> {
+        // TODO: security checks
+
         let maybe_subscription = Self::resolve_subscription(ctx, subscription_id).await?;
         if let Some(mut subscription) = maybe_subscription {
             subscription
@@ -259,6 +223,8 @@ impl WebhookSubscriptionsMut {
         ctx: &Context<'_>,
         subscription_id: WebhookSubscriptionID,
     ) -> Result<RemoveWebhookSubscriptionResult> {
+        // TODO: security checks
+
         let maybe_subscription = Self::resolve_subscription(ctx, subscription_id).await?;
         if let Some(mut subscription) = maybe_subscription {
             subscription
@@ -281,8 +247,8 @@ impl WebhookSubscriptionsMut {
 #[derive(InputObject, Debug)]
 pub struct CreateWebhookSubscriptionInput {
     dataset_id: Option<DatasetID<'static>>,
-    target_url: String,
-    event_types: Vec<String>,
+    target_url: GqlUrl,
+    event_types: Vec<WebhookEventType>,
     label: String,
 }
 
@@ -290,8 +256,8 @@ pub struct CreateWebhookSubscriptionInput {
 
 #[derive(InputObject, Debug)]
 pub struct UpdateWebhookSubscriptionInput {
-    target_url: String,
-    event_types: Vec<String>,
+    target_url: GqlUrl,
+    event_types: Vec<WebhookEventType>,
     label: String,
 }
 
@@ -301,14 +267,15 @@ pub struct UpdateWebhookSubscriptionInput {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateWebhookSubscriptionResult {
     Success(CreateWebhookSubscriptionResultSuccess),
-    LabelNotUnique(WebhookSubscriptionLabelNotUnique),
-    TargetUrlInvalid(WebhookSubscriptionTargetUrlInvalid),
-    EventTypeUnknown(WebhookSubscriptionEventTypeUnknown),
+    DuplicateLabel(WebhookSubscriptionDuplicateLabel),
+    InvalidTargetUrl(WebhookSubscriptionInvalidTargetUrl),
+    NoEventTypesProvided(WebhookSubscriptionNoEventTypesProvided),
 }
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateWebhookSubscriptionResultSuccess {
+    subscription_id: String,
     secret: String,
 }
 
@@ -326,9 +293,9 @@ impl CreateWebhookSubscriptionResultSuccess {
 pub enum UpdateWebhookSubscriptionResult {
     Success(UpdateWebhookSubscriptionResultSuccess),
     NotFound(WebhookSubscriptionNotFound),
-    LabelNotUnique(WebhookSubscriptionLabelNotUnique),
-    TargetUrlInvalid(WebhookSubscriptionTargetUrlInvalid),
-    EventTypeUnknown(WebhookSubscriptionEventTypeUnknown),
+    DuplicateLabel(WebhookSubscriptionDuplicateLabel),
+    InvalidTargetUrl(WebhookSubscriptionInvalidTargetUrl),
+    NoEventTypesProvided(WebhookSubscriptionNoEventTypesProvided),
 }
 
 #[derive(SimpleObject, Debug)]
@@ -428,12 +395,12 @@ impl WebhookSubscriptionNotFound {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct WebhookSubscriptionLabelNotUnique {
+pub struct WebhookSubscriptionDuplicateLabel {
     label: String,
 }
 
 #[ComplexObject]
-impl WebhookSubscriptionLabelNotUnique {
+impl WebhookSubscriptionDuplicateLabel {
     async fn message(&self) -> String {
         format!("Label '{}' is not unique", self.label)
     }
@@ -443,14 +410,14 @@ impl WebhookSubscriptionLabelNotUnique {
 
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
-pub struct WebhookSubscriptionTargetUrlInvalid {
-    target_url: String,
+pub struct WebhookSubscriptionInvalidTargetUrl {
+    inner_message: String,
 }
 
 #[ComplexObject]
-impl WebhookSubscriptionTargetUrlInvalid {
+impl WebhookSubscriptionInvalidTargetUrl {
     async fn message(&self) -> String {
-        format!("Target URL '{}' is invalid", self.target_url)
+        self.inner_message.clone()
     }
 }
 
@@ -466,6 +433,21 @@ pub struct WebhookSubscriptionEventTypeUnknown {
 impl WebhookSubscriptionEventTypeUnknown {
     async fn message(&self) -> String {
         format!("Event type '{}' is unknown", self.event_type)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct WebhookSubscriptionNoEventTypesProvided {
+    num_event_types: usize,
+}
+
+#[ComplexObject]
+impl WebhookSubscriptionNoEventTypesProvided {
+    async fn message(&self) -> String {
+        "At least one event type must be provided".to_string()
     }
 }
 

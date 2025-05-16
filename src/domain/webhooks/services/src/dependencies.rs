@@ -21,6 +21,8 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<WebhookSenderImpl>();
     catalog_builder.add::<WebhookSecretGeneratorImpl>();
     catalog_builder.add::<WebhookDatasetRemovalHandler>();
+
+    catalog_builder.add::<CreateWebhookSubscriptionUseCaseImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
