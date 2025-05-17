@@ -38,8 +38,6 @@ impl UpdateWebhookSubscriptionUseCase for UpdateWebhookSubscriptionUseCaseImpl {
         event_types: Vec<WebhookEventType>,
         label: WebhookSubscriptionLabel,
     ) -> Result<(), UpdateWebhookSubscriptionError> {
-        // TODO: security checks
-
         let mut subscription = crate::helpers::resolve_webhook_subscription(
             subscription_id,
             self.subscription_event_store.clone(),

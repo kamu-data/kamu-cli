@@ -39,9 +39,6 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
         event_types: Vec<WebhookEventType>,
         label: WebhookSubscriptionLabel,
     ) -> Result<CreateWebhookSubscriptionResult, CreateWebhookSubscriptionError> {
-        // TODO: check dataset exists
-        // TODO: security checks
-
         use super::helpers::*;
         validate_webhook_target_url(&target_url)?;
         validate_webhook_event_types(&event_types)?;

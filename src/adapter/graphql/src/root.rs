@@ -103,14 +103,6 @@ impl Mutation {
     async fn accounts(&self) -> AccountsMut {
         AccountsMut
     }
-
-    /// Webhook-related functionality group
-    ///
-    /// Webhooks are used to send notifications about events happening in the
-    /// system. This groups deals with their management and subscriptions.
-    async fn webhooks(&self) -> WebhooksMut {
-        WebhooksMut
-    }
 }
 
 pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;

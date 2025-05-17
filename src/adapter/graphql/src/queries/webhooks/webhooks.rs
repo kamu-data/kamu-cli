@@ -9,8 +9,6 @@
 
 use async_graphql::Object;
 
-use crate::queries::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Webhooks;
@@ -26,11 +24,6 @@ impl Webhooks {
             .iter()
             .map(ToString::to_string)
             .collect()
-    }
-
-    /// Access to the webhook subscriptions methods
-    async fn subscriptions(&self) -> WebhookSubscriptions {
-        WebhookSubscriptions
     }
 }
 

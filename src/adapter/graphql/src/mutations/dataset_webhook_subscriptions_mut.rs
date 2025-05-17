@@ -10,27 +10,43 @@
 use async_graphql::{ComplexObject, InputObject, Interface, Object, SimpleObject};
 
 use crate::prelude::*;
+use crate::queries::*;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct WebhookSubscriptionsMut;
+pub struct DatasetWebhookSubscriptionsMut<'a> {
+    dataset_request_state: &'a DatasetRequestState,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl WebhookSubscriptionsMut {
+impl<'a> DatasetWebhookSubscriptionsMut<'a> {
+    #[graphql(skip)]
+    pub async fn new_with_access_check(
+        ctx: &Context<'_>,
+        dataset_request_state: &'a DatasetRequestState,
+    ) -> Result<Self> {
+        utils::check_dataset_maintain_access(ctx, dataset_request_state).await?;
+
+        Ok(Self {
+            dataset_request_state,
+        })
+    }
+
     async fn create_subscription(
         &self,
         ctx: &Context<'_>,
-        input: CreateWebhookSubscriptionInput,
+        input: WebhookSubscriptionInput,
     ) -> Result<CreateWebhookSubscriptionResult> {
         let create_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::CreateWebhookSubscriptionUseCase);
 
         match create_webhook_subscription_use_case
             .execute(
-                input.dataset_id.map(Into::into),
+                Some(self.dataset_request_state.dataset_id().clone()),
                 input.target_url.0.clone(),
                 input
                     .event_types
@@ -78,7 +94,7 @@ impl WebhookSubscriptionsMut {
         &self,
         ctx: &Context<'_>,
         subscription_id: WebhookSubscriptionID,
-        input: UpdateWebhookSubscriptionInput,
+        input: WebhookSubscriptionInput,
     ) -> Result<UpdateWebhookSubscriptionResult> {
         let update_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::UpdateWebhookSubscriptionUseCase);
@@ -220,17 +236,7 @@ impl WebhookSubscriptionsMut {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug)]
-pub struct CreateWebhookSubscriptionInput {
-    dataset_id: Option<DatasetID<'static>>,
-    target_url: GqlUrl,
-    event_types: Vec<WebhookEventType>,
-    label: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(InputObject, Debug)]
-pub struct UpdateWebhookSubscriptionInput {
+pub struct WebhookSubscriptionInput {
     target_url: GqlUrl,
     event_types: Vec<WebhookEventType>,
     label: String,

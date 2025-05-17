@@ -20,7 +20,10 @@ use kamu_webhooks::{
     WebhookSubscriptionSecret,
 };
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
-use kamu_webhooks_services::CreateWebhookSubscriptionUseCaseImpl;
+use kamu_webhooks_services::{
+    CreateWebhookSubscriptionUseCaseImpl,
+    WebhookSubscriptionQueryServiceImpl,
+};
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 
@@ -89,8 +92,8 @@ async fn test_create_and_see_subscription() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    let subscription_id = res.data.clone().into_json().unwrap()["webhooks"]["subscriptions"]
-        ["createSubscription"]["subscriptionId"]
+    let subscription_id = res.data.clone().into_json().unwrap()["datasets"]["byId"]
+        ["webhookSubscriptions"]["createSubscription"]["subscriptionId"]
         .as_str()
         .unwrap()
         .to_string();
@@ -98,15 +101,18 @@ async fn test_create_and_see_subscription() {
     assert_eq!(
         res.data,
         value!({
-            "webhooks": {
-                "subscriptions": {
-                    "createSubscription": {
-                        "__typename": "CreateWebhookSubscriptionResultSuccess",
-                        "message": "Success",
-                        "subscriptionId": subscription_id,
-                        "secret": FIXED_SECRET
+            "datasets": {
+                "byId": {
+                    "webhookSubscriptions": {
+                        "createSubscription": {
+                            "__typename": "CreateWebhookSubscriptionResultSuccess",
+                            "message": "Success",
+                            "subscriptionId": subscription_id,
+                            "secret": FIXED_SECRET
+                        }
                     }
                 }
+
             }
         })
     );
@@ -128,20 +134,23 @@ async fn test_create_and_see_subscription() {
     assert_eq!(
         res.data,
         value!({
-            "webhooks": {
-                "subscriptions": {
-                    "byDataset": [
-                        {
-                            "__typename": "WebhookSubscription",
-                            "id": subscription_id,
-                            "datasetId": create_result.dataset_handle.id.to_string(),
-                            "targetUrl": "https://example.com/webhook",
-                            "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
-                            "label": "My Webhook Subscription",
-                            "status": "ENABLED",
-                        }
-                    ]
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "subscriptions": [
+                            {
+                                "__typename": "WebhookSubscription",
+                                "id": subscription_id,
+                                "datasetId": create_result.dataset_handle.id.to_string(),
+                                "targetUrl": "https://example.com/webhook",
+                                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                                "label": "My Webhook Subscription",
+                                "status": "ENABLED",
+                            }
+                        ]
+                    }
                 }
+
             }
         })
     );
@@ -150,6 +159,7 @@ async fn test_create_and_see_subscription() {
         .execute(
             async_graphql::Request::new(WebhookSubscriptiuonsHarness::subscription_by_id_query())
                 .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
                     "subscriptionId": subscription_id.clone(),
                 })))
                 .data(harness.catalog_authorized.clone()),
@@ -160,16 +170,18 @@ async fn test_create_and_see_subscription() {
     assert_eq!(
         res.data,
         value!({
-            "webhooks": {
-                "subscriptions": {
-                    "byId": {
-                        "__typename": "WebhookSubscription",
-                        "id": subscription_id,
-                        "datasetId": create_result.dataset_handle.id.to_string(),
-                        "targetUrl": "https://example.com/webhook",
-                        "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
-                        "label": "My Webhook Subscription",
-                        "status": "ENABLED",
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "subscription": {
+                            "__typename": "WebhookSubscription",
+                            "id": subscription_id,
+                            "datasetId": create_result.dataset_handle.id.to_string(),
+                            "targetUrl": "https://example.com/webhook",
+                            "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                            "label": "My Webhook Subscription",
+                            "status": "ENABLED",
+                        }
                     }
                 }
             }
@@ -220,8 +232,9 @@ async fn test_completely_invalid_target_urls() {
         assert_eq!(
             errors[0].path,
             &[
-                PathSegment::Field("webhooks".into()),
-                PathSegment::Field("subscriptions".into()),
+                PathSegment::Field("datasets".into()),
+                PathSegment::Field("byId".into()),
+                PathSegment::Field("webhookSubscriptions".into()),
                 PathSegment::Field("createSubscription".into()),
             ],
         );
@@ -270,11 +283,13 @@ async fn test_target_url_non_https_or_localhost() {
         assert_eq!(
             res.data,
             value!({
-                "webhooks": {
-                    "subscriptions": {
-                        "createSubscription": {
-                            "__typename": "WebhookSubscriptionInvalidTargetUrl",
-                            "message": format!("Expecting https:// target URLs with host not pointing to 'localhost': {invalid_url}"),
+                "datasets": {
+                    "byId": {
+                        "webhookSubscriptions": {
+                            "createSubscription": {
+                                "__typename": "WebhookSubscriptionInvalidTargetUrl",
+                                "message": format!("Expecting https:// target URLs with host not pointing to 'localhost': {invalid_url}"),
+                            }
                         }
                     }
                 }
@@ -323,8 +338,9 @@ async fn test_bad_event_type() {
     assert_eq!(
         errors[0].path,
         &[
-            PathSegment::Field("webhooks".into()),
-            PathSegment::Field("subscriptions".into()),
+            PathSegment::Field("datasets".into()),
+            PathSegment::Field("byId".into()),
+            PathSegment::Field("webhookSubscriptions".into()),
             PathSegment::Field("createSubscription".into()),
         ],
     );
@@ -365,11 +381,13 @@ async fn test_no_event_types() {
     assert_eq!(
         res.data,
         value!({
-            "webhooks": {
-                "subscriptions": {
-                    "createSubscription": {
-                        "__typename": "WebhookSubscriptionNoEventTypesProvided",
-                        "message": "At least one event type must be provided",
+            "datasets": {
+                "byId": {
+                    "webhookSubscriptions": {
+                        "createSubscription": {
+                            "__typename": "WebhookSubscriptionNoEventTypesProvided",
+                            "message": "At least one event type must be provided",
+                        }
                     }
                 }
             }
@@ -429,11 +447,13 @@ async fn test_duplicate_labels() {
     assert_eq!(
         res.data,
         value!({
-            "webhooks": {
-                "subscriptions": {
-                    "createSubscription": {
-                        "__typename": "WebhookSubscriptionDuplicateLabel",
-                        "message": "Label 'My Webhook Subscription' is not unique",
+            "datasets": {
+                "byId": {
+                    "webhookSubscriptions": {
+                        "createSubscription": {
+                            "__typename": "WebhookSubscriptionDuplicateLabel",
+                            "message": "Label 'My Webhook Subscription' is not unique",
+                        }
                     }
                 }
             }
@@ -458,6 +478,7 @@ impl WebhookSubscriptiuonsHarness {
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
             b.add::<CreateWebhookSubscriptionUseCaseImpl>();
+            b.add::<WebhookSubscriptionQueryServiceImpl>();
             b.add_value(mock_secret_generator);
             b.bind::<dyn WebhookSecretGenerator, MockWebhookSecretGenerator>();
             b.add::<InMemoryWebhookSubscriptionEventStore>();
@@ -505,21 +526,22 @@ impl WebhookSubscriptiuonsHarness {
         indoc!(
             r#"
             mutation ($datasetId: DatasetID!, $targetUrl: String!, $eventTypes: [String!]!, $label: String!) {
-                webhooks {
-                    subscriptions {
-                        createSubscription(
-                            input: {
-                                datasetId: $datasetId
-                                targetUrl: $targetUrl
-                                eventTypes: $eventTypes
-                                label: $label
-                            }
-                        ) {
-                            __typename
-                            message
-                            ... on CreateWebhookSubscriptionResultSuccess {
-                                subscriptionId
-                                secret
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        webhookSubscriptions {
+                            createSubscription(
+                                input: {
+                                    targetUrl: $targetUrl
+                                    eventTypes: $eventTypes
+                                    label: $label
+                                }
+                            ) {
+                                __typename
+                                message
+                                ... on CreateWebhookSubscriptionResultSuccess {
+                                    subscriptionId
+                                    secret
+                                }
                             }
                         }
                     }
@@ -545,16 +567,18 @@ impl WebhookSubscriptiuonsHarness {
         indoc!(
             r#"
             query($datasetId: DatasetID!) {
-                webhooks {
-                    subscriptions {
-                        byDataset(datasetId: $datasetId) {
-                            __typename
-                            id
-                            datasetId
-                            targetUrl
-                            eventTypes
-                            label
-                            status
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        webhooks {
+                            subscriptions {
+                                __typename
+                                id
+                                datasetId
+                                targetUrl
+                                eventTypes
+                                label
+                                status
+                            }
                         }
                     }
                 }
@@ -566,17 +590,19 @@ impl WebhookSubscriptiuonsHarness {
     fn subscription_by_id_query() -> &'static str {
         indoc!(
             r#"
-            query($subscriptionId: WebhookSubscriptionID!) {
-                webhooks {
-                    subscriptions {
-                        byId(subscriptionId: $subscriptionId) {
-                            __typename
-                            id
-                            datasetId
-                            targetUrl
-                            eventTypes
-                            label
-                            status
+            query($datasetId: DatasetID!, $subscriptionId: WebhookSubscriptionID!) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        webhooks {
+                            subscription(id: $subscriptionId) {
+                                __typename
+                                id
+                                datasetId
+                                targetUrl
+                                eventTypes
+                                label
+                                status
+                            }
                         }
                     }
                 }

@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod webhook_subscription;
-mod webhook_subscriptions;
 mod webhooks;
 
 pub use webhook_subscription::*;
-pub use webhook_subscriptions::*;
 pub use webhooks::*;

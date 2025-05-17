@@ -11,14 +11,7 @@ use chrono::{DateTime, Utc};
 use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
 
-use crate::mutations::{
-    CollectionMut,
-    DatasetCollaborationMut,
-    DatasetEnvVarsMut,
-    DatasetFlowsMut,
-    DatasetMetadataMut,
-    VersionedFileMut,
-};
+use crate::mutations::*;
 use crate::prelude::*;
 use crate::queries::*;
 use crate::utils::{self, from_catalog_n};
@@ -59,6 +52,15 @@ impl DatasetMut {
     /// Access to collaboration management methods
     async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaborationMut> {
         DatasetCollaborationMut::new_with_access_check(ctx, &self.dataset_request_state).await
+    }
+
+    /// Access to webhooks subscriptions management methods
+    async fn webhook_subscriptions(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<DatasetWebhookSubscriptionsMut> {
+        DatasetWebhookSubscriptionsMut::new_with_access_check(ctx, &self.dataset_request_state)
+            .await
     }
 
     /// Rename the dataset

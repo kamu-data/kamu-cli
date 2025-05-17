@@ -35,7 +35,6 @@ impl RemoveWebhookSubscriptionUseCase for RemoveWebhookSubscriptionUseCaseImpl {
         &self,
         subscription_id: WebhookSubscriptionID,
     ) -> Result<(), RemoveWebhookSubscriptionError> {
-        // TODO: security checks
         // TODO: idempontency
 
         let mut subscription = crate::helpers::resolve_webhook_subscription(

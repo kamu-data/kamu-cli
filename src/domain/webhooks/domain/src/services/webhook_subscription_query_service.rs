@@ -7,23 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::Object;
+use internal_error::InternalError;
 
-use crate::mutations::WebhookSubscriptionsMut;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct WebhooksMut;
+use crate::{WebhookSubscription, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
-#[Object]
-impl WebhooksMut {
-    /// Access to the mutable webhook subscriptions methods
-    async fn subscriptions(&self) -> WebhookSubscriptionsMut {
-        WebhookSubscriptionsMut
-    }
+#[async_trait::async_trait]
+pub trait WebhookSubscriptionQueryService: Send + Sync {
+    async fn list_dataset_webhook_subscriptions(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<WebhookSubscription>, InternalError>;
+
+    async fn find_dataset_webhook_subscription(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+    ) -> Result<Option<WebhookSubscription>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

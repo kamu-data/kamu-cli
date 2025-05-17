@@ -712,13 +712,6 @@ interface CreateTokenResult {
 	message: String!
 }
 
-input CreateWebhookSubscriptionInput {
-	datasetId: DatasetID
-	targetUrl: URL!
-	eventTypes: [WebhookEventType!]!
-	label: String!
-}
-
 interface CreateWebhookSubscriptionResult {
 	message: String!
 }
@@ -913,6 +906,10 @@ type Dataset {
 	Access to the dataset collaboration data
 	"""
 	collaboration: DatasetCollaboration!
+	"""
+	Access to the dataset collaboration data
+	"""
+	webhooks: DatasetWebhooks!
 	"""
 	Various endpoints for interacting with data
 	"""
@@ -1230,6 +1227,10 @@ type DatasetMut {
 	"""
 	collaboration: DatasetCollaborationMut!
 	"""
+	Access to webhooks subscriptions management methods
+	"""
+	webhookSubscriptions: DatasetWebhookSubscriptionsMut!
+	"""
 	Rename the dataset
 	"""
 	rename(newName: DatasetName!): RenameResult!
@@ -1261,6 +1262,7 @@ type DatasetPermissions {
 	collaboration: DatasetCollaborationPermissions!
 	envVars: DatasetEnvVarsPermissions!
 	flows: DatasetFlowsPermissions!
+	webhooks: DatasetWebhooksPermissions!
 	general: DatasetGeneralPermissions!
 	metadata: DatasetMetadataPermissions!
 }
@@ -1305,6 +1307,30 @@ input DatasetVisibilityInput @oneOf {
 }
 
 union DatasetVisibilityOutput = PrivateDatasetVisibility | PublicDatasetVisibility
+
+type DatasetWebhookSubscriptionsMut {
+	createSubscription(input: WebhookSubscriptionInput!): CreateWebhookSubscriptionResult!
+	updateSubscription(subscriptionId: WebhookSubscriptionID!, input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
+	pauseSubscription(subscriptionId: WebhookSubscriptionID!): PauseWebhookSubscriptionResult!
+	resumeSubscription(subscriptionId: WebhookSubscriptionID!): ResumeWebhookSubscriptionResult!
+	removeSubscription(subscriptionId: WebhookSubscriptionID!): RemoveWebhookSubscriptionResult!
+}
+
+type DatasetWebhooks {
+	"""
+	Lists all webhook subscriptions for the dataset
+	"""
+	subscriptions: [WebhookSubscription!]!
+	"""
+	Returns a webhook subscription by ID
+	"""
+	subscription(id: WebhookSubscriptionID!): WebhookSubscription
+}
+
+type DatasetWebhooksPermissions {
+	canView: Boolean!
+	canUpdate: Boolean!
+}
 
 type Datasets {
 	"""
@@ -2467,13 +2493,6 @@ type Mutation {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: AccountsMut!
-	"""
-	Webhook-related functionality group
-	
-	Webhooks are used to send notifications about events happening in the
-	system. This groups deals with their management and subscriptions.
-	"""
-	webhooks: WebhooksMut!
 }
 
 union NameLookupResult = Account
@@ -3572,12 +3591,6 @@ type UpdateVersionSuccess implements UpdateVersionResult {
 	message: String!
 }
 
-input UpdateWebhookSubscriptionInput {
-	targetUrl: URL!
-	eventTypes: [WebhookEventType!]!
-	label: String!
-}
-
 interface UpdateWebhookSubscriptionResult {
 	message: String!
 }
@@ -3871,6 +3884,12 @@ type WebhookSubscriptionDuplicateLabel implements CreateWebhookSubscriptionResul
 
 scalar WebhookSubscriptionID
 
+input WebhookSubscriptionInput {
+	targetUrl: URL!
+	eventTypes: [WebhookEventType!]!
+	label: String!
+}
+
 type WebhookSubscriptionInvalidTargetUrl implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
 	innerMessage: String!
 	message: String!
@@ -3894,35 +3913,11 @@ enum WebhookSubscriptionStatus {
 	REMOVED
 }
 
-type WebhookSubscriptions {
-	byDataset(datasetId: DatasetID!): [WebhookSubscription!]!
-	byId(subscriptionId: WebhookSubscriptionID!): WebhookSubscription
-}
-
-type WebhookSubscriptionsMut {
-	createSubscription(input: CreateWebhookSubscriptionInput!): CreateWebhookSubscriptionResult!
-	updateSubscription(subscriptionId: WebhookSubscriptionID!, input: UpdateWebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
-	pauseSubscription(subscriptionId: WebhookSubscriptionID!): PauseWebhookSubscriptionResult!
-	resumeSubscription(subscriptionId: WebhookSubscriptionID!): ResumeWebhookSubscriptionResult!
-	removeSubscription(subscriptionId: WebhookSubscriptionID!): RemoveWebhookSubscriptionResult!
-}
-
 type Webhooks {
 	"""
 	List of supported event types
 	"""
 	eventTypes: [String!]!
-	"""
-	Access to the webhook subscriptions methods
-	"""
-	subscriptions: WebhookSubscriptions!
-}
-
-type WebhooksMut {
-	"""
-	Access to the mutable webhook subscriptions methods
-	"""
-	subscriptions: WebhookSubscriptionsMut!
 }
 
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
