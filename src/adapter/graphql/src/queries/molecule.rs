@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use kamu::domain;
 use kamu_core::DatasetRegistryExt as _;
 
+use super::CollectionEntry;
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
 
@@ -475,6 +476,8 @@ impl MoleculeProject {
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[ComplexObject]
 impl MoleculeProject {
+    const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
+
     /// Project's organizational account
     #[tracing::instrument(level = "info", name = MoleculeProject_account, skip_all)]
     async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
@@ -503,6 +506,88 @@ impl MoleculeProject {
             )),
         }
     }
+
+    /// Project's activity events in reverse chronological order
+    #[tracing::instrument(level = "info", name = MoleculeProject_activity, skip_all)]
+    async fn activity(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<MoleculeProjectEventConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
+
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
+        let last_records = async |dataset_id: &odf::DatasetID| -> Result<Vec<serde_json::Value>> {
+            let Some(df) = query_svc
+                .tail(
+                    &dataset_id.as_local_ref(),
+                    0,
+                    (per_page * (page + 1)) as u64,
+                    domain::GetDataOptions::default(),
+                )
+                .await
+                .int_err()?
+                .df
+            else {
+                return Ok(Vec::new());
+            };
+
+            let df = df
+                .sort(vec![datafusion::prelude::col(
+                    odf::metadata::DatasetVocabulary::default().offset_column,
+                )
+                .sort(false, false)])
+                .int_err()?;
+
+            let records = df.collect_json_aos().await.int_err()?;
+
+            Ok(records)
+        };
+
+        // Fetch last records
+        let mut merged_records = Vec::new();
+        merged_records.append(&mut last_records(&self.announcements_dataset_id).await?);
+        merged_records.append(&mut last_records(&self.data_room_dataset_id).await?);
+
+        // Order and truncate
+        merged_records.sort_by(|a, b| {
+            a["system_time"]
+                .as_str()
+                .unwrap()
+                .cmp(b["system_time"].as_str().unwrap())
+                .reverse()
+        });
+
+        let mut nodes = Vec::new();
+        for record in merged_records.into_iter().skip(page * per_page) {
+            if !record["announcement_id"].is_null() {
+                nodes.push(MoleculeProjectEvent::Announcement(
+                    MoleculeProjectEventAnnouncement {
+                        announcement: record,
+                    },
+                ));
+            } else {
+                let entry = CollectionEntry::from_json(record);
+
+                nodes.push(MoleculeProjectEvent::DataRoomEntryAdded(
+                    MoleculeProjectEventDataRoomEntryAdded { entry },
+                ));
+            }
+        }
+
+        // TODO: Need quasi-infinite connection API
+        let total_count = (page * per_page) + nodes.len() + 1;
+
+        Ok(MoleculeProjectEventConnection::new(
+            nodes,
+            page,
+            per_page,
+            total_count,
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -511,6 +596,33 @@ page_based_connection!(
     MoleculeProject,
     MoleculeProjectConnection,
     MoleculeProjectEdge
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union)]
+
+pub enum MoleculeProjectEvent {
+    DataRoomEntryAdded(MoleculeProjectEventDataRoomEntryAdded),
+    Announcement(MoleculeProjectEventAnnouncement),
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeProjectEventDataRoomEntryAdded {
+    /// Collection entry
+    pub entry: CollectionEntry,
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeProjectEventAnnouncement {
+    /// Announcement record
+    pub announcement: serde_json::Value,
+}
+
+page_based_connection!(
+    MoleculeProjectEvent,
+    MoleculeProjectEventConnection,
+    MoleculeProjectEventEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

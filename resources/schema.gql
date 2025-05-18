@@ -2500,6 +2500,10 @@ type MoleculeProject {
 	Project's announcements dataset
 	"""
 	announcements: Dataset!
+	"""
+	Project's activity events in reverse chronological order
+	"""
+	activity(page: Int, perPage: Int): MoleculeProjectEventConnection!
 }
 
 type MoleculeProjectConnection {
@@ -2520,6 +2524,42 @@ type MoleculeProjectConnection {
 
 type MoleculeProjectEdge {
 	node: MoleculeProject!
+}
+
+union MoleculeProjectEvent = MoleculeProjectEventDataRoomEntryAdded | MoleculeProjectEventAnnouncement
+
+type MoleculeProjectEventAnnouncement {
+	"""
+	Announcement record
+	"""
+	announcement: JSON!
+}
+
+type MoleculeProjectEventConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeProjectEvent!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MoleculeProjectEventEdge!]!
+}
+
+type MoleculeProjectEventDataRoomEntryAdded {
+	"""
+	Collection entry
+	"""
+	entry: CollectionEntry!
+}
+
+type MoleculeProjectEventEdge {
+	node: MoleculeProjectEvent!
 }
 
 type MoleculeProjectMut {

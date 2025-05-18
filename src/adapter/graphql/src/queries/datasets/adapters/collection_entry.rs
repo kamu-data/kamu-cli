@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::ResolvedDataset;
 
 use crate::mutations::CollectionEntryInput;
 use crate::prelude::*;
@@ -19,10 +18,6 @@ use crate::queries::Dataset;
 #[derive(SimpleObject, Clone)]
 #[graphql(complex)]
 pub struct CollectionEntry {
-    #[graphql(skip)]
-    #[expect(dead_code)]
-    dataset: ResolvedDataset,
-
     /// Time when this version was created
     pub system_time: DateTime<Utc>,
 
@@ -45,14 +40,13 @@ pub struct CollectionEntry {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CollectionEntry {
-    pub fn from_input(dataset: ResolvedDataset, input: CollectionEntryInput) -> Self {
+    pub fn from_input(input: CollectionEntryInput) -> Self {
         let extra_data = input
             .extra_data
             .unwrap_or(serde_json::Value::Object(Default::default()));
         let now = Utc::now();
 
         Self {
-            dataset,
             system_time: now,
             event_time: now,
             path: input.path,
@@ -61,7 +55,7 @@ impl CollectionEntry {
         }
     }
 
-    pub fn from_json(dataset: ResolvedDataset, record: serde_json::Value) -> Self {
+    pub fn from_json(record: serde_json::Value) -> Self {
         let serde_json::Value::Object(mut record) = record else {
             unreachable!()
         };
@@ -95,7 +89,6 @@ impl CollectionEntry {
             odf::DatasetID::from_did_str(record.remove("ref").unwrap().as_str().unwrap()).unwrap();
 
         Self {
-            dataset,
             system_time,
             event_time,
             path: path.into(),
