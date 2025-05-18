@@ -84,7 +84,14 @@ impl InMemoryWebhookSubscriptionEventStore {
                     state.webhook_subscription_data.get(event.subscription_id())
                 {
                     if let Some(dataset_id) = subscription.dataset_id() {
-                        Self::check_unique_label_within_dataset(state, dataset_id, &e.new_label)?;
+                        if subscription.label() != &e.new_label {
+                            // Check if the new label is unique for the dataset
+                            Self::check_unique_label_within_dataset(
+                                state,
+                                dataset_id,
+                                &e.new_label,
+                            )?;
+                        }
                     }
                 }
                 Self::update_subscription_state(state, event);
