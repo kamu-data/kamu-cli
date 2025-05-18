@@ -7,29 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use internal_error::InternalError;
 use kamu_webhooks::*;
 use thiserror::Error;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn resolve_webhook_subscription<TError>(
-    subscription_id: WebhookSubscriptionID,
-    event_store: Arc<dyn WebhookSubscriptionEventStore>,
-    not_found_error: impl Fn(WebhookSubscriptionNotFoundError) -> TError,
-    internal_error: impl Fn(InternalError) -> TError,
-) -> Result<WebhookSubscription, TError> {
-    match WebhookSubscription::load(subscription_id, event_store.as_ref()).await {
-        Ok(subscription) => Ok(subscription),
-        Err(LoadError::NotFound(_)) => Err(not_found_error(WebhookSubscriptionNotFoundError {
-            subscription_id,
-        })),
-        Err(LoadError::ProjectionError(e)) => Err(internal_error(e.int_err())),
-        Err(LoadError::Internal(e)) => Err(internal_error(e)),
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

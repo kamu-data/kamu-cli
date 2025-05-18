@@ -29,20 +29,12 @@ impl ResumeWebhookSubscriptionUseCase for ResumeWebhookSubscriptionUseCaseImpl {
         level = "info",
         name = ResumeWebhookSubscriptionUseCaseImpl_execute,
         skip_all,
-        fields(%subscription_id)
+        fields(subscription_id=%subscription.id()),
     )]
     async fn execute(
         &self,
-        subscription_id: WebhookSubscriptionID,
+        subscription: &mut WebhookSubscription,
     ) -> Result<(), ResumeWebhookSubscriptionError> {
-        let mut subscription = crate::helpers::resolve_webhook_subscription(
-            subscription_id,
-            self.subscription_event_store.clone(),
-            ResumeWebhookSubscriptionError::NotFound,
-            ResumeWebhookSubscriptionError::Internal,
-        )
-        .await?;
-
         // TODO: idempotency
 
         subscription

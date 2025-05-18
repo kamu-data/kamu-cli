@@ -18,7 +18,7 @@ use crate::*;
 pub trait UpdateWebhookSubscriptionUseCase: Send + Sync {
     async fn execute(
         &self,
-        subscription_id: WebhookSubscriptionID,
+        subscription: &mut WebhookSubscription,
         target_url: url::Url,
         event_types: Vec<WebhookEventType>,
         label: WebhookSubscriptionLabel,
@@ -29,9 +29,6 @@ pub trait UpdateWebhookSubscriptionUseCase: Send + Sync {
 
 #[derive(Debug, Error)]
 pub enum UpdateWebhookSubscriptionError {
-    #[error(transparent)]
-    NotFound(#[from] WebhookSubscriptionNotFoundError),
-
     #[error(transparent)]
     InvalidTargetUrl(#[from] WebhookSubscriptionInvalidTargetUrlError),
 

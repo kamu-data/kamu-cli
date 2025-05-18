@@ -92,8 +92,8 @@ async fn test_create_and_see_subscription() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    let subscription_id = res.data.clone().into_json().unwrap()["datasets"]["byId"]
-        ["webhookSubscriptions"]["createSubscription"]["subscriptionId"]
+    let subscription_id = res.data.clone().into_json().unwrap()["datasets"]["byId"]["webhooks"]
+        ["createSubscription"]["subscriptionId"]
         .as_str()
         .unwrap()
         .to_string();
@@ -103,7 +103,7 @@ async fn test_create_and_see_subscription() {
         value!({
             "datasets": {
                 "byId": {
-                    "webhookSubscriptions": {
+                    "webhooks": {
                         "createSubscription": {
                             "__typename": "CreateWebhookSubscriptionResultSuccess",
                             "message": "Success",
@@ -234,7 +234,7 @@ async fn test_completely_invalid_target_urls() {
             &[
                 PathSegment::Field("datasets".into()),
                 PathSegment::Field("byId".into()),
-                PathSegment::Field("webhookSubscriptions".into()),
+                PathSegment::Field("webhooks".into()),
                 PathSegment::Field("createSubscription".into()),
             ],
         );
@@ -285,7 +285,7 @@ async fn test_target_url_non_https_or_localhost() {
             value!({
                 "datasets": {
                     "byId": {
-                        "webhookSubscriptions": {
+                        "webhooks": {
                             "createSubscription": {
                                 "__typename": "WebhookSubscriptionInvalidTargetUrl",
                                 "message": format!("Expecting https:// target URLs with host not pointing to 'localhost': {invalid_url}"),
@@ -340,7 +340,7 @@ async fn test_bad_event_type() {
         &[
             PathSegment::Field("datasets".into()),
             PathSegment::Field("byId".into()),
-            PathSegment::Field("webhookSubscriptions".into()),
+            PathSegment::Field("webhooks".into()),
             PathSegment::Field("createSubscription".into()),
         ],
     );
@@ -383,7 +383,7 @@ async fn test_no_event_types() {
         value!({
             "datasets": {
                 "byId": {
-                    "webhookSubscriptions": {
+                    "webhooks": {
                         "createSubscription": {
                             "__typename": "WebhookSubscriptionNoEventTypesProvided",
                             "message": "At least one event type must be provided",
@@ -449,7 +449,7 @@ async fn test_duplicate_labels() {
         value!({
             "datasets": {
                 "byId": {
-                    "webhookSubscriptions": {
+                    "webhooks": {
                         "createSubscription": {
                             "__typename": "WebhookSubscriptionDuplicateLabel",
                             "message": "Label 'My Webhook Subscription' is not unique",
@@ -528,7 +528,7 @@ impl WebhookSubscriptiuonsHarness {
             mutation ($datasetId: DatasetID!, $targetUrl: String!, $eventTypes: [String!]!, $label: String!) {
                 datasets {
                     byId(datasetId: $datasetId) {
-                        webhookSubscriptions {
+                        webhooks {
                             createSubscription(
                                 input: {
                                     targetUrl: $targetUrl

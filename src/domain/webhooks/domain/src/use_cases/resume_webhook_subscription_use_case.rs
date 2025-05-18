@@ -18,7 +18,7 @@ use crate::*;
 pub trait ResumeWebhookSubscriptionUseCase: Send + Sync {
     async fn execute(
         &self,
-        subscription_id: WebhookSubscriptionID,
+        subscription: &mut WebhookSubscription,
     ) -> Result<(), ResumeWebhookSubscriptionError>;
 }
 
@@ -26,9 +26,6 @@ pub trait ResumeWebhookSubscriptionUseCase: Send + Sync {
 
 #[derive(Debug, Error)]
 pub enum ResumeWebhookSubscriptionError {
-    #[error(transparent)]
-    NotFound(#[from] WebhookSubscriptionNotFoundError),
-
     #[error(transparent)]
     Internal(
         #[from]

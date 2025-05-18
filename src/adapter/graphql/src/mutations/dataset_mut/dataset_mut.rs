@@ -54,13 +54,9 @@ impl DatasetMut {
         DatasetCollaborationMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
-    /// Access to webhooks subscriptions management methods
-    async fn webhook_subscriptions(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<DatasetWebhookSubscriptionsMut> {
-        DatasetWebhookSubscriptionsMut::new_with_access_check(ctx, &self.dataset_request_state)
-            .await
+    /// Access to webhooks management methods
+    async fn webhooks(&self, ctx: &Context<'_>) -> Result<DatasetWebhooksMut> {
+        DatasetWebhooksMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Rename the dataset

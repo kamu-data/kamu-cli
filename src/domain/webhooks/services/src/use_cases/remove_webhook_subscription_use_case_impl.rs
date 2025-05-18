@@ -29,22 +29,12 @@ impl RemoveWebhookSubscriptionUseCase for RemoveWebhookSubscriptionUseCaseImpl {
         level = "info",
         name = RemoveWebhookSubscriptionUseCaseImpl_execute,
         skip_all,
-        fields(%subscription_id)
+        fields(subscription_id=%subscription.id()),
     )]
     async fn execute(
         &self,
-        subscription_id: WebhookSubscriptionID,
+        subscription: &mut WebhookSubscription,
     ) -> Result<(), RemoveWebhookSubscriptionError> {
-        // TODO: idempontency
-
-        let mut subscription = crate::helpers::resolve_webhook_subscription(
-            subscription_id,
-            self.subscription_event_store.clone(),
-            RemoveWebhookSubscriptionError::NotFound,
-            RemoveWebhookSubscriptionError::Internal,
-        )
-        .await?;
-
         subscription
             .remove()
             .map_err(|e| RemoveWebhookSubscriptionError::Internal(e.int_err()))?;

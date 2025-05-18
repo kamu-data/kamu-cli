@@ -29,23 +29,15 @@ impl UpdateWebhookSubscriptionUseCase for UpdateWebhookSubscriptionUseCaseImpl {
         level = "info",
         name = UpdateWebhookSubscriptionUseCaseImpl_execute,
         skip_all,
-        fields(%subscription_id, %target_url, ?event_types, %label)
+        fields(subscription_id=%subscription.id(), %target_url, ?event_types, %label)
     )]
     async fn execute(
         &self,
-        subscription_id: WebhookSubscriptionID,
+        subscription: &mut WebhookSubscription,
         target_url: url::Url,
         event_types: Vec<WebhookEventType>,
         label: WebhookSubscriptionLabel,
     ) -> Result<(), UpdateWebhookSubscriptionError> {
-        let mut subscription = crate::helpers::resolve_webhook_subscription(
-            subscription_id,
-            self.subscription_event_store.clone(),
-            UpdateWebhookSubscriptionError::NotFound,
-            UpdateWebhookSubscriptionError::Internal,
-        )
-        .await?;
-
         use super::helpers::*;
         validate_webhook_target_url(&target_url)?;
         validate_webhook_event_types(&event_types)?;

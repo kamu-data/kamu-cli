@@ -1227,9 +1227,9 @@ type DatasetMut {
 	"""
 	collaboration: DatasetCollaborationMut!
 	"""
-	Access to webhooks subscriptions management methods
+	Access to webhooks management methods
 	"""
-	webhookSubscriptions: DatasetWebhookSubscriptionsMut!
+	webhooks: DatasetWebhooksMut!
 	"""
 	Rename the dataset
 	"""
@@ -1308,14 +1308,6 @@ input DatasetVisibilityInput @oneOf {
 
 union DatasetVisibilityOutput = PrivateDatasetVisibility | PublicDatasetVisibility
 
-type DatasetWebhookSubscriptionsMut {
-	createSubscription(input: WebhookSubscriptionInput!): CreateWebhookSubscriptionResult!
-	updateSubscription(subscriptionId: WebhookSubscriptionID!, input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
-	pauseSubscription(subscriptionId: WebhookSubscriptionID!): PauseWebhookSubscriptionResult!
-	resumeSubscription(subscriptionId: WebhookSubscriptionID!): ResumeWebhookSubscriptionResult!
-	removeSubscription(subscriptionId: WebhookSubscriptionID!): RemoveWebhookSubscriptionResult!
-}
-
 type DatasetWebhooks {
 	"""
 	Lists all webhook subscriptions for the dataset
@@ -1325,6 +1317,14 @@ type DatasetWebhooks {
 	Returns a webhook subscription by ID
 	"""
 	subscription(id: WebhookSubscriptionID!): WebhookSubscription
+}
+
+type DatasetWebhooksMut {
+	createSubscription(input: WebhookSubscriptionInput!): CreateWebhookSubscriptionResult!
+	"""
+	Returns a webhook subscription management API by ID
+	"""
+	subscription(id: WebhookSubscriptionID!): WebhookSubscriptionMut
 }
 
 type DatasetWebhooksPermissions {
@@ -3895,13 +3895,15 @@ type WebhookSubscriptionInvalidTargetUrl implements CreateWebhookSubscriptionRes
 	message: String!
 }
 
-type WebhookSubscriptionNoEventTypesProvided implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
-	numEventTypes: Int!
-	message: String!
+type WebhookSubscriptionMut {
+	update(input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
+	pause: PauseWebhookSubscriptionResult!
+	resume: ResumeWebhookSubscriptionResult!
+	remove: RemoveWebhookSubscriptionResult!
 }
 
-type WebhookSubscriptionNotFound implements UpdateWebhookSubscriptionResult & PauseWebhookSubscriptionResult & ResumeWebhookSubscriptionResult & RemoveWebhookSubscriptionResult {
-	subscriptionId: WebhookSubscriptionID!
+type WebhookSubscriptionNoEventTypesProvided implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	numEventTypes: Int!
 	message: String!
 }
 

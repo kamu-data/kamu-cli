@@ -9,7 +9,7 @@
 
 use thiserror::Error;
 
-use crate::{WebhookSubscriptionID, WebhookSubscriptionLabel};
+use crate::WebhookSubscriptionLabel;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,14 +31,6 @@ pub struct WebhookSubscriptionNoEventTypesProvidedError {}
 #[error("Webhook subscription with label '{label}' already exists")]
 pub struct WebhookSubscriptionDuplicateLabelError {
     pub label: WebhookSubscriptionLabel,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Webhook subscription '{subscription_id}' not found")]
-pub struct WebhookSubscriptionNotFoundError {
-    pub subscription_id: WebhookSubscriptionID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
