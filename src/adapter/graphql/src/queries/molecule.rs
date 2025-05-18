@@ -9,7 +9,9 @@
 
 use chrono::{DateTime, Utc};
 use kamu::domain;
-use kamu_core::DatasetRegistryExt as _;
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::auth::DatasetAction;
+use kamu_core::ResolvedDataset;
 
 use super::CollectionEntry;
 use crate::prelude::*;
@@ -171,16 +173,17 @@ impl Molecule {
 
     pub async fn get_projects_dataset(
         ctx: &Context<'_>,
+        action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<domain::ResolvedDataset> {
-        let dataset_reg = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
+        let dataset_reg = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
 
         match dataset_reg
-            .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
+            .resolve_dataset_by_ref(&"molecule/projects".parse().unwrap(), action)
             .await
         {
             Ok(ds) => Ok(ds),
-            Err(odf::DatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
+            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
                 let create_dataset_use_case =
                     from_catalog_n!(ctx, dyn kamu_datasets::CreateDatasetFromSnapshotUseCase);
 
@@ -199,10 +202,14 @@ impl Molecule {
                     .await
                     .int_err()?;
 
-                Ok(dataset_reg
-                    .get_dataset_by_handle(&create_res.dataset_handle)
-                    .await)
+                // TODO: Use case should return ResolvedDataset directly
+                Ok(ResolvedDataset::new(
+                    create_res.dataset,
+                    create_res.dataset_handle,
+                ))
             }
+            Err(RebacDatasetRefUnresolvedError::NotFound(err)) => Err(GqlError::Gql(err.into())),
+            Err(RebacDatasetRefUnresolvedError::Access(err)) => Err(GqlError::Access(err)),
             Err(err) => Err(err.int_err().into()),
         }
     }
@@ -227,16 +234,20 @@ impl Molecule {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(ctx, false).await?;
+        let projects_dataset = Self::get_projects_dataset(ctx, DatasetAction::Read, false).await?;
 
         // Query data
-        let query_res = query_svc
+        let query_res = match query_svc
             .get_data(
                 &projects_dataset.get_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
             .await
-            .int_err()?;
+        {
+            Ok(res) => res,
+            Err(domain::QueryError::Access(err)) => return Err(GqlError::Access(err)),
+            Err(err) => return Err(err.int_err().into()),
+        };
 
         let Some(df) = query_res.df else {
             return Ok(None);
@@ -278,7 +289,7 @@ impl Molecule {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(ctx, false).await?;
+        let projects_dataset = Self::get_projects_dataset(ctx, DatasetAction::Read, false).await?;
 
         // Query data
         let query_res = query_svc

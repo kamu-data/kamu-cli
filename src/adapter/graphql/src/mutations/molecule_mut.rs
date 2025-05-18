@@ -9,6 +9,7 @@
 
 use kamu::domain;
 use kamu_accounts::{AccountServiceExt as _, CurrentAccountSubject};
+use kamu_core::auth::DatasetAction;
 use kamu_core::DatasetRegistryExt;
 
 use crate::prelude::*;
@@ -67,7 +68,8 @@ impl MoleculeMut {
         }
 
         // Resolve projects dataset
-        let projects_dataset = Molecule::get_projects_dataset(ctx, true).await?;
+        let projects_dataset =
+            Molecule::get_projects_dataset(ctx, DatasetAction::Write, true).await?;
 
         // Check for conflicts
         let query_res = query_svc
@@ -236,7 +238,8 @@ impl MoleculeMut {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = Molecule::get_projects_dataset(ctx, false).await?;
+        let projects_dataset =
+            Molecule::get_projects_dataset(ctx, DatasetAction::Read, false).await?;
 
         // Query data
         let query_res = query_svc
