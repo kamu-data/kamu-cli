@@ -35,8 +35,6 @@ impl PauseWebhookSubscriptionUseCase for PauseWebhookSubscriptionUseCaseImpl {
         &self,
         subscription: &mut WebhookSubscription,
     ) -> Result<(), PauseWebhookSubscriptionError> {
-        // TODO: idempotency
-
         subscription
             .pause()
             .map_err(|e| PauseWebhookSubscriptionError::Internal(e.int_err()))?;

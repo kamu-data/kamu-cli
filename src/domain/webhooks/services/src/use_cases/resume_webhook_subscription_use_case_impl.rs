@@ -35,8 +35,6 @@ impl ResumeWebhookSubscriptionUseCase for ResumeWebhookSubscriptionUseCaseImpl {
         &self,
         subscription: &mut WebhookSubscription,
     ) -> Result<(), ResumeWebhookSubscriptionError> {
-        // TODO: idempotency
-
         subscription
             .resume()
             .map_err(|e| ResumeWebhookSubscriptionError::Internal(e.int_err()))?;
