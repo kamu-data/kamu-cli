@@ -521,7 +521,7 @@ impl MoleculeProject {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         let last_records = async |dataset_id: &odf::DatasetID| -> Result<Vec<serde_json::Value>> {
-            let Some(df) = query_svc
+            let df = match query_svc
                 .tail(
                     &dataset_id.as_local_ref(),
                     0,
@@ -529,18 +529,14 @@ impl MoleculeProject {
                     domain::GetDataOptions::default(),
                 )
                 .await
-                .int_err()?
-                .df
-            else {
-                return Ok(Vec::new());
+            {
+                Ok(res) => match res.df {
+                    Some(df) => df,
+                    None => return Ok(Vec::new()),
+                },
+                Err(domain::QueryError::Access(err)) => return Err(GqlError::Access(err)),
+                Err(err) => return Err(err.int_err().into()),
             };
-
-            let df = df
-                .sort(vec![datafusion::prelude::col(
-                    odf::metadata::DatasetVocabulary::default().offset_column,
-                )
-                .sort(false, false)])
-                .int_err()?;
 
             let records = df.collect_json_aos().await.int_err()?;
 
@@ -552,12 +548,14 @@ impl MoleculeProject {
         merged_records.append(&mut last_records(&self.announcements_dataset_id).await?);
         merged_records.append(&mut last_records(&self.data_room_dataset_id).await?);
 
+        let vocab = odf::metadata::DatasetVocabulary::default();
+
         // Order and truncate
         merged_records.sort_by(|a, b| {
-            a["system_time"]
+            a[&vocab.system_time_column]
                 .as_str()
                 .unwrap()
-                .cmp(b["system_time"].as_str().unwrap())
+                .cmp(b[&vocab.system_time_column].as_str().unwrap())
                 .reverse()
         });
 
@@ -578,15 +576,7 @@ impl MoleculeProject {
             }
         }
 
-        // TODO: Need quasi-infinite connection API
-        let total_count = (page * per_page) + nodes.len() + 1;
-
-        Ok(MoleculeProjectEventConnection::new(
-            nodes,
-            page,
-            per_page,
-            total_count,
-        ))
+        Ok(MoleculeProjectEventConnection::new(nodes, page, per_page))
     }
 }
 
@@ -619,7 +609,7 @@ pub struct MoleculeProjectEventAnnouncement {
     pub announcement: serde_json::Value,
 }
 
-page_based_connection!(
+page_based_stream_connection!(
     MoleculeProjectEvent,
     MoleculeProjectEventConnection,
     MoleculeProjectEventEdge

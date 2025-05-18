@@ -10,7 +10,7 @@
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Page-based connection
+// Page-based finite connection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
@@ -78,6 +78,56 @@ macro_rules! page_based_connection {
 }
 
 pub(crate) use page_based_connection;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Page-based stream connection
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Public only for tests
+#[macro_export]
+macro_rules! page_based_stream_connection {
+    ($node_type:ident, $connection_type:ident, $edge_type:ident) => {
+        #[derive(async_graphql::SimpleObject)]
+        #[graphql(complex)]
+        pub struct $connection_type {
+            /// A shorthand for `edges { node { ... } }`
+            pub nodes: Vec<$node_type>,
+
+            /// Page information
+            pub page_info: $crate::scalars::PageBasedInfo,
+        }
+
+        #[async_graphql::ComplexObject]
+        impl $connection_type {
+            #[graphql(skip)]
+            pub fn new(nodes: Vec<$node_type>, current_page: usize, per_page: usize) -> Self {
+                // Simple heuristic: if page is full - assume there's more on next
+                let has_next_page = nodes.len() == per_page;
+
+                Self {
+                    nodes,
+                    page_info: $crate::scalars::PageBasedInfo {
+                        has_previous_page: current_page > 0,
+                        has_next_page,
+                        current_page,
+                        total_pages: None,
+                    },
+                }
+            }
+
+            async fn edges(&self) -> Vec<$edge_type> {
+                self.nodes.iter().map(|node| $edge_type { node }).collect()
+            }
+        }
+
+        #[derive(async_graphql::SimpleObject)]
+        pub struct $edge_type<'a> {
+            pub node: &'a $node_type,
+        }
+    };
+}
+
+pub(crate) use page_based_stream_connection;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
