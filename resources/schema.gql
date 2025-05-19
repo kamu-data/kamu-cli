@@ -949,7 +949,7 @@ type Dataset {
 	"""
 	collaboration: DatasetCollaboration!
 	"""
-	Access to the dataset collaboration data
+	Access to the dataset's webhooks management functionality
 	"""
 	webhooks: DatasetWebhooks!
 	"""
