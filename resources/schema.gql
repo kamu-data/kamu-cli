@@ -754,6 +754,16 @@ interface CreateTokenResult {
 	message: String!
 }
 
+interface CreateWebhookSubscriptionResult {
+	message: String!
+}
+
+type CreateWebhookSubscriptionResultSuccess implements CreateWebhookSubscriptionResult {
+	subscriptionId: String!
+	secret: String!
+	message: String!
+}
+
 type CreatedAccessToken {
 	"""
 	Unique identifier of the access token
@@ -938,6 +948,10 @@ type Dataset {
 	Access to the dataset collaboration data
 	"""
 	collaboration: DatasetCollaboration!
+	"""
+	Access to the dataset collaboration data
+	"""
+	webhooks: DatasetWebhooks!
 	"""
 	Various endpoints for interacting with data
 	"""
@@ -1255,6 +1269,10 @@ type DatasetMut {
 	"""
 	collaboration: DatasetCollaborationMut!
 	"""
+	Access to webhooks management methods
+	"""
+	webhooks: DatasetWebhooksMut!
+	"""
 	Rename the dataset
 	"""
 	rename(newName: DatasetName!): RenameResult!
@@ -1286,6 +1304,7 @@ type DatasetPermissions {
 	collaboration: DatasetCollaborationPermissions!
 	envVars: DatasetEnvVarsPermissions!
 	flows: DatasetFlowsPermissions!
+	webhooks: DatasetWebhooksPermissions!
 	general: DatasetGeneralPermissions!
 	metadata: DatasetMetadataPermissions!
 }
@@ -1330,6 +1349,30 @@ input DatasetVisibilityInput @oneOf {
 }
 
 union DatasetVisibilityOutput = PrivateDatasetVisibility | PublicDatasetVisibility
+
+type DatasetWebhooks {
+	"""
+	Lists all webhook subscriptions for the dataset
+	"""
+	subscriptions: [WebhookSubscription!]!
+	"""
+	Returns a webhook subscription by ID
+	"""
+	subscription(id: WebhookSubscriptionID!): WebhookSubscription
+}
+
+type DatasetWebhooksMut {
+	createSubscription(input: WebhookSubscriptionInput!): CreateWebhookSubscriptionResult!
+	"""
+	Returns a webhook subscription management API by ID
+	"""
+	subscription(id: WebhookSubscriptionID!): WebhookSubscriptionMut
+}
+
+type DatasetWebhooksPermissions {
+	canView: Boolean!
+	canUpdate: Boolean!
+}
 
 type Datasets {
 	"""
@@ -2693,6 +2736,20 @@ type PageBasedInfo {
 	totalPages: Int
 }
 
+interface PauseWebhookSubscriptionResult {
+	message: String!
+}
+
+type PauseWebhookSubscriptionResultSuccess implements PauseWebhookSubscriptionResult {
+	paused: Boolean!
+	message: String!
+}
+
+type PauseWebhookSubscriptionResultUnexpected implements PauseWebhookSubscriptionResult {
+	status: WebhookSubscriptionStatus!
+	message: String!
+}
+
 type PostgreSqlDesl {
 	url: String!
 }
@@ -2781,6 +2838,13 @@ type Query {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: Accounts!
+	"""
+	Webhook-related functionality group
+	
+	Webhooks are used to send notifications about events happening in the
+	system. This groups deals with their management and subscriptions.
+	"""
+	webhooks: Webhooks!
 	"""
 	Search-related functionality group
 	"""
@@ -3028,6 +3092,15 @@ type ReadStepParquet {
 	schema: [String!]
 }
 
+interface RemoveWebhookSubscriptionResult {
+	message: String!
+}
+
+type RemoveWebhookSubscriptionResultSuccess implements RemoveWebhookSubscriptionResult {
+	removed: Boolean!
+	message: String!
+}
+
 interface RenameResult {
 	message: String!
 }
@@ -3074,6 +3147,20 @@ type RestProtocolDesc {
 	tailUrl: String!
 	queryUrl: String!
 	pushUrl: String!
+}
+
+interface ResumeWebhookSubscriptionResult {
+	message: String!
+}
+
+type ResumeWebhookSubscriptionResultSuccess implements ResumeWebhookSubscriptionResult {
+	resumed: Boolean!
+	message: String!
+}
+
+type ResumeWebhookSubscriptionResultUnexpected implements ResumeWebhookSubscriptionResult {
+	status: WebhookSubscriptionStatus!
+	message: String!
 }
 
 interface RevokeResult {
@@ -3623,6 +3710,8 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	message: String!
 }
 
+scalar URL
+
 interface UnsetRoleResult {
 	message: String!
 }
@@ -3675,6 +3764,20 @@ type UpdateVersionSuccess implements UpdateVersionResult {
 	newHead: Multihash!
 	contentHash: Multihash!
 	isSuccess: Boolean!
+	message: String!
+}
+
+interface UpdateWebhookSubscriptionResult {
+	message: String!
+}
+
+type UpdateWebhookSubscriptionResultSuccess implements UpdateWebhookSubscriptionResult {
+	updated: Boolean!
+	message: String!
+}
+
+type UpdateWebhookSubscriptionResultUnexpected implements UpdateWebhookSubscriptionResult {
+	status: WebhookSubscriptionStatus!
 	message: String!
 }
 
@@ -3927,6 +4030,81 @@ type ViewDatasetEnvVarEdge {
 
 type WebSocketProtocolDesc {
 	url: String!
+}
+
+scalar WebhookEventType
+
+type WebhookSubscription {
+	"""
+	Unique identifier of the webhook subscription
+	"""
+	id: WebhookSubscriptionID!
+	"""
+	Optional label for the subscription. Maybe an empty string.
+	"""
+	label: String!
+	"""
+	Associated dataset ID
+	Not present for system subscriptions
+	"""
+	datasetId: DatasetID
+	"""
+	Target URL for the webhook
+	"""
+	targetUrl: String!
+	"""
+	List of events that trigger the webhook
+	"""
+	eventTypes: [String!]!
+	"""
+	Status of the subscription
+	"""
+	status: WebhookSubscriptionStatus!
+}
+
+type WebhookSubscriptionDuplicateLabel implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	label: String!
+	message: String!
+}
+
+scalar WebhookSubscriptionID
+
+input WebhookSubscriptionInput {
+	targetUrl: URL!
+	eventTypes: [WebhookEventType!]!
+	label: String!
+}
+
+type WebhookSubscriptionInvalidTargetUrl implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	innerMessage: String!
+	message: String!
+}
+
+type WebhookSubscriptionMut {
+	update(input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
+	pause: PauseWebhookSubscriptionResult!
+	resume: ResumeWebhookSubscriptionResult!
+	remove: RemoveWebhookSubscriptionResult!
+}
+
+type WebhookSubscriptionNoEventTypesProvided implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	numEventTypes: Int!
+	message: String!
+}
+
+enum WebhookSubscriptionStatus {
+	UNVERIFIED
+	ENABLED
+	PAUSED
+	UNREACHABLE
+	REMOVED
+}
+
+type Webhooks {
+	"""
+	List of supported event types
+	"""
+	eventTypes: [String!]!
 }
 
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT

@@ -6212,6 +6212,9 @@ dependencies = [
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
+ "kamu-webhooks",
+ "kamu-webhooks-inmem",
+ "kamu-webhooks-services",
  "messaging-outbox",
  "observability",
  "oop",
@@ -6538,6 +6541,10 @@ dependencies = [
  "kamu-task-system-postgres",
  "kamu-task-system-services",
  "kamu-task-system-sqlite",
+ "kamu-webhooks-inmem",
+ "kamu-webhooks-postgres",
+ "kamu-webhooks-services",
+ "kamu-webhooks-sqlite",
  "lazy_static",
  "libc",
  "merge",
@@ -7263,11 +7270,13 @@ dependencies = [
  "internal-error",
  "kamu-core",
  "messaging-outbox",
+ "mockall",
  "opendatafabric",
  "serde",
  "sqlx",
  "thiserror 2.0.12",
  "tokio-stream",
+ "uuid",
 ]
 
 [[package]]
@@ -7339,6 +7348,7 @@ dependencies = [
  "kamu-datasets-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
+ "kamu-webhooks",
  "messaging-outbox",
  "mockall",
  "observability",
@@ -7370,6 +7380,157 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+]
+
+[[package]]
+name = "kamu-webhooks"
+version = "0.237.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "database-common",
+ "enum-variants",
+ "event-sourcing",
+ "http 1.3.1",
+ "internal-error",
+ "kamu-datasets",
+ "kamu-task-system",
+ "mockall",
+ "nutype",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.12",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-webhooks-inmem"
+version = "0.237.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "event-sourcing",
+ "futures",
+ "kamu-task-system",
+ "kamu-task-system-inmem",
+ "kamu-webhooks",
+ "kamu-webhooks-repo-tests",
+ "opendatafabric",
+ "test-group",
+ "test-log",
+ "thiserror 2.0.12",
+ "tokio",
+]
+
+[[package]]
+name = "kamu-webhooks-postgres"
+version = "0.237.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "futures",
+ "http 1.3.1",
+ "internal-error",
+ "kamu-task-system",
+ "kamu-task-system-postgres",
+ "kamu-webhooks",
+ "kamu-webhooks-repo-tests",
+ "opendatafabric",
+ "serde_json",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-webhooks-repo-tests"
+version = "0.237.0"
+dependencies = [
+ "chrono",
+ "database-common",
+ "dill",
+ "futures",
+ "http 1.3.1",
+ "kamu-task-system",
+ "kamu-webhooks",
+ "opendatafabric",
+ "serde_json",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-webhooks-services"
+version = "0.237.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "chrono",
+ "common-macros",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "hex",
+ "http 1.3.1",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-datasets",
+ "kamu-datasets-services",
+ "kamu-task-system",
+ "kamu-webhooks",
+ "kamu-webhooks-inmem",
+ "messaging-outbox",
+ "oop",
+ "opendatafabric",
+ "rand 0.8.5",
+ "reqwest",
+ "ring",
+ "serde_json",
+ "sha2",
+ "test-log",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-webhooks-sqlite"
+version = "0.237.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "futures",
+ "internal-error",
+ "kamu-task-system",
+ "kamu-task-system-sqlite",
+ "kamu-webhooks",
+ "kamu-webhooks-repo-tests",
+ "opendatafabric",
+ "serde_json",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "uuid",
 ]
 
 [[package]]
@@ -12223,6 +12384,7 @@ checksum = "458f7a779bf54acc9f347480ac654f68407d3aab21269a6e3c9f922acd9e2da9"
 dependencies = [
  "getrandom 0.3.2",
  "js-sys",
+ "serde",
  "wasm-bindgen",
 ]
 

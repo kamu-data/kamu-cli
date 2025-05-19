@@ -237,7 +237,7 @@ impl CollectionProjection {
     pub async fn entries_by_ref(
         &self,
         ctx: &Context<'_>,
-        refs: Vec<DatasetID<'static>>,
+        refs: Vec<DatasetID<'_>>,
     ) -> Result<Vec<CollectionEntry>> {
         use datafusion::logical_expr::{col, lit};
 
