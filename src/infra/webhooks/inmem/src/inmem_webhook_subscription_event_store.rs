@@ -108,6 +108,10 @@ impl InMemoryWebhookSubscriptionEventStore {
         dataset_id: &odf::DatasetID,
         label: &WebhookSubscriptionLabel,
     ) -> Result<(), InternalError> {
+        if label.as_ref().is_empty() {
+            return Ok(());
+        }
+
         if let Some(ids) = state.webhook_subscriptions_by_dataset.get(dataset_id) {
             if ids.iter().any(|id| {
                 state
