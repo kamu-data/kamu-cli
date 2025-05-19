@@ -16,12 +16,12 @@ use crate::queries::{FileVersion, VersionedFileEntry};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct VersionedFileMut {
-    dataset: domain::ResolvedDataset,
+pub struct VersionedFileMut<'a> {
+    dataset: &'a domain::ResolvedDataset,
 }
 
-impl VersionedFileMut {
-    pub fn new(dataset: domain::ResolvedDataset) -> Self {
+impl<'a> VersionedFileMut<'a> {
+    pub fn new(dataset: &'a domain::ResolvedDataset) -> Self {
         Self { dataset }
     }
 
@@ -150,9 +150,9 @@ impl VersionedFileMut {
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl VersionedFileMut {
-    /// Uploads new version of content in-band. Can be used for very small files
-    /// only.
+impl VersionedFileMut<'_> {
+    /// Uploads a new version of content in-band. Can be used for very small
+    /// files only.
     #[tracing::instrument(level = "info", name = VersionedFileMut_upload_new_version, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn upload_new_version(
