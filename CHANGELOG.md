@@ -11,6 +11,17 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+# Unreleased
+### Added
+- GQL: Added new scalars: `Email`, AccountPassword`.
+- GQL: Added `AccountMut::delete()`.
+### Changed
+- DB: Removed FK for `did_secret_keys.creator_id` 
+- DB: Added missing triggers for deleting account rows (`ON DELETE CASCADE`) 
+    for related tables (`accounts_passwords`, `access_tokens`).
+- GQL: `AccountMut::modifyPassword()`: no longer accepts the `accountName` argument.
+- GQL: `AccountMuts::createAccount()`: method moved from `AccountMut`.
+
 ## [0.237.0] - 2025-05-14
 ### Added
 - GQL api:
