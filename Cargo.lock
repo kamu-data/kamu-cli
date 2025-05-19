@@ -7493,6 +7493,7 @@ dependencies = [
  "kamu-webhooks",
  "kamu-webhooks-inmem",
  "messaging-outbox",
+ "oop",
  "opendatafabric",
  "rand 0.8.5",
  "reqwest",

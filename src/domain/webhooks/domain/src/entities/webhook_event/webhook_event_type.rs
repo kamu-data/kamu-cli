@@ -14,7 +14,18 @@ use nutype::nutype;
 #[nutype(
     sanitize(trim, uppercase),
     validate(not_empty),
-    derive(Debug, Display, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
+    derive(
+        Debug,
+        Display,
+        AsRef,
+        Clone,
+        Ord,
+        PartialOrd,
+        Eq,
+        PartialEq,
+        Serialize,
+        Deserialize
+    )
 )]
 pub struct WebhookEventType(String);
 

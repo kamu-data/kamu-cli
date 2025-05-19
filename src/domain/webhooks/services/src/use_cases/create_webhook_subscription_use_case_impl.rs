@@ -36,12 +36,13 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
         &self,
         dataset_id: Option<odf::DatasetID>,
         target_url: url::Url,
-        event_types: Vec<WebhookEventType>,
+        mut event_types: Vec<WebhookEventType>,
         label: WebhookSubscriptionLabel,
     ) -> Result<CreateWebhookSubscriptionResult, CreateWebhookSubscriptionError> {
         use super::helpers::*;
         validate_webhook_target_url(&target_url)?;
         validate_webhook_event_types(&event_types)?;
+        deduplicate_event_types(&mut event_types);
 
         if let Some(dataset_id) = &dataset_id {
             validate_webhook_subscription_label_unique_in_dataset(

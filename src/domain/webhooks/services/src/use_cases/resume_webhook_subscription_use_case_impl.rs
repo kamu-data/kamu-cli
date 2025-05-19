@@ -37,7 +37,15 @@ impl ResumeWebhookSubscriptionUseCase for ResumeWebhookSubscriptionUseCaseImpl {
     ) -> Result<(), ResumeWebhookSubscriptionError> {
         subscription
             .resume()
-            .map_err(|e| ResumeWebhookSubscriptionError::Internal(e.int_err()))?;
+            .map_err(|e: ProjectionError<WebhookSubscriptionState>| {
+                tracing::error!(error=?e, error_msg=%e, "Webhook subscription resume failed");
+                ResumeWebhookSubscriptionError::ResumeUnexpected(
+                    ResumeWebhookSubscriptionUnexpectedError {
+                        status: subscription.status(),
+                    },
+                )
+            })?;
+
         subscription
             .save(self.subscription_event_store.as_ref())
             .await

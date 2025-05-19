@@ -20,9 +20,14 @@ pub trait WebhookSubscriptionQueryService: Send + Sync {
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<WebhookSubscription>, InternalError>;
 
-    async fn find_dataset_webhook_subscription(
+    async fn find_webhook_subscription_in_dataset(
         &self,
         dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
+    ) -> Result<Option<WebhookSubscription>, InternalError>;
+
+    async fn find_webhook_subscription(
+        &self,
         subscription_id: WebhookSubscriptionID,
     ) -> Result<Option<WebhookSubscription>, InternalError>;
 }

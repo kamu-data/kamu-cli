@@ -37,7 +37,15 @@ impl PauseWebhookSubscriptionUseCase for PauseWebhookSubscriptionUseCaseImpl {
     ) -> Result<(), PauseWebhookSubscriptionError> {
         subscription
             .pause()
-            .map_err(|e| PauseWebhookSubscriptionError::Internal(e.int_err()))?;
+            .map_err(|e: ProjectionError<WebhookSubscriptionState>| {
+                tracing::error!(error=?e, error_msg=%e, "Webhook subscription pause failed");
+                PauseWebhookSubscriptionError::PauseUnexpected(
+                    PauseWebhookSubscriptionUnexpectedError {
+                        status: subscription.status(),
+                    },
+                )
+            })?;
+
         subscription
             .save(self.subscription_event_store.as_ref())
             .await

@@ -14,7 +14,7 @@ use crate::WebhookSubscriptionLabel;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("Expecting https:// target URLs with host not pointing to 'localhost': {url}")]
+#[error("Webhook target should use https:// and should not point at a loopback address: {url}")]
 pub struct WebhookSubscriptionInvalidTargetUrlError {
     pub url: url::Url,
 }

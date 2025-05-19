@@ -27,11 +27,22 @@ pub trait PauseWebhookSubscriptionUseCase: Send + Sync {
 #[derive(Debug, Error)]
 pub enum PauseWebhookSubscriptionError {
     #[error(transparent)]
+    PauseUnexpected(#[from] PauseWebhookSubscriptionUnexpectedError),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Webhook subscription is not in a state that allows pausing: {status:?}")]
+pub struct PauseWebhookSubscriptionUnexpectedError {
+    pub status: WebhookSubscriptionStatus,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

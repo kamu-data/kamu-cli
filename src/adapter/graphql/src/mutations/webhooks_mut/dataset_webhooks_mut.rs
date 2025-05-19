@@ -103,7 +103,10 @@ impl<'a> DatasetWebhooksMut<'a> {
             from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionQueryService);
 
         match webhook_subscription_query_svc
-            .find_dataset_webhook_subscription(self.dataset_request_state.dataset_id(), id.into())
+            .find_webhook_subscription_in_dataset(
+                self.dataset_request_state.dataset_id(),
+                id.into(),
+            )
             .await
         {
             Ok(subscription) => Ok(subscription.map(WebhookSubscriptionMut::new)),

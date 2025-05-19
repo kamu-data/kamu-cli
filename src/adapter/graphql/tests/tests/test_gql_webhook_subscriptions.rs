@@ -261,7 +261,7 @@ async fn test_target_url_non_https_or_localhost() {
                         "webhooks": {
                             "createSubscription": {
                                 "__typename": "WebhookSubscriptionInvalidTargetUrl",
-                                "message": format!("Expecting https:// target URLs with host not pointing to 'localhost': {invalid_url}"),
+                                "message": format!("Webhook target should use https:// and should not point at a loopback address: {invalid_url}"),
                             }
                         }
                     }
@@ -611,7 +611,7 @@ async fn test_update_subscription_failure() {
                         "subscription": {
                             "update": {
                                 "__typename": "WebhookSubscriptionInvalidTargetUrl",
-                                "message": "Expecting https:// target URLs with host not pointing to 'localhost': http://example.com/",
+                                "message": "Webhook target should use https:// and should not point at a loopback address: http://example.com/",
                             }
                         },
                     }

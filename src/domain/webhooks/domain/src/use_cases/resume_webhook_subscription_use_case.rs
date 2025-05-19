@@ -27,11 +27,22 @@ pub trait ResumeWebhookSubscriptionUseCase: Send + Sync {
 #[derive(Debug, Error)]
 pub enum ResumeWebhookSubscriptionError {
     #[error(transparent)]
+    ResumeUnexpected(#[from] ResumeWebhookSubscriptionUnexpectedError),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Webhook subscription is not in a state that allows resuming: {status:?}")]
+pub struct ResumeWebhookSubscriptionUnexpectedError {
+    pub status: WebhookSubscriptionStatus,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -2571,6 +2571,11 @@ type PauseWebhookSubscriptionResultSuccess implements PauseWebhookSubscriptionRe
 	message: String!
 }
 
+type PauseWebhookSubscriptionResultUnexpected implements PauseWebhookSubscriptionResult {
+	status: WebhookSubscriptionStatus!
+	message: String!
+}
+
 type PostgreSqlDesl {
 	url: String!
 }
@@ -2972,6 +2977,11 @@ interface ResumeWebhookSubscriptionResult {
 
 type ResumeWebhookSubscriptionResultSuccess implements ResumeWebhookSubscriptionResult {
 	resumed: Boolean!
+	message: String!
+}
+
+type ResumeWebhookSubscriptionResultUnexpected implements ResumeWebhookSubscriptionResult {
+	status: WebhookSubscriptionStatus!
 	message: String!
 }
 
@@ -3597,6 +3607,11 @@ interface UpdateWebhookSubscriptionResult {
 
 type UpdateWebhookSubscriptionResultSuccess implements UpdateWebhookSubscriptionResult {
 	updated: Boolean!
+	message: String!
+}
+
+type UpdateWebhookSubscriptionResultUnexpected implements UpdateWebhookSubscriptionResult {
+	status: WebhookSubscriptionStatus!
 	message: String!
 }
 

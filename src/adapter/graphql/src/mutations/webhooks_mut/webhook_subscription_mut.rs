@@ -59,6 +59,14 @@ impl WebhookSubscriptionMut {
                 UpdateWebhookSubscriptionResultSuccess { updated: true },
             )),
 
+            Err(kamu_webhooks::UpdateWebhookSubscriptionError::UpdateUnexpected(e)) => {
+                Ok(UpdateWebhookSubscriptionResult::UpdateUnexpected(
+                    UpdateWebhookSubscriptionResultUnexpected {
+                        status: e.status.into(),
+                    },
+                ))
+            }
+
             Err(e @ kamu_webhooks::UpdateWebhookSubscriptionError::InvalidTargetUrl(_)) => {
                 Ok(UpdateWebhookSubscriptionResult::InvalidTargetUrl(
                     WebhookSubscriptionInvalidTargetUrl {
@@ -99,6 +107,14 @@ impl WebhookSubscriptionMut {
                 PauseWebhookSubscriptionResultSuccess { paused: true },
             )),
 
+            Err(kamu_webhooks::PauseWebhookSubscriptionError::PauseUnexpected(e)) => {
+                Ok(PauseWebhookSubscriptionResult::PauseUnexpected(
+                    PauseWebhookSubscriptionResultUnexpected {
+                        status: e.status.into(),
+                    },
+                ))
+            }
+
             Err(kamu_webhooks::PauseWebhookSubscriptionError::Internal(e)) => {
                 Err(GqlError::Internal(e))
             }
@@ -118,6 +134,14 @@ impl WebhookSubscriptionMut {
             Ok(_) => Ok(ResumeWebhookSubscriptionResult::Success(
                 ResumeWebhookSubscriptionResultSuccess { resumed: true },
             )),
+
+            Err(kamu_webhooks::ResumeWebhookSubscriptionError::ResumeUnexpected(e)) => {
+                Ok(ResumeWebhookSubscriptionResult::ResumeUnexpected(
+                    ResumeWebhookSubscriptionResultUnexpected {
+                        status: e.status.into(),
+                    },
+                ))
+            }
 
             Err(kamu_webhooks::ResumeWebhookSubscriptionError::Internal(e)) => {
                 Err(GqlError::Internal(e))
@@ -152,6 +176,7 @@ impl WebhookSubscriptionMut {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum UpdateWebhookSubscriptionResult {
     Success(UpdateWebhookSubscriptionResultSuccess),
+    UpdateUnexpected(UpdateWebhookSubscriptionResultUnexpected),
     DuplicateLabel(WebhookSubscriptionDuplicateLabel),
     InvalidTargetUrl(WebhookSubscriptionInvalidTargetUrl),
     NoEventTypesProvided(WebhookSubscriptionNoEventTypesProvided),
@@ -170,12 +195,26 @@ impl UpdateWebhookSubscriptionResultSuccess {
     }
 }
 
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct UpdateWebhookSubscriptionResultUnexpected {
+    status: WebhookSubscriptionStatus,
+}
+
+#[ComplexObject]
+impl UpdateWebhookSubscriptionResultUnexpected {
+    async fn message(&self) -> String {
+        "Updating webhook subscription is unexpected at this state".to_string()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum PauseWebhookSubscriptionResult {
     Success(PauseWebhookSubscriptionResultSuccess),
+    PauseUnexpected(PauseWebhookSubscriptionResultUnexpected),
 }
 
 #[derive(SimpleObject, Debug)]
@@ -191,12 +230,26 @@ impl PauseWebhookSubscriptionResultSuccess {
     }
 }
 
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct PauseWebhookSubscriptionResultUnexpected {
+    status: WebhookSubscriptionStatus,
+}
+
+#[ComplexObject]
+impl PauseWebhookSubscriptionResultUnexpected {
+    async fn message(&self) -> String {
+        "Pausing webhook subscription is unexpected at this state".to_string()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum ResumeWebhookSubscriptionResult {
     Success(ResumeWebhookSubscriptionResultSuccess),
+    ResumeUnexpected(ResumeWebhookSubscriptionResultUnexpected),
 }
 
 #[derive(SimpleObject, Debug)]
@@ -209,6 +262,19 @@ pub struct ResumeWebhookSubscriptionResultSuccess {
 impl ResumeWebhookSubscriptionResultSuccess {
     async fn message(&self) -> String {
         "Success".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct ResumeWebhookSubscriptionResultUnexpected {
+    status: WebhookSubscriptionStatus,
+}
+
+#[ComplexObject]
+impl ResumeWebhookSubscriptionResultUnexpected {
+    async fn message(&self) -> String {
+        "Resuming webhook subscription is unexpected at this state".to_string()
     }
 }
 

@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_webhook_sender_impl;
-mod test_webhook_signer_impl;
+mod test_create_webhook_subscription_use_case;
+mod test_pause_webhook_subscription_use_case;
+mod test_remove_webhook_subscription_use_case;
+mod test_resume_webhook_subscription_use_case;
+mod test_update_webhook_subscription_use_case;
 
-mod use_cases;
+mod webhook_subscription_use_case_harness;
+pub(crate) use webhook_subscription_use_case_harness::*;

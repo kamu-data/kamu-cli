@@ -22,12 +22,26 @@ pub(crate) fn validate_webhook_target_url(
         });
     }
 
-    match target_url.host_str() {
-        Some("localhost" | "127.0.0.1" | "::1") => Err(WebhookSubscriptionInvalidTargetUrlError {
-            url: target_url.clone(),
-        }),
-        _ => Ok(()),
+    // Try resolving the hostname
+    if let Some(host) = target_url.host_str() {
+        use std::net::ToSocketAddrs;
+        let clean_host = host.trim_matches(['[', ']'].as_ref());
+        if let Ok(addrs) =
+            (clean_host, target_url.port_or_known_default().unwrap_or(80)).to_socket_addrs()
+        {
+            for addr in addrs {
+                let ip = addr.ip();
+                if ip.is_loopback() {
+                    // Reject localhost, ::1, etc.
+                    return Err(WebhookSubscriptionInvalidTargetUrlError {
+                        url: target_url.clone(),
+                    });
+                }
+            }
+        }
     }
+
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +54,13 @@ pub(crate) fn validate_webhook_event_types(
     }
 
     Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn deduplicate_event_types(event_types: &mut Vec<WebhookEventType>) {
+    event_types.sort();
+    event_types.dedup();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

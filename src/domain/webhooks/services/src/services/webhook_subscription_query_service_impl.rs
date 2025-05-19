@@ -59,7 +59,7 @@ impl WebhookSubscriptionQueryService for WebhookSubscriptionQueryServiceImpl {
         Ok(res)
     }
 
-    async fn find_dataset_webhook_subscription(
+    async fn find_webhook_subscription_in_dataset(
         &self,
         dataset_id: &odf::DatasetID,
         subscription_id: WebhookSubscriptionID,
@@ -69,7 +69,9 @@ impl WebhookSubscriptionQueryService for WebhookSubscriptionQueryServiceImpl {
         {
             Ok(subscription) => match subscription.dataset_id() {
                 Some(subscription_dataset_id) => {
-                    if subscription_dataset_id == dataset_id {
+                    if subscription_dataset_id == dataset_id
+                        && subscription.status() != WebhookSubscriptionStatus::Removed
+                    {
                         Ok(Some(subscription))
                     } else {
                         Ok(None)
@@ -77,6 +79,26 @@ impl WebhookSubscriptionQueryService for WebhookSubscriptionQueryServiceImpl {
                 }
                 None => Ok(None),
             },
+            Err(LoadError::NotFound(_)) => Ok(None),
+            Err(LoadError::ProjectionError(e)) => Err(e.int_err()),
+            Err(LoadError::Internal(e)) => Err(e),
+        }
+    }
+
+    async fn find_webhook_subscription(
+        &self,
+        subscription_id: WebhookSubscriptionID,
+    ) -> Result<Option<WebhookSubscription>, InternalError> {
+        match WebhookSubscription::load(subscription_id, self.subscription_event_store.as_ref())
+            .await
+        {
+            Ok(subscription) => Ok(
+                if subscription.status() != WebhookSubscriptionStatus::Removed {
+                    Some(subscription)
+                } else {
+                    None
+                },
+            ),
             Err(LoadError::NotFound(_)) => Ok(None),
             Err(LoadError::ProjectionError(e)) => Err(e.int_err()),
             Err(LoadError::Internal(e)) => Err(e),

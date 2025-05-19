@@ -39,11 +39,22 @@ pub enum UpdateWebhookSubscriptionError {
     DuplicateLabel(#[from] WebhookSubscriptionDuplicateLabelError),
 
     #[error(transparent)]
+    UpdateUnexpected(#[from] UpdateWebhookSubscriptionUnexpectedError),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Webhook subscription is not in a state that allows updating: {status:?}")]
+pub struct UpdateWebhookSubscriptionUnexpectedError {
+    pub status: WebhookSubscriptionStatus,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
