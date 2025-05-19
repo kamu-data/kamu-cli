@@ -38,30 +38,26 @@ async fn test_deliver_webhook() {
 
     let harness = TestWebhookDeliveryWorkerHarness::new(mock_webhook_sender);
 
-    let task_attempt_id = ts::TaskAttemptID::new(ts::TaskID::new(153), 0);
+    let task_id = ts::TaskID::new(153);
 
     harness.new_webhook_event(event_id).await;
     harness.new_webhook_subscription(subscription_id).await;
 
     harness
         .webhook_delivery_worker
-        .deliver_webhook(
-            task_attempt_id,
-            subscription_id.into_inner(),
-            event_id.into_inner(),
-        )
+        .deliver_webhook(task_id, subscription_id.into_inner(), event_id.into_inner())
         .await
         .unwrap();
 
     let delivery = harness
         .webhook_delivery_repo
-        .get_by_task_attempt_id(task_attempt_id)
+        .get_by_task_id(task_id)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(delivery.webhook_subscription_id, subscription_id);
     assert_eq!(delivery.webhook_event_id, event_id);
-    assert_eq!(delivery.task_attempt_id, task_attempt_id);
+    assert_eq!(delivery.task_id, task_id);
 
     assert!(delivery.is_successful());
 }
@@ -83,31 +79,27 @@ async fn test_deliver_webhook_failed() {
 
     let harness = TestWebhookDeliveryWorkerHarness::new(mock_webhook_sender);
 
-    let task_attempt_id = ts::TaskAttemptID::new(ts::TaskID::new(153), 0);
+    let task_id = ts::TaskID::new(153);
 
     harness.new_webhook_event(event_id).await;
     harness.new_webhook_subscription(subscription_id).await;
 
     harness
         .webhook_delivery_worker
-        .deliver_webhook(
-            task_attempt_id,
-            subscription_id.into_inner(),
-            event_id.into_inner(),
-        )
+        .deliver_webhook(task_id, subscription_id.into_inner(), event_id.into_inner())
         .await
         .unwrap();
 
     let delivery = harness
         .webhook_delivery_repo
-        .get_by_task_attempt_id(task_attempt_id)
+        .get_by_task_id(task_id)
         .await
         .unwrap()
         .unwrap();
 
     assert_eq!(delivery.webhook_subscription_id, subscription_id);
     assert_eq!(delivery.webhook_event_id, event_id);
-    assert_eq!(delivery.task_attempt_id, task_attempt_id);
+    assert_eq!(delivery.task_id, task_id);
 
     assert!(!delivery.is_successful());
 }

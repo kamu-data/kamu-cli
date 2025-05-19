@@ -314,7 +314,7 @@ impl TestWebhookDeliverySchedulerHarness {
             })
             .returning(|plan, _| {
                 let task_id = TaskID::new(35);
-                let task = Task::new(Utc::now(), task_id, plan, None, TaskRetryPolicy::default());
+                let task = Task::new(Utc::now(), task_id, plan, None);
                 Ok(task.into())
             });
     }
