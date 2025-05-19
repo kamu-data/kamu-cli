@@ -220,10 +220,7 @@ impl DatasetMut {
     /// Downcast a dataset to a collection interface
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<CollectionMut>> {
         Ok(Some(CollectionMut::new(
-            self.dataset_request_state
-                .resolved_dataset(ctx)
-                .await?
-                .clone(),
+            self.dataset_request_state.resolved_dataset(ctx).await?,
         )))
     }
 }

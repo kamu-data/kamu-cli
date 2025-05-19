@@ -16,14 +16,14 @@ use crate::queries::CollectionEntry;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct CollectionMut {
-    dataset: domain::ResolvedDataset,
+pub struct CollectionMut<'a> {
+    dataset: &'a domain::ResolvedDataset,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl CollectionMut {
-    pub fn new(dataset: domain::ResolvedDataset) -> Self {
+impl<'a> CollectionMut<'a> {
+    pub fn new(dataset: &'a domain::ResolvedDataset) -> Self {
         Self { dataset }
     }
 
@@ -49,7 +49,7 @@ impl CollectionMut {
 
         let ingest_result = match push_ingest_use_case
             .execute(
-                &self.dataset,
+                self.dataset,
                 kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(ndjson)),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -217,7 +217,7 @@ impl CollectionMut {
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl CollectionMut {
+impl CollectionMut<'_> {
     /// Links new entry to this collection
     #[tracing::instrument(level = "info", name = CollectionMut_add_entry, skip_all)]
     pub async fn add_entry(
