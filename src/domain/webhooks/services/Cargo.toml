@@ -50,6 +50,9 @@ url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
 
 [dev-dependencies]
+kamu-accounts = { workspace = true }
+kamu-datasets-services = { workspace = true, features = ["testing"] }
+kamu-task-system = { workspace = true, features = ["testing"] }
 kamu-webhooks-inmem = { workspace = true }
 
 oop = { version = "0.0.2", default-features = false }

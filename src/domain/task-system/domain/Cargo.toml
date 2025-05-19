@@ -12,6 +12,8 @@ include = { workspace = true }
 edition = { workspace = true }
 publish = { workspace = true }
 
+[features]
+testing = ["dep:mockall"]
 
 [lints]
 workspace = true
@@ -39,5 +41,7 @@ thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde"] }
 
+# Optional
+mockall = { optional = true, version = "0.13", default-features = false }
 
 [dev-dependencies]

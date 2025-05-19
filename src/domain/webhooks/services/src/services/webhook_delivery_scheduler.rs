@@ -89,7 +89,6 @@ impl WebhookDeliveryScheduler {
             .task_scheduler
             .create_task(
                 LogicalPlan::DeliverWebhook(LogicalPlanDeliverWebhook {
-                    dataset_id: None, // TODO: why?
                     webhook_subscription_id: subscription_id.into_inner(),
                     webhook_event_id: event_id.into_inner(),
                 }),
