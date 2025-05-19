@@ -28,9 +28,6 @@ pub trait DeleteAccountUseCase: Send + Sync {
 
 #[derive(Debug, Error)]
 pub enum DeleteAccountByNameError {
-    #[error("Self-deletion is prohibited")]
-    SelfDeletion,
-
     #[error(transparent)]
     Access(
         #[from]

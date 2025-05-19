@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use internal_error::InternalError;
 use kamu_accounts::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,27 +23,37 @@ pub struct DeleteAccountUseCaseImpl {
     outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
+impl DeleteAccountUseCaseImpl {
+    async fn unauthenticated(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<bool, InternalError> {
+        match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(l) if l.account_name == *account_name => Ok(true),
+            CurrentAccountSubject::Logged(l) => {
+                use internal_error::ResultIntoInternal;
+                use kamu_auth_rebac::RebacServiceExt;
+
+                let is_admin = self
+                    .rebac_service
+                    .is_account_admin(&l.account_id)
+                    .await
+                    .int_err()?;
+
+                Ok(is_admin)
+            }
+            CurrentAccountSubject::Anonymous(_) => Ok(false),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
     async fn execute(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), DeleteAccountByNameError> {
-        if self.current_account_subject.account_name() == account_name {
-            return Err(DeleteAccountByNameError::SelfDeletion);
-        }
-
-        let is_admin = {
-            use internal_error::ResultIntoInternal;
-            use kamu_auth_rebac::RebacServiceExt;
-
-            self.rebac_service
-                .is_account_admin(self.current_account_subject.account_id())
-                .await
-                .int_err()?
-        };
-
-        if !is_admin {
+        if !self.unauthenticated(account_name).await? {
             return Err(DeleteAccountByNameError::Access(
                 odf::AccessError::Unauthenticated(
                     AccountDeletionNotAuthorizedError {

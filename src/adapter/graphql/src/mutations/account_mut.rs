@@ -91,9 +91,6 @@ impl AccountMut {
             .await
         {
             Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),
-            Err(E::SelfDeletion) => Ok(DeleteAccountResult::SelfDeletionIsForbidden(
-                Default::default(),
-            )),
             Err(E::Access(access_error)) => Err(access_error.into()),
             Err(e @ (E::NotFound(_) | E::Internal(_))) => Err(e.int_err().into()),
         }
@@ -182,7 +179,6 @@ impl Default for ModifyPasswordSuccess {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum DeleteAccountResult {
     Success(DeleteAccountSuccess),
-    SelfDeletionIsForbidden(SelfDeletionIsForbidden),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
