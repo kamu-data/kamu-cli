@@ -58,10 +58,8 @@ jobs:
         with:
           repository: open-data-fabric/open-data-fabric
           path: open-data-fabric
-      # TODO: Unclear how to make this action look for rust-toolchain in a subdirectory
       - uses: actions-rs/toolchain@v1
         with:
-          #toolchain: stable
           components: rustfmt
       # TODO: Generate all artifacts (requires containerizing tools like flatc and protoc)
       - name: Generate artifacts
