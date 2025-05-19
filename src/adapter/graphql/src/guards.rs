@@ -107,7 +107,7 @@ impl Guard for CanProvisionAccountsGuard {
             )
         };
 
-        let can_provision_accounts = !rebac_service
+        let can_provision_accounts = rebac_service
             .can_provision_accounts(logged_account_id)
             .await
             .int_err()?;

@@ -55,37 +55,25 @@ impl AccountMut {
     }
 
     /// Reset password for a selected account. Allowed only for admin users
-    #[tracing::instrument(level = "info", name = AccountMut_modify_password, skip_all, fields(%account_name))]
+    #[tracing::instrument(level = "info", name = AccountMut_modify_password, skip_all)]
     #[graphql(guard = "AdminGuard")]
     async fn modify_password(
         &self,
         ctx: &Context<'_>,
-        account_name: AccountName<'_>,
-        password: String,
+        password: AccountPassword<'_>,
     ) -> Result<ModifyPasswordResult> {
         let account_service = from_catalog_n!(ctx, dyn AccountService);
-        let password = match Password::try_new(password.as_str()) {
-            Ok(pass) => pass,
-            Err(err) => {
-                return Ok(ModifyPasswordResult::InvalidPassword(
-                    ModifyPasswordInvalidPassword {
-                        reason: err.to_string(),
-                    },
-                ))
-            }
-        };
+
+        use ModifyPasswordError as E;
 
         match account_service
-            .modify_password(&account_name, password)
+            .modify_password(&self.account.account_name, password.into())
             .await
         {
             Ok(_) => Ok(ModifyPasswordResult::Success(
                 ModifyPasswordSuccess::default(),
             )),
-            Err(ModifyPasswordError::AccountNotFound(_)) => Ok(
-                ModifyPasswordResult::AccountNotFound(AccountNotFound::default()),
-            ),
-            Err(e @ ModifyPasswordError::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ (E::Internal(_) | E::AccountNotFound(_))) => Err(e.int_err().into()),
         }
     }
 
@@ -107,8 +95,7 @@ impl AccountMut {
                 Default::default(),
             )),
             Err(E::Access(access_error)) => Err(access_error.into()),
-            Err(E::NotFound(_)) => Ok(DeleteAccountResult::AccountNotFound(Default::default())),
-            Err(e @ E::Internal(_)) => Err(e.int_err().into()),
+            Err(e @ (E::NotFound(_) | E::Internal(_))) => Err(e.int_err().into()),
         }
     }
 
@@ -167,11 +154,9 @@ impl Default for UpdateEmailNonUnique {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(name = "message", ty = "&String"))]
 pub enum ModifyPasswordResult {
     Success(ModifyPasswordSuccess),
-    AccountNotFound(AccountNotFound),
-    InvalidPassword(ModifyPasswordInvalidPassword),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -188,35 +173,6 @@ impl Default for ModifyPasswordSuccess {
         }
     }
 }
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct AccountNotFound {
-    pub message: String,
-}
-
-impl Default for AccountNotFound {
-    fn default() -> Self {
-        Self {
-            message: "Account not found".to_string(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, SimpleObject)]
-#[graphql(complex)]
-pub struct ModifyPasswordInvalidPassword {
-    pub reason: String,
-}
-
-#[ComplexObject]
-impl ModifyPasswordInvalidPassword {
-    pub async fn message(&self) -> &String {
-        &self.reason
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DeleteAccountResult
@@ -227,7 +183,6 @@ impl ModifyPasswordInvalidPassword {
 pub enum DeleteAccountResult {
     Success(DeleteAccountSuccess),
     SelfDeletionIsForbidden(SelfDeletionIsForbidden),
-    AccountNotFound(AccountNotFound),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

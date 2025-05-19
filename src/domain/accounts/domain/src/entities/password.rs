@@ -12,16 +12,22 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(
-    sanitize(trim),
-    validate(with = validate_password, error = PasswordValidationError),
-    derive(Debug, PartialEq, Clone, Deref)
-)]
-pub struct Password(String);
+pub const MIN_PASSWORD_LENGTH: usize = 8;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MIN_PASSWORD_LENGTH: usize = 8;
+#[nutype(
+    sanitize(trim),
+    validate(with = validate_password, error = PasswordValidationError),
+    derive(Debug, PartialEq, Eq, Clone, Deref)
+)]
+pub struct Password(String);
+
+impl std::fmt::Display for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "********")
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

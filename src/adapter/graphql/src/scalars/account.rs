@@ -17,6 +17,7 @@ use crate::prelude::*;
 simple_string_scalar!(AccountID, odf::AccountID, from_did_str);
 simple_string_scalar!(AccountName, odf::AccountName);
 simple_string_scalar!(Email, email_utils::Email, parse);
+simple_string_scalar!(AccountPassword, kamu_accounts::Password, try_new);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountDisplayName

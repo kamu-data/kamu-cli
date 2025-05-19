@@ -140,17 +140,13 @@ type AccountMut {
 	"""
 	updateEmail(newEmail: Email!): UpdateEmailResult!
 	"""
-	Create a new account
-	"""
-	createAccount(accountName: AccountName!, email: Email): CreateAccountResult!
-	"""
 	Reset password for a selected account. Allowed only for admin users
 	"""
-	modifyPassword(accountName: AccountName!, password: String!): ModifyPasswordResult!
+	modifyPassword(password: AccountPassword!): ModifyPasswordResult!
 	"""
-	Deleting an account by name
+	Delete a selected account. Allowed only for admin users
 	"""
-	deleteAccountByName(accountName: AccountName!): DeleteAccountResult!
+	delete: DeleteAccountResult!
 	"""
 	Access to the mutable flow configurations of this account
 	"""
@@ -159,9 +155,7 @@ type AccountMut {
 
 scalar AccountName
 
-type AccountNotFound implements ModifyPasswordResult & DeleteAccountResult {
-	message: String!
-}
+scalar AccountPassword
 
 enum AccountType {
 	USER
@@ -213,6 +207,10 @@ type AccountsMut {
 	Returns a mutable account by its name
 	"""
 	byName(accountName: AccountName!): AccountMut
+	"""
+	Create a new account
+	"""
+	createAccount(accountName: AccountName!, email: Email): CreateAccountResult!
 }
 
 """
@@ -668,10 +666,6 @@ type CreateAccessTokenResultDuplicate implements CreateTokenResult {
 
 type CreateAccessTokenResultSuccess implements CreateTokenResult {
 	token: CreatedAccessToken!
-	message: String!
-}
-
-type CreateAccountEmailInvalid implements CreateAccountResult {
 	message: String!
 }
 
@@ -2397,11 +2391,6 @@ type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetF
 	message: String!
 }
 
-type ModifyPasswordInvalidPassword implements ModifyPasswordResult {
-	reason: String!
-	message: String!
-}
-
 interface ModifyPasswordResult {
 	message: String!
 }
@@ -3011,6 +3000,10 @@ type Seed {
 	Type of the dataset.
 	"""
 	datasetKind: DatasetKind!
+}
+
+type SelfDeletionIsForbidden implements DeleteAccountResult {
+	message: String!
 }
 
 """

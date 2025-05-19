@@ -215,7 +215,8 @@ impl AccountService for AccountServiceImpl {
 
         self.password_hash_repository
             .modify_password_hash(account_name, password_hash)
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(())
     }

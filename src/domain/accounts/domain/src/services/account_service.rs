@@ -124,9 +124,10 @@ pub enum GetAccountMapError {
 #[derive(Debug, Error)]
 pub enum ModifyPasswordError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
-    #[error(transparent)]
     AccountNotFound(#[from] AccountNotFoundByNameError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 impl From<ModifyPasswordHashError> for ModifyPasswordError {
