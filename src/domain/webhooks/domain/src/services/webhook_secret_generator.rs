@@ -11,6 +11,7 @@ use crate::WebhookSubscriptionSecret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 pub trait WebhookSecretGenerator: Send + Sync {
     fn generate_secret(&self) -> WebhookSubscriptionSecret;
 }

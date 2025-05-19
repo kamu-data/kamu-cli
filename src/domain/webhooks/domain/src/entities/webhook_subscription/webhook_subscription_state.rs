@@ -94,59 +94,53 @@ impl Projection for WebhookSubscriptionState {
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Enabled(_) => {
-                        if s.status == WebhookSubscriptionStatus::Unverified {
-                            Ok(WebhookSubscriptionState {
-                                status: WebhookSubscriptionStatus::Enabled,
-                                ..s
-                            })
-                        } else {
-                            Err(ProjectionError::new(Some(s), event))
-                        }
-                    }
+                    E::Enabled(_) => match s.status {
+                        WebhookSubscriptionStatus::Enabled
+                        | WebhookSubscriptionStatus::Unverified => Ok(WebhookSubscriptionState {
+                            status: WebhookSubscriptionStatus::Enabled,
+                            ..s
+                        }),
+                        _ => Err(ProjectionError::new(Some(s), event)),
+                    },
 
-                    E::Paused(_) => {
-                        if s.status == WebhookSubscriptionStatus::Enabled {
-                            Ok(WebhookSubscriptionState {
-                                status: WebhookSubscriptionStatus::Paused,
-                                ..s
-                            })
-                        } else {
-                            Err(ProjectionError::new(Some(s), event))
-                        }
-                    }
-
-                    E::Resumed(_) => {
-                        if s.status == WebhookSubscriptionStatus::Paused {
-                            Ok(WebhookSubscriptionState {
-                                status: WebhookSubscriptionStatus::Enabled,
-                                ..s
-                            })
-                        } else {
-                            Err(ProjectionError::new(Some(s), event))
-                        }
-                    }
-
-                    E::MarkedUnreachable(_) => match s.status {
+                    E::Paused(_) => match s.status {
                         WebhookSubscriptionStatus::Enabled | WebhookSubscriptionStatus::Paused => {
                             Ok(WebhookSubscriptionState {
-                                status: WebhookSubscriptionStatus::Unreachable,
+                                status: WebhookSubscriptionStatus::Paused,
                                 ..s
                             })
                         }
                         _ => Err(ProjectionError::new(Some(s), event)),
                     },
 
-                    E::Reactivated(_) => {
-                        if s.status == WebhookSubscriptionStatus::Unreachable {
+                    E::Resumed(_) => match s.status {
+                        WebhookSubscriptionStatus::Enabled | WebhookSubscriptionStatus::Paused => {
                             Ok(WebhookSubscriptionState {
                                 status: WebhookSubscriptionStatus::Enabled,
                                 ..s
                             })
-                        } else {
-                            Err(ProjectionError::new(Some(s), event))
                         }
-                    }
+                        _ => Err(ProjectionError::new(Some(s), event)),
+                    },
+
+                    E::MarkedUnreachable(_) => match s.status {
+                        WebhookSubscriptionStatus::Enabled
+                        | WebhookSubscriptionStatus::Paused
+                        | WebhookSubscriptionStatus::Unreachable => Ok(WebhookSubscriptionState {
+                            status: WebhookSubscriptionStatus::Unreachable,
+                            ..s
+                        }),
+                        _ => Err(ProjectionError::new(Some(s), event)),
+                    },
+
+                    E::Reactivated(_) => match s.status {
+                        WebhookSubscriptionStatus::Enabled
+                        | WebhookSubscriptionStatus::Unreachable => Ok(WebhookSubscriptionState {
+                            status: WebhookSubscriptionStatus::Enabled,
+                            ..s
+                        }),
+                        _ => Err(ProjectionError::new(Some(s), event)),
+                    },
 
                     E::SecretRotated(WebhookSubscriptionEventSecretRotated {
                         new_secret, ..

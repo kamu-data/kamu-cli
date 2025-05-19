@@ -23,7 +23,7 @@ doctest = false
 [features]
 default = []
 sqlx = ["dep:sqlx"]
-
+testing = ["dep:mockall"]
 
 [dependencies]
 database-common = { workspace = true }
@@ -46,6 +46,7 @@ url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 
 # Optional
+mockall = { optional = true, version = "0.13", default-features = false }
 sqlx = { optional = true, version = "0.8", default-features = false, features = [
     "macros",
 ] }

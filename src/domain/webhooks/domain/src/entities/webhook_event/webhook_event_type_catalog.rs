@@ -30,6 +30,10 @@ impl WebhookEventTypeCatalog {
         vec![Self::dataset_ref_updated()]
     }
 
+    pub fn all_non_test_as_str() -> Vec<&'static str> {
+        vec![Self::DATASET_REF_UPDATED]
+    }
+
     pub fn is_valid_type(event_type: &WebhookEventType) -> bool {
         event_type.as_ref() == Self::TEST || event_type.as_ref() == Self::DATASET_REF_UPDATED
     }

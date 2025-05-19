@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod webhook_subscriptions_mut;
-mod webhooks_mut;
+mod dataset_webhooks_mut;
+mod webhook_subscription_mut;
 
-pub use webhook_subscriptions_mut::*;
-pub use webhooks_mut::*;
+pub use dataset_webhooks_mut::*;
+pub use webhook_subscription_mut::*;

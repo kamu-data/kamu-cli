@@ -9,8 +9,6 @@
 
 use async_graphql::Object;
 
-use crate::queries::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Webhooks;
@@ -22,15 +20,10 @@ pub struct Webhooks;
 impl Webhooks {
     /// List of supported event types
     async fn event_types(&self) -> Vec<String> {
-        kamu_webhooks::WebhookEventTypeCatalog::all_non_test()
+        kamu_webhooks::WebhookEventTypeCatalog::all_non_test_as_str()
             .iter()
             .map(ToString::to_string)
             .collect()
-    }
-
-    /// Access to the webhook subscriptions methods
-    async fn subscriptions(&self) -> WebhookSubscriptions {
-        WebhookSubscriptions
     }
 }
 

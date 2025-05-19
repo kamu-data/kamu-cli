@@ -13,6 +13,7 @@ use crate::WebhookResponse;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait WebhookSender: Send + Sync {
     async fn send_webhook(

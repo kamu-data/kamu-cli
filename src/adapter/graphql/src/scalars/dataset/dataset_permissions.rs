@@ -10,11 +10,13 @@
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetPermissions {
     pub collaboration: DatasetCollaborationPermissions,
     pub env_vars: DatasetEnvVarsPermissions,
     pub flows: DatasetFlowsPermissions,
+    pub webhooks: DatasetWebhooksPermissions,
     pub general: DatasetGeneralPermissions,
     pub metadata: DatasetMetadataPermissions,
 }
@@ -35,6 +37,12 @@ pub struct DatasetEnvVarsPermissions {
 pub struct DatasetFlowsPermissions {
     pub can_view: bool,
     pub can_run: bool,
+}
+
+#[derive(SimpleObject, Debug, PartialEq, Eq)]
+pub struct DatasetWebhooksPermissions {
+    pub can_view: bool,
+    pub can_update: bool,
 }
 
 #[derive(SimpleObject, Debug, PartialEq, Eq)]

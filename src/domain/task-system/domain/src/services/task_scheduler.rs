@@ -14,6 +14,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait TaskScheduler: Sync + Send {
     /// Creates a new task from provided logical plan & metadata

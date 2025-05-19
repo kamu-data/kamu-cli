@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+common-macros = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 internal-error = { workspace = true }
@@ -43,12 +44,18 @@ rand = { version = "0.8", default-features = false }
 ring = { version = "0.17", default-features = false}
 serde_json = { version = "1", default-features = false }
 sha2 = { version = "0.10", default-features = false }
+thiserror = { version = "2", default-features = false }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
 
 [dev-dependencies]
+kamu-accounts = { workspace = true }
+kamu-datasets-services = { workspace = true, features = ["testing"] }
+kamu-task-system = { workspace = true, features = ["testing"] }
+kamu-webhooks = { workspace = true, features = ["testing"] }
 kamu-webhooks-inmem = { workspace = true }
 
+oop = { version = "0.0.2", default-features = false }
 test-log = { version = "0.2", default-features = false }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
