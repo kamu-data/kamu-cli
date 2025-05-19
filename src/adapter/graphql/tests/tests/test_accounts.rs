@@ -687,33 +687,30 @@ impl GraphQLAccountsHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_account_request(new_account_name: &str) -> async_graphql::Request {
-    async_graphql::from_value(async_graphql::value!({
-        "query": indoc::indoc!(
-            r#"
-            mutation ($newAccountName: AccountName!) {
-              accounts {
-                createAccount(accountName: $newAccountName) {
-                  ... on CreateAccountSuccess {
-                    message
-                    account {
-                      accountName
-                      displayName
-                      accountType
-                    }
-                  }
-                  ... on AccountFieldNonUnique {
-                    message
-                  }
+    async_graphql::Request::new(indoc!(
+        r#"
+        mutation ($newAccountName: AccountName!) {
+          accounts {
+            createAccount(accountName: $newAccountName) {
+              ... on CreateAccountSuccess {
+                message
+                account {
+                  accountName
+                  displayName
+                  accountType
                 }
               }
+              ... on AccountFieldNonUnique {
+                message
+              }
             }
-            "#
-        ),
-        "variables": {
-            "newAccountName": new_account_name,
+          }
         }
-    }))
-    .unwrap()
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(value!({
+        "newAccountName": new_account_name,
+    })))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

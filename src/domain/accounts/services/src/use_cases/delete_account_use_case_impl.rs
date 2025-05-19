@@ -29,6 +29,7 @@ impl DeleteAccountUseCaseImpl {
         account_name: &odf::AccountName,
     ) -> Result<bool, InternalError> {
         match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => Ok(false),
             CurrentAccountSubject::Logged(l) if l.account_name == *account_name => Ok(true),
             CurrentAccountSubject::Logged(l) => {
                 use internal_error::ResultIntoInternal;
@@ -42,7 +43,6 @@ impl DeleteAccountUseCaseImpl {
 
                 Ok(is_admin)
             }
-            CurrentAccountSubject::Anonymous(_) => Ok(false),
         }
     }
 }

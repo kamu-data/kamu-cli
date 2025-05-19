@@ -155,7 +155,7 @@ async fn test_create_account() {
 
     // Compare original account_id from db and id generated from a stored private
     // key
-    assert_eq!(created_account_id.as_did(), &did_odf);
+    pretty_assertions::assert_eq!(created_account_id.as_did(), &did_odf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

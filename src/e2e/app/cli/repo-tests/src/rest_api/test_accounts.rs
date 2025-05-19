@@ -9,7 +9,6 @@
 
 use std::assert_matches::assert_matches;
 
-use async_graphql::value;
 use indoc::indoc;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
 use kamu_adapter_graphql::traits::ResponseExt;
@@ -91,26 +90,25 @@ pub async fn test_create_account_and_modify_password(
 
     let res = kamu_api_server_client
         .graphql_api_call_ex(
-            async_graphql::from_value(async_graphql::value!({
-                "query": indoc::indoc!(
-                    r#"
-                        mutation ($accountName: AccountName, $newPassword: AccountPassword!) {
-                          accounts {
-                            byName(accountName: $accountName) {
-                              modifyPassword(password: $newPassword) {
-                                message
-                              }
-                            }
-                          }
-                        }
-                        "#
-                ),
-                "variables": {
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($accountName: AccountName, $newPassword: AccountPassword!) {
+                  accounts {
+                    byName(accountName: $accountName) {
+                      modifyPassword(password: $newPassword) {
+                        message
+                      }
+                    }
+                  }
+                }
+                "#,
+            ))
+            .variables(async_graphql::Variables::from_value(
+                async_graphql::value!({
                     "accountName": "foo",
                     "newPassword": "foo_password",
-                }
-            }))
-            .unwrap(),
+                }),
+            )),
         )
         .await;
     pretty_assertions::assert_eq!(
@@ -162,9 +160,11 @@ fn create_account_request(new_account_name: &str) -> async_graphql::Request {
         }
         "#,
     ))
-    .variables(async_graphql::Variables::from_value(value!({
-        "newAccountName": new_account_name,
-    })))
+    .variables(async_graphql::Variables::from_value(
+        async_graphql::value!({
+            "newAccountName": new_account_name,
+        }),
+    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
