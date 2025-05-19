@@ -132,7 +132,7 @@ impl CollectionMut {
                     .await
                     .int_err()?
                     .into_iter()
-                    .map(|record| CollectionEntry::from_json(self.dataset.clone(), record))
+                    .map(CollectionEntry::from_json)
                     .map(|entry| (entry.path.clone(), entry))
                     .collect()
             }
@@ -146,7 +146,7 @@ impl CollectionMut {
                     diff.push((Op::Retract, existing));
                 }
 
-                let new_entry = CollectionEntry::from_input(self.dataset.clone(), add.entry);
+                let new_entry = CollectionEntry::from_input(add.entry);
                 current_entries.insert(new_entry.path.clone(), new_entry.clone());
                 diff.push((Op::Append, new_entry));
             } else if let Some(remove) = op.remove {

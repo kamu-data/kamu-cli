@@ -470,6 +470,48 @@ async fn test_molecule_data_room_operations() {
             },
         }),
     );
+
+    // Check activity events
+    const LIST_EVENTS: &str = indoc!(
+        r#"
+        query ($ipnftUid: String!) {
+            molecule {
+                project(ipnftUid: $ipnftUid) {
+                    activity {
+                        nodes {
+                            ... on MoleculeProjectEventDataRoomEntryAdded {
+                                entry {
+                                    path
+                                    ref
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(LIST_EVENTS).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["project"]["activity"]["nodes"],
+        json!([
+            {
+                "entry": {
+                    "path": "/foo",
+                    "ref": test_file_did,
+                }
+            },
+        ])
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -778,6 +820,40 @@ async fn test_molecule_announcements_operations() {
                 },
             ]
         )
+    );
+
+    // Check activity events
+    const LIST_EVENTS: &str = indoc!(
+        r#"
+        query ($ipnftUid: String!) {
+            molecule {
+                project(ipnftUid: $ipnftUid) {
+                    activity {
+                        nodes {
+                            __typename
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(LIST_EVENTS).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["project"]["activity"]["nodes"],
+        json!([
+            {"__typename": "MoleculeProjectEventAnnouncement"},
+            {"__typename": "MoleculeProjectEventAnnouncement"},
+            {"__typename": "MoleculeProjectEventAnnouncement"},
+        ])
     );
 }
 

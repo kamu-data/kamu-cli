@@ -9,8 +9,11 @@
 
 use chrono::{DateTime, Utc};
 use kamu::domain;
-use kamu_core::DatasetRegistryExt as _;
+use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::auth::DatasetAction;
+use kamu_core::ResolvedDataset;
 
+use super::CollectionEntry;
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
 
@@ -170,16 +173,17 @@ impl Molecule {
 
     pub async fn get_projects_dataset(
         ctx: &Context<'_>,
+        action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<domain::ResolvedDataset> {
-        let dataset_reg = from_catalog_n!(ctx, dyn domain::DatasetRegistry);
+        let dataset_reg = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
 
         match dataset_reg
-            .get_dataset_by_ref(&"molecule/projects".parse().unwrap())
+            .resolve_dataset_by_ref(&"molecule/projects".parse().unwrap(), action)
             .await
         {
             Ok(ds) => Ok(ds),
-            Err(odf::DatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
+            Err(RebacDatasetRefUnresolvedError::NotFound(_)) if create_if_not_exist => {
                 let create_dataset_use_case =
                     from_catalog_n!(ctx, dyn kamu_datasets::CreateDatasetFromSnapshotUseCase);
 
@@ -198,10 +202,14 @@ impl Molecule {
                     .await
                     .int_err()?;
 
-                Ok(dataset_reg
-                    .get_dataset_by_handle(&create_res.dataset_handle)
-                    .await)
+                // TODO: Use case should return ResolvedDataset directly
+                Ok(ResolvedDataset::new(
+                    create_res.dataset,
+                    create_res.dataset_handle,
+                ))
             }
+            Err(RebacDatasetRefUnresolvedError::NotFound(err)) => Err(GqlError::Gql(err.into())),
+            Err(RebacDatasetRefUnresolvedError::Access(err)) => Err(GqlError::Access(err)),
             Err(err) => Err(err.int_err().into()),
         }
     }
@@ -226,16 +234,20 @@ impl Molecule {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(ctx, false).await?;
+        let projects_dataset = Self::get_projects_dataset(ctx, DatasetAction::Read, false).await?;
 
         // Query data
-        let query_res = query_svc
+        let query_res = match query_svc
             .get_data(
                 &projects_dataset.get_handle().as_local_ref(),
                 domain::GetDataOptions::default(),
             )
             .await
-            .int_err()?;
+        {
+            Ok(res) => res,
+            Err(domain::QueryError::Access(err)) => return Err(GqlError::Access(err)),
+            Err(err) => return Err(err.int_err().into()),
+        };
 
         let Some(df) = query_res.df else {
             return Ok(None);
@@ -277,7 +289,7 @@ impl Molecule {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(ctx, false).await?;
+        let projects_dataset = Self::get_projects_dataset(ctx, DatasetAction::Read, false).await?;
 
         // Query data
         let query_res = query_svc
@@ -475,6 +487,8 @@ impl MoleculeProject {
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[ComplexObject]
 impl MoleculeProject {
+    const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
+
     /// Project's organizational account
     #[tracing::instrument(level = "info", name = MoleculeProject_account, skip_all)]
     async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
@@ -503,6 +517,78 @@ impl MoleculeProject {
             )),
         }
     }
+
+    /// Project's activity events in reverse chronological order
+    #[tracing::instrument(level = "info", name = MoleculeProject_activity, skip_all)]
+    async fn activity(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<MoleculeProjectEventConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
+
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
+
+        let last_records = async |dataset_id: &odf::DatasetID| -> Result<Vec<serde_json::Value>> {
+            let df = match query_svc
+                .tail(
+                    &dataset_id.as_local_ref(),
+                    0,
+                    (per_page * (page + 1)) as u64,
+                    domain::GetDataOptions::default(),
+                )
+                .await
+            {
+                Ok(res) => match res.df {
+                    Some(df) => df,
+                    None => return Ok(Vec::new()),
+                },
+                Err(domain::QueryError::Access(err)) => return Err(GqlError::Access(err)),
+                Err(err) => return Err(err.int_err().into()),
+            };
+
+            let records = df.collect_json_aos().await.int_err()?;
+
+            Ok(records)
+        };
+
+        // Fetch last records
+        let mut merged_records = Vec::new();
+        merged_records.append(&mut last_records(&self.announcements_dataset_id).await?);
+        merged_records.append(&mut last_records(&self.data_room_dataset_id).await?);
+
+        let vocab = odf::metadata::DatasetVocabulary::default();
+
+        // Order and truncate
+        merged_records.sort_by(|a, b| {
+            a[&vocab.system_time_column]
+                .as_str()
+                .unwrap()
+                .cmp(b[&vocab.system_time_column].as_str().unwrap())
+                .reverse()
+        });
+
+        let mut nodes = Vec::new();
+        for record in merged_records.into_iter().skip(page * per_page) {
+            if !record["announcement_id"].is_null() {
+                nodes.push(MoleculeProjectEvent::Announcement(
+                    MoleculeProjectEventAnnouncement {
+                        announcement: record,
+                    },
+                ));
+            } else {
+                let entry = CollectionEntry::from_json(record);
+
+                nodes.push(MoleculeProjectEvent::DataRoomEntryAdded(
+                    MoleculeProjectEventDataRoomEntryAdded { entry },
+                ));
+            }
+        }
+
+        Ok(MoleculeProjectEventConnection::new(nodes, page, per_page))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -511,6 +597,33 @@ page_based_connection!(
     MoleculeProject,
     MoleculeProjectConnection,
     MoleculeProjectEdge
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union)]
+
+pub enum MoleculeProjectEvent {
+    DataRoomEntryAdded(MoleculeProjectEventDataRoomEntryAdded),
+    Announcement(MoleculeProjectEventAnnouncement),
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeProjectEventDataRoomEntryAdded {
+    /// Collection entry
+    pub entry: CollectionEntry,
+}
+
+#[derive(SimpleObject)]
+pub struct MoleculeProjectEventAnnouncement {
+    /// Announcement record
+    pub announcement: serde_json::Value,
+}
+
+page_based_stream_connection!(
+    MoleculeProjectEvent,
+    MoleculeProjectEventConnection,
+    MoleculeProjectEventEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
