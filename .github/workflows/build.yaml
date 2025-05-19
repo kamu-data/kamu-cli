@@ -52,6 +52,8 @@ jobs:
         with:
           repository: kamu-data/kamu-cli
           path: kamu-cli
+      - name: Copy rust-toolchain file
+        run: cp kamu-cli/rust-toolchain ./rust-toolchain          
       - uses: actions/checkout@v4
         with:
           repository: open-data-fabric/open-data-fabric
