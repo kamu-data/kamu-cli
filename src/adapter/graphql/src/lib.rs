@@ -12,14 +12,14 @@
 #![feature(let_chains)]
 
 pub mod extensions;
+pub mod guards;
 pub(crate) mod mutations;
 pub(crate) mod prelude;
 pub(crate) mod queries;
 mod root;
 pub mod scalars;
+pub mod traits;
 pub(crate) mod utils;
 
-pub use root::*;
-
-pub mod guards;
 pub use guards::*;
+pub use root::*;

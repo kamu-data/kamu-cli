@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DidEntity, DidEntityType, DidSecretKey};
+use crate::{DidEntity, DidSecretKey};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,17 +19,22 @@ pub trait DidSecretKeyRepository: Send + Sync {
     async fn save_did_secret_key(
         &self,
         entity: &DidEntity,
-        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveDidSecretKeyError>;
 
-    async fn get_did_secret_keys_by_creator_id(
+    async fn get_did_secret_key(
         &self,
-        creator_id: &odf::AccountID,
-        entity_type: Option<DidEntityType>,
-    ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByCreatorIdError>;
+        entity: &DidEntity,
+    ) -> Result<DidSecretKey, GetDidSecretKeyError>;
+
+    async fn delete_did_secret_key(
+        &self,
+        entity: &DidEntity,
+    ) -> Result<(), DeleteDidSecretKeyError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -38,8 +43,44 @@ pub enum SaveDidSecretKeyError {
     Internal(#[from] InternalError),
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
-pub enum GetDidSecretKeysByCreatorIdError {
+pub enum GetDidSecretKeyError {
+    #[error(transparent)]
+    NotFound(#[from] DidSecretKeyNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+#[error("Entity's DID secret key not found: '{entity:?}'")]
+pub struct DidSecretKeyNotFoundError {
+    pub entity: DidEntity<'static>,
+}
+
+impl DidSecretKeyNotFoundError {
+    pub fn new(entity: &DidEntity<'_>) -> Self {
+        Self {
+            entity: entity.clone().into_owned(),
+        }
+    }
+}
+
+impl From<DidEntity<'static>> for DidSecretKeyNotFoundError {
+    fn from(entity: DidEntity<'static>) -> Self {
+        Self { entity }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteDidSecretKeyError {
+    #[error(transparent)]
+    NotFound(#[from] DidSecretKeyNotFoundError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

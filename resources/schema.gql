@@ -138,15 +138,15 @@ type AccountMut {
 	"""
 	Update account email
 	"""
-	updateEmail(newEmail: String!): UpdateEmailResult!
+	updateEmail(newEmail: Email!): UpdateEmailResult!
 	"""
-	Create a new account
+	Reset password for a selected account. Allowed only for admin users
 	"""
-	createAccount(accountName: String!, email: String): CreateAccountResult!
+	modifyPassword(password: AccountPassword!): ModifyPasswordResult!
 	"""
-	Reset password for selected account. Allowed only for admin users
+	Delete a selected account. Allowed only for admin users
 	"""
-	modifyPassword(accountName: AccountName!, password: String!): ModifyPasswordResult!
+	delete: DeleteAccountResult!
 	"""
 	Access to the mutable flow configurations of this account
 	"""
@@ -155,9 +155,7 @@ type AccountMut {
 
 scalar AccountName
 
-type AccountNameInvalid implements CreateAccountResult {
-	message: String!
-}
+scalar AccountPassword
 
 enum AccountType {
 	USER
@@ -209,6 +207,10 @@ type AccountsMut {
 	Returns a mutable account by its name
 	"""
 	byName(accountName: AccountName!): AccountMut
+	"""
+	Create a new account
+	"""
+	createAccount(accountName: AccountName!, email: Email): CreateAccountResult!
 }
 
 """
@@ -664,10 +666,6 @@ type CreateAccessTokenResultDuplicate implements CreateTokenResult {
 
 type CreateAccessTokenResultSuccess implements CreateTokenResult {
 	token: CreatedAccessToken!
-	message: String!
-}
-
-type CreateAccountEmailInvalid implements CreateAccountResult {
 	message: String!
 }
 
@@ -1384,6 +1382,14 @@ The input/output is a string in RFC3339 format.
 """
 scalar DateTime
 
+interface DeleteAccountResult {
+	message: String!
+}
+
+type DeleteAccountSuccess implements DeleteAccountResult {
+	message: String!
+}
+
 interface DeleteDatasetEnvVarResult {
 	message: String!
 }
@@ -1449,6 +1455,8 @@ type DisablePushSource {
 	"""
 	sourceName: String!
 }
+
+scalar Email
 
 type EngineDesc {
 	"""
@@ -2380,15 +2388,6 @@ type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapsh
 }
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
-	message: String!
-}
-
-type ModifyPasswordAccountNotFound implements ModifyPasswordResult {
-	message: String!
-}
-
-type ModifyPasswordInvalidPassword implements ModifyPasswordResult {
-	reason: String!
 	message: String!
 }
 
@@ -3450,10 +3449,6 @@ interface UnsetRoleResult {
 }
 
 type UnsetRoleResultSuccess implements UnsetRoleResult {
-	message: String!
-}
-
-type UpdateEmailInvalid implements UpdateEmailResult {
 	message: String!
 }
 

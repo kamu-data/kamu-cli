@@ -6068,9 +6068,11 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
+ "kamu-datasets",
  "messaging-outbox",
  "mockall",
  "opendatafabric",
+ "pretty_assertions",
  "random-strings",
  "secrecy",
  "serde",
@@ -6663,6 +6665,7 @@ dependencies = [
 name = "kamu-cli-e2e-repo-tests"
 version = "0.237.0"
 dependencies = [
+ "async-graphql",
  "chrono",
  "database-common",
  "datafusion",
@@ -6670,6 +6673,7 @@ dependencies = [
  "indoc 2.0.6",
  "kamu",
  "kamu-accounts",
+ "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-auth-rebac",
  "kamu-cli-e2e-common",

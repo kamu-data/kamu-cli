@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use email_utils::Email;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{Account, AccountService, CreateAccountError, CreateAccountUseCase, Password};
 use random_strings::AllowedSymbols;
 
@@ -22,23 +22,34 @@ pub struct CreateAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
 }
 
+impl CreateAccountUseCaseImpl {
+    fn generate_email(
+        creator_account: &Account,
+        account_name: &odf::AccountName,
+    ) -> Result<Email, InternalError> {
+        let parent_host = creator_account.email.host();
+        let email_str = format!(
+            "{}+{}@{}",
+            creator_account.account_name, account_name, parent_host
+        );
+
+        Email::parse(&email_str).int_err()
+    }
+}
+
 #[async_trait::async_trait]
 impl CreateAccountUseCase for CreateAccountUseCaseImpl {
     async fn execute(
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        email_maybe: Option<Email>,
+        maybe_email: Option<Email>,
     ) -> Result<Account, CreateAccountError> {
-        let email = email_maybe.unwrap_or({
-            let parent_host = creator_account.email.host();
-            let email_str = format!(
-                "{}+{}@{}",
-                creator_account.account_name, account_name, parent_host
-            );
-
-            Email::parse(&email_str).int_err()?
-        });
+        let email = if let Some(email) = maybe_email {
+            email
+        } else {
+            Self::generate_email(creator_account, account_name)?
+        };
 
         let random_password =
             random_strings::get_random_string(None, 10, &AllowedSymbols::AsciiSymbols);
@@ -48,7 +59,6 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
                 account_name,
                 email,
                 Password::try_new(&random_password).unwrap(),
-                &creator_account.id,
             )
             .await
     }

@@ -9,15 +9,7 @@
 
 use database_common::{TransactionRef, TransactionRefT};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{
-    DidEntity,
-    DidEntityType,
-    DidSecretKey,
-    DidSecretKeyRepository,
-    DidSecretKeyRowModel,
-    GetDidSecretKeysByCreatorIdError,
-    SaveDidSecretKeyError,
-};
+use kamu_accounts::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,7 +34,6 @@ impl DidSecretKeyRepository for PostgresDidSecretKeyRepository {
     async fn save_did_secret_key(
         &self,
         entity: &DidEntity,
-        creator_id: &odf::AccountID,
         did_secret_key: &DidSecretKey,
     ) -> Result<(), SaveDidSecretKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -50,16 +41,13 @@ impl DidSecretKeyRepository for PostgresDidSecretKeyRepository {
 
         sqlx::query!(
             r#"
-                INSERT INTO did_secret_keys (
-                    entity_id, entity_type, secret_key, secret_nonce, creator_id
-                )
-                VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO did_secret_keys (entity_id, entity_type, secret_key, secret_nonce)
+            VALUES ($1, $2, $3, $4)
             "#,
             &entity.entity_id,
             entity.entity_type as DidEntityType,
             did_secret_key.secret_key,
             did_secret_key.secret_nonce,
-            creator_id.to_string(),
         )
         .execute(connection_mut)
         .await
@@ -68,33 +56,63 @@ impl DidSecretKeyRepository for PostgresDidSecretKeyRepository {
         Ok(())
     }
 
-    async fn get_did_secret_keys_by_creator_id(
+    async fn get_did_secret_key(
         &self,
-        creator_id: &odf::AccountID,
-        entity_type_maybe: Option<DidEntityType>,
-    ) -> Result<Vec<DidSecretKey>, GetDidSecretKeysByCreatorIdError> {
+        entity: &DidEntity,
+    ) -> Result<DidSecretKey, GetDidSecretKeyError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_secret_key = sqlx::query_as!(
+            DidSecretKey,
+            r#"
+            SELECT secret_key, secret_nonce
+            FROM did_secret_keys
+            WHERE entity_type = $1
+              AND entity_id = $2
+            "#,
+            entity.entity_type as DidEntityType,
+            &entity.entity_id,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        if let Some(secret_key) = maybe_secret_key {
+            Ok(secret_key)
+        } else {
+            Err(DidSecretKeyNotFoundError::new(entity).into())
+        }
+    }
+
+    async fn delete_did_secret_key(
+        &self,
+        entity: &DidEntity,
+    ) -> Result<(), DeleteDidSecretKeyError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let did_secret_keys = sqlx::query_as!(
-            DidSecretKeyRowModel,
+        let delete_result = sqlx::query!(
             r#"
-                SELECT entity_id as "entity_id: _",
-                       entity_type as "entity_type: _",
-                       secret_key,
-                       secret_nonce
-                FROM did_secret_keys
-                WHERE creator_id = $1
-                    AND ($2::did_entity_type IS NULL OR entity_type = $2)
-                "#,
-            creator_id.to_string(),
-            entity_type_maybe as Option<DidEntityType>,
+            DELETE
+            FROM did_secret_keys
+            WHERE entity_type = $1
+              AND entity_id = $2
+            "#,
+            entity.entity_type as DidEntityType,
+            &entity.entity_id,
         )
-        .fetch_all(connection_mut)
+        .execute(&mut *connection_mut)
         .await
         .int_err()?;
 
-        Ok(did_secret_keys.into_iter().map(Into::into).collect())
+        if delete_result.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(DidSecretKeyNotFoundError::new(entity).into())
+        }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -26,10 +26,11 @@ default = []
 
 
 [dependencies]
-http-common = { workspace = true }
 database-common = { workspace = true, default-features = false }
+http-common = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
+kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-cli-e2e-common = { workspace = true }
@@ -41,6 +42,7 @@ odf = { workspace = true }
 regex = { version = "1", default-features = false }
 test-utils = { workspace = true }
 
+async-graphql = { version = "7", default-features = false }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "47", default-features = false, features = [] }
 indoc = "2"

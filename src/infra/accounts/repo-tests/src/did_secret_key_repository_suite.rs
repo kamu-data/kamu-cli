@@ -7,105 +7,72 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{SubsecRound, Utc};
-use email_utils::Email;
-use kamu_accounts::{
-    Account,
-    AccountRepository,
-    AccountType,
-    DidEntity,
-    DidEntityType,
-    DidSecretKey,
-    DidSecretKeyRepository,
-    SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
-};
+use std::assert_matches::assert_matches;
+
+use kamu_accounts::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_insert_and_locate_did_secret_keys(catalog: &dill::Catalog) {
-    let creator_account = Account {
-        id: odf::AccountID::new_seeded_ed25519("foo".as_bytes()),
-        account_name: odf::AccountName::new_unchecked("foo"),
-        email: Email::parse("foo@example.com").unwrap(),
-        display_name: String::from("foo"),
-        account_type: AccountType::User,
-        avatar_url: None,
-        registered_at: Utc::now().round_subsecs(6),
-        provider: String::from("foo"),
-        provider_identity_key: String::from("foo"),
-    };
-    let new_account_did = odf::AccountID::new_generated_ed25519();
-    let new_dataset_did = odf::AccountID::new_generated_ed25519();
-
-    let account_did_secret_key = DidSecretKey::try_new(
-        &new_account_did.0.into(),
-        SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
-    )
-    .unwrap();
-    let dataset_did_secret_key = DidSecretKey::try_new(
-        &new_dataset_did.0.into(),
-        SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
-    )
-    .unwrap();
-
-    let account_repository = catalog.get_one::<dyn AccountRepository>().unwrap();
     let did_secret_key_repository = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
 
-    account_repository
-        .save_account(&creator_account)
-        .await
-        .unwrap();
+    {
+        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
+        let account_did_secret_key =
+            DidSecretKey::try_new(&account_key.into(), SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY)
+                .unwrap();
+        let account_id = account_id.as_did_str().to_stack_string();
 
-    let all_did_secret_keys = did_secret_key_repository
-        .get_did_secret_keys_by_creator_id(&creator_account.id, None)
-        .await
-        .unwrap();
-
-    assert_eq!(all_did_secret_keys, vec![]);
-
-    did_secret_key_repository
-        .save_did_secret_key(
-            &DidEntity::new_account(new_account_did.1.to_string()),
-            &creator_account.id,
-            &account_did_secret_key,
+        test(
+            did_secret_key_repository.as_ref(),
+            account_did_secret_key,
+            DidEntity::new_account(account_id.as_str()),
         )
-        .await
-        .unwrap();
-    did_secret_key_repository
-        .save_did_secret_key(
-            &DidEntity::new_dataset(new_dataset_did.1.to_string()),
-            &creator_account.id,
-            &dataset_did_secret_key,
+        .await;
+    }
+    {
+        let (dataset_key, dataset_id) = odf::DatasetID::new_generated_ed25519();
+        let dataset_did_secret_key =
+            DidSecretKey::try_new(&dataset_key.into(), SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY)
+                .unwrap();
+        let dataset_id = dataset_id.as_did_str().to_stack_string();
+
+        test(
+            did_secret_key_repository.as_ref(),
+            dataset_did_secret_key,
+            DidEntity::new_dataset(dataset_id.as_str()),
         )
-        .await
-        .unwrap();
+        .await;
+    }
 
-    let account_did_secret_keys = did_secret_key_repository
-        .get_did_secret_keys_by_creator_id(&creator_account.id, Some(DidEntityType::Account))
-        .await
-        .unwrap();
-    assert_eq!(
-        account_did_secret_keys,
-        vec![account_did_secret_key.clone()]
-    );
+    async fn test(
+        did_secret_key_repository: &dyn DidSecretKeyRepository,
+        did_secret_key: DidSecretKey,
+        did_entity: DidEntity<'_>,
+    ) {
+        assert_matches!(
+            did_secret_key_repository
+                .get_did_secret_key(&did_entity)
+                .await,
+            Err(GetDidSecretKeyError::NotFound(e))
+                if e.entity == did_entity
+        );
 
-    let dataset_did_secret_keys = did_secret_key_repository
-        .get_did_secret_keys_by_creator_id(&creator_account.id, Some(DidEntityType::Dataset))
-        .await
-        .unwrap();
-    assert_eq!(
-        dataset_did_secret_keys,
-        vec![dataset_did_secret_key.clone()]
-    );
+        assert_matches!(
+            did_secret_key_repository
+                .save_did_secret_key(&did_entity, &did_secret_key)
+                .await,
+            Ok(_)
+        );
 
-    let all_did_secret_keys = did_secret_key_repository
-        .get_did_secret_keys_by_creator_id(&creator_account.id, None)
-        .await
-        .unwrap();
-    assert_eq!(
-        all_did_secret_keys,
-        vec![account_did_secret_key, dataset_did_secret_key]
-    );
+        assert_matches!(
+            did_secret_key_repository
+                .get_did_secret_key(&did_entity)
+                .await,
+            Ok(got_did_secret_key)
+                if got_did_secret_key == did_secret_key
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
