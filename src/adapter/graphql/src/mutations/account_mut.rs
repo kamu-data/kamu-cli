@@ -184,21 +184,6 @@ pub enum DeleteAccountResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct SelfDeletionIsForbidden {
-    message: String,
-}
-
-impl Default for SelfDeletionIsForbidden {
-    fn default() -> Self {
-        Self {
-            message: "Self-deletion is prohibited".to_string(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
 pub struct DeleteAccountSuccess {
     message: String,
 }
