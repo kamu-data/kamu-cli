@@ -10,7 +10,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::auth::*;
@@ -22,6 +21,8 @@ use crate::{KamuAuthOso, OsoResourceServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component(pub)]
+#[dill::interface(dyn DatasetActionAuthorizer)]
 pub struct OsoDatasetAuthorizer {
     kamu_auth_oso: Arc<KamuAuthOso>,
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -30,21 +31,7 @@ pub struct OsoDatasetAuthorizer {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn DatasetActionAuthorizer)]
 impl OsoDatasetAuthorizer {
-    pub fn new(
-        kamu_auth_oso: Arc<KamuAuthOso>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        oso_resource_service: Arc<OsoResourceServiceImpl>,
-    ) -> Self {
-        Self {
-            kamu_auth_oso,
-            current_account_subject,
-            oso_resource_service,
-        }
-    }
-
     async fn user_actor(&self) -> Result<UserActor, InternalError> {
         let maybe_account_id = self.current_account_subject.get_maybe_logged_account_id();
 
