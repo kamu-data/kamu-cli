@@ -94,8 +94,10 @@ impl Datasets {
 
         let account_owned_datasets_stream =
             dataset_registry.all_dataset_handles_by_owner_id(account_ref.account_id_internal());
-        let readable_dataset_handles_stream = dataset_action_authorizer
-            .filtered_datasets_stream(account_owned_datasets_stream, auth::DatasetAction::Read);
+        let readable_dataset_handles_stream = dataset_action_authorizer.filtered_datasets_stream(
+            account_owned_datasets_stream.into_inner(),
+            auth::DatasetAction::Read,
+        );
         let mut accessible_datasets_handles = readable_dataset_handles_stream
             .try_collect::<Vec<_>>()
             .await?;

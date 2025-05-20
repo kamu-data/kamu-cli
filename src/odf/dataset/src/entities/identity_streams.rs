@@ -18,6 +18,9 @@ use tokio_stream::Stream;
 pub type DatasetHandleStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
 
+#[nutype::nutype(derive(AsRef, From, Into))]
+pub struct OwnedDatasetHandleStream<'a>(DatasetHandleStream<'a>);
+
 pub type DatasetIDStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetID, InternalError>> + Send + 'a>>;
 

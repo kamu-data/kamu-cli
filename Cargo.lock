@@ -8439,6 +8439,7 @@ dependencies = [
  "futures",
  "internal-error",
  "mockall",
+ "nutype",
  "opendatafabric-metadata",
  "opendatafabric-storage",
  "pin-project",

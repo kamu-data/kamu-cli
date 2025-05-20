@@ -172,10 +172,10 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
     fn all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
-    ) -> odf::dataset::DatasetHandleStream<'_> {
+    ) -> odf::dataset::OwnedDatasetHandleStream<'_> {
         let owner_id = owner_id.clone();
 
-        Box::pin(async_stream::try_stream! {
+        odf::dataset::OwnedDatasetHandleStream::new(Box::pin(async_stream::try_stream! {
             use futures::TryStreamExt;
             let mut dataset_ids_stream = self.dataset_storage_unit.stored_dataset_ids();
             while let Some(dataset_id) = dataset_ids_stream.try_next().await? {
@@ -204,7 +204,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
                     yield dataset_handle;
                 }
             }
-        })
+        }))
     }
 
     async fn resolve_multiple_dataset_handles_by_ids(

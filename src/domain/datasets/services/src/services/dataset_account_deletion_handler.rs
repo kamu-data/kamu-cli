@@ -45,7 +45,8 @@ impl DatasetAccountDeletionHandler {
     ) -> Result<(), InternalError> {
         let mut owned_dataset_stream = self
             .dataset_registry
-            .all_dataset_handles_by_owner_id(&message.account_id);
+            .all_dataset_handles_by_owner_id(&message.account_id)
+            .into_inner();
 
         use tokio_stream::StreamExt;
 
