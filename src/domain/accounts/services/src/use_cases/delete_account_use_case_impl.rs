@@ -54,7 +54,7 @@ impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
             return Err(DeleteAccountByNameError::Access(
                 odf::AccessError::Unauthenticated(
                     AccountDeletionNotAuthorizedError {
-                        subject_account: self.current_account_subject.account_name().clone(),
+                        subject_account: self.current_account_subject.maybe_account_name().cloned(),
                         object_account: account_name.clone(),
                     }
                     .into(),
