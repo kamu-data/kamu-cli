@@ -50,11 +50,4 @@ impl From<DeleteAccountError> for DeleteAccountByNameError {
     }
 }
 
-#[derive(Debug, Error)]
-#[error("Account '{subject_account:?}' is not authorized to delete account '{object_account}'")]
-pub struct AccountDeletionNotAuthorizedError {
-    pub subject_account: Option<odf::AccountName>,
-    pub object_account: odf::AccountName,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

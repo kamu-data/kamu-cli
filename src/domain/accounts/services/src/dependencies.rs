@@ -23,6 +23,8 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool, produ
     b.add::<CreateAccountUseCaseImpl>();
     b.add::<DeleteAccountUseCaseImpl>();
 
+    b.add::<utils::AccountAuthorizationHelper>();
+
     b.add::<DidSecretService>();
 
     if needs_indexing {

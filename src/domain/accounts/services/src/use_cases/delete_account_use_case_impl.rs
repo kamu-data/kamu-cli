@@ -9,55 +9,26 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
 use kamu_accounts::*;
+
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn DeleteAccountUseCase)]
 pub struct DeleteAccountUseCaseImpl {
-    current_account_subject: Arc<CurrentAccountSubject>,
-    rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
+    account_authorization_helper: Arc<utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
-}
-
-impl DeleteAccountUseCaseImpl {
-    async fn authenticated(&self, account_name: &odf::AccountName) -> Result<bool, InternalError> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => Ok(false),
-            CurrentAccountSubject::Logged(l) if l.account_name == *account_name => Ok(true),
-            CurrentAccountSubject::Logged(l) => {
-                use internal_error::ResultIntoInternal;
-                use kamu_auth_rebac::RebacServiceExt;
-
-                let is_admin = self
-                    .rebac_service
-                    .is_account_admin(&l.account_id)
-                    .await
-                    .int_err()?;
-
-                Ok(is_admin)
-            }
-        }
-    }
 }
 
 #[async_trait::async_trait]
 impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
     async fn execute(&self, account: &Account) -> Result<(), DeleteAccountByNameError> {
-        if !self.authenticated(&account.account_name).await? {
-            return Err(DeleteAccountByNameError::Access(
-                odf::AccessError::Unauthenticated(
-                    AccountDeletionNotAuthorizedError {
-                        subject_account: self.current_account_subject.maybe_account_name().cloned(),
-                        object_account: account.account_name.clone(),
-                    }
-                    .into(),
-                ),
-            ));
-        }
+        self.account_authorization_helper
+            .ensure_account_can_be_deleted(&account.account_name)
+            .await?;
 
         self.account_service
             .delete_account_by_name(&account.account_name)
