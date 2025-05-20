@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
 use database_common::PaginationOpts;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
@@ -224,8 +224,13 @@ impl AccountService for AccountServiceImpl {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError> {
-        self.account_repo.delete_account_by_name(account_name).await
+    ) -> Result<(), InternalError> {
+        use DeleteAccountError as E;
+
+        match self.account_repo.delete_account_by_name(account_name).await {
+            Ok(_) | Err(E::NotFound(_)) => Ok(()),
+            Err(e @ E::Internal(_)) => Err(e.int_err()),
+        }
     }
 }
 

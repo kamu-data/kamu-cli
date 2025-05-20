@@ -8,31 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use indoc::indoc;
-use kamu_accounts::{
-    CurrentAccountSubject,
-    JwtAuthenticationConfig,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME_STR,
-    DUMMY_EMAIL_ADDRESS,
-};
-use kamu_accounts_inmem::{
-    InMemoryAccessTokenRepository,
-    InMemoryDidSecretKeyRepository,
-    InMemoryOAuthDeviceCodeRepository,
-};
-use kamu_accounts_services::{
-    AccessTokenServiceImpl,
-    AuthenticationServiceImpl,
-    CreateAccountUseCaseImpl,
-    OAuthDeviceCodeGeneratorDefault,
-    OAuthDeviceCodeServiceImpl,
-};
+use kamu_accounts::*;
 use kamu_adapter_graphql::traits::ResponseExt;
-use messaging_outbox::{Outbox, OutboxImmediateImpl};
-use time_source::SystemTimeSourceDefault;
 
 use crate::utils::{authentication_catalogs, PredefinedAccountOpts};
 
@@ -703,7 +682,7 @@ async fn test_admin_delete_other_account() {
     .await;
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let another_account_username = "another_user";
+    let another_account_username = "another-user";
 
     let res = schema
         .execute(
@@ -762,7 +741,7 @@ async fn test_anonymous_try_to_delete_account() {
                 .data(harness.catalog_anonymous),
         )
         .await;
-    pretty_assertions::assert_eq!(["Account access error"], *res.error_messages(), "{res:?}");
+    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -776,7 +755,7 @@ async fn test_non_admin_try_to_delete_other_account() {
     .await;
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let another_account_username = "another_user";
+    let another_account_username = "another-user";
 
     let res = schema
         .execute(
@@ -790,7 +769,7 @@ async fn test_non_admin_try_to_delete_other_account() {
         .execute(delete_account_request(another_account_username).data(harness.catalog_authorized))
         .await;
 
-    pretty_assertions::assert_eq!(["Account access error"], *res.error_messages(), "{res:?}");
+    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -803,25 +782,27 @@ struct GraphQLAccountsHarness {
 impl GraphQLAccountsHarness {
     pub async fn new(predefined_account_opts: PredefinedAccountOpts) -> Self {
         let mut b = dill::CatalogBuilder::new();
-        NoOpDatabasePlugin::init_database_components(&mut b);
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
         let final_catalog = dill::CatalogBuilder::new_chained(&catalog)
-            .add::<AuthenticationServiceImpl>()
-            .add::<AccessTokenServiceImpl>()
-            .add::<CreateAccountUseCaseImpl>()
-            .add::<InMemoryAccessTokenRepository>()
-            .add::<InMemoryDidSecretKeyRepository>()
-            .add::<OAuthDeviceCodeServiceImpl>()
-            .add::<SystemTimeSourceDefault>()
-            .add::<OAuthDeviceCodeGeneratorDefault>()
-            .add::<InMemoryOAuthDeviceCodeRepository>()
+            .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
+            .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
+            .add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>()
+            .add::<kamu_accounts_services::AccessTokenServiceImpl>()
+            .add::<kamu_accounts_services::AuthenticationServiceImpl>()
+            .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
+            .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
+            .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
+            .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
+            .add::<kamu_accounts_services::utils::AccountAuthorizationHelper>()
+            .add::<time_source::SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>()
             .build();
 
         let (catalog_anonymous, catalog_authorized) =

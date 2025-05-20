@@ -10,16 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use database_common::NoOpDatabasePlugin;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_accounts_services::{
-    AccountServiceImpl,
-    DeleteAccountUseCaseImpl,
-    PredefinedAccountsRegistrator,
-};
-use kamu_auth_rebac::AccountPropertyName;
-use kamu_auth_rebac_services::{DefaultAccountProperties, DefaultDatasetProperties};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,24 +67,6 @@ async fn test_admin_delete_other_account() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_try_delete_non_existent_account() {
-    let harness =
-        DeleteAccountUseCaseImplHarness::new(CurrentAccountSubject::new_test_with(&ADMIN)).await;
-
-    let non_existent_account: Account = (&AccountConfig::test_config_from_name(
-        odf::AccountName::new_unchecked("non_existent_account"),
-    ))
-        .into();
-
-    assert_matches!(
-        harness.use_case.execute(&non_existent_account).await,
-        Err(DeleteAccountByNameError::NotFound(_))
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_anonymous_try_to_delete_account() {
     let harness = DeleteAccountUseCaseImplHarness::new(CurrentAccountSubject::anonymous(
         AnonymousAccountReason::NoAuthenticationProvided,
@@ -105,7 +78,7 @@ async fn test_anonymous_try_to_delete_account() {
     assert_matches!(
         harness.use_case.execute(&regular_user_account).await,
         Err(DeleteAccountByNameError::Access(odf::AccessError::Unauthenticated(e)))
-            if e.to_string() == String::new()
+            if e.to_string() == format!("Anonymous is not authorized to delete account '{REGULAR_USER}'")
     );
 }
 
@@ -122,7 +95,7 @@ async fn test_non_admin_try_to_delete_other_account() {
     assert_matches!(
         harness.use_case.execute(&admin_user_account).await,
         Err(DeleteAccountByNameError::Access(odf::AccessError::Unauthenticated(e)))
-            if e.to_string() == String::new()
+            if e.to_string() == format!("Account '{REGULAR_USER}' is not authorized to delete account '{ADMIN}'")
     );
 }
 
@@ -141,29 +114,30 @@ impl DeleteAccountUseCaseImplHarness {
             let mut p = PredefinedAccountsConfig::new();
             p.predefined = vec![
                 AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                    .set_properties(vec![AccountPropertyName::IsAdmin]),
+                    .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
                 AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
             ];
             p
         };
 
-        b.add::<AccountServiceImpl>()
-            .add::<InMemoryAccountRepository>()
-            .add_value(predefined_account_config)
-            .add_value(current_account_subject.clone())
-            // .add::<SystemTimeSourceDefault>()
-            // .add::<LoginPasswordAuthProvider>()
-            // .add::<RebacServiceImpl>()
-            // .add::<InMemoryRebacRepository>()
-            // .add_value(DidSecretEncryptionConfig::sample())
-            // .add::<InMemoryDidSecretKeyRepository>()
-            .add_value(DefaultAccountProperties::default())
-            .add_value(DefaultDatasetProperties::default())
-            // .add::<DummyOutboxImpl>()
-            .add::<DeleteAccountUseCaseImpl>()
-            .add::<PredefinedAccountsRegistrator>();
+        b.add::<kamu_accounts_inmem::InMemoryAccountRepository>();
+        b.add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>();
+        b.add::<kamu_accounts_services::AccountServiceImpl>();
+        b.add::<kamu_accounts_services::DeleteAccountUseCaseImpl>();
+        b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
+        b.add::<kamu_accounts_services::PredefinedAccountsRegistrator>();
+        b.add::<kamu_accounts_services::utils::AccountAuthorizationHelper>();
+        b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
+        b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
+        b.add::<messaging_outbox::DummyOutboxImpl>();
+        b.add::<time_source::SystemTimeSourceDefault>();
+        b.add_value(DidSecretEncryptionConfig::sample());
+        b.add_value(current_account_subject);
+        b.add_value(kamu_auth_rebac_services::DefaultAccountProperties::default());
+        b.add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default());
+        b.add_value(predefined_account_config);
 
-        NoOpDatabasePlugin::init_database_components(&mut b);
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
 

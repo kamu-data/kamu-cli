@@ -18,7 +18,6 @@ use crate::{
     AccountNotFoundByNameError,
     AccountPageStream,
     CreateAccountError,
-    DeleteAccountError,
     GetAccountByIdError,
     ModifyPasswordHashError,
     Password,
@@ -82,7 +81,7 @@ pub trait AccountService: Sync + Send {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError>;
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
