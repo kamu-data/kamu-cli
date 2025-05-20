@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id as \"id: uuid::Uuid\" FROM webhook_subscriptions\n                WHERE dataset_id = $1 AND\n                      status = 'ENABLED' AND\n                      event_types LIKE '%' || $2 || '%'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1b051b6675936f7fd9f2f330b068e65b830bb33f076c18643b7ead817c4d98fc"
+}

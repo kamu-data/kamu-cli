@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO webhook_subscriptions (id, dataset_id, event_types, status, label)\n                VALUES ($1, $2, $3, 'UNVERIFIED'::webhook_subscription_status, $4)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "VarcharArray",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "15da8137dbb24eb687bee86bf8cca507a2324b05af8be848e3fb7b2804d8cc91"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(id) AS subscriptions_count FROM webhook_subscriptions\n                WHERE\n                    dataset_id = $1\n                    AND status != 'REMOVED'::webhook_subscription_status\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "subscriptions_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "989beba176d2ae5b1914285b3db1fa1fc2778a743665090bcabff2e06561a3c9"
+}

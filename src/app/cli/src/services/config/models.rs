@@ -1323,13 +1323,13 @@ impl Default for FlowAgentConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TaskAgentConfig {
-    pub task_checking_interval_secs: Option<i64>,
+    pub checking_interval_secs: Option<u32>,
 }
 
 impl TaskAgentConfig {
     pub fn new() -> Self {
         Self {
-            task_checking_interval_secs: None,
+            checking_interval_secs: None,
         }
     }
 
@@ -1341,7 +1341,7 @@ impl TaskAgentConfig {
 impl Default for TaskAgentConfig {
     fn default() -> Self {
         Self {
-            task_checking_interval_secs: Some(1),
+            checking_interval_secs: Some(1),
         }
     }
 }

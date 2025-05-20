@@ -75,7 +75,7 @@ async fn test_task_save_load_update() {
     // Full load
     let task = Task::load(task_id, &event_store).await.unwrap();
     assert_eq!(task.status(), TaskStatus::Finished);
-    assert_eq!(task.outcome, Some(TaskOutcome::Cancelled));
+    assert_eq!(task.outcome(), Some(TaskOutcome::Cancelled).as_ref());
 
     // Partial load
     let mut task = Task::load_ext(
@@ -88,12 +88,12 @@ async fn test_task_save_load_update() {
     .await
     .unwrap();
     assert_eq!(task.status(), TaskStatus::Running);
-    assert!(task.cancellation_requested);
+    assert!(task.timing.cancellation_requested_at.is_some());
 
     // Update
     task.update(&event_store).await.unwrap();
     assert_eq!(task.status(), TaskStatus::Finished);
-    assert_eq!(task.outcome, Some(TaskOutcome::Cancelled));
+    assert_eq!(task.outcome(), Some(TaskOutcome::Cancelled).as_ref());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////#[test_log::test(tokio::test)]
@@ -128,7 +128,7 @@ async fn test_task_load_multi() {
         let task = task_res.unwrap();
         assert_eq!(task.task_id, expected_id);
         assert_eq!(task.status(), TaskStatus::Finished);
-        assert_eq!(task.outcome, Some(TaskOutcome::Cancelled));
+        assert_eq!(task.outcome(), Some(TaskOutcome::Cancelled).as_ref());
     }
 }
 
@@ -144,6 +144,7 @@ async fn test_task_agg_illegal_transition() {
         LogicalPlanProbe::default().into(),
         None,
     );
+    task.run(Utc::now()).unwrap();
     task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
 
     assert_matches!(task.run(Utc::now(),), Err(ProjectionError { .. }));

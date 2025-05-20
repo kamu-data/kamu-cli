@@ -10,7 +10,7 @@
 use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system_sqlite::SqliteTaskSystemEventStore;
+use kamu_task_system_sqlite::SqliteTaskEventStore;
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +97,7 @@ impl SqliteTaskSystemEventStoreHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
-        catalog_builder.add::<SqliteTaskSystemEventStore>();
+        catalog_builder.add::<SqliteTaskEventStore>();
 
         Self {
             catalog: catalog_builder.build(),

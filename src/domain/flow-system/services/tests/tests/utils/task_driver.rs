@@ -116,7 +116,9 @@ impl TaskDriver {
                 );
             }
             LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
-            LogicalPlan::HardCompactDataset(_) | LogicalPlan::ResetDataset(_) => (),
+            LogicalPlan::HardCompactDataset(_)
+            | LogicalPlan::ResetDataset(_)
+            | LogicalPlan::DeliverWebhook(_) => (),
         }
     }
 }

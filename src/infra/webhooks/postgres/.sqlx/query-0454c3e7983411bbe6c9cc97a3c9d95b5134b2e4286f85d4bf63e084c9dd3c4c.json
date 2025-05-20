@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id FROM webhook_subscriptions\n                WHERE dataset_id = $1 AND\n                    status = 'ENABLED'::webhook_subscription_status AND\n                    event_types::text[] @> $2::text[]\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0454c3e7983411bbe6c9cc97a3c9d95b5134b2e4286f85d4bf63e084c9dd3c4c"
+}

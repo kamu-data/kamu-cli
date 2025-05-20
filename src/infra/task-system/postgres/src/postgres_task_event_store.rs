@@ -294,7 +294,6 @@ impl TaskEventStore for PostgresTaskEventStore {
         Ok(TaskID::try_from(task_id).unwrap())
     }
 
-    /// Attempts to get the earliest queued task, if any
     async fn try_get_queued_task(&self) -> Result<Option<TaskID>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;

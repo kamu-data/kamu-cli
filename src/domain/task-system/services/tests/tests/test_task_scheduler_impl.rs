@@ -10,14 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use kamu_task_system::{
-    LogicalPlan,
-    LogicalPlanProbe,
-    TaskMetadata,
-    TaskScheduler,
-    TaskState,
-    TaskStatus,
-};
+use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use time_source::SystemTimeSourceStub;
@@ -45,12 +38,14 @@ async fn test_creates_task() {
 
     assert_matches!(task_state_actual, TaskState {
         outcome: None,
-        cancellation_requested: false,
         logical_plan,
         metadata,
-        ran_at: None,
-        cancellation_requested_at: None,
-        finished_at: None,
+        timing: TaskTimingRecords {
+            cancellation_requested_at: None,
+            ran_at: None,
+            finished_at: None,
+            ..
+        },
         ..
     } if logical_plan == logical_plan_expected && metadata == metadata_expected );
 }

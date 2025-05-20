@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                id as \"id!: uuid::Uuid\",\n                event_type,\n                payload as \"payload: serde_json::Value\",\n                created_at as \"created_at: DateTime<Utc>\"\n            FROM webhook_events\n            ORDER BY created_at DESC\n            LIMIT $1 OFFSET $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "event_type",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "payload: serde_json::Value",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "created_at: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0b7199865106c94b9b45194e9853c6cd84f0b186a6c7b1d80b54d3b94c8d984c"
+}

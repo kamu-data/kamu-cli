@@ -51,6 +51,14 @@ impl Query {
         Accounts
     }
 
+    /// Webhook-related functionality group
+    ///
+    /// Webhooks are used to send notifications about events happening in the
+    /// system. This groups deals with their management and subscriptions.
+    async fn webhooks(&self) -> Webhooks {
+        Webhooks
+    }
+
     /// Search-related functionality group
     async fn search(&self) -> Search {
         Search
@@ -64,6 +72,11 @@ impl Query {
     /// Admin-related functionality group
     async fn admin(&self) -> Admin {
         Admin
+    }
+
+    /// Temporary: Molecule-specific functionality group
+    async fn molecule(&self) -> Molecule {
+        Molecule
     }
 }
 
@@ -94,6 +107,11 @@ impl Mutation {
     /// system. This groups deals with their identities and permissions.
     async fn accounts(&self) -> AccountsMut {
         AccountsMut
+    }
+
+    /// Temporary: Molecule-specific functionality group
+    async fn molecule(&self) -> MoleculeMut {
+        MoleculeMut
     }
 }
 

@@ -50,12 +50,12 @@ impl Task {
 
     /// Task is queued or running and cancellation was not already requested
     pub fn can_cancel(&self) -> bool {
-        matches!(self.status(), TaskStatus::Queued | TaskStatus::Running if !self.cancellation_requested)
+        matches!(self.status(), TaskStatus::Queued | TaskStatus::Running if self.timing.cancellation_requested_at.is_none())
     }
 
     /// Set cancellation flag (if not already set)
     pub fn cancel(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<TaskState>> {
-        if self.cancellation_requested {
+        if self.timing.cancellation_requested_at.is_some() {
             return Ok(());
         }
 

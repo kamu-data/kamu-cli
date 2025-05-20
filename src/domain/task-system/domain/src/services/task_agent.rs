@@ -24,8 +24,7 @@ pub trait TaskAgent: Sync + Send {
 
 #[derive(Debug)]
 pub struct TaskAgentConfig {
-    /// Defines interval between task executor checks whether there are any new
-    /// tasks
+    /// Defines interval between task executor checks for new pending tasks
     pub task_checking_interval: chrono::Duration,
 }
 

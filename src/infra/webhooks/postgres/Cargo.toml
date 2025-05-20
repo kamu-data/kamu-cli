@@ -1,0 +1,56 @@
+[package]
+name = "kamu-webhooks-postgres"
+description = "Postgres-specific implementation of the webhooks"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+internal-error = { workspace = true }
+odf = { workspace = true }
+kamu-task-system = { workspace = true }
+kamu-webhooks = { workspace = true, features = ["sqlx"]}
+
+async-stream = "0.3"
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.13", default-features = false }
+futures = "0.3"
+http = { version = "1", default-features = false }
+serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "json",
+    "macros",
+    "postgres",
+    "chrono",
+    "uuid"
+] }
+url = { version = "2", default-features = false }
+uuid = { version = "1", default-features = false }
+
+
+[dev-dependencies]
+database-common-macros = { workspace = true }
+kamu-webhooks-repo-tests = { workspace = true }
+kamu-task-system-postgres = { workspace = true }
+
+test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

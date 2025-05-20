@@ -131,7 +131,6 @@ impl TaskEventStore for InMemoryTaskEventStore {
         Ok(self.inner.as_state().lock().unwrap().next_task_id())
     }
 
-    /// Attempts to get the earliest queued task, if any
     async fn try_get_queued_task(&self) -> Result<Option<TaskID>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
