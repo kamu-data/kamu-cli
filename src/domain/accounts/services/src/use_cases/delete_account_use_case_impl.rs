@@ -24,10 +24,7 @@ pub struct DeleteAccountUseCaseImpl {
 }
 
 impl DeleteAccountUseCaseImpl {
-    async fn unauthenticated(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<bool, InternalError> {
+    async fn authenticated(&self, account_name: &odf::AccountName) -> Result<bool, InternalError> {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => Ok(false),
             CurrentAccountSubject::Logged(l) if l.account_name == *account_name => Ok(true),
@@ -53,7 +50,7 @@ impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), DeleteAccountByNameError> {
-        if !self.unauthenticated(account_name).await? {
+        if !self.authenticated(account_name).await? {
             return Err(DeleteAccountByNameError::Access(
                 odf::AccessError::Unauthenticated(
                     AccountDeletionNotAuthorizedError {
