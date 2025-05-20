@@ -18,7 +18,7 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - DB: Removed FK for `did_secret_keys.creator_id` 
 - DB: Added missing triggers for deleting account rows (`ON DELETE CASCADE`) 
-    for related tables (`accounts_passwords`, `access_tokens`).
+    for related tables (`accounts_passwords`, `access_tokens`, `dataset_entries`).
 - GQL: `AccountMut::modifyPassword()`: no longer accepts the `accountName` argument.
 - GQL: `AccountMuts::createAccount()`: method moved from `AccountMut`.
 
