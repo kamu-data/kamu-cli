@@ -12,6 +12,7 @@ use database_common::NoOpDatabasePlugin;
 use dill::Component;
 use indoc::indoc;
 use kamu_accounts::{
+    CurrentAccountSubject,
     JwtAuthenticationConfig,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
@@ -643,6 +644,157 @@ async fn test_modify_password_non_admin() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_delete_own_account() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        is_admin: false,
+        can_provision_accounts: true,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let default_test_account = CurrentAccountSubject::new_test();
+
+    let res = schema
+        .execute(
+            delete_account_request(default_test_account.account_name())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    pretty_assertions::assert_eq!(
+        &value!({
+            "accounts": {
+                "byName": {
+                    "delete": {
+                        "message": "Account deleted",
+                    }
+                }
+            }
+        }),
+        &res.data,
+        "{res:?}"
+    );
+
+    let res = schema
+        .execute(
+            account_by_name_request(default_test_account.account_name())
+                .data(harness.catalog_authorized),
+        )
+        .await;
+    pretty_assertions::assert_eq!(
+        &res.data,
+        &value!({
+            "accounts": {
+                "byName": null
+            }
+        }),
+        "{res:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_admin_delete_other_account() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        can_provision_accounts: true,
+        is_admin: true,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let another_account_username = "another_user";
+
+    let res = schema
+        .execute(
+            create_account_request(another_account_username)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let res = schema
+        .execute(
+            delete_account_request(another_account_username)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    pretty_assertions::assert_eq!(
+        &value!({
+            "accounts": {
+                "byName": {
+                    "delete": {
+                        "message": "Account deleted",
+                    }
+                }
+            }
+        }),
+        &res.data,
+        "{res:?}"
+    );
+
+    let res = schema
+        .execute(account_by_name_request(another_account_username).data(harness.catalog_authorized))
+        .await;
+    pretty_assertions::assert_eq!(
+        &res.data,
+        &value!({
+            "accounts": {
+                "byName": null
+            }
+        }),
+        "{res:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_anonymous_try_to_delete_account() {
+    let harness = GraphQLAccountsHarness::new(Default::default()).await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let default_test_account = CurrentAccountSubject::new_test();
+
+    let res = schema
+        .execute(
+            delete_account_request(default_test_account.account_name())
+                .data(harness.catalog_anonymous),
+        )
+        .await;
+    pretty_assertions::assert_eq!(["Account access error"], *res.error_messages(), "{res:?}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_non_admin_try_to_delete_other_account() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        is_admin: false,
+        can_provision_accounts: true,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let another_account_username = "another_user";
+
+    let res = schema
+        .execute(
+            create_account_request(another_account_username)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let res = schema
+        .execute(delete_account_request(another_account_username).data(harness.catalog_authorized))
+        .await;
+
+    pretty_assertions::assert_eq!(["Account access error"], *res.error_messages(), "{res:?}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct GraphQLAccountsHarness {
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
@@ -732,6 +884,46 @@ fn modify_password_request(account_name: &str, new_password: &str) -> async_grap
     .variables(async_graphql::Variables::from_value(value!({
         "accountName": account_name,
         "newPassword": new_password,
+    })))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn account_by_name_request(account_name: &str) -> async_graphql::Request {
+    async_graphql::Request::new(indoc!(
+        r#"
+        query ($accountName: AccountName!) {
+          accounts {
+            byName(name: $accountName) {
+              accountName
+            }
+          }
+        }
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(value!({
+        "accountName": account_name,
+    })))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn delete_account_request(account_name: &str) -> async_graphql::Request {
+    async_graphql::Request::new(indoc!(
+        r#"
+        mutation ($accountName: AccountName!) {
+          accounts {
+            byName(accountName: $accountName) {
+              delete {
+                message
+              }
+            }
+          }
+        }
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(value!({
+        "accountName": account_name,
     })))
 }
 
