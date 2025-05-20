@@ -70,7 +70,7 @@ pub trait AccountRepository: Send + Sync {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<Account, DeleteAccountError>;
+    ) -> Result<(), DeleteAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
