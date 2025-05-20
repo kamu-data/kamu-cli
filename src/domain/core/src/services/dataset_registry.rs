@@ -26,7 +26,7 @@ pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
     fn all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
-    ) -> odf::dataset::OwnedDatasetHandleStream<'_>;
+    ) -> odf::dataset::DatasetHandleStream<'_>;
 
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,

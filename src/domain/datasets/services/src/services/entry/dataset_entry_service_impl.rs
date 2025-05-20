@@ -464,16 +464,16 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     fn all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
-    ) -> odf::dataset::OwnedDatasetHandleStream<'_> {
+    ) -> odf::dataset::DatasetHandleStream<'_> {
         let owner_id = owner_id.clone();
 
-        odf::dataset::OwnedDatasetHandleStream::new(EntityPageStreamer::default().into_stream(
+        EntityPageStreamer::default().into_stream(
             move || async { Ok(owner_id) },
             move |owner_id, pagination| async move {
                 self.list_all_dataset_handles_by_owner_id(&owner_id, pagination)
                     .await
             },
-        ))
+        )
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]
@@ -504,7 +504,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         })
     }
 
-    // Note: in the future we will be resolving storage repository,
+    // Note: in future we will be resolving storage repository,
     // but for now we have just a single one
     async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset {
         let maybe_cached_dataset = {
@@ -519,7 +519,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         if let Some(cached_dataset) = maybe_cached_dataset {
             ResolvedDataset::new(cached_dataset, dataset_handle.clone())
         } else {
-            // Note: in the future we will be resolving storage repository,
+            // Note: in future we will be resolving storage repository,
             // but for now we have just a single one
             let dataset = self
                 .dataset_storage_unit
