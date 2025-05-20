@@ -49,6 +49,7 @@ impl DatasetAccountDeletionHandler {
 
         use tokio_stream::StreamExt;
 
+        // TODO: PERF: Batch/concurrent processing
         while let Some(dataset_handle) = owned_dataset_stream.try_next().await? {
             match self
                 .delete_dataset_use_case

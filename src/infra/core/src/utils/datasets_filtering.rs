@@ -206,7 +206,7 @@ pub fn matches_local_ref_pattern(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A utility that allows you to filter an `DatasetHandleStream` without
+/// A utility that allows you to filter a ` DatasetHandleStream ` without
 /// changing its type (like `StreamExt::filter_ok()` does).
 pub fn filter_dataset_handle_stream<'a, F>(
     mut stream: odf::dataset::DatasetHandleStream<'a>,
