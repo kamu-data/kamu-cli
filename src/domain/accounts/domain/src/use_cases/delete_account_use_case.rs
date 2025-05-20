@@ -10,16 +10,13 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{AccountNotFoundByNameError, DeleteAccountError};
+use crate::{Account, AccountNotFoundByNameError, DeleteAccountError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DeleteAccountUseCase: Send + Sync {
-    async fn execute(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountByNameError>;
+    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountByNameError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

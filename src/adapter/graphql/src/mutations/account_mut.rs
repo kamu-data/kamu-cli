@@ -86,13 +86,11 @@ impl AccountMut {
 
         use DeleteAccountByNameError as E;
 
-        match delete_account_use_case
-            .execute(&self.account.account_name)
-            .await
-        {
+        match delete_account_use_case.execute(&self.account).await {
             Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),
+            Err(E::NotFound(e)) => unreachable!("Account should exist: {e}"),
             Err(E::Access(access_error)) => Err(access_error.into()),
-            Err(e @ (E::NotFound(_) | E::Internal(_))) => Err(e.int_err().into()),
+            Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
     }
 

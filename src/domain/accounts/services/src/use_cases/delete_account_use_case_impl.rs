@@ -46,25 +46,21 @@ impl DeleteAccountUseCaseImpl {
 
 #[async_trait::async_trait]
 impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
-    async fn execute(
-        &self,
-        account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountByNameError> {
-        if !self.authenticated(account_name).await? {
+    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountByNameError> {
+        if !self.authenticated(&account.account_name).await? {
             return Err(DeleteAccountByNameError::Access(
                 odf::AccessError::Unauthenticated(
                     AccountDeletionNotAuthorizedError {
                         subject_account: self.current_account_subject.maybe_account_name().cloned(),
-                        object_account: account_name.clone(),
+                        object_account: account.account_name.clone(),
                     }
                     .into(),
                 ),
             ));
         }
 
-        let deleted_account = self
-            .account_service
-            .delete_account_by_name(account_name)
+        self.account_service
+            .delete_account_by_name(&account.account_name)
             .await?;
 
         use messaging_outbox::OutboxExt;
@@ -73,9 +69,9 @@ impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
                 AccountLifecycleMessage::deleted(
-                    deleted_account.id,
-                    deleted_account.email,
-                    deleted_account.display_name,
+                    account.id.clone(),
+                    account.email.clone(),
+                    account.display_name.clone(),
                 ),
             )
             .await?;
