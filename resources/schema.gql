@@ -1464,11 +1464,11 @@ type DisablePushSource {
 	sourceName: String!
 }
 
-scalar Email
-
 type Eip4361AuthNonceResponse {
 	value: String!
 }
+
+scalar Email
 
 type EngineDesc {
 	"""
