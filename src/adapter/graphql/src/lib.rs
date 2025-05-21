@@ -20,7 +20,7 @@ mod root;
 #[cfg(any(feature = "testing", test))]
 pub mod scalars;
 #[cfg(not(any(feature = "testing", test)))]
-pub mod scalars;
+pub(crate) mod scalars;
 pub mod traits;
 pub(crate) mod utils;
 
