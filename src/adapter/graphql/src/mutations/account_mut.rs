@@ -62,12 +62,13 @@ impl AccountMut {
         ctx: &Context<'_>,
         password: AccountPassword<'_>,
     ) -> Result<ModifyPasswordResult> {
-        let modify_password_use_case = from_catalog_n!(ctx, dyn ModifyPasswordUseCase);
+        let modify_account_password_use_case =
+            from_catalog_n!(ctx, dyn ModifyAccountPasswordUseCase);
 
-        use ModifyPasswordError as E;
+        use ModifyAccountPasswordError as E;
 
-        match modify_password_use_case
-            .execute(&self.account.account_name, password.into())
+        match modify_account_password_use_case
+            .execute(&self.account, password.into())
             .await
         {
             Ok(_) => Ok(ModifyPasswordResult::Success(

@@ -21,9 +21,9 @@ Recommendation: for ease of reading, use the following order:
     for related tables (`accounts_passwords`, `access_tokens`, `dataset_entries`).
 - GQL: `AccountMut::modifyPassword()`: no longer accepts the `accountName` argument.
 - GQL: `AccountMuts::createAccount()`: method moved from `AccountMut`.
-### Fixed
 - Refactor:
-  - Remove password logic from `AccountService` level
+  - Remove password logic from `AccountService` level 
+
 ## [0.237.0] - 2025-05-14
 ### Added
 - GQL:

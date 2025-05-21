@@ -9,40 +9,27 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
-use crypto_utils::{Argon2Hasher, Hasher};
+use crypto_utils::Argon2Hasher;
 use database_common::NoOpDatabasePlugin;
-use email_utils::Email;
 use kamu_accounts::{
     Account,
-    ModifyPasswordUseCase,
+    ModifyAccountPasswordUseCase,
     Password,
     PasswordHashRepository,
-    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
 use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_accounts_services::{LoginPasswordAuthProvider, ModifyPasswordUseCaseImpl};
+use kamu_accounts_services::{LoginPasswordAuthProvider, ModifyAccountPasswordUseCaseImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_modify_password_use_case() {
-    let harness = ModifyPasswordUseCaseImplHarness::new().await;
+async fn test_modify_account_password_use_case() {
+    let harness = ModifyAccountPasswordUseCaseImplHarness::new().await;
 
     let password = "foo_password".to_string();
 
-    let account = Account {
-        id: DEFAULT_ACCOUNT_ID.clone(),
-        account_name: DEFAULT_ACCOUNT_NAME.clone(),
-        email: Email::parse("foo@example.com").unwrap(),
-        display_name: DEFAULT_ACCOUNT_NAME.to_string(),
-        account_type: kamu_accounts::AccountType::User,
-        avatar_url: None,
-        registered_at: Utc::now(),
-        provider: "foo".to_string(),
-        provider_identity_key: "foo".to_string(),
-    };
+    let account = Account::dummy();
 
     assert!(harness
         .login_password_auth_provider
@@ -53,7 +40,7 @@ async fn test_modify_password_use_case() {
     let new_password = Password::try_new("new_foo_password").unwrap();
     assert!(harness
         .use_case
-        .execute(&DEFAULT_ACCOUNT_NAME, new_password.clone())
+        .execute(&account, new_password.clone())
         .await
         .is_ok());
 
@@ -64,30 +51,29 @@ async fn test_modify_password_use_case() {
         .unwrap()
         .unwrap();
 
-    tokio::task::spawn_blocking(move || {
-        let argon2_hasher: Argon2Hasher<'_> =
-            Argon2Hasher::new(crypto_utils::PasswordHashingMode::Default);
-        assert!(argon2_hasher.verify(new_password.as_bytes(), &password_hash));
-    })
+    assert!(Argon2Hasher::verify_async(
+        new_password.as_bytes(),
+        password_hash.as_str(),
+        crypto_utils::PasswordHashingMode::Default
+    )
     .await
-    .unwrap();
+    .unwrap());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct ModifyPasswordUseCaseImplHarness {
-    _catalog: dill::Catalog,
-    use_case: Arc<dyn ModifyPasswordUseCase>,
+struct ModifyAccountPasswordUseCaseImplHarness {
+    use_case: Arc<dyn ModifyAccountPasswordUseCase>,
     login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
     password_hash_repository: Arc<dyn PasswordHashRepository>,
 }
 
-impl ModifyPasswordUseCaseImplHarness {
+impl ModifyAccountPasswordUseCaseImplHarness {
     async fn new() -> Self {
         let mut b = dill::CatalogBuilder::new();
 
         b.add::<InMemoryAccountRepository>()
-            .add::<ModifyPasswordUseCaseImpl>()
+            .add::<ModifyAccountPasswordUseCaseImpl>()
             .add::<LoginPasswordAuthProvider>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
@@ -100,7 +86,6 @@ impl ModifyPasswordUseCaseImplHarness {
             use_case: catalog.get_one().unwrap(),
             login_password_auth_provider: catalog.get_one().unwrap(),
             password_hash_repository: catalog.get_one().unwrap(),
-            _catalog: catalog,
         }
     }
 }

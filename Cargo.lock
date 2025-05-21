@@ -3080,6 +3080,7 @@ dependencies = [
  "internal-error",
  "password-hash",
  "thiserror 2.0.12",
+ "tokio",
 ]
 
 [[package]]

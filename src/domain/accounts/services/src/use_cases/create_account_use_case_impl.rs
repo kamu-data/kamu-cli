@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
+use crypto_utils::{Argon2Hasher, PasswordHashingMode};
 use email_utils::Email;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
@@ -85,13 +85,10 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             .await?;
 
         // Save account password
-        let hashing_mode = self.password_hashing_mode;
-        let password_hash = tokio::task::spawn_blocking(move || {
-            let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(random_password.as_bytes())
-        })
-        .await
-        .int_err()?;
+        let password_hash =
+            Argon2Hasher::hash_async(random_password.as_bytes(), self.password_hashing_mode)
+                .await
+                .int_err()?;
 
         self.password_hash_repository
             .save_password_hash(&created_account.id, account_name, password_hash)

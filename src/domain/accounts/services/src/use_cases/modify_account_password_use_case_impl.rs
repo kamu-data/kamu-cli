@@ -9,20 +9,26 @@
 
 use std::sync::Arc;
 
-use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
+use crypto_utils::{Argon2Hasher, PasswordHashingMode};
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{ModifyPasswordError, ModifyPasswordUseCase, Password, PasswordHashRepository};
+use kamu_accounts::{
+    Account,
+    ModifyAccountPasswordError,
+    ModifyAccountPasswordUseCase,
+    Password,
+    PasswordHashRepository,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ModifyPasswordUseCaseImpl {
+pub struct ModifyAccountPasswordUseCaseImpl {
     password_hash_repository: Arc<dyn PasswordHashRepository>,
     password_hashing_mode: PasswordHashingMode,
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn ModifyPasswordUseCase)]
-impl ModifyPasswordUseCaseImpl {
+#[dill::interface(dyn ModifyAccountPasswordUseCase)]
+impl ModifyAccountPasswordUseCaseImpl {
     #[allow(clippy::needless_pass_by_value)]
     fn new(
         password_hash_repository: Arc<dyn PasswordHashRepository>,
@@ -39,22 +45,19 @@ impl ModifyPasswordUseCaseImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ModifyPasswordUseCase for ModifyPasswordUseCaseImpl {
+impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
     async fn execute(
         &self,
-        account_name: &odf::AccountName,
+        account: &Account,
         password: Password,
-    ) -> Result<(), ModifyPasswordError> {
-        let hashing_mode = self.password_hashing_mode;
-        let password_hash = tokio::task::spawn_blocking(move || {
-            let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(password.as_bytes())
-        })
-        .await
-        .int_err()?;
+    ) -> Result<(), ModifyAccountPasswordError> {
+        let password_hash =
+            Argon2Hasher::hash_async(password.as_bytes(), self.password_hashing_mode)
+                .await
+                .int_err()?;
 
         self.password_hash_repository
-            .modify_password_hash(account_name, password_hash)
+            .modify_password_hash(&account.account_name, password_hash)
             .await?;
 
         Ok(())
