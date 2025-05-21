@@ -66,8 +66,12 @@ pub trait AccountService: Sync + Send {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError>;
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

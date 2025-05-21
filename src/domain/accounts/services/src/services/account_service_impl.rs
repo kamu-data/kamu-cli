@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
@@ -142,11 +142,10 @@ impl AccountService for AccountServiceImpl {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError> {
-        let account_did = odf::AccountID::new_generated_ed25519();
+        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
         let account = Account {
-            id: account_did.1,
+            id: account_id,
             account_name: account_name.clone(),
             email,
             display_name: account_name.to_string(),
@@ -160,16 +159,16 @@ impl AccountService for AccountServiceImpl {
         self.account_repo.save_account(&account).await?;
 
         if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
+            let account_id = account.id.as_did_str().to_stack_string();
             let did_secret_key = DidSecretKey::try_new(
-                &account_did.0.into(),
+                &account_key.into(),
                 did_secret_encryption_key.expose_secret(),
             )
             .int_err()?;
 
             self.did_secret_key_repo
                 .save_did_secret_key(
-                    &DidEntity::new_account(account.id.to_string()),
-                    owner_account_id,
+                    &DidEntity::new_account(account_id.as_str()),
                     &did_secret_key,
                 )
                 .await
@@ -177,6 +176,18 @@ impl AccountService for AccountServiceImpl {
         }
 
         Ok(account)
+    }
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), InternalError> {
+        use DeleteAccountError as E;
+
+        match self.account_repo.delete_account_by_name(account_name).await {
+            Ok(_) | Err(E::NotFound(_)) => Ok(()),
+            Err(e @ E::Internal(_)) => Err(e.int_err()),
+        }
     }
 }
 

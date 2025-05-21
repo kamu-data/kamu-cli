@@ -8,11 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::Context;
-use kamu_accounts::{AccountService, AccountServiceExt};
+use kamu_accounts::{
+    AccountService,
+    AccountServiceExt,
+    CreateAccountError,
+    CreateAccountUseCase,
+    CurrentAccountSubject,
+};
 
 use crate::mutations::AccountMut;
 use crate::prelude::*;
-use crate::utils::{check_logged_account_id_match, check_logged_account_name_match};
+use crate::queries;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +34,7 @@ impl AccountsMut {
         ctx: &Context<'_>,
         account_id: AccountID<'_>,
     ) -> Result<Option<AccountMut>> {
-        check_logged_account_id_match(ctx, &account_id)?;
+        // NOTE: AccountMut' methods handle access verification
 
         let account_service = from_catalog_n!(ctx, dyn AccountService);
 
@@ -43,12 +49,95 @@ impl AccountsMut {
         ctx: &Context<'_>,
         account_name: AccountName<'_>,
     ) -> Result<Option<AccountMut>> {
-        check_logged_account_name_match(ctx, &account_name)?;
+        // NOTE: AccountMut' methods handle access verification
 
         let account_service = from_catalog_n!(ctx, dyn AccountService);
 
         let account_maybe = account_service.account_by_name(&account_name).await?;
         Ok(account_maybe.map(AccountMut::new))
+    }
+
+    /// Create a new account
+    #[tracing::instrument(level = "info", name = AccountsMut_create_account, skip_all, fields(%account_name, ?email))]
+    #[graphql(guard = "LoggedInGuard.and(CanProvisionAccountsGuard)")]
+    async fn create_account(
+        &self,
+        ctx: &Context<'_>,
+        account_name: AccountName<'_>,
+        email: Option<Email<'_>>,
+    ) -> Result<CreateAccountResult> {
+        let (current_account_subject, create_account_use_case, account_service) = from_catalog_n!(
+            ctx,
+            CurrentAccountSubject,
+            dyn CreateAccountUseCase,
+            dyn AccountService
+        );
+
+        let logged_account_id = current_account_subject.account_id();
+        let logged_account = account_service
+            .get_account_by_id(logged_account_id)
+            .await
+            .int_err()?;
+
+        match create_account_use_case
+            .execute(
+                &logged_account,
+                account_name.as_ref(),
+                email.map(Into::into),
+            )
+            .await
+        {
+            Ok(created_account) => Ok(CreateAccountResult::Success(CreateAccountSuccess {
+                account: queries::Account::from_account(created_account),
+            })),
+            Err(CreateAccountError::Duplicate(e)) => Ok(
+                CreateAccountResult::NonUniqueAccountField(AccountFieldNonUnique {
+                    field: e.account_field.to_string(),
+                }),
+            ),
+            Err(e @ CreateAccountError::Internal(_)) => Err(e.int_err().into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CreateAccountResult
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum CreateAccountResult {
+    Success(CreateAccountSuccess),
+    NonUniqueAccountField(AccountFieldNonUnique),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CreateAccountSuccess {
+    pub account: queries::Account,
+}
+
+#[ComplexObject]
+impl CreateAccountSuccess {
+    pub async fn message(&self) -> String {
+        "Account created".to_string()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, SimpleObject)]
+#[graphql(complex)]
+pub struct AccountFieldNonUnique {
+    field: String,
+}
+
+#[ComplexObject]
+impl AccountFieldNonUnique {
+    pub async fn message(&self) -> String {
+        format!("Non-unique account field '{}'", self.field)
     }
 }
 

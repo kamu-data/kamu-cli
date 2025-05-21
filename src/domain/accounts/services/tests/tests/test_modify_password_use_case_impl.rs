@@ -9,12 +9,16 @@
 
 use std::sync::Arc;
 
+use chrono::Utc;
 use crypto_utils::{Argon2Hasher, Hasher};
 use database_common::NoOpDatabasePlugin;
+use email_utils::Email;
 use kamu_accounts::{
+    Account,
     ModifyPasswordUseCase,
     Password,
     PasswordHashRepository,
+    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
 use kamu_accounts_inmem::InMemoryAccountRepository;
@@ -28,9 +32,21 @@ async fn test_modify_password_use_case() {
 
     let password = "foo_password".to_string();
 
+    let account = Account {
+        id: DEFAULT_ACCOUNT_ID.clone(),
+        account_name: DEFAULT_ACCOUNT_NAME.clone(),
+        email: Email::parse("foo@example.com").unwrap(),
+        display_name: DEFAULT_ACCOUNT_NAME.to_string(),
+        account_type: kamu_accounts::AccountType::User,
+        avatar_url: None,
+        registered_at: Utc::now(),
+        provider: "foo".to_string(),
+        provider_identity_key: "foo".to_string(),
+    };
+
     assert!(harness
         .login_password_auth_provider
-        .save_password(&DEFAULT_ACCOUNT_NAME, password)
+        .save_password(&account, password)
         .await
         .is_ok());
 

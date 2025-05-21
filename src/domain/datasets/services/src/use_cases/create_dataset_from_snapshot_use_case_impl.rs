@@ -94,7 +94,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         )
         .await?;
 
-        // Adjust alias for current tenancy configuration
+        // Adjust alias for the current tenancy configuration
         let canonical_alias = self
             .create_helper
             .canonical_dataset_alias(&snapshot.name, logged_account_name);
@@ -126,14 +126,13 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             self.did_secret_key_repo
                 .save_did_secret_key(
                     &DidEntity::new_dataset(dataset_did.0.to_string()),
-                    logged_account_id,
                     &dataset_did_secret_key,
                 )
                 .await
                 .int_err()?;
         }
 
-        // Make storage level dataset (no HEAD yet)
+        // Make a storage level dataset (no HEAD yet)
         let store_result = self
             .create_helper
             .store_dataset(canonical_alias.as_ref(), seed_block)

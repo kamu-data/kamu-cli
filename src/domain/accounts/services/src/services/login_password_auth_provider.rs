@@ -46,7 +46,7 @@ impl LoginPasswordAuthProvider {
 
     pub async fn save_password(
         &self,
-        account_name: &odf::AccountName,
+        account: &Account,
         password: String,
     ) -> Result<(), InternalError> {
         // Copy hashing mod
@@ -65,7 +65,7 @@ impl LoginPasswordAuthProvider {
 
         // Save hash in the repository
         self.password_hash_repository
-            .save_password_hash(account_name, password_hash)
+            .save_password_hash(&account.id, &account.account_name, password_hash)
             .await
             .int_err()?;
 

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
 use email_utils::Email;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
     AccountService,
@@ -45,6 +45,19 @@ impl CreateAccountUseCaseImpl {
                 .map_or(PasswordHashingMode::Default, |mode| *mode),
         }
     }
+
+    fn generate_email(
+        creator_account: &Account,
+        account_name: &odf::AccountName,
+    ) -> Result<Email, InternalError> {
+        let parent_host = creator_account.email.host();
+        let email_str = format!(
+            "{}+{}@{}",
+            creator_account.account_name, account_name, parent_host
+        );
+
+        Email::parse(&email_str).int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,24 +68,20 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        email_maybe: Option<Email>,
+        maybe_email: Option<Email>,
     ) -> Result<Account, CreateAccountError> {
-        let email = email_maybe.unwrap_or({
-            let parent_host = creator_account.email.host();
-            let email_str = format!(
-                "{}+{}@{}",
-                creator_account.account_name, account_name, parent_host
-            );
-
-            Email::parse(&email_str).int_err()?
-        });
+        let email = if let Some(email) = maybe_email {
+            email
+        } else {
+            Self::generate_email(creator_account, account_name)?
+        };
 
         let random_password =
             random_strings::get_random_string(None, 10, &AllowedSymbols::AsciiSymbols);
 
         let created_account = self
             .account_service
-            .create_account(account_name, email, &creator_account.id)
+            .create_account(account_name, email)
             .await?;
 
         // Save account password
@@ -85,7 +94,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         .int_err()?;
 
         self.password_hash_repository
-            .save_password_hash(account_name, password_hash)
+            .save_password_hash(&created_account.id, account_name, password_hash)
             .await
             .int_err()?;
 
