@@ -479,7 +479,7 @@ async fn test_versioned_file_extra_data() {
         .build()
         .await;
 
-    // Create versioned file dataset
+    // Create a versioned file dataset
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
@@ -525,12 +525,12 @@ async fn test_versioned_file_extra_data() {
         .unwrap()
         .to_string();
 
-    // Upload first version
+    // Upload the first version
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($datasetId: DatasetID!, $content: Base64Usnp!, $extraData: JSON!) {
+                mutation ($datasetId: DatasetID!, $content: Base64Usnp!, $extraData: ExtraData!) {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
@@ -576,7 +576,7 @@ async fn test_versioned_file_extra_data() {
         })
     );
 
-    // Read back latest content
+    // Read back the latest content
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
@@ -626,7 +626,7 @@ async fn test_versioned_file_extra_data() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($datasetId: DatasetID!, $extraData: JSON!) {
+                mutation ($datasetId: DatasetID!, $extraData: ExtraData!) {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
@@ -667,7 +667,7 @@ async fn test_versioned_file_extra_data() {
         })
     );
 
-    // Read back latest content
+    // Read back the latest content
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
