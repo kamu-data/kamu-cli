@@ -2569,13 +2569,16 @@ type MoleculeProjectEdge {
 	node: MoleculeProject!
 }
 
-union MoleculeProjectEvent = MoleculeProjectEventDataRoomEntryAdded | MoleculeProjectEventAnnouncement
+interface MoleculeProjectEvent {
+	systemTime: DateTime!
+}
 
-type MoleculeProjectEventAnnouncement {
+type MoleculeProjectEventAnnouncement implements MoleculeProjectEvent {
 	"""
 	Announcement record
 	"""
 	announcement: JSON!
+	systemTime: DateTime!
 }
 
 type MoleculeProjectEventConnection {
@@ -2590,15 +2593,44 @@ type MoleculeProjectEventConnection {
 	edges: [MoleculeProjectEventEdge!]!
 }
 
-type MoleculeProjectEventDataRoomEntryAdded {
+type MoleculeProjectEventDataRoomEntryAdded implements MoleculeProjectEvent {
 	"""
 	Collection entry
 	"""
 	entry: CollectionEntry!
+	systemTime: DateTime!
+}
+
+type MoleculeProjectEventDataRoomEntryRemoved implements MoleculeProjectEvent {
+	"""
+	Collection entry
+	"""
+	entry: CollectionEntry!
+	systemTime: DateTime!
+}
+
+type MoleculeProjectEventDataRoomEntryUpdated implements MoleculeProjectEvent {
+	"""
+	Collection entry
+	"""
+	newEntry: CollectionEntry!
+	systemTime: DateTime!
 }
 
 type MoleculeProjectEventEdge {
 	node: MoleculeProjectEvent!
+}
+
+type MoleculeProjectEventFileUpdated implements MoleculeProjectEvent {
+	"""
+	Versioned file dataset
+	"""
+	dataset: Dataset!
+	"""
+	New file version entry
+	"""
+	newEntry: VersionedFileEntry!
+	systemTime: DateTime!
 }
 
 type MoleculeProjectMut {

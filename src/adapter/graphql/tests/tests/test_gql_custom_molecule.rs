@@ -470,48 +470,6 @@ async fn test_molecule_data_room_operations() {
             },
         }),
     );
-
-    // Check activity events
-    const LIST_EVENTS: &str = indoc!(
-        r#"
-        query ($ipnftUid: String!) {
-            molecule {
-                project(ipnftUid: $ipnftUid) {
-                    activity {
-                        nodes {
-                            ... on MoleculeProjectEventDataRoomEntryAdded {
-                                entry {
-                                    path
-                                    ref
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "#
-    );
-    let res = harness
-        .execute_authorized_query(async_graphql::Request::new(LIST_EVENTS).variables(
-            async_graphql::Variables::from_json(json!({
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
-            })),
-        ))
-        .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    pretty_assertions::assert_eq!(
-        res.data.into_json().unwrap()["molecule"]["project"]["activity"]["nodes"],
-        json!([
-            {
-                "entry": {
-                    "path": "/foo",
-                    "ref": test_file_did,
-                }
-            },
-        ])
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -821,6 +779,369 @@ async fn test_molecule_announcements_operations() {
             ]
         )
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_molecule_activity() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Create project (projects dataset is auto-created)
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftSymbol": "vitafast",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
+                "ipnftTokenId": 9,
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let res = &res.data.into_json().unwrap()["molecule"]["createProject"];
+    let project_account_name = res["project"]["account"]["accountName"].as_str().unwrap();
+    let data_room_did = res["project"]["dataRoom"]["id"].as_str().unwrap();
+
+    // Create a few versioned files
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(CREATE_VERSIONED_FILE).variables(
+                async_graphql::Variables::from_json(json!({
+                    // TODO: Need ability  to create datasets with target AccountID
+                    "datasetAlias": format!("{project_account_name}/test-file-1"),
+                })),
+            ),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let test_file_1 = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]
+        ["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(CREATE_VERSIONED_FILE).variables(
+                async_graphql::Variables::from_json(json!({
+                    // TODO: Need ability  to create datasets with target AccountID
+                    "datasetAlias": format!("{project_account_name}/test-file-2"),
+                })),
+            ),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let test_file_2 = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]
+        ["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Upload new file versions
+    const UPLOAD_NEW_VERSION: &str = indoc!(
+        r#"
+        mutation ($datasetId: DatasetID!, $content: Base64Usnp!) {
+            datasets {
+                byId(datasetId: $datasetId) {
+                    asVersionedFile {
+                        uploadNewVersion(content: $content) {
+                            isSuccess
+                            message
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(UPLOAD_NEW_VERSION).variables(
+            async_graphql::Variables::from_json(json!({
+                "datasetId": &test_file_1,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"file 1"),
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(UPLOAD_NEW_VERSION).variables(
+            async_graphql::Variables::from_json(json!({
+                "datasetId": &test_file_2,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"file 2"),
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Link new file into the project data room
+    const COLLECTION_ADD_ENTRY: &str = indoc!(
+        r#"
+        mutation ($datasetId: DatasetID!, $entry: CollectionEntryInput!) {
+            datasets {
+                byId(datasetId: $datasetId) {
+                    asCollection {
+                        addEntry(entry: $entry) {
+                            isSuccess
+                            message
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    );
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(COLLECTION_ADD_ENTRY).variables(
+            async_graphql::Variables::from_json(json!({
+                "datasetId": data_room_did,
+                "entry": {
+                    "path": "/foo",
+                    "ref": test_file_1,
+                    "extraData": {
+                        "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
+                    },
+                },
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["addEntry"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(COLLECTION_ADD_ENTRY).variables(
+            async_graphql::Variables::from_json(json!({
+                "datasetId": data_room_did,
+                "entry": {
+                    "path": "/bar",
+                    "ref": test_file_2,
+                    "extraData": {
+                        "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC"
+                    },
+                },
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["addEntry"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Move a file (retract + append)
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+            mutation ($datasetId: DatasetID!, $pathFrom: CollectionPath!, $pathTo: CollectionPath!) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        asCollection {
+                            moveEntry(pathFrom: $pathFrom, pathTo: $pathTo) {
+                                isSuccess
+                                message
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &data_room_did,
+                "pathFrom": "/bar",
+                "pathTo": "/baz"
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["moveEntry"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Update a file (correction from-to)
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+            mutation ($datasetId: DatasetID!, $pathFrom: CollectionPath!, $pathTo: CollectionPath!, $extraData: JSON) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        asCollection {
+                            moveEntry(pathFrom: $pathFrom, pathTo: $pathTo, extraData: $extraData) {
+                                isSuccess
+                                message
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &data_room_did,
+                "pathFrom": "/foo",
+                "pathTo": "/foo",
+                "extraData": {
+                    "molecule_change_by": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BD"
+                },
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["moveEntry"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Create an announcement
+    const CREATE_ANNOUNCEMENT: &str = indoc!(
+        r#"
+        mutation (
+            $ipnftUid: String!,
+            $headline: String!,
+            $body: String!,
+            $attachments: [String!],
+            $moleculeAccessLevel: String!,
+            $moleculeChangeBy: String!,
+        ) {
+            molecule {
+                project(ipnftUid: $ipnftUid) {
+                    createAnnouncement(
+                        headline: $headline,
+                        body: $body,
+                        attachments: $attachments,
+                        moleculeAccessLevel: $moleculeAccessLevel,
+                        moleculeChangeBy: $moleculeChangeBy,
+                    ) {
+                        isSuccess
+                        message
+                    }
+                }
+            }
+        }
+        "#
+    );
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_ANNOUNCEMENT).variables(
+            async_graphql::Variables::from_json(json!({
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
+                "headline": "Test announcement 1",
+                "body": "Blah blah",
+                "attachments": [test_file_1, test_file_2],
+                "moleculeAccessLevel": "holders",
+                "moleculeChangeBy": "did:ethr:0x43f3F090af7fF638ad0EfD64c5354B6945fE75BC",
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["project"]["createAnnouncement"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Upload new file version
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(UPLOAD_NEW_VERSION).variables(
+            async_graphql::Variables::from_json(json!({
+                "datasetId": &test_file_1,
+                "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"file 1 - updated"),
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
+
+    // Remove a file
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+            mutation ($datasetId: DatasetID!, $path: CollectionPath!) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        asCollection {
+                            removeEntry(path: $path) {
+                                isSuccess
+                                message
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &data_room_did,
+                "path": "/bar",
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["removeEntry"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+        })
+    );
 
     // Check activity events
     const LIST_EVENTS: &str = indoc!(
@@ -831,6 +1152,30 @@ async fn test_molecule_announcements_operations() {
                     activity {
                         nodes {
                             __typename
+                            ... on MoleculeProjectEventDataRoomEntryAdded {
+                                entry {
+                                    path
+                                }
+                            }
+                            ... on MoleculeProjectEventDataRoomEntryRemoved {
+                                entry {
+                                    path
+                                }
+                            }
+                            ... on MoleculeProjectEventDataRoomEntryUpdated {
+                                newEntry {
+                                    path
+                                }
+                            }
+                            # ... on MoleculeProjectEventAnnouncement {
+                            #     announcement
+                            # }
+                            ... on MoleculeProjectEventFileUpdated {
+                                dataset { alias }
+                                newEntry {
+                                    version
+                                }
+                            }
                         }
                     }
                 }
@@ -850,9 +1195,66 @@ async fn test_molecule_announcements_operations() {
     pretty_assertions::assert_eq!(
         res.data.into_json().unwrap()["molecule"]["project"]["activity"]["nodes"],
         json!([
-            {"__typename": "MoleculeProjectEventAnnouncement"},
-            {"__typename": "MoleculeProjectEventAnnouncement"},
-            {"__typename": "MoleculeProjectEventAnnouncement"},
+            {
+                "__typename": "MoleculeProjectEventFileUpdated",
+                "dataset": {
+                    "alias": "molecule.vitafast/test-file-1",
+                },
+                "newEntry": {
+                    "version": 2,
+                },
+            },
+            {
+                "__typename": "MoleculeProjectEventAnnouncement",
+            },
+            {
+                "__typename": "MoleculeProjectEventDataRoomEntryUpdated",
+                "newEntry": {
+                    "path": "/foo",
+                },
+            },
+            {
+                "__typename": "MoleculeProjectEventDataRoomEntryAdded",
+                "entry": {
+                    "path": "/baz",
+                },
+            },
+            {
+                "__typename": "MoleculeProjectEventDataRoomEntryRemoved",
+                "entry": {
+                    "path": "/bar",
+                },
+            },
+            {
+                "__typename": "MoleculeProjectEventDataRoomEntryAdded",
+                "entry": {
+                    "path": "/bar",
+                },
+            },
+            {
+                "__typename": "MoleculeProjectEventDataRoomEntryAdded",
+                "entry": {
+                    "path": "/foo",
+                },
+            },
+            {
+                "__typename": "MoleculeProjectEventFileUpdated",
+                "dataset": {
+                    "alias": "molecule.vitafast/test-file-2",
+                },
+                "newEntry": {
+                    "version": 1,
+                },
+            },
+            {
+                "__typename": "MoleculeProjectEventFileUpdated",
+                "dataset": {
+                    "alias": "molecule.vitafast/test-file-1",
+                },
+                "newEntry": {
+                    "version": 1,
+                },
+            },
         ])
     );
 }
