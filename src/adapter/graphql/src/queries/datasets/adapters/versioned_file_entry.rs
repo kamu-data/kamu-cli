@@ -147,7 +147,7 @@ impl VersionedFileEntry {
 #[ComplexObject]
 impl VersionedFileEntry {
     /// Returns encoded content in-band. Should be used for small files only and
-    /// will retrurn error if called on large data.
+    /// will return an error if called on large data.
     #[tracing::instrument(level = "info", name = VersionedFileEntry_content, skip_all)]
     pub async fn content(&self) -> Result<Base64Usnp> {
         // TODO: Restrict by content size
@@ -204,7 +204,7 @@ pub struct VersionedFileContentDownload {
     /// Direct download URL
     pub url: String,
 
-    /// Headers to include in request
+    /// Headers to include in the request
     pub headers: Vec<KeyValue>,
 
     /// Download URL expiration timestamp

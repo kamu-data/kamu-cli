@@ -313,13 +313,13 @@ pub struct CollectionEntryInput {
 
 #[derive(InputObject, Debug, Default)]
 pub struct CollectionUpdateInput {
-    /// Inserts new entry under specified path. If an entry at the target path
-    /// already exists it will be retracted.
+    /// Inserts a new entry under the specified path. If an entry at the target
+    /// path already exists, it will be retracted.
     pub add: Option<CollectionUpdateInputAdd>,
 
     /// Retracts and appends an entry under the new path. Returns error if from
-    /// path does not exist. If an entry at the target path already exists it
-    /// will be retracted. Use this to update extra data by specifying same
+    /// path does not exist. If an entry at the target path already exists, it
+    /// will be retracted. Use this to update extra data by specifying the same
     /// source and target paths.
     pub r#move: Option<CollectionUpdateInputMove>,
 

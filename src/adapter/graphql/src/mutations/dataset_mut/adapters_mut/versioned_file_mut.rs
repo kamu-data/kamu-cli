@@ -350,7 +350,7 @@ impl VersionedFileMut<'_> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        // Get latest record and head
+        // Get the latest record and head
         let entry = self.get_latest_entry(ctx).await?;
         let Some(mut entry) = entry else {
             return Ok(UpdateVersionResult::InvalidExtraData(
@@ -360,7 +360,7 @@ impl VersionedFileMut<'_> {
             ));
         };
 
-        // Form and write new record
+        // Form and write a new record
         entry.version += 1;
         entry.extra_data = extra_data;
 
