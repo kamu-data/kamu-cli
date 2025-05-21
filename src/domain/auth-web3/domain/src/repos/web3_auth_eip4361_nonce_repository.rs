@@ -58,14 +58,14 @@ impl PartialEq for SetNonceError {
 
 #[derive(Error, Debug, PartialEq)]
 #[error("nonce not found for wallet: {wallet}")]
-pub struct WalletNotFoundError {
+pub struct NonceNotFoundError {
     pub wallet: EvmWalletAddress,
 }
 
 #[derive(Error, Debug)]
 pub enum GetNonceError {
     #[error(transparent)]
-    NotFound(#[from] WalletNotFoundError),
+    NotFound(#[from] NonceNotFoundError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -86,7 +86,7 @@ impl PartialEq for GetNonceError {
 #[derive(Error, Debug)]
 pub enum ConsumeNonceError {
     #[error(transparent)]
-    NotFound(#[from] WalletNotFoundError),
+    NotFound(#[from] NonceNotFoundError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

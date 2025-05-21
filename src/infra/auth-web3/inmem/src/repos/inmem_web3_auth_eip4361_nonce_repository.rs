@@ -62,7 +62,7 @@ impl Web3AuthEip4361NonceRepository for InMemoryWeb3AuthEip4361NonceRepository {
         if let Some(nonce_entity) = readable_state.nonce_by_wallet.get(wallet) {
             Ok(nonce_entity.clone())
         } else {
-            Err(GetNonceError::NotFound(WalletNotFoundError {
+            Err(GetNonceError::NotFound(NonceNotFoundError {
                 wallet: *wallet,
             }))
         }
@@ -82,7 +82,7 @@ impl Web3AuthEip4361NonceRepository for InMemoryWeb3AuthEip4361NonceRepository {
                 entry.remove();
                 Ok(())
             }
-            _ => Err(ConsumeNonceError::NotFound(WalletNotFoundError {
+            _ => Err(ConsumeNonceError::NotFound(NonceNotFoundError {
                 wallet: *wallet,
             })),
         }

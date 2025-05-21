@@ -17,7 +17,7 @@ use kamu_accounts::{
     ProviderLoginError,
     ProviderLoginResponse,
 };
-use kamu_auth_web3::{ConsumeNonceError, EvmWalletAddress};
+use kamu_auth_web3::{ConsumeNonceError, EvmWalletAddress, NonceNotFoundError};
 use kamu_core::ServerUrlConfig;
 use nutype::nutype;
 use serde::Deserialize;
@@ -186,8 +186,8 @@ enum SignatureVerificationError {
     #[error("Parse error: {0}")]
     MessageParseError(#[from] siwe::ParseError),
 
-    #[error("Nonce not found")]
-    NonceNotFound,
+    #[error(transparent)]
+    NonceNotFound(#[from] NonceNotFoundError),
 
     #[error(transparent)]
     MissingMessageField(#[from] MissingMessageFieldError),

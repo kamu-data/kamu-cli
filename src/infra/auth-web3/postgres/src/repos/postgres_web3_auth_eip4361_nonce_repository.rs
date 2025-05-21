@@ -83,7 +83,7 @@ impl Web3AuthEip4361NonceRepository for PostgresWeb3AuthEip4361NonceRepository {
 
             Ok(nonce_row)
         } else {
-            Err(GetNonceError::NotFound(WalletNotFoundError {
+            Err(GetNonceError::NotFound(NonceNotFoundError {
                 wallet: *wallet,
             }))
         }
@@ -114,7 +114,7 @@ impl Web3AuthEip4361NonceRepository for PostgresWeb3AuthEip4361NonceRepository {
         if delete_result.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(ConsumeNonceError::NotFound(WalletNotFoundError {
+            Err(ConsumeNonceError::NotFound(NonceNotFoundError {
                 wallet: *wallet,
             }))
         }

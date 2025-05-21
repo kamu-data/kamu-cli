@@ -28,7 +28,7 @@ pub async fn test_set_and_get_nonce(catalog: &dill::Catalog) {
         };
 
         pretty_assertions::assert_eq!(
-            Err(GetNonceError::NotFound(WalletNotFoundError {
+            Err(GetNonceError::NotFound(NonceNotFoundError {
                 wallet: wallet_address
             })),
             harness.nonce_repo.get_nonce(&wallet_address).await
@@ -84,7 +84,7 @@ pub async fn test_consume_nonce(catalog: &dill::Catalog) {
     {
         // Simulate a future consumption attempt (expired nonce)
         pretty_assertions::assert_eq!(
-            Err(ConsumeNonceError::NotFound(WalletNotFoundError {
+            Err(ConsumeNonceError::NotFound(NonceNotFoundError {
                 wallet: wallet_address
             })),
             harness
@@ -111,7 +111,7 @@ pub async fn test_consume_nonce(catalog: &dill::Catalog) {
         );
 
         pretty_assertions::assert_eq!(
-            Err(GetNonceError::NotFound(WalletNotFoundError {
+            Err(GetNonceError::NotFound(NonceNotFoundError {
                 wallet: wallet_address
             })),
             harness.nonce_repo.get_nonce(&wallet_address).await
@@ -119,7 +119,7 @@ pub async fn test_consume_nonce(catalog: &dill::Catalog) {
 
         // ... and we guarantee the consumption is disposable
         pretty_assertions::assert_eq!(
-            Err(ConsumeNonceError::NotFound(WalletNotFoundError {
+            Err(ConsumeNonceError::NotFound(NonceNotFoundError {
                 wallet: wallet_address
             })),
             harness
@@ -155,7 +155,7 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
         pretty_assertions::assert_eq!(Ok(()), harness.nonce_repo.cleanup_expired_nonces(t0).await,);
 
         pretty_assertions::assert_eq!(
-            Err(GetNonceError::NotFound(WalletNotFoundError {
+            Err(GetNonceError::NotFound(NonceNotFoundError {
                 wallet: nonce_1_expired.wallet_address
             })),
             harness
@@ -178,7 +178,7 @@ pub async fn test_cleanup_expired_nonces(catalog: &dill::Catalog) {
         pretty_assertions::assert_eq!(Ok(()), harness.nonce_repo.cleanup_expired_nonces(t1).await,);
 
         pretty_assertions::assert_eq!(
-            Err(GetNonceError::NotFound(WalletNotFoundError {
+            Err(GetNonceError::NotFound(NonceNotFoundError {
                 wallet: nonce_2.wallet_address
             })),
             harness.nonce_repo.get_nonce(&nonce_2.wallet_address).await
