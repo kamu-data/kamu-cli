@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - GQL: Added new scalars: `Email`, AccountPassword`.
 - GQL: Added `AccountMut::delete()`.
+- GQL: Collection API: Add `ExtraData` scalar to validate incoming data.
 ### Changed
 - DB: Removed FK for `did_secret_keys.creator_id` 
 - DB: Added missing triggers for deleting account rows (`ON DELETE CASCADE`) 
@@ -22,7 +23,7 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `AccountMut::modifyPassword()`: no longer accepts the `accountName` argument.
 - GQL: `AccountMuts::createAccount()`: method moved from `AccountMut`.
 - Refactor:
-  - Remove password logic from `AccountService` level 
+  - Remove password logic from `AccountService` level.
 
 ## [0.237.0] - 2025-05-14
 ### Added

@@ -144,7 +144,7 @@ pub async fn test_gql_dataset_adapter_versioned_file_direct_upload_download_mt(
                 mutation finishUpload(
                   $datasetId: DatasetID!,
                   $uploadToken: String!,
-                  $extraData: JSON,
+                  $extraData: ExtraData!,
                   $expectedHead: Multihash,
                 ) {
                   datasets {

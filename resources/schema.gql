@@ -396,11 +396,11 @@ type CliProtocolDesc {
 
 type Collection {
 	"""
-	Latest state projection of the state of collection
+	Latest state projection of the state of a collection
 	"""
 	latest: CollectionProjection!
 	"""
-	State projection of the state of collection at the specified point in
+	State projection of the state of a collection at the specified point in
 	time
 	"""
 	asOf(blockHash: Multihash!): CollectionProjection!
@@ -428,7 +428,7 @@ type CollectionEntry {
 	"""
 	Extra data associated with this entry
 	"""
-	extraData: JSON!
+	extraData: ExtraData!
 	"""
 	Resolves the reference to linked dataset
 	"""
@@ -467,7 +467,7 @@ input CollectionEntryInput {
 	"""
 	Json object containing extra column values
 	"""
-	extraData: JSON
+	extraData: ExtraData
 }
 
 type CollectionMut {
@@ -478,7 +478,7 @@ type CollectionMut {
 	"""
 	Moves or renames an entry
 	"""
-	moveEntry(pathFrom: CollectionPath!, pathTo: CollectionPath!, extraData: JSON, expectedHead: Multihash): CollectionUpdateResult!
+	moveEntry(pathFrom: CollectionPath!, pathTo: CollectionPath!, extraData: ExtraData, expectedHead: Multihash): CollectionUpdateResult!
 	"""
 	Remove an entry from this collection
 	"""
@@ -500,7 +500,8 @@ type CollectionProjection {
 	"""
 	entry(path: CollectionPath!): CollectionEntry
 	"""
-	Returns the state of entries as they existed at specified point in time
+	Returns the state of entries as they existed at a specified point in
+	time
 	"""
 	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int): CollectionEntryConnection!
 	"""
@@ -524,14 +525,14 @@ type CollectionUpdateErrorNotFound implements CollectionUpdateResult {
 
 input CollectionUpdateInput {
 	"""
-	Inserts new entry under specified path. If an entry at the target path
-	already exists it will be retracted.
+	Inserts a new entry under the specified path. If an entry at the target
+	path already exists, it will be retracted.
 	"""
 	add: CollectionUpdateInputAdd
 	"""
 	Retracts and appends an entry under the new path. Returns error if from
-	path does not exist. If an entry at the target path already exists it
-	will be retracted. Use this to update extra data by specifying same
+	path does not exist. If an entry at the target path already exists, it
+	will be retracted. Use this to update extra data by specifying the same
 	source and target paths.
 	"""
 	move: CollectionUpdateInputMove
@@ -551,7 +552,7 @@ input CollectionUpdateInputMove {
 	"""
 	Optionally update the extra data
 	"""
-	extraData: JSON
+	extraData: ExtraData
 }
 
 input CollectionUpdateInputRemove {
@@ -1618,6 +1619,8 @@ type ExecuteTransformInput {
 	newOffset: Int
 }
 
+scalar ExtraData
+
 """
 Defines the external source of data.
 
@@ -2162,11 +2165,6 @@ input InitiatorFilterInput @oneOf {
 	accounts: [AccountID!]
 }
 
-
-"""
-A scalar that can represent any JSON value.
-"""
-scalar JSON
 
 type JdbcDesc {
 	url: String!
@@ -3539,7 +3537,7 @@ type VersionedFileContentDownload {
 	"""
 	url: String!
 	"""
-	Headers to include in request
+	Headers to include in the request
 	"""
 	headers: [KeyValue!]!
 	"""
@@ -3572,10 +3570,10 @@ type VersionedFileEntry {
 	"""
 	Extra data associated with this file version
 	"""
-	extraData: JSON!
+	extraData: ExtraData!
 	"""
 	Returns encoded content in-band. Should be used for small files only and
-	will retrurn error if called on large data.
+	will return an error if called on large data.
 	"""
 	content: Base64Usnp!
 	"""
@@ -3606,8 +3604,8 @@ type VersionedFileEntryEdge {
 
 type VersionedFileMut {
 	"""
-	Uploads new version of content in-band. Can be used for very small files
-	only.
+	Uploads a new version of content in-band. Can be used for very small
+	files only.
 	"""
 	uploadNewVersion(
 		"""
@@ -3621,7 +3619,7 @@ type VersionedFileMut {
 		"""
 		Json object containing values of extra columns
 		"""
-		extraData: JSON,
+		extraData: ExtraData,
 		"""
 		Expected head block hash to prevent concurrent updates
 		"""
@@ -3642,7 +3640,7 @@ type VersionedFileMut {
 		contentType: String
 	): StartUploadVersionResult!
 	"""
-	Finalizes the content upload by incoporating the content into the
+	Finalizes the content upload by incorporating the content into the
 	dataset as a new version
 	"""
 	finishUploadNewVersion(
@@ -3653,7 +3651,7 @@ type VersionedFileMut {
 		"""
 		Json object containing values of extra columns
 		"""
-		extraData: JSON,
+		extraData: ExtraData,
 		"""
 		Expected head block hash to prevent concurrent updates
 		"""
@@ -3667,7 +3665,7 @@ type VersionedFileMut {
 		"""
 		Json object containing values of extra columns
 		"""
-		extraData: JSON!,
+		extraData: ExtraData!,
 		"""
 		Expected head block hash to prevent concurrent updates
 		"""

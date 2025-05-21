@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod account;
-mod dataset_access_role;
+mod extra_data;
 
-pub use account::*;
-pub use dataset_access_role::*;
+pub use extra_data::*;

@@ -27,13 +27,13 @@ impl Collection {
         Self { dataset }
     }
 
-    /// Latest state projection of the state of collection
+    /// Latest state projection of the state of a collection
     #[tracing::instrument(level = "info", name = Collection_latest, skip_all)]
     pub async fn latest(&self) -> CollectionProjection {
         CollectionProjection::new(self.dataset.clone(), None)
     }
 
-    /// State projection of the state of collection at the specified point in
+    /// State projection of the state of a collection at the specified point in
     /// time
     #[tracing::instrument(level = "info", name = Collection_as_of, skip_all)]
     pub async fn as_of(&self, block_hash: Multihash<'static>) -> CollectionProjection {
@@ -111,7 +111,8 @@ impl CollectionProjection {
         Ok(Some(entry))
     }
 
-    /// Returns the state of entries as they existed at specified point in time
+    /// Returns the state of entries as they existed at a specified point in
+    /// time
     #[tracing::instrument(level = "info", name = CollectionProjection_entries, skip_all)]
     pub async fn entries(
         &self,
@@ -144,8 +145,8 @@ impl CollectionProjection {
         };
 
         // Apply filters
-        // Note: we are still working with a changelog here in hope to narrow down the
-        // record set before projecting
+        // Note: we are still working with a changelog here in the hope to narrow down
+        // the record set before projecting
         let df = match path_prefix {
             None => df,
             Some(path_prefix) => df

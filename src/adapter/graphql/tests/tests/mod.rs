@@ -25,4 +25,5 @@ mod test_gql_pagination;
 mod test_gql_remote_statuses;
 mod test_gql_search;
 mod test_guards;
+mod test_scalars;
 mod test_update_schema;

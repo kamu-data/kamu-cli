@@ -17,7 +17,10 @@ pub(crate) mod mutations;
 pub(crate) mod prelude;
 pub(crate) mod queries;
 mod root;
+#[cfg(any(feature = "testing", test))]
 pub mod scalars;
+#[cfg(not(any(feature = "testing", test)))]
+pub(crate) mod scalars;
 pub mod traits;
 pub(crate) mod utils;
 
