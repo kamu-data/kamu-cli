@@ -49,9 +49,6 @@ impl LoginPasswordAuthProvider {
         account: &Account,
         password: String,
     ) -> Result<(), InternalError> {
-        // Generate password hash: this is a compute-intensive operation,
-        // so spawn a blocking task
-        tracing::info_span!("Generate password hash");
         let password_hash =
             Argon2Hasher::hash_async(password.as_bytes(), self.password_hashing_mode)
                 .await
@@ -119,9 +116,6 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             },
         };
 
-        // Verify password hash: this is a compute-intensive operation,
-        // so spawn a blocking task
-        tracing::info_span!("Verify password hash");
         if !Argon2Hasher::verify_async(
             password_login_credentials.password.as_bytes(),
             password_hash.as_str(),

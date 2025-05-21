@@ -59,9 +59,13 @@ impl Argon2Hasher<'_> {
     ) -> Result<String, InternalError> {
         let value = value.to_owned();
 
+        // Generate hash: this is a compute-intensive operation,
+        // so spawn a blocking task
         tokio::task::spawn_blocking(move || {
-            let argon2 = Self::new(password_hashing_mode);
-            argon2.hash_impl(&value)
+            tracing::info_span!("Generating hash").in_scope(|| {
+                let argon2 = Self::new(password_hashing_mode);
+                argon2.hash_impl(&value)
+            })
         })
         .await
         .int_err()
@@ -75,9 +79,13 @@ impl Argon2Hasher<'_> {
         let value = value.to_owned();
         let hashed_value = hashed_value.to_owned();
 
+        // Verify hash: this is a compute-intensive operation,
+        // so spawn a blocking task
         tokio::task::spawn_blocking(move || {
-            let argon2 = Self::new(password_hashing_mode);
-            argon2.verify_impl(&value, &hashed_value)
+            tracing::info_span!("Verifying hash").in_scope(|| {
+                let argon2 = Self::new(password_hashing_mode);
+                argon2.verify_impl(&value, &hashed_value)
+            })
         })
         .await
         .int_err()
