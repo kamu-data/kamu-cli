@@ -244,7 +244,7 @@ impl CollectionMut<'_> {
         ctx: &Context<'_>,
         path_from: CollectionPath,
         path_to: CollectionPath,
-        extra_data: Option<serde_json::Value>,
+        extra_data: Option<ExtraData>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
         self.update_entries_impl(
@@ -253,7 +253,7 @@ impl CollectionMut<'_> {
                 r#move: Some(CollectionUpdateInputMove {
                     path_from,
                     path_to,
-                    extra_data,
+                    extra_data: extra_data.map(Into::into),
                 }),
                 ..Default::default()
             }],
@@ -306,7 +306,7 @@ pub struct CollectionEntryInput {
     pub reference: DatasetID<'static>,
 
     /// Json object containing extra column values
-    pub extra_data: Option<serde_json::Value>,
+    pub extra_data: Option<ExtraData>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -338,7 +338,7 @@ pub struct CollectionUpdateInputMove {
     pub path_to: CollectionPath,
 
     /// Optionally update the extra data
-    pub extra_data: Option<serde_json::Value>,
+    pub extra_data: Option<ExtraData>,
 }
 
 #[derive(InputObject, Debug)]
@@ -408,6 +408,7 @@ impl CollectionUpdateErrorCasFailed {
 pub struct CollectionUpdateErrorNotFound {
     pub path: CollectionPath,
 }
+
 #[ComplexObject]
 impl CollectionUpdateErrorNotFound {
     async fn is_success(&self) -> bool {

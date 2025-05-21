@@ -29,7 +29,7 @@ lazy_static::lazy_static! {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype::nutype(derive(AsRef, Debug, Into))]
+#[nutype::nutype(derive(AsRef, Clone, Debug, Into))]
 pub struct ExtraData(serde_json::Value);
 
 impl Default for ExtraData {
@@ -42,13 +42,13 @@ impl Default for ExtraData {
 impl async_graphql::ScalarType for ExtraData {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         let async_graphql::Value::Object(gql_extra_data) = &value else {
-            return Err(invalid_input_error(value));
+            return Err(invalid_input_error(&value));
         };
 
         let extra_data = serde_json::to_value(gql_extra_data)?;
 
         if !EXTRA_DATA_JSONSCHEMA_VALIDATOR.is_valid(&extra_data) {
-            return Err(invalid_input_error(value));
+            return Err(invalid_input_error(&value));
         }
 
         Ok(Self::new(extra_data))
@@ -67,7 +67,7 @@ impl async_graphql::ScalarType for ExtraData {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn invalid_input_error(
-    input_value: async_graphql::Value,
+    input_value: &async_graphql::Value,
 ) -> async_graphql::InputValueError<ExtraData> {
     let message = format!(
         "Invalid input value: '{input_value}'. A flat object is expected, such as: '{{}}', \

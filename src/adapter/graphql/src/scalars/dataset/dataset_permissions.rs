@@ -10,6 +10,7 @@
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetPermissions {
     pub collaboration: DatasetCollaborationPermissions,
