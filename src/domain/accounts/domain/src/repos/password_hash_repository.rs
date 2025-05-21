@@ -10,15 +10,24 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
+use super::AccountNotFoundByNameError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait PasswordHashRepository: Send + Sync {
     async fn save_password_hash(
         &self,
+        account_id: &odf::AccountID,
         account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError>;
+
+    async fn modify_password_hash(
+        &self,
+        account_name: &odf::AccountName,
+        password_hash: String,
+    ) -> Result<(), ModifyPasswordHashError>;
 
     async fn find_password_hash_by_account_name(
         &self,
@@ -32,6 +41,16 @@ pub trait PasswordHashRepository: Send + Sync {
 pub enum SavePasswordHashError {
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum ModifyPasswordHashError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+    #[error(transparent)]
+    AccountNotFound(#[from] AccountNotFoundByNameError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

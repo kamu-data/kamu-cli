@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use email_utils::Email;
-use kamu_accounts::{Account, AccountRepository, UpdateAccountError};
+use kamu_accounts::*;
 
 use super::AccountFlowsMut;
 use crate::prelude::*;
+use crate::{utils, AdminGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,17 +33,13 @@ impl AccountMut {
     pub async fn update_email(
         &self,
         ctx: &Context<'_>,
-        new_email: String,
+        new_email: Email<'_>,
     ) -> Result<UpdateEmailResult> {
-        let Ok(new_email) = Email::parse(&new_email) else {
-            return Ok(UpdateEmailResult::InvalidEmail(
-                UpdateEmailInvalid::default(),
-            ));
-        };
+        utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
 
         let account_repo = from_catalog_n!(ctx, dyn AccountRepository);
         match account_repo
-            .update_account_email(&self.account.id, new_email.clone())
+            .update_account_email(&self.account.id, new_email.clone().into())
             .await
         {
             Ok(_) => Ok(UpdateEmailResult::Success(UpdateEmailSuccess {
@@ -52,24 +48,70 @@ impl AccountMut {
             Err(UpdateAccountError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
                 UpdateEmailNonUnique::default(),
             )),
-            Err(UpdateAccountError::NotFound(e)) => Err(e.int_err().into()),
-            Err(UpdateAccountError::Internal(e)) => Err(e.into()),
+            Err(e @ (UpdateAccountError::NotFound(_) | UpdateAccountError::Internal(_))) => {
+                Err(e.int_err().into())
+            }
+        }
+    }
+
+    /// Reset password for a selected account. Allowed only for admin users
+    #[tracing::instrument(level = "info", name = AccountMut_modify_password, skip_all)]
+    #[graphql(guard = "AdminGuard")]
+    async fn modify_password(
+        &self,
+        ctx: &Context<'_>,
+        password: AccountPassword<'_>,
+    ) -> Result<ModifyPasswordResult> {
+        let modify_account_password_use_case =
+            from_catalog_n!(ctx, dyn ModifyAccountPasswordUseCase);
+
+        use ModifyAccountPasswordError as E;
+
+        match modify_account_password_use_case
+            .execute(&self.account, password.into())
+            .await
+        {
+            Ok(_) => Ok(ModifyPasswordResult::Success(
+                ModifyPasswordSuccess::default(),
+            )),
+            Err(e @ (E::Internal(_) | E::AccountNotFound(_))) => Err(e.int_err().into()),
+        }
+    }
+
+    /// Delete a selected account. Allowed only for admin users
+    #[tracing::instrument(level = "info", name = AccountMut_delete, skip_all)]
+    async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
+        // NOTE: DeleteAccountUseCase handles access verification
+
+        let delete_account_use_case = from_catalog_n!(ctx, dyn DeleteAccountUseCase);
+
+        use DeleteAccountByNameError as E;
+
+        match delete_account_use_case.execute(&self.account).await {
+            Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),
+            Err(E::NotFound(e)) => unreachable!("Account should exist: {e}"),
+            Err(E::Access(access_error)) => Err(access_error.into()),
+            Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
     /// Access to the mutable flow configurations of this account
-    async fn flows(&self) -> AccountFlowsMut {
-        AccountFlowsMut::new(self.account.clone())
+    #[expect(clippy::unused_async)]
+    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlowsMut> {
+        utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
+
+        Ok(AccountFlowsMut::new(&self.account))
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// UpdateEmailResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum UpdateEmailResult {
     Success(UpdateEmailSuccess),
-    InvalidEmail(UpdateEmailInvalid),
     NonUniqueEmail(UpdateEmailNonUnique),
 }
 
@@ -91,21 +133,6 @@ impl UpdateEmailSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
-pub struct UpdateEmailInvalid {
-    message: String,
-}
-
-impl Default for UpdateEmailInvalid {
-    fn default() -> Self {
-        Self {
-            message: "Invalid email".to_string(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug)]
 pub struct UpdateEmailNonUnique {
     message: String,
 }
@@ -114,6 +141,56 @@ impl Default for UpdateEmailNonUnique {
     fn default() -> Self {
         Self {
             message: "Non-unique email".to_string(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ModifyPasswordResult
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "&String"))]
+pub enum ModifyPasswordResult {
+    Success(ModifyPasswordSuccess),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct ModifyPasswordSuccess {
+    pub message: String,
+}
+
+impl Default for ModifyPasswordSuccess {
+    fn default() -> Self {
+        Self {
+            message: "Password modified".to_string(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DeleteAccountResult
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum DeleteAccountResult {
+    Success(DeleteAccountSuccess),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct DeleteAccountSuccess {
+    message: String,
+}
+
+impl Default for DeleteAccountSuccess {
+    fn default() -> Self {
+        Self {
+            message: "Account deleted".to_string(),
         }
     }
 }

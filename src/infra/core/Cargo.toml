@@ -46,6 +46,7 @@ testing = [
 # Kamu
 common-macros = { workspace = true }
 container-runtime = { workspace = true }
+crypto-utils = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
@@ -56,7 +57,7 @@ kamu-datasets = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["lfs", "s3"] }
-random-names = { workspace = true }
+random-strings = { workspace = true }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
 

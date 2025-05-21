@@ -13,7 +13,13 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Account, AccountPageStream, GetAccountByIdError, SearchAccountsByNamePatternFilters};
+use crate::{
+    Account,
+    AccountPageStream,
+    CreateAccountError,
+    GetAccountByIdError,
+    SearchAccountsByNamePatternFilters,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,6 +61,17 @@ pub trait AccountService: Sync + Send {
         filters: SearchAccountsByNamePatternFilters,
         pagination: PaginationOpts,
     ) -> AccountPageStream<'a>;
+
+    async fn create_account(
+        &self,
+        account_name: &odf::AccountName,
+        email: email_utils::Email,
+    ) -> Result<Account, CreateAccountError>;
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

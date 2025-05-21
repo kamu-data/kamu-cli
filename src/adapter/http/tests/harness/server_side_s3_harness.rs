@@ -20,6 +20,7 @@ use kamu_accounts::*;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::*;
@@ -143,7 +144,11 @@ impl ServerSideS3Harness {
                 .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
+                .add::<CreateAccountUseCaseImpl>()
+                .add::<ModifyAccountPasswordUseCaseImpl>()
                 .add::<InMemoryAccountRepository>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
                 .add_value(jwt_authentication_config)

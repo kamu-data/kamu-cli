@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
+use kamu_accounts::{DidEntity, DidSecretEncryptionConfig, DidSecretKeyRepository};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
@@ -30,7 +31,9 @@ async fn test_create_root_dataset_from_snapshot() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let harness = CreateFromSnapshotUseCaseHarness::new(vec![predefined_foo_id.clone()]).await;
+    let mock_did_generator =
+        MockDidGenerator::predefined_dataset_ids(vec![predefined_foo_id.clone()]);
+    let harness = CreateFromSnapshotUseCaseHarness::new(Some(mock_did_generator)).await;
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -45,7 +48,7 @@ async fn test_create_root_dataset_from_snapshot() {
         .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         harness
             .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
@@ -88,11 +91,11 @@ async fn test_create_derived_dataset_from_snapshot() {
     let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let predefined_bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let harness = CreateFromSnapshotUseCaseHarness::new(vec![
+    let mock_did_generator = MockDidGenerator::predefined_dataset_ids(vec![
         predefined_foo_id.clone(),
         predefined_bar_id.clone(),
-    ])
-    .await;
+    ]);
+    let harness = CreateFromSnapshotUseCaseHarness::new(Some(mock_did_generator)).await;
 
     let snapshot_root = MetadataFactory::dataset_snapshot()
         .name(alias_foo.clone())
@@ -126,13 +129,13 @@ async fn test_create_derived_dataset_from_snapshot() {
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));
 
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         harness
             .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
         foo_created.head,
     );
-    assert_eq!(
+    pretty_assertions::assert_eq!(
         harness
             .get_dataset_reference(&bar_created.dataset_handle.id, &odf::BlockRef::Head)
             .await,
@@ -188,23 +191,72 @@ async fn test_create_derived_dataset_from_snapshot() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = CreateFromSnapshotUseCaseHarness::new(None).await;
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name(alias_foo.clone())
+        .kind(odf::DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
+
+    let foo_created = harness
+        .use_case
+        .execute(snapshot, Default::default())
+        .await
+        .unwrap();
+
+    assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
+    pretty_assertions::assert_eq!(
+        harness
+            .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
+            .await,
+        foo_created.head,
+    );
+
+    let did_secret_key = harness
+        .did_secret_key_repo
+        .get_did_secret_key(&DidEntity::new_dataset(
+            foo_created.dataset_handle.id.to_string(),
+        ))
+        .await
+        .unwrap();
+
+    let did_private_key = did_secret_key
+        .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key.unwrap())
+        .unwrap();
+
+    let public_key = did_private_key.verifying_key().to_bytes();
+    let did_odf = odf::metadata::DidOdf::from(
+        odf::metadata::DidKey::new(odf::metadata::Multicodec::Ed25519Pub, &public_key).unwrap(),
+    );
+
+    // Compare original account_id from db and id generated from a stored private
+    // key
+    pretty_assertions::assert_eq!(foo_created.dataset_handle.id.as_did(), &did_odf);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct CreateFromSnapshotUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
     dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
+    did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
 }
 
 impl CreateFromSnapshotUseCaseHarness {
-    async fn new(predefined_dataset_ids: Vec<odf::DatasetID>) -> Self {
+    async fn new(maybe_mock_did_generator: Option<MockDidGenerator>) -> Self {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
                 maybe_system_time_source_stub: Some(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                 )),
-                maybe_mock_did_generator: Some(MockDidGenerator::predefined_dataset_ids(
-                    predefined_dataset_ids,
-                )),
+                maybe_mock_did_generator,
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;
@@ -219,6 +271,7 @@ impl CreateFromSnapshotUseCaseHarness {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
             dataset_reference_repo: catalog.get_one().unwrap(),
+            did_secret_key_repo: catalog.get_one().unwrap(),
         }
     }
 

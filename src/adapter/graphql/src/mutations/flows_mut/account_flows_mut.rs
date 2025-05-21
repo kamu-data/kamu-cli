@@ -14,19 +14,19 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AccountFlowsMut {
-    account: Account,
+pub struct AccountFlowsMut<'a> {
+    account: &'a Account,
 }
 
 #[Object]
-impl AccountFlowsMut {
+impl<'a> AccountFlowsMut<'a> {
     #[graphql(skip)]
-    pub fn new(account: Account) -> Self {
+    pub fn new(account: &'a Account) -> Self {
         Self { account }
     }
 
     async fn triggers(&self) -> AccountFlowTriggersMut {
-        AccountFlowTriggersMut::new(self.account.clone())
+        AccountFlowTriggersMut::new(self.account)
     }
 }
 

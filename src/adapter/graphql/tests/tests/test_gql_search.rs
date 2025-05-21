@@ -13,7 +13,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -352,7 +352,8 @@ impl GqlSearchHarness {
             .build();
 
         let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(base_gql_harness.catalog()).await;
+            authentication_catalogs(base_gql_harness.catalog(), PredefinedAccountOpts::default())
+                .await;
         let schema = kamu_adapter_graphql::schema_quiet();
 
         Self {

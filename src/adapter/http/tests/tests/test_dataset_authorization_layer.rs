@@ -18,7 +18,7 @@ use kamu::domain::auth::DatasetAction;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::*;
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::CreateDatasetUseCase;
@@ -376,7 +376,9 @@ impl ServerHarness {
                 .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<AccountServiceImpl>()
-                .add::<InMemoryAccountRepository>();
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add::<InMemoryAccountRepository>()
+                .add_value(DidSecretEncryptionConfig::sample());
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -386,7 +388,7 @@ impl ServerHarness {
         base_catalog
             .get_one::<dyn AccountRepository>()
             .unwrap()
-            .create_account(&Account::dummy())
+            .save_account(&Account::dummy())
             .await
             .unwrap();
 

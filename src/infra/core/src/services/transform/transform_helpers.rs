@@ -21,7 +21,7 @@ use kamu_core::{
     TransformPreliminaryRequestExt,
     VerifyTransformPlanError,
 };
-use random_names::get_random_name;
+use random_strings::get_random_name;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

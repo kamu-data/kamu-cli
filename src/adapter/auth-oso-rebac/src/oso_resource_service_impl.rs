@@ -46,7 +46,11 @@ impl OsoResourceServiceImpl {
             .await
             .int_err()?;
 
-        Ok(UserActor::logged(account_id, account_properties.is_admin))
+        Ok(UserActor::logged(
+            account_id,
+            account_properties.is_admin,
+            account_properties.can_provision_accounts,
+        ))
     }
 
     pub async fn dataset_resource(

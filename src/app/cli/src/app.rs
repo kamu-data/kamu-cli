@@ -14,6 +14,7 @@ use std::sync::Arc;
 use async_utils::ResultAsync;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
+use crypto_utils::AesGcmEncryptor;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -816,13 +817,29 @@ pub fn register_config_in_catalog(
                 catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
             } else {
                 assert!(
-                    kamu_datasets::DatasetEnvVar::try_asm_256_gcm_from_str(encryption_key).is_ok(),
+                    AesGcmEncryptor::try_new(encryption_key).is_ok(),
                     "Invalid dataset env var encryption key",
                 );
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
                 catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
             }
         }
+    }
+    //
+
+    // Did secret key encryption configuration
+    catalog_builder.add_value(config.did_encryption.clone().unwrap());
+
+    if let Some(did_encryption_config) = config.did_encryption.as_ref()
+        && let Some(encryption_key) = &did_encryption_config.encryption_key
+        && did_encryption_config.is_enabled()
+    {
+        assert!(
+            AesGcmEncryptor::try_new(encryption_key).is_ok(),
+            "Invalid did secret encryption key",
+        );
+    } else {
+        warn!("Did secret keys will not be stored");
     }
     //
 
@@ -837,10 +854,10 @@ pub fn register_config_in_catalog(
     // Password hashing mode configuration
     match password_hashing_mode {
         Some(cli::PasswordHashingMode::Testing) => {
-            catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Minimal);
+            catalog_builder.add_value(crypto_utils::PasswordHashingMode::Minimal);
         }
         Some(cli::PasswordHashingMode::Production) | None => {
-            catalog_builder.add_value(kamu_accounts_services::PasswordHashingMode::Default);
+            catalog_builder.add_value(crypto_utils::PasswordHashingMode::Default);
         }
     }
     //

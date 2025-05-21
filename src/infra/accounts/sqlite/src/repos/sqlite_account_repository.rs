@@ -81,7 +81,7 @@ impl SqliteAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for SqliteAccountRepository {
-    async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError> {
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -484,6 +484,37 @@ impl AccountRepository for SqliteAccountRepository {
             }
         })
     }
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), DeleteAccountError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_name_str = account_name.as_str();
+
+        let delete_result = sqlx::query!(
+            r#"
+            DELETE
+            FROM accounts
+            WHERE account_name = $1
+            "#,
+            account_name_str
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        if delete_result.rows_affected() > 0 {
+            Ok(())
+        } else {
+            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
+                account_name: account_name.clone(),
+            }))
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -553,6 +584,7 @@ impl ExpensiveAccountRepository for SqliteAccountRepository {
 impl PasswordHashRepository for SqliteAccountRepository {
     async fn save_password_hash(
         &self,
+        account_id: &odf::AccountID,
         account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
@@ -562,18 +594,55 @@ impl PasswordHashRepository for SqliteAccountRepository {
 
         // TODO: duplicates are prevented with unique indices, but handle error
 
-        let account_name = account_name.to_string();
+        let account_name = account_name.as_str();
+        let account_id_stack = account_id.as_did_str().to_stack_string();
+        let account_id = account_id_stack.as_str();
+
         sqlx::query!(
             r#"
-            INSERT INTO accounts_passwords (account_name, password_hash)
-                VALUES ($1, $2)
+            INSERT INTO accounts_passwords (account_name, password_hash, account_id)
+            VALUES ($1, $2, $3)
             "#,
             account_name,
-            password_hash
+            password_hash,
+            account_id
         )
         .execute(connection_mut)
         .await
         .int_err()?;
+
+        Ok(())
+    }
+
+    async fn modify_password_hash(
+        &self,
+        account_name: &odf::AccountName,
+        password_hash: String,
+    ) -> Result<(), ModifyPasswordHashError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_name_string = account_name.to_string();
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts_passwords set password_hash=$1
+                where account_name=$2
+            "#,
+            password_hash,
+            account_name_string
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(ModifyPasswordHashError::AccountNotFound(
+                AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                },
+            ));
+        }
 
         Ok(())
     }

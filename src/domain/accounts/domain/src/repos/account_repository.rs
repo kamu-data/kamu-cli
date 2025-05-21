@@ -11,7 +11,7 @@ use std::fmt::Display;
 
 use database_common::{EntityPageListing, EntityPageStream, EntityPageStreamer, PaginationOpts};
 use email_utils::Email;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use thiserror::Error;
 
 use crate::Account;
@@ -20,7 +20,7 @@ use crate::Account;
 
 #[async_trait::async_trait]
 pub trait AccountRepository: Send + Sync {
-    async fn create_account(&self, account: &Account) -> Result<(), CreateAccountError>;
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError>;
 
     async fn get_account_by_id(
         &self,
@@ -66,6 +66,11 @@ pub trait AccountRepository: Send + Sync {
         account_id: &odf::AccountID,
         new_email: Email,
     ) -> Result<(), UpdateAccountError>;
+
+    async fn delete_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), DeleteAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -249,6 +254,28 @@ pub enum UpdateAccountError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum DeleteAccountError {
+    #[error(transparent)]
+    NotFound(AccountNotFoundByNameError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<GetAccountByNameError> for DeleteAccountError {
+    fn from(e: GetAccountByNameError) -> Self {
+        use GetAccountByNameError as E;
+
+        match e {
+            E::NotFound(e) => Self::NotFound(e),
+            e @ E::Internal(_) => Self::Internal(e.int_err()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

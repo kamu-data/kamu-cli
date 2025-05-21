@@ -13,7 +13,8 @@ use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
-use kamu_auth_rebac::{AccountPropertyName, RebacService};
+use kamu_auth_rebac::{boolean_property_value, AccountPropertyName, RebacService};
+use kamu_auth_rebac_services::DefaultAccountProperties;
 use odf::AccountID;
 
 use crate::LoginPasswordAuthProvider;
@@ -26,6 +27,7 @@ pub struct PredefinedAccountsRegistrator {
     login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
     account_repository: Arc<dyn AccountRepository>,
     rebac_service: Arc<dyn RebacService>,
+    default_account_properties: Arc<DefaultAccountProperties>,
 }
 
 #[component(pub)]
@@ -41,12 +43,14 @@ impl PredefinedAccountsRegistrator {
         login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
         account_repository: Arc<dyn AccountRepository>,
         rebac_service: Arc<dyn RebacService>,
+        default_account_properties: Arc<DefaultAccountProperties>,
     ) -> Self {
         Self {
             predefined_accounts_config,
             login_password_auth_provider,
             account_repository,
             rebac_service,
+            default_account_properties,
         }
     }
 
@@ -56,7 +60,18 @@ impl PredefinedAccountsRegistrator {
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
         // TODO: Revisit if batch property setting will be implemented
-        for (name, value) in [AccountPropertyName::is_admin(account_config.is_admin)] {
+        for name in [
+            AccountPropertyName::IsAdmin,
+            AccountPropertyName::CanProvisionAccounts,
+        ] {
+            let value = if let Some(predefined_properties) = &account_config.properties
+                && predefined_properties.contains(&name)
+            {
+                boolean_property_value(true)
+            } else {
+                self.default_account_properties.as_property_value(name)
+            };
+
             self.rebac_service
                 .set_account_property(account_id, name, &value)
                 .await
@@ -73,13 +88,13 @@ impl PredefinedAccountsRegistrator {
         let account = account_config.into();
 
         self.account_repository
-            .create_account(&account)
+            .save_account(&account)
             .await
             .int_err()?;
 
         if account_config.provider == PROVIDER_PASSWORD {
             self.login_password_auth_provider
-                .save_password(&account.account_name, account_config.get_password())
+                .save_password(&account, account_config.get_password())
                 .await?;
         }
 

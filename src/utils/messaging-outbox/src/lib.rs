@@ -9,6 +9,8 @@
 
 #![feature(let_chains)]
 
+pub mod prelude;
+
 mod agent;
 mod consumers;
 mod entities;

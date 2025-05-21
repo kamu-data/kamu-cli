@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
 use std::time::Duration;
 
-use random_names::get_random_name;
+use random_strings::get_random_name;
 use tokio::process::{ChildStderr, ChildStdin, ChildStdout, Command};
 
 use crate::*;

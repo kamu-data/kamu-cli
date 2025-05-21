@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM accounts\n            WHERE account_name = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "1bca4924c9445014cd84f851e46ac49eaba4feb51d348bff201520bc2865cb65"
+}

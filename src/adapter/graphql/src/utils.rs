@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::{Context, ErrorExtensions};
+use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_core::auth;
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
 
-use crate::prelude::{AccessTokenID, AccountID, AccountName};
+use crate::prelude::{AccessTokenID, AccountID};
 use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -111,10 +111,9 @@ async fn check_dataset_access(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn make_dataset_access_error(dataset_handle: &odf::DatasetHandle) -> GqlError {
-    GqlError::Gql(
-        async_graphql::Error::new("Dataset access error")
-            .extend_with(|_, eev| eev.set("alias", dataset_handle.alias.to_string())),
-    )
+    GqlError::gql_extended("Dataset access error", |eev| {
+        eev.set("alias", dataset_handle.alias.to_string());
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -134,12 +133,12 @@ pub(crate) async fn get_task(
 
 pub(crate) fn ensure_dataset_env_vars_enabled(ctx: &Context<'_>) -> Result<(), GqlError> {
     let dataset_env_vars_config = from_catalog_n!(ctx, DatasetEnvVarsConfig);
-    if !dataset_env_vars_config.as_ref().is_enabled() {
-        return Err(GqlError::Gql(async_graphql::Error::new(
-            "API is unavailable",
-        )));
+
+    if dataset_env_vars_config.is_enabled() {
+        Ok(())
+    } else {
+        Err(GqlError::gql("API is unavailable"))
     }
-    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,10 +154,10 @@ pub(crate) fn check_logged_account_id_match(
             return Ok(());
         }
     };
-    Err(GqlError::Gql(
-        async_graphql::Error::new("Account access error")
-            .extend_with(|_, eev| eev.set("account_id", account_id.to_string())),
-    ))
+
+    Err(GqlError::gql_extended("Account access error", |eev| {
+        eev.set("account_id", account_id.to_string());
+    }))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -177,9 +176,7 @@ pub(crate) async fn check_access_token_valid(
         .get_token_by_id(token_id)
         .await
         .map_err(|err| match err {
-            GetAccessTokenError::NotFound(_) => {
-                GqlError::Gql(async_graphql::Error::new("Access token not found"))
-            }
+            GetAccessTokenError::NotFound(_) => GqlError::gql("Access token not found"),
             GetAccessTokenError::Internal(e) => GqlError::Internal(e),
         })?;
 
@@ -188,30 +185,29 @@ pub(crate) async fn check_access_token_valid(
             return Ok(());
         }
     };
-    Err(GqlError::Gql(
-        async_graphql::Error::new("Access token access error").extend_with(|_, eev| {
-            eev.set("account_id", existing_access_token.account_id.to_string());
-        }),
-    ))
+
+    Err(GqlError::gql_extended("Access token access error", |eev| {
+        eev.set("account_id", existing_access_token.account_id.to_string());
+    }))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn check_logged_account_name_match(
     ctx: &Context<'_>,
-    account_name: &AccountName,
+    account_name: &odf::AccountName,
 ) -> Result<(), GqlError> {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_name == **account_name {
+        if logged_account.account_name == *account_name {
             return Ok(());
         }
     };
-    Err(GqlError::Gql(
-        async_graphql::Error::new("Account access error")
-            .extend_with(|_, eev| eev.set("account_name", account_name.to_string())),
-    ))
+
+    Err(GqlError::gql_extended("Account access error", |eev| {
+        eev.set("account_name", account_name.to_string());
+    }))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -239,6 +235,19 @@ pub enum GqlError {
     Internal(InternalError),
     Access(odf::AccessError),
     Gql(async_graphql::Error),
+}
+
+impl GqlError {
+    pub fn gql(message: impl Into<String>) -> Self {
+        Self::gql_extended(message, |_| {})
+    }
+
+    pub fn gql_extended(
+        message: impl Into<String>,
+        callback: impl FnOnce(&mut ErrorExtensionValues),
+    ) -> Self {
+        GqlError::Gql(async_graphql::Error::new(message).extend_with(|_, eev| callback(eev)))
+    }
 }
 
 impl From<InternalError> for GqlError {

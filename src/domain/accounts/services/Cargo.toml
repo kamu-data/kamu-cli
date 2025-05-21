@@ -23,21 +23,25 @@ doctest = false
 
 [dependencies]
 common-macros = { workspace = true }
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
+email-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
+kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
+random-strings = { workspace = true }
 time-source = { workspace = true }
 
-argon2 = { version = "0.5" }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.13", default-features = false }
 jsonwebtoken = "9"
-password-hash = { version = "0.5", default-features = false }
+secrecy = "0.10"
 serde = "1"
 serde_json = "1"
 thiserror = "2"
@@ -53,4 +57,5 @@ kamu-accounts-inmem = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
 
 mockall = "0.13"
+pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

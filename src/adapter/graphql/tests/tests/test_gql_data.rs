@@ -74,6 +74,7 @@ async fn create_catalog_with_local_workspace(
             .add::<LoginPasswordAuthProvider>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
+            .add_value(DidSecretEncryptionConfig::sample())
             .add_value(DefaultAccountProperties::default())
             .add_value(DefaultDatasetProperties::default())
             .add::<PredefinedAccountsRegistrator>()

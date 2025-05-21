@@ -1,6 +1,6 @@
 [package]
-name = "random-names"
-description = "Common helpers for generating random names"
+name = "random-strings"
+description = "Common helpers for generating random strings"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

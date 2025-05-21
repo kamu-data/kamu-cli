@@ -11,12 +11,32 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+### TODO
 ### Added
 - `kamu --show-error-stack-trace`: Added an argument to show stack trace in case of an error during command execution
 
-## [Unreleased]
+# Unreleased
+### Added
+- GQL: Added new scalars: `Email`, AccountPassword`.
+- GQL: Added `AccountMut::delete()`.
+### Changed
+- DB: Removed FK for `did_secret_keys.creator_id` 
+- DB: Added missing triggers for deleting account rows (`ON DELETE CASCADE`) 
+    for related tables (`accounts_passwords`, `access_tokens`, `dataset_entries`).
+- GQL: `AccountMut::modifyPassword()`: no longer accepts the `accountName` argument.
+- GQL: `AccountMuts::createAccount()`: method moved from `AccountMut`.
+- Refactor:
+  - Remove password logic from `AccountService` level 
+
+## [0.237.0] - 2025-05-14
+### Added
+- GQL:
+  - New `createAccount()` method to create a new account, method is available only for admins
+      and user's with `can_provision_accounts` ReBAC properties.
+  - New `modifyPassword()` method to change password for an existing account, method is available only for admins.
+- New repository `DidSecretKeysRepository` where stored all encrypted private parts of created accounts and datasets.
 ### Fixed
-- Dependency graph is less sensitive to requests that come too early, before dataset node is created
+- The dependency graph is less sensitive to requests that come too early, before the dataset node is created.
 
 ## [0.236.0] - 2025-05-09
 ### Added

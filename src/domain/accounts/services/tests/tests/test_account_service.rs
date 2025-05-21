@@ -10,8 +10,19 @@
 use std::assert_matches::assert_matches;
 
 use database_common::NoOpDatabasePlugin;
-use kamu_accounts::{AccountConfig, AccountService, AccountServiceExt, PredefinedAccountsConfig};
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use email_utils::Email;
+use kamu_accounts::{
+    AccountConfig,
+    AccountService,
+    AccountServiceExt,
+    DidEntity,
+    DidSecretEncryptionConfig,
+    DidSecretKey,
+    DidSecretKeyRepository,
+    PredefinedAccountsConfig,
+    SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
+};
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -23,7 +34,9 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
+use odf::metadata::{DidKey, DidOdf};
 use odf::AccountName;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -84,22 +97,79 @@ async fn test_multi_find() {
         .get_accounts_by_ids(&[wasya_id.clone(), petya_id.clone()])
         .await
         .unwrap();
-    assert_eq!(2, accounts.len());
+    pretty_assertions::assert_eq!(2, accounts.len());
     accounts.sort_by(|acc1, acc2| acc1.account_name.cmp(&acc2.account_name));
-    assert_eq!(accounts[0].account_name.as_str(), PETYA);
-    assert_eq!(accounts[1].account_name.as_str(), WASYA);
+    pretty_assertions::assert_eq!(PETYA, accounts[0].account_name.as_str());
+    pretty_assertions::assert_eq!(WASYA, accounts[1].account_name.as_str());
 
     let accounts_map = account_svc
         .get_account_map(&[wasya_id.clone(), petya_id.clone()])
         .await
         .unwrap();
-    assert_eq!(2, accounts.len());
+    pretty_assertions::assert_eq!(2, accounts.len());
     assert!(accounts_map
         .get(&wasya_id)
         .is_some_and(|a| a.account_name.as_str() == WASYA));
     assert!(accounts_map
         .get(&petya_id)
         .is_some_and(|a| a.account_name.as_str() == PETYA));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_account() {
+    let catalog = make_catalog().await;
+    let account_svc = catalog.get_one::<dyn AccountService>().unwrap();
+    let did_secret_key_repo = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
+
+    let new_account_name = AccountName::new_unchecked("new_account");
+    account_svc
+        .create_account(&new_account_name, Email::parse("new_email@com").unwrap())
+        .await
+        .unwrap();
+
+    let created_account_id = account_svc
+        .find_account_id_by_name(&new_account_name)
+        .await
+        .unwrap()
+        .unwrap();
+
+    let created_account_did_secret_key = did_secret_key_repo
+        .get_did_secret_key(&DidEntity::new_account(created_account_id.to_string()))
+        .await
+        .unwrap();
+
+    let did_private_key = created_account_did_secret_key
+        .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key.unwrap())
+        .unwrap();
+
+    let public_key = did_private_key.verifying_key().to_bytes();
+    let did_odf =
+        DidOdf::from(DidKey::new(odf::metadata::Multicodec::Ed25519Pub, &public_key).unwrap());
+
+    // Compare original account_id from db and id generated from a stored private
+    // key
+    pretty_assertions::assert_eq!(created_account_id.as_did(), &did_odf);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_did_secret_key_generation() {
+    let account_did = odf::AccountID::new_generated_ed25519();
+    let new_did_secret_key =
+        DidSecretKey::try_new(&account_did.0.into(), SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY).unwrap();
+
+    let original_value = new_did_secret_key
+        .get_decrypted_private_key(SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY)
+        .unwrap();
+
+    let public_key = original_value.verifying_key().to_bytes();
+    let did_odf =
+        DidOdf::from(DidKey::new(odf::metadata::Multicodec::Ed25519Pub, &public_key).unwrap());
+
+    assert_eq!(account_did.1.as_did(), &did_odf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,9 +189,12 @@ async fn make_catalog() -> dill::Catalog {
     b.add::<AccountServiceImpl>()
         .add::<InMemoryAccountRepository>()
         .add_value(predefined_account_config)
+        .add::<SystemTimeSourceDefault>()
         .add::<LoginPasswordAuthProvider>()
         .add::<RebacServiceImpl>()
         .add::<InMemoryRebacRepository>()
+        .add_value(DidSecretEncryptionConfig::sample())
+        .add::<InMemoryDidSecretKeyRepository>()
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
         .add::<PredefinedAccountsRegistrator>();

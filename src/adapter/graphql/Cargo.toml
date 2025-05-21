@@ -44,6 +44,7 @@ odf = { workspace = true, default-features = false, features = [
     "lfs",
     "s3",
 ] }
+random-strings = { workspace = true }
 
 async-graphql = { version = "7", default-features = false, features = [
     "chrono",

@@ -19,6 +19,7 @@ use kamu::*;
 use kamu_accounts::{
     Account,
     AccountConfig,
+    DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_ID,
@@ -27,6 +28,7 @@ use kamu_accounts::{
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::*;
@@ -162,6 +164,8 @@ impl ServerSideLocalFsHarness {
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
                 .add_value(jwt_authentication_config)

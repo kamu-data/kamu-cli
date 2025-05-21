@@ -13,24 +13,28 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(
-    catalog_builder: &mut CatalogBuilder,
-    needs_indexing: bool,
-    production: bool,
-) {
-    catalog_builder.add::<AccessTokenServiceImpl>();
-    catalog_builder.add::<AccountServiceImpl>();
-    catalog_builder.add::<AuthenticationServiceImpl>();
-    catalog_builder.add::<LoginPasswordAuthProvider>();
-    catalog_builder.add::<PredefinedAccountsRegistrator>();
+pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool, production: bool) {
+    b.add::<AccessTokenServiceImpl>();
+    b.add::<AccountServiceImpl>();
+    b.add::<AuthenticationServiceImpl>();
+    b.add::<LoginPasswordAuthProvider>();
+    b.add::<PredefinedAccountsRegistrator>();
+
+    b.add::<CreateAccountUseCaseImpl>();
+    b.add::<DeleteAccountUseCaseImpl>();
+    b.add::<ModifyAccountPasswordUseCaseImpl>();
+
+    b.add::<utils::AccountAuthorizationHelper>();
+
+    b.add::<DidSecretService>();
 
     if needs_indexing {
-        catalog_builder.add::<OAuthDeviceCodeServiceImpl>();
+        b.add::<OAuthDeviceCodeServiceImpl>();
 
         if production {
-            catalog_builder.add::<OAuthDeviceCodeGeneratorDefault>();
+            b.add::<OAuthDeviceCodeGeneratorDefault>();
         } else {
-            catalog_builder.add::<PredefinedOAuthDeviceCodeGenerator>();
+            b.add::<PredefinedOAuthDeviceCodeGenerator>();
         }
     }
 }

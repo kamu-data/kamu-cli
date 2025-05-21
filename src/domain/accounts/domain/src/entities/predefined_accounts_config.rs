@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use email_utils::Email;
+use kamu_auth_rebac::AccountPropertyName;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -52,7 +53,7 @@ impl PredefinedAccountsConfig {
                 account_type: AccountType::User,
                 display_name: None,
                 avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
-                is_admin: true,
+                properties: Some(vec![AccountPropertyName::IsAdmin]),
                 registered_at: Utc::now(),
                 provider: String::from(PROVIDER_PASSWORD),
                 email: DUMMY_EMAIL_ADDRESS.clone(),
@@ -95,8 +96,7 @@ pub struct AccountConfig {
     pub avatar_url: Option<String>,
     #[serde(default = "AccountConfig::default_registered_at")]
     pub registered_at: DateTime<Utc>,
-    #[serde(default)]
-    pub is_admin: bool,
+    pub properties: Option<Vec<AccountPropertyName>>,
     #[serde(default)]
     pub treat_datasets_as_public: bool,
 }
@@ -116,7 +116,7 @@ impl AccountConfig {
             provider: Self::default_provider(),
             avatar_url: None,
             registered_at: Self::default_registered_at(),
-            is_admin: false,
+            properties: None,
             treat_datasets_as_public: false,
         }
     }
@@ -128,6 +128,11 @@ impl AccountConfig {
 
     pub fn set_display_name(mut self, account_display_name: AccountDisplayName) -> Self {
         self.display_name = Some(account_display_name);
+        self
+    }
+
+    pub fn set_properties(mut self, properties: Vec<AccountPropertyName>) -> Self {
+        self.properties = Some(properties);
         self
     }
 

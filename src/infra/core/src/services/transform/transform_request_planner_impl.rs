@@ -15,7 +15,7 @@ use dill::*;
 use engine::TransformRequestExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
-use random_names::get_random_name;
+use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
 use super::build_preliminary_request_ext;

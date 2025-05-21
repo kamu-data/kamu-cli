@@ -15,7 +15,7 @@ use kamu_datasets_inmem::*;
 use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness};
+use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -325,7 +325,8 @@ impl DatasetEnvVarsHarness {
             b.build()
         };
 
-        let (_, catalog_authorized) = authentication_catalogs(&catalog_base).await;
+        let (_, catalog_authorized) =
+            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
 
         Self {
             base_gql_harness,

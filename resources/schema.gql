@@ -84,6 +84,11 @@ type AccountEdge {
 	node: Account!
 }
 
+type AccountFieldNonUnique implements CreateAccountResult {
+	field: String!
+	message: String!
+}
+
 input AccountFlowFilters {
 	byFlowType: DatasetFlowType
 	byStatus: FlowStatus
@@ -133,7 +138,15 @@ type AccountMut {
 	"""
 	Update account email
 	"""
-	updateEmail(newEmail: String!): UpdateEmailResult!
+	updateEmail(newEmail: Email!): UpdateEmailResult!
+	"""
+	Reset password for a selected account. Allowed only for admin users
+	"""
+	modifyPassword(password: AccountPassword!): ModifyPasswordResult!
+	"""
+	Delete a selected account. Allowed only for admin users
+	"""
+	delete: DeleteAccountResult!
 	"""
 	Access to the mutable flow configurations of this account
 	"""
@@ -141,6 +154,8 @@ type AccountMut {
 }
 
 scalar AccountName
+
+scalar AccountPassword
 
 enum AccountType {
 	USER
@@ -192,6 +207,10 @@ type AccountsMut {
 	Returns a mutable account by its name
 	"""
 	byName(accountName: AccountName!): AccountMut
+	"""
+	Create a new account
+	"""
+	createAccount(accountName: AccountName!, email: Email): CreateAccountResult!
 }
 
 """
@@ -655,6 +674,15 @@ type CreateAccessTokenResultDuplicate implements CreateTokenResult {
 
 type CreateAccessTokenResultSuccess implements CreateTokenResult {
 	token: CreatedAccessToken!
+	message: String!
+}
+
+interface CreateAccountResult {
+	message: String!
+}
+
+type CreateAccountSuccess implements CreateAccountResult {
+	account: Account!
 	message: String!
 }
 
@@ -1362,6 +1390,14 @@ The input/output is a string in RFC3339 format.
 """
 scalar DateTime
 
+interface DeleteAccountResult {
+	message: String!
+}
+
+type DeleteAccountSuccess implements DeleteAccountResult {
+	message: String!
+}
+
 interface DeleteDatasetEnvVarResult {
 	message: String!
 }
@@ -1427,6 +1463,8 @@ type DisablePushSource {
 	"""
 	sourceName: String!
 }
+
+scalar Email
 
 type Eip4361AuthNonceResponse {
 	value: String!
@@ -2364,6 +2402,14 @@ type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapsh
 }
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
+	message: String!
+}
+
+interface ModifyPasswordResult {
+	message: String!
+}
+
+type ModifyPasswordSuccess implements ModifyPasswordResult {
 	message: String!
 }
 
@@ -3417,10 +3463,6 @@ interface UnsetRoleResult {
 }
 
 type UnsetRoleResultSuccess implements UnsetRoleResult {
-	message: String!
-}
-
-type UpdateEmailInvalid implements UpdateEmailResult {
 	message: String!
 }
 

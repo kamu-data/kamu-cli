@@ -56,7 +56,7 @@ pub async fn test_update_device_token_with_token_params_part(catalog: &dill::Cat
     let harness = OAuthDeviceCodeRepositoryTestSuiteHarness::new(catalog);
 
     let not_saved_token_device_code = DeviceCode::new_uuid_v4();
-    let [user] = harness.create_accounts(["user"]).await;
+    let [user] = harness.save_accounts(["user"]).await;
     let device_token_params_part = DeviceTokenParamsPart {
         iat: 100,
         exp: 500,
@@ -126,7 +126,7 @@ pub async fn test_find_device_token_by_device_code(catalog: &dill::Catalog) {
             .as_ref()
     );
 
-    let [user] = harness.create_accounts(["user"]).await;
+    let [user] = harness.save_accounts(["user"]).await;
     let [device_token_with_access_token] = harness
         .issue_access_tokens_for_device_tokens([(device_token, user)])
         .await;
@@ -209,7 +209,7 @@ pub async fn test_cleanup_expired_device_codes(catalog: &dill::Catalog) {
         );
     }
 
-    let [user1, user2] = harness.create_accounts(["user1", "user2"]).await;
+    let [user1, user2] = harness.save_accounts(["user1", "user2"]).await;
     let [token_3_t3_with_access_token, token_4_t4_with_access_token] = harness
         .issue_access_tokens_for_device_tokens([(token_3_t3, user1), (token_4_t4, user2)])
         .await;
@@ -342,7 +342,7 @@ impl OAuthDeviceCodeRepositoryTestSuiteHarness {
         report
     }
 
-    pub async fn create_accounts<const N: usize>(&self, account_names: [&str; N]) -> [Account; N] {
+    pub async fn save_accounts<const N: usize>(&self, account_names: [&str; N]) -> [Account; N] {
         use std::mem::MaybeUninit;
 
         let mut accounts: [MaybeUninit<Account>; N] = MaybeUninit::uninit_array();
@@ -356,7 +356,7 @@ impl OAuthDeviceCodeRepositoryTestSuiteHarness {
             );
 
             assert_matches!(
-                self.account_repo.create_account(&new_account).await,
+                self.account_repo.save_account(&new_account).await,
                 Ok(_),
                 "Tag: {account_name}",
             );

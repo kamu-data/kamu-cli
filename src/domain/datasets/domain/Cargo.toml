@@ -28,12 +28,12 @@ testing = ["dep:mockall"]
 
 
 [dependencies]
+crypto-utils = { workspace = true }
 database-common = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
 
-aes-gcm = { version = "0.10.3" }
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
