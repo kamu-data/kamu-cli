@@ -58,30 +58,29 @@ pub async fn test_login_password_predefined_successful(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_login_enabled_methods(kamu_api_server_client: KamuApiServerClient) {
-    kamu_api_server_client
-        .graphql_api_call_assert(
-            indoc::indoc!(
-                r#"
-                query {
-                  auth {
-                    enabledLoginMethods
-                  }
-                }
-                "#,
-            ),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "auth": {
-                    "enabledLoginMethods": [
-                      "password"
-                    ]
-                  }
-                }
-                "#,
-            )),
-        )
+    let res = kamu_api_server_client
+        .graphql_api_call_ex(async_graphql::Request::new(indoc::indoc!(
+            r#"
+            query {
+              auth {
+                enabledLoginMethods
+              }
+            }
+            "#,
+        )))
         .await;
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
+            "auth": {
+                "enabledLoginMethods": [
+                    "password",
+                    "web3-wallet",
+                ]
+            }
+        }),
+        res.data,
+        "{res:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
