@@ -21,6 +21,11 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+testing = []
+
+
 [dependencies]
 common-macros = { workspace = true }
 database-common = { workspace = true }
