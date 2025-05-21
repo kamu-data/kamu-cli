@@ -1,0 +1,46 @@
+[package]
+name = "kamu-auth-web3-sqlite"
+description = "SQLite-specific implementation of the Web3 authentication domain"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+internal-error = { workspace = true }
+kamu-auth-web3 = { workspace = true, default-features = false, features = ["sqlx"] }
+
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.13", default-features = false }
+sqlx = { version = "0.8", default-features = false, features = [
+    "chrono",
+    "macros",
+    "migrate",
+    "sqlite",
+] }
+
+
+[dev-dependencies]
+database-common-macros = { workspace = true }
+kamu-auth-web3-repo-tests = { workspace = true }
+
+test-group = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

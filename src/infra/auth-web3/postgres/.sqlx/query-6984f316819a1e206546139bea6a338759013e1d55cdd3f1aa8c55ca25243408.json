@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO web3_auth_eip4361_nonces(wallet_address, nonce, expires_at)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (wallet_address) DO UPDATE\n                SET nonce      = excluded.nonce,\n                    expires_at = excluded.expires_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6984f316819a1e206546139bea6a338759013e1d55cdd3f1aa8c55ca25243408"
+}

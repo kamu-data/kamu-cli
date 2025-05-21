@@ -225,10 +225,13 @@ impl AuthenticationServiceImpl {
 #[async_trait::async_trait]
 impl AuthenticationService for AuthenticationServiceImpl {
     fn supported_login_methods(&self) -> Vec<&'static str> {
-        self.authentication_providers_by_method
+        let mut methods = self
+            .authentication_providers_by_method
             .keys()
             .copied()
-            .collect()
+            .collect::<Vec<_>>();
+        methods.sort();
+        methods
     }
 
     async fn login(
@@ -237,13 +240,13 @@ impl AuthenticationService for AuthenticationServiceImpl {
         login_credentials_json: String,
         device_code: Option<DeviceCode>,
     ) -> Result<LoginResponse, LoginError> {
-        // Resolve provider via specified login method
+        // Resolve provider via a specified login method
         let provider = self.resolve_authentication_provider(login_method)?;
 
         // Attempt to login via provider
         let provider_response = provider.login(login_credentials_json).await?;
 
-        // Try to resolve existing account via provider's identity key
+        // Try to resolve an existing account via provider's identity key
         let maybe_account_id = self
             .account_repository
             .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)

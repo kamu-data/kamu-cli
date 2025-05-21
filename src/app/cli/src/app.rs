@@ -315,7 +315,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             );
 
             if output_config.verbosity_level == 0 {
-                eprintln!("{}", err.pretty(false));
+                eprintln!("{}", err.pretty(output_config.show_error_stack_trace));
             }
         }
     }
@@ -530,6 +530,8 @@ pub fn configure_base_catalog(
     b.add::<messaging_outbox::OutboxAgent>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
 
+    kamu_auth_web3_services::register_dependencies(&mut b);
+
     explore::register_dependencies(&mut b);
 
     register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
@@ -581,6 +583,8 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     kamu_task_system_services::register_dependencies(&mut b);
 
     kamu_flow_system_services::register_dependencies(&mut b);
+
+    kamu_adapter_auth_web3::register_dependencies(&mut b);
 
     b.add::<UploadServiceLocal>();
 
@@ -1131,6 +1135,7 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
         format,
         trace_file,
         metrics_file,
+        show_error_stack_trace: args.show_error_stack_trace,
     }
 }
 

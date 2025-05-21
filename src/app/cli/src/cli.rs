@@ -28,7 +28,7 @@ use crate::{
 #[command(name = crate::BINARY_NAME)]
 #[command(version = crate::VERSION)]
 #[command(after_help = r#"
-To get help for individual commands use:
+To get help for individual commands, use:
     kamu <command> -h
     kamu <command> <sub-command> -h
 "#)]
@@ -53,15 +53,19 @@ pub struct Cli {
     #[arg(long)]
     pub trace: bool,
 
+    /// Show stack trace in case of a command execution error
+    #[arg(long)]
+    pub show_error_stack_trace: bool,
+
     /// Dump all metrics at the end of command execution
     #[arg(long)]
     pub metrics: bool,
 
-    /// Overrides system time clock with provided value
+    /// Overrides system time clock with the provided value
     #[arg(long, value_name = "T", hide = true)]
     pub system_time: Option<parsers::DateTimeRfc3339>,
 
-    /// Specifies account for multi-tenant Workspace
+    /// Specifies an account for multi-tenant Workspace
     #[arg(long, short = 'a', hide = true)]
     pub account: Option<String>,
 
