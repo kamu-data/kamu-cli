@@ -15,12 +15,9 @@ use thiserror::Error;
 
 use crate::{
     Account,
-    AccountNotFoundByNameError,
     AccountPageStream,
     CreateAccountError,
     GetAccountByIdError,
-    ModifyPasswordHashError,
-    Password,
     SearchAccountsByNamePatternFilters,
 };
 
@@ -69,14 +66,7 @@ pub trait AccountService: Sync + Send {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        password: Password,
     ) -> Result<Account, CreateAccountError>;
-
-    async fn modify_password(
-        &self,
-        account_name: &odf::AccountName,
-        password: Password,
-    ) -> Result<(), ModifyPasswordError>;
 
     async fn delete_account_by_name(
         &self,
@@ -116,26 +106,6 @@ impl<T: AccountService + ?Sized> AccountServiceExt for T {
 pub enum GetAccountMapError {
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ModifyPasswordError {
-    #[error(transparent)]
-    AccountNotFound(#[from] AccountNotFoundByNameError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<ModifyPasswordHashError> for ModifyPasswordError {
-    fn from(value: ModifyPasswordHashError) -> Self {
-        match value {
-            ModifyPasswordHashError::AccountNotFound(err) => Self::AccountNotFound(err),
-            ModifyPasswordHashError::Internal(err) => Self::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

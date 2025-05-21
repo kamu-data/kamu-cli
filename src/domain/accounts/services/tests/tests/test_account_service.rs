@@ -19,7 +19,6 @@ use kamu_accounts::{
     DidSecretEncryptionConfig,
     DidSecretKey,
     DidSecretKeyRepository,
-    Password,
     PredefinedAccountsConfig,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
@@ -126,11 +125,7 @@ async fn test_create_account() {
 
     let new_account_name = AccountName::new_unchecked("new_account");
     account_svc
-        .create_account(
-            &new_account_name,
-            Email::parse("new_email@com").unwrap(),
-            Password::try_new("foo_password").unwrap(),
-        )
+        .create_account(&new_account_name, Email::parse("new_email@com").unwrap())
         .await
         .unwrap();
 

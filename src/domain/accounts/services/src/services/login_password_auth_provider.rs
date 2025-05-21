@@ -10,7 +10,7 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
+use crypto_utils::{Argon2Hasher, PasswordHashingMode};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::{Deserialize, Serialize};
@@ -49,19 +49,10 @@ impl LoginPasswordAuthProvider {
         account: &Account,
         password: String,
     ) -> Result<(), InternalError> {
-        // Copy hashing mod
-        let hashing_mode = self.password_hashing_mode;
-
-        // Generate password hash: this is a compute-intensive operation,
-        // so spawn a blocking task
-        let password_hash = tokio::task::spawn_blocking(move || {
-            tracing::info_span!("Generate password hash").in_scope(|| {
-                let argon2_hasher = Argon2Hasher::new(hashing_mode);
-                argon2_hasher.hash(password.as_bytes())
-            })
-        })
-        .await
-        .int_err()?;
+        let password_hash =
+            Argon2Hasher::hash_async(password.as_bytes(), self.password_hashing_mode)
+                .await
+                .int_err()?;
 
         // Save hash in the repository
         self.password_hash_repository
@@ -125,28 +116,18 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             },
         };
 
-        // Copy hashing mode
-        let hashing_mode = self.password_hashing_mode;
-
-        // Verify password hash: this is a compute-intensive operation,
-        // so spawn a blocking task
-        tokio::task::spawn_blocking(move || {
-            tracing::info_span!("Verify password hash").in_scope(|| {
-                let argon2_hasher = Argon2Hasher::new(hashing_mode);
-                if !argon2_hasher.verify(
-                    password_login_credentials.password.as_bytes(),
-                    password_hash.as_str(),
-                ) {
-                    return Err(ProviderLoginError::RejectedCredentials(
-                        RejectedCredentialsError {},
-                    ));
-                }
-
-                Ok(())
-            })
-        })
+        if !Argon2Hasher::verify_async(
+            password_login_credentials.password.as_bytes(),
+            password_hash.as_str(),
+            self.password_hashing_mode,
+        )
         .await
-        .int_err()??;
+        .int_err()?
+        {
+            return Err(ProviderLoginError::RejectedCredentials(
+                RejectedCredentialsError {},
+            ));
+        };
 
         // Extract known account data
         let account = self
