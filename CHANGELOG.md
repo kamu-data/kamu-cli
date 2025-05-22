@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-# Unreleased
+## [0.238.0] - 2025-05-22
 ### Added
 - GQL: Added new scalars: `Email`, AccountPassword`.
 - GQL: Added `AccountMut::delete()`.
