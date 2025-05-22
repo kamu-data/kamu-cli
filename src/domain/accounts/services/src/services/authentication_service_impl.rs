@@ -230,7 +230,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
             .keys()
             .copied()
             .collect::<Vec<_>>();
-        methods.sort();
+        methods.sort_unstable();
         methods
     }
 

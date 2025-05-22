@@ -216,7 +216,7 @@ impl From<ConsumeNonceError> for SignatureVerificationError {
         use ConsumeNonceError as E;
 
         match e {
-            E::NotFound(_) => Self::NonceNotFound,
+            E::NotFound(e) => Self::NonceNotFound(e),
             E::Internal(_) => Self::Internal(e.int_err()),
         }
     }
