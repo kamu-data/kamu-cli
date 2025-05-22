@@ -45,6 +45,10 @@ type Account {
 	"""
 	accountType: AccountType!
 	"""
+	Account provider
+	"""
+	accountProvider: String!
+	"""
 	Email address
 	"""
 	email: String!

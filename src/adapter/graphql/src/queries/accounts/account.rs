@@ -174,6 +174,13 @@ impl Account {
         })
     }
 
+    /// Account provider
+    async fn account_provider(&self, ctx: &Context<'_>) -> Result<&String> {
+        let full_account_info = self.get_full_account_info(ctx).await?;
+
+        Ok(&full_account_info.provider)
+    }
+
     /// Email address
     async fn email(&self, ctx: &Context<'_>) -> Result<&str> {
         check_logged_account_id_match(ctx, &self.account_id)?;
