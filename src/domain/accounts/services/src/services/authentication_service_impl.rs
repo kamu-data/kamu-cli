@@ -246,7 +246,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         // Attempt to login via provider
         let provider_response = provider.login(login_credentials_json).await?;
 
-        // Try to resolve an existing account via provider's identity key
+        // Try to resolve an existing account via the provider's identity key
         let maybe_account_id = self
             .account_repository
             .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)
@@ -258,7 +258,8 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
             // Account does not exist and needs to be created
             None => {
-                // Generate identity: temporarily we do this via provider, but revise in future
+                // Generate identity: temporarily we do this via provider, but revise in the
+                // future
                 let account_id = provider.generate_id(&provider_response.account_name);
 
                 // Create a new account
@@ -274,7 +275,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     provider_identity_key: provider_response.provider_identity_key,
                 };
 
-                // Register account in the repository
+                // Register an account in the repository
                 self.account_repository
                     .save_account(&new_account)
                     .await
