@@ -7,25 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
-
-use email_utils::Email;
-use kamu_accounts::{
-    Account,
-    AccountRepository,
-    AccountService,
-    CreateAccountError,
-    CreateAccountUseCase,
-    ModifyPasswordError,
-    Password,
-    UpdateAccountError,
-};
+use kamu_accounts::*;
 
 use super::AccountFlowsMut;
 use crate::prelude::*;
-use crate::queries::Account as AccountView;
-use crate::utils::ensure_account_can_provision_accounts;
-use crate::AdminGuard;
+use crate::{utils, AdminGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,17 +33,13 @@ impl AccountMut {
     pub async fn update_email(
         &self,
         ctx: &Context<'_>,
-        new_email: String,
+        new_email: Email<'_>,
     ) -> Result<UpdateEmailResult> {
-        let Ok(new_email) = Email::parse(&new_email) else {
-            return Ok(UpdateEmailResult::InvalidEmail(
-                UpdateEmailInvalid::default(),
-            ));
-        };
+        utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
 
         let account_repo = from_catalog_n!(ctx, dyn AccountRepository);
         match account_repo
-            .update_account_email(&self.account.id, new_email.clone())
+            .update_account_email(&self.account.id, new_email.clone().into())
             .await
         {
             Ok(_) => Ok(UpdateEmailResult::Success(UpdateEmailSuccess {
@@ -66,94 +48,70 @@ impl AccountMut {
             Err(UpdateAccountError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
                 UpdateEmailNonUnique::default(),
             )),
-            Err(UpdateAccountError::NotFound(e)) => Err(e.int_err().into()),
-            Err(UpdateAccountError::Internal(e)) => Err(e.into()),
+            Err(e @ (UpdateAccountError::NotFound(_) | UpdateAccountError::Internal(_))) => {
+                Err(e.int_err().into())
+            }
         }
     }
 
-    /// Create a new account
-    async fn create_account(
-        &self,
-        ctx: &Context<'_>,
-        account_name: String,
-        email: Option<String>,
-    ) -> Result<CreateAccountResult> {
-        ensure_account_can_provision_accounts(ctx, &self.account.id).await?;
-        let Ok(account_name) = odf::AccountName::from_str(&account_name) else {
-            return Ok(CreateAccountResult::InvalidAccountName(
-                AccountNameInvalid::default(),
-            ));
-        };
-        let Ok(email) = email.map(|e| Email::parse(&e)).transpose() else {
-            return Ok(CreateAccountResult::InvalidEmail(
-                CreateAccountEmailInvalid::default(),
-            ));
-        };
-
-        let create_account_use_case = from_catalog_n!(ctx, dyn CreateAccountUseCase);
-        match create_account_use_case
-            .execute(&self.account, &account_name, email)
-            .await
-        {
-            Ok(created_account) => Ok(CreateAccountResult::Success(CreateAccountSuccess {
-                account: AccountView::from_account(created_account),
-            })),
-            Err(CreateAccountError::Duplicate(err)) => Ok(
-                CreateAccountResult::NonUniqueAccountField(AccountFieldNonUnique {
-                    field: err.account_field.to_string(),
-                }),
-            ),
-            Err(CreateAccountError::Internal(e)) => Err(e.into()),
-        }
-    }
-
-    /// Reset password for selected account. Allowed only for admin users
-    #[graphql(guard = "AdminGuard::new()")]
+    /// Reset password for a selected account. Allowed only for admin users
+    #[tracing::instrument(level = "info", name = AccountMut_modify_password, skip_all)]
+    #[graphql(guard = "AdminGuard")]
     async fn modify_password(
         &self,
         ctx: &Context<'_>,
-        account_name: AccountName<'_>,
-        password: String,
+        password: AccountPassword<'_>,
     ) -> Result<ModifyPasswordResult> {
-        let account_service = from_catalog_n!(ctx, dyn AccountService);
-        let password = match Password::try_new(password.as_str()) {
-            Ok(pass) => pass,
-            Err(err) => {
-                return Ok(ModifyPasswordResult::InvalidPassword(
-                    ModifyPasswordInvalidPassword {
-                        reason: err.to_string(),
-                    },
-                ))
-            }
-        };
+        let modify_account_password_use_case =
+            from_catalog_n!(ctx, dyn ModifyAccountPasswordUseCase);
 
-        match account_service
-            .modify_password(&account_name, password)
+        use ModifyAccountPasswordError as E;
+
+        match modify_account_password_use_case
+            .execute(&self.account, password.into())
             .await
         {
             Ok(_) => Ok(ModifyPasswordResult::Success(
                 ModifyPasswordSuccess::default(),
             )),
-            Err(ModifyPasswordError::AccountNotFound(_)) => Ok(
-                ModifyPasswordResult::AccountNotFound(ModifyPasswordAccountNotFound::default()),
-            ),
-            Err(ModifyPasswordError::Internal(e)) => Err(e.into()),
+            Err(e @ (E::Internal(_) | E::AccountNotFound(_))) => Err(e.int_err().into()),
+        }
+    }
+
+    /// Delete a selected account. Allowed only for admin users
+    #[tracing::instrument(level = "info", name = AccountMut_delete, skip_all)]
+    async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
+        // NOTE: DeleteAccountUseCase handles access verification
+
+        let delete_account_use_case = from_catalog_n!(ctx, dyn DeleteAccountUseCase);
+
+        use DeleteAccountByNameError as E;
+
+        match delete_account_use_case.execute(&self.account).await {
+            Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),
+            Err(E::NotFound(e)) => unreachable!("Account should exist: {e}"),
+            Err(E::Access(access_error)) => Err(access_error.into()),
+            Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
     /// Access to the mutable flow configurations of this account
-    async fn flows(&self) -> AccountFlowsMut {
-        AccountFlowsMut::new(self.account.clone())
+    #[expect(clippy::unused_async)]
+    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlowsMut> {
+        utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
+
+        Ok(AccountFlowsMut::new(&self.account))
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// UpdateEmailResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum UpdateEmailResult {
     Success(UpdateEmailSuccess),
-    InvalidEmail(UpdateEmailInvalid),
     NonUniqueEmail(UpdateEmailNonUnique),
 }
 
@@ -175,21 +133,6 @@ impl UpdateEmailSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
-pub struct UpdateEmailInvalid {
-    message: String,
-}
-
-impl Default for UpdateEmailInvalid {
-    fn default() -> Self {
-        Self {
-            message: "Invalid email".to_string(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug)]
 pub struct UpdateEmailNonUnique {
     message: String,
 }
@@ -203,84 +146,13 @@ impl Default for UpdateEmailNonUnique {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-pub enum CreateAccountResult {
-    Success(CreateAccountSuccess),
-    InvalidAccountName(AccountNameInvalid),
-    InvalidEmail(CreateAccountEmailInvalid),
-    NonUniqueAccountField(AccountFieldNonUnique),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub struct CreateAccountSuccess {
-    pub account: AccountView,
-}
-
-#[ComplexObject]
-impl CreateAccountSuccess {
-    pub async fn message(&self) -> String {
-        "Account created".to_string()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug)]
-pub struct AccountNameInvalid {
-    message: String,
-}
-
-impl Default for AccountNameInvalid {
-    fn default() -> Self {
-        Self {
-            message: "Invalid account name".to_string(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, SimpleObject)]
-#[graphql(complex)]
-pub struct AccountFieldNonUnique {
-    field: String,
-}
-
-#[ComplexObject]
-impl AccountFieldNonUnique {
-    pub async fn message(&self) -> String {
-        format!("Non-unique account field '{}'", self.field)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug)]
-pub struct CreateAccountEmailInvalid {
-    message: String,
-}
-
-impl Default for CreateAccountEmailInvalid {
-    fn default() -> Self {
-        Self {
-            message: "Invalid email".to_string(),
-        }
-    }
-}
-
+// ModifyPasswordResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(name = "message", ty = "&String"))]
 pub enum ModifyPasswordResult {
     Success(ModifyPasswordSuccess),
-    AccountNotFound(ModifyPasswordAccountNotFound),
-    InvalidPassword(ModifyPasswordInvalidPassword),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -297,33 +169,29 @@ impl Default for ModifyPasswordSuccess {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DeleteAccountResult
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum DeleteAccountResult {
+    Success(DeleteAccountSuccess),
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct ModifyPasswordAccountNotFound {
-    pub message: String,
+pub struct DeleteAccountSuccess {
+    message: String,
 }
 
-impl Default for ModifyPasswordAccountNotFound {
+impl Default for DeleteAccountSuccess {
     fn default() -> Self {
         Self {
-            message: "Account not found".to_string(),
+            message: "Account deleted".to_string(),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, SimpleObject)]
-#[graphql(complex)]
-pub struct ModifyPasswordInvalidPassword {
-    pub reason: String,
-}
-
-#[ComplexObject]
-impl ModifyPasswordInvalidPassword {
-    pub async fn message(&self) -> String {
-        self.reason.clone()
     }
 }
 

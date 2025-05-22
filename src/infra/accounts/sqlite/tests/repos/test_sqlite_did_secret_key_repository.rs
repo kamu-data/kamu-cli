@@ -7,11 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
-use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_sqlite::{SqliteAccountRepository, SqliteDidSecretKeyRepository};
-use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,20 +21,18 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct SqliteDidSecretKeyRepositoryHarness {
-    catalog: Catalog,
+    catalog: dill::Catalog,
 }
 
 impl SqliteDidSecretKeyRepositoryHarness {
-    pub fn new(sqlite_pool: SqlitePool) -> Self {
-        let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add_value(sqlite_pool);
-        catalog_builder.add::<SqliteTransactionManager>();
-        catalog_builder.add::<SqliteDidSecretKeyRepository>();
-        catalog_builder.add::<SqliteAccountRepository>();
+    pub fn new(sqlite_pool: sqlx::SqlitePool) -> Self {
+        let mut b = dill::CatalogBuilder::new();
 
-        Self {
-            catalog: catalog_builder.build(),
-        }
+        b.add_value(sqlite_pool);
+        b.add::<database_common::SqliteTransactionManager>();
+        b.add::<kamu_accounts_sqlite::SqliteDidSecretKeyRepository>();
+
+        Self { catalog: b.build() }
     }
 }
 

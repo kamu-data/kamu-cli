@@ -15,10 +15,6 @@ use crate::AccountDisplayName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE: &str = "dev.kamu.domain.accounts.AccountsService";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 const ACCOUNT_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +24,9 @@ const ACCOUNT_LIFECYCLE_OUTBOX_VERSION: u32 = 1;
 pub enum AccountLifecycleMessage {
     /// Message indicating that an account has been created
     Created(AccountLifecycleMessageCreated),
+
+    /// Message indicating that an account has been deleted
+    Deleted(AccountLifecycleMessageDeleted),
 }
 
 impl AccountLifecycleMessage {
@@ -37,6 +36,18 @@ impl AccountLifecycleMessage {
         display_name: AccountDisplayName,
     ) -> Self {
         Self::Created(AccountLifecycleMessageCreated {
+            account_id,
+            email,
+            display_name,
+        })
+    }
+
+    pub fn deleted(
+        account_id: odf::AccountID,
+        email: Email,
+        display_name: AccountDisplayName,
+    ) -> Self {
+        Self::Deleted(AccountLifecycleMessageDeleted {
             account_id,
             email,
             display_name,
@@ -57,6 +68,20 @@ impl Message for AccountLifecycleMessage {
 /// Contains details about a newly created account
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountLifecycleMessageCreated {
+    /// The unique identifier of the account
+    pub account_id: odf::AccountID,
+
+    /// The email address associated with the account
+    pub email: Email,
+
+    /// The display name of the account
+    pub display_name: AccountDisplayName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountLifecycleMessageDeleted {
     /// The unique identifier of the account
     pub account_id: odf::AccountID,
 

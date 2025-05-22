@@ -94,7 +94,7 @@ impl PredefinedAccountsRegistrator {
 
         if account_config.provider == PROVIDER_PASSWORD {
             self.login_password_auth_provider
-                .save_password(&account.account_name, account_config.get_password())
+                .save_password(&account, account_config.get_password())
                 .await?;
         }
 

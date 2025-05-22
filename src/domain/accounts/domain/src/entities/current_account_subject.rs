@@ -50,10 +50,10 @@ impl CurrentAccountSubject {
     }
 
     #[cfg(any(feature = "testing", test))]
-    pub fn new_test_with(account_name: &odf::AccountName) -> Self {
+    pub fn new_test_with(account_name: &impl AsRef<str>) -> Self {
         Self::logged(
             odf::metadata::testing::account_id(account_name),
-            account_name.clone(),
+            odf::AccountName::new_unchecked(account_name),
         )
     }
 

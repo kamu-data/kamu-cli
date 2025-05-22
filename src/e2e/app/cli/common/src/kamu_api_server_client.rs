@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::{Method, StatusCode, Url};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
@@ -143,12 +143,18 @@ impl KamuApiServerClient {
         };
     }
 
+    /// NOTE: Please use [`Self::graphql_api_call_ex()`] instead of this method
     pub async fn graphql_api_call(
         &self,
         query: &str,
         variables: Option<serde_json::Value>,
     ) -> GraphQLResponse {
-        let response = self.graphql_api_call_impl(query, variables).await;
+        let response = self
+            .graphql_api_call_impl(&json!({
+               "query": query,
+               "variables": variables,
+            }))
+            .await;
 
         let response_body = response.json::<async_graphql::Response>().await.unwrap();
 
@@ -159,6 +165,17 @@ impl KamuApiServerClient {
         }
     }
 
+    pub async fn graphql_api_call_ex(
+        &self,
+        request: async_graphql::Request,
+    ) -> async_graphql::Response {
+        let response = self.graphql_api_call_impl(&request).await;
+
+        response.json::<async_graphql::Response>().await.unwrap()
+    }
+
+    /// NOTE: Please use [`Self::graphql_api_call_ex()`] instead of this method
+    /// and explicit [`pretty_assertions::assert_eq!()`]
     pub async fn graphql_api_call_assert(
         &self,
         query: &str,
@@ -191,16 +208,11 @@ impl KamuApiServerClient {
         };
     }
 
-    async fn graphql_api_call_impl(
+    async fn graphql_api_call_impl<T: Serialize + ?Sized>(
         &self,
-        query: &str,
-        variables: Option<serde_json::Value>,
+        request_data: &T,
     ) -> reqwest::Response {
         let endpoint = self.server_base_url.join("graphql").unwrap();
-        let request_data = json!({
-           "query": query,
-           "variables": variables,
-        });
 
         let mut request_builder = self.http_client.post(endpoint).json(&request_data);
 
@@ -216,7 +228,11 @@ impl KamuApiServerClient {
         query: &str,
         expected_response: Result<&str, &str>,
     ) {
-        let response = self.graphql_api_call_impl(query, None).await;
+        let response = self
+            .graphql_api_call_impl(&json!({
+               "query": query,
+            }))
+            .await;
 
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 

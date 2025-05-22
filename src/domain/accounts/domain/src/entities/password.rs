@@ -12,16 +12,22 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(
-    sanitize(trim),
-    validate(with = validate_password, error = PasswordValidationError),
-    derive(Debug, PartialEq, Clone, Deref)
-)]
-pub struct Password(String);
+pub const MIN_PASSWORD_LENGTH: usize = 8;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MIN_PASSWORD_LENGTH: usize = 8;
+#[nutype(
+    sanitize(trim),
+    validate(with = validate_password, error = PasswordValidationError),
+    derive(Debug, PartialEq, Eq, Clone, Deref)
+)]
+pub struct Password(String);
+
+impl std::fmt::Display for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "********")
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +51,7 @@ impl std::fmt::Display for PasswordValidationError {
 }
 
 fn validate_password(password: &str) -> Result<(), PasswordValidationError> {
-    if password.chars().count() < MIN_PASSWORD_LENGTH {
+    if password.len() < MIN_PASSWORD_LENGTH {
         return Err(PasswordValidationError::TooShort);
     }
     if !password.is_ascii() {
@@ -53,3 +59,5 @@ fn validate_password(password: &str) -> Result<(), PasswordValidationError> {
     }
     Ok(())
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

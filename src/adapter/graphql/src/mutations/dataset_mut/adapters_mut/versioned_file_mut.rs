@@ -16,12 +16,12 @@ use crate::queries::{FileVersion, VersionedFileEntry};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct VersionedFileMut {
-    dataset: domain::ResolvedDataset,
+pub struct VersionedFileMut<'a> {
+    dataset: &'a domain::ResolvedDataset,
 }
 
-impl VersionedFileMut {
-    pub fn new(dataset: domain::ResolvedDataset) -> Self {
+impl<'a> VersionedFileMut<'a> {
+    pub fn new(dataset: &'a domain::ResolvedDataset) -> Self {
         Self { dataset }
     }
 
@@ -99,7 +99,7 @@ impl VersionedFileMut {
 
         let ingest_result = match push_ingest_use_case
             .execute(
-                &self.dataset,
+                self.dataset,
                 kamu_core::DataSource::Buffer(entry.to_bytes()),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -150,11 +150,11 @@ impl VersionedFileMut {
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl VersionedFileMut {
-    /// Uploads new version of content in-band. Can be used for very small files
-    /// only.
+impl VersionedFileMut<'_> {
+    /// Uploads a new version of content in-band. Can be used for very small
+    /// files only.
     #[tracing::instrument(level = "info", name = VersionedFileMut_upload_new_version, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
+    #[graphql(guard = "LoggedInGuard")]
     pub async fn upload_new_version(
         &self,
         ctx: &Context<'_>,
@@ -163,12 +163,12 @@ impl VersionedFileMut {
             String,
         >,
         #[graphql(desc = "Json object containing values of extra columns")] extra_data: Option<
-            serde_json::Value,
+            ExtraData,
         >,
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        // Get latest version and head
+        // Get the latest version and head
         let (latest_version, _) = self.get_latest_version(ctx).await?;
         let new_version = latest_version + 1;
         let content_length = content.len();
@@ -198,7 +198,7 @@ impl VersionedFileMut {
     /// Returns a pre-signed URL and upload token for direct uploads of large
     /// files
     #[tracing::instrument(level = "info", name = VersionedFileMut_start_upload_new_version, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
+    #[graphql(guard = "LoggedInGuard")]
     pub async fn start_upload_new_version(
         &self,
         ctx: &Context<'_>,
@@ -243,16 +243,16 @@ impl VersionedFileMut {
         ))
     }
 
-    /// Finalizes the content upload by incoporating the content into the
+    /// Finalizes the content upload by incorporating the content into the
     /// dataset as a new version
     #[tracing::instrument(level = "info", name = VersionedFileMut_finish_upload_new_version, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
+    #[graphql(guard = "LoggedInGuard")]
     pub async fn finish_upload_new_version(
         &self,
         ctx: &Context<'_>,
         #[graphql(desc = "Token received when starting the upload")] upload_token: String,
         #[graphql(desc = "Json object containing values of extra columns")] extra_data: Option<
-            serde_json::Value,
+            ExtraData,
         >,
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
@@ -270,7 +270,7 @@ impl VersionedFileMut {
                 })?;
         let content_length = upload_token.0.content_length;
 
-        // Get latest version and head
+        // Get the latest version and head
         let (latest_version, head) = self.get_latest_version(ctx).await?;
         let new_version = latest_version + 1;
 
@@ -308,9 +308,10 @@ impl VersionedFileMut {
         let content_hash =
             odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest).unwrap();
 
-        // Get the stream again and copy data from uploads to storage using computet
-        // hash TODO: PERF: Should we create file in the final storage directly
-        // to avoid copying?
+        // Get the stream again and copy data from uploads to storage using computed
+        // hash
+        // TODO: PERF: Should we create file in the final storage directly to avoid
+        // copying?
         let stream = upload_svc
             .upload_token_into_stream(&upload_token.0)
             .await
@@ -329,7 +330,7 @@ impl VersionedFileMut {
             .await
             .int_err()?;
 
-        // Form and write new record
+        // Form and write a new record
         let entry = VersionedFileEntry::new(
             self.dataset.clone(),
             new_version,
@@ -345,16 +346,15 @@ impl VersionedFileMut {
     /// Creating a new version with that has updated values of extra columns but
     /// with the file content unchanged
     #[tracing::instrument(level = "info", name = VersionedFileMut_update_extra_data, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
+    #[graphql(guard = "LoggedInGuard")]
     pub async fn update_extra_data(
         &self,
         ctx: &Context<'_>,
-        #[graphql(desc = "Json object containing values of extra columns")]
-        extra_data: serde_json::Value,
+        #[graphql(desc = "Json object containing values of extra columns")] extra_data: ExtraData,
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        // Get latest record and head
+        // Get the latest record and head
         let entry = self.get_latest_entry(ctx).await?;
         let Some(mut entry) = entry else {
             return Ok(UpdateVersionResult::InvalidExtraData(
@@ -364,7 +364,7 @@ impl VersionedFileMut {
             ));
         };
 
-        // Form and write new record
+        // Form and write a new record
         entry.version += 1;
         entry.extra_data = extra_data;
 

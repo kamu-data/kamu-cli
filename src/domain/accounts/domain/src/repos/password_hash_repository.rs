@@ -18,6 +18,7 @@ use super::AccountNotFoundByNameError;
 pub trait PasswordHashRepository: Send + Sync {
     async fn save_password_hash(
         &self,
+        account_id: &odf::AccountID,
         account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError>;

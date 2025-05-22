@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                INSERT INTO did_secret_keys (\n                    entity_id, entity_type, secret_key, secret_nonce, creator_id\n                )\n                VALUES ($1, $2, $3, $4, $5)\n            ",
+  "query": "\n            INSERT INTO did_secret_keys (entity_id, entity_type, secret_key, secret_nonce)\n            VALUES ($1, $2, $3, $4)\n            ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -18,11 +18,10 @@
           }
         },
         "Bytea",
-        "Bytea",
-        "Varchar"
+        "Bytea"
       ]
     },
     "nullable": []
   },
-  "hash": "e498855decdfa2a26f38f59c6e1b8c396874fa44cc20f6dab3d9b9ddda9c5681"
+  "hash": "9db0fb36c8dfcae3626757324d60b45b76ddc02fdff6f17a90fe31df9a712724"
 }

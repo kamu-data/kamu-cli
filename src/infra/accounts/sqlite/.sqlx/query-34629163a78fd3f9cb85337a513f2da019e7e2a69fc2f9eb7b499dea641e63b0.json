@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT secret_key, secret_nonce\n            FROM did_secret_keys\n            WHERE entity_type = $1\n              AND entity_id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "secret_key",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "secret_nonce",
+        "ordinal": 1,
+        "type_info": "Blob"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "34629163a78fd3f9cb85337a513f2da019e7e2a69fc2f9eb7b499dea641e63b0"
+}

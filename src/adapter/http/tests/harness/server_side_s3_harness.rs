@@ -145,6 +145,7 @@ impl ServerSideS3Harness {
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<CreateAccountUseCaseImpl>()
+                .add::<ModifyAccountPasswordUseCaseImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add_value(DidSecretEncryptionConfig::sample())

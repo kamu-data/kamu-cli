@@ -99,7 +99,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         )
         .await?;
 
-        // Resolve target account and full alias of the dataset
+        // Resolve a target account and full alias of the dataset
         let (canonical_alias, target_account_id) = self
             .create_helper
             .resolve_alias_target(&snapshot.name, subject)
@@ -131,14 +131,13 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             self.did_secret_key_repo
                 .save_did_secret_key(
                     &DidEntity::new_dataset(dataset_did.0.to_string()),
-                    &subject.account_id,
                     &dataset_did_secret_key,
                 )
                 .await
                 .int_err()?;
         }
 
-        // Make storage level dataset (no HEAD yet)
+        // Make a storage level dataset (no HEAD yet)
         let store_result = self
             .create_helper
             .store_dataset(canonical_alias.as_ref(), seed_block)
