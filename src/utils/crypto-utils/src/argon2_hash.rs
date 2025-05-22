@@ -9,6 +9,7 @@
 
 use aes_gcm::aead::OsRng;
 use argon2::{Algorithm, Argon2, Params, PasswordHash, Version};
+use internal_error::{InternalError, ResultIntoInternal};
 use password_hash::{PasswordHasher, PasswordVerifier, SaltString};
 
 use crate::Hasher;
@@ -39,21 +40,67 @@ impl Argon2Hasher<'_> {
 
         Self { argon2 }
     }
+
+    fn hash_impl(&self, value: &[u8]) -> String {
+        let salt = SaltString::generate(&mut OsRng);
+
+        self.argon2.hash_password(value, &salt).unwrap().to_string()
+    }
+
+    fn verify_impl(&self, value: &[u8], hashed_value: &str) -> bool {
+        let password_hash = PasswordHash::new(hashed_value).unwrap();
+
+        self.argon2.verify_password(value, &password_hash).is_ok()
+    }
+
+    pub async fn hash_async(
+        value: &[u8],
+        password_hashing_mode: PasswordHashingMode,
+    ) -> Result<String, InternalError> {
+        let value = value.to_owned();
+
+        // Generate hash: this is a compute-intensive operation,
+        // so spawn a blocking task
+        tokio::task::spawn_blocking(move || {
+            tracing::info_span!("Generating hash").in_scope(|| {
+                let argon2 = Self::new(password_hashing_mode);
+                argon2.hash_impl(&value)
+            })
+        })
+        .await
+        .int_err()
+    }
+
+    pub async fn verify_async(
+        value: &[u8],
+        hashed_value: &str,
+        password_hashing_mode: PasswordHashingMode,
+    ) -> Result<bool, InternalError> {
+        let value = value.to_owned();
+        let hashed_value = hashed_value.to_owned();
+
+        // Verify hash: this is a compute-intensive operation,
+        // so spawn a blocking task
+        tokio::task::spawn_blocking(move || {
+            tracing::info_span!("Verifying hash").in_scope(|| {
+                let argon2 = Self::new(password_hashing_mode);
+                argon2.verify_impl(&value, &hashed_value)
+            })
+        })
+        .await
+        .int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Hasher for Argon2Hasher<'_> {
     fn hash(&self, value: &[u8]) -> String {
-        let salt = SaltString::generate(&mut OsRng);
-
-        self.argon2.hash_password(value, &salt).unwrap().to_string()
+        self.hash_impl(value)
     }
 
     fn verify(&self, value: &[u8], hashed_value: &str) -> bool {
-        let password_hash = PasswordHash::new(hashed_value).unwrap();
-
-        self.argon2.verify_password(value, &password_hash).is_ok()
+        self.verify_impl(value, hashed_value)
     }
 }
 

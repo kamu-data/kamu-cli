@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod auth_utils;
-pub use auth_utils::*;
-
 mod base_gql_dataset_harness;
+
+pub use auth_utils::*;
 pub use base_gql_dataset_harness::*;

@@ -10,9 +10,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crypto_utils::{Argon2Hasher, Hasher, PasswordHashingMode};
 use database_common::PaginationOpts;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
@@ -24,8 +23,6 @@ pub struct AccountServiceImpl {
     account_repo: Arc<dyn AccountRepository>,
     time_source: Arc<dyn SystemTimeSource>,
     did_secret_encryption_key: Option<SecretString>,
-    password_hash_repository: Arc<dyn PasswordHashRepository>,
-    password_hashing_mode: PasswordHashingMode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,8 +36,6 @@ impl AccountServiceImpl {
         account_repo: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
-        password_hash_repository: Arc<dyn PasswordHashRepository>,
-        password_hashing_mode: Option<Arc<PasswordHashingMode>>,
     ) -> Self {
         Self {
             did_secret_key_repo,
@@ -50,9 +45,6 @@ impl AccountServiceImpl {
                 .encryption_key
                 .as_ref()
                 .map(|encryption_key| SecretString::from(encryption_key.clone())),
-            password_hash_repository,
-            password_hashing_mode: password_hashing_mode
-                .map_or(PasswordHashingMode::Default, |mode| *mode),
         }
     }
 }
@@ -150,12 +142,10 @@ impl AccountService for AccountServiceImpl {
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
-        password: Password,
-        owner_account_id: &odf::AccountID,
     ) -> Result<Account, CreateAccountError> {
-        let account_did = odf::AccountID::new_generated_ed25519();
+        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
         let account = Account {
-            id: account_did.1,
+            id: account_id,
             account_name: account_name.clone(),
             email,
             display_name: account_name.to_string(),
@@ -169,56 +159,35 @@ impl AccountService for AccountServiceImpl {
         self.account_repo.save_account(&account).await?;
 
         if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
+            let account_id = account.id.as_did_str().to_stack_string();
             let did_secret_key = DidSecretKey::try_new(
-                &account_did.0.into(),
+                &account_key.into(),
                 did_secret_encryption_key.expose_secret(),
             )
             .int_err()?;
 
             self.did_secret_key_repo
                 .save_did_secret_key(
-                    &DidEntity::new_account(account.id.to_string()),
-                    owner_account_id,
+                    &DidEntity::new_account(account_id.as_str()),
                     &did_secret_key,
                 )
                 .await
                 .int_err()?;
         }
 
-        let hashing_mode = self.password_hashing_mode;
-        let password_hash = tokio::task::spawn_blocking(move || {
-            let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(password.as_bytes())
-        })
-        .await
-        .int_err()?;
-
-        self.password_hash_repository
-            .save_password_hash(account_name, password_hash)
-            .await
-            .int_err()?;
-
         Ok(account)
     }
 
-    async fn modify_password(
+    async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-        password: Password,
-    ) -> Result<(), ModifyPasswordError> {
-        let hashing_mode = self.password_hashing_mode;
-        let password_hash = tokio::task::spawn_blocking(move || {
-            let argon2_hasher = Argon2Hasher::new(hashing_mode);
-            argon2_hasher.hash(password.as_bytes())
-        })
-        .await
-        .int_err()?;
+    ) -> Result<(), InternalError> {
+        use DeleteAccountError as E;
 
-        self.password_hash_repository
-            .modify_password_hash(account_name, password_hash)
-            .await?;
-
-        Ok(())
+        match self.account_repo.delete_account_by_name(account_name).await {
+            Ok(_) | Err(E::NotFound(_)) => Ok(()),
+            Err(e @ E::Internal(_)) => Err(e.int_err()),
+        }
     }
 }
 

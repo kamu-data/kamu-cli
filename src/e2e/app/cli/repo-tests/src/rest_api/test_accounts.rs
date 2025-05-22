@@ -9,7 +9,9 @@
 
 use std::assert_matches::assert_matches;
 
+use indoc::indoc;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
+use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_cli_e2e_common::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,79 +52,78 @@ pub async fn test_accounts_me_unauthorized(kamu_api_server_client: KamuApiServer
 pub async fn test_create_account_and_modify_password(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
-    // First try to create account with user without permissions
+    // First, try to create an account with a user without permissions
     kamu_api_server_client.auth().login_as_e2e_user().await;
-    let owner_account_info = kamu_api_server_client.account().me().await.unwrap();
 
-    let result = kamu_api_server_client
-        .graphql_api_call(&create_account_query(&owner_account_info.id, "foo"), None)
+    let res = kamu_api_server_client
+        .graphql_api_call_ex(create_account_request("foo"))
         .await;
-
-    assert!(result.is_err());
-    assert_eq!(
-        result.err().unwrap().first().unwrap().message,
-        "Account does not have permission to provision accounts"
+    pretty_assertions::assert_eq!(
+        ["Account is not authorized to provision accounts"],
+        *res.error_messages(),
+        "{res:?}"
     );
 
     kamu_api_server_client.auth().logout();
     kamu_api_server_client.auth().login_as_kamu().await;
-    let owner_account_info = kamu_api_server_client.account().me().await.unwrap();
 
-    kamu_api_server_client
-        .graphql_api_call_assert(
-            &create_account_query(&owner_account_info.id, "foo"),
-            Ok(indoc::indoc!(
+    let res = kamu_api_server_client
+        .graphql_api_call_ex(create_account_request("foo"))
+        .await;
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
+            "accounts": {
+                "createAccount": {
+                    "account": {
+                        "accountName": "foo",
+                        "accountType": "USER",
+                        "displayName": "foo"
+                    },
+                    "message": "Account created"
+
+                }
+            }
+        }),
+        res.data,
+        "{res:?}"
+    );
+
+    let res = kamu_api_server_client
+        .graphql_api_call_ex(
+            async_graphql::Request::new(indoc!(
                 r#"
-                {
-                  "accounts": {
-                    "byId": {
-                      "createAccount": {
-                        "account": {
-                          "accountName": "foo",
-                          "accountType": "USER",
-                          "displayName": "foo"
-                        },
-                        "message": "Account created"
+                mutation ($accountName: AccountName, $newPassword: AccountPassword!) {
+                  accounts {
+                    byName(accountName: $accountName) {
+                      modifyPassword(password: $newPassword) {
+                        message
                       }
                     }
                   }
                 }
-            "#,
+                "#,
+            ))
+            .variables(async_graphql::Variables::from_value(
+                async_graphql::value!({
+                    "accountName": "foo",
+                    "newPassword": "foo_password",
+                }),
             )),
         )
         .await;
-
-    kamu_api_server_client
-        .graphql_api_call_assert(
-            &indoc::indoc!(
-                r#"
-                mutation {
-                    accounts {
-                        byId (accountId: $accountId) {
-                            modifyPassword(accountName: "foo", password: "foo_password") {
-                                message
-                            }
-                        }
-                    }
-                }
-                "#
-            )
-            .replace("$accountId", &format!("\"{}\"", owner_account_info.id)),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "accounts": {
-                    "byId": {
-                      "modifyPassword": {
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
+            "accounts": {
+                "byName": {
+                    "modifyPassword": {
                         "message": "Password modified"
-                      }
                     }
-                  }
                 }
-            "#,
-            )),
-        )
-        .await;
+            }
+        }),
+        res.data,
+        "{res:?}"
+    );
 
     kamu_api_server_client.auth().logout();
     kamu_api_server_client
@@ -137,28 +138,33 @@ pub async fn test_create_account_and_modify_password(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn create_account_query(account_id: &odf::AccountID, account_name: &str) -> String {
-    indoc::indoc!(
+fn create_account_request(new_account_name: &str) -> async_graphql::Request {
+    async_graphql::Request::new(indoc!(
         r#"
-        mutation {
-            accounts {
-                byId (accountId: $accountId) {
-                    createAccount(accountName: "$accountName") {
-                        ... on CreateAccountSuccess {
-                            message
-                            account {
-                                accountName
-                                displayName
-                                accountType
-                            }
-                        }
-                    }
+        mutation ($newAccountName: AccountName!) {
+          accounts {
+            createAccount(accountName: $newAccountName) {
+              ... on CreateAccountSuccess {
+                message
+                account {
+                  accountName
+                  displayName
+                  accountType
                 }
+              }
             }
+          }
         }
-        "#
-    )
-    .replace("$accountId", &format!("\"{account_id}\""))
-    .replace("$accountName", account_name)
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(
+        async_graphql::value!({
+            "newAccountName": new_account_name,
+        }),
+    ))
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

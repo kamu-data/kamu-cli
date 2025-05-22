@@ -174,7 +174,7 @@ pub fn get_local_datasets_stream<'a>(
     current_account_name: &odf::AccountName,
 ) -> impl Stream<Item = Result<odf::DatasetRefAny, odf::DatasetRefUnresolvedError>> + 'a {
     dataset_registry
-        .all_dataset_handles_by_owner(current_account_name)
+        .all_dataset_handles_by_owner_name(current_account_name)
         .try_filter(move |dataset_handle| {
             future::ready(dataset_ref_patterns.iter().any(|dataset_ref_pattern| {
                 matches_local_ref_pattern(dataset_ref_pattern, dataset_handle)
@@ -206,7 +206,7 @@ pub fn matches_local_ref_pattern(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A utility that allows you to filter an `DatasetHandleStream` without
+/// A utility that allows you to filter a ` DatasetHandleStream ` without
 /// changing its type (like `StreamExt::filter_ok()` does).
 pub fn filter_dataset_handle_stream<'a, F>(
     mut stream: odf::dataset::DatasetHandleStream<'a>,

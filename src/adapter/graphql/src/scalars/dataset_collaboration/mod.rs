@@ -10,5 +10,5 @@
 mod account;
 mod dataset_access_role;
 
-pub(crate) use account::*;
-pub(crate) use dataset_access_role::*;
+pub use account::*;
+pub use dataset_access_role::*;

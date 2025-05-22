@@ -34,16 +34,13 @@ pub struct CollectionEntry {
     pub reference: DatasetID<'static>,
 
     /// Extra data associated with this entry
-    pub extra_data: serde_json::Value,
+    pub extra_data: ExtraData,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CollectionEntry {
     pub fn from_input(input: CollectionEntryInput) -> Self {
-        let extra_data = input
-            .extra_data
-            .unwrap_or(serde_json::Value::Object(Default::default()));
         let now = Utc::now();
 
         Self {
@@ -51,7 +48,7 @@ impl CollectionEntry {
             event_time: now,
             path: input.path,
             reference: input.reference,
-            extra_data,
+            extra_data: input.extra_data.unwrap_or_default(),
         }
     }
 
@@ -93,12 +90,12 @@ impl CollectionEntry {
             event_time,
             path: path.into(),
             reference: reference.into(),
-            extra_data: record.into(),
+            extra_data: ExtraData::new(record.into()),
         }
     }
 
     pub fn to_record_data(&self) -> serde_json::Value {
-        let mut record = self.extra_data.clone();
+        let mut record = self.extra_data.clone().into_inner();
         record["path"] = self.path.clone().into();
         record["ref"] = self.reference.to_string().into();
         record

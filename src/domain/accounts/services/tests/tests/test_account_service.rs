@@ -15,10 +15,10 @@ use kamu_accounts::{
     AccountConfig,
     AccountService,
     AccountServiceExt,
+    DidEntity,
     DidSecretEncryptionConfig,
     DidSecretKey,
     DidSecretKeyRepository,
-    Password,
     PredefinedAccountsConfig,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
@@ -97,16 +97,16 @@ async fn test_multi_find() {
         .get_accounts_by_ids(&[wasya_id.clone(), petya_id.clone()])
         .await
         .unwrap();
-    assert_eq!(2, accounts.len());
+    pretty_assertions::assert_eq!(2, accounts.len());
     accounts.sort_by(|acc1, acc2| acc1.account_name.cmp(&acc2.account_name));
-    assert_eq!(accounts[0].account_name.as_str(), PETYA);
-    assert_eq!(accounts[1].account_name.as_str(), WASYA);
+    pretty_assertions::assert_eq!(PETYA, accounts[0].account_name.as_str());
+    pretty_assertions::assert_eq!(WASYA, accounts[1].account_name.as_str());
 
     let accounts_map = account_svc
         .get_account_map(&[wasya_id.clone(), petya_id.clone()])
         .await
         .unwrap();
-    assert_eq!(2, accounts.len());
+    pretty_assertions::assert_eq!(2, accounts.len());
     assert!(accounts_map
         .get(&wasya_id)
         .is_some_and(|a| a.account_name.as_str() == WASYA));
@@ -123,20 +123,9 @@ async fn test_create_account() {
     let account_svc = catalog.get_one::<dyn AccountService>().unwrap();
     let did_secret_key_repo = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
 
-    let creator_account_id = account_svc
-        .find_account_id_by_name(&AccountName::new_unchecked(WASYA))
-        .await
-        .unwrap()
-        .unwrap();
-
     let new_account_name = AccountName::new_unchecked("new_account");
     account_svc
-        .create_account(
-            &new_account_name,
-            Email::parse("new_email@com").unwrap(),
-            Password::try_new("foo_password").unwrap(),
-            &creator_account_id,
-        )
+        .create_account(&new_account_name, Email::parse("new_email@com").unwrap())
         .await
         .unwrap();
 
@@ -146,14 +135,12 @@ async fn test_create_account() {
         .unwrap()
         .unwrap();
 
-    let created_account_did_secret_keys = did_secret_key_repo
-        .get_did_secret_keys_by_creator_id(&creator_account_id, None)
+    let created_account_did_secret_key = did_secret_key_repo
+        .get_did_secret_key(&DidEntity::new_account(created_account_id.to_string()))
         .await
         .unwrap();
 
-    let did_private_key = created_account_did_secret_keys
-        .first()
-        .unwrap()
+    let did_private_key = created_account_did_secret_key
         .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key.unwrap())
         .unwrap();
 
@@ -161,8 +148,9 @@ async fn test_create_account() {
     let did_odf =
         DidOdf::from(DidKey::new(odf::metadata::Multicodec::Ed25519Pub, &public_key).unwrap());
 
-    // Compare original account_id from db and id generated from stored private key
-    assert_eq!(created_account_id.as_did(), &did_odf);
+    // Compare original account_id from db and id generated from a stored private
+    // key
+    pretty_assertions::assert_eq!(created_account_id.as_did(), &did_odf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

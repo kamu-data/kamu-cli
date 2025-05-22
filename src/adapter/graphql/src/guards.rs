@@ -14,6 +14,8 @@ use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// LoggedInGuard
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE: &str = "Anonymous access forbidden";
 pub const INVALID_ACCESS_TOKEN_MESSAGE: &str = "Invalid access token";
@@ -21,7 +23,7 @@ pub const EXPIRED_ACCESS_TOKEN_MESSAGE: &str = "Expired access token";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LoggedInGuard {}
+pub struct LoggedInGuard;
 
 impl LoggedInGuard {
     pub fn new() -> Self {
@@ -47,12 +49,14 @@ impl Guard for LoggedInGuard {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AdminGuard
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const STAFF_ONLY_MESSAGE: &str = "Access restricted to administrators only";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AdminGuard {}
+pub struct AdminGuard;
 
 impl AdminGuard {
     pub fn new() -> Self {
@@ -77,6 +81,41 @@ impl Guard for AdminGuard {
                 Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE))
             }
             _ => Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE)),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CanProvisionAccountsGuard
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const CAN_PROVISION_ACCOUNTS_GUARD_MESSAGE: &str =
+    "Account is not authorized to provision accounts";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct CanProvisionAccountsGuard;
+
+impl Guard for CanProvisionAccountsGuard {
+    async fn check(&self, ctx: &Context<'_>) -> Result<()> {
+        let (current_account_subject, rebac_service) =
+            from_catalog_n!(ctx, CurrentAccountSubject, dyn RebacService);
+
+        let Some(logged_account_id) = current_account_subject.get_maybe_logged_account_id() else {
+            unreachable!(
+                r#"Most likely you are mistaken this guard should be used together with LoggedInGuard: #[graphql(guard = "LoggedInGuard.and(CanProvisionAccountsGuard)")]"#
+            )
+        };
+
+        let can_provision_accounts = rebac_service
+            .can_provision_accounts(logged_account_id)
+            .await
+            .int_err()?;
+
+        if can_provision_accounts {
+            Ok(())
+        } else {
+            Err(Error::new(CAN_PROVISION_ACCOUNTS_GUARD_MESSAGE))
         }
     }
 }

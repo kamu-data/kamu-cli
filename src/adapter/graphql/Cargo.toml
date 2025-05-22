@@ -21,6 +21,11 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+testing = []
+
+
 [dependencies]
 common-macros = { workspace = true }
 database-common = { workspace = true }
@@ -63,6 +68,9 @@ dill = { version = "0.13", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 humansize = { version = "2", default-features = false }
 indoc = "2"
+jsonschema = { version = "0.30", default-features = false }
+lazy_static = { version = "1" }
+nutype = { version = "0.6", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
@@ -81,6 +89,7 @@ kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
+kamu-adapter-graphql = { workspace = true, features = ["testing"] }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }

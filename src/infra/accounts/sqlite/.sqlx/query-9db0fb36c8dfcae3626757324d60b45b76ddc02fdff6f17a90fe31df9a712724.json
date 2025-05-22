@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO did_secret_keys (entity_id, entity_type, secret_key, secret_nonce)\n            VALUES ($1, $2, $3, $4)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "9db0fb36c8dfcae3626757324d60b45b76ddc02fdff6f17a90fe31df9a712724"
+}
