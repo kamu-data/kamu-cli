@@ -16,6 +16,7 @@ use kamu_accounts::{
     AuthenticationProvider,
     ProviderLoginError,
     ProviderLoginResponse,
+    PROVIDER_WEB3_WALLET,
 };
 use kamu_auth_web3::{ConsumeNonceError, EvmWalletAddress, NonceNotFoundError};
 use kamu_core::ServerUrlConfig;
@@ -25,7 +26,6 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const PROVIDER_WEB3_WALLET: &str = "web3-wallet";
 pub const EIP_4361_EXPECTED_STATEMENT: &str =
     "By signing, you confirm wallet ownership and log in. No transaction or fees are involved.";
 

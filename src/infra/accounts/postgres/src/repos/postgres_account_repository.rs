@@ -66,7 +66,7 @@ impl AccountRepository for PostgresAccountRepository {
                 VALUES ($1, $2, $3, $4, ($5::text)::account_type, $6, $7, $8, $9)
             "#,
             account.id.to_string(),
-            account.account_name.to_ascii_lowercase(),
+            account.prepare_account_name_for_storage(),
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type as AccountType,
@@ -110,7 +110,7 @@ impl AccountRepository for PostgresAccountRepository {
             WHERE id = $1
             "#,
             updated_account.id.to_string(),
-            updated_account.account_name.to_ascii_lowercase(),
+            updated_account.prepare_account_name_for_storage(),
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,
@@ -275,6 +275,7 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        //
         let maybe_account_row = sqlx::query_as!(
             AccountRowModel,
             r#"
@@ -365,6 +366,7 @@ impl AccountRepository for PostgresAccountRepository {
         let connection_mut = tr.connection_mut().await?;
 
         use odf::AccountID;
+        //
         let maybe_account_row = sqlx::query!(
             r#"
             SELECT id as "id: AccountID"
@@ -597,6 +599,7 @@ impl PasswordHashRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        //
         let maybe_password_row = sqlx::query!(
             r#"
             SELECT password_hash

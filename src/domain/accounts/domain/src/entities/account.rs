@@ -21,6 +21,9 @@ pub type AccountDisplayName = String;
 
 pub const DEFAULT_ACCOUNT_NAME_STR: &str = "kamu";
 
+// The name is formed here, as we use it for comparison in this module.
+pub const PROVIDER_WEB3_WALLET: &str = "web3-wallet";
+
 lazy_static! {
     pub static ref DEFAULT_ACCOUNT_NAME: odf::AccountName =
         odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR);
@@ -44,6 +47,19 @@ pub struct Account {
     pub registered_at: DateTime<Utc>,
     pub provider: String,
     pub provider_identity_key: String,
+}
+
+#[cfg(feature = "sqlx")]
+impl Account {
+    pub fn prepare_account_name_for_storage(&self) -> String {
+        if self.provider == PROVIDER_WEB3_WALLET {
+            // When storing wallet addresses, we should preserve case sensitivity
+            // as it forms the checksum address.
+            self.account_name.to_string()
+        } else {
+            self.account_name.to_ascii_lowercase()
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
