@@ -44,7 +44,6 @@ impl FetchService {
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         use alloy::providers::{Provider, ProviderBuilder};
-        use alloy::rpc::types::eth::BlockTransactionsKind;
         use datafusion::prelude::*;
         use datafusion_ethers::convert::*;
         use datafusion_ethers::stream::*;
@@ -93,9 +92,10 @@ impl FetchService {
         };
 
         let rpc_client = ProviderBuilder::new()
-            .on_builtin(node_url.as_str())
+            .connect(node_url.as_str())
             .await
-            .int_err()?;
+            .int_err()?
+            .erased();
 
         let chain_id = rpc_client.get_chain_id().await.int_err()?;
         tracing::info!(%node_url, %chain_id, "Connected to ETH node");
@@ -238,7 +238,7 @@ impl FetchService {
         // Record scanning state
         // TODO: Reorg tolerance
         let last_seen_block = rpc_client
-            .get_block(state.last_seen_block.into(), BlockTransactionsKind::Hashes)
+            .get_block(state.last_seen_block.into())
             .await
             .int_err()?
             .unwrap();
