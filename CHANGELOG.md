@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Panic's now also log correct tracing message
+
 ## [0.238.0] - 2025-05-22
 ### Added
 - GQL: Added new scalars: `Email`, AccountPassword`.
