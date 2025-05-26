@@ -595,8 +595,7 @@ impl PasswordHashRepository for SqliteAccountRepository {
         // TODO: duplicates are prevented with unique indices, but handle error
 
         let account_name = account_name.as_str();
-        let account_id_stack = account_id.as_did_str().to_stack_string();
-        let account_id = account_id_stack.as_str();
+        let account_id = account_id.to_string();
 
         sqlx::query!(
             r#"

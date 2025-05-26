@@ -69,12 +69,11 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         &self,
         owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError> {
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
-
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+
+        let owner_id = owner_id.to_string();
 
         let dataset_entries_count = sqlx::query_scalar!(
             r#"
@@ -82,7 +81,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             FROM dataset_entries
             WHERE owner_id = $1
             "#,
-            owner_id_as_str
+            owner_id
         )
         .fetch_one(connection_mut)
         .await
@@ -239,8 +238,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
+        let owner_id_str = owner_id.to_string();
         let dataset_name_as_str = name.as_str();
 
         let maybe_dataset_entry_row = sqlx::query_as!(
@@ -256,7 +254,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             WHERE owner_id = $1
               AND dataset_name = $2
             "#,
-            owner_id_as_str,
+            owner_id_str,
             dataset_name_as_str
         )
         .fetch_optional(connection_mut)
@@ -275,8 +273,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
-
+        let owner_id = owner_id.to_string();
         let limit = i64::try_from(pagination.limit).unwrap();
         let offset = i64::try_from(pagination.offset).unwrap();
 
@@ -284,8 +281,6 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             let mut tr = self.transaction.lock().await;
 
             let connection_mut = tr.connection_mut().await?;
-
-            let owner_id_as_str = stack_owner_id.as_str();
 
             let mut query_stream = sqlx::query_as!(
                 DatasetEntryRowModel,
@@ -301,7 +296,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 WHERE owner_id = $1
                 LIMIT $2 OFFSET $3
                 "#,
-                owner_id_as_str,
+                owner_id,
                 limit,
                 offset
             )
@@ -324,8 +319,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let stack_dataset_id = dataset_entry.id.as_did_str().to_stack_string();
         let dataset_id_as_str = stack_dataset_id.as_str();
-        let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
+        let owner_id = dataset_entry.owner_id.to_string();
         let owner_name_as_str = dataset_entry.owner_name.as_str();
         let dataset_name_as_str = dataset_entry.name.as_str();
 
@@ -338,7 +332,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 VALUES ($1, $2, $3, $4, $5, $6)
             "#,
             dataset_id_as_str,
-            owner_id_as_str,
+            owner_id,
             owner_name_as_str,
             dataset_name_as_str,
             dataset_entry.created_at,

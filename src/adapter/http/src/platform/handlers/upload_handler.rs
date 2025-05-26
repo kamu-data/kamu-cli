@@ -113,7 +113,7 @@ pub struct UploadFromPath {
     upload_token: UploadTokenBase64Json,
 }
 
-/// Upload file to temporary storage
+/// Upload a file to temporary storage
 #[utoipa::path(
     post,
     path = "/file/upload/{upload_token}",
@@ -132,9 +132,7 @@ pub async fn file_upload_post_handler(
     mut multipart: axum::extract::Multipart,
 ) -> Result<(), ApiError> {
     let account_id = ensure_authenticated_account(&catalog).api_err()?;
-    if account_id.as_multibase().to_stack_string().as_str()
-        != upload_param.upload_token.0.owner_account_id.as_str()
-    {
+    if account_id.to_string() != upload_param.upload_token.0.owner_account_id {
         return Err(ApiError::new_forbidden());
     }
 

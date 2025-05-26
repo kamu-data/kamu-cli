@@ -62,11 +62,11 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         &self,
         owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError> {
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
-
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+
+        let owner_id = owner_id.to_string();
 
         let dataset_entries_count = sqlx::query_scalar!(
             r#"
@@ -74,7 +74,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             FROM dataset_entries
             WHERE owner_id = $1
             "#,
-            stack_owner_id.as_str()
+            owner_id
         )
         .fetch_one(connection_mut)
         .await
@@ -216,8 +216,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
-
         let maybe_dataset_entry_row = sqlx::query_as!(
             DatasetEntryRowModel,
             r#"
@@ -231,7 +229,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             WHERE owner_id = $1
                   AND dataset_name = $2
             "#,
-            stack_owner_id.as_str(),
+            owner_id.to_string(),
             name.as_str()
         )
         .fetch_optional(connection_mut)
@@ -250,7 +248,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
+        let owner_id = owner_id.to_string();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -270,7 +268,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 WHERE owner_id = $1
                 LIMIT $2 OFFSET $3
                 "#,
-                stack_owner_id.as_str(),
+                owner_id,
                 i64::try_from(pagination.limit).unwrap(),
                 i64::try_from(pagination.offset).unwrap(),
             )
@@ -280,7 +278,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             while let Some(row) = query_stream.try_next().await.int_err()? {
                 yield Ok(row.into());
             }
-
         })
     }
 
@@ -291,7 +288,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         let mut tr = self.transaction.lock().await;
 
         let stack_dataset_id = dataset_entry.id.as_did_str().to_stack_string();
-        let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
+        let owner_id = dataset_entry.owner_id.to_string();
 
         // Do not provoke conflict of unique violation at Postgres level, if we can
         // avoid it. Note: any unique violation immediately marks the entire
@@ -304,7 +301,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 SELECT 1 as res FROM dataset_entries WHERE dataset_name = $1 AND owner_id = $2 LIMIT 1
                 "#,
                 dataset_entry.name.as_str(),
-                stack_owner_id.as_str(),
+                &owner_id,
             )
             .fetch_optional(connection_mut)
             .await
@@ -325,7 +322,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 VALUES ($1, $2, $3, $4, $5, ($6::text)::dataset_kind)
             "#,
             stack_dataset_id.as_str(),
-            stack_owner_id.as_str(),
+            &owner_id,
             dataset_entry.owner_name.as_str(),
             dataset_entry.name.as_str(),
             dataset_entry.created_at,

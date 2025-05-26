@@ -3660,7 +3660,7 @@ type VersionedFileMut {
 		contentType: String
 	): StartUploadVersionResult!
 	"""
-	Finalizes the content upload by incoporating the content into the
+	Finalizes the content upload by incorporating the content into the
 	dataset as a new version
 	"""
 	finishUploadNewVersion(

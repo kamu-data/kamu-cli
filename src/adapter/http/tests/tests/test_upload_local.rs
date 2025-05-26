@@ -144,7 +144,7 @@ impl Harness {
         UploadTokenBase64Json(UploadToken {
             upload_id: "123".to_string(),
             file_name: "someFile.json".to_string(),
-            owner_account_id: DEFAULT_ACCOUNT_ID.as_multibase().to_string(),
+            owner_account_id: DEFAULT_ACCOUNT_ID.to_string(),
             content_length: 123,
             content_type: Some(MediaType::JSON.to_owned()),
         })
@@ -174,7 +174,7 @@ impl Harness {
 
         cache_dir
             .join("uploads")
-            .join(DEFAULT_ACCOUNT_ID.as_multibase().to_string())
+            .join(DEFAULT_ACCOUNT_ID.to_string())
             .join(upload_token.upload_id)
             .join(upload_token.file_name)
     }

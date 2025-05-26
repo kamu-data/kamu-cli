@@ -72,9 +72,7 @@ pub async fn dataset_ingest_handler(
 
     let (data_stream, media_type) = if let Some(upload_token) = params.upload_token {
         let account_id = ensure_authenticated_account(&catalog).api_err()?;
-        if account_id.as_multibase().to_stack_string().as_str()
-            != upload_token.0.owner_account_id.as_str()
-        {
+        if account_id.to_string() != upload_token.0.owner_account_id {
             return Err(ApiError::new_forbidden());
         }
 

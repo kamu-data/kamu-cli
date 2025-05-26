@@ -138,6 +138,7 @@ impl AccountService for AccountServiceImpl {
             .search_accounts_by_name_pattern(name_pattern, filters, pagination)
     }
 
+    // TODO: Wallet-based auth: rename to create_password_account()
     async fn create_account(
         &self,
         account_name: &odf::AccountName,
@@ -159,7 +160,6 @@ impl AccountService for AccountServiceImpl {
         self.account_repo.save_account(&account).await?;
 
         if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
-            let account_id = account.id.as_did_str().to_stack_string();
             let did_secret_key = DidSecretKey::try_new(
                 &account_key.into(),
                 did_secret_encryption_key.expose_secret(),
@@ -168,7 +168,7 @@ impl AccountService for AccountServiceImpl {
 
             self.did_secret_key_repo
                 .save_did_secret_key(
-                    &DidEntity::new_account(account_id.as_str()),
+                    &DidEntity::new_account(account.id.to_string()),
                     &did_secret_key,
                 )
                 .await

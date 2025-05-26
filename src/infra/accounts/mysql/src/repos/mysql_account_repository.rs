@@ -175,14 +175,15 @@ impl AccountRepository for MySqlAccountRepository {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-        let account_id_stack = account_id.as_did_str().to_stack_string();
+
+        let account_id_str = account_id.to_string();
 
         let update_result = sqlx::query!(
             r#"
             UPDATE accounts SET email = ? WHERE id = ?
             "#,
             new_email.as_ref(),
-            account_id_stack.as_str(),
+            account_id_str,
         )
         .execute(connection_mut)
         .await
@@ -568,8 +569,6 @@ impl PasswordHashRepository for MySqlAccountRepository {
 
         // TODO: duplicates are prevented with unique indices, but handle error
 
-        let account_id = account_id.as_did_str().to_stack_string();
-
         sqlx::query!(
             r#"
             INSERT INTO accounts_passwords (account_name, password_hash, account_id)
@@ -577,7 +576,7 @@ impl PasswordHashRepository for MySqlAccountRepository {
             "#,
             account_name.as_str(),
             password_hash,
-            account_id.as_str()
+            account_id.to_string()
         )
         .execute(connection_mut)
         .await

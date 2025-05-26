@@ -241,7 +241,7 @@ impl VersionedFileMut {
         ))
     }
 
-    /// Finalizes the content upload by incoporating the content into the
+    /// Finalizes the content upload by incorporating the content into the
     /// dataset as a new version
     #[tracing::instrument(level = "info", name = VersionedFileMut_finish_upload_new_version, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]

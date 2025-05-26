@@ -62,17 +62,17 @@ impl UploadService for UploadServiceLocal {
 
         let upload_id = Uuid::new_v4().simple().to_string();
 
-        let owner_account_id_mb = owner_account_id.as_multibase().to_stack_string();
+        let owner_account_id = owner_account_id.to_string();
 
         let upload_folder_path = self
-            .make_account_folder_path(owner_account_id_mb.as_str())
+            .make_account_folder_path(&owner_account_id)
             .join(upload_id.clone());
         std::fs::create_dir_all(upload_folder_path).map_err(ErrorIntoInternal::int_err)?;
 
         let upload_token = UploadTokenBase64Json(UploadToken {
             upload_id,
             file_name,
-            owner_account_id: owner_account_id_mb.to_string(),
+            owner_account_id,
             content_length,
             content_type,
         });
@@ -109,7 +109,7 @@ impl UploadService for UploadServiceLocal {
         file_name: &str,
     ) -> Result<usize, UploadTokenIntoStreamError> {
         let upload_file_path = self
-            .make_account_folder_path(owner_account_id.as_multibase().to_stack_string().as_str())
+            .make_account_folder_path(&owner_account_id.to_string())
             .join(upload_id)
             .join(file_name);
 
@@ -128,7 +128,7 @@ impl UploadService for UploadServiceLocal {
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
         let upload_file_path = self
-            .make_account_folder_path(owner_account_id.as_multibase().to_stack_string().as_str())
+            .make_account_folder_path(&owner_account_id.to_string())
             .join(upload_id)
             .join(file_name);
 

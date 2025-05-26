@@ -1319,7 +1319,7 @@
             "api_key": []
           }
         ],
-        "summary": "Upload file to temporary storage",
+        "summary": "Upload a file to temporary storage",
         "tags": [
           "kamu"
         ]

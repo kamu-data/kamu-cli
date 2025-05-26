@@ -6754,6 +6754,7 @@ dependencies = [
  "indoc 2.0.6",
  "internal-error",
  "kamu-accounts-services",
+ "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-auth-rebac",
  "kamu-cli-e2e-common-macros",

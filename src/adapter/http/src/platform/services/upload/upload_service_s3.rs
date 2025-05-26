@@ -39,7 +39,7 @@ impl UploadServiceS3 {
         upload_id: &str,
         file_name: &str,
     ) -> String {
-        format!("{}/{}/{}", account_id.as_multibase(), upload_id, file_name,)
+        format!("{account_id}/{upload_id}/{file_name}")
     }
 }
 
@@ -76,12 +76,10 @@ impl UploadService for UploadServiceS3 {
             .await
             .map_err(ErrorIntoInternal::int_err)?;
 
-        let owner_account_id_mb = owner_account_id.as_multibase().to_stack_string();
-
         let upload_token = UploadTokenBase64Json(UploadToken {
             upload_id,
             file_name,
-            owner_account_id: owner_account_id_mb.to_string(),
+            owner_account_id: owner_account_id.to_string(),
             content_length,
             content_type,
         });
