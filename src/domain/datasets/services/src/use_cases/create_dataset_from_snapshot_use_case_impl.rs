@@ -40,9 +40,6 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     create_helper: Arc<CreateDatasetUseCaseHelper>,
     did_secret_encryption_key: Option<SecretString>,
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
-
-    // TODO: Rebac is here temporarily - using Lazy to avoid modifying all tests
-    rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
 }
 
 #[component(pub)]
@@ -57,7 +54,6 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
         create_helper: Arc<CreateDatasetUseCaseHelper>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
         did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
-        rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
     ) -> Self {
         Self {
             current_account_subject,
@@ -70,7 +66,6 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
                 .as_ref()
                 .map(|encryption_key| SecretString::from(encryption_key.clone())),
             did_secret_key_repo,
-            rebac_svc,
         }
     }
 }
@@ -102,8 +97,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // Resolve a target account and full alias of the dataset
         let (canonical_alias, target_account_id) = self
             .create_helper
-            .resolve_alias_target(&snapshot.name, subject)
-            .await?;
+            .resolve_alias_target(&snapshot.name, subject)?;
 
         let dataset_did = self.did_generator.generate_dataset_id();
         // Make a seed block
@@ -153,23 +147,14 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .await
         .int_err()?;
 
-        // TODO: HACK: SEC: When creating a dataaset under another account we currently
-        // give subject a "maintainer" role on it. In future this should be refactored
-        // into organization-level permissions.
+        // TODO: Creating dataset under another account is not supported yet.
+        // In future we should check organization-level permissions here.
         //
         // See: https://github.com/kamu-data/kamu-node/issues/233
-        if target_account_id != subject.account_id {
-            self.rebac_svc
-                .get()
-                .int_err()?
-                .set_account_dataset_relation(
-                    &subject.account_id,
-                    kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
-                    &store_result.dataset_id,
-                )
-                .await
-                .int_err()?;
-        }
+        assert_eq!(
+            target_account_id, subject.account_id,
+            "Creating dataset under another account is not supported yet"
+        );
 
         // Notify interested parties the dataset was created
         self.create_helper
