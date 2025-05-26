@@ -193,7 +193,8 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
         // Roughly speaking, the public dataset grants the Reader role to everyone,
         // so we don't get the DatasetNotFound error
         for (tag, client, expected_error) in [
-            ("anonymous", &anonymous, Access),
+            // Note: anonymous access is handled by logged in guard
+            // ("anonymous", &anonymous, Access),
             ("not_owner", &not_owner, Access),
             ("reader", &reader, Access),
             ("editor", &editor, Access),
@@ -262,7 +263,8 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
             use SetDatasetVisibilityError::{Access, DatasetNotFound};
 
             for (tag, client, expected_error) in [
-                ("anonymous", &anonymous, DatasetNotFound),
+                // Note: anonymous access is restricted by logged in guard
+                // ("anonymous", &anonymous, DatasetNotFound),
                 ("not_owner", &not_owner, DatasetNotFound),
                 ("reader", &reader, Access),
                 ("editor", &editor, Access),

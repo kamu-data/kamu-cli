@@ -31,7 +31,6 @@ pub struct DatasetStorageUnitLocalFs {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetStorageUnitLocalFs {
-    #[cfg(any(feature = "testing", test))]
     pub fn get_dataset_layout(
         &self,
         dataset_id: &DatasetID,

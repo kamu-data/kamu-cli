@@ -180,6 +180,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 latest {
                                     version
+                                    contentLength
                                     contentType
                                     contentHash
                                     content
@@ -205,6 +206,7 @@ async fn test_versioned_file_create_in_band() {
         latest,
         json!({
             "version": 1,
+            "contentLength": b"hello".len(),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},
@@ -268,6 +270,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 latest {
                                     version
+                                    contentLength
                                     contentType
                                     contentHash
                                     content
@@ -293,6 +296,7 @@ async fn test_versioned_file_create_in_band() {
         latest,
         json!({
             "version": 2,
+            "contentLength": b"bye".len(),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"bye"),
             "contentType": "application/octet-stream",
             "extraData": {},
@@ -311,6 +315,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 asOf(blockHash: $blockHash) {
                                     version
+                                    contentLength
                                     contentType
                                     contentHash
                                     content
@@ -336,6 +341,7 @@ async fn test_versioned_file_create_in_band() {
         entry,
         json!({
             "version": 1,
+            "contentLength": b"hello".len(),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},
@@ -354,6 +360,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 asOf(version: 1) {
                                     version
+                                    contentLength
                                     contentType
                                     contentHash
                                     content
@@ -378,6 +385,7 @@ async fn test_versioned_file_create_in_band() {
         entry,
         json!({
             "version": 1,
+            "contentLength": b"hello".len(),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},

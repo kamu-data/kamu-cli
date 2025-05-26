@@ -68,6 +68,10 @@ impl DataFrameExt {
         self.0.create_physical_plan().await
     }
 
+    pub fn distinct(self) -> Result<Self, DataFusionError> {
+        self.0.distinct().map(Self)
+    }
+
     pub fn filter(self, predicate: Expr) -> Result<Self, DataFusionError> {
         self.0.filter(predicate).map(Self)
     }

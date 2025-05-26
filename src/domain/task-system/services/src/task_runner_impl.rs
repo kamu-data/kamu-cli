@@ -14,6 +14,7 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_core::*;
 use kamu_task_system::*;
+use kamu_webhooks::WebhookDeliveryWorker;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,6 +26,7 @@ pub struct TaskRunnerImpl {
     reset_executor: Arc<dyn ResetExecutor>,
     compaction_executor: Arc<dyn CompactionExecutor>,
     sync_service: Arc<dyn SyncService>,
+    webhook_sender: Arc<dyn WebhookDeliveryWorker>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +42,7 @@ impl TaskRunnerImpl {
         reset_executor: Arc<dyn ResetExecutor>,
         compaction_executor: Arc<dyn CompactionExecutor>,
         sync_service: Arc<dyn SyncService>,
+        webhook_sender: Arc<dyn WebhookDeliveryWorker>,
     ) -> Self {
         Self {
             catalog,
@@ -49,6 +52,7 @@ impl TaskRunnerImpl {
             reset_executor,
             compaction_executor,
             sync_service,
+            webhook_sender,
         }
     }
 
@@ -309,6 +313,28 @@ impl TaskRunnerImpl {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?task_webhook))]
+    async fn run_deliver_webhook(
+        &self,
+        task_webhook: TaskDefinitionDeliverWebhook,
+    ) -> Result<TaskOutcome, InternalError> {
+        match self
+            .webhook_sender
+            .deliver_webhook(
+                task_webhook.task_id,
+                task_webhook.webhook_subscription_id,
+                task_webhook.webhook_event_id,
+            )
+            .await
+        {
+            Ok(_) => Ok(TaskOutcome::Success(TaskResult::Empty)),
+            Err(err) => {
+                tracing::error!(error = ?err, "Send webhook failed");
+                Ok(TaskOutcome::Failed(TaskError::Empty))
+            }
+        }
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_head))]
     #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn update_dataset_head(
@@ -350,6 +376,9 @@ impl TaskRunner for TaskRunnerImpl {
             TaskDefinition::Update(td_update) => self.run_update(td_update).await?,
             TaskDefinition::Reset(td_reset) => self.run_reset(td_reset).await?,
             TaskDefinition::HardCompact(td_compact) => self.run_hard_compaction(td_compact).await?,
+            TaskDefinition::DeliverWebhook(td_webhook) => {
+                self.run_deliver_webhook(td_webhook).await?
+            }
         };
 
         Ok(task_outcome)

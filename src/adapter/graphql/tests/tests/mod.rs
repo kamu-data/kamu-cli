@@ -24,6 +24,7 @@ mod test_gql_metadata_chain;
 mod test_gql_pagination;
 mod test_gql_remote_statuses;
 mod test_gql_search;
+mod test_gql_webhook_subscriptions;
 mod test_guards;
 mod test_scalars;
 mod test_update_schema;

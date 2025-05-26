@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use dill::component;
-use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::DEFAULT_ACCOUNT_NAME;
+use internal_error::*;
+use kamu_accounts::{LoggedAccount, DEFAULT_ACCOUNT_NAME};
 use kamu_core::{ResolvedDataset, TenancyConfig};
 use kamu_datasets::{
     CreateDatasetError,
@@ -40,29 +40,71 @@ pub struct CreateDatasetUseCaseHelper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CreateDatasetUseCaseHelper {
+    /// Given a raw alias under which user wants to create a dataset and user's
+    /// credentials determine the target account under which dataset will be
+    /// created and whether user has permissions to do so
+    pub fn resolve_alias_target(
+        &self,
+        raw_alias: &odf::DatasetAlias,
+        subject: &LoggedAccount,
+    ) -> Result<(CanonicalDatasetAlias, odf::AccountID), CreateDatasetError> {
+        match self.tenancy_config.as_ref() {
+            TenancyConfig::SingleTenant => {
+                // Ignore the account name in the alias and use subject account
+                Ok((
+                    CanonicalDatasetAlias::new(odf::DatasetAlias::new(
+                        None,
+                        raw_alias.dataset_name.clone(),
+                    )),
+                    subject.account_id.clone(),
+                ))
+            }
+            TenancyConfig::MultiTenant => {
+                if let Some(account_name) = &raw_alias.account_name
+                    && *account_name != subject.account_name
+                {
+                    // Creating dataset for account different that the subject
+                    // TODO: check organization permissions
+                    //
+                    // See: https://github.com/kamu-data/kamu-node/issues/233
+                    Err(odf::AccessError::Unauthorized(
+                        format!("Cannot create a dataset in account {account_name}").into(),
+                    )
+                    .into())
+                } else {
+                    Ok((
+                        CanonicalDatasetAlias::new(odf::DatasetAlias::new(
+                            Some(subject.account_name.clone()),
+                            raw_alias.dataset_name.clone(),
+                        )),
+                        subject.account_id.clone(),
+                    ))
+                }
+            }
+        }
+    }
+
     pub fn canonical_dataset_alias(
         &self,
         raw_alias: &odf::DatasetAlias,
         logged_account_name: &odf::AccountName,
     ) -> CanonicalDatasetAlias {
-        let alias = match self.tenancy_config.as_ref() {
+        match self.tenancy_config.as_ref() {
             TenancyConfig::SingleTenant => {
                 // Ignore the account name in the alias
-                odf::DatasetAlias::new(None, raw_alias.dataset_name.clone())
+                CanonicalDatasetAlias::new(odf::DatasetAlias::new(
+                    None,
+                    raw_alias.dataset_name.clone(),
+                ))
             }
-            TenancyConfig::MultiTenant => {
-                let account_name = if raw_alias.is_multi_tenant() {
-                    // Safety: In multi-tenant, we have a name.
-                    let alias_account_name = raw_alias.account_name.as_ref().unwrap();
-                    alias_account_name
-                } else {
-                    logged_account_name
-                };
-
-                odf::DatasetAlias::new(Some(account_name.clone()), raw_alias.dataset_name.clone())
+            TenancyConfig::MultiTenant if raw_alias.account_name.is_some() => {
+                CanonicalDatasetAlias::new(raw_alias.clone())
             }
-        };
-        CanonicalDatasetAlias::new(alias)
+            TenancyConfig::MultiTenant => CanonicalDatasetAlias::new(odf::DatasetAlias::new(
+                Some(logged_account_name.clone()),
+                raw_alias.dataset_name.clone(),
+            )),
+        }
     }
 
     pub fn validate_canonical_dataset_alias_account_name(

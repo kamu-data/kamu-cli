@@ -246,6 +246,10 @@ impl Dataset {
                 can_view: logged && can_read,
                 can_run: can_maintain,
             },
+            webhooks: DatasetWebhooksPermissions {
+                can_view: can_maintain,
+                can_update: can_maintain,
+            },
             general: DatasetGeneralPermissions {
                 can_rename: can_maintain,
                 can_set_visibility: can_maintain,
@@ -281,6 +285,11 @@ impl Dataset {
     /// Access to the dataset collaboration data
     async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaboration> {
         DatasetCollaboration::new_with_access_check(ctx, &self.dataset_request_state).await
+    }
+
+    /// Access to the dataset's webhooks management functionality
+    async fn webhooks(&self) -> DatasetWebhooks {
+        DatasetWebhooks::new(&self.dataset_request_state)
     }
 
     /// Various endpoints for interacting with data

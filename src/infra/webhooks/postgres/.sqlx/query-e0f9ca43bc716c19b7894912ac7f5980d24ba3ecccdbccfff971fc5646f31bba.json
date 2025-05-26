@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE webhook_subscriptions\n                    SET event_types = $2\n                    WHERE id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "VarcharArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e0f9ca43bc716c19b7894912ac7f5980d24ba3ecccdbccfff971fc5646f31bba"
+}

@@ -109,14 +109,100 @@ async fn test_dataset_by_id_does_not_exist() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_dataset_by_id() {
+async fn test_dataset_by_id_private() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::SingleTenant)
         .build()
         .await;
 
     let foo_result = harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+
+    // Can't see private dataset without logging in
+    let res = harness
+        .execute_anonymous_query(
+            indoc!(
+                r#"
+                {
+                    datasets {
+                        byId (datasetId: "<id>") {
+                            name
+                        }
+                    }
+                }
+                "#
+            )
+            .replace(
+                "<id>",
+                &foo_result.dataset_handle.id.as_did_str().to_stack_string(),
+            ),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
+            "datasets": {
+                "byId": null
+            }
+        }),
+        res.data,
+    );
+
+    // Can see private dataset when authorized
+    let res = harness
+        .execute_authorized_query(
+            indoc!(
+                r#"
+                {
+                    datasets {
+                        byId (datasetId: "<id>") {
+                            name
+                        }
+                    }
+                }
+                "#
+            )
+            .replace(
+                "<id>",
+                &foo_result.dataset_handle.id.as_did_str().to_stack_string(),
+            ),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
+            "datasets": {
+                "byId": {
+                    "name": "foo",
+                }
+            }
+        }),
+        res.data,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_by_id_public() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
+    let foo_result = harness
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
 
     let res = harness
@@ -167,6 +253,7 @@ async fn test_dataset_by_account_and_name_case_insensitive() {
         .create_root_dataset(
             Some(account_name.clone()),
             odf::DatasetName::new_unchecked("Foo"),
+            odf::DatasetVisibility::Public,
         )
         .await;
 
@@ -214,7 +301,11 @@ async fn test_dataset_by_account_id() {
         .await;
 
     harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("Foo"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("Foo"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
 
     let res = harness
@@ -447,7 +538,11 @@ async fn test_dataset_rename_success() {
         .await;
 
     let foo_result = harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
 
     let request_code = indoc!(
@@ -503,7 +598,11 @@ async fn test_dataset_rename_no_changes() {
         .await;
 
     let foo_result = harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
 
     let res = harness
@@ -557,10 +656,18 @@ async fn test_dataset_rename_name_collision() {
         .await;
 
     let foo_result = harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
     let _bar_result = harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("bar"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("bar"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
 
     let res = harness
@@ -614,7 +721,11 @@ async fn test_dataset_delete_success() {
         .await;
 
     let foo_result = harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
 
     let request_code = indoc!(
@@ -667,7 +778,11 @@ async fn test_dataset_delete_dangling_ref() {
         .await;
 
     let foo_result = harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
     let _bar_result = harness
         .create_derived_dataset(
@@ -874,7 +989,11 @@ async fn test_dataset_view_permissions(
         .await;
 
     let foo_result = harness
-        .create_root_dataset(None, odf::DatasetName::new_unchecked("foo"))
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Public,
+        )
         .await;
 
     let request_code = indoc!(
@@ -972,6 +1091,7 @@ impl GraphQLDatasetsHarness {
         &self,
         account_name: Option<odf::AccountName>,
         name: odf::DatasetName,
+        visibility: odf::DatasetVisibility,
     ) -> CreateDatasetResult {
         let create_dataset = self
             .catalog_authorized
@@ -985,7 +1105,9 @@ impl GraphQLDatasetsHarness {
                     .kind(odf::DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
-                Default::default(),
+                CreateDatasetUseCaseOptions {
+                    dataset_visibility: visibility,
+                },
             )
             .await
             .unwrap()
