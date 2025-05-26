@@ -71,8 +71,6 @@ pub use task_id::*;
 pub use task_status_outcome::*;
 pub use webhook_scalars::*;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 macro_rules! simple_scalar {
     ($name: ident, $source_type: ty) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]

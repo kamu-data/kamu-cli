@@ -11,7 +11,7 @@ POSTGRES_CRATES := \
 	./src/infra/flow-system/postgres \
 	./src/infra/messaging-outbox/postgres \
 	./src/infra/task-system/postgres \
-	./src/infra/webhooks/postgres \
+	./src/infra/webhooks/postgres
 
 MYSQL_CRATES := \
 	./src/e2e/app/cli/mysql \
@@ -25,7 +25,7 @@ SQLITE_CRATES := \
 	./src/infra/flow-system/sqlite \
 	./src/infra/messaging-outbox/sqlite \
 	./src/infra/task-system/sqlite \
-	./src/infra/webhooks/sqlite \
+	./src/infra/webhooks/sqlite
 
 ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
 MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
