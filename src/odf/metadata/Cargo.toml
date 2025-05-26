@@ -56,6 +56,7 @@ ed25519-dalek = { version = "2", default-features = false, features = [
     "zeroize",
     "rand_core",
 ] }
+ssi-caips = { version = "0.2", default-features = false, features = ["eip"] }
 
 # Serialization
 base64 = { version = "0.22", default-features = false, features = ["std"] }

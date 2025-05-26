@@ -17,6 +17,7 @@ use crate::formats::*;
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AccountID {
     Odf(DidOdf),
+    Pkh(DidPkh),
 }
 
 impl AccountID {
@@ -35,7 +36,8 @@ impl AccountID {
 
     pub fn as_did_odf(&self) -> Option<&DidOdf> {
         match self {
-            AccountID::Odf(did) => Some(did),
+            Self::Odf(did) => Some(did),
+            Self::Pkh(_) => None,
         }
     }
 
@@ -45,22 +47,24 @@ impl AccountID {
             return Ok(Self::Odf(DidOdf::from_bytes(bytes)?));
         }
 
-        if bytes.starts_with("did:pkh:".as_bytes()) {
-            todo!("TODO: Wallet-based auth")
+        if bytes.starts_with(DID_PKH_PREFIX.as_bytes()) {
+            unimplemented!("Use AccountID::from_did_str for {DID_PKH_PREFIX}")
         }
 
         Err(AccountIdParseBytesError::InvalidValueFormat)
     }
 
+    // TODO: Wallet-based auth: test
     /// Parses `AccountID` from a canonical `did:odf:<multibase>`
-    /// or `did:pkh:<address>` string
+    /// or `did:pkh:<chain-code>:<address>` string
     pub fn from_did_str(s: &str) -> Result<Self, AccountIdParseStrError> {
         if let Some(stripped) = s.strip_prefix(DID_ODF_PREFIX) {
             return Self::from_multibase_string(stripped).map_err(Into::into);
         }
 
-        if s.starts_with("did:pkh:") {
-            todo!("TODO: Wallet-based auth")
+        if let Some(stripped) = s.strip_prefix(DID_PKH_PREFIX) {
+            let did_pkh = DidPkh::from_caip10_account_id(stripped)?;
+            return Ok(Self::Pkh(did_pkh));
         }
 
         Err(AccountIdParseStrError::InvalidValueFormat {
@@ -80,6 +84,9 @@ impl AccountID {
 pub enum AccountIdParseStrError {
     #[error(transparent)]
     OdfParseError(#[from] ParseError<DidOdf>),
+
+    #[error(transparent)]
+    PkhParseError(#[from] DidPkhParseError),
 
     #[error("Invalid value format: {value}")]
     InvalidValueFormat { value: String },
@@ -118,15 +125,23 @@ impl From<DidKey> for AccountID {
     }
 }
 
+impl From<DidPkh> for AccountID {
+    fn from(did: DidPkh) -> Self {
+        Self::Pkh(did)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl std::fmt::Debug for AccountID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AccountID::Odf(did) => f
-                .debug_tuple(&format!("AccountID<{:?}>", Multicodec::Ed25519Pub))
+            Self::Odf(did) => f
+                .debug_tuple(&format!("AccountID<odf:{:?}>", Multicodec::Ed25519Pub))
                 .field(&did.as_multibase())
                 .finish(),
+            // TODO: Wallet-based auth: test
+            Self::Pkh(did) => f.debug_tuple("AccountID<pkh>").field(&did).finish(),
         }
     }
 }
@@ -136,7 +151,10 @@ impl std::fmt::Debug for AccountID {
 impl std::fmt::Display for AccountID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AccountID::Odf(did) => {
+            Self::Odf(did) => {
+                write!(f, "{}", did.as_did_str())
+            }
+            Self::Pkh(did) => {
                 write!(f, "{}", did.as_did_str())
             }
         }
@@ -150,7 +168,8 @@ impl std::fmt::Display for AccountID {
 impl serde::Serialize for AccountID {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match &self {
-            AccountID::Odf(did) => serializer.collect_str(&did.as_did_str()),
+            Self::Odf(did) => serializer.collect_str(&did.as_did_str()),
+            Self::Pkh(did) => serializer.collect_str(&did.as_did_str()),
         }
     }
 }
@@ -193,6 +212,7 @@ impl utoipa::PartialSchema for AccountID {
         Schema::Object(
             ObjectBuilder::new()
                 .schema_type(SchemaType::Type(Type::String))
+                // TODO: Wallet-based auth: add example
                 .examples([serde_json::json!(AccountID::new_seeded_ed25519(b"account"))])
                 .build(),
         )

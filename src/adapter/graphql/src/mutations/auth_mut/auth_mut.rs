@@ -72,9 +72,11 @@ impl AuthMut {
             .create_access_token(&token_name, &account_id)
             .await
         {
-            Ok(created_token) => Ok(CreateTokenResult::Success(CreateAccessTokenResultSuccess {
-                token: CreatedAccessToken::new(created_token, account_id, &token_name),
-            })),
+            Ok(created_token) => Ok(CreateTokenResult::Success(Box::new(
+                CreateAccessTokenResultSuccess {
+                    token: CreatedAccessToken::new(created_token, account_id, &token_name),
+                },
+            ))),
             Err(err) => match err {
                 CreateAccessTokenError::Duplicate(_) => Ok(CreateTokenResult::DuplicateName(
                     CreateAccessTokenResultDuplicate { token_name },
@@ -208,7 +210,7 @@ impl RevokeResultAlreadyRevoked<'_> {
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateTokenResult<'a> {
-    Success(CreateAccessTokenResultSuccess<'a>),
+    Success(Box<CreateAccessTokenResultSuccess<'a>>),
     DuplicateName(CreateAccessTokenResultDuplicate),
 }
 

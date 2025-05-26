@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod did_odf;
+mod did_pkh;
 
 pub use did_odf::*;
+pub use did_pkh::*;
 pub use multiformats::*;
