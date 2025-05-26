@@ -33,7 +33,7 @@ impl AccountID {
         Self::Odf(DidOdf::new_seeded_ed25519(seed))
     }
 
-    pub fn as_did(&self) -> Option<&DidOdf> {
+    pub fn as_did_odf(&self) -> Option<&DidOdf> {
         match self {
             AccountID::Odf(did) => Some(did),
         }
