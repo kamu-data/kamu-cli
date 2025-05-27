@@ -41,6 +41,13 @@ impl AccountID {
         }
     }
 
+    pub fn as_did_pkh(&self) -> Option<&DidPkh> {
+        match self {
+            Self::Odf(_) => None,
+            Self::Pkh(did) => Some(did),
+        }
+    }
+
     /// Reads `AccountID` from canonical byte representation
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AccountIdParseBytesError> {
         if bytes.starts_with(DID_ODF_PREFIX.as_bytes()) {
@@ -48,23 +55,21 @@ impl AccountID {
         }
 
         if bytes.starts_with(DID_PKH_PREFIX.as_bytes()) {
-            unimplemented!("Use AccountID::from_did_str for {DID_PKH_PREFIX}")
+            unimplemented!("Use AccountID::from_did_str() for {DID_PKH_PREFIX}")
         }
 
         Err(AccountIdParseBytesError::InvalidValueFormat)
     }
 
-    // TODO: Wallet-based auth: test
     /// Parses `AccountID` from a canonical `did:odf:<multibase>`
-    /// or `did:pkh:<chain-code>:<address>` string
+    /// or `did:pkh:<account_id(CAIP-10)>` string
     pub fn from_did_str(s: &str) -> Result<Self, AccountIdParseStrError> {
         if let Some(stripped) = s.strip_prefix(DID_ODF_PREFIX) {
             return Self::from_multibase_string(stripped).map_err(Into::into);
         }
 
         if let Some(stripped) = s.strip_prefix(DID_PKH_PREFIX) {
-            let did_pkh = DidPkh::from_caip10_account_id(stripped)?;
-            return Ok(Self::Pkh(did_pkh));
+            return Self::from_caip10_account_id(stripped).map_err(Into::into);
         }
 
         Err(AccountIdParseStrError::InvalidValueFormat {
@@ -75,6 +80,12 @@ impl AccountID {
     /// Parses `AccountID` from a multibase string (without `did:odf:`) prefix
     pub fn from_multibase_string(s: &str) -> Result<Self, ParseError<DidOdf>> {
         Ok(Self::Odf(DidOdf::from_multibase(s)?))
+    }
+
+    /// Parses `AccountID` from a CAIP-10 account ID string (without `did:pkh:`)
+    /// prefix
+    pub fn from_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
+        Ok(Self::Pkh(DidPkh::from_caip10_account_id(s)?))
     }
 }
 
@@ -137,11 +148,10 @@ impl std::fmt::Debug for AccountID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Odf(did) => f
-                .debug_tuple(&format!("AccountID<odf:{:?}>", Multicodec::Ed25519Pub))
+                .debug_tuple(&format!("AccountID<{:?}>", Multicodec::Ed25519Pub))
                 .field(&did.as_multibase())
                 .finish(),
-            // TODO: Wallet-based auth: test
-            Self::Pkh(did) => f.debug_tuple("AccountID<pkh>").field(&did).finish(),
+            Self::Pkh(did) => f.debug_tuple("AccountID").field(&did).finish(),
         }
     }
 }
@@ -207,13 +217,19 @@ impl utoipa::ToSchema for AccountID {}
 #[cfg(feature = "utoipa")]
 impl utoipa::PartialSchema for AccountID {
     fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use serde_json::json;
         use utoipa::openapi::schema::*;
 
         Schema::Object(
             ObjectBuilder::new()
                 .schema_type(SchemaType::Type(Type::String))
-                // TODO: Wallet-based auth: add example
-                .examples([serde_json::json!(AccountID::new_seeded_ed25519(b"account"))])
+                .examples([
+                    json!(AccountID::new_seeded_ed25519(b"account")),
+                    json!(AccountID::from_caip10_account_id(
+                        "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+                    )
+                    .unwrap()),
+                ])
                 .build(),
         )
         .into()

@@ -20,7 +20,7 @@ pub const DID_PKH_PREFIX: &str = "did:pkh:";
 /// Format: `did:pkh:<account_id(CAIP-10)>`
 ///
 /// Example: `did:pkh:eip155:1:0xab16a96D359eC26a11e2C2b3d8f8B8942d5Bfcdb`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DidPkh {
     caip10_account_id: caip10::BlockchainAccountId,
 }
@@ -39,11 +39,13 @@ impl DidPkh {
 
     /// Parses DID from a CAIP-10 account ID string
     pub fn from_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
-        use std::str::FromStr;
+        Ok(Self {
+            caip10_account_id: s.parse()?,
+        })
+    }
 
-        let caip10_account_id = caip10::BlockchainAccountId::from_str(s)?;
-
-        Ok(Self { caip10_account_id })
+    pub fn caip10_account_id(&self) -> &caip10::BlockchainAccountId {
+        &self.caip10_account_id
     }
 
     /// Formats DID as a canonical `did:pkh:<account_id(CAIP-10)>` string
@@ -103,7 +105,15 @@ impl PartialOrd for DidPkh {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Wallet-based auth: implement std::fmt::Debug?
+impl std::fmt::Debug for DidPkh {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("DidPkh")
+            .field(&self.caip10_account_id.chain_id.namespace)
+            .field(&self.caip10_account_id.chain_id.reference)
+            .field(&self.caip10_account_id.account_address)
+            .finish()
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -115,9 +125,7 @@ impl multiformats::Multiformat for DidPkh {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// /// Formats [`DidPkh`] as a canonical `did:pkh:<chain-code>:<address>` string
+/// Formats [`DidPkh`] as a canonical `did:pkh:<chain-code>:<address>` string
 pub struct DidPkhFmt<'a> {
     value: &'a DidPkh,
 }

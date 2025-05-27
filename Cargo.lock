@@ -9192,6 +9192,7 @@ dependencies = [
  "internal-error",
  "like",
  "multiformats",
+ "pretty_assertions",
  "prost",
  "rand 0.8.5",
  "serde",
