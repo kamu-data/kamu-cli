@@ -12,7 +12,6 @@ use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizerExt};
 use kamu_search::SearchLocalNatLangError;
-use odf::dataset::TryStreamExtExt as _;
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -58,22 +57,10 @@ impl Search {
         //       - Logged: all owned datasets and datasets with relations
         let filtered_all_dataset_handles_stream =
             filter_dataset_handle_stream(dataset_registry.all_dataset_handles(), |hdl| {
-                hdl.alias
-                    .account_name
-                    .as_ref()
-                    .map_or(false, |name| name.contains(&query))
-                    || hdl.alias.dataset_name.contains(&query)
+                format!("{}", hdl.alias).contains(&query)
             });
-        let readable_dataset_handles_stream = dataset_action_authorizer
-            .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetAction::Read);
-        let mut readable_dataset_handles = readable_dataset_handles_stream
-            .filter_ok(|hdl| {
-                hdl.alias
-                    .account_name
-                    .as_ref()
-                    .map_or(false, |name| name.contains(&query))
-                    || hdl.alias.dataset_name.contains(&query)
-            })
+        let mut readable_dataset_handles = dataset_action_authorizer
+            .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetAction::Read)
             .try_collect::<Vec<_>>()
             .await?;
         // Sort first by dataset name and for stability after by account name

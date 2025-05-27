@@ -117,6 +117,7 @@ pub async fn test_search_dataset_by_account_substring(
         )
         .await;
 
+    kamu_api_server_client.auth().logout();
     kamu_api_server_client.auth().login_as_e2e_user().await;
 
     let foo1_alias = odf::DatasetAlias {
