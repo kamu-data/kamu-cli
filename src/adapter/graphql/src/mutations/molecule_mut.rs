@@ -22,7 +22,7 @@ pub(crate) struct MoleculeMut;
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl MoleculeMut {
-    #[graphql(guard = "LoggedInGuard::new()")]
+    #[graphql(guard = "LoggedInGuard")]
     #[tracing::instrument(level = "info", name = MoleculeMut_create_project, skip_all, fields(?ipnft_symbol, ?ipnft_uid))]
     async fn create_project(
         &self,
@@ -30,7 +30,7 @@ impl MoleculeMut {
         ipnft_symbol: String,
         ipnft_uid: String,
         ipnft_address: String,
-        ipnft_token_id: usize,
+        ipnft_token_id: BigInt,
     ) -> Result<CreateProjectResult> {
         use datafusion::logical_expr::{col, lit};
 
@@ -63,7 +63,7 @@ impl MoleculeMut {
             }
         };
 
-        if ipnft_uid != format!("{ipnft_address}_{ipnft_token_id}") {
+        if ipnft_uid != format!("{ipnft_address}_{}", ipnft_token_id.as_ref()) {
             return Err(Error::new("Inconsistent ipnft info").into());
         }
 
@@ -105,7 +105,7 @@ impl MoleculeMut {
             }
         }
 
-        // Create project account
+        // Create a project account
         let molecule_account = account_svc
             .account_by_id(subject.account_id())
             .await?
