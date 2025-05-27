@@ -15,6 +15,22 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - Panic's now also log correct tracing message
 
+## [0.239.0] - 2025-05-26
+### Added
+- Prototype of webhooks support:
+   - webhooks are sent for dataset update events
+   - GQL API to subscribe, update, pause/resume and remove subbscriptions
+   - webhook events are recorded per business event via outbox bridge
+   - webhook events that match enabled subscriptions get scheduled in the task system
+   - webhooks are attempted with at most 10s timeout, but no retries are supported yet
+   - webhook request and delivery headers and content are saved for future debug purposes
+   - webhook messages are signed in the spirit of webhook signatures (RFC 9421) and content digests (RFC 9530)
+### Changed
+- Extended create dataset GQL results with isSuccess
+- GQL: versioned files return `contentLength` field
+### Fixed
+- GQL: all dataset mutations require logged-in users
+
 ## [0.238.0] - 2025-05-22
 ### Added
 - GQL: Added new scalars: `Email`, AccountPassword`.

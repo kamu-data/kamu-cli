@@ -13,7 +13,7 @@ use dill::*;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
-use kamu_core::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
+use kamu_core::auth::DatasetActionAuthorizer;
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
@@ -80,7 +80,7 @@ impl BaseGQLDatasetHarness {
                 b.add_value(mock)
                     .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
             } else {
-                b.add::<AlwaysHappyDatasetActionAuthorizer>();
+                kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
             }
 
             NoOpDatabasePlugin::init_database_components(&mut b);

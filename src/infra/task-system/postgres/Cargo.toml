@@ -1,6 +1,6 @@
 [package]
 name = "kamu-task-system-postgres"
-description = "Postgres-specific implementation of the compute node's task system for testing purposes"
+description = "Postgres-specific implementation of the compute node's task system"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

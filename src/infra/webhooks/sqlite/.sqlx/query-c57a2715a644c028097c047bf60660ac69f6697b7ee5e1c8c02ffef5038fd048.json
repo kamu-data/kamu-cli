@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE webhook_subscriptions\n                    SET last_event_id = $2\n                    WHERE id = $1 AND (\n                        last_event_id IS NULL AND CAST($3 as BIGINT) IS NULL OR\n                        last_event_id IS NOT NULL AND CAST($3 as BIGINT) IS NOT NULL AND last_event_id = $3\n                    )\n                    RETURNING status as \"status: _\"\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "status: _",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c57a2715a644c028097c047bf60660ac69f6697b7ee5e1c8c02ffef5038fd048"
+}

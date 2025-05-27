@@ -28,6 +28,7 @@ mod event_id;
 mod flow_configuration;
 mod flow_scalars;
 mod flow_trigger;
+mod gql_url;
 mod key_value;
 mod metadata;
 mod multihash;
@@ -36,6 +37,7 @@ mod os_path;
 mod pagination;
 mod task_id;
 mod task_status_outcome;
+mod webhook_scalars;
 
 pub use access_token::*;
 pub use account::*;
@@ -58,6 +60,7 @@ pub use event_id::*;
 pub use flow_configuration::*;
 pub use flow_scalars::*;
 pub use flow_trigger::*;
+pub use gql_url::*;
 pub use key_value::*;
 pub use metadata::*;
 pub use multihash::*;
@@ -66,8 +69,7 @@ pub use os_path::*;
 pub use pagination::*;
 pub use task_id::*;
 pub use task_status_outcome::*;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub use webhook_scalars::*;
 
 macro_rules! simple_scalar {
     ($name: ident, $source_type: ty) => {

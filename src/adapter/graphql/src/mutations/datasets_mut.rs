@@ -66,6 +66,7 @@ impl DatasetsMut {
 impl DatasetsMut {
     /// Returns a mutable dataset by its ID
     #[tracing::instrument(level = "info", name = DatasetsMut_by_id, skip_all, fields(%dataset_id))]
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn by_id(
         &self,
         ctx: &Context<'_>,
@@ -248,30 +249,6 @@ impl DatasetsMut {
         >,
         #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
-        let push_source = odf::metadata::AddPushSource {
-            source_name: "default".into(),
-            read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
-                schema: Some(
-                    [
-                        "version INT".to_string(),
-                        "content_hash STRING".to_string(),
-                        "content_type STRING".to_string(),
-                    ]
-                    .into_iter()
-                    .chain(
-                        extra_columns
-                            .unwrap_or_default()
-                            .into_iter()
-                            .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
-                    )
-                    .collect(),
-                ),
-                ..Default::default()
-            }),
-            preprocess: None,
-            merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
-        };
-
         let extra_events_parsed = match self
             .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
         {
@@ -280,14 +257,11 @@ impl DatasetsMut {
             Err(Err(err)) => return Err(err),
         };
 
-        let snapshot = odf::DatasetSnapshot {
-            name: dataset_alias.into(),
-            kind: odf::DatasetKind::Root,
-            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
-                .into_iter()
-                .chain(extra_events_parsed.into_iter())
-                .collect(),
-        };
+        let snapshot = crate::queries::VersionedFile::dataset_shapshot(
+            dataset_alias.into(),
+            extra_columns.unwrap_or_default(),
+            extra_events_parsed,
+        );
 
         self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
             .await
@@ -315,31 +289,6 @@ impl DatasetsMut {
         >,
         #[graphql(desc = "Visibility of the dataset")] dataset_visibility: DatasetVisibility,
     ) -> Result<CreateDatasetFromSnapshotResult> {
-        let push_source = odf::metadata::AddPushSource {
-            source_name: "default".into(),
-            read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
-                schema: Some(
-                    ["op INT", "path STRING", "ref STRING"]
-                        .into_iter()
-                        .map(str::to_string)
-                        .chain(
-                            extra_columns
-                                .unwrap_or_default()
-                                .into_iter()
-                                .map(|c| format!("{} {}", c.name, c.data_type.ddl)),
-                        )
-                        .collect(),
-                ),
-                ..Default::default()
-            }),
-            preprocess: None,
-            merge: odf::metadata::MergeStrategy::ChangelogStream(
-                odf::metadata::MergeStrategyChangelogStream {
-                    primary_key: vec!["path".to_string()],
-                },
-            ),
-        };
-
         let extra_events_parsed = match self
             .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
         {
@@ -348,14 +297,11 @@ impl DatasetsMut {
             Err(Err(err)) => return Err(err),
         };
 
-        let snapshot = odf::DatasetSnapshot {
-            name: dataset_alias.into(),
-            kind: odf::DatasetKind::Root,
-            metadata: [odf::MetadataEvent::AddPushSource(push_source)]
-                .into_iter()
-                .chain(extra_events_parsed.into_iter())
-                .collect(),
-        };
+        let snapshot = crate::queries::Collection::dataset_shapshot(
+            dataset_alias.into(),
+            extra_columns.unwrap_or_default(),
+            extra_events_parsed,
+        );
 
         self.create_from_snapshot_impl(ctx, snapshot, dataset_visibility.into())
             .await
@@ -367,14 +313,20 @@ impl DatasetsMut {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
 pub enum CreateDatasetResult<'a> {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision<'a>),
 }
 
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(
+    field(name = "is_success", ty = "bool"),
+    field(name = "message", ty = "String")
+)]
 pub enum CreateDatasetFromSnapshotResult<'a> {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision<'a>),
@@ -396,7 +348,10 @@ pub struct CreateDatasetResultSuccess {
 
 #[ComplexObject]
 impl CreateDatasetResultSuccess {
-    async fn message(&self) -> String {
+    pub async fn is_success(&self) -> bool {
+        true
+    }
+    pub async fn message(&self) -> String {
         "Success".to_string()
     }
 }
@@ -412,7 +367,10 @@ pub struct CreateDatasetResultNameCollision<'a> {
 
 #[ComplexObject]
 impl CreateDatasetResultNameCollision<'_> {
-    async fn message(&self) -> String {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+    pub async fn message(&self) -> String {
         format!("Dataset with name '{}' already exists", self.dataset_name)
     }
 }
@@ -420,8 +378,16 @@ impl CreateDatasetResultNameCollision<'_> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
+#[graphql(complex)]
 pub struct CreateDatasetResultInvalidSnapshot {
     pub message: String,
+}
+
+#[ComplexObject]
+impl CreateDatasetResultInvalidSnapshot {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -436,7 +402,10 @@ pub struct CreateDatasetResultMissingInputs {
 
 #[ComplexObject]
 impl CreateDatasetResultMissingInputs {
-    async fn message(&self) -> String {
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+    pub async fn message(&self) -> String {
         format!(
             "Dataset is referencing non-existing inputs: {}",
             self.missing_inputs.join(", ")

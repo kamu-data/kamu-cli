@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::*;
 use kamu_accounts::{
     CurrentAccountSubject,
     DidEntity,
@@ -80,11 +80,11 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         // There must be a logged-in user
-        let (logged_account_id, logged_account_name) = match self.current_account_subject.as_ref() {
+        let subject = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(subj) => subj,
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account cannot create dataset");
             }
-            CurrentAccountSubject::Logged(l) => (&l.account_id, &l.account_name),
         };
 
         // Validate / resolve metadata events from the snapshot
@@ -94,14 +94,10 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         )
         .await?;
 
-        // Adjust alias for the current tenancy configuration
-        let canonical_alias = self
+        // Resolve a target account and full alias of the dataset
+        let (canonical_alias, target_account_id) = self
             .create_helper
-            .canonical_dataset_alias(&snapshot.name, logged_account_name);
-
-        // Verify that we can create a dataset with this alias
-        self.create_helper
-            .validate_canonical_dataset_alias_account_name(&canonical_alias, logged_account_name)?;
+            .resolve_alias_target(&snapshot.name, subject)?;
 
         let dataset_did = self.did_generator.generate_dataset_id();
         // Make a seed block
@@ -113,7 +109,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         self.create_helper
             .create_dataset_entry(
                 &seed_block.event.dataset_id,
-                logged_account_id,
+                &target_account_id,
                 canonical_alias.as_ref(),
                 snapshot.kind,
             )
@@ -123,6 +119,9 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             let dataset_did_secret_key =
                 DidSecretKey::try_new(&dataset_did.1, did_secret_encryption_key.expose_secret())
                     .int_err()?;
+
+            // Note: subject and target might be two different accounts, but we use subject
+            // here as the creator of the key
             self.did_secret_key_repo
                 .save_did_secret_key(
                     &DidEntity::new_dataset(dataset_did.0.to_string()),
@@ -148,12 +147,21 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .await
         .int_err()?;
 
+        // TODO: Creating dataset under another account is not supported yet.
+        // In future we should check organization-level permissions here.
+        //
+        // See: https://github.com/kamu-data/kamu-node/issues/233
+        assert_eq!(
+            target_account_id, subject.account_id,
+            "Creating dataset under another account is not supported yet"
+        );
+
         // Notify interested parties the dataset was created
         self.create_helper
             .notify_dataset_created(
                 &store_result.dataset_id,
                 canonical_alias.dataset_name(),
-                logged_account_id,
+                &target_account_id,
                 options.dataset_visibility,
             )
             .await?;
