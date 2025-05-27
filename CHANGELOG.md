@@ -11,6 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- GQL: `BigInt` scalar
+### Changed
+- GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
+
 ## [0.239.0] - 2025-05-26
 ### Added
 - Prototype of webhooks support:
@@ -26,7 +32,6 @@ Recommendation: for ease of reading, use the following order:
 - GQL: versioned files return `contentLength` field
 ### Fixed
 - GQL: all dataset mutations require logged-in users
-
 
 ## [0.238.0] - 2025-05-22
 ### Added

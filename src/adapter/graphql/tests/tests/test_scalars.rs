@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-use kamu_adapter_graphql::scalars::ExtraData;
+use kamu_adapter_graphql::scalars::{BigInt, ExtraData};
 use kamu_adapter_graphql::traits::ResponseExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,11 +90,92 @@ async fn extra_data() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn extra_big_int() {
+    fn request(variables_as_value: Value) -> Request {
+        Request::new(indoc::indoc!(
+            r#"
+            query ($bigInt: BigInt!) {
+              bigInt(value: $bigInt)
+            }
+            "#
+        ))
+        .variables(Variables::from_value(variables_as_value))
+    }
+
+    let schema = schema();
+
+    {
+        let res = schema
+            .execute(request(
+                value!({
+                    "bigInt": "108494037067113761580099112583860151730516105403483528465874625006707409835912"
+                }),
+            ))
+            .await;
+        pretty_assertions::assert_eq!(
+            value!({
+                "bigInt": "108494037067113761580099112583860151730516105403483528465874625006707409835912"
+            }),
+            res.data,
+            "{res:?}"
+        );
+    }
+    {
+        let res = schema
+            .execute(request(value!({
+                "bigInt": ""
+            })))
+            .await;
+        pretty_assertions::assert_eq!(
+            [
+                "Failed to parse \"BigInt\": Invalid BigInt: cannot parse integer from empty \
+                 string"
+            ],
+            *res.error_messages(),
+            "{res:?}"
+        );
+    }
+    {
+        let res = schema
+            .execute(request(value!({
+                "bigInt": 9
+            })))
+            .await;
+        pretty_assertions::assert_eq!(
+            [
+                "Failed to parse \"BigInt\": Invalid BigInt: the value is expected to be a string \
+                 (\"9\") instead of a number (9)"
+            ],
+            *res.error_messages(),
+            "{res:?}"
+        );
+    }
+    {
+        let res = schema
+            .execute(request(value!({
+                "bigInt": "0xFFFF"
+            })))
+            .await;
+        pretty_assertions::assert_eq!(
+            ["Failed to parse \"BigInt\": Invalid BigInt: invalid digit found in string"],
+            *res.error_messages(),
+            "{res:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct TestScalarQuery;
 
 #[Object]
 impl TestScalarQuery {
     async fn extra_data(&self, value: ExtraData) -> ExtraData {
+        value
+    }
+
+    async fn big_int(&self, value: BigInt) -> BigInt {
         value
     }
 }
