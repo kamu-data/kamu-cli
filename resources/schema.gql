@@ -342,6 +342,11 @@ input BatchingInput {
 	maxBatchingInterval: TimeDeltaInput!
 }
 
+"""
+A big integer scalar type.
+"""
+scalar BigInt
+
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -2501,7 +2506,7 @@ type Molecule {
 }
 
 type MoleculeMut {
-	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: Int!): CreateProjectResult!
+	createProject(ipnftSymbol: String!, ipnftUid: String!, ipnftAddress: String!, ipnftTokenId: BigInt!): CreateProjectResult!
 	"""
 	Looks up the project
 	"""
@@ -2532,7 +2537,7 @@ type MoleculeProject {
 	"""
 	Token ID withing the IPNFT contract
 	"""
-	ipnftTokenId: Int!
+	ipnftTokenId: BigInt!
 	"""
 	Project's organizational account
 	"""

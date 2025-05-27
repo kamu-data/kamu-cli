@@ -39,7 +39,7 @@ impl Molecule {
                                 "ipnft_symbol STRING",
                                 "ipnft_uid STRING",
                                 "ipnft_address STRING",
-                                "ipnft_token_id BIGINT",
+                                "ipnft_token_id STRING",
                                 "data_room_dataset_id STRING",
                                 "announcements_dataset_id STRING",
                             ]
@@ -358,7 +358,7 @@ pub struct MoleculeProject {
     pub ipnft_address: String,
 
     /// Token ID withing the IPNFT contract
-    pub ipnft_token_id: usize,
+    pub ipnft_token_id: BigInt,
 
     #[graphql(skip)]
     pub data_room_dataset_id: odf::DatasetID,
@@ -426,7 +426,17 @@ impl MoleculeProject {
             .unwrap()
             .to_string();
 
-        let ipnft_token_id = record.remove("ipnft_token_id").unwrap().as_i64().unwrap();
+        let ipnft_token_id = {
+            let value = record.remove("ipnft_token_id").unwrap();
+
+            if let Some(s) = value.as_str() {
+                BigInt::new(s.parse().unwrap())
+            } else if let Some(n) = value.as_number() {
+                BigInt::new(n.to_string().parse().unwrap())
+            } else {
+                panic!("Unexpected value for ipnft_token_id: {value:?}");
+            }
+        };
 
         let data_room_dataset_id = odf::DatasetID::from_did_str(
             record
@@ -453,7 +463,7 @@ impl MoleculeProject {
             ipnft_symbol,
             ipnft_uid,
             ipnft_address,
-            ipnft_token_id: usize::try_from(ipnft_token_id).unwrap(),
+            ipnft_token_id,
             data_room_dataset_id,
             announcements_dataset_id,
         }
@@ -465,7 +475,7 @@ impl MoleculeProject {
         r["ipnft_symbol"] = self.ipnft_symbol.clone().into();
         r["ipnft_uid"] = self.ipnft_uid.clone().into();
         r["ipnft_address"] = self.ipnft_address.clone().into();
-        r["ipnft_token_id"] = self.ipnft_token_id.into();
+        r["ipnft_token_id"] = self.ipnft_token_id.clone().into_inner().to_string().into();
         r["data_room_dataset_id"] = self.data_room_dataset_id.as_did_str().to_string().into();
         r["announcements_dataset_id"] = self
             .announcements_dataset_id
