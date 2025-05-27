@@ -16,5 +16,6 @@ mod test_ingest;
 mod test_odf_core;
 mod test_odf_query;
 mod test_openapi;
+mod test_search;
 mod test_swagger;
 mod test_upload;

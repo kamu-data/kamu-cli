@@ -493,38 +493,49 @@ impl DatasetApi<'_> {
         &self,
         dataset_kind: odf::DatasetKind,
         dataset_alias: &odf::DatasetAlias,
+        dataset_visibility: &odf::DatasetVisibility,
     ) -> CreateDatasetResponse {
-        let create_response = self
-            .client
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    mutation {
-                      datasets {
-                        createEmpty(datasetKind: <dataset_kind>, datasetAlias: "<dataset_alias>") {
-                          message
-                          ... on CreateDatasetResultSuccess {
-                            dataset {
-                              id
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#,
-                )
-                .replace(
-                    "<dataset_kind>",
-                    &format!("{dataset_kind:?}").to_uppercase(),
-                )
-                .replace("<dataset_alias>", &format!("{dataset_alias}"))
-                .as_str(),
-                None,
-            )
-            .await
-            .data();
+        let dataset_visibility_value = if dataset_visibility.is_public() {
+            "PUBLIC"
+        } else {
+            "PRIVATE"
+        };
 
-        let create_response_node = &create_response["datasets"]["createEmpty"];
+        let create_response = self.client
+            .graphql_api_call_ex(
+                async_graphql::Request::new(indoc::indoc!(
+                r#"
+                mutation createEmptyDataset(
+                        $datasetKind: DatasetKind!,
+                        $datasetAlias: DatasetAlias!,
+                        $datasetVisibility: DatasetVisibility!,
+                    ) {
+                        datasets {
+                            createEmpty(datasetKind: $datasetKind, datasetAlias: $datasetAlias, datasetVisibility: $datasetVisibility) {
+                                message
+                                ... on CreateDatasetResultSuccess {
+                                    dataset {
+                                        id
+                                        alias
+                                    }
+                                }
+                            }
+                        }
+                    }
+                "#,
+            ))
+            .variables(async_graphql::Variables::from_value(
+                async_graphql::value!({
+                    "datasetKind": format!("{dataset_kind:?}").to_uppercase(),
+                    "datasetAlias": dataset_alias,
+                    "datasetVisibility": dataset_visibility_value,
+                }),
+            )),
+            )
+            .await;
+
+        let create_response_node =
+            &create_response.data.into_json().unwrap()["datasets"]["createEmpty"];
 
         pretty_assertions::assert_eq!(Some("Success"), create_response_node["message"].as_str());
 
