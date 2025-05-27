@@ -59,7 +59,7 @@ pub async fn test_search_dataset_by_name(mut kamu_api_server_client: KamuApiServ
             async_graphql::Request::new(indoc::indoc!(
                 r#"
                 query search(
-                  $query: String!, 
+                  $query: String!,
                 ) {
                     search {
                         query(query: $query) {
@@ -77,11 +77,11 @@ pub async fn test_search_dataset_by_name(mut kamu_api_server_client: KamuApiServ
                 async_graphql::value!({
                     "query": "foo",
                 }),
-            ))
+            )),
         )
         .await;
 
-        pretty_assertions::assert_eq!(
+    pretty_assertions::assert_eq!(
         async_graphql::value!({
             "search": {
                 "query": {
@@ -100,7 +100,9 @@ pub async fn test_search_dataset_by_name(mut kamu_api_server_client: KamuApiServ
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_search_dataset_by_account_substring(mut kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_search_dataset_by_account_substring(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
     kamu_api_server_client.auth().login_as_kamu().await;
     let bar_alias = odf::DatasetAlias {
         account_name: Some(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR)),
@@ -149,7 +151,7 @@ pub async fn test_search_dataset_by_account_substring(mut kamu_api_server_client
             async_graphql::Request::new(indoc::indoc!(
                 r#"
                 query search(
-                  $query: String!, 
+                  $query: String!,
                 ) {
                     search {
                         query(query: $query) {
@@ -167,11 +169,11 @@ pub async fn test_search_dataset_by_account_substring(mut kamu_api_server_client
                 async_graphql::value!({
                     "query": "e2e",
                 }),
-            ))
+            )),
         )
         .await;
 
-        pretty_assertions::assert_eq!(
+    pretty_assertions::assert_eq!(
         async_graphql::value!({
             "search": {
                 "query": {
