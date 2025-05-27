@@ -118,7 +118,7 @@ async fn test_molecule_provision_project() {
                 "ipnftSymbol": "vitafast",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 9,
+                "ipnftTokenId": "9",
             })),
         ))
         .await;
@@ -190,7 +190,7 @@ async fn test_molecule_provision_project() {
             "ipnftSymbol": "vitafast",
             "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
             "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-            "ipnftTokenId": 9,
+            "ipnftTokenId": "9",
         }),
     );
 
@@ -215,7 +215,7 @@ async fn test_molecule_provision_project() {
                 "ipnftSymbol": "vitaslow",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 9,
+                "ipnftTokenId": "9",
             })),
         ))
         .await;
@@ -237,7 +237,7 @@ async fn test_molecule_provision_project() {
                 "ipnftSymbol": "vitafast",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_1",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 1,
+                "ipnftTokenId": "1",
             })),
         ))
         .await;
@@ -258,9 +258,9 @@ async fn test_molecule_provision_project() {
         .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
             async_graphql::Variables::from_json(json!({
                 "ipnftSymbol": "vitaslow",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
+                "ipnftUid": r#"0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912"#,
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 10,
+                "ipnftTokenId": "108494037067113761580099112583860151730516105403483528465874625006707409835912",
             })),
         ))
         .await;
@@ -286,7 +286,7 @@ async fn test_molecule_provision_project() {
             },
             {
                 "ipnftSymbol": "vitaslow",
-                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_10",
+                "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_108494037067113761580099112583860151730516105403483528465874625006707409835912",
             }
         ]),
     );
@@ -308,7 +308,7 @@ async fn test_molecule_data_room_operations() {
                 "ipnftSymbol": "vitafast",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 9,
+                "ipnftTokenId": "9",
             })),
         ))
         .await;
@@ -488,7 +488,7 @@ async fn test_molecule_announcements_operations() {
                 "ipnftSymbol": "vitafast",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 9,
+                "ipnftTokenId": "9",
             })),
         ))
         .await;
@@ -797,7 +797,7 @@ async fn test_molecule_activity() {
                 "ipnftSymbol": "vitafast",
                 "ipnftUid": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1_9",
                 "ipnftAddress": "0xcaD88677CA87a7815728C72D74B4ff4982d54Fc1",
-                "ipnftTokenId": 9,
+                "ipnftTokenId": "9",
             })),
         ))
         .await;

@@ -139,11 +139,26 @@ async fn extra_big_int() {
     {
         let res = schema
             .execute(request(value!({
+                "bigInt": 9
+            })))
+            .await;
+        pretty_assertions::assert_eq!(
+            [
+                "Failed to parse \"BigInt\": Invalid BigInt: the value is expected to be a string \
+                 (\"9\") instead of a number (9)"
+            ],
+            *res.error_messages(),
+            "{res:?}"
+        );
+    }
+    {
+        let res = schema
+            .execute(request(value!({
                 "bigInt": "0xFFFF"
             })))
             .await;
         pretty_assertions::assert_eq!(
-            ["Failed to parse \"BigInt\": Invalid BigInt: invalid digit found in string",],
+            ["Failed to parse \"BigInt\": Invalid BigInt: invalid digit found in string"],
             *res.error_messages(),
             "{res:?}"
         );
