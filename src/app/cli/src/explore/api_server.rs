@@ -14,13 +14,13 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use axum::{middleware, Extension};
+use axum::{Extension, middleware};
 use database_common_macros::transactional_handler;
 use http_common::ApiError;
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
-use kamu_adapter_http::e2e::e2e_router;
 use kamu_adapter_http::DatasetAuthorizationLayer;
+use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowAgent;
 use kamu_task_system_inmem::domain::TaskAgent;
 use messaging_outbox::OutboxAgent;
@@ -83,7 +83,7 @@ impl APIServer {
 
         if let Some(path) = e2e_output_data_path {
             fs::write(path, base_url_rest.to_string()).unwrap();
-        };
+        }
 
         let default_protocols = Protocols::default();
 

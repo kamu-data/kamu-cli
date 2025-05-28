@@ -23,10 +23,10 @@ use kamu::domain::upload_service::{
 use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
+    DEFAULT_ACCOUNT_ID,
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
-    DEFAULT_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -53,7 +53,7 @@ use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
-use crate::harness::{await_client_server_flow, TestAPIServer};
+use crate::harness::{TestAPIServer, await_client_server_flow};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

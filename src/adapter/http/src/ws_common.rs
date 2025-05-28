@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::BoxedError;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

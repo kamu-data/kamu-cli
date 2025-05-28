@@ -432,8 +432,8 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
 
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
-    use odf::metadata::testing::{account_id, account_name as name};
     use SearchAccountsByNamePatternFilters as Filters;
+    use odf::metadata::testing::{account_id, account_name as name};
 
     let accounts = [
         account("user1", "alice (deactivated)", "alice@example.com"),

@@ -122,7 +122,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             return Err(ProviderLoginError::RejectedCredentials(
                 RejectedCredentialsError {},
             ));
-        };
+        }
 
         // Extract known account data
         let account = self

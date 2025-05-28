@@ -14,8 +14,8 @@ use std::io::{Cursor, Write};
 use std::path::PathBuf;
 
 use grep_regex::{RegexMatcher, RegexMatcherBuilder};
-use grep_searcher::sinks::UTF8;
 use grep_searcher::Searcher;
+use grep_searcher::sinks::UTF8;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

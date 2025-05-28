@@ -97,10 +97,10 @@ impl std::fmt::Display for ErrorBacktraceFormatter<'_> {
         let mut error = Some(self.0);
         let mut backtrace = None;
         while let Some(e) = error {
-            if let Some(bt) = core::error::request_ref::<Backtrace>(e) {
-                if bt.status() == BacktraceStatus::Captured {
-                    backtrace = Some(bt);
-                }
+            if let Some(bt) = core::error::request_ref::<Backtrace>(e)
+                && bt.status() == BacktraceStatus::Captured
+            {
+                backtrace = Some(bt);
             }
             error = e.source();
         }

@@ -38,10 +38,7 @@ async fn compare_chains(
     rhs_chain: &dyn odf::MetadataChain,
 ) -> CompareChainsResult {
     let lhs_head = lhs_chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
-    let rhs_head = match rhs_chain.resolve_ref(&odf::BlockRef::Head).await {
-        Ok(h) => Some(h),
-        Err(_) => None,
-    };
+    let rhs_head = rhs_chain.resolve_ref(&odf::BlockRef::Head).await.ok();
 
     MetadataChainComparator::compare_chains(
         lhs_chain,

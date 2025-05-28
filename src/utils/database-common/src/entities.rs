@@ -115,12 +115,9 @@ impl EntityPageStreamer {
     ) -> EntityPageStream<'a, Entity>
     where
         Entity: Send + 'a,
-
         Args: Clone + Send + 'a,
-
         HInitArgs: FnOnce() -> HInitArgsFut + Send + 'a,
         HInitArgsFut: Future<Output = Result<Args, InternalError>> + Send + 'a,
-
         HListing: Fn(Args, PaginationOpts) -> HListingFut + Send + 'a,
         HListingFut: Future<Output = Result<EntityPageListing<Entity>, InternalError>> + Send + 'a,
     {

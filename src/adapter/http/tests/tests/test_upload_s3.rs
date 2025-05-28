@@ -15,10 +15,10 @@ use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{FileUploadLimitConfig, ServerUrlConfig, TenancyConfig, UploadContext};
 use kamu_accounts::{
+    DEFAULT_ACCOUNT_ID,
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
-    DEFAULT_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -47,7 +47,7 @@ use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 use tokio::io::AsyncReadExt;
 
-use crate::harness::{await_client_server_flow, TestAPIServer};
+use crate::harness::{TestAPIServer, await_client_server_flow};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

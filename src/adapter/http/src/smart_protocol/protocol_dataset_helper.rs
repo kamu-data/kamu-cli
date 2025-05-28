@@ -320,57 +320,53 @@ async fn collect_object_references_from_block(
 
     match &block.event {
         odf::MetadataEvent::AddData(e) => {
-            if let Some(new_data) = &e.new_data {
-                if !missing_files_only
-                    || !data_repo.contains(&new_data.physical_hash).await.unwrap()
-                {
-                    target_references.push(ObjectFileReference {
-                        object_type: ObjectType::DataSlice,
-                        physical_hash: new_data.physical_hash.clone(),
-                        size: new_data.size,
-                    });
-                }
+            if let Some(new_data) = &e.new_data
+                && (!missing_files_only
+                    || !data_repo.contains(&new_data.physical_hash).await.unwrap())
+            {
+                target_references.push(ObjectFileReference {
+                    object_type: ObjectType::DataSlice,
+                    physical_hash: new_data.physical_hash.clone(),
+                    size: new_data.size,
+                });
             }
-            if let Some(new_checkpoint) = &e.new_checkpoint {
-                if !missing_files_only
+            if let Some(new_checkpoint) = &e.new_checkpoint
+                && (!missing_files_only
                     || !checkpoint_repo
                         .contains(&new_checkpoint.physical_hash)
                         .await
-                        .unwrap()
-                {
-                    target_references.push(ObjectFileReference {
-                        object_type: ObjectType::Checkpoint,
-                        physical_hash: new_checkpoint.physical_hash.clone(),
-                        size: new_checkpoint.size,
-                    });
-                }
+                        .unwrap())
+            {
+                target_references.push(ObjectFileReference {
+                    object_type: ObjectType::Checkpoint,
+                    physical_hash: new_checkpoint.physical_hash.clone(),
+                    size: new_checkpoint.size,
+                });
             }
         }
         odf::MetadataEvent::ExecuteTransform(e) => {
-            if let Some(new_data) = &e.new_data {
-                if !missing_files_only
-                    || !data_repo.contains(&new_data.physical_hash).await.unwrap()
-                {
-                    target_references.push(ObjectFileReference {
-                        object_type: ObjectType::DataSlice,
-                        physical_hash: new_data.physical_hash.clone(),
-                        size: new_data.size,
-                    });
-                }
+            if let Some(new_data) = &e.new_data
+                && (!missing_files_only
+                    || !data_repo.contains(&new_data.physical_hash).await.unwrap())
+            {
+                target_references.push(ObjectFileReference {
+                    object_type: ObjectType::DataSlice,
+                    physical_hash: new_data.physical_hash.clone(),
+                    size: new_data.size,
+                });
             }
-            if let Some(new_checkpoint) = &e.new_checkpoint {
-                if !missing_files_only
+            if let Some(new_checkpoint) = &e.new_checkpoint
+                && (!missing_files_only
                     || !checkpoint_repo
                         .contains(&new_checkpoint.physical_hash)
                         .await
-                        .unwrap()
-                {
-                    target_references.push(ObjectFileReference {
-                        object_type: ObjectType::Checkpoint,
-                        physical_hash: new_checkpoint.physical_hash.clone(),
-                        size: new_checkpoint.size,
-                    });
-                }
+                        .unwrap())
+            {
+                target_references.push(ObjectFileReference {
+                    object_type: ObjectType::Checkpoint,
+                    physical_hash: new_checkpoint.physical_hash.clone(),
+                    size: new_checkpoint.size,
+                });
             }
         }
 
@@ -486,7 +482,7 @@ fn get_simple_transfer_protocol_headers(
             name: http::header::AUTHORIZATION.to_string(),
             value: format!("Bearer {}", bearer.0.token()),
         });
-    };
+    }
     headers
 }
 
@@ -611,7 +607,7 @@ pub async fn dataset_import_object_file(
 
     use tokio_util::compat::FuturesAsyncReadCompatExt;
     let reader = stream
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .map_err(std::io::Error::other)
         .into_async_read()
         .compat();
 

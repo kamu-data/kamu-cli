@@ -37,7 +37,7 @@ pub trait Dataset: Send + Sync {
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
-    /// Helper function to commit [AddData] event into a local dataset.
+    /// Helper function to commit [`AddData`] event into a local dataset.
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
@@ -49,7 +49,8 @@ pub trait Dataset: Send + Sync {
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
-    /// Helper function to commit [ExecuteTransform] event into a local dataset.
+    /// Helper function to commit [`ExecuteTransform`] event into a local
+    /// dataset.
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
@@ -61,7 +62,7 @@ pub trait Dataset: Send + Sync {
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
-    /// Helper function to prepare [ExecuteTransform] event without committing
+    /// Helper function to prepare [`ExecuteTransform`] event without committing
     /// it.
     async fn prepare_execute_transform(
         &self,

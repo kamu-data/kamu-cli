@@ -10,7 +10,7 @@
 use kamu::domain::*;
 use kamu::testing::DatasetTestHelper;
 
-use crate::harness::{await_client_server_flow, ClientSideHarness, ServerSideHarness};
+use crate::harness::{ClientSideHarness, ServerSideHarness, await_client_server_flow};
 use crate::tests::tests_pull::scenarios::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

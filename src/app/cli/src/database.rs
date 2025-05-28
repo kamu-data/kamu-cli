@@ -16,7 +16,7 @@ use secrecy::SecretString;
 use tempfile::TempDir;
 
 use crate::config::{DatabaseConfig, DatabaseCredentialSourceConfig, RemoteDatabaseConfig};
-use crate::{config, WorkspaceLayout, WorkspaceStatus};
+use crate::{WorkspaceLayout, WorkspaceStatus, config};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,7 +91,7 @@ pub async fn move_initial_database_to_workspace_if_needed(
             workspace_layout.default_workspace_database_path(),
         )
         .await?;
-    };
+    }
 
     Ok(())
 }

@@ -180,7 +180,7 @@ impl PollingIngestServiceImpl {
                 return Ok(PollingIngestResult::UpToDate {
                     no_source_defined: false,
                     uncacheable,
-                })
+                });
             }
         };
 

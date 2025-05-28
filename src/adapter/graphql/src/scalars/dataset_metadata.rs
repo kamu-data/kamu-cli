@@ -10,8 +10,8 @@
 use std::convert::Into;
 
 use async_graphql::*;
-use kamu_core::utils::metadata_chain_comparator as comp;
 use kamu_core::StatusCheckError;
+use kamu_core::utils::metadata_chain_comparator as comp;
 
 use crate::scalars::DatasetRefRemote;
 

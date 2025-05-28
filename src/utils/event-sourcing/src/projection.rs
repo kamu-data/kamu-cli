@@ -18,16 +18,12 @@ pub trait Projection
 where
     Self: Sized + Send + Sync + 'static,
     Self::Query: Sized + Send + Sync + 'static,
-
     Self: Clone,
     Self::Query: Clone,
-
     Self::Query: Hash,
     Self::Query: Eq,
-
     Self: std::fmt::Debug,
     Self::Query: std::fmt::Debug,
-
     Self::Event: ProjectionEvent<Self::Query>,
 {
     /// Type of the query this projection uses to filter events in the event

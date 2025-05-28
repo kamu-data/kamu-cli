@@ -11,10 +11,10 @@ use std::assert_matches::assert_matches;
 
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
-    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

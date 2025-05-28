@@ -15,7 +15,7 @@ use chrono::Utc;
 use dill::*;
 use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use kamu_accounts::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::dataset::DUMMY_ODF_ACCESS_TOKEN;

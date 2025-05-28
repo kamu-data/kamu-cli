@@ -19,10 +19,10 @@ use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
 
 use crate::utils::{
-    authentication_catalogs,
-    expect_anonymous_access_error,
     BaseGQLDatasetHarness,
     PredefinedAccountOpts,
+    authentication_catalogs,
+    expect_anonymous_access_error,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

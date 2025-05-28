@@ -79,7 +79,7 @@ pub(crate) fn body_into_async_read(body: axum::body::Body) -> impl tokio::io::As
     use tokio_util::compat::FuturesAsyncReadCompatExt;
 
     body.into_data_stream()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .map_err(std::io::Error::other)
         .into_async_read()
         .compat()
 }

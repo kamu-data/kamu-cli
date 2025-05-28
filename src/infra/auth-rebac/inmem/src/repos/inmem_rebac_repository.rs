@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use dill::{component, interface, scope, Singleton};
+use dill::{Singleton, component, interface, scope};
 use kamu_auth_rebac::{
     DeleteEntitiesRelationError,
     DeleteEntityPropertiesError,
@@ -146,7 +146,7 @@ impl RebacRepository for InMemoryRebacRepository {
 
         if not_found {
             return Err(DeleteEntityPropertiesError::not_found(entity));
-        };
+        }
 
         Ok(())
     }

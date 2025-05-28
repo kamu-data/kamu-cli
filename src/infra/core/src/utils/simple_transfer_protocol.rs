@@ -10,8 +10,8 @@
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
-use dill::{component, Catalog};
-use futures::{stream, Future, StreamExt, TryStreamExt};
+use dill::{Catalog, component};
+use futures::{Future, StreamExt, TryStreamExt, stream};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
@@ -147,7 +147,7 @@ impl SimpleTransferProtocol {
                     }));
                 }
             }
-        };
+        }
 
         let mut blocks_desc_ordered = match chains_comparison {
             CompareChainsResult::Equal => unreachable!(),

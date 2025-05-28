@@ -9,7 +9,9 @@ readme = { workspace = true }
 license-file = { workspace = true }
 keywords = { workspace = true }
 include = { workspace = true }
-edition = { workspace = true }
+# TODO: Flatbuffers codegen needs to be updated to produce code that doesn't violate new unsafe linting rules
+edition = "2021"
+# edition = { workspace = true }
 publish = { workspace = true }
 
 

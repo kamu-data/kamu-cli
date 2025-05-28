@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::str::FromStr;
 
-use kamu_auth_rebac::{AccountToDatasetRelation, Relation, RELATION_GROUP_SEPARATOR};
+use kamu_auth_rebac::{AccountToDatasetRelation, RELATION_GROUP_SEPARATOR, Relation};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

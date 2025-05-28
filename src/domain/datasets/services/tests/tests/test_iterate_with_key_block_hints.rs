@@ -169,7 +169,9 @@ async fn test_missing_key_block() {
 
     pretty_assertions::assert_eq!(
         iteration_order,
-        vec![(6, odf::metadata::MetadataEventTypeFlags::ADD_DATA), /* first is unconditional */]
+        vec![
+            (6, odf::metadata::MetadataEventTypeFlags::ADD_DATA), /* first is unconditional */
+        ]
     );
 }
 

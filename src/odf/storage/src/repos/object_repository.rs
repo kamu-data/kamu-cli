@@ -37,10 +37,10 @@ pub trait ObjectRepository: Send + Sync {
     /// Returns an object URL for internal operations.
     ///
     /// When, for example, working with S3-backed repo an internal Url will be
-    /// in the form of "s3://bucket/a/b/c", so the user has to be
+    /// in the form of `<s3://bucket/a/b/c>`, so the user has to be
     /// authorized to access the data. To let any authorized user access
-    /// the data use [ObjectRepository::get_external_download_url()] to issue a
-    /// pre-signed URL.
+    /// the data use [`ObjectRepository::get_external_download_url()`] to issue
+    /// a pre-signed URL.
     async fn get_internal_url(&self, hash: &Multihash) -> Url;
 
     /// Returns a URL that should be accessible to any unauthorized user.
@@ -48,7 +48,7 @@ pub trait ObjectRepository: Send + Sync {
     /// When, for example, working with S3-backed repo this method will issue a
     /// pre-signed URL that (for a limited time) will be accessible to any user.
     /// For referring to objects internally use
-    /// [ObjectRepository::get_internal_url()].
+    /// [`ObjectRepository::get_internal_url()`].
     async fn get_external_download_url(
         &self,
         hash: &Multihash,

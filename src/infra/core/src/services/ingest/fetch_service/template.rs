@@ -8,20 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::sync::LazyLock;
 
 use kamu_core::{TemplateError, TemplateInvalidPatternError, TemplateValueNotFoundError};
-use lazy_static::lazy_static;
 use regex::Regex;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-lazy_static! {
-    static ref RE_ENV: Regex =
-        Regex::new(r"^env\.([a-zA-Z-_0-9]+)$").expect("Invalid template env variable regex");
-    static ref RE_NUM: Regex =
-        Regex::new(r"^(-?[0-9]+(?:.[0-9]+)?)$").expect("Invalid template number regex");
-    static ref RE_STR: Regex = Regex::new(r"^'([^']*)'$").expect("Invalid template string regex");
-}
+static RE_ENV: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^env\.([a-zA-Z-_0-9]+)$").expect("Invalid template env variable regex")
+});
+static RE_NUM: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(-?[0-9]+(?:.[0-9]+)?)$").expect("Invalid template number regex")
+});
+static RE_STR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^'([^']*)'$").expect("Invalid template string regex"));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,9 +109,9 @@ pub fn template_string<'a>(
                 None => {
                     return Err(TemplateError::ValueNotFound(
                         TemplateValueNotFoundError::new(tokens_str),
-                    ))
+                    ));
                 }
-            };
+            }
         } else {
             if let Cow::Owned(_) = &s {
                 tracing::debug!(%s, "String after template substitution");

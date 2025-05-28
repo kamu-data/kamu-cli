@@ -203,7 +203,7 @@ impl FlowSchedulingHelper {
                             flow_trigger_rule: Some(FlowTriggerRule::Batching(batching_rule)),
                             maybe_config_snapshot: None,
                         });
-                    };
+                    }
                 }
             }
 
@@ -396,7 +396,7 @@ impl FlowSchedulingHelper {
                                     throttling_boundary_time,
                                     trigger_time,
                                 )?;
-                            };
+                            }
 
                             if let Some(config_snapshot) = config_snapshot_maybe {
                                 flow.modify_config_snapshot(trigger_time, config_snapshot)
@@ -527,7 +527,7 @@ impl FlowSchedulingHelper {
         // Scan each accumulated trigger to decide
         for trigger in &flow.triggers {
             match trigger {
-                FlowTriggerType::InputDatasetFlow(ref trigger_type) => {
+                FlowTriggerType::InputDatasetFlow(trigger_type) => {
                     match &trigger_type.flow_result {
                         FlowResult::Empty | FlowResult::DatasetReset(_) => {}
                         FlowResult::DatasetCompact(_) => {
@@ -553,7 +553,7 @@ impl FlowSchedulingHelper {
                         }
                     }
                 }
-                FlowTriggerType::Push(ref trigger_type) => {
+                FlowTriggerType::Push(trigger_type) => {
                     let old_head_maybe = match trigger_type.result {
                         DatasetPushResult::HttpIngest(ref update_result) => {
                             update_result.old_head_maybe.as_ref()

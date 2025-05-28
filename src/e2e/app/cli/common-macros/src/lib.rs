@@ -10,7 +10,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, parse_str, Expr, Ident, LitStr, Path, Token};
+use syn::{Expr, Ident, LitStr, Path, Token, parse_macro_input, parse_str};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,7 +140,7 @@ impl Parse for InputArgs {
                     "Unexpected key: {unexpected_key}\nAllowable values: \"storage\", \
                      \"fixture\", \"options\", and \"extra_test_groups\"."
                 ),
-            };
+            }
 
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;

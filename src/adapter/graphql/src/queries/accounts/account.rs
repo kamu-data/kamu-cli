@@ -28,7 +28,7 @@ use crate::utils::check_logged_account_id_match;
 pub struct Account {
     account_id: AccountID<'static>,
     account_name: AccountName<'static>,
-    full_account_info: OnceCell<kamu_accounts::Account>,
+    full_account_info: OnceCell<Box<kamu_accounts::Account>>,
 }
 
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
@@ -53,7 +53,7 @@ impl Account {
         Self {
             account_id: AccountID::from(account.id.clone()),
             account_name: account.account_name.clone().into(),
-            full_account_info: OnceCell::new_with(Some(account)),
+            full_account_info: OnceCell::new_with(Some(Box::new(account))),
         }
     }
 
@@ -133,8 +133,9 @@ impl Account {
         ctx: &Context<'_>,
     ) -> Result<&'a kamu_accounts::Account> {
         self.full_account_info
-            .get_or_try_init(|| self.resolve_full_account_info(ctx))
+            .get_or_try_init(async || self.resolve_full_account_info(ctx).await.map(Box::new))
             .await
+            .map(AsRef::as_ref)
     }
 
     #[graphql(skip)]

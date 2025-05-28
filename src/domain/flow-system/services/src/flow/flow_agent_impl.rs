@@ -395,7 +395,7 @@ impl FlowAgentImpl {
                         max_slice_records = compaction_rule.max_slice_records();
                         keep_metadata_only =
                             matches!(compaction_rule, CompactionRule::MetadataOnly(_));
-                    };
+                    }
 
                     Ok(LogicalPlan::HardCompactDataset(
                         LogicalPlanHardCompactDataset {

@@ -22,12 +22,12 @@ use test_utils::TEST_BUCKET_NAME;
 use url::Url;
 
 use crate::harness::{
-    commit_add_data_event,
-    make_dataset_ref,
     ServerSideHarness,
     ServerSideHarnessOptions,
     ServerSideLocalFsHarness,
     ServerSideS3Harness,
+    commit_add_data_event,
+    make_dataset_ref,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

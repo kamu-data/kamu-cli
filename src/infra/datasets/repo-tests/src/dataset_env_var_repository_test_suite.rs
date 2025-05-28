@@ -20,8 +20,8 @@ use kamu_datasets::{
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
-    UpsertDatasetEnvVarStatus,
     SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
+    UpsertDatasetEnvVarStatus,
 };
 use secrecy::SecretString;
 use uuid::Uuid;

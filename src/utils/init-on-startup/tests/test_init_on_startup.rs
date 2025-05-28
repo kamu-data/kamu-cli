@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
-use init_on_startup::{run_startup_jobs, InitOnStartup, InitOnStartupMeta, StartupJobsError};
+use init_on_startup::{InitOnStartup, InitOnStartupMeta, StartupJobsError, run_startup_jobs};
 use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

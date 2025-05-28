@@ -20,8 +20,8 @@ use odf::metadata::FetchStep;
 use url::Url;
 
 use super::*;
-use crate::ingest::fetch_service::template::template_string;
 use crate::PollingSourceState;
+use crate::ingest::fetch_service::template::template_string;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

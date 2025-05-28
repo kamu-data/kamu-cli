@@ -201,10 +201,9 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         if let Some(owned_by_name) = writable_state
             .rows_by_owner_and_name
             .get(&dataset_entry.owner_id)
+            && owned_by_name.contains_key(&dataset_entry.name)
         {
-            if owned_by_name.contains_key(&dataset_entry.name) {
-                return Err(DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into());
-            }
+            return Err(DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into());
         }
 
         writable_state

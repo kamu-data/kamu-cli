@@ -25,7 +25,7 @@ pub fn router(title: String, version: String) -> axum::Router {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(clippy::unused_async)]
-async fn index_handler(title: &str, version: &str) -> impl axum::response::IntoResponse {
+async fn index_handler(title: &str, version: &str) -> impl axum::response::IntoResponse + use<> {
     let html = include_str!("../assets/index.template.html");
 
     axum::response::Html(

@@ -25,8 +25,8 @@ use kamu_cli_e2e_common::{
     SetDatasetVisibilityError,
     UnresolvedDatasetDependency,
 };
-use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use odf::metadata::testing::MetadataFactory;
 
 use crate::utils::make_logged_clients;
@@ -68,7 +68,14 @@ pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_datasets_have_correct_visibility_after_creation(anonymous: KamuApiServerClient) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",
@@ -156,7 +163,14 @@ pub async fn test_datasets_have_correct_visibility_after_creation(anonymous: Kam
 pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",
@@ -322,7 +336,14 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
 pub async fn test_a_private_dataset_is_available_only_to_authorized_users_in_the_search_results(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",
@@ -462,7 +483,14 @@ pub async fn test_a_private_dataset_is_available_only_to_authorized_users_in_the
 pub async fn test_a_private_dataset_is_available_in_queries_only_to_authorized_users(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",
@@ -589,7 +617,14 @@ pub async fn test_a_private_dataset_is_available_in_queries_only_to_authorized_u
 pub async fn test_a_private_dataset_is_available_only_to_authorized_users_in_a_users_dataset_list(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",
@@ -680,7 +715,14 @@ pub async fn test_a_private_dataset_is_available_only_to_authorized_users_in_a_u
 pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_to_authorized_users(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",
@@ -812,7 +854,14 @@ pub async fn test_a_private_dataset_as_a_downstream_dependency_is_visible_only_t
 pub async fn test_a_private_dataset_as_an_upstream_dependency_is_visible_only_to_authorized_users(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",
@@ -1327,7 +1376,14 @@ pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_minimum_dataset_maintainer_can_access_roles(anonymous: KamuApiServerClient) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",
@@ -1416,8 +1472,8 @@ pub async fn test_minimum_dataset_maintainer_can_access_roles(anonymous: KamuApi
 
     // Validate granted roles
     {
-        use odf::metadata::testing::account_name as name;
         use AccountToDatasetRelation as R;
+        use odf::metadata::testing::account_name as name;
 
         let success = Ok(vec![
             (name(&"editor"), R::Editor),
@@ -1471,8 +1527,8 @@ pub async fn test_granted_role_is_correctly_replaced_by_another_one(
         )
         .await;
 
-    use odf::metadata::testing::account_name as name;
     use AccountToDatasetRelation as R;
+    use odf::metadata::testing::account_name as name;
 
     // Bob is allowed to read
     {
@@ -1541,8 +1597,8 @@ pub async fn test_granted_role_is_correctly_revoked(anonymous: KamuApiServerClie
         )
         .await;
 
-    use odf::metadata::testing::account_name as name;
     use AccountToDatasetRelation as R;
+    use odf::metadata::testing::account_name as name;
 
     // Initial
     {
@@ -1639,7 +1695,14 @@ pub async fn test_granted_role_is_correctly_revoked(anonymous: KamuApiServerClie
 pub async fn test_dataset_role_is_correctly_displayed_for_the_current_user(
     anonymous: KamuApiServerClient,
 ) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner, admin] = make_logged_clients(
+    let [
+        not_owner,
+        mut reader,
+        mut editor,
+        mut maintainer,
+        owner,
+        admin,
+    ] = make_logged_clients(
         &anonymous,
         [
             "not-owner",

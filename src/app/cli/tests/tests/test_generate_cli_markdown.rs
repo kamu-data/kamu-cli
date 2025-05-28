@@ -10,8 +10,8 @@
 use std::fmt::{self, Write};
 use std::path::PathBuf;
 
-use clap::builder::PossibleValue;
 use clap::CommandFactory;
+use clap::builder::PossibleValue;
 
 #[test_group::group(resourcegen)]
 #[test_log::test(tokio::test)]

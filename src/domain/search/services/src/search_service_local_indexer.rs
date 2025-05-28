@@ -63,9 +63,8 @@ impl SearchServiceLocalIndexer {
         let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
         let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
 
-        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<
-            Error = odf::dataset::Infallible,
-        >; 4] = [
+        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>;
+            4] = [
             &mut attachments_visitor,
             &mut info_visitor,
             &mut schema_visitor,

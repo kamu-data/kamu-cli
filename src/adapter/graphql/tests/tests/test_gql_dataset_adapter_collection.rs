@@ -14,7 +14,7 @@ use kamu_core::*;
 use kamu_datasets_services::*;
 use serde_json::json;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -749,12 +749,10 @@ impl GraphQLDatasetsHarness {
             .await;
 
         assert!(res.is_ok(), "{res:#?}");
-        let did = res.data.into_json().unwrap()["datasets"]["createCollection"]["dataset"]["id"]
+        res.data.into_json().unwrap()["datasets"]["createCollection"]["dataset"]["id"]
             .as_str()
             .unwrap()
-            .to_string();
-
-        did
+            .to_string()
     }
 
     pub async fn list_entries(&self, did: &str) -> serde_json::Value {

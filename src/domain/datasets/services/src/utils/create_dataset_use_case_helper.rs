@@ -11,15 +11,15 @@ use std::sync::Arc;
 
 use dill::component;
 use internal_error::*;
-use kamu_accounts::{LoggedAccount, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{DEFAULT_ACCOUNT_NAME, LoggedAccount};
 use kamu_core::{ResolvedDataset, TenancyConfig};
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetFromSnapshotError,
     DatasetLifecycleMessage,
     DatasetReferenceCASError,
-    NameCollisionError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+    NameCollisionError,
 };
 use messaging_outbox::{Outbox, OutboxExt};
 use nutype::nutype;

@@ -16,9 +16,9 @@ use std::time::Duration;
 use container_runtime::*;
 use internal_error::*;
 
+use crate::WorkspaceLayout;
 use crate::config::JupyterConfig;
 use crate::error::{CommandRunError, SubprocessError};
-use crate::WorkspaceLayout;
 
 #[dill::component]
 pub struct NotebookServerFactory {
@@ -268,11 +268,11 @@ impl TokenExtractor {
 
                 output.write_all(line.as_bytes()).await.unwrap();
 
-                if let Some(capture) = re.captures(&line) {
-                    if let Some(clb) = on_token.take() {
-                        let token = capture.get(1).unwrap().as_str();
-                        clb(token);
-                    }
+                if let Some(capture) = re.captures(&line)
+                    && let Some(clb) = on_token.take()
+                {
+                    let token = capture.get(1).unwrap().as_str();
+                    clb(token);
                 }
             }
         });
