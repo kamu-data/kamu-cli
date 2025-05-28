@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::ResolvedDataset;
 
 use crate::mutations::CollectionEntryInput;
 use crate::prelude::*;
@@ -19,10 +18,6 @@ use crate::queries::Dataset;
 #[derive(SimpleObject, Clone)]
 #[graphql(complex)]
 pub struct CollectionEntry {
-    #[graphql(skip)]
-    #[expect(dead_code)]
-    dataset: ResolvedDataset,
-
     /// Time when this version was created
     pub system_time: DateTime<Utc>,
 
@@ -39,29 +34,25 @@ pub struct CollectionEntry {
     pub reference: DatasetID<'static>,
 
     /// Extra data associated with this entry
-    pub extra_data: serde_json::Value,
+    pub extra_data: ExtraData,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CollectionEntry {
-    pub fn from_input(dataset: ResolvedDataset, input: CollectionEntryInput) -> Self {
-        let extra_data = input
-            .extra_data
-            .unwrap_or(serde_json::Value::Object(Default::default()));
+    pub fn from_input(input: CollectionEntryInput) -> Self {
         let now = Utc::now();
 
         Self {
-            dataset,
             system_time: now,
             event_time: now,
             path: input.path,
             reference: input.reference,
-            extra_data,
+            extra_data: input.extra_data.unwrap_or_default(),
         }
     }
 
-    pub fn from_json(dataset: ResolvedDataset, record: serde_json::Value) -> Self {
+    pub fn from_json(record: serde_json::Value) -> Self {
         let serde_json::Value::Object(mut record) = record else {
             unreachable!()
         };
@@ -95,17 +86,16 @@ impl CollectionEntry {
             odf::DatasetID::from_did_str(record.remove("ref").unwrap().as_str().unwrap()).unwrap();
 
         Self {
-            dataset,
             system_time,
             event_time,
             path: path.into(),
             reference: reference.into(),
-            extra_data: record.into(),
+            extra_data: ExtraData::new(record.into()),
         }
     }
 
     pub fn to_record_data(&self) -> serde_json::Value {
-        let mut record = self.extra_data.clone();
+        let mut record = self.extra_data.clone().into_inner();
         record["path"] = self.path.clone().into();
         record["ref"] = self.reference.to_string().into();
         record

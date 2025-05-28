@@ -11,14 +11,7 @@ use chrono::{DateTime, Utc};
 use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
 use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
 
-use crate::mutations::{
-    CollectionMut,
-    DatasetCollaborationMut,
-    DatasetEnvVarsMut,
-    DatasetFlowsMut,
-    DatasetMetadataMut,
-    VersionedFileMut,
-};
+use crate::mutations::*;
 use crate::prelude::*;
 use crate::queries::*;
 use crate::utils::{self, from_catalog_n};
@@ -59,6 +52,11 @@ impl DatasetMut {
     /// Access to collaboration management methods
     async fn collaboration(&self, ctx: &Context<'_>) -> Result<DatasetCollaborationMut> {
         DatasetCollaborationMut::new_with_access_check(ctx, &self.dataset_request_state).await
+    }
+
+    /// Access to webhooks management methods
+    async fn webhooks(&self, ctx: &Context<'_>) -> Result<DatasetWebhooksMut> {
+        DatasetWebhooksMut::new_with_access_check(ctx, &self.dataset_request_state).await
     }
 
     /// Rename the dataset
@@ -210,20 +208,14 @@ impl DatasetMut {
     /// Downcast a dataset to a versioned file interface
     async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileMut>> {
         Ok(Some(VersionedFileMut::new(
-            self.dataset_request_state
-                .resolved_dataset(ctx)
-                .await?
-                .clone(),
+            self.dataset_request_state.resolved_dataset(ctx).await?,
         )))
     }
 
     /// Downcast a dataset to a collection interface
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<CollectionMut>> {
         Ok(Some(CollectionMut::new(
-            self.dataset_request_state
-                .resolved_dataset(ctx)
-                .await?
-                .clone(),
+            self.dataset_request_state.resolved_dataset(ctx).await?,
         )))
     }
 }

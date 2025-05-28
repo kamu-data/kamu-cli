@@ -1,0 +1,38 @@
+[package]
+name = "kamu-webhooks-repo-tests"
+description = "Shared repository tests for Kamu webhooks"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+kamu-webhooks = { workspace = true }
+kamu-task-system = { workspace = true }
+odf = { workspace = true }
+
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.13", default-features = false }
+futures = "0.3"
+http = { version = "1", default-features = false }
+serde_json = "1"
+url = { version = "2", default-features = false }
+uuid = { version = "1", default-features = false }
+
+[dev-dependencies]

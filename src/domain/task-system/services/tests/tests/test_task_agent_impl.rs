@@ -17,8 +17,8 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::DatasetEnvVarsConfig;
-use kamu_datasets_inmem::InMemoryDatasetEnvVarRepository;
-use kamu_datasets_services::DatasetEnvVarServiceImpl;
+use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEnvVarRepository};
+use kamu_datasets_services::{DatasetEnvVarServiceImpl, DependencyGraphServiceImpl};
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::*;
@@ -35,9 +35,15 @@ async fn test_pre_run_requeues_running_tasks() {
     let harness = TaskAgentHarness::new(MockOutbox::new(), MockTaskRunner::new());
 
     // Schedule 3 tasks
-    let task_id_1 = harness.schedule_probe_task().await;
-    let task_id_2 = harness.schedule_probe_task().await;
-    let task_id_3 = harness.schedule_probe_task().await;
+    let task_id_1 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_2 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_3 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
 
     // Make 2 of 3 Running
     let task_1 = harness.try_take_task().await;
@@ -85,7 +91,9 @@ async fn test_run_single_task() {
 
     // Schedule the only task
     let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
-    let task_id = harness.schedule_probe_task().await;
+    let task_id = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
     let task = harness.get_task(task_id).await;
     assert_eq!(task.status(), TaskStatus::Queued);
 
@@ -116,9 +124,15 @@ async fn test_run_two_of_three_tasks() {
 
     // Schedule 3 tasks
     let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
-    let task_id_1 = harness.schedule_probe_task().await;
-    let task_id_2 = harness.schedule_probe_task().await;
-    let task_id_3 = harness.schedule_probe_task().await;
+    let task_id_1 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_2 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_3 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
 
     // All 3 must be in Queued state before runs
     let task_1 = harness.get_task(task_id_1).await;
@@ -180,15 +194,19 @@ impl TaskAgentHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteRepositoryRegistryImpl>()
+            .add::<RemoteAliasResolverImpl>()
             .add_value(IpfsGateway::default())
             .add_value(IpfsClient::default())
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DatasetEnvVarServiceImpl>()
             .add::<InMemoryDatasetEnvVarRepository>()
+            .add::<DependencyGraphServiceImpl>()
+            .add::<InMemoryDatasetDependencyRepository>()
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
             ))
             .add::<DatasetRegistrySoloUnitBridge>()
+            .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_value(TaskAgentConfig::new(chrono::Duration::seconds(1)))
@@ -209,15 +227,9 @@ impl TaskAgentHarness {
         }
     }
 
-    async fn schedule_probe_task(&self) -> TaskID {
+    async fn schedule_probe_task(&self, probe_plan: LogicalPlanProbe) -> TaskID {
         self.task_scheduler
-            .create_task(
-                LogicalPlanProbe {
-                    ..LogicalPlanProbe::default()
-                }
-                .into(),
-                None,
-            )
+            .create_task(probe_plan.into(), None)
             .await
             .unwrap()
             .task_id
@@ -274,17 +286,24 @@ impl TaskAgentHarness {
         probe: LogicalPlanProbe,
         times: usize,
     ) {
+        let probe_plan = probe.clone();
+
         mock_task_runner
             .expect_run_task()
             .withf(move |td| {
                 matches!(
                     td,
                     TaskDefinition::Probe(TaskDefinitionProbe { probe: probe_ })
-                    if probe_ == &probe
+                    if probe_ == &probe_plan
                 )
             })
             .times(times)
-            .returning(|_| Ok(TaskOutcome::Success(TaskResult::Empty)));
+            .returning(move |_| {
+                Ok(probe
+                    .end_with_outcome
+                    .clone()
+                    .unwrap_or(TaskOutcome::Success(TaskResult::Empty)))
+            });
     }
 }
 

@@ -19,7 +19,7 @@ pub trait TaskEventStore: EventStore<TaskState> {
     /// Generates new unique task identifier
     async fn new_task_id(&self) -> Result<TaskID, InternalError>;
 
-    /// Attempts to get the earliest queued task, if any
+    /// Attempts to get the earliest queued task, that is ready to run
     async fn try_get_queued_task(&self) -> Result<Option<TaskID>, InternalError>;
 
     /// Returns list of tasks, which are in Running state,

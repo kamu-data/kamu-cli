@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod adapters;
 mod dataset_permissions;
 
+pub use adapters::*;
 pub use dataset_permissions::*;

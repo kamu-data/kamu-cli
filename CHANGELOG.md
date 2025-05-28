@@ -11,14 +11,31 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-### TODO
+## [Unreleased]
 ### Added
 - `kamu --show-error-stack-trace`: Added an argument to show stack trace in case of an error during command execution
 
-# Unreleased
+## [0.239.0] - 2025-05-26
+### Added
+- Prototype of webhooks support:
+   - webhooks are sent for dataset update events
+   - GQL API to subscribe, update, pause/resume and remove subbscriptions
+   - webhook events are recorded per business event via outbox bridge
+   - webhook events that match enabled subscriptions get scheduled in the task system
+   - webhooks are attempted with at most 10s timeout, but no retries are supported yet
+   - webhook request and delivery headers and content are saved for future debug purposes
+   - webhook messages are signed in the spirit of webhook signatures (RFC 9421) and content digests (RFC 9530)
+### Changed
+- Extended create dataset GQL results with isSuccess
+- GQL: versioned files return `contentLength` field
+### Fixed
+- GQL: all dataset mutations require logged-in users
+
+## [0.238.0] - 2025-05-22
 ### Added
 - GQL: Added new scalars: `Email`, AccountPassword`.
 - GQL: Added `AccountMut::delete()`.
+- GQL: Collection API: Add `ExtraData` scalar to validate incoming data.
 ### Changed
 - DB: Removed FK for `did_secret_keys.creator_id` 
 - DB: Added missing triggers for deleting account rows (`ON DELETE CASCADE`) 
@@ -26,7 +43,7 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `AccountMut::modifyPassword()`: no longer accepts the `accountName` argument.
 - GQL: `AccountMuts::createAccount()`: method moved from `AccountMut`.
 - Refactor:
-  - Remove password logic from `AccountService` level 
+  - Remove password logic from `AccountService` level.
 
 ## [0.237.0] - 2025-05-14
 ### Added

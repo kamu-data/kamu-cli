@@ -180,6 +180,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 latest {
                                     version
+                                    contentLength
                                     contentType
                                     contentHash
                                     content
@@ -205,6 +206,7 @@ async fn test_versioned_file_create_in_band() {
         latest,
         json!({
             "version": 1,
+            "contentLength": b"hello".len(),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},
@@ -268,6 +270,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 latest {
                                     version
+                                    contentLength
                                     contentType
                                     contentHash
                                     content
@@ -293,6 +296,7 @@ async fn test_versioned_file_create_in_band() {
         latest,
         json!({
             "version": 2,
+            "contentLength": b"bye".len(),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"bye"),
             "contentType": "application/octet-stream",
             "extraData": {},
@@ -311,6 +315,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 asOf(blockHash: $blockHash) {
                                     version
+                                    contentLength
                                     contentType
                                     contentHash
                                     content
@@ -336,6 +341,7 @@ async fn test_versioned_file_create_in_band() {
         entry,
         json!({
             "version": 1,
+            "contentLength": b"hello".len(),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},
@@ -354,6 +360,7 @@ async fn test_versioned_file_create_in_band() {
                             asVersionedFile {
                                 asOf(version: 1) {
                                     version
+                                    contentLength
                                     contentType
                                     contentHash
                                     content
@@ -378,6 +385,7 @@ async fn test_versioned_file_create_in_band() {
         entry,
         json!({
             "version": 1,
+            "contentLength": b"hello".len(),
             "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
             "contentType": "application/octet-stream",
             "extraData": {},
@@ -479,7 +487,7 @@ async fn test_versioned_file_extra_data() {
         .build()
         .await;
 
-    // Create versioned file dataset
+    // Create a versioned file dataset
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
@@ -525,12 +533,12 @@ async fn test_versioned_file_extra_data() {
         .unwrap()
         .to_string();
 
-    // Upload first version
+    // Upload the first version
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($datasetId: DatasetID!, $content: Base64Usnp!, $extraData: JSON!) {
+                mutation ($datasetId: DatasetID!, $content: Base64Usnp!, $extraData: ExtraData!) {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
@@ -576,7 +584,7 @@ async fn test_versioned_file_extra_data() {
         })
     );
 
-    // Read back latest content
+    // Read back the latest content
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
@@ -626,7 +634,7 @@ async fn test_versioned_file_extra_data() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($datasetId: DatasetID!, $extraData: JSON!) {
+                mutation ($datasetId: DatasetID!, $extraData: ExtraData!) {
                     datasets {
                         byId(datasetId: $datasetId) {
                             asVersionedFile {
@@ -667,7 +675,7 @@ async fn test_versioned_file_extra_data() {
         })
     );
 
-    // Read back latest content
+    // Read back the latest content
     let res = harness
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(

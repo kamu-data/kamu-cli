@@ -9,7 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
@@ -680,7 +680,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
             &task_ids[0],
             Some(last_event_ids[0]),
             vec![TaskEventRequeued {
-                event_time: Utc::now(),
+                event_time: Utc::now() - Duration::seconds(1), // to ensure time order
                 task_id: task_ids[0],
             }
             .into()],

@@ -130,6 +130,10 @@ pub fn configure_database_components(
 
             b.add::<kamu_auth_rebac_postgres::PostgresRebacRepository>();
 
+            b.add::<kamu_webhooks_postgres::PostgresWebhookEventRepository>();
+            b.add::<kamu_webhooks_postgres::PostgresWebhookDeliveryRepository>();
+            b.add::<kamu_webhooks_postgres::PostgresWebhookSubscriptionEventStore>();
+
             b.add::<kamu_auth_web3_postgres::PostgresWeb3AuthEip4361NonceRepository>();
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
@@ -161,6 +165,10 @@ pub fn configure_database_components(
 
             b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
+            b.add::<kamu_webhooks_inmem::InMemoryWebhookEventRepository>();
+            b.add::<kamu_webhooks_inmem::InMemoryWebhookDeliveryRepository>();
+            b.add::<kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore>();
+
             b.add::<kamu_auth_web3_inmem::InMemoryWeb3AuthEip4361NonceRepository>();
         }
         DatabaseProvider::Sqlite => {
@@ -182,12 +190,16 @@ pub fn configure_database_components(
             b.add::<kamu_flow_system_sqlite::SqliteFlowTriggerEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowEventStore>();
 
-            b.add::<kamu_task_system_sqlite::SqliteTaskSystemEventStore>();
+            b.add::<kamu_task_system_sqlite::SqliteTaskEventStore>();
 
             b.add::<kamu_messaging_outbox_sqlite::SqliteOutboxMessageRepository>();
             b.add::<kamu_messaging_outbox_sqlite::SqliteOutboxMessageConsumptionRepository>();
 
             b.add::<kamu_auth_rebac_sqlite::SqliteRebacRepository>();
+
+            b.add::<kamu_webhooks_sqlite::SqliteWebhookEventRepository>();
+            b.add::<kamu_webhooks_sqlite::SqliteWebhookDeliveryRepository>();
+            b.add::<kamu_webhooks_sqlite::SqliteWebhookSubscriptionEventStore>();
 
             b.add::<kamu_auth_web3_sqlite::SqliteWeb3AuthEip4361NonceRepository>();
         }
@@ -224,6 +236,10 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlockRepository>();
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
+
+    b.add::<kamu_webhooks_inmem::InMemoryWebhookEventRepository>();
+    b.add::<kamu_webhooks_inmem::InMemoryWebhookDeliveryRepository>();
+    b.add::<kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore>();
 
     b.add::<kamu_auth_web3_inmem::InMemoryWeb3AuthEip4361NonceRepository>();
 

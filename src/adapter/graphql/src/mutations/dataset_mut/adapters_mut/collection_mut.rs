@@ -16,14 +16,14 @@ use crate::queries::CollectionEntry;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct CollectionMut {
-    dataset: domain::ResolvedDataset,
+pub struct CollectionMut<'a> {
+    dataset: &'a domain::ResolvedDataset,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl CollectionMut {
-    pub fn new(dataset: domain::ResolvedDataset) -> Self {
+impl<'a> CollectionMut<'a> {
+    pub fn new(dataset: &'a domain::ResolvedDataset) -> Self {
         Self { dataset }
     }
 
@@ -49,7 +49,7 @@ impl CollectionMut {
 
         let ingest_result = match push_ingest_use_case
             .execute(
-                &self.dataset,
+                self.dataset,
                 kamu_core::DataSource::Buffer(bytes::Bytes::from_owner(ndjson)),
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
@@ -132,7 +132,7 @@ impl CollectionMut {
                     .await
                     .int_err()?
                     .into_iter()
-                    .map(|record| CollectionEntry::from_json(self.dataset.clone(), record))
+                    .map(CollectionEntry::from_json)
                     .map(|entry| (entry.path.clone(), entry))
                     .collect()
             }
@@ -146,7 +146,7 @@ impl CollectionMut {
                     diff.push((Op::Retract, existing));
                 }
 
-                let new_entry = CollectionEntry::from_input(self.dataset.clone(), add.entry);
+                let new_entry = CollectionEntry::from_input(add.entry);
                 current_entries.insert(new_entry.path.clone(), new_entry.clone());
                 diff.push((Op::Append, new_entry));
             } else if let Some(remove) = op.remove {
@@ -217,7 +217,7 @@ impl CollectionMut {
 
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl CollectionMut {
+impl CollectionMut<'_> {
     /// Links new entry to this collection
     #[tracing::instrument(level = "info", name = CollectionMut_add_entry, skip_all)]
     pub async fn add_entry(
@@ -244,7 +244,7 @@ impl CollectionMut {
         ctx: &Context<'_>,
         path_from: CollectionPath,
         path_to: CollectionPath,
-        extra_data: Option<serde_json::Value>,
+        extra_data: Option<ExtraData>,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<CollectionUpdateResult> {
         self.update_entries_impl(
@@ -253,7 +253,7 @@ impl CollectionMut {
                 r#move: Some(CollectionUpdateInputMove {
                     path_from,
                     path_to,
-                    extra_data,
+                    extra_data: extra_data.map(Into::into),
                 }),
                 ..Default::default()
             }],
@@ -306,20 +306,20 @@ pub struct CollectionEntryInput {
     pub reference: DatasetID<'static>,
 
     /// Json object containing extra column values
-    pub extra_data: Option<serde_json::Value>,
+    pub extra_data: Option<ExtraData>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Default)]
 pub struct CollectionUpdateInput {
-    /// Inserts new entry under specified path. If an entry at the target path
-    /// already exists it will be retracted.
+    /// Inserts a new entry under the specified path. If an entry at the target
+    /// path already exists, it will be retracted.
     pub add: Option<CollectionUpdateInputAdd>,
 
     /// Retracts and appends an entry under the new path. Returns error if from
-    /// path does not exist. If an entry at the target path already exists it
-    /// will be retracted. Use this to update extra data by specifying same
+    /// path does not exist. If an entry at the target path already exists, it
+    /// will be retracted. Use this to update extra data by specifying the same
     /// source and target paths.
     pub r#move: Option<CollectionUpdateInputMove>,
 
@@ -338,7 +338,7 @@ pub struct CollectionUpdateInputMove {
     pub path_to: CollectionPath,
 
     /// Optionally update the extra data
-    pub extra_data: Option<serde_json::Value>,
+    pub extra_data: Option<ExtraData>,
 }
 
 #[derive(InputObject, Debug)]
@@ -408,6 +408,7 @@ impl CollectionUpdateErrorCasFailed {
 pub struct CollectionUpdateErrorNotFound {
     pub path: CollectionPath,
 }
+
 #[ComplexObject]
 impl CollectionUpdateErrorNotFound {
     async fn is_success(&self) -> bool {

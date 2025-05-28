@@ -584,6 +584,8 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
 
     kamu_flow_system_services::register_dependencies(&mut b);
 
+    kamu_webhooks_services::register_dependencies(&mut b);
+
     kamu_adapter_auth_web3::register_dependencies(&mut b);
 
     b.add::<UploadServiceLocal>();
@@ -873,7 +875,7 @@ pub fn register_config_in_catalog(
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();
     catalog_builder.add_value(kamu_task_system_inmem::domain::TaskAgentConfig::new(
-        Duration::seconds(task_agent_config.task_checking_interval_secs.unwrap()),
+        Duration::seconds(i64::from(task_agent_config.checking_interval_secs.unwrap())),
     ));
     //
 

@@ -22,10 +22,10 @@ pub struct VersionedFileEntry {
     #[graphql(skip)]
     dataset: ResolvedDataset,
 
-    /// Time when this version was created
+    /// System time when this version was created/updated
     pub system_time: DateTime<Utc>,
 
-    /// Time when this version was created
+    /// Event time when this version was created/updated
     pub event_time: DateTime<Utc>,
 
     /// File version
@@ -34,11 +34,14 @@ pub struct VersionedFileEntry {
     /// Media type of the file content
     pub content_type: String,
 
+    /// Size of the content in bytes
+    pub content_length: usize,
+
     /// Multihash of the file content
     pub content_hash: Multihash<'static>,
 
     /// Extra data associated with this file version
-    pub extra_data: serde_json::Value,
+    pub extra_data: ExtraData,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,10 +54,11 @@ impl VersionedFileEntry {
         dataset: ResolvedDataset,
         version: FileVersion,
         content_hash: odf::Multihash,
+        content_length: usize,
         content_type: Option<impl Into<MediaType>>,
-        extra_data: Option<serde_json::Value>,
+        extra_data: Option<ExtraData>,
     ) -> Self {
-        let extra_data = extra_data.unwrap_or(serde_json::Value::Object(Default::default()));
+        let extra_data = extra_data.unwrap_or_default();
         let now = Utc::now();
 
         Self {
@@ -62,6 +66,7 @@ impl VersionedFileEntry {
             system_time: now,
             event_time: now,
             version,
+            content_length,
             content_type: content_type
                 .map(Into::into)
                 .unwrap_or_else(|| Self::DEFAULT_CONTENT_TYPE.to_owned())
@@ -102,6 +107,15 @@ impl VersionedFileEntry {
         // Parse core columns
         let version =
             FileVersion::try_from(record.remove("version").unwrap().as_i64().unwrap()).unwrap();
+        // TODO: Restrict after migration
+        let content_length = usize::try_from(
+            record
+                .remove("content_length")
+                .unwrap_or_default()
+                .as_u64()
+                .unwrap_or_default(),
+        )
+        .unwrap();
         let content_type = record
             .remove("content_type")
             .unwrap()
@@ -119,21 +133,25 @@ impl VersionedFileEntry {
             system_time,
             event_time,
             version,
+            content_length,
             content_type,
             content_hash,
-            extra_data: record.into(),
+            extra_data: ExtraData::new(record.into()),
         }
     }
 
-    pub fn to_record_data(&self) -> serde_json::Value {
-        let mut record = self.extra_data.clone();
+    #[expect(clippy::wrong_self_convention)]
+    pub fn to_record_data(self) -> serde_json::Value {
+        let mut record: serde_json::Value = self.extra_data.into();
         record["version"] = self.version.into();
         record["content_hash"] = self.content_hash.to_string().into();
+        record["content_length"] = self.content_length.into();
         record["content_type"] = self.content_type.clone().into();
         record
     }
 
-    pub fn to_bytes(&self) -> bytes::Bytes {
+    #[expect(clippy::wrong_self_convention)]
+    pub fn to_bytes(self) -> bytes::Bytes {
         let buf = self.to_record_data().to_string().into_bytes();
         bytes::Bytes::from_owner(buf)
     }
@@ -145,7 +163,7 @@ impl VersionedFileEntry {
 #[ComplexObject]
 impl VersionedFileEntry {
     /// Returns encoded content in-band. Should be used for small files only and
-    /// will retrurn error if called on large data.
+    /// will return an error if called on large data.
     #[tracing::instrument(level = "info", name = VersionedFileEntry_content, skip_all)]
     pub async fn content(&self) -> Result<Base64Usnp> {
         // TODO: Restrict by content size
@@ -202,7 +220,7 @@ pub struct VersionedFileContentDownload {
     /// Direct download URL
     pub url: String,
 
-    /// Headers to include in request
+    /// Headers to include in the request
     pub headers: Vec<KeyValue>,
 
     /// Download URL expiration timestamp

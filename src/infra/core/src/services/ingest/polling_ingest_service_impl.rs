@@ -326,21 +326,20 @@ impl PollingIngestServiceImpl {
         let data_cache_key = get_random_name(Some("fetch-"), 10);
         let target_path = self.cache_dir.join(&data_cache_key);
 
-        let fetch_result = self
-            .fetch_service
-            .fetch(
-                &args.dataset_handle,
-                &args.operation_id,
-                fetch_step,
-                prev_source_state.as_ref(),
-                &target_path,
-                &args.system_time,
-                &args.options.dataset_env_vars,
-                Some(Arc::new(FetchProgressListenerBridge::new(
-                    args.listener.clone(),
-                ))),
-            )
-            .await?;
+        // Note: Boxing the fetch service to reduce stack usage
+        let fetch_result = Box::pin(self.fetch_service.fetch(
+            &args.dataset_handle,
+            &args.operation_id,
+            fetch_step,
+            prev_source_state.as_ref(),
+            &target_path,
+            &args.system_time,
+            &args.options.dataset_env_vars,
+            Some(Arc::new(FetchProgressListenerBridge::new(
+                args.listener.clone(),
+            ))),
+        ))
+        .await?;
 
         match fetch_result {
             FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
