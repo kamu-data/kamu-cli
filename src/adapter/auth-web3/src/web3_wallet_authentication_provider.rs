@@ -53,7 +53,7 @@ impl Web3WalletAuthenticationProvider {
                 return Err(SignatureVerificationError::MissingMessageField(
                     MissedMessageField::ExpirationTime.into(),
                 ));
-            };
+            }
 
             if !message.valid_now() {
                 return Err(SignatureVerificationError::MessageExpired);

@@ -29,7 +29,7 @@ impl DidPkh {
     /// Parses DID from a canonical `did:pkh:<chain-code>:<address>` string
     pub fn from_did_str(s: &str) -> Result<Self, DidPkhParseError> {
         if let Some(stripped) = s.strip_prefix(DID_PKH_PREFIX) {
-            DidPkh::parse_caip10_account_id(stripped).map_err(Into::into)
+            DidPkh::parse_caip10_account_id(stripped)
         } else {
             Err(DidPkhParseError::InvalidValueFormat {
                 value: s.to_string(),

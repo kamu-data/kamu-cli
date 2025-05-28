@@ -28,7 +28,7 @@ kamu-auth-web3 = { workspace = true, default-features = false, features = ["sqlx
 
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
     "chrono",
     "macros",
