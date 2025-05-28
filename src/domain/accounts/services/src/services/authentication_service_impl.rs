@@ -258,13 +258,9 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
             // Account does not exist and needs to be created
             None => {
-                // Generate identity: temporarily we do this via provider, but revise in the
-                // future
-                let account_id = provider.generate_id(&provider_response.account_name);
-
                 // Create a new account
                 let new_account = Account {
-                    id: account_id,
+                    id: provider_response.account_id,
                     account_name: provider_response.account_name.clone(),
                     email: provider_response.email,
                     display_name: provider_response.display_name,

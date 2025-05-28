@@ -148,11 +148,6 @@ impl AuthenticationProvider for OAuthGithub {
         PROVIDER_GITHUB
     }
 
-    fn generate_id(&self, _: &odf::AccountName) -> odf::AccountID {
-        // For GitHub, generate a random DID, regardless of the name
-        odf::AccountID::new_generated_ed25519().1
-    }
-
     async fn login(
         &self,
         login_credentials_json: String,
@@ -197,6 +192,8 @@ impl AuthenticationProvider for OAuthGithub {
 
         // Extract matching fields
         Ok(ProviderLoginResponse {
+            // For GitHub, generate a random DID, regardless of the name
+            account_id: odf::AccountID::new_generated_ed25519().1,
             account_name: odf::AccountName::new_unchecked(&github_account_info.login),
             account_type: AccountType::User,
             email,
@@ -305,11 +302,6 @@ impl AuthenticationProvider for DummyOAuthGithub {
         PROVIDER_GITHUB
     }
 
-    fn generate_id(&self, _account_name: &odf::AccountName) -> odf::AccountID {
-        // Random
-        odf::AccountID::new_generated_ed25519().1
-    }
-
     async fn login(
         &self,
         _login_credentials_json: String,
@@ -317,6 +309,7 @@ impl AuthenticationProvider for DummyOAuthGithub {
         let account = "e2e-user".to_string();
 
         Ok(ProviderLoginResponse {
+            account_id: odf::AccountID::new_generated_ed25519().1,
             account_name: odf::AccountName::new_unchecked(&account),
             account_type: AccountType::User,
             email: Email::parse("e2e-user@example.com").unwrap(),

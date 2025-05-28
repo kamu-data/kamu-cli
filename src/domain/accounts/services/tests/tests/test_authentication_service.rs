@@ -180,15 +180,12 @@ impl AuthenticationProvider for DummyAuthenticationProviderA {
         "method-A"
     }
 
-    fn generate_id(&self, _: &odf::AccountName) -> odf::AccountID {
-        DEFAULT_ACCOUNT_ID.clone()
-    }
-
     async fn login(
         &self,
         _login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
         Ok(ProviderLoginResponse {
+            account_id: DEFAULT_ACCOUNT_ID.clone(),
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
             email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
@@ -205,15 +202,12 @@ impl AuthenticationProvider for DummyAuthenticationProviderB {
         "method-B"
     }
 
-    fn generate_id(&self, _: &odf::AccountName) -> odf::AccountID {
-        DEFAULT_ACCOUNT_ID.clone()
-    }
-
     async fn login(
         &self,
         _login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
         Ok(ProviderLoginResponse {
+            account_id: DEFAULT_ACCOUNT_ID.clone(),
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
             email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),

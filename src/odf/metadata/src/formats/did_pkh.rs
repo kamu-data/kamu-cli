@@ -29,7 +29,7 @@ impl DidPkh {
     /// Parses DID from a canonical `did:pkh:<chain-code>:<address>` string
     pub fn from_did_str(s: &str) -> Result<Self, DidPkhParseError> {
         if let Some(stripped) = s.strip_prefix(DID_PKH_PREFIX) {
-            DidPkh::from_caip10_account_id(stripped).map_err(Into::into)
+            DidPkh::parse_caip10_account_id(stripped).map_err(Into::into)
         } else {
             Err(DidPkhParseError::InvalidValueFormat {
                 value: s.to_string(),
@@ -38,19 +38,19 @@ impl DidPkh {
     }
 
     /// Parses DID from a CAIP-10 account ID string
-    pub fn from_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
+    pub fn parse_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
         Ok(Self {
             caip10_account_id: s.parse()?,
         })
     }
 
-    pub fn caip10_account_id(&self) -> &caip10::BlockchainAccountId {
-        &self.caip10_account_id
-    }
-
     /// Formats DID as a canonical `did:pkh:<account_id(CAIP-10)>` string
     pub fn as_did_str(&self) -> DidPkhFmt {
         DidPkhFmt::new(self)
+    }
+
+    pub fn wallet_address(&self) -> &str {
+        &self.caip10_account_id.account_address
     }
 }
 

@@ -69,7 +69,7 @@ impl AccountID {
         }
 
         if let Some(stripped) = s.strip_prefix(DID_PKH_PREFIX) {
-            return Self::from_caip10_account_id(stripped).map_err(Into::into);
+            return Self::parse_caip10_account_id(stripped).map_err(Into::into);
         }
 
         Err(AccountIdParseStrError::InvalidValueFormat {
@@ -84,8 +84,8 @@ impl AccountID {
 
     /// Parses `AccountID` from a CAIP-10 account ID string (without `did:pkh:`)
     /// prefix
-    pub fn from_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
-        Ok(Self::Pkh(DidPkh::from_caip10_account_id(s)?))
+    pub fn parse_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
+        Ok(Self::Pkh(DidPkh::parse_caip10_account_id(s)?))
     }
 }
 
@@ -225,7 +225,7 @@ impl utoipa::PartialSchema for AccountID {
                 .schema_type(SchemaType::Type(Type::String))
                 .examples([
                     json!(AccountID::new_seeded_ed25519(b"account")),
-                    json!(AccountID::from_caip10_account_id(
+                    json!(AccountID::parse_caip10_account_id(
                         "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
                     )
                     .unwrap()),

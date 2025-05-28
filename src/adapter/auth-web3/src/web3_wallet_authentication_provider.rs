@@ -18,7 +18,12 @@ use kamu_accounts::{
     ProviderLoginResponse,
     PROVIDER_WEB3_WALLET,
 };
-use kamu_auth_web3::{ConsumeNonceError, EvmWalletAddress, NonceNotFoundError};
+use kamu_auth_web3::{
+    ConsumeNonceError,
+    EvmWalletAddress,
+    EvmWalletAddressConvertor,
+    NonceNotFoundError,
+};
 use kamu_core::ServerUrlConfig;
 use nutype::nutype;
 use serde::Deserialize;
@@ -107,7 +112,7 @@ impl Web3WalletAuthenticationProvider {
     async fn handle_login(
         &self,
         login_request: &LoginRequest,
-    ) -> Result<ChecksumEvmWalletAddress, SignatureVerificationError> {
+    ) -> Result<odf::metadata::DidPkh, SignatureVerificationError> {
         let message: siwe::Message = login_request.message.parse()?;
         let wallet_address = EvmWalletAddress::new(message.address);
 
@@ -116,7 +121,19 @@ impl Web3WalletAuthenticationProvider {
         self.verify_eip4361_message_format(&message)?;
         self.verify_eip191_message_signature(&message, &login_request.signature)?;
 
-        Ok(ChecksumEvmWalletAddress::from(message.address))
+        let did_pkh = {
+            let chain_id = message.chain_id;
+            let checksum_wallet_address =
+                ChecksumEvmWalletAddress::from(wallet_address).into_inner();
+
+            // Only EVM-based (eip155) at the moment
+            odf::metadata::DidPkh::parse_caip10_account_id(&format!(
+                "eip155:{chain_id}:{checksum_wallet_address}",
+            ))
+            .unwrap()
+        };
+
+        Ok(did_pkh)
     }
 }
 
@@ -128,14 +145,6 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
         PROVIDER_WEB3_WALLET
     }
 
-    // TODO: Wallet-based auth: absorb into login() method
-    // TODO: Wallet-based auth: return enum:
-    //       - odf::AccountID; and
-    //       - the brand new did:ethr:0x1337....FFFF
-    fn generate_id(&self, _: &odf::AccountName) -> odf::AccountID {
-        odf::AccountID::new_generated_ed25519().1
-    }
-
     async fn login(
         &self,
         login_credentials_json: String,
@@ -143,9 +152,11 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
         let request = serde_json::from_str::<LoginRequest>(login_credentials_json.as_str())
             .map_err(ProviderLoginError::invalid_credentials)?;
 
-        let wallet_address = self.handle_login(&request).await?.into_inner();
+        let did_pkh = self.handle_login(&request).await?;
+        let wallet_address = did_pkh.wallet_address().to_string();
 
         Ok(ProviderLoginResponse {
+            account_id: did_pkh.into(),
             account_name: odf::AccountName::new_unchecked(&wallet_address),
             // TODO: Wallet-based auth: replace with none
             email: Email::parse(&format!("{wallet_address}@example.com")).unwrap(),
@@ -168,12 +179,12 @@ struct LoginRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype]
+#[nutype(derive(AsRef))]
 struct ChecksumEvmWalletAddress(String);
 
-impl From<[u8; 20]> for ChecksumEvmWalletAddress {
-    fn from(value: [u8; 20]) -> Self {
-        Self::new(siwe::eip55(&value))
+impl From<EvmWalletAddress> for ChecksumEvmWalletAddress {
+    fn from(value: EvmWalletAddress) -> Self {
+        Self::new(EvmWalletAddressConvertor::checksummed_string(&value))
     }
 }
 

@@ -72,11 +72,6 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         PROVIDER_PASSWORD
     }
 
-    fn generate_id(&self, account_name: &odf::AccountName) -> odf::AccountID {
-        // For passwords, use an ID based on name
-        odf::AccountID::new_seeded_ed25519(account_name.as_bytes())
-    }
-
     async fn login(
         &self,
         login_credentials_json: String,
@@ -137,6 +132,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             .int_err()?;
 
         Ok(ProviderLoginResponse {
+            // For passwords, use an ID based on name
+            account_id: odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
             account_name,
             email: account.email.clone(),
             display_name: password_login_credentials.login.clone(),
