@@ -17,14 +17,14 @@ use kamu_flow_system::{
 };
 
 use super::{
-    ensure_expected_dataset_kind,
-    ensure_flow_preconditions,
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
+    ensure_expected_dataset_kind,
+    ensure_flow_preconditions,
 };
+use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
-use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +53,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         let flow_run_config: FlowRunConfiguration = config_input.into();
         if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowConfigResult::TypeIsNotSupported(err));
-        };
+        }
 
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,

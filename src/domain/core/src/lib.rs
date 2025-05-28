@@ -23,5 +23,5 @@ pub use entities::*;
 pub use jobs::*;
 pub use services::*;
 pub use use_cases::*;
-pub use utils::paths::*;
 pub use utils::TenancyConfig;
+pub use utils::paths::*;

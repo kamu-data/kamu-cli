@@ -152,13 +152,13 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
                         state.finished_range = true;
 
                         return Decision::Stop;
-                    };
+                    }
 
                     let block_flag = Flag::from(&block.event);
 
                     if Flag::EXECUTE_TRANSFORM.contains(block_flag) {
                         state.blocks.push((hash.clone(), block.clone()));
-                    };
+                    }
 
                     if Some(block.sequence_number) == state.tail_sequence_number {
                         state.finished_range = true;

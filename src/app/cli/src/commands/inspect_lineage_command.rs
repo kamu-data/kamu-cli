@@ -178,19 +178,11 @@ impl LineageVisitor for ShellVisitor {
             let is_last = deps_left == num_deps;
 
             let suffix = if line.starts_with(['└', '├', '│', ' ']) {
-                if is_last {
-                    "    "
-                } else {
-                    "│   "
-                }
+                if is_last { "    " } else { "│   " }
             } else {
                 deps_left -= 1;
 
-                if is_last {
-                    "└── "
-                } else {
-                    "├── "
-                }
+                if is_last { "└── " } else { "├── " }
             };
             line.insert_str(0, suffix);
         }

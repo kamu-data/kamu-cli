@@ -123,7 +123,7 @@ impl DatasetFactoryImpl {
     }
 
     #[cfg(feature = "http")]
-    fn get_http(base_url: &Url, header_map: http::HeaderMap) -> impl Dataset {
+    fn get_http(base_url: &Url, header_map: http::HeaderMap) -> impl Dataset + use<> {
         // When joining url without trailing '/', last path part is being dropped
         let mut base_url = base_url.clone();
         if !base_url.path().ends_with('/') {
@@ -204,7 +204,7 @@ impl DatasetFactoryImpl {
     }
 
     #[cfg(feature = "http")]
-    async fn get_ipfs_http(&self, base_url: Url) -> Result<impl Dataset, InternalError> {
+    async fn get_ipfs_http(&self, base_url: Url) -> Result<impl Dataset + use<>, InternalError> {
         // Resolve IPNS DNSLink names if configured
         let dataset_url = match base_url.scheme() {
             "ipns" if self.ipfs_gateway.pre_resolve_dnslink => {
@@ -335,9 +335,9 @@ impl DatasetFactoryImpl {
 #[async_trait::async_trait]
 impl DatasetFactory for DatasetFactoryImpl {
     #[allow(unused_variables)]
-    async fn get_dataset(
-        &self,
-        url: &Url,
+    async fn get_dataset<'a, 'b>(
+        &'a self,
+        url: &'b Url,
         create_if_not_exists: bool,
     ) -> Result<Arc<dyn Dataset>, BuildDatasetError> {
         match url.scheme() {

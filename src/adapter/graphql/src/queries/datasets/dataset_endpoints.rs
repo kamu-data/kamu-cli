@@ -158,7 +158,7 @@ impl<'a> DatasetEndpoints<'a> {
             if let Some(account_url_segment) = maybe_account_url_segment {
                 url.push('/');
                 url.push_str(account_url_segment);
-            };
+            }
 
             url
         };

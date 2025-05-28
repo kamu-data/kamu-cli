@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::hash_map::{Entry, HashMap};
 use std::collections::BTreeMap;
+use std::collections::hash_map::{Entry, HashMap};
 
 use database_common::PaginationOpts;
 use dill::*;
@@ -70,14 +70,14 @@ impl InMemoryTaskEventStore {
     }
 
     fn update_index(state: &mut State, event: &TaskEvent) {
-        if let TaskEvent::TaskCreated(e) = &event {
-            if let Some(dataset_id) = e.logical_plan.dataset_id() {
-                let entries = match state.tasks_by_dataset.entry(dataset_id.clone()) {
-                    Entry::Occupied(v) => v.into_mut(),
-                    Entry::Vacant(v) => v.insert(Vec::default()),
-                };
-                entries.push(event.task_id());
-            }
+        if let TaskEvent::TaskCreated(e) = &event
+            && let Some(dataset_id) = e.logical_plan.dataset_id()
+        {
+            let entries = match state.tasks_by_dataset.entry(dataset_id.clone()) {
+                Entry::Occupied(v) => v.into_mut(),
+                Entry::Vacant(v) => v.insert(Vec::default()),
+            };
+            entries.push(event.task_id());
         }
 
         state

@@ -43,10 +43,12 @@ pub async fn test_store_dataset<
     assert_eq!(store_result.dataset_id, seed_block.event.dataset_id);
 
     // We should see the dataset
-    assert!(storage_unit
-        .get_stored_dataset_by_id(&seed_block.event.dataset_id)
-        .await
-        .is_ok());
+    assert!(
+        storage_unit
+            .get_stored_dataset_by_id(&seed_block.event.dataset_id)
+            .await
+            .is_ok()
+    );
 
     // Set head ref
     store_result
@@ -93,10 +95,12 @@ pub async fn test_delete_dataset<
     set_initial_head(&store_result).await;
 
     // We should see the dataset
-    assert!(storage_unit
-        .get_stored_dataset_by_id(&seed_block.event.dataset_id)
-        .await
-        .is_ok());
+    assert!(
+        storage_unit
+            .get_stored_dataset_by_id(&seed_block.event.dataset_id)
+            .await
+            .is_ok()
+    );
 
     // Delete the dataset
     storage_unit

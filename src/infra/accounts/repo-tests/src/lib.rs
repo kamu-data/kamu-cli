@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 #![feature(assert_matches)]
-#![feature(maybe_uninit_uninit_array)]
 
 mod access_token_repository_test_utils;
 mod accounts_repository_test_utils;

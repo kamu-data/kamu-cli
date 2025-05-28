@@ -10,14 +10,14 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
 use rand::{Rng, SeedableRng};
 
 async fn setup(tempdir: &Path, num_rows: usize) -> String {
     use datafusion::arrow::array;
-    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, UInt64Type, UInt8Type};
+    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, UInt8Type, UInt64Type};
     use datafusion::arrow::record_batch::RecordBatch;
 
     let ctx = SessionContext::new();

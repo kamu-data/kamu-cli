@@ -9,7 +9,7 @@
 
 use chrono::prelude::*;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{auth, ServerUrlConfig};
+use kamu_core::{ServerUrlConfig, auth};
 use odf::dataset::MetadataChainExt;
 
 use crate::prelude::*;
@@ -45,7 +45,7 @@ impl Dataset {
                 use RebacDatasetRefUnresolvedError as E;
                 match e {
                     E::Access(_) => {
-                        return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()))
+                        return Ok(TransformInputDataset::not_accessible(dataset_ref.clone()));
                     }
                     e @ (E::NotFound(_) | E::Internal(_)) => Err(e.int_err()),
                 }

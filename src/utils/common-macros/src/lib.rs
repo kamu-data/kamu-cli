@@ -10,7 +10,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, Ident, ImplItem, LitStr, Token, Type};
+use syn::{Ident, ImplItem, LitStr, Token, Type, parse_macro_input};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,6 +68,8 @@ use syn::{parse_macro_input, Ident, ImplItem, LitStr, Token, Type};
 /// }
 #[proc_macro_attribute]
 pub fn method_names_consts(attr: TokenStream, item: TokenStream) -> TokenStream {
+    use std::fmt::Write;
+
     let MethodNamesConstsOptions { const_value_prefix } =
         parse_macro_input!(attr as MethodNamesConstsOptions);
     let input = parse_macro_input!(item as syn::ItemImpl);
@@ -103,8 +105,8 @@ pub fn method_names_consts(attr: TokenStream, item: TokenStream) -> TokenStream 
                 let mut value = String::new();
                 if let Some(const_value_prefix) = &const_value_prefix {
                     value += &const_value_prefix.value();
-                };
-                value += &format!("{struct_name}::{method_name}");
+                }
+                write!(&mut value, "{struct_name}::{method_name}").unwrap();
                 value
             };
 
@@ -149,7 +151,7 @@ impl Parse for MethodNamesConstsOptions {
                 unexpected_key => panic!(
                     "Unexpected key: {unexpected_key}\nAllowable values: \"const_value_prefix\"."
                 ),
-            };
+            }
 
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;

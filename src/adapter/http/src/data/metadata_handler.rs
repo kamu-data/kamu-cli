@@ -181,9 +181,8 @@ pub async fn dataset_metadata_handler(
         .contains(&Include::Vocab)
         .then(odf::dataset::SearchSetVocabVisitor::new);
 
-    let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<
-        Error = odf::dataset::Infallible,
-    >; 6] = [
+    let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>;
+        6] = [
         &mut attachments_visitor,
         &mut info_visitor,
         &mut license_visitor,

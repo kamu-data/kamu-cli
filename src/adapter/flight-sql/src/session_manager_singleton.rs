@@ -15,7 +15,7 @@ use datafusion::prelude::SessionContext;
 use kamu_core::QueryService;
 use tonic::Status;
 
-use crate::{internal_error, PlanId, SessionManager};
+use crate::{PlanId, SessionManager, internal_error};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -10,11 +10,11 @@
 use std::sync::Arc;
 
 use console::style as s;
-use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
 use kamu::UrlExt;
+use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
 use url::Url;
 
-use crate::{odf_server, CLIError, Command, OutputConfig};
+use crate::{CLIError, Command, OutputConfig, odf_server};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

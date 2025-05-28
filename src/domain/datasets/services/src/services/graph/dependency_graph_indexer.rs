@@ -20,9 +20,9 @@ use kamu_datasets::{
 };
 
 use crate::{
-    extract_modified_dependencies_in_interval,
     DependencyChange,
     DependencyGraphServiceImpl,
+    extract_modified_dependencies_in_interval,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

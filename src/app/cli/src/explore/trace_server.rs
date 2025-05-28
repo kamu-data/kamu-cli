@@ -115,7 +115,7 @@ async fn download_trace(
             return Err((
                 http::StatusCode::NOT_FOUND,
                 format!("File not found: {err}"),
-            ))
+            ));
         }
     };
 

@@ -21,11 +21,11 @@ use kamu_accounts::{
     DeviceTokenCreated,
     DeviceTokenParamsPart,
     FindDeviceTokenByDeviceCodeError,
+    JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
     OAuthDeviceCodeGenerator,
     OAuthDeviceCodeRepository,
     OAuthDeviceCodeService,
     UpdateDeviceCodeWithTokenParamsPartError,
-    JOB_KAMU_ACCOUNTS_DEVICE_CODE_SERVICE,
 };
 use time_source::SystemTimeSource;
 

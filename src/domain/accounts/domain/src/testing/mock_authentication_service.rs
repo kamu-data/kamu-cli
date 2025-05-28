@@ -16,14 +16,14 @@ use crate::{
     AccessTokenError,
     Account,
     AuthenticationService,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
+    DUMMY_ACCESS_TOKEN,
     DeviceCode,
     GetAccountInfoError,
     LoginError,
     LoginResponse,
     UnsupportedLoginMethodError,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
-    DUMMY_ACCESS_TOKEN,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

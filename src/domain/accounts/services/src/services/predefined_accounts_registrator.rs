@@ -13,7 +13,7 @@ use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
-use kamu_auth_rebac::{boolean_property_value, AccountPropertyName, RebacService};
+use kamu_auth_rebac::{AccountPropertyName, RebacService, boolean_property_value};
 use kamu_auth_rebac_services::DefaultAccountProperties;
 use odf::AccountID;
 

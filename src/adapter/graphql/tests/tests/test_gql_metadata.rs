@@ -16,7 +16,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

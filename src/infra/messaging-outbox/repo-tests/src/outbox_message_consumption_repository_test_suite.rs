@@ -197,7 +197,7 @@ pub async fn test_multiple_boundaries(catalog: &Catalog) {
             let boundary = OutboxMessageConsumptionBoundary {
                 consumer_name: format!("{TEST_CONSUMER}_{consumer_suffix}"),
                 producer_name: format!("{TEST_PRODUCER}_{producer_suffix}"),
-                last_consumed_message_id: OutboxMessageID::new(rng.gen()),
+                last_consumed_message_id: OutboxMessageID::new(rng.r#gen()),
             };
             let res = consumption_repo.create_consumption_boundary(boundary).await;
             assert_matches!(res, Ok(_));

@@ -519,13 +519,15 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
         .save_events(
             &task_id_1,
             None,
-            vec![TaskEventCreated {
-                event_time: Utc::now(),
-                task_id: task_id_1,
-                logical_plan: LogicalPlanProbe::default().into(),
-                metadata: None,
-            }
-            .into()],
+            vec![
+                TaskEventCreated {
+                    event_time: Utc::now(),
+                    task_id: task_id_1,
+                    logical_plan: LogicalPlanProbe::default().into(),
+                    metadata: None,
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -539,11 +541,13 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
         .save_events(
             &task_id_1,
             Some(last_event_id),
-            vec![TaskEventRunning {
-                event_time: Utc::now(),
-                task_id: task_id_1,
-            }
-            .into()],
+            vec![
+                TaskEventRunning {
+                    event_time: Utc::now(),
+                    task_id: task_id_1,
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -557,11 +561,13 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
         .save_events(
             &task_id_1,
             Some(last_event_id),
-            vec![TaskEventRequeued {
-                event_time: Utc::now(),
-                task_id: task_id_1,
-            }
-            .into()],
+            vec![
+                TaskEventRequeued {
+                    event_time: Utc::now(),
+                    task_id: task_id_1,
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -611,13 +617,15 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
             .save_events(
                 &task_id,
                 None,
-                vec![TaskEventCreated {
-                    event_time: Utc::now(),
-                    task_id,
-                    logical_plan: LogicalPlanProbe::default().into(),
-                    metadata: None,
-                }
-                .into()],
+                vec![
+                    TaskEventCreated {
+                        event_time: Utc::now(),
+                        task_id,
+                        logical_plan: LogicalPlanProbe::default().into(),
+                        metadata: None,
+                    }
+                    .into(),
+                ],
             )
             .await
             .unwrap();
@@ -635,11 +643,13 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
         .save_events(
             &task_ids[0],
             Some(last_event_ids[0]),
-            vec![TaskEventRunning {
-                event_time: Utc::now(),
-                task_id: task_ids[0],
-            }
-            .into()],
+            vec![
+                TaskEventRunning {
+                    event_time: Utc::now(),
+                    task_id: task_ids[0],
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -679,11 +689,13 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
         .save_events(
             &task_ids[0],
             Some(last_event_ids[0]),
-            vec![TaskEventRequeued {
-                event_time: Utc::now() - Duration::seconds(1), // to ensure time order
-                task_id: task_ids[0],
-            }
-            .into()],
+            vec![
+                TaskEventRequeued {
+                    event_time: Utc::now() - Duration::seconds(1), // to ensure time order
+                    task_id: task_ids[0],
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -723,11 +735,13 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
         .save_events(
             &task_ids[2],
             Some(last_event_ids[2]),
-            vec![TaskEventRunning {
-                event_time: Utc::now(),
-                task_id: task_ids[2],
-            }
-            .into()],
+            vec![
+                TaskEventRunning {
+                    event_time: Utc::now(),
+                    task_id: task_ids[2],
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -766,13 +780,15 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
             .save_events(
                 &task_id,
                 None,
-                vec![TaskEventCreated {
-                    event_time: Utc::now(),
-                    task_id,
-                    logical_plan: LogicalPlanProbe::default().into(),
-                    metadata: None,
-                }
-                .into()],
+                vec![
+                    TaskEventCreated {
+                        event_time: Utc::now(),
+                        task_id,
+                        logical_plan: LogicalPlanProbe::default().into(),
+                        metadata: None,
+                    }
+                    .into(),
+                ],
             )
             .await
             .unwrap();
@@ -801,11 +817,13 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
         .save_events(
             &task_ids[0],
             Some(last_event_ids[0]),
-            vec![TaskEventRunning {
-                event_time: Utc::now(),
-                task_id: task_ids[0],
-            }
-            .into()],
+            vec![
+                TaskEventRunning {
+                    event_time: Utc::now(),
+                    task_id: task_ids[0],
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -813,11 +831,13 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
         .save_events(
             &task_ids[1],
             Some(last_event_ids[1]),
-            vec![TaskEventRunning {
-                event_time: Utc::now(),
-                task_id: task_ids[1],
-            }
-            .into()],
+            vec![
+                TaskEventRunning {
+                    event_time: Utc::now(),
+                    task_id: task_ids[1],
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -874,12 +894,14 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
         .save_events(
             &task_ids[1],
             Some(last_event_ids[1]),
-            vec![TaskEventFinished {
-                event_time: Utc::now(),
-                task_id: task_ids[1],
-                outcome: TaskOutcome::Success(TaskResult::Empty),
-            }
-            .into()],
+            vec![
+                TaskEventFinished {
+                    event_time: Utc::now(),
+                    task_id: task_ids[1],
+                    outcome: TaskOutcome::Success(TaskResult::Empty),
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -904,11 +926,13 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
         .save_events(
             &task_ids[0],
             Some(last_event_ids[0]),
-            vec![TaskEventRequeued {
-                event_time: Utc::now(),
-                task_id: task_ids[0],
-            }
-            .into()],
+            vec![
+                TaskEventRequeued {
+                    event_time: Utc::now(),
+                    task_id: task_ids[0],
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -941,13 +965,15 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &task_id,
             Some(EventID::new(15)),
-            vec![TaskEventCreated {
-                event_time: Utc::now(),
-                task_id,
-                logical_plan: LogicalPlanProbe::default().into(),
-                metadata: None,
-            }
-            .into()],
+            vec![
+                TaskEventCreated {
+                    event_time: Utc::now(),
+                    task_id,
+                    logical_plan: LogicalPlanProbe::default().into(),
+                    metadata: None,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
@@ -957,13 +983,15 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &task_id,
             None,
-            vec![TaskEventCreated {
-                event_time: Utc::now(),
-                task_id,
-                logical_plan: LogicalPlanProbe::default().into(),
-                metadata: None,
-            }
-            .into()],
+            vec![
+                TaskEventCreated {
+                    event_time: Utc::now(),
+                    task_id,
+                    logical_plan: LogicalPlanProbe::default().into(),
+                    metadata: None,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Ok(_));
@@ -973,11 +1001,13 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &task_id,
             None,
-            vec![TaskEventRunning {
-                event_time: Utc::now(),
-                task_id,
-            }
-            .into()],
+            vec![
+                TaskEventRunning {
+                    event_time: Utc::now(),
+                    task_id,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
@@ -987,11 +1017,13 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &task_id,
             Some(EventID::new(15)),
-            vec![TaskEventRunning {
-                event_time: Utc::now(),
-                task_id,
-            }
-            .into()],
+            vec![
+                TaskEventRunning {
+                    event_time: Utc::now(),
+                    task_id,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
@@ -1001,11 +1033,13 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &task_id,
             Some(EventID::new(1)),
-            vec![TaskEventRunning {
-                event_time: Utc::now(),
-                task_id,
-            }
-            .into()],
+            vec![
+                TaskEventRunning {
+                    event_time: Utc::now(),
+                    task_id,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Ok(_));

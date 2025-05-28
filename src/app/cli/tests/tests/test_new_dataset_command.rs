@@ -10,10 +10,10 @@
 use std::str::FromStr;
 
 use dill::TypedBuilder;
-use kamu::domain::*;
 use kamu::ResourceLoaderImpl;
-use kamu_cli::commands::*;
+use kamu::domain::*;
 use kamu_cli::CLIError;
+use kamu_cli::commands::*;
 
 #[test_log::test(tokio::test)]
 async fn test_ambiguity_is_punished() {

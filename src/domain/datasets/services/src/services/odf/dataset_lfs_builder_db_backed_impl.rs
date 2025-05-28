@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface, Catalog};
+use dill::{Catalog, component, interface};
 use odf::Dataset;
 use url::Url;
 

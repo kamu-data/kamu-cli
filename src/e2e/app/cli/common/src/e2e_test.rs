@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_cli_puppet::extensions::ServerOutput;
 use reqwest::Url;
-use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
+use tokio_retry::strategy::FixedInterval;
 
 use crate::KamuApiServerClient;
 

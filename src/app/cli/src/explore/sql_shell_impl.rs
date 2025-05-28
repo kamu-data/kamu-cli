@@ -19,8 +19,8 @@ use internal_error::*;
 use odf::dataset::DatasetLayout;
 use random_strings::get_random_name;
 
-use crate::error::{CommandRunError, SubprocessError};
 use crate::WorkspaceLayout;
+use crate::error::{CommandRunError, SubprocessError};
 
 pub struct SqlShellImpl {
     container_runtime: Arc<ContainerRuntime>,

@@ -98,11 +98,7 @@ pub fn preprocess_default(
             }
         }
 
-        if noop {
-            df
-        } else {
-            df.select(select)?
-        }
+        if noop { df } else { df.select(select)? }
     } else {
         df
     };
@@ -167,11 +163,7 @@ pub fn preprocess_default(
             }
         }
 
-        if noop {
-            df
-        } else {
-            df.select(select)?
-        }
+        if noop { df } else { df.select(select)? }
     } else {
         df
     };

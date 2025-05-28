@@ -61,10 +61,10 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
         block_ref: &odf::BlockRef,
     ) -> Result<DatasetStatistics, GetDatasetStatisticsError> {
         let guard = self.state.lock().unwrap();
-        if let Some(stats_by_ref) = guard.statistics.get(dataset_id) {
-            if let Some(stats) = stats_by_ref.get(block_ref) {
-                return Ok(*stats);
-            }
+        if let Some(stats_by_ref) = guard.statistics.get(dataset_id)
+            && let Some(stats) = stats_by_ref.get(block_ref)
+        {
+            return Ok(*stats);
         }
 
         Err(GetDatasetStatisticsError::NotFound(

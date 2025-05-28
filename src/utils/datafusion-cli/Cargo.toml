@@ -26,8 +26,15 @@ readme = { workspace = true }
 license-file = { workspace = true }
 keywords = { workspace = true }
 include = { workspace = true }
-edition = { workspace = true }
+# TODO: Waiting for upstream to upgrade to avoid increasing diff due to more strict lints
+edition = "2021"
+# edition = { workspace = true }
 publish = { workspace = true }
+
+
+# TODO: Waiting for upstream to fix to avoid increasing diff due to more strict lints
+[lints.clippy]
+uninlined_format_args = "allow"
 
 
 [dependencies]
@@ -36,7 +43,15 @@ async-trait = "0.1"
 aws-config = "1"
 aws-credential-types = "1"
 clap = { version = "4", features = ["derive"] }
-datafusion = { version = "47", features = ["crypto_expressions", "datetime_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
+datafusion = { version = "47", features = [
+    "crypto_expressions",
+    "datetime_expressions",
+    "encoding_expressions",
+    "parquet",
+    "regex_expressions",
+    "unicode_expressions",
+    "compression",
+] }
 dirs = "6"
 futures = "0.3"
 object_store = { version = "0.12", features = ["aws", "gcp", "http"] }

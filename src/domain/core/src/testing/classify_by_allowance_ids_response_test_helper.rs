@@ -20,6 +20,8 @@ impl ClassifyByAllowanceIdsResponseTestHelper {
         mut response: ClassifyByAllowanceIdsResponse,
         dataset_handle_map: &HashMap<odf::DatasetID, odf::DatasetAlias>,
     ) -> String {
+        use std::fmt::Write;
+
         response.authorized_ids.sort();
         response
             .unauthorized_ids_with_errors
@@ -27,19 +29,19 @@ impl ClassifyByAllowanceIdsResponseTestHelper {
 
         let mut res = "authorized:\n".to_string();
         for id in response.authorized_ids {
-            res += &if let Some(alias) = dataset_handle_map.get(&id) {
-                format!("- {alias}\n")
+            if let Some(alias) = dataset_handle_map.get(&id) {
+                writeln!(&mut res, "- {alias}").unwrap();
             } else {
-                format!("- {id}\n")
-            };
+                writeln!(&mut res, "- {id}").unwrap();
+            }
         }
         res += "\nunauthorized_with_errors:\n";
         for (id, e) in response.unauthorized_ids_with_errors {
-            res += &if let Some(alias) = dataset_handle_map.get(&id) {
-                format!("- {alias}: {e}\n")
+            if let Some(alias) = dataset_handle_map.get(&id) {
+                writeln!(&mut res, "- {alias}: {e}").unwrap();
             } else {
-                format!("- {id}: {e}\n")
-            };
+                writeln!(&mut res, "- {id}: {e}").unwrap();
+            }
         }
 
         res

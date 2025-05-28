@@ -11,7 +11,7 @@ use kamu_datasets::CreateDatasetResult;
 use odf::dataset::DatasetLayout;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::harness::{make_dataset_ref, ClientSideHarness, ServerSideHarness};
+use crate::harness::{ClientSideHarness, ServerSideHarness, make_dataset_ref};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

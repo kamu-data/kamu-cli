@@ -7,25 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::LazyLock;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-lazy_static::lazy_static! {
-    static ref EXTRA_DATA_JSONSCHEMA_VALIDATOR: jsonschema::Validator = {
-        let schema = serde_json::json!({
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "type": "object",
-            "additionalProperties": {
-                "type": [
-                    "string",
-                    "number",
-                    "boolean"
-                ]
-            },
-            "minProperties": 0
-        });
-        jsonschema::validator_for(&schema).unwrap()
-    };
-}
+static EXTRA_DATA_JSONSCHEMA_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
+    let schema = serde_json::json!({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": {
+            "type": [
+                "string",
+                "number",
+                "boolean"
+            ]
+        },
+        "minProperties": 0
+    });
+    jsonschema::validator_for(&schema).unwrap()
+});
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

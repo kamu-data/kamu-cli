@@ -78,7 +78,7 @@ impl From<std::io::Error> for WaitForResourceError {
 
 #[derive(Error, Debug)]
 pub struct ProcessError {
-    command: Command,
+    command: Box<Command>,
     code: i32,
     stdout: Option<String>,
     stderr: Option<String>,
@@ -101,7 +101,7 @@ impl std::fmt::Display for ProcessError {
 impl ProcessError {
     pub fn from_output(command: Command, output: Output) -> Self {
         Self {
-            command,
+            command: Box::new(command),
             code: output.status.code().unwrap(),
             stdout: Some(String::from_utf8(output.stdout).expect("Non-unicode data")),
             stderr: Some(String::from_utf8(output.stderr).expect("Non-unicode data")),

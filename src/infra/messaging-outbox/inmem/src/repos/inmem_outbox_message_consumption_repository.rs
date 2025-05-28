@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::{Arc, Mutex};
 
-use dill::{component, interface, scope, Singleton};
+use dill::{Singleton, component, interface, scope};
 use internal_error::InternalError;
 
 use crate::domain::*;

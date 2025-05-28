@@ -48,7 +48,7 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
                 }
             }
             fs::FlowKey::System(_) => {
-                return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })))
+                return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
             }
         },
         Err(e) => {
@@ -57,7 +57,7 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
                     Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })))
                 }
                 fs::GetFlowError::Internal(e) => Err(GqlError::Internal(e)),
-            }
+            };
         }
     }
 
@@ -187,7 +187,7 @@ pub(crate) async fn ensure_flow_preconditions(
                         return Ok(Some(FlowPreconditionsNotMet {
                             preconditions: "New head hash not found".to_string(),
                         }));
-                    };
+                    }
 
                     if new_head_hash == &current_head_hash_maybe.unwrap().into() {
                         return Ok(Some(FlowPreconditionsNotMet {

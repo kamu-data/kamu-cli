@@ -8,17 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{
-    mysql_generate_placeholders_list,
     PaginationOpts,
     TransactionRef,
     TransactionRefT,
+    mysql_generate_placeholders_list,
 };
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use sqlx::Row;
 use sqlx::error::DatabaseError;
 use sqlx::mysql::MySqlRow;
-use sqlx::Row;
 
 use crate::domain::*;
 

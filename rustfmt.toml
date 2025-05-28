@@ -1,5 +1,5 @@
 # Reference: https://rust-lang.github.io/rustfmt/?version=master
-edition = "2021"
+edition = "2024"
 
 # Add newline breaks to string literals where necessary
 format_strings = true

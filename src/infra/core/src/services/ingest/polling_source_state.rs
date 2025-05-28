@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use odf::metadata::serde::yaml::{datetime_rfc3339, datetime_rfc3339_opt, SourceStateDef};
+use odf::metadata::serde::yaml::{SourceStateDef, datetime_rfc3339, datetime_rfc3339_opt};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
 

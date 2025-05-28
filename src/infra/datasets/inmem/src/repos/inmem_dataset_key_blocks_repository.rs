@@ -113,10 +113,9 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             if let Some(blocks) = guard
                 .key_blocks
                 .get(&(dataset_id.clone(), block_ref.clone()))
+                && blocks.iter().any(|block| block.event_kind == event_type)
             {
-                if blocks.iter().any(|block| block.event_kind == event_type) {
-                    result.push(dataset_id);
-                }
+                result.push(dataset_id);
             }
         }
 

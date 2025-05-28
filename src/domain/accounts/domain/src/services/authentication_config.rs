@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use random_strings::{get_random_string, AllowedSymbols};
+use random_strings::{AllowedSymbols, get_random_string};
 
 use crate::Account;
 
