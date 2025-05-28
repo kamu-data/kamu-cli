@@ -9,10 +9,10 @@
 
 use kamu_datasets::CommitDatasetEventUseCase;
 
+use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
 use crate::utils::make_dataset_access_error;
-use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,13 +51,13 @@ impl<'a> MetadataChainMut<'a> {
                     Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
                         return Ok(CommitResult::Malformed(MetadataManifestMalformed {
                             message: e.to_string(),
-                        }))
+                        }));
                     }
                     Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
-                        return Ok(CommitResult::UnsupportedVersion(e.into()))
+                        return Ok(CommitResult::UnsupportedVersion(e.into()));
                     }
                     Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
-                        return Err(e.int_err().into())
+                        return Err(e.int_err().into());
                     }
                 }
             }
@@ -82,7 +82,7 @@ impl<'a> MetadataChainMut<'a> {
                 })
             }
             Err(odf::dataset::CommitError::Access(_)) => {
-                return Err(make_dataset_access_error(dataset_handle))
+                return Err(make_dataset_access_error(dataset_handle));
             }
             Err(e @ odf::dataset::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };

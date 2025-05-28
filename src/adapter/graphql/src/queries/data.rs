@@ -63,7 +63,7 @@ impl DataQueries {
             _ => {
                 return Ok(DataQueryResult::invalid_sql(format!(
                     "Dialect {query_dialect:?} is not yet supported"
-                )))
+                )));
             }
         };
 

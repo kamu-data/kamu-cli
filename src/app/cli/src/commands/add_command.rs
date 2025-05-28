@@ -275,7 +275,7 @@ impl Command for AddCommand {
                     self.delete_dataset.execute_via_handle(&hdl).await?;
                 }
             }
-        };
+        }
 
         let create_options = CreateDatasetUseCaseOptions {
             dataset_visibility: self.dataset_visibility,

@@ -67,8 +67,8 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::DFSchema;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::{DataFrame, SessionContext};
-use prost::bytes::Bytes;
 use prost::Message;
+use prost::bytes::Bytes;
 use tonic::codegen::tokio_stream::Stream;
 use tonic::metadata::MetadataValue;
 use tonic::{Request, Response, Status, Streaming};
@@ -636,8 +636,8 @@ impl FlightSqlService for KamuFlightSqlService {
         Response<Pin<Box<dyn Stream<Item = Result<HandshakeResponse, Status>> + Send>>>,
         Status,
     > {
-        use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
         use base64::Engine;
+        use base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 
         let basic = "Basic ";
         let authorization = request

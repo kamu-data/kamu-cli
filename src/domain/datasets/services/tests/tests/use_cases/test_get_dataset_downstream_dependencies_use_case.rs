@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::Component;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
-use kamu_accounts::{AccountConfig, PredefinedAccountsConfig, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::{AccountConfig, DEFAULT_ACCOUNT_NAME_STR, PredefinedAccountsConfig};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{
     AccountServiceImpl,
@@ -31,11 +31,11 @@ use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_datasets_services::*;
 use messaging_outbox::{
-    register_message_dispatcher,
     ConsumerFilter,
     Outbox,
     OutboxExt,
     OutboxImmediateImpl,
+    register_message_dispatcher,
 };
 use time_source::SystemTimeSource;
 

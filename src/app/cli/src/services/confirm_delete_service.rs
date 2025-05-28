@@ -86,7 +86,7 @@ impl ConfirmDeleteService {
                     );
                 }
                 eprintln!();
-            };
+            }
         }
 
         self.interact.require_confirmation(format!(

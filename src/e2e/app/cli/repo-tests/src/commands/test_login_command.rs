@@ -10,13 +10,13 @@
 use std::time::Duration;
 
 use kamu_cli_e2e_common::{
-    KamuApiServerClient,
-    KamuApiServerClientExt,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    KamuApiServerClient,
+    KamuApiServerClientExt,
 };
-use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoRecord};
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoRecord};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

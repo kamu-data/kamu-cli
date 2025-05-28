@@ -18,8 +18,8 @@ use kamu::domain::*;
 use kamu::testing::ParquetWriterHelper;
 use odf::dataset::DatasetLayout;
 use odf::metadata::testing::{AddDataBuilder, MetadataFactory};
-use odf::storage::lfs::ObjectRepositoryLocalFSSha3;
 use odf::storage::ObjectRepository as _;
+use odf::storage::lfs::ObjectRepositoryLocalFSSha3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

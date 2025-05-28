@@ -23,8 +23,8 @@ use kamu_accounts::{
     FindAccountByTokenError,
     GetAccessTokenError,
     KamuAccessToken,
-    RevokeTokenError,
     MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
+    RevokeTokenError,
 };
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;

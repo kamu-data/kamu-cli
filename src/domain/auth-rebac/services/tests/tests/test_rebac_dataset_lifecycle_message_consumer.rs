@@ -15,7 +15,7 @@ use kamu_auth_rebac::{DatasetProperties, Entity, RebacRepository, RebacService};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{RebacDatasetLifecycleMessageConsumer, RebacServiceImpl};
 use kamu_datasets::DatasetLifecycleMessage;
-use messaging_outbox::{consume_deserialized_message, ConsumerFilter, Message};
+use messaging_outbox::{ConsumerFilter, Message, consume_deserialized_message};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

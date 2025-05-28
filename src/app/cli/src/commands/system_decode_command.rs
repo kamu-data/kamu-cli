@@ -50,7 +50,7 @@ impl Command for SystemDecodeCommand {
                 scheme => {
                     return Err(CLIError::usage_error(format!(
                         "Fetchind data from {scheme} is not supported"
-                    )))
+                    )));
                 }
             }
         } else {

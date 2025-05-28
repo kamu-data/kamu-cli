@@ -17,8 +17,8 @@ use kamu_core::auth::{
     DatasetActionAuthorizer,
     DatasetActionUnauthorizedError,
 };
-use mockall::predicate::{always, eq, function};
 use mockall::Predicate;
+use mockall::predicate::{always, eq, function};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

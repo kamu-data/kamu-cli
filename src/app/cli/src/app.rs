@@ -33,17 +33,21 @@ use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
-use kamu_task_system_inmem::domain::{TaskProgressMessage, MESSAGE_PRODUCER_KAMU_TASK_AGENT};
+use kamu_task_system_inmem::domain::{MESSAGE_PRODUCER_KAMU_TASK_AGENT, TaskProgressMessage};
 use merge::Merge as _;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxDispatchingImpl};
+use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
-use tracing::{warn, Instrument};
+use tracing::{Instrument, warn};
 
 use crate::accounts::AccountService;
 use crate::cli::Command;
 use crate::error::*;
 use crate::output::*;
 use crate::{
+    ConfirmDeleteService,
+    GcService,
+    WorkspaceLayout,
+    WorkspaceService,
     build_db_connection_settings,
     cli,
     cli_commands,
@@ -56,10 +60,6 @@ use crate::{
     move_initial_database_to_workspace_if_needed,
     odf_server,
     spawn_password_refreshing_job,
-    ConfirmDeleteService,
-    GcService,
-    WorkspaceLayout,
-    WorkspaceService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,7 +84,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Always capture backtraces for logging - we will separately decide whether to
     // display them to the user based on verbosity level
     if std::env::var_os("RUST_BACKTRACE").is_none() {
-        std::env::set_var("RUST_BACKTRACE", "1");
+        unsafe {
+            std::env::set_var("RUST_BACKTRACE", "1");
+        }
     }
 
     // Sometimes (in the case of predefined users), we need to know whether the
@@ -146,7 +148,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             );
         } else {
             configure_in_memory_components(&mut base_catalog_builder);
-        };
+        }
 
         let output_config = configure_output_format(&args, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
@@ -323,12 +325,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Flush all logging sinks
     drop(guards);
 
-    if let Some(metrics_file) = &output_config.metrics_file {
-        if let Ok(mut file) = std::fs::File::create(metrics_file) {
-            use prometheus::Encoder as _;
-            let _ = prometheus::TextEncoder::new().encode(&metrics_registry.gather(), &mut file);
-            eprintln!("Saving metrics to {}", metrics_file.display());
-        }
+    if let Some(metrics_file) = &output_config.metrics_file
+        && let Ok(mut file) = std::fs::File::create(metrics_file)
+    {
+        use prometheus::Encoder as _;
+        let _ = prometheus::TextEncoder::new().encode(&metrics_registry.gather(), &mut file);
+        eprintln!("Saving metrics to {}", metrics_file.display());
     }
 
     if let Some(trace_file) = &output_config.trace_file {
@@ -999,9 +1001,9 @@ fn configure_logging(
 ) -> Guards {
     use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
     use tracing_log::LogTracer;
+    use tracing_subscriber::EnvFilter;
     use tracing_subscriber::fmt::format::FmtSpan;
     use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::EnvFilter;
 
     if no_color_output {
         console::set_colors_enabled(false);

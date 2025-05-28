@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use async_utils::AsyncReadObj;
 use aws_config::{BehaviorVersion, SdkConfig};
+use aws_sdk_s3::Client;
 use aws_sdk_s3::config::SharedCredentialsProvider;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
@@ -20,7 +21,6 @@ use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::presigning::{PresignedRequest, PresigningConfig};
 use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectCannedAcl, ObjectIdentifier};
-use aws_sdk_s3::Client;
 use internal_error::{InternalError, ResultIntoInternal, *};
 use url::Url;
 
@@ -211,7 +211,7 @@ impl S3Context {
                         None,
                         host.to_owned(),
                         path.trim_start_matches('/').to_owned(),
-                    )
+                    );
                 }
                 ("s3+http", Some(host), None, path) => {
                     (Some(format!("http://{host}")), path.to_owned())

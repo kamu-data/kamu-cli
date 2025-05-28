@@ -186,34 +186,32 @@ where
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         // Validate referential consistency
-        if opts.check_object_refs {
-            if let Some(event) = event.as_data_stream_event() {
-                if let Some(data_slice) = event.new_data {
-                    if !self
-                        .as_data_repo()
-                        .contains(&data_slice.physical_hash)
-                        .await
-                        .int_err()?
-                    {
-                        return Err(ObjectNotFoundError {
-                            hash: data_slice.physical_hash.clone(),
-                        }
-                        .into());
-                    }
+        if opts.check_object_refs
+            && let Some(event) = event.as_data_stream_event()
+        {
+            if let Some(data_slice) = event.new_data
+                && !self
+                    .as_data_repo()
+                    .contains(&data_slice.physical_hash)
+                    .await
+                    .int_err()?
+            {
+                return Err(ObjectNotFoundError {
+                    hash: data_slice.physical_hash.clone(),
                 }
-                if let Some(checkpoint) = event.new_checkpoint {
-                    if !self
-                        .as_checkpoint_repo()
-                        .contains(&checkpoint.physical_hash)
-                        .await
-                        .int_err()?
-                    {
-                        return Err(ObjectNotFoundError {
-                            hash: checkpoint.physical_hash.clone(),
-                        }
-                        .into());
-                    }
+                .into());
+            }
+            if let Some(checkpoint) = event.new_checkpoint
+                && !self
+                    .as_checkpoint_repo()
+                    .contains(&checkpoint.physical_hash)
+                    .await
+                    .int_err()?
+            {
+                return Err(ObjectNotFoundError {
+                    hash: checkpoint.physical_hash.clone(),
                 }
+                .into());
             }
         }
 

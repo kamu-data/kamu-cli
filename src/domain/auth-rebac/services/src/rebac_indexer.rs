@@ -16,8 +16,8 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     ExpensiveAccountRepository,
     ExpensiveAccountRepositoryExt,
-    PredefinedAccountsConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
+    PredefinedAccountsConfig,
 };
 use kamu_auth_rebac::{DatasetPropertyName, RebacService};
 use kamu_datasets::{DatasetEntryService, JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER};

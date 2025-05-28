@@ -188,7 +188,7 @@ impl Command for IngestCommand {
                 .map_err(CLIError::failure)?;
 
             match ingest_result {
-                PushIngestResult::UpToDate { .. } => (),
+                PushIngestResult::UpToDate => (),
                 PushIngestResult::Updated { .. } => updated += 1,
             }
         }
@@ -304,7 +304,7 @@ impl PushIngestListener for PushIngestProgress {
                         console::style("Dataset is up-to-date".to_owned()).yellow(),
                     ));
             }
-            PushIngestResult::Updated { ref new_head, .. } => {
+            PushIngestResult::Updated { new_head, .. } => {
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
@@ -317,7 +317,7 @@ impl PushIngestListener for PushIngestProgress {
                         .green(),
                     ));
             }
-        };
+        }
     }
 
     fn error(&self, _error: &PushIngestError) {

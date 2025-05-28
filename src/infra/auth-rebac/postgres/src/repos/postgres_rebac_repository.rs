@@ -11,9 +11,9 @@ use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
 use database_common::{
-    postgres_generate_placeholders_tuple_list_2,
     TransactionRef,
     TransactionRefT,
+    postgres_generate_placeholders_tuple_list_2,
 };
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};

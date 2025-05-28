@@ -11,12 +11,12 @@ use odf::dataset::DatasetLayout;
 use odf::metadata::testing::MetadataFactory;
 
 use crate::harness::{
+    ClientSideHarness,
+    ServerSideHarness,
     commit_add_data_event,
     copy_folder_recursively,
     make_dataset_ref,
     write_dataset_alias,
-    ClientSideHarness,
-    ServerSideHarness,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

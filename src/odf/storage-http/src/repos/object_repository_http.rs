@@ -162,7 +162,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         use futures::TryStreamExt;
         use tokio_util::compat::FuturesAsyncReadCompatExt;
         let reader = stream
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            .map_err(std::io::Error::other)
             .into_async_read()
             .compat();
 

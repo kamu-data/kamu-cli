@@ -36,9 +36,9 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageDeliveryMechanism,
 };
-use petgraph::stable_graph::{NodeIndex, StableDiGraph};
-use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
+use petgraph::stable_graph::{NodeIndex, StableDiGraph};
+use petgraph::visit::{Bfs, DfsEvent, Reversed, depth_first_search};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

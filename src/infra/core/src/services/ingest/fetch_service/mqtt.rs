@@ -99,7 +99,7 @@ impl FetchService {
                 }
             } else {
                 break;
-            };
+            }
         }
 
         tracing::debug!(

@@ -285,13 +285,15 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .save_events(
             &flow_active,
             None,
-            vec![FlowTriggerEventCreated {
-                event_time: Utc::now(),
-                flow_key: flow_active.clone(),
-                paused: false,
-                rule: dummy_schedule(),
-            }
-            .into()],
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now(),
+                    flow_key: flow_active.clone(),
+                    paused: false,
+                    rule: dummy_schedule(),
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -302,13 +304,15 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .save_events(
             &flow_paused,
             None,
-            vec![FlowTriggerEventCreated {
-                event_time: Utc::now(),
-                flow_key: flow_paused.clone(),
-                paused: true,
-                rule: dummy_schedule(),
-            }
-            .into()],
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now(),
+                    flow_key: flow_paused.clone(),
+                    paused: true,
+                    rule: dummy_schedule(),
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -397,13 +401,15 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .save_events(
             &flow_system,
             None,
-            vec![FlowTriggerEventCreated {
-                event_time: Utc::now(),
-                flow_key: flow_system.clone(),
-                paused: false,
-                rule: dummy_schedule(),
-            }
-            .into()],
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now(),
+                    flow_key: flow_system.clone(),
+                    paused: false,
+                    rule: dummy_schedule(),
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();

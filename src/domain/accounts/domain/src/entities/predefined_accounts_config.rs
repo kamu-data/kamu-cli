@@ -14,7 +14,7 @@ use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use super::{LoggedAccount, DUMMY_EMAIL_ADDRESS};
+use super::{DUMMY_EMAIL_ADDRESS, LoggedAccount};
 use crate::{
     AccountDisplayName,
     AccountType,

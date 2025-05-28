@@ -13,7 +13,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -417,13 +417,15 @@ impl GqlSearchHarness {
     }
 
     pub async fn search_authorized(&self, query: &str, options: SearchOptions) -> Response {
+        use std::fmt::Write;
+
         let extra_arguments = {
             let mut s = String::new();
             if let Some(value) = options.page {
-                s += &format!(", page: {value}",);
+                write!(&mut s, ", page: {value}").unwrap();
             }
             if let Some(value) = options.per_page {
-                s += &format!(", perPage: {value}");
+                write!(&mut s, ", perPage: {value}").unwrap();
             }
             s
         };

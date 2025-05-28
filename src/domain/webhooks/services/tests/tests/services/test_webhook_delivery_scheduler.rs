@@ -23,7 +23,7 @@ use kamu_task_system::*;
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::{InMemoryWebhookEventRepository, InMemoryWebhookSubscriptionEventStore};
 use kamu_webhooks_services::{WebhookDeliveryScheduler, WebhookEventBuilderImpl};
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxExt, OutboxImmediateImpl};
+use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -12,8 +12,8 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::InternalError;
 use secrecy::ExposeSecret;
-use sqlx::postgres::PgConnectOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgConnectOptions;
 
 use crate::{DatabaseConnectionSettings, DatabasePasswordProvider, DatabasePasswordRefresher};
 

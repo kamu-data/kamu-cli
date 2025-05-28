@@ -34,7 +34,8 @@ pub(crate) async fn make_logged_clients<const N: usize>(
 ) -> [KamuApiServerClient; N] {
     use std::mem::MaybeUninit;
 
-    let mut logged_clients: [MaybeUninit<KamuApiServerClient>; N] = MaybeUninit::uninit_array();
+    let mut logged_clients: [MaybeUninit<KamuApiServerClient>; N] =
+        [const { MaybeUninit::uninit() }; N];
 
     for (i, account_name) in account_names.iter().enumerate() {
         let logged_client = make_logged_client(anonymous, account_name).await;

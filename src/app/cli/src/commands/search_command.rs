@@ -45,7 +45,7 @@ impl SearchCommand {
         if size == 0 {
             return "-".to_owned();
         }
-        use humansize::{format_size, BINARY};
+        use humansize::{BINARY, format_size};
         format_size(size, BINARY)
     }
 

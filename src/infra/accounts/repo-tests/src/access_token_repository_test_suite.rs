@@ -15,7 +15,7 @@ use dill::Catalog;
 use kamu_accounts::*;
 use uuid::Uuid;
 
-use crate::{make_test_access_token, make_test_account, GITHUB_ACCOUNT_ID_WASYA};
+use crate::{GITHUB_ACCOUNT_ID_WASYA, make_test_access_token, make_test_account};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

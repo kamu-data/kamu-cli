@@ -9,8 +9,8 @@
 
 use std::sync::Arc;
 
-use axum::routing::{get, post};
 use axum::Router;
+use axum::routing::{get, post};
 use tokio::sync::Notify;
 
 use crate::e2e::system_time_handler::set_system_time_handler;

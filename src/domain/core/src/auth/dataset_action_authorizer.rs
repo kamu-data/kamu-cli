@@ -227,8 +227,8 @@ impl oso::FromPolar for DatasetAction {
     fn from_polar(polar_value: oso::PolarValue) -> oso::Result<Self> {
         use std::str::FromStr;
 
-        use oso::errors::{OsoError, TypeError};
         use oso::PolarValue;
+        use oso::errors::{OsoError, TypeError};
 
         let PolarValue::String(raw_dataset_action) = polar_value else {
             return Err(TypeError::expected("String").user());

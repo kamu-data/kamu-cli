@@ -13,7 +13,6 @@ use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{
-    auth,
     CompactDatasetUseCase,
     CompactionError,
     CompactionExecutor,
@@ -24,6 +23,7 @@ use kamu_core::{
     CompactionResponse,
     CompactionResult,
     NullCompactionMultiListener,
+    auth,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

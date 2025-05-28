@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use std::fs::File;
-use std::io::prelude::*;
 use std::io::Error as IOError;
+use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::process::{Command, Stdio};

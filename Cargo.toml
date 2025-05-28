@@ -240,7 +240,7 @@ kamu-cli-e2e-repo-tests = { version = "0.239.0", path = "src/e2e/app/cli/repo-te
 
 [workspace.package]
 version = "0.239.0"
-edition = "2021"
+edition = "2024"
 homepage = "https://github.com/kamu-data/kamu-cli"
 repository = "https://github.com/kamu-data/kamu-cli"
 authors = ["Kamu Data Inc. <dev@kamu.dev>"]

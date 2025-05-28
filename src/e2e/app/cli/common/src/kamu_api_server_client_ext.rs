@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -26,12 +27,11 @@ use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoR
 use kamu_adapter_http::platform::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_auth_rebac::AccountToDatasetRelation;
 use kamu_flow_system::{DatasetFlowType, FlowID};
-use lazy_static::lazy_static;
 use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use thiserror::Error;
-use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
+use tokio_retry::strategy::FixedInterval;
 
 use crate::kamu_api_server_client::LoggedInUser;
 use crate::{AccessToken, GraphQLResponseExt, KamuApiServerClient, RequestBody};
@@ -96,29 +96,28 @@ pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
     "#
 );
 
-lazy_static! {
-    /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
-    pub static ref DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: String = {
-        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
-            .escape_default()
-            .to_string()
-    };
+/// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
+pub static DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: LazyLock<String> = LazyLock::new(|| {
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
+        .escape_default()
+        .to_string()
+});
 
-    pub static ref DATASET_ROOT_PLAYER_NAME: odf::DatasetName = odf::DatasetName::new_unchecked("player-scores");
+pub static DATASET_ROOT_PLAYER_NAME: LazyLock<odf::DatasetName> =
+    LazyLock::new(|| odf::DatasetName::new_unchecked("player-scores"));
 
-    /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
-    pub static ref DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: String = {
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
-            .escape_default()
-            .to_string()
-    };
+/// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
+pub static DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: LazyLock<String> = LazyLock::new(|| {
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+        .escape_default()
+        .to_string()
+});
 
-    pub static ref DATASET_DERIVATIVE_LEADERBOARD_NAME: odf::DatasetName =
-        odf::DatasetName::new_unchecked("leaderboard");
+pub static DATASET_DERIVATIVE_LEADERBOARD_NAME: LazyLock<odf::DatasetName> =
+    LazyLock::new(|| odf::DatasetName::new_unchecked("leaderboard"));
 
-    pub static ref E2E_USER_ACCOUNT_NAME: odf::AccountName =
-        odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR);
-}
+pub static E2E_USER_ACCOUNT_NAME: LazyLock<odf::AccountName> =
+    LazyLock::new(|| odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR));
 
 /// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/1.ndjson>
 pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1: &str = indoc::indoc!(
@@ -867,12 +866,10 @@ impl DatasetApi<'_> {
             .await
             .data();
 
-        let content = tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
+        tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
             .as_str()
             .map(ToOwned::to_owned)
-            .unwrap();
-
-        content
+            .unwrap()
     }
 
     pub async fn blocks(&self, dataset_id: &odf::DatasetID) -> DatasetBlocksResponse {
@@ -1640,11 +1637,7 @@ impl FlowApi<'_> {
                 status == "FINISHED"
             });
 
-            if all_finished {
-                Ok(())
-            } else {
-                Err(())
-            }
+            if all_finished { Ok(()) } else { Err(()) }
         })
         .await
         .unwrap();
