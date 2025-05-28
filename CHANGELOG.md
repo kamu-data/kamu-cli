@@ -19,7 +19,7 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - Prototype of webhooks support:
    - webhooks are sent for dataset update events
-   - GQL API to subscribe, update, pause/resume and remove subbscriptions
+   - GQL API to subscribe, update, pause/resume, and remove subscriptions
    - webhook events are recorded per business event via outbox bridge
    - webhook events that match enabled subscriptions get scheduled in the task system
    - webhooks are attempted with at most 10s timeout, but no retries are supported yet

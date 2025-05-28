@@ -272,7 +272,6 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        //
         let maybe_account_row = sqlx::query_as!(
             AccountRowModel,
             r#"
@@ -363,7 +362,6 @@ impl AccountRepository for PostgresAccountRepository {
         let connection_mut = tr.connection_mut().await?;
 
         use odf::AccountID;
-        //
         let maybe_account_row = sqlx::query!(
             r#"
             SELECT id as "id: AccountID"
@@ -594,7 +592,6 @@ impl PasswordHashRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        //
         let maybe_password_row = sqlx::query!(
             r#"
             SELECT password_hash

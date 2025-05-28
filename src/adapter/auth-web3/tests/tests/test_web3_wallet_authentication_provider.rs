@@ -13,12 +13,7 @@ use std::sync::{Arc, LazyLock};
 use chrono::{TimeZone, Utc};
 use kamu_accounts::{AuthenticationProvider, ProviderLoginError};
 use kamu_adapter_auth_web3::{LoginRequest, Web3WalletAuthenticationProvider};
-use kamu_auth_web3::{
-    EvmWalletAddressConvertor,
-    Web3AuthEip4361NonceEntity,
-    Web3AuthEip4361NonceRepository,
-    Web3AuthenticationEip4361Nonce,
-};
+use kamu_auth_web3::{EvmWalletAddressConvertor, Web3AuthEip4361NonceService};
 use kamu_auth_web3_inmem::InMemoryWeb3AuthEip4361NonceRepository;
 use kamu_auth_web3_services::Web3AuthEip4361NonceServiceImpl;
 use kamu_core::ServerUrlConfig;
@@ -336,14 +331,12 @@ async fn test_nonce_expired() {
         serde_json::to_string(&request).unwrap()
     };
 
+    harness.create_nonce().await;
     {
-        let entity = Web3AuthEip4361NonceEntity {
-            wallet_address: EvmWalletAddressConvertor::parse_checksummed(WALLET_ADDRESS).unwrap(),
-            nonce: Web3AuthenticationEip4361Nonce::try_new(PREDEFINED_NONCE).unwrap(),
-            expires_at: Utc.with_ymd_and_hms(2050, 1, 2, 3, 3, 5).unwrap(), // -1 minute
-        };
+        let old_now = harness.system_time_source_stub.now();
+        let new_now = old_now + std::time::Duration::from_mins(20);
 
-        harness.nonce_repo.set_nonce(&entity).await.unwrap();
+        harness.system_time_source_stub.set(new_now);
     }
 
     assert_matches!(
@@ -359,7 +352,8 @@ async fn test_nonce_expired() {
 
 struct Web3WalletAuthenticationProviderHarness {
     provider: Arc<dyn AuthenticationProvider>,
-    nonce_repo: Arc<dyn Web3AuthEip4361NonceRepository>,
+    nonce_service: Arc<dyn Web3AuthEip4361NonceService>,
+    system_time_source_stub: Arc<SystemTimeSourceStub>,
 }
 
 impl Web3WalletAuthenticationProviderHarness {
@@ -378,18 +372,18 @@ impl Web3WalletAuthenticationProviderHarness {
         };
         Self {
             provider: catalog.get_one().unwrap(),
-            nonce_repo: catalog.get_one().unwrap(),
+            nonce_service: catalog.get_one().unwrap(),
+            system_time_source_stub: catalog.get_one().unwrap(),
         }
     }
 
     async fn create_nonce(&self) {
-        let entity = Web3AuthEip4361NonceEntity {
-            wallet_address: EvmWalletAddressConvertor::parse_checksummed(WALLET_ADDRESS).unwrap(),
-            nonce: Web3AuthenticationEip4361Nonce::try_new(PREDEFINED_NONCE).unwrap(),
-            expires_at: Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap(),
-        };
+        let wallet_address = EvmWalletAddressConvertor::parse_checksummed(WALLET_ADDRESS).unwrap();
 
-        self.nonce_repo.set_nonce(&entity).await.unwrap();
+        self.nonce_service
+            .create_nonce(wallet_address)
+            .await
+            .unwrap();
     }
 }
 
