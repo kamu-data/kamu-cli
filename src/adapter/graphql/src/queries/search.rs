@@ -57,7 +57,7 @@ impl Search {
         //       - Logged: all owned datasets and datasets with relations
         let filtered_all_dataset_handles_stream =
             filter_dataset_handle_stream(dataset_registry.all_dataset_handles(), |hdl| {
-                format!("{}", hdl.alias).contains(&query)
+                hdl.alias.to_string().contains(&query)
             });
         let mut readable_dataset_handles = dataset_action_authorizer
             .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetAction::Read)
