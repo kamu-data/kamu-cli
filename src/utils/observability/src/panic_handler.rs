@@ -26,7 +26,11 @@ lazy_static! {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn set_hook_capture_panic_backtraces_no_propagate() {
-    panic::set_hook(Box::new(move |_| {
+    let default_hook = Arc::new(panic::take_hook());
+
+    panic::set_hook(Box::new(move |info| {
+        default_hook(info);
+
         *BACKTRACE.lock().unwrap() = Some(std::backtrace::Backtrace::force_capture().to_string());
     }));
 }
