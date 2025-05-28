@@ -130,11 +130,7 @@ impl CompactionPlannerImpl {
                         }
                     }
                     odf::MetadataEvent::Seed(_) => maybe_seed = Some(block_hash),
-                    odf::MetadataEvent::ExecuteTransform(_) => {
-                        if keep_metadata_only {
-                            continue;
-                        }
-                    }
+                    odf::MetadataEvent::ExecuteTransform(_) if keep_metadata_only => {}
                     event => {
                         if let odf::MetadataEvent::SetVocab(set_vocab_event) = event {
                             vocab_event = Some(set_vocab_event);

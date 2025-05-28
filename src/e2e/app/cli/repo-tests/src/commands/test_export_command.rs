@@ -9,13 +9,13 @@
 
 use std::fs::read_dir;
 
-use datafusion::arrow::array::{downcast_array, Int64Array, RecordBatch};
+use datafusion::arrow::array::{Int64Array, RecordBatch, downcast_array};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::options::{CsvReadOptions, NdJsonReadOptions, ParquetReadOptions};
 use kamu_cli_e2e_common::DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR;
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -10,7 +10,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use ::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
+use ::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header};
 use chrono::{DateTime, Utc};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;

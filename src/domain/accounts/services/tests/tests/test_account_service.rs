@@ -34,8 +34,8 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use odf::metadata::{DidKey, DidOdf};
 use odf::AccountName;
+use odf::metadata::{DidKey, DidOdf};
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -107,12 +107,16 @@ async fn test_multi_find() {
         .await
         .unwrap();
     pretty_assertions::assert_eq!(2, accounts.len());
-    assert!(accounts_map
-        .get(&wasya_id)
-        .is_some_and(|a| a.account_name.as_str() == WASYA));
-    assert!(accounts_map
-        .get(&petya_id)
-        .is_some_and(|a| a.account_name.as_str() == PETYA));
+    assert!(
+        accounts_map
+            .get(&wasya_id)
+            .is_some_and(|a| a.account_name.as_str() == WASYA)
+    );
+    assert!(
+        accounts_map
+            .get(&petya_id)
+            .is_some_and(|a| a.account_name.as_str() == PETYA)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

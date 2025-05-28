@@ -188,7 +188,7 @@ impl ContainerRuntime {
                 (false, true) => volume += ":Z",
                 (true, false) => volume += ":ro",
                 (false, false) => { /* no labels needed */ }
-            };
+            }
 
             cmd.arg(volume);
         });
@@ -384,7 +384,7 @@ impl ContainerRuntime {
                         return Err(ResourceFailedError::new(format!(
                             "Container transitioned into '{stdout}' state"
                         ))
-                        .into())
+                        .into());
                     }
                 }
             }

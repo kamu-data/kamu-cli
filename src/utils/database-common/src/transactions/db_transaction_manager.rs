@@ -11,7 +11,7 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use dill::{component, Catalog, CatalogBuilder};
+use dill::{Catalog, CatalogBuilder, component};
 use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Mutex;
 

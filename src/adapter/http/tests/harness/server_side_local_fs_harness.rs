@@ -19,11 +19,11 @@ use kamu::*;
 use kamu_accounts::{
     Account,
     AccountConfig,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -55,20 +55,20 @@ use kamu_datasets_inmem::{
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::dataset::DatasetLayout;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
 
 use super::{
-    create_cli_user_catalog,
-    create_web_user_catalog,
-    make_server_account,
+    SERVER_ACCOUNT_NAME,
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
-    SERVER_ACCOUNT_NAME,
+    create_cli_user_catalog,
+    create_web_user_catalog,
+    make_server_account,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

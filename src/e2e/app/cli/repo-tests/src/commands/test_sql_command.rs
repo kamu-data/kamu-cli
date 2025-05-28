@@ -13,8 +13,8 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -142,18 +142,21 @@ pub async fn test_sql_command(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_sql_command_exports_to_parquet(kamu: KamuCliPuppet) {
+    use std::fmt::Write;
+
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
 
     let mut games = String::new();
     for game_id in 0..50_000 {
-        games.push_str(&format!(
+        write!(
+            &mut games,
             r#"
             {{"match_time": "2000-01-01", "match_id": {game_id}, "player_id": "Alice", "score": 100}}
             {{"match_time": "2000-01-01", "match_id": {game_id}, "player_id": "Bob", "score": 80}}
             "#
-        ));
+        ).unwrap();
     }
 
     kamu.execute_with_input(

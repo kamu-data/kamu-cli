@@ -44,19 +44,21 @@ impl MergeStrategyUpsertStream {
         let rank_col = "__rank";
 
         let proj = changelog
-            .window(vec![datafusion::functions_window::row_number::row_number()
-                .partition_by(
-                    self.primary_key
-                        .iter()
-                        .map(|name| col(Column::from_name(name)))
-                        .collect(),
-                )
-                .order_by(vec![
-                    col(Column::from_name(&self.vocab.offset_column)).sort(false, false)
-                ])
-                .build()
-                .int_err()?
-                .alias(rank_col)])
+            .window(vec![
+                datafusion::functions_window::row_number::row_number()
+                    .partition_by(
+                        self.primary_key
+                            .iter()
+                            .map(|name| col(Column::from_name(name)))
+                            .collect(),
+                    )
+                    .order_by(vec![
+                        col(Column::from_name(&self.vocab.offset_column)).sort(false, false),
+                    ])
+                    .build()
+                    .int_err()?
+                    .alias(rank_col),
+            ])
             .int_err()?
             .filter(
                 col(Column::from_name(rank_col)).eq(lit(1)).and(
@@ -91,18 +93,20 @@ impl MergeStrategyUpsertStream {
         )?;
 
         let proj = with_offsets
-            .window(vec![datafusion::functions_window::row_number::row_number()
-                .partition_by(
-                    self.primary_key
-                        .iter()
-                        .map(|name| col(Column::from_name(name)))
-                        .collect(),
-                )
-                .order_by(vec![
-                    col(Column::from_name(&self.vocab.offset_column)).sort(false, false)
-                ])
-                .build()?
-                .alias(rank_col)])?
+            .window(vec![
+                datafusion::functions_window::row_number::row_number()
+                    .partition_by(
+                        self.primary_key
+                            .iter()
+                            .map(|name| col(Column::from_name(name)))
+                            .collect(),
+                    )
+                    .order_by(vec![
+                        col(Column::from_name(&self.vocab.offset_column)).sort(false, false),
+                    ])
+                    .build()?
+                    .alias(rank_col),
+            ])?
             .filter(col(Column::from_name(rank_col)).eq(lit(1)))?
             .without_columns(&[rank_col, &self.vocab.offset_column])?;
 

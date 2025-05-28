@@ -118,7 +118,7 @@ impl LoginService {
                     return Ok(LoginInteractiveResponse {
                         access_token: r.access_token,
                         backend_url: odf_server_backend_url,
-                    })
+                    });
                 }
                 DeviceAccessTokenResult::Error(r) => {
                     use DeviceAccessTokenErrorStatus as Status;
@@ -133,7 +133,7 @@ impl LoginService {
                                     r.message
                                 ),
                             }
-                            .into())
+                            .into());
                         }
                     }
                 }

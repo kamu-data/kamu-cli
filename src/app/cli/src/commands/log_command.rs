@@ -576,8 +576,8 @@ impl YamlRenderer {
         _hash: &odf::Multihash,
         block: &odf::MetadataBlock,
     ) -> Result<(), std::io::Error> {
-        use odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
         use odf::metadata::serde::MetadataBlockSerializer;
+        use odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
 
         let buf = YamlMetadataBlockSerializer.write_manifest(block).unwrap();
 

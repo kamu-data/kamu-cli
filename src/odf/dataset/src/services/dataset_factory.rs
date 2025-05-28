@@ -18,9 +18,9 @@ use crate::Dataset;
 
 #[async_trait::async_trait]
 pub trait DatasetFactory: Send + Sync {
-    async fn get_dataset(
-        &self,
-        url: &Url,
+    async fn get_dataset<'a, 'b>(
+        &'a self,
+        url: &'b Url,
         create_if_not_exists: bool,
     ) -> Result<Arc<dyn Dataset>, BuildDatasetError>;
 }

@@ -17,8 +17,8 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
 };
-use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,24 +27,26 @@ pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
         odf::DatasetSnapshot {
             name: "population".try_into().unwrap(),
             kind: odf::DatasetKind::Root,
-            metadata: vec![odf::metadata::AddPushSource {
-                source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
-                read: odf::metadata::ReadStepNdJson {
-                    schema: Some(vec![
-                        "event_time TIMESTAMP".to_owned(),
-                        "city STRING".to_owned(),
-                        "population BIGINT".to_owned(),
-                    ]),
-                    ..Default::default()
+            metadata: vec![
+                odf::metadata::AddPushSource {
+                    source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                    read: odf::metadata::ReadStepNdJson {
+                        schema: Some(vec![
+                            "event_time TIMESTAMP".to_owned(),
+                            "city STRING".to_owned(),
+                            "population BIGINT".to_owned(),
+                        ]),
+                        ..Default::default()
+                    }
+                    .into(),
+                    preprocess: None,
+                    merge: odf::metadata::MergeStrategyLedger {
+                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                    }
+                    .into(),
                 }
                 .into(),
-                preprocess: None,
-                merge: odf::metadata::MergeStrategyLedger {
-                    primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                }
-                .into(),
-            }
-            .into()],
+            ],
         },
         AddDatasetOptions::default(),
     )
@@ -109,24 +111,26 @@ pub async fn test_push_ingest_from_file_snapshot_with_event_time(kamu: KamuCliPu
         odf::DatasetSnapshot {
             name: "population".try_into().unwrap(),
             kind: odf::DatasetKind::Root,
-            metadata: vec![odf::metadata::AddPushSource {
-                source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
-                read: odf::metadata::ReadStepNdJson {
-                    schema: Some(vec![
-                        "city STRING".to_owned(),
-                        "population BIGINT".to_owned(),
-                    ]),
-                    ..Default::default()
+            metadata: vec![
+                odf::metadata::AddPushSource {
+                    source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                    read: odf::metadata::ReadStepNdJson {
+                        schema: Some(vec![
+                            "city STRING".to_owned(),
+                            "population BIGINT".to_owned(),
+                        ]),
+                        ..Default::default()
+                    }
+                    .into(),
+                    preprocess: None,
+                    merge: odf::metadata::MergeStrategySnapshot {
+                        primary_key: vec!["city".to_owned()],
+                        compare_columns: None,
+                    }
+                    .into(),
                 }
                 .into(),
-                preprocess: None,
-                merge: odf::metadata::MergeStrategySnapshot {
-                    primary_key: vec!["city".to_owned()],
-                    compare_columns: None,
-                }
-                .into(),
-            }
-            .into()],
+            ],
         },
         AddDatasetOptions::default(),
     )

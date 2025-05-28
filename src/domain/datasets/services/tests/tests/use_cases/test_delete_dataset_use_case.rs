@@ -35,7 +35,7 @@ async fn test_delete_dataset_success_via_ref() {
     let harness = DeleteUseCaseHarness::new(
         mock_authorizer,
         Some(MockDidGenerator::predefined_dataset_ids(vec![
-            foo_id.clone()
+            foo_id.clone(),
         ])),
     )
     .await;
@@ -83,7 +83,7 @@ async fn test_delete_dataset_success_via_handle() {
     let harness = DeleteUseCaseHarness::new(
         mock_authorizer,
         Some(MockDidGenerator::predefined_dataset_ids(vec![
-            foo_id.clone()
+            foo_id.clone(),
         ])),
     )
     .await;

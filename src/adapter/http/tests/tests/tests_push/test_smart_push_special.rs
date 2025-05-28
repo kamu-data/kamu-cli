@@ -13,12 +13,12 @@ use kamu::domain::{PushError, SyncError};
 use kamu_core::TenancyConfig;
 
 use crate::harness::{
-    await_client_server_flow,
     ClientSideHarness,
     ClientSideHarnessOptions,
     ServerSideHarness,
     ServerSideHarnessOptions,
     ServerSideLocalFsHarness,
+    await_client_server_flow,
 };
 use crate::tests::tests_push::scenarios::*;
 

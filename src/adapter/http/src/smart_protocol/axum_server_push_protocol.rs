@@ -23,8 +23,8 @@ use kamu_datasets::{
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
     DatasetExternallyChangedMessage,
-    SetRefCheckRefMode,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+    SetRefCheckRefMode,
 };
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::Multihash;
@@ -35,9 +35,9 @@ use super::errors::*;
 use super::messages::*;
 use super::phases::*;
 use super::protocol_dataset_helper::*;
+use crate::BearerHeader;
 use crate::smart_protocol::*;
 use crate::ws_common::ReadMessageError;
-use crate::BearerHeader;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -175,7 +175,7 @@ impl AxumServerPushProtocolInstance {
             .is_err()
         {
             tracing::debug!("Timeout reached, closing connection");
-        };
+        }
     }
 
     async fn push_main_flow(&mut self) -> Result<(), PushServerError> {

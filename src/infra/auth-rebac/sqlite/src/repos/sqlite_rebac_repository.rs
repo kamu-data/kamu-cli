@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
-use database_common::{sqlite_generate_placeholders_tuple_list_2, TransactionRef, TransactionRefT};
+use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_tuple_list_2};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::*;

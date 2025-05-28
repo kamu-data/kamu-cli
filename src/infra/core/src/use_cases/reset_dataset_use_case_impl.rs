@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{auth, ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlanner, ResetResult};
+use kamu_core::{ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlanner, ResetResult, auth};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -24,7 +24,7 @@ use kamu_datasets::{
 };
 use messaging_outbox::*;
 
-use crate::{extract_modified_dependencies_in_interval, DependencyChange};
+use crate::{DependencyChange, extract_modified_dependencies_in_interval};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

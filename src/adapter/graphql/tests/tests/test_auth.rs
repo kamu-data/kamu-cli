@@ -11,7 +11,7 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu_accounts::testing::{MockAuthenticationService, DUMMY_LOGIN_METHOD};
+use kamu_accounts::testing::{DUMMY_LOGIN_METHOD, MockAuthenticationService};
 use kamu_accounts::{
     AccessTokenLifecycleMessage,
     AuthenticationService,
@@ -21,10 +21,10 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::AccessTokenServiceImpl;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::SystemTimeSourceDefault;
 
-use crate::utils::{authentication_catalogs, PredefinedAccountOpts};
+use crate::utils::{PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

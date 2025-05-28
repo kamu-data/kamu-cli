@@ -11,17 +11,17 @@ use chrono::Utc;
 use kamu_flow_system as fs;
 
 use super::{
-    check_if_flow_belongs_to_dataset,
-    ensure_expected_dataset_kind,
-    ensure_flow_preconditions,
     FlowInDatasetError,
     FlowIncompatibleDatasetKind,
     FlowNotFound,
     FlowPreconditionsNotMet,
+    check_if_flow_belongs_to_dataset,
+    ensure_expected_dataset_kind,
+    ensure_flow_preconditions,
 };
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, Flow};
-use crate::{utils, LoggedInGuard};
+use crate::{LoggedInGuard, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

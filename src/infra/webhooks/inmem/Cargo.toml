@@ -30,7 +30,7 @@ kamu-webhooks = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 futures = "0.3"
 thiserror = { version = "2", default-features = false }
 

@@ -13,7 +13,7 @@ use indoc::indoc;
 use kamu_accounts::*;
 use kamu_adapter_graphql::traits::ResponseExt;
 
-use crate::utils::{authentication_catalogs, PredefinedAccountOpts};
+use crate::utils::{PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

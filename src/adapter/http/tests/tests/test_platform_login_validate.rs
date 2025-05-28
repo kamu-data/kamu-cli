@@ -39,7 +39,7 @@ use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
-use crate::harness::{await_client_server_flow, TestAPIServer};
+use crate::harness::{TestAPIServer, await_client_server_flow};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -258,7 +258,7 @@ impl RemoteAliasResolverApiHelper {
                 http::header::AUTHORIZATION,
                 http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
             );
-        };
+        }
         header_map
     }
 

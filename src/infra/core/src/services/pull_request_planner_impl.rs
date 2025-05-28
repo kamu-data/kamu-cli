@@ -530,7 +530,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                     None => {
                         return Err(PullError::NotFound(odf::DatasetNotFoundError {
                             dataset_ref: local_ref.clone(),
-                        }))
+                        }));
                     }
                 }
             }
@@ -591,24 +591,21 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<Option<odf::DatasetHandle>, InternalError> {
         // Do a quick check when remote and local names match
-        if let Some(remote_name) = remote_ref.dataset_name() {
-            if let Some(local_handle) = self
+        if let Some(remote_name) = remote_ref.dataset_name()
+            && let Some(local_handle) = self
                 .dataset_registry
                 .try_resolve_dataset_handle_by_ref(
                     &odf::DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
                 )
                 .await?
-            {
-                if self
-                    .remote_alias_registry
-                    .get_remote_aliases(&local_handle)
-                    .await
-                    .int_err()?
-                    .contains(remote_ref, RemoteAliasKind::Pull)
-                {
-                    return Ok(Some(local_handle));
-                }
-            }
+            && self
+                .remote_alias_registry
+                .get_remote_aliases(&local_handle)
+                .await
+                .int_err()?
+                .contains(remote_ref, RemoteAliasKind::Pull)
+        {
+            return Ok(Some(local_handle));
         }
 
         // No luck - now have to search through aliases of all users
@@ -695,18 +692,17 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
 
     fn infer_local_name_from_url(&self, url: &Url) -> Result<odf::DatasetName, PullError> {
         // Try to use last path segment for a name (ignoring the trailing slash)
-        if let Some(path) = url.path_segments() {
-            if let Some(last_segment) = path.rev().find(|s| !s.is_empty()) {
-                if let Ok(name) = odf::DatasetName::try_from(last_segment) {
-                    return Ok(name);
-                }
-            }
+        if let Some(path) = url.path_segments()
+            && let Some(last_segment) = path.rev().find(|s| !s.is_empty())
+            && let Ok(name) = odf::DatasetName::try_from(last_segment)
+        {
+            return Ok(name);
         }
         // Fall back to using domain name
-        if let Some(url::Host::Domain(host)) = url.host() {
-            if let Ok(name) = odf::DatasetName::try_from(host) {
-                return Ok(name);
-            }
+        if let Some(url::Host::Domain(host)) = url.host()
+            && let Ok(name) = odf::DatasetName::try_from(host)
+        {
+            return Ok(name);
         }
         Err(PullError::InvalidOperation(
             "Unable to infer local name from remote URL, please specify the destination explicitly"

@@ -42,21 +42,21 @@ impl SearchServiceRemoteImpl {
             .int_err()?;
         let query = query.unwrap_or_default();
         for entry in std::fs::read_dir(path).int_err()? {
-            if let Some(file_name) = entry.int_err()?.file_name().to_str() {
-                if query.is_empty() || file_name.contains(query) {
-                    datasets.push(SearchRemoteResultDataset {
-                        id: None,
-                        alias: odf::DatasetAliasRemote::new(
-                            repo_name.clone(),
-                            None,
-                            odf::DatasetName::try_from(file_name).int_err()?,
-                        ),
-                        kind: None,
-                        num_blocks: None,
-                        num_records: None,
-                        estimated_size: None,
-                    });
-                }
+            if let Some(file_name) = entry.int_err()?.file_name().to_str()
+                && (query.is_empty() || file_name.contains(query))
+            {
+                datasets.push(SearchRemoteResultDataset {
+                    id: None,
+                    alias: odf::DatasetAliasRemote::new(
+                        repo_name.clone(),
+                        None,
+                        odf::DatasetName::try_from(file_name).int_err()?,
+                    ),
+                    kind: None,
+                    num_blocks: None,
+                    num_records: None,
+                    estimated_size: None,
+                });
             }
         }
 

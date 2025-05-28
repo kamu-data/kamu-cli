@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use internal_error::InternalError;
-use kamu_core::{auth, ResolvedDataset};
+use kamu_core::{ResolvedDataset, auth};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

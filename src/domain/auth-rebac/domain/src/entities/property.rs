@@ -117,7 +117,7 @@ impl FromStr for PropertyName {
             unexpected_property_group => {
                 return InternalError::bail(format!(
                     "Unexpected property group: '{unexpected_property_group}'"
-                ))
+                ));
             }
         };
 

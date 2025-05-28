@@ -554,7 +554,7 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
             Ok(_) => return Ok(()), // idempotent handling of duplicates
             Err(GetDatasetEntryError::NotFound(_)) => { /* happy case, create record */ }
             Err(GetDatasetEntryError::Internal(e)) => {
-                return Err(CreateDatasetEntryError::Internal(e))
+                return Err(CreateDatasetEntryError::Internal(e));
             }
         }
 

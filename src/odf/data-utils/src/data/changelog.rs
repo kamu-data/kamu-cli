@@ -66,18 +66,20 @@ pub fn project(
     let rank_col = "__rank";
 
     let state = ledger
-        .window(vec![datafusion::functions_window::row_number::row_number()
-            .partition_by(
-                primary_key
-                    .iter()
-                    .map(|name| col(Column::from_name(name)))
-                    .collect(),
-            )
-            .order_by(vec![
-                col(Column::from_name(&vocab.offset_column)).sort(false, false)
-            ])
-            .build()?
-            .alias(rank_col)])?
+        .window(vec![
+            datafusion::functions_window::row_number::row_number()
+                .partition_by(
+                    primary_key
+                        .iter()
+                        .map(|name| col(Column::from_name(name)))
+                        .collect(),
+                )
+                .order_by(vec![
+                    col(Column::from_name(&vocab.offset_column)).sort(false, false),
+                ])
+                .build()?
+                .alias(rank_col),
+        ])?
         .filter(
             col(Column::from_name(rank_col)).eq(lit(1)).and(
                 // TODO: Cast to `u8` after Spark is updated

@@ -216,8 +216,8 @@ pub trait MetadataChainExt: MetadataChain {
         })
     }
 
-    /// A method of accepting Visitors ([MetadataChainVisitor]) that allows us
-    /// to go through the metadata chain once and, if desired,
+    /// A method for accepting visitors (see [`MetadataChainVisitor`]) that
+    /// allows us to go through the metadata chain once and, if desired,
     /// bypassing blocks of no interest.
     async fn accept<E>(
         &self,
@@ -229,8 +229,8 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_by_ref(visitors, &BlockRef::Head).await
     }
 
-    /// Same as [Self::accept()], allowing us to define the block (by hash) from
-    /// which we will start the traverse
+    /// Same as [`MetadataChainExt::accept()`], allowing us to define the block
+    /// (by hash) from which we will start the traverse
     async fn accept_by_hash<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -243,7 +243,7 @@ pub trait MetadataChainExt: MetadataChain {
             .await
     }
 
-    /// Same as [Self::accept()], allowing us to define the block
+    /// Same as [`MetadataChainExt::accept()`], allowing us to define the block
     /// (by block reference) from which we will start the traverse
     async fn accept_by_ref<E>(
         &self,
@@ -261,8 +261,8 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_by_hash(visitors, &block_ref_hash).await
     }
 
-    /// Same as [Self::accept()], allowing us to define the block interval under
-    /// which we will be making the traverse.
+    /// Same as [`MetadataChainExt::accept()`], allowing us to define the block
+    /// interval under which we will be making the traverse.
     ///
     /// Note: the interval is `[head, tail)` - tail is exclusive
     #[tracing::instrument(level = "debug", skip_all, fields(?head_hash, ?tail_hash))]
@@ -398,8 +398,8 @@ pub trait MetadataChainExt: MetadataChain {
         Ok(visitor)
     }
 
-    /// Same as [Self::accept_one()], allowing us to define the block
-    /// (by block hash) from which we will start the traverse
+    /// Same as [`MetadataChainExt::accept_one()`], allowing us to define the
+    /// block (by block hash) from which we will start the traverse
     async fn accept_one_by_hash<V, E>(
         &self,
         head_hash: &Multihash,
@@ -417,8 +417,8 @@ pub trait MetadataChainExt: MetadataChain {
 
     /// Method that allows you to apply the reduce operation over a chain
     ///
-    /// Note: there is also a method [Self::try_reduce()] that allows you to
-    /// apply a fallible callback
+    /// Note: there is also a method [`MetadataChainExt::try_reduce()`] that
+    /// allows you to apply a fallible callback
     async fn reduce<S, F>(
         &self,
         state: S,
@@ -436,8 +436,8 @@ pub trait MetadataChainExt: MetadataChain {
             .await?)
     }
 
-    /// Same as [Self::reduce()], allowing us to define the block (by hash)
-    /// from which we will start the traverse
+    /// Same as [`MetadataChainExt::reduce()`], allowing us to define the block
+    /// (by hash) from which we will start the traverse
     async fn reduce_by_hash<S, F>(
         &self,
         head_hash: &Multihash,
@@ -461,8 +461,8 @@ pub trait MetadataChainExt: MetadataChain {
 
     /// Method that allows you to apply the reduce operation over a chain
     ///
-    /// Note: there is also a method [Self::reduce()] that allows you to
-    /// apply an infallible callback
+    /// Note: there is also a method [`MetadataChainExt::reduce()`] that allows
+    /// you to apply an infallible callback
     async fn try_reduce<S, F, E>(
         &self,
         state: S,
@@ -484,8 +484,8 @@ pub trait MetadataChainExt: MetadataChain {
             .await
     }
 
-    /// Same as [Self::try_reduce()], allowing us to define the block (by hash)
-    /// from which we will start the traverse
+    /// Same as [`MetadataChainExt::try_reduce()`], allowing us to define the
+    /// block (by hash) from which we will start the traverse
     async fn try_reduce_by_hash<S, F, E>(
         &self,
         head_hash: &Multihash,
@@ -513,8 +513,8 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_one(visitor).await.map_err(Into::into)
     }
 
-    /// Same as [Self::last_data_block()], but skipping data blocks that have no
-    /// real data
+    /// Same as [`MetadataChainExt::last_data_block()`], but skipping data
+    /// blocks that have no real data
     async fn last_data_block_with_new_data(
         &self,
     ) -> Result<SearchSingleDataBlockVisitor, IterBlocksError> {

@@ -413,7 +413,7 @@ impl std::fmt::Display for BadQueryError {
                     Self::fmt_df_error(f, e)?;
                 }
             }
-        };
+        }
 
         Ok(())
     }

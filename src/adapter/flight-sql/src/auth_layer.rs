@@ -20,8 +20,8 @@ use kamu_accounts::{
     CurrentAccountSubject,
     GetAccountInfoError,
 };
-use tonic::body::BoxBody;
 use tonic::Status;
+use tonic::body::BoxBody;
 use tower::{Layer, Service};
 
 use crate::SessionId;

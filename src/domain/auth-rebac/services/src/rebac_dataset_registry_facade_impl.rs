@@ -16,7 +16,7 @@ use kamu_auth_rebac::{
     RebacDatasetRefUnresolvedError,
     RebacDatasetRegistryFacade,
 };
-use kamu_core::{auth, DatasetRegistry, ResolvedDataset};
+use kamu_core::{DatasetRegistry, ResolvedDataset, auth};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -101,8 +101,8 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             .check_action_allowed(&dataset_handle.id, action)
             .await
             .map_err(|e| {
-                use auth::DatasetActionUnauthorizedError as SourceError;
                 use RebacDatasetIdUnresolvedError as Error;
+                use auth::DatasetActionUnauthorizedError as SourceError;
 
                 match e {
                     SourceError::Access(e) => Error::Access(e),

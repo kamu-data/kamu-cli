@@ -14,8 +14,8 @@ use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::{Method, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
+use tokio_retry::strategy::FixedInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -117,7 +117,7 @@ impl KamuApiServerClient {
                     .header("Content-Type", "application/x-ndjson")
                     .body(value),
             }
-        };
+        }
 
         match request_builder.send().await {
             Ok(response_body) => response_body,
@@ -140,7 +140,7 @@ impl KamuApiServerClient {
         if let Some(expected_response_body) = expected_response_body {
             self.rest_api_call_response_body_assert(response, expected_response_body)
                 .await;
-        };
+        }
     }
 
     /// NOTE: Please use [`Self::graphql_api_call_ex()`] instead of this method
@@ -205,7 +205,7 @@ impl KamuApiServerClient {
 
                 pretty_assertions::assert_eq!(expected_plain_response_body, actual_response_body);
             }
-        };
+        }
     }
 
     async fn graphql_api_call_impl<T: Serialize + ?Sized>(

@@ -32,13 +32,15 @@ use time_source::SystemTimeSourceDefault;
 // #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
-    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::metadata::MergeStrategySnapshot {
-            primary_key: vec!["city".to_string()],
-            compare_columns: None,
-        })
-        .build()
-        .into()])
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategySnapshot {
+                primary_key: vec!["city".to_string()],
+                compare_columns: None,
+            })
+            .build()
+            .into(),
+    ])
     .await;
 
     // Round 1
@@ -587,12 +589,14 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
 
     testing_logger::setup();
 
-    let harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::metadata::MergeStrategyLedger {
-            primary_key: vec!["event_time".to_string(), "city".to_string()],
-        })
-        .build()
-        .into()])
+    let harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
     .await;
 
     let mut writer = DataWriterDataFusion::from_metadata_chain(
@@ -700,12 +704,14 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_ledger_orders_by_event_time() {
-    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::metadata::MergeStrategyLedger {
-            primary_key: vec!["event_time".to_string(), "city".to_string()],
-        })
-        .build()
-        .into()])
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
     .await;
 
     let res = harness
@@ -773,13 +779,15 @@ async fn test_data_writer_ledger_orders_by_event_time() {
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
-    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::metadata::MergeStrategySnapshot {
-            primary_key: vec!["city".to_string()],
-            compare_columns: None,
-        })
-        .build()
-        .into()])
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategySnapshot {
+                primary_key: vec!["city".to_string()],
+                compare_columns: None,
+            })
+            .build()
+            .into(),
+    ])
     .await;
 
     let res = harness
@@ -914,12 +922,14 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
-    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::metadata::MergeStrategyLedger {
-            primary_key: vec!["event_time".to_string(), "city".to_string()],
-        })
-        .build()
-        .into()])
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
     .await;
 
     harness
@@ -980,12 +990,14 @@ async fn test_data_writer_optimal_parquet_encoding() {
     use ::datafusion::parquet::basic::{Compression, Encoding, PageType};
     use ::datafusion::parquet::file::reader::FileReader;
 
-    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::metadata::MergeStrategyLedger {
-            primary_key: vec!["event_time".to_string(), "city".to_string()],
-        })
-        .build()
-        .into()])
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
     .await;
 
     harness
@@ -1048,11 +1060,13 @@ async fn test_data_writer_optimal_parquet_encoding() {
 
 #[test_log::test(tokio::test)]
 async fn test_data_writer_builder_scan_no_source() {
-    let harness = Harness::new(vec![odf::metadata::SetVocab {
-        event_time_column: Some("foo".to_string()),
-        ..Default::default()
-    }
-    .into()])
+    let harness = Harness::new(vec![
+        odf::metadata::SetVocab {
+            event_time_column: Some("foo".to_string()),
+            ..Default::default()
+        }
+        .into(),
+    ])
     .await;
 
     let metadata_state =
@@ -1089,12 +1103,14 @@ async fn test_data_writer_builder_scan_no_source() {
 
 #[test_log::test(tokio::test)]
 async fn test_data_writer_builder_scan_polling_source() {
-    let harness = Harness::new(vec![MetadataFactory::set_polling_source()
-        .merge(odf::metadata::MergeStrategyLedger {
-            primary_key: vec!["event_time".to_string(), "city".to_string()],
-        })
-        .build()
-        .into()])
+    let harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
     .await;
 
     let metadata_state =
@@ -1122,20 +1138,22 @@ async fn test_data_writer_builder_scan_polling_source() {
 
 #[test_log::test(tokio::test)]
 async fn test_data_writer_builder_scan_push_source() {
-    let harness = Harness::new(vec![MetadataFactory::add_push_source()
-        .read(odf::metadata::ReadStepNdJson {
-            schema: Some(vec![
-                "event_time".to_string(),
-                "city".to_string(),
-                "population".to_string(),
-            ]),
-            ..Default::default()
-        })
-        .merge(odf::metadata::MergeStrategyLedger {
-            primary_key: vec!["event_time".to_string(), "city".to_string()],
-        })
-        .build()
-        .into()])
+    let harness = Harness::new(vec![
+        MetadataFactory::add_push_source()
+            .read(odf::metadata::ReadStepNdJson {
+                schema: Some(vec![
+                    "event_time".to_string(),
+                    "city".to_string(),
+                    "population".to_string(),
+                ]),
+                ..Default::default()
+            })
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
     .await;
 
     let metadata_state =

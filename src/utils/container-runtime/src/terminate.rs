@@ -9,7 +9,7 @@
 
 use std::time::{Duration, Instant};
 
-/// An extension trait to [tokio::process::Child] that provides a graceful
+/// An extension trait to [`tokio::process::Child`] that provides a graceful
 /// termination option
 #[async_trait::async_trait]
 pub trait Terminate {
@@ -21,7 +21,7 @@ pub trait Terminate {
     /// a process to exit before sending SIGKILL.
     async fn terminate(&mut self, timeout: Duration) -> std::io::Result<TerminateStatus>;
 
-    /// A blocking version of [Terminate::terminate()]
+    /// A blocking version of [`Terminate::terminate()`]
     fn terminate_blocking(&mut self, timeout: Duration) -> std::io::Result<TerminateStatus>;
 }
 

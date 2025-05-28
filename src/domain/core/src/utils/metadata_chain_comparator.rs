@@ -33,8 +33,8 @@ impl MetadataChainComparator {
         rhs_head: Option<&odf::Multihash>,
         listener: &dyn CompareChainsListener,
     ) -> Result<CompareChainsResult, CompareChainsError> {
-        use odf::dataset::MetadataChainExt;
         use odf::MetadataChain;
+        use odf::dataset::MetadataChainExt;
 
         // When source and destination point to the same block, chains are equal, no
         // further scanning required

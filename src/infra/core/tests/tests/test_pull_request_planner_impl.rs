@@ -36,7 +36,7 @@ use kamu_datasets_services::{
     DependencyGraphServiceImpl,
     MockDatasetEntryWriter,
 };
-use messaging_outbox::{register_message_dispatcher, ConsumerFilter, Outbox, OutboxImmediateImpl};
+use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 
@@ -964,7 +964,7 @@ impl PullTestHarness {
                             psi.sync_request.dst.as_user_friendly_any_ref(),
                         )));
                     }
-                };
+                }
             }
 
             self.calls.lock().unwrap().push(jobs);

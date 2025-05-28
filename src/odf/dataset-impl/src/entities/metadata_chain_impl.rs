@@ -12,8 +12,8 @@ use odf_dataset::*;
 use odf_metadata::*;
 use odf_storage::*;
 
-use super::metadata_chain_validators::*;
 use super::MetadataChainReferenceRepository;
+use super::metadata_chain_validators::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,10 +74,7 @@ where
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        self.meta_block_repo
-            .get_block(hash)
-            .await
-            .map_err(Into::into)
+        self.meta_block_repo.get_block(hash).await
     }
 
     async fn get_preceding_block_with_hint(

@@ -73,7 +73,7 @@ impl<'a> CollectionMut<'a> {
                         expected_head: e.expected.unwrap().into(),
                         actual_head: e.actual.unwrap().into(),
                     },
-                ))
+                ));
             }
             Err(err) => {
                 return Err(err.int_err().into());
@@ -253,7 +253,7 @@ impl CollectionMut<'_> {
                 r#move: Some(CollectionUpdateInputMove {
                     path_from,
                     path_to,
-                    extra_data: extra_data.map(Into::into),
+                    extra_data,
                 }),
                 ..Default::default()
             }],

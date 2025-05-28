@@ -42,7 +42,7 @@ pub trait RecordsWriter {
                     _ => return Err(WriterError::IoError(io_err)),
                 },
                 err => return Err(WriterError::ArrowError(err)),
-            };
+            }
         }
         Ok(())
     }

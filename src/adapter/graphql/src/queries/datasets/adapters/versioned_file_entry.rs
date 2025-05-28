@@ -185,7 +185,7 @@ impl VersionedFileEntry {
         {
             Ok(res) => res,
             Err(err @ odf::storage::GetExternalUrlError::NotSupported) => {
-                return Err(GqlError::Gql(err.into()))
+                return Err(GqlError::Gql(err.into()));
             }
             Err(err) => return Err(err.int_err().into()),
         };

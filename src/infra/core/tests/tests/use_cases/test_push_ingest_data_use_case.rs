@@ -13,7 +13,7 @@ use std::sync::Arc;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
 use kamu_core::*;
-use messaging_outbox::{register_message_dispatcher, DummyOutboxImpl};
+use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

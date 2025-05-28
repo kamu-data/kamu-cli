@@ -216,8 +216,8 @@ pub(crate) fn make_key_block(
     block_hash: odf::Multihash,
     block: &odf::MetadataBlock,
 ) -> DatasetKeyBlock {
-    use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
     use odf::serde::MetadataBlockSerializer;
+    use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 
     let block_data = FlatbuffersMetadataBlockSerializer
         .write_manifest(block)

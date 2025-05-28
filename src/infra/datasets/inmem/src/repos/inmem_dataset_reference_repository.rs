@@ -62,10 +62,10 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
         block_ref: &odf::BlockRef,
     ) -> Result<odf::Multihash, GetDatasetReferenceError> {
         let guard = self.state.lock().unwrap();
-        if let Some(dataset_references) = guard.references.get(dataset_id) {
-            if let Some(block_hash) = dataset_references.get(block_ref) {
-                return Ok(block_hash.clone());
-            }
+        if let Some(dataset_references) = guard.references.get(dataset_id)
+            && let Some(block_hash) = dataset_references.get(block_ref)
+        {
+            return Ok(block_hash.clone());
         }
 
         Err(GetDatasetReferenceError::NotFound(
@@ -164,10 +164,10 @@ impl DatasetReferenceRepository for InMemoryDatasetReferenceRepository {
         block_ref: &odf::BlockRef,
     ) -> Result<(), RemoveDatasetReferenceError> {
         let mut guard = self.state.lock().unwrap();
-        if let Some(dataset_references) = guard.references.get_mut(dataset_id) {
-            if dataset_references.remove(block_ref).is_some() {
-                return Ok(());
-            }
+        if let Some(dataset_references) = guard.references.get_mut(dataset_id)
+            && dataset_references.remove(block_ref).is_some()
+        {
+            return Ok(());
         }
 
         Err(RemoveDatasetReferenceError::NotFound(

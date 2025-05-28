@@ -18,8 +18,8 @@ use http_common::*;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf::metadata::serde::MetadataBlockSerializer;
+use odf::metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use url::Url;
 
 use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;
@@ -192,7 +192,7 @@ pub async fn dataset_checkpoints_get_handler(
 async fn dataset_get_object_common(
     object_repository: &dyn odf::storage::ObjectRepository,
     physical_hash: &odf::Multihash,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse + use<>, ApiError> {
     let stream = match object_repository.get_stream(physical_hash).await {
         Ok(stream) => Ok(stream),
         Err(e @ odf::storage::GetError::NotFound(_)) => Err(ApiError::not_found(e)),
@@ -346,10 +346,10 @@ pub async fn dataset_push_ws_upgrade_handler(
                         else {
                             unreachable!()
                         };
-                        if let Some(ref_account_name) = dataset_ref.account_name() {
-                            if ref_account_name != &acc.account_name {
-                                return Err(ApiError::new_forbidden());
-                            }
+                        if let Some(ref_account_name) = dataset_ref.account_name()
+                            && ref_account_name != &acc.account_name
+                        {
+                            return Err(ApiError::new_forbidden());
                         }
                         Ok(None)
                     }

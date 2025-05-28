@@ -15,8 +15,8 @@ use kamu::domain::KAMU_WORKSPACE_DIR_NAME;
 use kamu::testing::ParquetWriterHelper;
 use kamu::*;
 use kamu_cli::*;
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout};
 use odf::metadata::testing::MetadataFactory;
 
@@ -37,10 +37,12 @@ async fn test_workspace_upgrade() {
     assert!(!temp_dir.path().join(".kamu/version").is_file());
     assert!(temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
     assert!(temp_dir.path().join(".kamu/datasets/foo/config").is_file());
-    assert!(!temp_dir
-        .path()
-        .join(".kamu/datasets/foo/info/config")
-        .is_file());
+    assert!(
+        !temp_dir
+            .path()
+            .join(".kamu/datasets/foo/info/config")
+            .is_file()
+    );
     assert_eq!(
         workspace_svc.workspace_version().unwrap(),
         Some(WorkspaceVersion::V0_Initial)
