@@ -49,7 +49,7 @@ pub fn panic_handler(err: Box<dyn Any + Send + 'static>) -> Response<Body> {
         .take()
         .unwrap_or("Backtrace not found".to_string());
 
-    tracing::error!(err = "Unhandled panic caught", panic_msg, %backtrace);
+    tracing::error!(panic_msg, %backtrace, "Unhandled panic caught");
 
     let body = Body::from(r#"{"error":"Internal Server Error"}"#);
     Response::builder()

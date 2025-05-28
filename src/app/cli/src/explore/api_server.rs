@@ -56,8 +56,6 @@ impl APIServer {
         external_address: Option<IpAddr>,
         e2e_output_data_path: Option<&PathBuf>,
     ) -> Result<Self, InternalError> {
-        observability::panic_handler::set_panic_hook();
-
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
         let task_agent = cli_catalog.get_one().unwrap();
