@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt, E2E_USER_ACCOUNT_NAME_STR};
+use kamu_cli_e2e_common::{E2E_USER_ACCOUNT_NAME_STR, KamuApiServerClient, KamuApiServerClientExt};
 use odf::AccountName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
