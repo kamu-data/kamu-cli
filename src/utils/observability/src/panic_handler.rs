@@ -25,7 +25,7 @@ lazy_static! {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn set_panic_hook() {
+pub fn set_hook_capture_panic_backtraces_no_propagate() {
     panic::set_hook(Box::new(move |_| {
         *BACKTRACE.lock().unwrap() = Some(std::backtrace::Backtrace::force_capture().to_string());
     }));
