@@ -17,7 +17,6 @@ fn main() {
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .expect("Could not install default TLS provider");
-    observability::panic_hook::extend_panic_hook();
 
     let workspace_layout = kamu_cli::WorkspaceService::find_workspace();
     let args = kamu_cli::cli::Cli::parse();

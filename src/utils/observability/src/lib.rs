@@ -12,7 +12,7 @@ pub mod build_info;
 pub mod config;
 pub mod health;
 pub mod init;
-pub mod panic_hook;
+pub mod panic_handler;
 pub mod tonic;
 pub mod tracing;
 
