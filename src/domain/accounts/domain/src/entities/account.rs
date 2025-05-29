@@ -9,7 +9,9 @@
 
 use std::sync::LazyLock;
 
-use chrono::{DateTime, TimeZone, Utc};
+#[cfg(any(feature = "testing", test))]
+use chrono::TimeZone;
+use chrono::{DateTime, Utc};
 use email_utils::Email;
 use serde::{Deserialize, Serialize};
 
@@ -24,15 +26,17 @@ pub const DEFAULT_ACCOUNT_NAME_STR: &str = "kamu";
 
 // The name is formed here, as we use it for comparison in this module.
 pub const PROVIDER_WEB3_WALLET: &str = "web3-wallet";
+pub const PROVIDER_PASSWORD: &str = "password";
 
 pub static DEFAULT_ACCOUNT_NAME: LazyLock<odf::AccountName> =
     LazyLock::new(|| odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR));
 pub static DEFAULT_ACCOUNT_ID: LazyLock<odf::AccountID> =
     LazyLock::new(|| odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()));
-static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
-    LazyLock::new(|| Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap());
 pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
     LazyLock::new(|| Email::parse("kamu@example.com").unwrap());
+#[cfg(any(feature = "testing", test))]
+static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
+    LazyLock::new(|| Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -92,10 +96,6 @@ pub enum AccountType {
     User,
     Organization,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub const PROVIDER_PASSWORD: &str = "password";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

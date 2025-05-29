@@ -16,7 +16,7 @@
       {
         "name": "expires_at: _",
         "ordinal": 2,
-        "type_info": "Null"
+        "type_info": "Text"
       }
     ],
     "parameters": {

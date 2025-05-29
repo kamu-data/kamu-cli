@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
-- `kamu --show-error-stack-trace`: Added an argument to show stack trace in case of an error during command execution
+- `kamu --show-error-stack-trace`: Added an argument to show stack trace in case of an error during command execution.
 - Implemented a new authorization provider for Web3 EVM-based wallets (`web3-wallet`):
   - Flow authorization is based on the ERC-4361 (Sign-In with Ethereum) standard.
   - Any browser that supports EIP-1193 (Ethereum Provider JavaScript API) can be used for authentication.
