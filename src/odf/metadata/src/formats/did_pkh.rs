@@ -13,6 +13,15 @@ use ssi_caips::caip10;
 
 pub const DID_PKH_PREFIX: &str = "did:pkh:";
 
+// Based on ssi-caips/src/caip10.rs
+const CAIP_10_CHAIN_ID_MAX_LENGTH: usize = 41;
+const CAIP_10_ACCOUNT_ADDRESS_MAX_LENGTH: usize = 64;
+
+pub const MAX_DID_PKH_STRING_REPR_LEN: usize = DID_PKH_PREFIX.len()
+    + CAIP_10_CHAIN_ID_MAX_LENGTH
+    + ":".len()
+    + CAIP_10_ACCOUNT_ADDRESS_MAX_LENGTH;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents DID in `did:pkh` method.
