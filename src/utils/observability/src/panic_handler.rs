@@ -8,53 +8,41 @@
 // by the Apache License, Version 2.0.
 
 use std::any::Any;
+use std::backtrace::Backtrace;
 use std::panic;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use axum::body::Body;
-use http::{header, Response, StatusCode};
-use lazy_static::lazy_static;
+use http::{Response, StatusCode, header};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Such as we can't get real backtrace in catch_unwind block
-// we need place to store trace if such occurs and then print it in logs
-lazy_static! {
-    static ref BACKTRACE: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn set_hook_capture_panic_backtraces_no_propagate() {
+pub fn set_hook_capture_panic_backtraces_no_propagate(enable_default_hook: bool) {
     let default_hook = Arc::new(panic::take_hook());
 
     panic::set_hook(Box::new(move |info| {
-        default_hook(info);
+        if enable_default_hook {
+            default_hook(info);
+        }
 
-        *BACKTRACE.lock().unwrap() = Some(std::backtrace::Backtrace::force_capture().to_string());
+        let backtrace = Backtrace::force_capture();
+        let payload = info.payload();
+        let error_msg = if let Some(s) = payload.downcast_ref::<&str>() {
+            *s
+        } else if let Some(s) = payload.downcast_ref::<String>() {
+            s.as_str()
+        } else {
+            "Unknown panic payload"
+        };
+
+        tracing::error!(error_msg, error_backtrace = %backtrace, "Unhandled panic caught");
     }));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn panic_handler(err: Box<dyn Any + Send + 'static>) -> Response<Body> {
-    let panic_msg = if let Some(s) = err.downcast_ref::<&str>() {
-        *s
-    } else if let Some(s) = err.downcast_ref::<String>() {
-        s.as_str()
-    } else {
-        "Unknown panic payload"
-    };
-
-    let backtrace = BACKTRACE
-        .lock()
-        .unwrap()
-        .take()
-        .unwrap_or("Backtrace not found".to_string());
-
-    tracing::error!(panic_msg, %backtrace, "Unhandled panic caught");
-
+pub fn panic_handler(_err: Box<dyn Any + Send + 'static>) -> Response<Body> {
     let body = Body::from(r#"{"error":"Internal Server Error"}"#);
     Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)

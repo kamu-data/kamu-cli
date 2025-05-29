@@ -17,10 +17,12 @@ fn main() {
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .expect("Could not install default TLS provider");
-    observability::panic_handler::set_hook_capture_panic_backtraces_no_propagate();
 
     let workspace_layout = kamu_cli::WorkspaceService::find_workspace();
     let args = kamu_cli::cli::Cli::parse();
+    observability::panic_handler::set_hook_capture_panic_backtraces_no_propagate(
+        args.verbose.is_zero(),
+    );
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let result = runtime.block_on(kamu_cli::run(workspace_layout, args));
