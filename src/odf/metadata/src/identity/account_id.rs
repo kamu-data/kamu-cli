@@ -58,7 +58,7 @@ impl AccountID {
     pub fn as_did_pkh(&self) -> Option<&DidPkh> {
         match self {
             Self::Odf(_) => None,
-            Self::Pkh(did) => Some(did),
+            Self::Pkh(pkh) => Some(pkh),
         }
     }
 
@@ -101,11 +101,34 @@ impl AccountID {
     pub fn parse_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
         Ok(Self::Pkh(DidPkh::parse_caip10_account_id(s)?))
     }
+
+    pub fn as_id_without_did_prefix(&self) -> IdWithoutDidPrefixFmt {
+        IdWithoutDidPrefixFmt { value: self }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for AccountID {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct IdWithoutDidPrefixFmt<'a> {
+    value: &'a AccountID,
+}
+
+impl std::fmt::Display for IdWithoutDidPrefixFmt<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.value {
+            AccountID::Odf(odf) => write!(f, "{}", odf.as_multibase()),
+            AccountID::Pkh(pkh) => {
+                // NOTE: We explicitly use only the address part (w/o chain id (CAIP-2))
+                //       since the wallet address is already unique.
+                write!(f, "{}", pkh.wallet_address())
+            }
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -149,14 +172,14 @@ impl From<DidOdf> for AccountID {
 }
 
 impl From<DidKey> for AccountID {
-    fn from(did: DidKey) -> Self {
-        Self::Odf(DidOdf::from(did))
+    fn from(odf: DidKey) -> Self {
+        Self::Odf(DidOdf::from(odf))
     }
 }
 
 impl From<DidPkh> for AccountID {
-    fn from(did: DidPkh) -> Self {
-        Self::Pkh(did)
+    fn from(pkh: DidPkh) -> Self {
+        Self::Pkh(pkh)
     }
 }
 
@@ -165,11 +188,11 @@ impl From<DidPkh> for AccountID {
 impl std::fmt::Debug for AccountID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Odf(did) => f
+            Self::Odf(odf) => f
                 .debug_tuple(&format!("AccountID<{:?}>", Multicodec::Ed25519Pub))
-                .field(&did.as_multibase())
+                .field(&odf.as_multibase())
                 .finish(),
-            Self::Pkh(did) => f.debug_tuple("AccountID").field(&did).finish(),
+            Self::Pkh(pkh) => f.debug_tuple("AccountID").field(&pkh).finish(),
         }
     }
 }
@@ -179,11 +202,11 @@ impl std::fmt::Debug for AccountID {
 impl std::fmt::Display for AccountID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Odf(did) => {
-                write!(f, "{}", did.as_did_str())
+            Self::Odf(odf) => {
+                write!(f, "{}", odf.as_did_str())
             }
-            Self::Pkh(did) => {
-                write!(f, "{}", did.as_did_str())
+            Self::Pkh(pkh) => {
+                write!(f, "{}", pkh.as_did_str())
             }
         }
     }
@@ -196,8 +219,8 @@ impl std::fmt::Display for AccountID {
 impl serde::Serialize for AccountID {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match &self {
-            Self::Odf(did) => serializer.collect_str(&did.as_did_str()),
-            Self::Pkh(did) => serializer.collect_str(&did.as_did_str()),
+            Self::Odf(odf) => serializer.collect_str(&odf.as_did_str()),
+            Self::Pkh(pkh) => serializer.collect_str(&pkh.as_did_str()),
         }
     }
 }
