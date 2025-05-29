@@ -74,7 +74,7 @@ impl<const S: usize> std::cmp::PartialEq<String> for StackString<S> {
 
 pub trait AsStackString<const S: usize>
 where
-    Self: std::fmt::Display + Sized,
+    Self: std::fmt::Display,
 {
     fn as_stack_string(&self) -> StackString<S> {
         use std::io::Write;
@@ -88,6 +88,15 @@ where
         };
 
         StackString::new(buf, len)
+    }
+}
+
+pub trait ToStackString<const S: usize>
+where
+    Self: AsStackString<S> + Sized,
+{
+    fn to_stack_string(self) -> StackString<S> {
+        self.as_stack_string()
     }
 }
 
