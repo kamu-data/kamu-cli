@@ -15,8 +15,8 @@ use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 
 use super::{BatchError, CLIError, Command};
-use crate::output::OutputConfig;
 use crate::VerificationMultiProgress;
+use crate::output::OutputConfig;
 
 type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 

@@ -21,9 +21,9 @@ use super::errors::*;
 use super::messages::*;
 use super::phases::*;
 use super::protocol_dataset_helper::*;
+use crate::BearerHeader;
 use crate::smart_protocol::*;
 use crate::ws_common::ReadMessageError;
-use crate::BearerHeader;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,7 +102,7 @@ impl AxumServerPullProtocolInstance {
             .is_err()
         {
             tracing::debug!("Timeout reached, closing connection");
-        };
+        }
     }
 
     async fn pull_main_flow(&mut self) -> Result<(), PullServerError> {

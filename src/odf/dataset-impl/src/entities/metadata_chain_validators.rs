@@ -21,14 +21,14 @@ impl ValidateSeedBlockOrderVisitor {
     pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
         match block.event {
             MetadataEvent::Seed(_) if block.prev_block_hash.is_some() => {
-                return Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain)
+                return Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain);
             }
             MetadataEvent::Seed(_) => (),
             _ if block.prev_block_hash.is_none() => {
-                return Err(AppendValidationError::FirstBlockMustBeSeed)
+                return Err(AppendValidationError::FirstBlockMustBeSeed);
             }
             _ => (),
-        };
+        }
 
         Ok(Self {})
     }
@@ -217,7 +217,7 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
 
         if let Some(data_block) = &maybe_data_block {
             Self::validate_internal_offset_consistency(&block.event, data_block)?;
-        };
+        }
 
         Ok(Self {
             appended_block_event: &block.event,
@@ -309,7 +309,7 @@ impl ValidateUnimplementedEventsVisitor {
             | MetadataEvent::SetPollingSource(_)
             | MetadataEvent::AddPushSource(_)
             | MetadataEvent::SetTransform(_) => {}
-        };
+        }
 
         Self {}
     }
@@ -395,10 +395,11 @@ impl ValidateSetPollingSourceVisitor {
                 }
 
                 // Eth source must identify the chain
-                if let FetchStep::EthereumLogs(f) = &e.fetch {
-                    if f.chain_id.is_none() && f.node_url.is_none() {
-                        invalid_event!(e.clone(), "Eth source must specify chainId or nodeUrl")
-                    }
+                if let FetchStep::EthereumLogs(f) = &e.fetch
+                    && f.chain_id.is_none()
+                    && f.node_url.is_none()
+                {
+                    invalid_event!(e.clone(), "Eth source must specify chainId or nodeUrl")
                 }
 
                 true
@@ -489,14 +490,14 @@ impl ValidateEventIsNotEmptyVisitor {
         match &block.event {
             // TODO: ensure only used on Root datasets
             MetadataEvent::AddData(e) if e.is_empty() => {
-                return Err(AppendValidationError::empty_event(e.clone()))
+                return Err(AppendValidationError::empty_event(e.clone()));
             }
             // TODO: ensure only used on Derivative datasets
             MetadataEvent::ExecuteTransform(e) if e.is_empty() => {
-                return Err(AppendValidationError::empty_event(e.clone()))
+                return Err(AppendValidationError::empty_event(e.clone()));
             }
             _ => (),
-        };
+        }
 
         Ok(Self {})
     }

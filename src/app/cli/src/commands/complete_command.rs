@@ -78,20 +78,20 @@ impl CompleteCommand {
     }
 
     async fn complete_alias(&self, output: &mut impl Write, prefix: &str) {
-        if let Some(registry) = self.dataset_registry.as_ref() {
-            if let Some(reg) = self.remote_alias_reg.as_ref() {
-                let mut datasets = registry.all_dataset_handles();
-                while let Some(hdl) = datasets.try_next().await.unwrap() {
-                    let aliases = reg.get_remote_aliases(&hdl).await.unwrap();
-                    for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
-                        if alias.to_string().starts_with(prefix) {
-                            writeln!(output, "{alias}").unwrap();
-                        }
+        if let Some(registry) = self.dataset_registry.as_ref()
+            && let Some(reg) = self.remote_alias_reg.as_ref()
+        {
+            let mut datasets = registry.all_dataset_handles();
+            while let Some(hdl) = datasets.try_next().await.unwrap() {
+                let aliases = reg.get_remote_aliases(&hdl).await.unwrap();
+                for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
+                    if alias.to_string().starts_with(prefix) {
+                        writeln!(output, "{alias}").unwrap();
                     }
-                    for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
-                        if alias.to_string().starts_with(prefix) {
-                            writeln!(output, "{alias}").unwrap();
-                        }
+                }
+                for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
+                    if alias.to_string().starts_with(prefix) {
+                        writeln!(output, "{alias}").unwrap();
                     }
                 }
             }

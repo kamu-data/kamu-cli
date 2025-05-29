@@ -16,8 +16,8 @@ use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::{
     AccountConfig,
     CurrentAccountSubject,
-    PredefinedAccountsConfig,
     DEFAULT_ACCOUNT_NAME,
+    PredefinedAccountsConfig,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
@@ -27,18 +27,18 @@ use kamu_accounts_services::{
 };
 use kamu_auth_rebac::AccountPropertyName;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_core::TenancyConfig;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::testing::ClassifyByAllowanceIdsResponseTestHelper;
-use kamu_core::TenancyConfig;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
 use kamu_datasets_services::{DatasetEntryServiceImpl, DatasetEntryWriter};
 use messaging_outbox::{
-    register_message_dispatcher,
     ConsumerFilter,
     Outbox,
     OutboxExt,
     OutboxImmediateImpl,
+    register_message_dispatcher,
 };
 use time_source::SystemTimeSourceDefault;
 

@@ -13,8 +13,8 @@ use dill::Catalog;
 use kamu_accounts::{
     AccountRepository,
     ModifyPasswordHashError,
-    PasswordHashRepository,
     PROVIDER_PASSWORD,
+    PasswordHashRepository,
 };
 use odf::AccountName;
 

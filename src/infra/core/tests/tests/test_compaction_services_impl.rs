@@ -28,7 +28,7 @@ use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
-use crate::{mock_engine_provisioner, TransformTestHelper};
+use crate::{TransformTestHelper, mock_engine_provisioner};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -943,7 +943,7 @@ async fn test_compact_offsets_are_sequential_impl() {
         let plan = capture
             .iter()
             .filter(|c| c.body.contains("Optimized physical plan:"))
-            .last()
+            .next_back()
             .unwrap()
             .body
             .trim();
@@ -1472,7 +1472,7 @@ impl CompactTestHarness {
         for block in &blocks {
             match block.event {
                 odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_) => {
-                    return true
+                    return true;
                 }
                 _ => (),
             }

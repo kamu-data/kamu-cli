@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 use dill::*;
 use futures::SinkExt;
@@ -25,20 +25,20 @@ use kamu_datasets::{
     SetRefCheckRefMode,
 };
 use odf::metadata::AsTypedBlock as _;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 use url::Url;
 
+use crate::OdfSmtpVersion;
 use crate::smart_protocol::errors::*;
 use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
 use crate::smart_protocol::protocol_dataset_helper::*;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
-use crate::OdfSmtpVersion;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -447,7 +447,7 @@ impl WsSmartTransferProtocolClient {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(SyncError::Internal(e.int_err()));
             }
-        };
+        }
 
         Ok(())
     }
@@ -738,8 +738,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             SyncResult::UpToDate
         };
 
-        use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
         use tokio_tungstenite::tungstenite::protocol::CloseFrame;
+        use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
         ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Normal,
@@ -832,7 +832,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(SyncError::Internal(e.int_err()));
             }
-        };
+        }
 
         match self
             .push_send_metadata_request(
@@ -852,7 +852,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     e => SyncError::Internal(e.int_err()),
                 });
             }
-        };
+        }
 
         let missing_objects = match collect_object_references_from_interval(
             src.as_ref(),
@@ -899,10 +899,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(SyncError::Internal(e.int_err()));
             }
-        };
+        }
 
-        use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
         use tokio_tungstenite::tungstenite::protocol::CloseFrame;
+        use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
         ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Normal,
@@ -978,7 +978,7 @@ fn map_tungstenite_error(error: TungsteniteError, dataset_endpoint: &Url) -> Syn
                 return SyncError::Access(odf::AccessError::Unauthorized(Box::new(error)));
             }
             StatusCode::UNAUTHORIZED => {
-                return SyncError::Access(odf::AccessError::Unauthenticated(Box::new(error)))
+                return SyncError::Access(odf::AccessError::Unauthenticated(Box::new(error)));
             }
             StatusCode::NOT_FOUND => {
                 return DatasetAnyRefUnresolvedError::new(dataset_endpoint).into();

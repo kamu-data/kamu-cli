@@ -12,8 +12,8 @@ use std::str::FromStr;
 
 use chrono::DateTime;
 use kamu_cli_e2e_common::*;
-use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use serde_json::json;
 use test_utils::LocalS3Server;
 

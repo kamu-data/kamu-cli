@@ -541,7 +541,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
                         .and_modify(|val| {
                             if event_time.gt(val) {
                                 *val = event_time;
-                            };
+                            }
                         })
                         .or_insert(event_time);
                     acc
@@ -556,18 +556,16 @@ impl FlowEventStore for InMemoryFlowEventStore {
                 // Also also apply given filters on this stage in order to reduce amount of
                 // items to process in further steps
                 let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
-                if let FlowKey::Dataset(flow_key_dataset) = flow_key {
-                    if dataset_ids.contains(&flow_key_dataset.dataset_id)
-                        && g.matches_dataset_flow(*flow_id, filters)
-                    {
-                        if let Some(flow) = g.flow_search_index.get(flow_id) {
-                            let item = (flow_id, recent_events.get(flow_id));
-                            match flow.flow_status {
-                                FlowStatus::Waiting => waiting_flows.push(item),
-                                FlowStatus::Running => running_flows.push(item),
-                                FlowStatus::Finished => finished_flows.push(item),
-                            }
-                        }
+                if let FlowKey::Dataset(flow_key_dataset) = flow_key
+                    && dataset_ids.contains(&flow_key_dataset.dataset_id)
+                    && g.matches_dataset_flow(*flow_id, filters)
+                    && let Some(flow) = g.flow_search_index.get(flow_id)
+                {
+                    let item = (flow_id, recent_events.get(flow_id));
+                    match flow.flow_status {
+                        FlowStatus::Waiting => waiting_flows.push(item),
+                        FlowStatus::Running => running_flows.push(item),
+                        FlowStatus::Finished => finished_flows.push(item),
                     }
                 }
             }
@@ -705,12 +703,11 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let mut count = 0;
         for flow_id in &g.all_flows {
             let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
-            if let FlowKey::Dataset(flow_key_dataset) = flow_key {
-                if dataset_ids.contains(&flow_key_dataset.dataset_id)
-                    && g.matches_dataset_flow(*flow_id, filters)
-                {
-                    count += 1;
-                }
+            if let FlowKey::Dataset(flow_key_dataset) = flow_key
+                && dataset_ids.contains(&flow_key_dataset.dataset_id)
+                && g.matches_dataset_flow(*flow_id, filters)
+            {
+                count += 1;
             }
         }
         Ok(count)
@@ -728,10 +725,10 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let mut filtered_dataset_ids = HashSet::new();
         for flow_id in &g.all_flows {
             let flow_key = g.flow_key_by_flow_id.get(flow_id).unwrap();
-            if let FlowKey::Dataset(flow_key_dataset) = flow_key {
-                if dataset_ids.contains(&flow_key_dataset.dataset_id) {
-                    filtered_dataset_ids.insert(flow_key_dataset.dataset_id.clone());
-                }
+            if let FlowKey::Dataset(flow_key_dataset) = flow_key
+                && dataset_ids.contains(&flow_key_dataset.dataset_id)
+            {
+                filtered_dataset_ids.insert(flow_key_dataset.dataset_id.clone());
             }
         }
         Ok(filtered_dataset_ids.into_iter().collect())

@@ -136,11 +136,11 @@ impl RecordsFormat {
             .or(self.default_column_format.max_len)
         {
             // Quick bytes check
-            if value.len() > max_len {
-                if let Some((byte_index, _)) = value.char_indices().nth(max_len) {
-                    value.truncate(byte_index);
-                    value.push('…');
-                }
+            if value.len() > max_len
+                && let Some((byte_index, _)) = value.char_indices().nth(max_len)
+            {
+                value.truncate(byte_index);
+                value.push('…');
             }
         }
 

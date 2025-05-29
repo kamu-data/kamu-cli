@@ -10,6 +10,7 @@
 use bytes::Bytes;
 use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_core::MediaType;
 use kamu_core::services::upload_service::{
     MakeUploadContextError,
     SaveUploadError,
@@ -18,9 +19,8 @@ use kamu_core::services::upload_service::{
     UploadTokenBase64Json,
     UploadTokenIntoStreamError,
 };
-use kamu_core::MediaType;
-use serde::de::IntoDeserializer as _;
 use serde::Deserialize as _;
+use serde::de::IntoDeserializer as _;
 use thiserror::Error;
 
 use crate::axum_utils::{ensure_authenticated_account, from_catalog_n};

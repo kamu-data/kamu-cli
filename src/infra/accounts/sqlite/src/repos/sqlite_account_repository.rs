@@ -10,17 +10,17 @@
 use std::num::NonZeroUsize;
 
 use database_common::{
-    sqlite_generate_placeholders_list,
     PaginationOpts,
     TransactionRef,
     TransactionRefT,
+    sqlite_generate_placeholders_list,
 };
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use sqlx::Row;
 use sqlx::error::DatabaseError;
 use sqlx::sqlite::SqliteRow;
-use sqlx::Row;
 
 use crate::domain::*;
 

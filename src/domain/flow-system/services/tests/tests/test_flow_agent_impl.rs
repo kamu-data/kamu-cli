@@ -23,8 +23,8 @@ use super::{
     FlowSystemTestListener,
     ManualFlowAbortArgs,
     ManualFlowTriggerArgs,
-    TaskDriverArgs,
     SCHEDULING_ALIGNMENT_MS,
+    TaskDriverArgs,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,13 +180,15 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
         .save_events(
             &foo_flow_key,
             None,
-            vec![FlowTriggerEventCreated {
-                event_time: start_time,
-                flow_key: foo_flow_key.clone(),
-                paused: false,
-                rule: FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
-            }
-            .into()],
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: start_time,
+                    flow_key: foo_flow_key.clone(),
+                    paused: false,
+                    rule: FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();

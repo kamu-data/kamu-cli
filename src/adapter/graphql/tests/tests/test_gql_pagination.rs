@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::{value, EmptyMutation, EmptySubscription, Object, Schema};
+use async_graphql::{EmptyMutation, EmptySubscription, Object, Schema, value};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -169,13 +169,15 @@ impl PaginationHarness {
         options: GenerateItemOptions,
         expected_response_data: async_graphql::Value,
     ) {
+        use std::fmt::Write;
+
         let arguments = {
             let mut s = format!("count: {}", options.count);
             if let Some(value) = options.page {
-                s += &format!(", page: {value}",);
+                write!(&mut s, ", page: {value}").unwrap();
             }
             if let Some(value) = options.per_page {
-                s += &format!(", perPage: {value}");
+                write!(&mut s, ", perPage: {value}").unwrap();
             }
             s
         };

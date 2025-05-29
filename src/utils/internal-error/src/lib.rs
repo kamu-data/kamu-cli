@@ -56,11 +56,13 @@ impl InternalError {
     }
 
     pub fn reason(&self) -> String {
+        use std::fmt::Write;
+
         let mut reason = format!("{self}: {}", self.source);
 
         if let Some(context) = &self.context {
-            reason += &format!(" (context: {context})");
-        };
+            write!(&mut reason, " (context: {context})").unwrap();
+        }
 
         reason
     }

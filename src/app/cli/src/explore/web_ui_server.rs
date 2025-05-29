@@ -12,9 +12,9 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 
+use axum::Extension;
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
-use axum::Extension;
 use database_common::DatabaseTransactionRunner;
 use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
@@ -24,8 +24,8 @@ use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyCon
 use kamu_accounts::{
     AccountConfig,
     AuthenticationService,
-    PredefinedAccountsConfig,
     PROVIDER_PASSWORD,
+    PredefinedAccountsConfig,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_http::DatasetAuthorizationLayer;

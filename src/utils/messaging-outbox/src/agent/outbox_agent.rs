@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use database_common_macros::transactional_method2;
 use dill::*;

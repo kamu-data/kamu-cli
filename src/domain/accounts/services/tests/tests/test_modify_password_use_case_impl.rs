@@ -13,10 +13,10 @@ use crypto_utils::Argon2Hasher;
 use database_common::NoOpDatabasePlugin;
 use kamu_accounts::{
     Account,
+    DEFAULT_ACCOUNT_NAME,
     ModifyAccountPasswordUseCase,
     Password,
     PasswordHashRepository,
-    DEFAULT_ACCOUNT_NAME,
 };
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_accounts_services::{LoginPasswordAuthProvider, ModifyAccountPasswordUseCaseImpl};
@@ -31,18 +31,22 @@ async fn test_modify_account_password_use_case() {
 
     let account = Account::dummy();
 
-    assert!(harness
-        .login_password_auth_provider
-        .save_password(&account, password)
-        .await
-        .is_ok());
+    assert!(
+        harness
+            .login_password_auth_provider
+            .save_password(&account, password)
+            .await
+            .is_ok()
+    );
 
     let new_password = Password::try_new("new_foo_password").unwrap();
-    assert!(harness
-        .use_case
-        .execute(&account, new_password.clone())
-        .await
-        .is_ok());
+    assert!(
+        harness
+            .use_case
+            .execute(&account, new_password.clone())
+            .await
+            .is_ok()
+    );
 
     let password_hash = harness
         .password_hash_repository
@@ -51,13 +55,15 @@ async fn test_modify_account_password_use_case() {
         .unwrap()
         .unwrap();
 
-    assert!(Argon2Hasher::verify_async(
-        new_password.as_bytes(),
-        password_hash.as_str(),
-        crypto_utils::PasswordHashingMode::Default
-    )
-    .await
-    .unwrap());
+    assert!(
+        Argon2Hasher::verify_async(
+            new_password.as_bytes(),
+            password_hash.as_str(),
+            crypto_utils::PasswordHashingMode::Default
+        )
+        .await
+        .unwrap()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

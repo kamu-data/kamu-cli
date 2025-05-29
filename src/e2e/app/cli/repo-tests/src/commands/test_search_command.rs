@@ -8,16 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli_e2e_common::{
-    KamuApiServerClient,
-    KamuApiServerClientExt,
-    RequestBody,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     E2E_USER_ACCOUNT_NAME,
+    KamuApiServerClient,
+    KamuApiServerClientExt,
+    RequestBody,
 };
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use odf::metadata::testing::MetadataFactory;
 
 use crate::utils::make_logged_clients;

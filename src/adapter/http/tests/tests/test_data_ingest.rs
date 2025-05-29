@@ -639,25 +639,30 @@ impl DataIngestHarness {
                     ),
                     kind: odf::DatasetKind::Root,
                     metadata: if with_schema {
-                        vec![odf::metadata::AddPushSource {
-                            source_name: "source1".to_string(),
-                            read: odf::metadata::ReadStepNdJson {
-                                schema: Some(vec![
-                                    "event_time TIMESTAMP".to_owned(),
-                                    "city STRING".to_owned(),
-                                    "population BIGINT".to_owned(),
-                                ]),
-                                ..Default::default()
+                        vec![
+                            odf::metadata::AddPushSource {
+                                source_name: "source1".to_string(),
+                                read: odf::metadata::ReadStepNdJson {
+                                    schema: Some(vec![
+                                        "event_time TIMESTAMP".to_owned(),
+                                        "city STRING".to_owned(),
+                                        "population BIGINT".to_owned(),
+                                    ]),
+                                    ..Default::default()
+                                }
+                                .into(),
+                                preprocess: None,
+                                merge: odf::metadata::MergeStrategy::Ledger(
+                                    odf::metadata::MergeStrategyLedger {
+                                        primary_key: vec![
+                                            "event_time".to_owned(),
+                                            "city".to_owned(),
+                                        ],
+                                    },
+                                ),
                             }
                             .into(),
-                            preprocess: None,
-                            merge: odf::metadata::MergeStrategy::Ledger(
-                                odf::metadata::MergeStrategyLedger {
-                                    primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                                },
-                            ),
-                        }
-                        .into()]
+                        ]
                     } else {
                         vec![]
                     },

@@ -11,8 +11,8 @@ use kamu_core::TenancyConfig;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use crate::simple_protocol::*;
 use crate::DatasetResolverLayer;
+use crate::simple_protocol::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

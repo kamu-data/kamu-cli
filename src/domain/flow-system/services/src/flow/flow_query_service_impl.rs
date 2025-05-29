@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
-use dill::{component, interface, Catalog};
+use dill::{Catalog, component, interface};
 use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};

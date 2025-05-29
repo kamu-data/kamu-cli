@@ -74,7 +74,7 @@ impl Command for SystemE2ECommand {
             "account-add" => {
                 if self.arguments.is_empty() {
                     return Err("Account names have not been provided".int_err().into());
-                };
+                }
 
                 for account_name in &self.arguments {
                     eprint!("Add {account_name}... ");

@@ -13,7 +13,6 @@ use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::{
-    auth,
     VerificationError,
     VerificationListener,
     VerificationMultiListener,
@@ -21,6 +20,7 @@ use kamu_core::{
     VerificationResult,
     VerificationService,
     VerifyDatasetUseCase,
+    auth,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,10 +9,10 @@
 
 use std::io::IsTerminal;
 
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
-use tracing_subscriber::EnvFilter;
 
 use super::config::Config;
 

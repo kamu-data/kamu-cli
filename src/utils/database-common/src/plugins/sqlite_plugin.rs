@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
+use sqlx::SqlitePool;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::SqlitePool;
 
 use crate::*;
 

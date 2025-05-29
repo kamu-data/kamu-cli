@@ -10,10 +10,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dill::{component, Catalog};
+use dill::{Catalog, component};
 use internal_error::InternalError;
 
-use crate::{group_message_dispatchers_by_producer, ConsumerFilter, MessageDispatcher, Outbox};
+use crate::{ConsumerFilter, MessageDispatcher, Outbox, group_message_dispatchers_by_producer};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

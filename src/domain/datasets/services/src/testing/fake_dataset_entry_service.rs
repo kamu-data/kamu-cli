@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use dill::{component, interface, scope, Singleton};
+use dill::{Singleton, component, interface, scope};
 use kamu_datasets::{
     DatasetEntriesResolution,
     DatasetEntry,

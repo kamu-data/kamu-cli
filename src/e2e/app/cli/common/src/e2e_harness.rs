@@ -14,7 +14,7 @@ use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
 use sqlx::{MySqlPool, PgPool};
 
-use crate::{api_server_e2e_test, KamuApiServerClient};
+use crate::{KamuApiServerClient, api_server_e2e_test};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

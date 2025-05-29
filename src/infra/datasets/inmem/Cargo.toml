@@ -28,7 +28,7 @@ odf = { workspace = true }
 internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }

@@ -83,7 +83,7 @@ impl CompactionExecutorImpl {
                     // TODO: PERF: Consider passing sort order hint to `read_parquet` to let DF now
                     // that the data is already pre-sorted
                     .sort(vec![
-                        col(Column::from_name(&plan.offset_column_name)).sort(true, false)
+                        col(Column::from_name(&plan.offset_column_name)).sort(true, false),
                     ])
                     .int_err()?;
 

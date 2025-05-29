@@ -78,7 +78,7 @@ impl ExportService for ExportServiceImpl {
                 .options_mut()
                 .execution
                 .soft_max_rows_per_output_file = partition_size;
-        };
+        }
 
         let export_df = DataFrameExt::from(DataFrame::new(session_state, plan))
             .repartition(Partitioning::RoundRobinBatch(1))

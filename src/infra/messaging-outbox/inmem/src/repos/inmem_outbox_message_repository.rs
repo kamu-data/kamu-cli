@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::ops::Bound;
 use std::sync::{Arc, Mutex};
 
-use dill::{component, interface, scope, Singleton};
+use dill::{Singleton, component, interface, scope};
 use internal_error::InternalError;
 
 use crate::domain::*;

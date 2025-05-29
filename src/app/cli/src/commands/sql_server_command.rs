@@ -18,9 +18,9 @@ use kamu::*;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command, SqlShellEngine};
+use crate::WorkspaceLayout;
 use crate::explore::{FlightSqlServiceFactory, SparkLivyServerFactory, SqlShellImpl};
 use crate::output::*;
-use crate::WorkspaceLayout;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

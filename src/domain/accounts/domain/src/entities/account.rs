@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::LazyLock;
+
 use chrono::{DateTime, TimeZone, Utc};
 use email_utils::Email;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
 use crate::AccountConfig;
@@ -21,15 +22,14 @@ pub type AccountDisplayName = String;
 
 pub const DEFAULT_ACCOUNT_NAME_STR: &str = "kamu";
 
-lazy_static! {
-    pub static ref DEFAULT_ACCOUNT_NAME: odf::AccountName =
-        odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR);
-    pub static ref DEFAULT_ACCOUNT_ID: odf::AccountID =
-        odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes());
-    static ref DUMMY_REGISTRATION_TIME: DateTime<Utc> =
-        Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap();
-    pub static ref DUMMY_EMAIL_ADDRESS: Email = Email::parse("kamu@example.com").unwrap();
-}
+pub static DEFAULT_ACCOUNT_NAME: LazyLock<odf::AccountName> =
+    LazyLock::new(|| odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR));
+pub static DEFAULT_ACCOUNT_ID: LazyLock<odf::AccountID> =
+    LazyLock::new(|| odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()));
+static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
+    LazyLock::new(|| Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap());
+pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
+    LazyLock::new(|| Email::parse("kamu@example.com").unwrap());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

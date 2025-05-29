@@ -38,7 +38,7 @@ prometheus = ["dep:prometheus"]
 [dependencies]
 async-trait = { version = "0.1" }
 axum = { version = "0.8", default-features = false, features = ["json", "matched-path", "query"] }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 http = { version = "1", default-features = false }
 lazy_static = { version = "1" }
 serde = { version = "1", default-features = false, features = ["derive"] }

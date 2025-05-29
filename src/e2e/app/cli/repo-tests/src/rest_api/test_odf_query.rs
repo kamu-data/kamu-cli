@@ -22,12 +22,12 @@ use kamu_adapter_http::data::query_types::{Include as QueryInclude, QueryRequest
 use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
-    KamuApiServerClient,
-    KamuApiServerClientExt,
-    RequestBody,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     E2E_USER_ACCOUNT_NAME,
+    KamuApiServerClient,
+    KamuApiServerClientExt,
+    RequestBody,
 };
 use serde_json::json;
 

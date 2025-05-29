@@ -25,7 +25,11 @@ use url::Url;
 #[test_log::test(tokio::test)]
 async fn test_protocol() {
     let s3 = LocalS3Server::new().await;
-    std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
+
+    // TODO: Reconsider this - we should not be modifying global env from tests
+    unsafe {
+        std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
+    }
     let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
 
     assert_matches!(repo.protocol(), ObjectRepositoryProtocol::S3);
@@ -38,7 +42,11 @@ async fn test_protocol() {
 #[test_log::test(tokio::test)]
 async fn test_unauthorized() {
     let s3 = LocalS3Server::new().await;
-    std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
+
+    // TODO: Reconsider this - we should not be modifying global env from tests
+    unsafe {
+        std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
+    }
     let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
 
     assert_matches!(

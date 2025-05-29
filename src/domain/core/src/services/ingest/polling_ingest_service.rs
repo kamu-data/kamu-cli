@@ -18,7 +18,7 @@ use internal_error::{BoxedError, InternalError};
 use kamu_datasets::{DatasetEnvVar, FindDatasetEnvVarError};
 use thiserror::Error;
 
-use crate::engine::{normalize_logs, EngineError, ProcessError};
+use crate::engine::{EngineError, ProcessError, normalize_logs};
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

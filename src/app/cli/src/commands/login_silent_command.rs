@@ -13,7 +13,7 @@ use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
 use kamu_adapter_oauth::PROVIDER_GITHUB;
 use url::Url;
 
-use crate::{odf_server, CLIError, Command};
+use crate::{CLIError, Command, odf_server};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

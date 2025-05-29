@@ -107,7 +107,7 @@ impl EngineProvisionerLocal {
             let mut state = self.inner.state.lock().unwrap();
             state.known_images.insert(image.to_owned());
             pull_image = false;
-        };
+        }
 
         if pull_image {
             let listener = listener

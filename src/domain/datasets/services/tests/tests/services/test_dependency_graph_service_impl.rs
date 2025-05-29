@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::*;
-use futures::{future, StreamExt};
+use futures::{StreamExt, future};
 use internal_error::ResultIntoInternal;
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig};
@@ -27,7 +27,7 @@ use kamu_datasets_inmem::{
 use kamu_datasets_services::testing::FakeConnectingDatasetEntryWriter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 

@@ -11,15 +11,15 @@ use chrono::Utc;
 use kamu_flow_system::{FlowKeyDataset, FlowTriggerRule, FlowTriggerService};
 
 use super::{
-    ensure_expected_dataset_kind,
-    ensure_flow_preconditions,
     FlowIncompatibleDatasetKind,
     FlowPreconditionsNotMet,
     FlowTypeIsNotSupported,
+    ensure_expected_dataset_kind,
+    ensure_flow_preconditions,
 };
+use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
-use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,7 +48,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
     ) -> Result<SetFlowTriggerResult> {
         if let Err(err) = trigger_input.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowTriggerResult::TypeIsNotSupported(err));
-        };
+        }
 
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type, None)

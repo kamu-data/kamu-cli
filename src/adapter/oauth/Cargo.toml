@@ -28,7 +28,7 @@ odf = { workspace = true }
 kamu-accounts = { workspace = true }
 
 async-trait = "0.1"
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 http = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
 serde = { version = "1", default-features = false }
