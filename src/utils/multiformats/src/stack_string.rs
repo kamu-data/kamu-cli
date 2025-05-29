@@ -72,11 +72,11 @@ impl<const S: usize> std::cmp::PartialEq<String> for StackString<S> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ToStackString<const S: usize>
+pub trait AsStackString<const S: usize>
 where
     Self: std::fmt::Display + Sized,
 {
-    fn to_stack_string(self) -> StackString<S> {
+    fn as_stack_string(&self) -> StackString<S> {
         use std::io::Write;
 
         let mut buf = [0u8; S];

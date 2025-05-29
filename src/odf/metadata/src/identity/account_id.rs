@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use ed25519_dalek::SigningKey;
-use multiformats::stack_string::ToStackString;
+use multiformats::stack_string::AsStackString;
 
 use crate::formats::*;
 
@@ -105,7 +105,7 @@ impl AccountID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ToStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for AccountID {}
+impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for AccountID {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
