@@ -14,9 +14,9 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{
     AccountType,
     AuthenticationProvider,
+    PROVIDER_WEB3_WALLET,
     ProviderLoginError,
     ProviderLoginResponse,
-    PROVIDER_WEB3_WALLET,
 };
 use kamu_auth_web3::{
     ConsumeNonceError,
@@ -26,8 +26,9 @@ use kamu_auth_web3::{
 };
 use kamu_core::ServerUrlConfig;
 use nutype::nutype;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,6 +42,7 @@ pub const EIP_4361_EXPECTED_STATEMENT: &str =
 pub struct Web3WalletAuthenticationProvider {
     server_url_config: Arc<ServerUrlConfig>,
     nonce_service: Arc<dyn kamu_auth_web3::Web3AuthEip4361NonceService>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl Web3WalletAuthenticationProvider {
@@ -55,7 +57,12 @@ impl Web3WalletAuthenticationProvider {
                 ));
             }
 
-            if !message.valid_now() {
+            let now = {
+                let chrono_now = self.time_source.now();
+                time::OffsetDateTime::from_unix_timestamp(chrono_now.timestamp()).unwrap()
+            };
+
+            if !message.valid_at(&now) {
                 return Err(SignatureVerificationError::MessageExpired);
             }
         }
@@ -170,9 +177,9 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct LoginRequest {
+pub struct LoginRequest {
     pub message: String,
     pub signature: String,
 }

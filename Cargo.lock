@@ -6696,19 +6696,27 @@ name = "kamu-adapter-auth-web3"
 version = "0.239.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "dill",
  "email-utils",
  "hex",
+ "indoc 2.0.6",
  "internal-error",
  "kamu-accounts",
  "kamu-auth-web3",
+ "kamu-auth-web3-inmem",
+ "kamu-auth-web3-services",
  "kamu-core",
  "nutype",
  "opendatafabric",
  "serde",
  "serde_json",
  "siwe",
+ "test-log",
  "thiserror 2.0.12",
+ "time",
+ "time-source",
+ "tokio",
 ]
 
 [[package]]
