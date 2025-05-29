@@ -152,12 +152,16 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+
         let update_result = sqlx::query!(
             r#"
             UPDATE accounts SET email = $1 WHERE id = $2
             "#,
             new_email.as_ref(),
-            account_id.to_string(),
+            account_id_stack.as_str(),
         )
         .execute(connection_mut)
         .await
@@ -191,6 +195,10 @@ impl AccountRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+
         let maybe_account_row = sqlx::query_as!(
             AccountRowModel,
             r#"
@@ -207,7 +215,7 @@ impl AccountRepository for PostgresAccountRepository {
             FROM accounts
             WHERE id = $1
             "#,
-            account_id.to_string()
+            account_id_stack.as_str()
         )
         .fetch_optional(connection_mut)
         .await
@@ -536,6 +544,10 @@ impl PasswordHashRepository for PostgresAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
+        let account_id = account_id.as_stack_string();
+
         sqlx::query!(
             r#"
             INSERT INTO accounts_passwords (account_name, password_hash, account_id)
@@ -543,7 +555,7 @@ impl PasswordHashRepository for PostgresAccountRepository {
             "#,
             account_name.as_str(),
             password_hash,
-            account_id.to_string()
+            account_id.as_str()
         )
         .execute(connection_mut)
         .await

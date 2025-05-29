@@ -72,6 +72,9 @@ impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
+        let account_id = token_params_part.account_id.as_stack_string();
         let token_iat: i64 = token_params_part.iat.try_into().int_err()?;
         let token_exp: i64 = token_params_part.exp.try_into().int_err()?;
 
@@ -86,7 +89,7 @@ impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
             device_code.as_ref(),
             token_iat,
             token_exp,
-            token_params_part.account_id.to_string(),
+            account_id.as_str(),
         )
         .execute(connection_mut)
         .await

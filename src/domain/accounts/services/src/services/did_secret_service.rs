@@ -45,7 +45,10 @@ impl DidSecretService {
         &self,
         message: &AccountLifecycleMessageDeleted,
     ) -> Result<(), InternalError> {
-        let account_entity = DidEntity::new_account(message.account_id.to_string());
+        use odf::metadata::AsStackString;
+
+        let account_id = message.account_id.as_stack_string();
+        let account_entity = DidEntity::new_account(account_id.as_str());
 
         match self
             .did_secret_key_repo

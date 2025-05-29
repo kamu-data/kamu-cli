@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use multiformats::stack_string::AsStackString;
 use ssi_caips::caip10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,7 +16,7 @@ pub const DID_PKH_PREFIX: &str = "did:pkh:";
 
 // Based on ssi-caips/src/caip10.rs
 const CAIP_10_CHAIN_ID_MAX_LENGTH: usize = 41;
-const CAIP_10_ACCOUNT_ADDRESS_MAX_LENGTH: usize = 64;
+pub const CAIP_10_ACCOUNT_ADDRESS_MAX_LENGTH: usize = 64;
 
 pub const MAX_DID_PKH_STRING_REPR_LEN: usize = DID_PKH_PREFIX.len()
     + CAIP_10_CHAIN_ID_MAX_LENGTH
@@ -139,12 +140,13 @@ pub struct DidPkhFmt<'a> {
     value: &'a DidPkh,
 }
 
-// TODO: Wallet-based auth: implement to_stack_string()
 impl<'a> DidPkhFmt<'a> {
     pub fn new(value: &'a DidPkh) -> Self {
         Self { value }
     }
 }
+
+impl AsStackString<MAX_DID_PKH_STRING_REPR_LEN> for DidPkhFmt<'_> {}
 
 impl std::fmt::Debug for DidPkhFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

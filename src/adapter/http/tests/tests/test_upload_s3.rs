@@ -246,7 +246,8 @@ async fn test_attempt_upload_file_authorized() {
 
         let expected_key = format!(
             "{}/{}/test.txt",
-            *DEFAULT_ACCOUNT_ID, upload_token.upload_id
+            DEFAULT_ACCOUNT_ID.as_id_without_did_prefix(),
+            upload_token.upload_id
         );
         let file_exists = upload_bucket_context
             .bucket_path_exists(&expected_key)

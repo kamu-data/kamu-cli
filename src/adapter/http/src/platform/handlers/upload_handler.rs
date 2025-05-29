@@ -131,8 +131,15 @@ pub async fn file_upload_post_handler(
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
     mut multipart: axum::extract::Multipart,
 ) -> Result<(), ApiError> {
+    use odf::metadata::AsStackString;
+
     let account_id = ensure_authenticated_account(&catalog).api_err()?;
-    if account_id.to_string() != upload_param.upload_token.0.owner_account_id {
+    if account_id
+        .as_id_without_did_prefix()
+        .as_stack_string()
+        .as_str()
+        != upload_param.upload_token.0.owner_account_id.as_str()
+    {
         return Err(ApiError::new_forbidden());
     }
 

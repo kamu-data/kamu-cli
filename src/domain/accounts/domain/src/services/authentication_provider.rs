@@ -73,6 +73,7 @@ pub enum ProviderLoginError {
 }
 
 impl ProviderLoginError {
+    // todo использовать RejectedCredentials если подпись не подошла
     pub fn invalid_credentials<E>(error: E) -> Self
     where
         E: std::error::Error + Send + Sync + 'static,

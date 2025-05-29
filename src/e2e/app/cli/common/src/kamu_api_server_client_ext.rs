@@ -14,7 +14,6 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
-use indoc::indoc;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
 use kamu_adapter_graphql::traits::ResponseExt;
@@ -1205,7 +1204,7 @@ impl DatasetCollaborationApi<'_> {
         let response = self
             .client
             .graphql_api_call_ex(
-                async_graphql::Request::new(indoc!(
+                async_graphql::Request::new(indoc::indoc!(
                     r#"
                     mutation ($dataset_id: DatasetID!, $account_id: AccountID!, $role: DatasetAccessRole!) {
                       datasets {

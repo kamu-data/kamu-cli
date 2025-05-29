@@ -62,17 +62,18 @@ impl UploadService for UploadServiceLocal {
 
         let upload_id = Uuid::new_v4().simple().to_string();
 
-        let owner_account_id = owner_account_id.to_string();
+        let owner_account_id_without_prefix =
+            owner_account_id.as_id_without_did_prefix().to_string();
 
         let upload_folder_path = self
-            .make_account_folder_path(&owner_account_id)
+            .make_account_folder_path(owner_account_id_without_prefix.as_str())
             .join(upload_id.clone());
         std::fs::create_dir_all(upload_folder_path).map_err(ErrorIntoInternal::int_err)?;
 
         let upload_token = UploadTokenBase64Json(UploadToken {
             upload_id,
             file_name,
-            owner_account_id,
+            owner_account_id: owner_account_id_without_prefix,
             content_length,
             content_type,
         });
@@ -108,8 +109,15 @@ impl UploadService for UploadServiceLocal {
         upload_id: &str,
         file_name: &str,
     ) -> Result<usize, UploadTokenIntoStreamError> {
+        use odf::metadata::AsStackString;
+
         let upload_file_path = self
-            .make_account_folder_path(&owner_account_id.to_string())
+            .make_account_folder_path(
+                owner_account_id
+                    .as_id_without_did_prefix()
+                    .as_stack_string()
+                    .as_str(),
+            )
             .join(upload_id)
             .join(file_name);
 
@@ -127,8 +135,15 @@ impl UploadService for UploadServiceLocal {
         upload_id: &str,
         file_name: &str,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
+        use odf::metadata::AsStackString;
+
         let upload_file_path = self
-            .make_account_folder_path(&owner_account_id.to_string())
+            .make_account_folder_path(
+                owner_account_id
+                    .as_id_without_did_prefix()
+                    .as_stack_string()
+                    .as_str(),
+            )
             .join(upload_id)
             .join(file_name);
 

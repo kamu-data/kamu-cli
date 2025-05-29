@@ -15,13 +15,27 @@ use crate::formats::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const MAX_ACCOUNT_ID_STRING_REPR_LEN: usize = {
-    const A: usize = MAX_DID_CANONICAL_STRING_REPR_LEN;
-    const B: usize = MAX_DID_PKH_STRING_REPR_LEN;
+    let a = MAX_DID_CANONICAL_STRING_REPR_LEN;
+    let b = MAX_DID_PKH_STRING_REPR_LEN;
 
-    if A > B {
-        A
+    if a > b {
+        a
     } else {
-        B
+        b
+    }
+};
+pub const MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
+    let a = MAX_DID_CANONICAL_STRING_REPR_LEN
+        .checked_sub(DID_ODF_PREFIX.len())
+        .unwrap();
+    let b = CAIP_10_ACCOUNT_ADDRESS_MAX_LENGTH
+        .checked_sub(DID_PKH_PREFIX.len())
+        .unwrap();
+
+    if a > b {
+        a
+    } else {
+        b
     }
 };
 
@@ -91,6 +105,20 @@ impl AccountID {
         })
     }
 
+    pub fn parse_id_without_did_prefix(s: &str) -> Result<Self, AccountIdParseStrError> {
+        if let Ok(id) = Self::from_multibase_string(s) {
+            return Ok(id);
+        }
+
+        if let Ok(id) = Self::parse_caip10_account_id(s) {
+            return Ok(id);
+        }
+
+        Err(AccountIdParseStrError::InvalidValueFormat {
+            value: s.to_string(),
+        })
+    }
+
     /// Parses `AccountID` from a multibase string (without `did:odf:`) prefix
     pub fn from_multibase_string(s: &str) -> Result<Self, ParseError<DidOdf>> {
         Ok(Self::Odf(DidOdf::from_multibase(s)?))
@@ -109,10 +137,6 @@ impl AccountID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for AccountID {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct IdWithoutDidPrefixFmt<'a> {
     value: &'a AccountID,
 }
@@ -122,12 +146,24 @@ impl std::fmt::Display for IdWithoutDidPrefixFmt<'_> {
         match self.value {
             AccountID::Odf(odf) => write!(f, "{}", odf.as_multibase()),
             AccountID::Pkh(pkh) => {
+                let wallet = pkh.wallet_address();
+
                 // NOTE: We explicitly use only the address part (w/o chain id (CAIP-2))
                 //       since the wallet address is already unique.
-                write!(f, "{}", pkh.wallet_address())
+                write!(f, "{}", wallet.strip_prefix("0x").unwrap_or(wallet))
             }
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for AccountID {}
+impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for &AccountID {}
+
+impl AsStackString<MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN>
+    for IdWithoutDidPrefixFmt<'_>
+{
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
