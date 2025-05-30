@@ -18,6 +18,8 @@ Recommendation: for ease of reading, use the following order:
   - Flow authorization is based on the ERC-4361 (Sign-In with Ethereum) standard.
   - Any browser that supports EIP-1193 (Ethereum Provider JavaScript API) can be used for authentication.
   - Signature verification is based on ERC-191 (Signed Data Standard).
+### Changed
+- GQL: search also matches entries by account name
 
 ## [0.239.0] - 2025-05-26
 ### Added
