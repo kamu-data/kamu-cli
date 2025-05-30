@@ -43,7 +43,6 @@ chrono = { version = "0.4", default-features = false }
 crc32fast = { version = "1.4.2" }
 futures = { version = "0.3", default-features = false }
 jsonwebtoken = "9"
-lazy_static = { version = "1" }
 merge = "0.1"
 mockall = { optional = true, version = "0.13" }
 nutype = { version = "0.6", default-features = false }

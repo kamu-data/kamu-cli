@@ -135,7 +135,6 @@ rumqttc = { optional = true, version = "0.24", default-features = false, feature
 ] }
 mockall = { optional = true, version = "0.13", default-features = false }
 oop = { optional = true, version = "0.0.2" }
-lazy_static = { version = "1" }
 
 
 [target.'cfg(unix)'.dependencies]

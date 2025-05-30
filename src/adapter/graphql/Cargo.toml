@@ -69,7 +69,6 @@ futures = { version = "0.3", default-features = false, features = ["alloc"] }
 humansize = { version = "2", default-features = false }
 indoc = "2"
 jsonschema = { version = "0.30", default-features = false }
-lazy_static = { version = "1" }
 nutype = { version = "0.6", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
