@@ -19,7 +19,10 @@ Recommendation: for ease of reading, use the following order:
   - Any browser that supports EIP-1193 (Ethereum Provider JavaScript API) can be used for authentication.
   - Signature verification is based on ERC-191 (Signed Data Standard).
 ### Changed
-- GQL: search also matches entries by account name
+- GQL: search also matches entries by account name.
+- GQL: `Account::account_provider()` returns `AccountProvider` instead of string.
+- GQL: `Auth::enabled_login_methods()` renamed to `Auth::enabled_providers()` returns `Vec<AccountProvider>`.
+- GQL: `AuthMut::login()` takes `AccountProvider` as argument instead of string.
 
 ## [0.239.0] - 2025-05-26
 ### Added
