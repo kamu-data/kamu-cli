@@ -16,6 +16,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#[cfg(not(feature = "did-pkh"))]
+compile_error!("Feature `did-pkh` must be enabled for using Web3WalletAuthenticationProvider");
+
 mod dependencies;
 mod web3_wallet_authentication_provider;
 

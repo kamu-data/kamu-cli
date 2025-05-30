@@ -8,8 +8,10 @@
 // by the Apache License, Version 2.0.
 
 mod did_odf;
+#[cfg(feature = "did-pkh")]
 mod did_pkh;
 
 pub use did_odf::*;
+#[cfg(feature = "did-pkh")]
 pub use did_pkh::*;
 pub use multiformats::*;

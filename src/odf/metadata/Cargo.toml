@@ -25,13 +25,15 @@ doctest = false
 
 [features]
 default = ["arrow"]
+
 arrow = ["dep:arrow"]
+did-pkh = ["dep:ssi-caips"]
 sqlx = ["dep:sqlx"]
 sqlx-mysql = ["sqlx", "sqlx/mysql"]
 sqlx-postgres = ["sqlx", "sqlx/postgres"]
 sqlx-sqlite = ["sqlx", "sqlx/sqlite"]
+testing = ["dep:datafusion", "dep:rand", "did-pkh"]
 utoipa = ["multiformats/utoipa", "dep:utoipa", "dep:serde_json"]
-testing = ["dep:datafusion", "dep:rand"]
 
 
 [dependencies]
@@ -55,7 +57,6 @@ ed25519-dalek = { version = "2", default-features = false, features = [
     "zeroize",
     "rand_core",
 ] }
-ssi-caips = { version = "0.2", default-features = false, features = ["eip"] }
 
 # Serialization
 base64 = { version = "0.22", default-features = false, features = ["std"] }
@@ -83,6 +84,7 @@ datafusion = { optional = true, version = "47", default-features = false }
 rand = { optional = true, version = "0.8", default-features = false }
 serde_json = { optional = true, version = "1", default-features = false }
 sqlx = { optional = true, version = "0.8", default-features = false }
+ssi-caips = { optional = true, version = "0.2", default-features = false, features = ["eip"] }
 utoipa = { optional = true, version = "5", default-features = false }
 
 

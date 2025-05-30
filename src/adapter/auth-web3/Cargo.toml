@@ -21,6 +21,12 @@ workspace = true
 doctest = false
 
 
+[features]
+default = ["did-pkh"]
+
+did-pkh = ["odf/did-pkh"]
+
+
 [dependencies]
 email-utils = { workspace = true, default-features = false }
 internal-error = { workspace = true, default-features = false }
