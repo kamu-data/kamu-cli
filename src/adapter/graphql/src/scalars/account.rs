@@ -69,7 +69,7 @@ impl ScalarType for AccountDisplayName<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
+#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 #[graphql(remote = "kamu_accounts::AccountProvider")]
 pub enum AccountProvider {
     Password,

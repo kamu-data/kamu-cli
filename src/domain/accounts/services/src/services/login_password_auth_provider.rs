@@ -79,11 +79,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         // Decode credentials
         let password_login_credentials =
             serde_json::from_str::<PasswordLoginCredentials>(login_credentials_json.as_str())
-                .map_err(|e| {
-                    ProviderLoginError::InvalidCredentials(InvalidCredentialsError::new(Box::new(
-                        e,
-                    )))
-                })?;
+                .map_err(ProviderLoginError::invalid_credentials)?;
 
         // Extract account name
         let account_name =

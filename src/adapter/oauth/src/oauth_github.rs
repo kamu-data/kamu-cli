@@ -154,11 +154,7 @@ impl AuthenticationProvider for OAuthGithub {
         // Decode credentials
         let github_login_credentials =
             serde_json::from_str::<GithubLoginCredentials>(login_credentials_json.as_str())
-                .map_err(|e| {
-                    ProviderLoginError::InvalidCredentials(InvalidCredentialsError::new(Box::new(
-                        e,
-                    )))
-                })?;
+                .map_err(ProviderLoginError::invalid_credentials)?;
 
         // Prepare HTTP client for GitHub
         let client = self.get_client().int_err()?;

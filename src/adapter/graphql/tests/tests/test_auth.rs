@@ -65,7 +65,7 @@ fn make_account_details_request() -> async_graphql::Request {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_enabled_login_methods() {
+async fn test_enabled_login_providers() {
     let mut mock_authentication_service = MockAuthenticationService::new();
     mock_authentication_service
         .expect_supported_login_methods()

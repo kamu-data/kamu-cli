@@ -331,7 +331,7 @@ type AttachmentsEmbedded {
 }
 
 type Auth {
-	enabledLoginMethods: [String!]!
+	enabledProviders: [AccountProvider!]!
 	listAccessTokens(accountId: AccountID!, page: Int, perPage: Int): AccessTokenConnection!
 }
 

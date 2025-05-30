@@ -28,7 +28,7 @@ use time_source::{SystemTimeSource, SystemTimeSourceStub};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_enabled_login_methods() {
+async fn test_enabled_login_providers() {
     let catalog = make_catalog(MockOutbox::new());
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
