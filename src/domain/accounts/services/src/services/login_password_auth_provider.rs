@@ -132,7 +132,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             .int_err()?;
 
         Ok(ProviderLoginResponse {
-            // For passwords, use an ID based on name
+            // For password-based accounts
             account_id: odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
             account_name,
             email: account.email.clone(),
