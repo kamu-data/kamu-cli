@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - Panic's now also log correct tracing message
+### Changed
+- GQL: search also matches entries by account name
 
 ## [0.239.0] - 2025-05-26
 ### Added

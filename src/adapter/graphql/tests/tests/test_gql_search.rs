@@ -119,6 +119,8 @@ async fn test_single_dataset_search() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_search_correct_dataset_order_in_response() {
     let harness = GqlSearchHarness::new().await;
@@ -258,6 +260,8 @@ async fn test_search_correct_dataset_order_in_response() {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_name_lookup_accounts() {
     let harness = GqlSearchHarness::new().await;
@@ -294,6 +298,8 @@ async fn test_name_lookup_accounts() {
         }),
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_name_lookup_accounts_with_excluding() {
