@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- GQL: search also matches entries by account name
+
 ## [0.239.0] - 2025-05-26
 ### Added
 - Prototype of webhooks support:
