@@ -47,7 +47,7 @@ type Account {
 	"""
 	Account provider
 	"""
-	accountProvider: String!
+	accountProvider: AccountProvider!
 	"""
 	Email address
 	"""
@@ -160,6 +160,12 @@ type AccountMut {
 scalar AccountName
 
 scalar AccountPassword
+
+enum AccountProvider {
+	PASSWORD
+	OAUTH_GITHUB
+	WEB3_WALLET
+}
 
 enum AccountType {
 	USER

@@ -36,7 +36,7 @@ static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(strum_macros::Display, strum_macros::IntoStaticStr, Copy, Clone)]
+#[derive(strum::EnumString, strum::Display, strum::IntoStaticStr, Copy, Clone)]
 pub enum AccountProvider {
     #[strum(serialize = "password")]
     Password,
