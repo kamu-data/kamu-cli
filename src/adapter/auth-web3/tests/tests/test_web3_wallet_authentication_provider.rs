@@ -22,8 +22,24 @@ use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const WALLET_ADDRESS: &str = "0x90C25A5947c24275eDC4544b74Aa11864F79eeAF";
-const PREDEFINED_NONCE: &str = "FROZEN1NONCE1TEST";
+// To generate a new signature:
+// - 1. Install MetaMask (https://metamask.io/download)
+// - 2. Import account
+//     - Add account
+//     - Import a wallet or account / Secret Recovery Phrase:
+//         - brisk lamp level dumb region beach kit moon cat egg detail morning
+//         - SECURITY NOTE: This is an empty test account.
+// - 3. git clone -b chore/unittest-message-generation https://github.com/s373r/siwe-quickstart
+// - 4. cd siwe-quickstart/03_complete_app/frontend/
+// - 5. npm install
+// - 6. npm start
+// - 7. Open http://localhost:9090/
+// - 8. Click "Connect wallet" and select imported account
+// - 9. Click "Sign-in with Ethereum"
+// - 10. Copy the signature from the console
+
+// Imported account address
+const WALLET_ADDRESS: &str = "0xC945C7Ee6360eb2375FB2ABcAEAD114AB4ac733B";
 
 static MESSAGE: LazyLock<String> = LazyLock::new(|| {
     indoc::formatdoc!(
@@ -36,7 +52,7 @@ static MESSAGE: LazyLock<String> = LazyLock::new(|| {
         URI: http://platform.example.com/v/login
         Version: 1
         Chain ID: 1
-        Nonce: {PREDEFINED_NONCE}
+        Nonce: FROZEN1NONCE1TEST
         Issued At: 2050-01-02T03:04:05.000Z
         Expiration Time: 2050-01-02T03:19:05.000Z"#
     )
