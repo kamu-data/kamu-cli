@@ -13,7 +13,13 @@ use std::sync::{Arc, LazyLock};
 use chrono::{TimeZone, Utc};
 use kamu_accounts::{AuthenticationProvider, ProviderLoginError};
 use kamu_adapter_auth_web3::{LoginRequest, Web3WalletAuthenticationProvider};
-use kamu_auth_web3::{EvmWalletAddressConvertor, Web3AuthEip4361NonceService};
+use kamu_auth_web3::{
+    EvmWalletAddressConvertor,
+    Web3AuthEip4361NonceEntity,
+    Web3AuthEip4361NonceRepository,
+    Web3AuthEip4361NonceService,
+    Web3AuthenticationEip4361Nonce,
+};
 use kamu_auth_web3_inmem::InMemoryWeb3AuthEip4361NonceRepository;
 use kamu_auth_web3_services::Web3AuthEip4361NonceServiceImpl;
 use kamu_core::ServerUrlConfig;
@@ -34,18 +40,19 @@ use time_source::{SystemTimeSource, SystemTimeSourceStub};
 // - 5. npm install
 // - 6. npm start
 // - 7. Open http://localhost:9090/
-// - 8. Click "Connect wallet" and select imported account
+// - 8. Click "Connect wallet" and select the imported account
 // - 9. Click "Sign-in with Ethereum"
 // - 10. Copy the signature from the console
 
 // Imported account address
 const WALLET_ADDRESS: &str = "0xC945C7Ee6360eb2375FB2ABcAEAD114AB4ac733B";
+const PREDEFINED_NONCE: &str = "FROZEN1NONCE1TEST";
 
 static MESSAGE: LazyLock<String> = LazyLock::new(|| {
     indoc::formatdoc!(
         r#"
         platform.example.com wants you to sign in with your Ethereum account:
-        {WALLET_ADDRESS}
+        0xC945C7Ee6360eb2375FB2ABcAEAD114AB4ac733B
 
         By signing, you confirm wallet ownership and log in. No transaction or fees are involved.
 
@@ -59,7 +66,7 @@ static MESSAGE: LazyLock<String> = LazyLock::new(|| {
 });
 
 // Suitable for the message above
-const SIGNATURE: &str = "0x226ba3e4213c3175202e873963cb18dd622175abb01d5faf6375016e95a9145c5b19afb98e2b5a017f1f4b838f6db0f4e4b863a542dd6c19b464b493c67c9e001c";
+const SIGNATURE: &str = "0x553ddc5944bd8df1a0ad3403c131877a86658c07303c793a1af88f6229dbe6540625a8cfe99a5b671e9e14cafbb947882bf9d24f91df513147a8c14078de43fe1b";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -295,7 +302,8 @@ async fn test_signature_verification_error() {
     let json_payload = {
         let request = LoginRequest {
             message: MESSAGE.clone(),
-            signature: SIGNATURE.replace('1', "0"),
+            // Correct signature, but the message is different
+            signature: "0x226ba3e4213c3175202e873963cb18dd622175abb01d5faf6375016e95a9145c5b19afb98e2b5a017f1f4b838f6db0f4e4b863a542dd6c19b464b493c67c9e001c".to_string(),
         };
 
         serde_json::to_string(&request).unwrap()
@@ -306,7 +314,7 @@ async fn test_signature_verification_error() {
     assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
-            if format!("{e:?}") == "InvalidCredentialsError { source: VerificationError(Crypto(signature::Error { source: None })) }"
+            if format!("{e:?}") == "InvalidCredentialsError { source: VerificationError(Signer) }"
     );
 }
 
@@ -328,7 +336,7 @@ async fn test_nonce_not_found_error() {
     assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
-            if format!("{e:?}") == "InvalidCredentialsError { source: NonceNotFound(NonceNotFoundError { wallet: 0x90c25a5947c24275edc4544b74aa11864f79eeaf }) }"
+            if format!("{e:?}") == "InvalidCredentialsError { source: NonceNotFound(NonceNotFoundError { wallet: 0xc945c7ee6360eb2375fb2abcaead114ab4ac733b }) }"
     );
 }
 
@@ -358,8 +366,37 @@ async fn test_nonce_expired() {
     assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
-            if format!("{e:?}") == "InvalidCredentialsError { source: NonceNotFound(NonceNotFoundError { wallet: 0x90c25a5947c24275edc4544b74aa11864f79eeaf }) }"
+            if format!("{e:?}") == "InvalidCredentialsError { source: NonceNotFound(NonceNotFoundError { wallet: 0xc945c7ee6360eb2375fb2abcaead114ab4ac733b }) }"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_signature_verified() {
+    let harness = Web3WalletAuthenticationProviderHarness::new();
+
+    {
+        let nonce_entity = Web3AuthEip4361NonceEntity {
+            wallet_address: EvmWalletAddressConvertor::parse_checksummed(WALLET_ADDRESS).unwrap(),
+            nonce: Web3AuthenticationEip4361Nonce::try_new(PREDEFINED_NONCE).unwrap(),
+            expires_at: Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap()
+                + std::time::Duration::from_mins(10),
+        };
+
+        harness.nonce_repo.set_nonce(&nonce_entity).await.unwrap();
+    }
+
+    let json_payload = {
+        let request = LoginRequest {
+            message: MESSAGE.to_string(),
+            signature: SIGNATURE.to_string(),
+        };
+
+        serde_json::to_string(&request).unwrap()
+    };
+
+    assert_matches!(harness.provider.login(json_payload).await, Ok(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -370,6 +407,7 @@ struct Web3WalletAuthenticationProviderHarness {
     provider: Arc<dyn AuthenticationProvider>,
     nonce_service: Arc<dyn Web3AuthEip4361NonceService>,
     system_time_source_stub: Arc<SystemTimeSourceStub>,
+    nonce_repo: Arc<dyn Web3AuthEip4361NonceRepository>,
 }
 
 impl Web3WalletAuthenticationProviderHarness {
@@ -390,6 +428,7 @@ impl Web3WalletAuthenticationProviderHarness {
             provider: catalog.get_one().unwrap(),
             nonce_service: catalog.get_one().unwrap(),
             system_time_source_stub: catalog.get_one().unwrap(),
+            nonce_repo: catalog.get_one().unwrap(),
         }
     }
 
