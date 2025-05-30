@@ -24,10 +24,6 @@ pub type AccountDisplayName = String;
 
 pub const DEFAULT_ACCOUNT_NAME_STR: &str = "kamu";
 
-// The name is formed here, as we use it for comparison in this module.
-pub const PROVIDER_WEB3_WALLET: &str = "web3-wallet";
-pub const PROVIDER_PASSWORD: &str = "password";
-
 pub static DEFAULT_ACCOUNT_NAME: LazyLock<odf::AccountName> =
     LazyLock::new(|| odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR));
 pub static DEFAULT_ACCOUNT_ID: LazyLock<odf::AccountID> =
@@ -37,6 +33,18 @@ pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
 #[cfg(any(feature = "testing", test))]
 static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
     LazyLock::new(|| Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap());
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(strum_macros::Display, strum_macros::IntoStaticStr, Copy, Clone)]
+pub enum AccountProvider {
+    #[strum(serialize = "password")]
+    Password,
+    #[strum(serialize = "oauth_github")]
+    OAuthGitHub,
+    #[strum(serialize = "web3_wallet")]
+    Web3Wallet,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,7 +64,7 @@ pub struct Account {
 #[cfg(feature = "sqlx")]
 impl Account {
     pub fn prepare_account_name_for_storage(&self) -> String {
-        if self.provider == PROVIDER_WEB3_WALLET {
+        if self.provider == <&'static str>::from(AccountProvider::Web3Wallet) {
             // When storing wallet addresses, we should preserve case sensitivity
             // as it forms the checksum address.
             self.account_name.to_string()
@@ -114,7 +122,7 @@ impl Account {
             avatar_url: None,
             email: Email::parse(format!("{name}@example.com").as_str()).unwrap(),
             registered_at: DUMMY_REGISTRATION_TIME.to_utc(),
-            provider: String::from(PROVIDER_PASSWORD),
+            provider: AccountProvider::Password.to_string(),
             provider_identity_key: String::from(name),
         }
     }

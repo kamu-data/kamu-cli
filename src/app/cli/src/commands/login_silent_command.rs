@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
-use kamu_adapter_oauth::PROVIDER_GITHUB;
+use kamu_accounts::AccountProvider;
 use url::Url;
 
 use crate::{CLIError, Command, odf_server};
@@ -85,19 +85,22 @@ impl LoginSilentCommand {
             Some(repo_name)
         };
 
-        // Execute login method depending on the input mode
+        // Execute a login method depending on the input mode
         let login_response = match &self.mode {
             LoginSilentMode::OAuth(github_mode) => {
-                let oauth_login_method = match github_mode.provider.to_ascii_lowercase().as_str() {
-                    "github" => Ok(PROVIDER_GITHUB),
-                    _ => Err(CLIError::usage_error(
-                        "Only 'github' provider is supported at the moment",
-                    )),
-                }?;
+                let actual_provider = github_mode.provider.to_ascii_lowercase();
+                let github_provider: &'static str = AccountProvider::OAuthGitHub.into();
+
+                if actual_provider != github_provider {
+                    return Err(CLIError::usage_error(format!(
+                        "Only '{github_provider}' provider is supported at the moment"
+                    )));
+                }
+
                 self.login_service
                     .login_oauth(
                         &odf_server_backend_url,
-                        oauth_login_method,
+                        &actual_provider,
                         &github_mode.access_token,
                     )
                     .await
@@ -123,8 +126,8 @@ impl LoginSilentCommand {
                 })?,
         };
 
-        // Save access token and associate it with backend URL only,
-        // as we don't have frontend here
+        // Save the access token and associate it with backend URL only,
+        // as we don't have a frontend here
         self.access_token_registry_service.save_access_token(
             self.scope,
             None,

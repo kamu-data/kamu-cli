@@ -90,7 +90,7 @@ impl APIServerRunCommand {
             .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
                 auth_svc
                     .login(
-                        PROVIDER_PASSWORD,
+                        AccountProvider::Password.into(),
                         serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
                             .map_int_err(CLIError::critical)?,
                         None,

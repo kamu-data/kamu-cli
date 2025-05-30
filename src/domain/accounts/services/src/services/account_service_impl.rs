@@ -154,7 +154,7 @@ impl AccountService for AccountServiceImpl {
             account_type: AccountType::User,
             avatar_url: None,
             registered_at: self.time_source.now(),
-            provider: String::from(PROVIDER_PASSWORD),
+            provider: AccountProvider::Password.to_string(),
             provider_identity_key: String::from(account_name.as_str()),
         };
 

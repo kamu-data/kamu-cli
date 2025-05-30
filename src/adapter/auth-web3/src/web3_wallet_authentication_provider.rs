@@ -12,9 +12,9 @@ use std::sync::Arc;
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{
+    AccountProvider,
     AccountType,
     AuthenticationProvider,
-    PROVIDER_WEB3_WALLET,
     ProviderLoginError,
     ProviderLoginResponse,
 };
@@ -149,7 +149,7 @@ impl Web3WalletAuthenticationProvider {
 #[async_trait::async_trait]
 impl AuthenticationProvider for Web3WalletAuthenticationProvider {
     fn provider_name(&self) -> &'static str {
-        PROVIDER_WEB3_WALLET
+        AccountProvider::Web3Wallet.into()
     }
 
     async fn login(

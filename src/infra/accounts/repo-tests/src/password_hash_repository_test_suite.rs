@@ -11,12 +11,11 @@ use std::assert_matches::assert_matches;
 
 use dill::Catalog;
 use kamu_accounts::{
+    AccountProvider,
     AccountRepository,
     ModifyPasswordHashError,
-    PROVIDER_PASSWORD,
     PasswordHashRepository,
 };
-use odf::AccountName;
 
 use crate::{generate_salt, make_password_hash, make_test_account};
 
@@ -39,8 +38,18 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
-    let account_wasya = make_test_account("wasya", "wasya@example.com", PROVIDER_PASSWORD, "wasya");
-    let account_petya = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
+    let account_wasya = make_test_account(
+        "wasya",
+        "wasya@example.com",
+        AccountProvider::Password.into(),
+        "wasya",
+    );
+    let account_petya = make_test_account(
+        "petya",
+        "petya@example.com",
+        AccountProvider::Password.into(),
+        "petya",
+    );
 
     account_repo.save_account(&account_wasya).await.unwrap();
     account_repo.save_account(&account_petya).await.unwrap();
@@ -97,7 +106,12 @@ pub async fn test_modify_password(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
-    let account_petya = make_test_account("petya", "petya@example.com", PROVIDER_PASSWORD, "petya");
+    let account_petya = make_test_account(
+        "petya",
+        "petya@example.com",
+        AccountProvider::Password.into(),
+        "petya",
+    );
 
     account_repo.save_account(&account_petya).await.unwrap();
 
@@ -150,7 +164,7 @@ pub async fn test_modify_password_non_existing(catalog: &Catalog) {
     assert_matches!(
         password_hash_repo
             .modify_password_hash(
-                &AccountName::new_unchecked("foo"),
+                &odf::AccountName::new_unchecked("foo"),
                 "password_hash".to_string(),
             )
             .await,

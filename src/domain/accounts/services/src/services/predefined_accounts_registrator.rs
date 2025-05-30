@@ -92,7 +92,7 @@ impl PredefinedAccountsRegistrator {
             .await
             .int_err()?;
 
-        if account_config.provider == PROVIDER_PASSWORD {
+        if account_config.provider == <&'static str>::from(AccountProvider::Password) {
             self.login_password_auth_provider
                 .save_password(&account, account_config.get_password())
                 .await?;

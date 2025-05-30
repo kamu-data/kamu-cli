@@ -18,7 +18,6 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const PROVIDER_GITHUB: &str = "oauth_github";
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
 
@@ -145,7 +144,7 @@ impl OAuthGithub {
 #[async_trait::async_trait]
 impl AuthenticationProvider for OAuthGithub {
     fn provider_name(&self) -> &'static str {
-        PROVIDER_GITHUB
+        AccountProvider::OAuthGitHub.into()
     }
 
     async fn login(
@@ -299,7 +298,7 @@ pub struct DummyOAuthGithub {}
 #[async_trait::async_trait]
 impl AuthenticationProvider for DummyOAuthGithub {
     fn provider_name(&self) -> &'static str {
-        PROVIDER_GITHUB
+        AccountProvider::OAuthGitHub.into()
     }
 
     async fn login(

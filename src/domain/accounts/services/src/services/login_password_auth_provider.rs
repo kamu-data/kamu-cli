@@ -69,7 +69,7 @@ impl LoginPasswordAuthProvider {
 #[async_trait::async_trait]
 impl AuthenticationProvider for LoginPasswordAuthProvider {
     fn provider_name(&self) -> &'static str {
-        PROVIDER_PASSWORD
+        AccountProvider::Password.into()
     }
 
     async fn login(
