@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- Panic's now also log correct tracing message
 ### Changed
 - GQL: search also matches entries by account name
 
@@ -30,7 +32,6 @@ Recommendation: for ease of reading, use the following order:
 - GQL: versioned files return `contentLength` field
 ### Fixed
 - GQL: all dataset mutations require logged-in users
-
 
 ## [0.238.0] - 2025-05-22
 ### Added
