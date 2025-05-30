@@ -66,6 +66,7 @@ impl Web3AuthEip4361NonceService for Web3AuthEip4361NonceServiceImpl {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl InitOnStartup for Web3AuthEip4361NonceServiceImpl {
