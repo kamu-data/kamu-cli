@@ -7,7 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use http::Uri;
+use std::any::Any;
+use std::backtrace::Backtrace;
+use std::panic;
+use std::sync::Arc;
+
+use axum::body::Body;
+use http::{Response, StatusCode, Uri, header};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -168,10 +174,14 @@ pub async fn unknown_fallback_handler(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn set_hook_capture_panic_backtraces_no_propagate(propagate: bool) {
-    let default_hook = Arc::new(panic::take_hook());
+    let default_hook_maybe = if propagate {
+        Some(Arc::new(panic::take_hook()))
+    } else {
+        None
+    };
 
     panic::set_hook(Box::new(move |info| {
-        if enable_default_hook {
+        if let Some(default_hook) = default_hook_maybe.as_ref() {
             default_hook(info);
         }
 
