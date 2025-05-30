@@ -489,13 +489,10 @@ pub fn configure_base_catalog(
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
 
-    // No GitHub login possible for single-tenant workspace
+    // GitHub/Web3 login not available for single-tenant workspaces
     if tenancy_config == TenancyConfig::MultiTenant {
-        if is_e2e_testing {
-            b.add::<kamu_adapter_oauth::DummyOAuthGithub>();
-        } else {
-            b.add::<kamu_adapter_oauth::OAuthGithub>();
-        }
+        kamu_adapter_oauth::register_dependencies(&mut b, !is_e2e_testing);
+        kamu_adapter_auth_web3::register_dependencies(&mut b);
     }
 
     kamu_accounts_services::register_dependencies(
@@ -587,8 +584,6 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     kamu_flow_system_services::register_dependencies(&mut b);
 
     kamu_webhooks_services::register_dependencies(&mut b);
-
-    kamu_adapter_auth_web3::register_dependencies(&mut b);
 
     b.add::<UploadServiceLocal>();
 
