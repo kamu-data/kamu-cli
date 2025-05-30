@@ -138,9 +138,7 @@ impl AccountService for AccountServiceImpl {
             .search_accounts_by_name_pattern(name_pattern, filters, pagination)
     }
 
-    //
-    // TODO: Wallet-based auth: rename to create_password_account()
-    async fn create_account(
+    async fn create_password_account(
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,

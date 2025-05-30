@@ -129,7 +129,7 @@ async fn test_create_account() {
 
     let new_account_name = AccountName::new_unchecked("new_account");
     account_svc
-        .create_account(&new_account_name, Email::parse("new_email@com").unwrap())
+        .create_password_account(&new_account_name, Email::parse("new_email@com").unwrap())
         .await
         .unwrap();
 

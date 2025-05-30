@@ -62,7 +62,7 @@ pub trait AccountService: Sync + Send {
         pagination: PaginationOpts,
     ) -> AccountPageStream<'a>;
 
-    async fn create_account(
+    async fn create_password_account(
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
