@@ -23,8 +23,8 @@ use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{
     AccountConfig,
+    AccountProvider,
     AuthenticationService,
-    PROVIDER_PASSWORD,
     PredefinedAccountsConfig,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
@@ -105,7 +105,7 @@ impl WebUIServer {
         let gql_schema = kamu_adapter_graphql::schema();
 
         let login_instructions = WebUILoginInstructions {
-            login_method: String::from(PROVIDER_PASSWORD),
+            login_method: AccountProvider::Password.to_string(),
             login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 
