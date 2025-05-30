@@ -88,19 +88,17 @@ impl LoginSilentCommand {
         // Execute a login method depending on the input mode
         let login_response = match &self.mode {
             LoginSilentMode::OAuth(github_mode) => {
-                let actual_provider = github_mode.provider.to_ascii_lowercase();
-                let github_provider: &'static str = AccountProvider::OAuthGitHub.into();
-
-                if actual_provider != github_provider {
-                    return Err(CLIError::usage_error(format!(
-                        "Only '{github_provider}' provider is supported at the moment"
-                    )));
-                }
+                let oauth_login_method = match github_mode.provider.to_ascii_lowercase().as_str() {
+                    "github" => Ok(AccountProvider::OAuthGitHub.into()),
+                    _ => Err(CLIError::usage_error(
+                        "Only 'github' provider is supported at the moment",
+                    )),
+                }?;
 
                 self.login_service
                     .login_oauth(
                         &odf_server_backend_url,
-                        &actual_provider,
+                        oauth_login_method,
                         &github_mode.access_token,
                     )
                     .await

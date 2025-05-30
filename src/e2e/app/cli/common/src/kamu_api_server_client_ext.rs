@@ -295,7 +295,7 @@ impl AuthApi<'_> {
             r#"
             mutation {
               auth {
-                login(loginMethod: "oauth_github", loginCredentialsJson: "") {
+                login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "") {
                   accessToken
                   account {
                     id
@@ -315,7 +315,7 @@ impl AuthApi<'_> {
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "oauth_github", loginCredentialsJson: "", deviceCode: "<device_code>") {
+                    login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "", deviceCode: "<device_code>") {
                       accessToken
                       account {
                         id
@@ -337,7 +337,7 @@ impl AuthApi<'_> {
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
+                    login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
                       accessToken
                       account {
                         id

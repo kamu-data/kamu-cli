@@ -29,7 +29,7 @@ pub async fn test_login_password_predefined_successful(
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                    login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
                       account {
                         accountName
                       }
@@ -63,7 +63,7 @@ pub async fn test_login_enabled_providers_st(kamu_api_server_client: KamuApiServ
             r#"
             query {
               auth {
-                enabledLoginMethods
+                enabledProviders
               }
             }
             "#,
@@ -72,8 +72,8 @@ pub async fn test_login_enabled_providers_st(kamu_api_server_client: KamuApiServ
     pretty_assertions::assert_eq!(
         async_graphql::value!({
             "auth": {
-                "enabledLoginMethods": [
-                    "password",
+                "enabledProviders": [
+                    async_graphql::Name::new("PASSWORD"),
                 ]
             }
         }),
@@ -90,7 +90,7 @@ pub async fn test_login_enabled_providers_mt(kamu_api_server_client: KamuApiServ
             r#"
             query {
               auth {
-                enabledLoginMethods
+                enabledProviders
               }
             }
             "#,
@@ -99,9 +99,10 @@ pub async fn test_login_enabled_providers_mt(kamu_api_server_client: KamuApiServ
     pretty_assertions::assert_eq!(
         async_graphql::value!({
             "auth": {
-                "enabledLoginMethods": [
-                    "password",
-                    "web3_wallet",
+                "enabledProviders": [
+                    async_graphql::Name::new("OAUTH_GITHUB"),
+                    async_graphql::Name::new("PASSWORD"),
+                    async_graphql::Name::new("WEB3_WALLET"),
                 ]
             }
         }),
@@ -120,7 +121,7 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "oauth_github", loginCredentialsJson: "{\"login\":\"e2e-user\"}") {
+                    login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "{\"login\":\"e2e-user\"}") {
                       account {
                         accountName
                       }
@@ -184,7 +185,7 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
           r#"
           mutation {
               auth {
-                  login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                  login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
                       accessToken,
                       account {
                           id

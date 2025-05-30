@@ -340,7 +340,7 @@ type AuthMut {
 	Web3-related functionality group
 	"""
 	web3: AuthWeb3Mut!
-	login(loginMethod: String!, loginCredentialsJson: String!, deviceCode: DeviceCode): LoginResponse!
+	login(loginMethod: AccountProvider!, loginCredentialsJson: String!, deviceCode: DeviceCode): LoginResponse!
 	accountDetails(accessToken: String!): Account!
 	createAccessToken(accountId: AccountID!, tokenName: String!): CreateTokenResult!
 	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!

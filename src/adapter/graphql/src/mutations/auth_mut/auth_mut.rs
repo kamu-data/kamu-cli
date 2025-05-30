@@ -31,7 +31,7 @@ impl AuthMut {
         &self,
         ctx: &Context<'_>,
         login_method: AccountProvider,
-        login_credentials: String,
+        login_credentials_json: String,
         device_code: Option<DeviceCode<'_>>,
     ) -> Result<LoginResponse> {
         let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
@@ -39,7 +39,7 @@ impl AuthMut {
         let login_method: kamu_accounts::AccountProvider = login_method.into();
         let device_code = device_code.map(Into::into);
         let login_result = authentication_service
-            .login(login_method.into(), login_credentials, device_code)
+            .login(login_method.into(), login_credentials_json, device_code)
             .await;
 
         match login_result {

@@ -176,7 +176,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         // Database requires extra actions:
         let final_base_catalog = if let Some(db_config) = database_config {
-            // Connect database and obtain a connection pool
+            // Connect a database and get a connection pool
             let catalog_with_pool = connect_database_initially(&base_catalog).await?;
 
             // Periodically refresh password in the connection pool, if configured
@@ -188,7 +188,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         };
 
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog = configure_server_catalog(&final_base_catalog).build();
+            let server_catalog =
+                configure_server_catalog(&final_base_catalog, tenancy_config).build();
             Some(server_catalog)
         } else {
             None
@@ -489,10 +490,9 @@ pub fn configure_base_catalog(
     b.add::<SetWatermarkUseCaseImpl>();
     b.add::<VerifyDatasetUseCaseImpl>();
 
-    // GitHub/Web3 login not available for single-tenant workspaces
+    // No GitHub login possible for single-tenant workspace
     if tenancy_config == TenancyConfig::MultiTenant {
         kamu_adapter_oauth::register_dependencies(&mut b, !is_e2e_testing);
-        kamu_adapter_auth_web3::register_dependencies(&mut b);
     }
 
     kamu_accounts_services::register_dependencies(
@@ -574,7 +574,10 @@ pub fn configure_cli_catalog(
 }
 
 // Public only for tests
-pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
+pub fn configure_server_catalog(
+    base_catalog: &Catalog,
+    tenancy_config: TenancyConfig,
+) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
     b.add::<DatasetChangesServiceImpl>();
@@ -584,6 +587,11 @@ pub fn configure_server_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     kamu_flow_system_services::register_dependencies(&mut b);
 
     kamu_webhooks_services::register_dependencies(&mut b);
+
+    // No Web3 wallet login possible for single-tenant workspace
+    if tenancy_config == TenancyConfig::MultiTenant {
+        kamu_adapter_auth_web3::register_dependencies(&mut b);
+    }
 
     b.add::<UploadServiceLocal>();
 
