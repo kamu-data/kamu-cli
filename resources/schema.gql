@@ -1524,8 +1524,10 @@ type DisablePushSource {
 	sourceName: String!
 }
 
+scalar Eip4361AuthNonce
+
 type Eip4361AuthNonceResponse {
-	value: String!
+	value: Eip4361AuthNonce!
 }
 
 scalar Email

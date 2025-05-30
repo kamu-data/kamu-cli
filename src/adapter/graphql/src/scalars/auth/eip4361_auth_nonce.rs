@@ -7,19 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::prelude::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype::nutype(
-    sanitize(trim),
-    validate(len_char_min = 8),
-    derive(AsRef, Clone, Debug, Display, Eq, PartialEq, TryFrom)
-)]
-pub struct Web3AuthenticationEip4361Nonce(String);
-
-impl Web3AuthenticationEip4361Nonce {
-    pub fn new() -> Self {
-        Self::try_new(siwe::generate_nonce()).expect("Invalid nonce generated")
-    }
-}
+simple_string_scalar!(
+    Eip4361AuthNonce,
+    kamu_auth_web3::Web3AuthenticationEip4361Nonce,
+    try_from
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

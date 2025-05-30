@@ -27,7 +27,7 @@ impl AuthWeb3Mut {
         let nonce_entity = nonce_service.create_nonce(account.into()).await.int_err()?;
 
         Ok(Eip4361AuthNonceResponse {
-            value: nonce_entity.nonce.into_inner(),
+            value: nonce_entity.nonce.into(),
         })
     }
 }
@@ -35,8 +35,8 @@ impl AuthWeb3Mut {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug)]
-pub(crate) struct Eip4361AuthNonceResponse {
-    value: String,
+pub(crate) struct Eip4361AuthNonceResponse<'a> {
+    value: Eip4361AuthNonce<'a>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
