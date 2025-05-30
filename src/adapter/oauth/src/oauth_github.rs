@@ -18,7 +18,6 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const PROVIDER_GITHUB: &str = "oauth_github";
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
 
@@ -145,12 +144,7 @@ impl OAuthGithub {
 #[async_trait::async_trait]
 impl AuthenticationProvider for OAuthGithub {
     fn provider_name(&self) -> &'static str {
-        PROVIDER_GITHUB
-    }
-
-    fn generate_id(&self, _: &odf::AccountName) -> odf::AccountID {
-        // For GitHub, generate a random DID, regardless of the name
-        odf::AccountID::new_generated_ed25519().1
+        AccountProvider::OAuthGitHub.into()
     }
 
     async fn login(
@@ -160,11 +154,7 @@ impl AuthenticationProvider for OAuthGithub {
         // Decode credentials
         let github_login_credentials =
             serde_json::from_str::<GithubLoginCredentials>(login_credentials_json.as_str())
-                .map_err(|e| {
-                    ProviderLoginError::InvalidCredentials(InvalidCredentialsError::new(Box::new(
-                        e,
-                    )))
-                })?;
+                .map_err(ProviderLoginError::invalid_credentials)?;
 
         // Prepare HTTP client for GitHub
         let client = self.get_client().int_err()?;
@@ -197,6 +187,8 @@ impl AuthenticationProvider for OAuthGithub {
 
         // Extract matching fields
         Ok(ProviderLoginResponse {
+            // For GitHub, generate a random DID, regardless of the name
+            account_id: odf::AccountID::new_generated_ed25519().1,
             account_name: odf::AccountName::new_unchecked(&github_account_info.login),
             account_type: AccountType::User,
             email,
@@ -302,12 +294,7 @@ pub struct DummyOAuthGithub {}
 #[async_trait::async_trait]
 impl AuthenticationProvider for DummyOAuthGithub {
     fn provider_name(&self) -> &'static str {
-        PROVIDER_GITHUB
-    }
-
-    fn generate_id(&self, _account_name: &odf::AccountName) -> odf::AccountID {
-        // Random
-        odf::AccountID::new_generated_ed25519().1
+        AccountProvider::OAuthGitHub.into()
     }
 
     async fn login(
@@ -317,6 +304,7 @@ impl AuthenticationProvider for DummyOAuthGithub {
         let account = "e2e-user".to_string();
 
         Ok(ProviderLoginResponse {
+            account_id: odf::AccountID::new_generated_ed25519().1,
             account_name: odf::AccountName::new_unchecked(&account),
             account_type: AccountType::User,
             email: Email::parse("e2e-user@example.com").unwrap(),

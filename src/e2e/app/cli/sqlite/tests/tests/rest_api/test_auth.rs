@@ -20,7 +20,15 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::rest_api::test_login_enabled_methods
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_login_enabled_providers_st
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::rest_api::test_login_enabled_providers_mt,
+    options = Options::default().with_multi_tenant()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

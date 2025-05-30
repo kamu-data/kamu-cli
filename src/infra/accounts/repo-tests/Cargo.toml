@@ -26,7 +26,6 @@ database-common = { workspace = true }
 email-utils = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-accounts-services = { workspace = true }
-kamu-adapter-oauth = { workspace = true }
 odf = { workspace = true, default-features = false, features = [
     "arrow",
     "testing"

@@ -17,10 +17,10 @@ use serde_with::skip_serializing_none;
 use super::{DUMMY_EMAIL_ADDRESS, LoggedAccount};
 use crate::{
     AccountDisplayName,
+    AccountProvider,
     AccountType,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
-    PROVIDER_PASSWORD,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +55,7 @@ impl PredefinedAccountsConfig {
                 avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
                 properties: Some(vec![AccountPropertyName::IsAdmin]),
                 registered_at: Utc::now(),
-                provider: String::from(PROVIDER_PASSWORD),
+                provider: AccountProvider::Password.to_string(),
                 email: DUMMY_EMAIL_ADDRESS.clone(),
                 treat_datasets_as_public: true,
             }],
@@ -185,7 +185,7 @@ impl AccountConfig {
     }
 
     pub fn default_provider() -> String {
-        String::from(PROVIDER_PASSWORD)
+        AccountProvider::Password.to_string()
     }
 
     pub fn default_registered_at() -> DateTime<Utc> {

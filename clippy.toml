@@ -2,11 +2,11 @@ unreadable-literal-lint-fractions = false
 disallowed-macros = ["std::dbg"]
 disallowed-names = []
 
-# Too many complaints - we whould lover this threshold over time
+# Too many complaints - we will lower this threshold over time
 # https://rust-lang.github.io/rust-clippy/master/index.html#large_enum_variant
 enum-variant-size-threshold = 1024
 
-# Too many complaints - we whould lover this threshold over time
+# Too many complaints - we will lower this threshold over time
 large-error-threshold = 256
 
 # Note: bug in Clippy, introduced in nightly-2024-12-27

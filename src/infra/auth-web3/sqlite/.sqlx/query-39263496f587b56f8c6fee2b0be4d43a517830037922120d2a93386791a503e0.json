@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT wallet_address,\n                   nonce,\n                   expires_at AS \"expires_at: _\"\n            FROM web3_auth_eip4361_nonces\n            WHERE wallet_address = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "wallet_address",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "nonce",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "expires_at: _",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "39263496f587b56f8c6fee2b0be4d43a517830037922120d2a93386791a503e0"
+}

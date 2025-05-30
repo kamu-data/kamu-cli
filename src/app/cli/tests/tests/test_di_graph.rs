@@ -104,11 +104,7 @@ fn test_di_cli_graph_validates(
 
     let validate_result = cli_catalog_builder.validate();
 
-    assert!(
-        validate_result.is_ok(),
-        "{}",
-        validate_result.err().unwrap()
-    );
+    assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +139,7 @@ fn test_di_server_graph_validates(
     .unwrap();
     let base_catalog = base_catalog_builder.build();
 
-    let mut cli_catalog_builder = kamu_cli::configure_server_catalog(&base_catalog);
+    let mut cli_catalog_builder = kamu_cli::configure_server_catalog(&base_catalog, tenancy_config);
     cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
     cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
@@ -156,11 +152,7 @@ fn test_di_server_graph_validates(
     // manually
     let validate_result = cli_catalog_builder.validate();
 
-    assert!(
-        validate_result.is_ok(),
-        "{}",
-        validate_result.err().unwrap()
-    );
+    assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -17,11 +17,11 @@ use kamu::domain::auth::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthor
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_accounts::{
     Account,
+    AccountProvider,
     AccountType,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
-    PROVIDER_PASSWORD,
 };
 use kamu_core::{CompactionExecutor, CompactionPlanner, DatasetRegistry, TenancyConfig};
 use kamu_datasets::{
@@ -105,7 +105,7 @@ pub(crate) fn make_server_account(tenancy_config: TenancyConfig) -> Account {
             email: Email::parse(SERVER_ACCOUNT_EMAIL_ADDRESS).unwrap(),
             avatar_url: None,
             registered_at: Utc::now(),
-            provider: String::from(PROVIDER_PASSWORD),
+            provider: AccountProvider::Password.to_string(),
             provider_identity_key: String::from(SERVER_ACCOUNT_NAME),
         },
         TenancyConfig::SingleTenant => Account::dummy(),

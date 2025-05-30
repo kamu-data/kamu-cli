@@ -32,7 +32,7 @@ pub async fn test_insert_and_locate_access_token(catalog: &Catalog) {
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
-        kamu_adapter_oauth::PROVIDER_GITHUB,
+        AccountProvider::OAuthGitHub.into(),
         GITHUB_ACCOUNT_ID_WASYA,
     );
 
@@ -61,7 +61,7 @@ pub async fn test_insert_and_locate_multiple_access_tokens(catalog: &Catalog) {
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
-        kamu_adapter_oauth::PROVIDER_GITHUB,
+        AccountProvider::OAuthGitHub.into(),
         GITHUB_ACCOUNT_ID_WASYA,
     );
 
@@ -121,7 +121,7 @@ pub async fn test_mark_existing_access_token_revoked(catalog: &Catalog) {
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
-        kamu_adapter_oauth::PROVIDER_GITHUB,
+        AccountProvider::OAuthGitHub.into(),
         GITHUB_ACCOUNT_ID_WASYA,
     );
 
@@ -164,7 +164,7 @@ pub async fn test_create_duplicate_active_access_token(catalog: &Catalog) {
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
-        kamu_adapter_oauth::PROVIDER_GITHUB,
+        AccountProvider::OAuthGitHub.into(),
         GITHUB_ACCOUNT_ID_WASYA,
     );
 
@@ -206,7 +206,7 @@ pub async fn test_create_duplicate_access_token_error(catalog: &Catalog) {
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
-        kamu_adapter_oauth::PROVIDER_GITHUB,
+        AccountProvider::OAuthGitHub.into(),
         GITHUB_ACCOUNT_ID_WASYA,
     );
 
@@ -255,7 +255,7 @@ pub async fn test_find_account_by_active_token_id(catalog: &Catalog) {
     let account = make_test_account(
         "wasya",
         "wasya@example.com",
-        kamu_adapter_oauth::PROVIDER_GITHUB,
+        AccountProvider::OAuthGitHub.into(),
         GITHUB_ACCOUNT_ID_WASYA,
     );
 

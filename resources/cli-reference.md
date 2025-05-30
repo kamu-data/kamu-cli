@@ -45,9 +45,10 @@ To regenerate this schema from existing code, use the following command:
 * `-q`, `--quiet` — Suppress all non-essential output
 * `-y`, `--yes` — Do not ask for confirmation and assume the 'yes' answer
 * `--trace` — Record and visualize the command execution as perfetto.dev trace
+* `--show-error-stack-trace` — Show stack trace in case of a command execution error
 * `--metrics` — Dump all metrics at the end of command execution
 
-To get help for individual commands use:
+To get help for individual commands, use:
     kamu <command> -h
     kamu <command> <sub-command> -h
 

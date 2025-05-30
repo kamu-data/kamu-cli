@@ -12,14 +12,23 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- `kamu --show-error-stack-trace`: Added an argument to show stack trace in case of an error during command execution.
+- Implemented a new authorization provider for Web3 EVM-based wallets (`web3-wallet`):
+  - Flow authorization is based on the ERC-4361 (Sign-In with Ethereum) standard.
+  - Any browser that supports EIP-1193 (Ethereum Provider JavaScript API) can be used for authentication.
+  - Signature verification is based on ERC-191 (Signed Data Standard).
 ### Changed
-- GQL: search also matches entries by account name
+- GQL: search also matches entries by account name.
+- GQL: `Account::account_provider()` returns `AccountProvider` instead of string.
+- GQL: `Auth::enabled_login_methods()` renamed to `Auth::enabled_providers()` returns `Vec<AccountProvider>`.
+- GQL: `AuthMut::login()` takes `AccountProvider` as argument instead of string.
 
 ## [0.239.0] - 2025-05-26
 ### Added
 - Prototype of webhooks support:
    - webhooks are sent for dataset update events
-   - GQL API to subscribe, update, pause/resume and remove subbscriptions
+   - GQL API to subscribe, update, pause/resume, and remove subscriptions
    - webhook events are recorded per business event via outbox bridge
    - webhook events that match enabled subscriptions get scheduled in the task system
    - webhooks are attempted with at most 10s timeout, but no retries are supported yet
@@ -30,7 +39,6 @@ Recommendation: for ease of reading, use the following order:
 - GQL: versioned files return `contentLength` field
 ### Fixed
 - GQL: all dataset mutations require logged-in users
-
 
 ## [0.238.0] - 2025-05-22
 ### Added
@@ -344,7 +352,7 @@ Recommendation: for ease of reading, use the following order:
     - flow system no longer uses real datasets
     - HTTP and GQL use real accounts and dataset entries
 - Moved several account-related routines from `AuthenticationService` to `AccountService`, 
-  the authentication services has focus only on JWT token and login flows
+  the authentication services have focus only on JWT token and login flows
 - Upgraded to `datafusion v45` (#1063)
 ### Fixed
 - GQL metadata query now correctly returns dataset aliases for `SetTransform` event in multi-tenant mode

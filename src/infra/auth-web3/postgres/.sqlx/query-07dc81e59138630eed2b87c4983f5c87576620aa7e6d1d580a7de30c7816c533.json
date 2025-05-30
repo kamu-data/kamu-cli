@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE\n            FROM web3_auth_eip4361_nonces\n            WHERE expires_at <= $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "07dc81e59138630eed2b87c4983f5c87576620aa7e6d1d580a7de30c7816c533"
+}

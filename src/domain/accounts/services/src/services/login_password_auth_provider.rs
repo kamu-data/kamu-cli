@@ -69,12 +69,7 @@ impl LoginPasswordAuthProvider {
 #[async_trait::async_trait]
 impl AuthenticationProvider for LoginPasswordAuthProvider {
     fn provider_name(&self) -> &'static str {
-        PROVIDER_PASSWORD
-    }
-
-    fn generate_id(&self, account_name: &odf::AccountName) -> odf::AccountID {
-        // For passwords, use an ID based on name
-        odf::AccountID::new_seeded_ed25519(account_name.as_bytes())
+        AccountProvider::Password.into()
     }
 
     async fn login(
@@ -84,11 +79,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         // Decode credentials
         let password_login_credentials =
             serde_json::from_str::<PasswordLoginCredentials>(login_credentials_json.as_str())
-                .map_err(|e| {
-                    ProviderLoginError::InvalidCredentials(InvalidCredentialsError::new(Box::new(
-                        e,
-                    )))
-                })?;
+                .map_err(ProviderLoginError::invalid_credentials)?;
 
         // Extract account name
         let account_name =
@@ -137,6 +128,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             .int_err()?;
 
         Ok(ProviderLoginResponse {
+            // For password-based accounts
+            account_id: odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
             account_name,
             email: account.email.clone(),
             display_name: password_login_credentials.login.clone(),

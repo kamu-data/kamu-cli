@@ -64,7 +64,7 @@ impl RebacService for RebacServiceImpl {
         property_name: AccountPropertyName,
         property_value: &PropertyValue,
     ) -> Result<(), SetEntityPropertyError> {
-        let account_id = account_id.as_did_str().to_stack_string();
+        let account_id = account_id.to_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
         self.rebac_repo
@@ -75,7 +75,7 @@ impl RebacService for RebacServiceImpl {
         let mut writable_state = self.cache_state.write().await;
         let account_properties = writable_state
             .account_properties_cache_map
-            .entry(account_id.to_string())
+            .entry(account_id)
             .or_insert_with(|| (*self.default_account_properties).clone());
 
         account_properties.apply(property_name, property_value);
@@ -89,8 +89,9 @@ impl RebacService for RebacServiceImpl {
         property_name: AccountPropertyName,
     ) -> Result<(), UnsetEntityPropertyError> {
         use futures::FutureExt;
+        use odf::metadata::AsStackString;
 
-        let account_id = account_id.as_did_str().to_stack_string();
+        let account_id = account_id.as_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
         self.rebac_repo
@@ -110,7 +111,9 @@ impl RebacService for RebacServiceImpl {
         &self,
         account_id: &odf::AccountID,
     ) -> Result<AccountProperties, GetPropertiesError> {
-        let account_id = account_id.as_did_str().to_stack_string();
+        use odf::metadata::AsStackString;
+
+        let account_id = account_id.as_stack_string();
 
         {
             let readable_state = self.cache_state.read().await;
@@ -276,7 +279,9 @@ impl RebacService for RebacServiceImpl {
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), SetRelationError> {
-        let account_id_stack = account_id.as_did_str().to_stack_string();
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
         let account_entity = Entity::new_account(account_id_stack.as_str());
 
         let dataset_id_stack = dataset_id.as_did_str().to_stack_string();
@@ -332,7 +337,9 @@ impl RebacService for RebacServiceImpl {
         &self,
         account_id: &odf::AccountID,
     ) -> Result<Vec<EntityWithRelation>, SubjectEntityRelationsError> {
-        let account_id = account_id.as_did_str().to_stack_string();
+        use odf::metadata::AsStackString;
+
+        let account_id = account_id.as_stack_string();
         let account_entity = Entity::new_account(account_id.as_str());
 
         let object_entities = self

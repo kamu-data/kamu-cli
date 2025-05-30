@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // A stack-allocated string to avoid allocations
 pub struct StackString<const S: usize> {
     buf: [u8; S],
@@ -67,3 +69,35 @@ impl<const S: usize> std::cmp::PartialEq<String> for StackString<S> {
         self.as_str() == *other
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait AsStackString<const S: usize>
+where
+    Self: std::fmt::Display,
+{
+    fn as_stack_string(&self) -> StackString<S> {
+        use std::io::Write;
+
+        let mut buf = [0u8; S];
+
+        let len = {
+            let mut c = std::io::Cursor::new(&mut buf[..]);
+            write!(c, "{self}").unwrap();
+            usize::try_from(c.position()).unwrap()
+        };
+
+        StackString::new(buf, len)
+    }
+}
+
+pub trait ToStackString<const S: usize>
+where
+    Self: AsStackString<S> + Sized,
+{
+    fn to_stack_string(self) -> StackString<S> {
+        self.as_stack_string()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

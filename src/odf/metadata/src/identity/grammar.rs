@@ -7,6 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::DID_ODF_PREFIX;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct Grammar;
 
 /// See: <https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity>
@@ -209,7 +213,7 @@ impl Grammar {
 
     // DatasetID = "did:odf:" Multibase
     pub fn match_dataset_id(s: &str) -> Option<(&str, &str)> {
-        let (h, t) = Self::match_str(s, "did:odf:")?;
+        let (h, t) = Self::match_str(s, DID_ODF_PREFIX)?;
         let (hh, tt) = Self::match_multibase(t)?;
         Some((&s[..h.len() + hh.len()], tt))
     }
@@ -292,3 +296,5 @@ impl Grammar {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

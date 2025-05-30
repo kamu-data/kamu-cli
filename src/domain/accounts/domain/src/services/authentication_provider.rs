@@ -20,8 +20,6 @@ use crate::{AccountDisplayName, AccountType};
 pub trait AuthenticationProvider: Sync + Send {
     fn provider_name(&self) -> &'static str;
 
-    fn generate_id(&self, account_name: &odf::AccountName) -> odf::AccountID;
-
     async fn login(
         &self,
         login_credentials_json: String,
@@ -32,6 +30,7 @@ pub trait AuthenticationProvider: Sync + Send {
 
 #[derive(Debug)]
 pub struct ProviderLoginResponse {
+    pub account_id: odf::AccountID,
     pub account_name: odf::AccountName,
     pub email: Email,
     pub display_name: AccountDisplayName,
@@ -71,6 +70,15 @@ pub enum ProviderLoginError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl ProviderLoginError {
+    pub fn invalid_credentials<E>(error: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        Self::InvalidCredentials(InvalidCredentialsError::new(Box::new(error)))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

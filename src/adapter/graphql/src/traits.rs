@@ -10,10 +10,16 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResponseExt {
+    fn into_json_data(self) -> serde_json::Value;
+
     fn error_messages(&self) -> Vec<String>;
 }
 
 impl ResponseExt for async_graphql::Response {
+    fn into_json_data(self) -> serde_json::Value {
+        self.data.into_json().unwrap()
+    }
+
     fn error_messages(&self) -> Vec<String> {
         self.errors
             .iter()

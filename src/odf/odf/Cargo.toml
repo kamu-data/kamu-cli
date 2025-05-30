@@ -25,6 +25,7 @@ doctest = false
 default = ["lfs"]
 
 arrow = ["odf-metadata/arrow"]
+did-pkh = ["odf-metadata/did-pkh"]
 http = ["dep:odf-storage-http", "odf-dataset-impl/http"]
 lfs = ["dep:odf-storage-lfs", "odf-dataset/lfs", "odf-dataset-impl/lfs"]
 s3 = ["dep:odf-storage-s3", "odf-dataset/s3", "odf-dataset-impl/s3"]

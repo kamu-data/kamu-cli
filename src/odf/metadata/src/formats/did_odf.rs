@@ -14,6 +14,10 @@ use multiformats::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const DID_ODF_PREFIX: &str = "did:odf:";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Represents DID in a custom `did:odf` method
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DidOdf {
@@ -27,7 +31,7 @@ impl DidOdf {
         })
     }
 
-    /// Creates DID from generated key pair using cryptographically secure RNG
+    /// Creates DID from a generated key pair using cryptographically secure RNG
     pub fn new_generated_ed25519() -> (ed25519_dalek::SigningKey, Self) {
         let (key, did) = DidKey::new_generated_ed25519();
         (key, Self::from(did))
@@ -74,10 +78,10 @@ impl DidOdf {
 
     /// Parses DID from a canonical `did:odf:<multibase>` string
     pub fn from_did_str(s: &str) -> Result<Self, ParseError<DidOdf>> {
-        if !s.starts_with("did:odf:") {
+        if !s.starts_with(DID_ODF_PREFIX) {
             return Err(ParseError::new(s));
         }
-        Self::from_multibase(&s[8..]).map_err(|e| ParseError::new_from(s, e))
+        Self::from_multibase(&s[DID_ODF_PREFIX.len()..]).map_err(|e| ParseError::new_from(s, e))
     }
 
     /// Parses DID from a multibase string (without `did:odf:`) prefix
@@ -156,6 +160,6 @@ impl std::fmt::Debug for DidOdfFmt<'_> {
 
 impl std::fmt::Display for DidOdfFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "did:odf:{}", self.inner)
+        write!(f, "{DID_ODF_PREFIX}{}", self.inner)
     }
 }
