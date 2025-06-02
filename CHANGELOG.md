@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.240.0] - 2025-06-02
 ### Added
 - `kamu --show-error-stack-trace`: Added an argument to show stack trace in case of an error during command execution.
 - Implemented a new authorization provider for Web3 EVM-based wallets (`web3-wallet`):
