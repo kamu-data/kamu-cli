@@ -54,7 +54,8 @@ pub trait UploadService: Send + Sync {
         upload_token: &UploadToken,
     ) -> Result<Box<dyn AsyncRead + Send + Unpin>, UploadTokenIntoStreamError> {
         let owner_account_id =
-            odf::AccountID::from_multibase_string(&upload_token.owner_account_id).int_err()?;
+            odf::AccountID::parse_id_without_did_prefix(&upload_token.owner_account_id)
+                .int_err()?;
 
         let actual_data_size = self
             .upload_reference_size(

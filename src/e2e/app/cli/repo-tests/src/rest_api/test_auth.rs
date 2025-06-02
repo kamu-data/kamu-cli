@@ -29,7 +29,7 @@ pub async fn test_login_password_predefined_successful(
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                    login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
                       account {
                         accountName
                       }
@@ -57,31 +57,58 @@ pub async fn test_login_password_predefined_successful(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_login_enabled_methods(kamu_api_server_client: KamuApiServerClient) {
-    kamu_api_server_client
-        .graphql_api_call_assert(
-            indoc::indoc!(
-                r#"
-                query {
-                  auth {
-                    enabledLoginMethods
-                  }
-                }
-                "#,
-            ),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "auth": {
-                    "enabledLoginMethods": [
-                      "password"
-                    ]
-                  }
-                }
-                "#,
-            )),
-        )
+pub async fn test_login_enabled_providers_st(kamu_api_server_client: KamuApiServerClient) {
+    let res = kamu_api_server_client
+        .graphql_api_call_ex(async_graphql::Request::new(indoc::indoc!(
+            r#"
+            query {
+              auth {
+                enabledProviders
+              }
+            }
+            "#,
+        )))
         .await;
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
+            "auth": {
+                "enabledProviders": [
+                    async_graphql::Name::new("PASSWORD"),
+                ]
+            }
+        }),
+        res.data,
+        "{res:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_enabled_providers_mt(kamu_api_server_client: KamuApiServerClient) {
+    let res = kamu_api_server_client
+        .graphql_api_call_ex(async_graphql::Request::new(indoc::indoc!(
+            r#"
+            query {
+              auth {
+                enabledProviders
+              }
+            }
+            "#,
+        )))
+        .await;
+    pretty_assertions::assert_eq!(
+        async_graphql::value!({
+            "auth": {
+                "enabledProviders": [
+                    async_graphql::Name::new("OAUTH_GITHUB"),
+                    async_graphql::Name::new("PASSWORD"),
+                    async_graphql::Name::new("WEB3_WALLET"),
+                ]
+            }
+        }),
+        res.data,
+        "{res:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +121,7 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "oauth_github", loginCredentialsJson: "{\"login\":\"e2e-user\"}") {
+                    login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "{\"login\":\"e2e-user\"}") {
                       account {
                         accountName
                       }
@@ -158,7 +185,7 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
           r#"
           mutation {
               auth {
-                  login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                  login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
                       accessToken,
                       account {
                           id

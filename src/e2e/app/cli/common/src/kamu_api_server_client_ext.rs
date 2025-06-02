@@ -16,6 +16,7 @@ use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
+use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataParams,
     DatasetMetadataResponse,
@@ -294,7 +295,7 @@ impl AuthApi<'_> {
             r#"
             mutation {
               auth {
-                login(loginMethod: "oauth_github", loginCredentialsJson: "") {
+                login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "") {
                   accessToken
                   account {
                     id
@@ -314,7 +315,7 @@ impl AuthApi<'_> {
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "oauth_github", loginCredentialsJson: "", deviceCode: "<device_code>") {
+                    login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "", deviceCode: "<device_code>") {
                       accessToken
                       account {
                         id
@@ -336,7 +337,7 @@ impl AuthApi<'_> {
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
+                    login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
                       accessToken
                       account {
                         id
@@ -1213,14 +1214,14 @@ impl DatasetCollaborationApi<'_> {
         };
         let response = self
             .client
-            .graphql_api_call(
-                &indoc::indoc!(
+            .graphql_api_call_ex(
+                async_graphql::Request::new(indoc::indoc!(
                     r#"
-                    mutation {
+                    mutation ($dataset_id: DatasetID!, $account_id: AccountID!, $role: DatasetAccessRole!) {
                       datasets {
-                        byId(datasetId: "<dataset_id>") {
+                        byId(datasetId: $dataset_id) {
                           collaboration {
-                            setRole(accountId: "<account_id>", role: <role>) {
+                            setRole(accountId: $account_id, role: $role) {
                               __typename
                             }
                           }
@@ -1228,32 +1229,31 @@ impl DatasetCollaborationApi<'_> {
                       }
                     }
                     "#,
-                )
-                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
-                .replace("<account_id>", &account_id.as_did_str().to_stack_string())
-                .replace("<role>", role),
-                None,
+                ))
+                .variables(async_graphql::Variables::from_value(
+                    async_graphql::value!({
+                        "dataset_id": dataset_id.as_did_str().to_stack_string().as_str(),
+                        "account_id": account_id.to_string(),
+                        "role": role,
+                    }),
+                )),
             )
             .await;
 
-        match response {
-            Ok(data) => {
-                let dataset = &data["datasets"]["byId"];
+        if response.is_ok() {
+            let dataset = &response.into_json_data()["datasets"]["byId"];
 
-                if dataset.is_null() {
-                    return Err(DatasetCollaborationSetRoleError::DatasetNotFound);
-                }
-
-                Ok(())
+            if dataset.is_null() {
+                return Err(DatasetCollaborationSetRoleError::DatasetNotFound);
             }
-            Err(errors) => {
-                let first_error = errors.first().unwrap();
-                let unexpected_message = first_error.message.as_str();
 
-                Err(format!("Unexpected error message: {unexpected_message}")
+            Ok(())
+        } else {
+            Err(
+                format!("Unexpected error message: {:?}", response.error_messages())
                     .int_err()
-                    .into())
-            }
+                    .into(),
+            )
         }
     }
 

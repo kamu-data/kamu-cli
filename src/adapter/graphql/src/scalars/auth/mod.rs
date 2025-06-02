@@ -8,5 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod device_code;
+mod eip4361_auth_nonce;
+mod evm_wallet_address;
 
 pub use device_code::*;
+pub use eip4361_auth_nonce::*;
+pub use evm_wallet_address::*;

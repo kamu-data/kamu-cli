@@ -351,7 +351,7 @@ impl OAuthDeviceCodeRepositoryTestSuiteHarness {
             let new_account = make_test_account(
                 account_name,
                 &format!("{account_name}@example.com"),
-                kamu_adapter_oauth::PROVIDER_GITHUB,
+                AccountProvider::OAuthGitHub.into(),
                 account_name,
             );
 

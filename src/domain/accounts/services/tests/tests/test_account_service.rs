@@ -129,7 +129,7 @@ async fn test_create_account() {
 
     let new_account_name = AccountName::new_unchecked("new_account");
     account_svc
-        .create_account(&new_account_name, Email::parse("new_email@com").unwrap())
+        .create_password_account(&new_account_name, Email::parse("new_email@com").unwrap())
         .await
         .unwrap();
 
@@ -154,7 +154,7 @@ async fn test_create_account() {
 
     // Compare original account_id from db and id generated from a stored private
     // key
-    pretty_assertions::assert_eq!(created_account_id.as_did(), &did_odf);
+    pretty_assertions::assert_eq!(created_account_id.as_did_odf(), Some(&did_odf));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,7 +173,7 @@ async fn test_did_secret_key_generation() {
     let did_odf =
         DidOdf::from(DidKey::new(odf::metadata::Multicodec::Ed25519Pub, &public_key).unwrap());
 
-    assert_eq!(account_did.1.as_did(), &did_odf);
+    pretty_assertions::assert_eq!(account_did.1.as_did_odf(), Some(&did_odf));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

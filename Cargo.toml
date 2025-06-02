@@ -41,6 +41,7 @@ members = [
     # Domain
     "src/domain/accounts/domain",
     "src/domain/auth-rebac/domain",
+    "src/domain/auth-web3/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
@@ -50,6 +51,7 @@ members = [
     # Domain service layer
     "src/domain/accounts/services",
     "src/domain/auth-rebac/services",
+    "src/domain/auth-web3/services",
     "src/domain/datasets/services",
     "src/domain/flow-system/services",
     "src/domain/search/services",
@@ -96,8 +98,14 @@ members = [
     "src/infra/webhooks/inmem",
     "src/infra/webhooks/postgres",
     "src/infra/webhooks/sqlite",
+    ## Web3
+    "src/infra/auth-web3/inmem",
+    "src/infra/auth-web3/postgres",
+    "src/infra/auth-web3/repo-tests",
+    "src/infra/auth-web3/sqlite",
     # Adapters
     "src/adapter/auth-oso-rebac",
+    "src/adapter/auth-web3",
     "src/adapter/flight-sql",
     "src/adapter/graphql",
     "src/adapter/http",
@@ -154,6 +162,7 @@ tracing-perfetto = { version = "0.239.0", path = "src/utils/tracing-perfetto", d
 # Domain
 kamu-accounts = { version = "0.239.0", path = "src/domain/accounts/domain", default-features = false }
 kamu-auth-rebac = { version = "0.239.0", path = "src/domain/auth-rebac/domain", default-features = false }
+kamu-auth-web3 = { version = "0.239.0", path = "src/domain/auth-web3/domain", default-features = false }
 kamu-core = { version = "0.239.0", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.239.0", path = "src/domain/datasets/domain", default-features = false }
 kamu-flow-system = { version = "0.239.0", path = "src/domain/flow-system/domain", default-features = false }
@@ -176,6 +185,7 @@ odf-storage-s3 = { version = "0.239.0", path = "src/odf/storage-s3", default-fea
 # Domain service layer
 kamu-accounts-services = { version = "0.239.0", path = "src/domain/accounts/services", default-features = false }
 kamu-auth-rebac-services = { version = "0.239.0", path = "src/domain/auth-rebac/services", default-features = false }
+kamu-auth-web3-services = { version = "0.239.0", path = "src/domain/auth-web3/services", default-features = false }
 kamu-datasets-services = { version = "0.239.0", path = "src/domain/datasets/services", default-features = false, features = ["lfs", "s3"] }
 kamu-flow-system-services = { version = "0.239.0", path = "src/domain/flow-system/services", default-features = false }
 kamu-search-services = { version = "0.239.0", path = "src/domain/search/services", default-features = false }
@@ -224,9 +234,15 @@ kamu-webhooks-inmem = { version = "0.239.0", path = "src/infra/webhooks/inmem", 
 kamu-webhooks-postgres = { version = "0.239.0", path = "src/infra/webhooks/postgres", default-features = false }
 kamu-webhooks-sqlite = { version = "0.239.0", path = "src/infra/webhooks/sqlite", default-features = false }
 kamu-webhooks-repo-tests = { version = "0.239.0", path = "src/infra/webhooks/repo-tests", default-features = false }
+## Web3
+kamu-auth-web3-inmem = { version = "0.239.0", path = "src/infra/auth-web3/inmem", default-features = false }
+kamu-auth-web3-postgres = { version = "0.239.0", path = "src/infra/auth-web3/postgres", default-features = false }
+kamu-auth-web3-repo-tests = { version = "0.239.0", path = "src/infra/auth-web3/repo-tests", default-features = false }
+kamu-auth-web3-sqlite = { version = "0.239.0", path = "src/infra/auth-web3/sqlite", default-features = false }
 
 # Adapters
 kamu-adapter-auth-oso-rebac = { version = "0.239.0", path = "src/adapter/auth-oso-rebac", default-features = false }
+kamu-adapter-auth-web3 = { version = "0.239.0", path = "src/adapter/auth-web3", default-features = false }
 kamu-adapter-flight-sql = { version = "0.239.0", path = "src/adapter/flight-sql", default-features = false }
 kamu-adapter-graphql = { version = "0.239.0", path = "src/adapter/graphql", default-features = false }
 kamu-adapter-http = { version = "0.239.0", path = "src/adapter/http", default-features = false }

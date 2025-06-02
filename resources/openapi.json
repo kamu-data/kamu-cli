@@ -3,7 +3,8 @@
     "schemas": {
       "AccountID": {
         "examples": [
-          "did:odf:fed01989de31f27202c3b989de31f27202c3b103636f656e746078ac3c053218d8e6b"
+          "did:odf:fed01989de31f27202c3b989de31f27202c3b103636f656e746078ac3c053218d8e6b",
+          "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
         ],
         "type": "string"
       },
@@ -1319,7 +1320,7 @@
             "api_key": []
           }
         ],
-        "summary": "Upload file to temporary storage",
+        "summary": "Upload a file to temporary storage",
         "tags": [
           "kamu"
         ]

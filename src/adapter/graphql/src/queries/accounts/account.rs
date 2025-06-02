@@ -175,6 +175,16 @@ impl Account {
         })
     }
 
+    /// Account provider
+    async fn account_provider(&self, ctx: &Context<'_>) -> Result<AccountProvider> {
+        let full_account_info = self.get_full_account_info(ctx).await?;
+
+        let provider: kamu_accounts::AccountProvider =
+            full_account_info.provider.parse().int_err()?;
+
+        Ok(provider.into())
+    }
+
     /// Email address
     async fn email(&self, ctx: &Context<'_>) -> Result<&str> {
         check_logged_account_id_match(ctx, &self.account_id)?;

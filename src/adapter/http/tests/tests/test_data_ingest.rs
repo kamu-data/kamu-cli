@@ -298,7 +298,10 @@ async fn test_data_push_ingest_upload_token_no_initial_source() {
     let upload_token = UploadTokenBase64Json(UploadToken {
         upload_id,
         file_name: String::from("population.json"),
-        owner_account_id: harness.server_account_id().as_multibase().to_string(),
+        owner_account_id: harness
+            .server_account_id()
+            .as_id_without_did_prefix()
+            .to_string(),
         content_type: Some(MediaType(String::from("application/json"))),
         content_length: FILE_CONTENT.len(),
     });
@@ -386,7 +389,10 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
     let upload_token = UploadTokenBase64Json(UploadToken {
         upload_id,
         file_name: String::from("population.json"),
-        owner_account_id: harness.server_account_id().as_multibase().to_string(),
+        owner_account_id: harness
+            .server_account_id()
+            .as_id_without_did_prefix()
+            .to_string(),
         content_type: Some(MediaType(String::from("application/json"))),
         content_length: FILE_CONTENT.len(),
     });
@@ -466,7 +472,10 @@ async fn test_data_push_ingest_upload_content_type_not_specified() {
     let upload_token = UploadTokenBase64Json(UploadToken {
         upload_id,
         file_name: String::from("population.ndjson"),
-        owner_account_id: harness.server_account_id().as_multibase().to_string(),
+        owner_account_id: harness
+            .server_account_id()
+            .as_id_without_did_prefix()
+            .to_string(),
         content_type: None,
         content_length: FILE_CONTENT.len(),
     });
@@ -554,7 +563,10 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
     let upload_token = UploadTokenBase64Json(UploadToken {
         upload_id,
         file_name: String::from("population.json"),
-        owner_account_id: harness.server_account_id().as_multibase().to_string(),
+        owner_account_id: harness
+            .server_account_id()
+            .as_id_without_did_prefix()
+            .to_string(),
         content_type: Some(MediaType(String::from("application/json"))),
         content_length: FILE_CONTENT.len() - 17, // Intentionally wrong file size
     });
@@ -686,7 +698,11 @@ impl DataIngestHarness {
 
         let upload_dir = cache_dir
             .join("uploads")
-            .join(self.server_account_id().as_multibase().to_string())
+            .join(
+                self.server_account_id()
+                    .as_id_without_did_prefix()
+                    .to_string(),
+            )
             .join(upload_id);
 
         std::fs::create_dir_all(upload_dir.clone()).unwrap();

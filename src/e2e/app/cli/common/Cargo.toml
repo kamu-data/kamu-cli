@@ -25,6 +25,7 @@ doctest = false
 http-common = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-cli-e2e-common-macros = { workspace = true }
@@ -39,7 +40,6 @@ async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["now"] }
 convert_case = { version = "0.7" }
 indoc = "2"
-lazy_static = { version = "1" }
 pretty_assertions = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
 serde = { version = "1", features = ["derive"] }
