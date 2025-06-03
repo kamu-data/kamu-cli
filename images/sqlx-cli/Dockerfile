@@ -1,9 +1,12 @@
 ################################################################################
 # Builder
 ################################################################################
-FROM rust:1.85-alpine AS builder
 
-ARG VERSION
+ARG RUSTC_VERSION
+
+FROM rust:${RUSTC_VERSION}-alpine AS builder
+
+ARG SQLX_VERSION
 
 ################################################################################
 
@@ -13,7 +16,7 @@ RUN apk add --no-cache \
     musl-dev
 
 # sqlx: build
-RUN cargo install sqlx-cli@$VERSION  \
+RUN cargo install "sqlx-cli@$SQLX_VERSION"  \
     --no-default-features \
     --features postgres,sqlite,mysql,rustls
 
