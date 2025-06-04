@@ -6698,6 +6698,7 @@ dependencies = [
  "kamu-core",
  "nutype",
  "opendatafabric",
+ "pretty_assertions",
  "serde",
  "serde_json",
  "siwe",
@@ -6706,6 +6707,7 @@ dependencies = [
  "time",
  "time-source",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -7216,7 +7218,6 @@ dependencies = [
  "kamu-webhooks-postgres",
  "kamu-webhooks-services",
  "kamu-webhooks-sqlite",
- "lazy_static",
  "libc",
  "merge",
  "messaging-outbox",

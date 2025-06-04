@@ -29,6 +29,7 @@ use nutype::nutype;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time_source::SystemTimeSource;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,7 +47,16 @@ pub struct Web3WalletAuthenticationProvider {
 }
 
 impl Web3WalletAuthenticationProvider {
-    fn verify_eip4361_message_format(
+    // Public only for tests
+    pub fn parse_siwe_message(
+        &self,
+        serialized_message: &str,
+    ) -> Result<siwe::Message, siwe::ParseError> {
+        serialized_message.parse()
+    }
+
+    // Public only for tests
+    pub fn verify_eip4361_message_format(
         &self,
         message: &siwe::Message,
     ) -> Result<(), SignatureVerificationError> {
@@ -80,12 +90,18 @@ impl Web3WalletAuthenticationProvider {
             }
         }
         {
-            let login_page_url = format!(
-                "{}v/login",
-                self.server_url_config.protocols.base_url_platform
-            );
+            let server_base_url = &self.server_url_config.protocols.base_url_platform;
+            let mut is_uri_correct = false;
+            if let Ok(mut uri) = Url::parse(message.uri.as_str()) {
+                uri.set_path("");
+                uri.set_query(None);
+                uri.set_fragment(None);
 
-            if message.uri != login_page_url {
+                // We're only interested in scheme and host
+                is_uri_correct = uri.as_str() == server_base_url.as_str();
+            }
+
+            if !is_uri_correct {
                 return Err(SignatureVerificationError::UnexpectedMessageUri(
                     message.uri.to_string().into(),
                 ));
@@ -120,7 +136,7 @@ impl Web3WalletAuthenticationProvider {
         &self,
         login_request: &LoginRequest,
     ) -> Result<odf::metadata::DidPkh, SignatureVerificationError> {
-        let message: siwe::Message = login_request.message.parse()?;
+        let message = self.parse_siwe_message(&login_request.message)?;
         let wallet_address = EvmWalletAddress::new(message.address);
 
         self.nonce_service.consume_nonce(&wallet_address).await?;
@@ -200,7 +216,7 @@ impl From<EvmWalletAddress> for ChecksumEvmWalletAddress {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-enum SignatureVerificationError {
+pub enum SignatureVerificationError {
     #[error("Parse error: {0}")]
     MessageParseError(#[from] siwe::ParseError),
 
@@ -256,7 +272,7 @@ enum MissedMessageField {
 
 #[derive(Error, Debug)]
 #[error("Missed field: {field:?}")]
-struct MissingMessageFieldError {
+pub struct MissingMessageFieldError {
     field: MissedMessageField,
 }
 
@@ -270,7 +286,7 @@ impl From<MissedMessageField> for MissingMessageFieldError {
 
 #[derive(Error, Debug)]
 #[error("Unexpected message statement: {statement}")]
-struct UnexpectedMessageStatementError {
+pub struct UnexpectedMessageStatementError {
     statement: String,
 }
 
@@ -284,7 +300,7 @@ impl From<String> for UnexpectedMessageStatementError {
 
 #[derive(Error, Debug)]
 #[error("Unexpected message URI: {uri}")]
-struct UnexpectedMessageUriError {
+pub struct UnexpectedMessageUriError {
     uri: String,
 }
 
