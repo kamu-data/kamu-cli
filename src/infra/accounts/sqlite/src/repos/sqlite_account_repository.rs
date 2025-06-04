@@ -10,17 +10,17 @@
 use std::num::NonZeroUsize;
 
 use database_common::{
-    sqlite_generate_placeholders_list,
     PaginationOpts,
     TransactionRef,
     TransactionRefT,
+    sqlite_generate_placeholders_list,
 };
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use sqlx::Row;
 use sqlx::error::DatabaseError;
 use sqlx::sqlite::SqliteRow;
-use sqlx::Row;
 
 use crate::domain::*;
 
@@ -87,7 +87,7 @@ impl AccountRepository for SqliteAccountRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id = account.id.to_string();
-        let account_name = account.account_name.to_ascii_lowercase();
+        let account_name = account.prepare_account_name_for_storage();
         let email = account.email.as_ref().to_ascii_lowercase();
         let provider = account.provider.to_string();
         let provider_identity_key = account.provider_identity_key.to_string();
@@ -129,7 +129,7 @@ impl AccountRepository for SqliteAccountRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id = updated_account.id.to_string();
-        let account_name = updated_account.account_name.to_ascii_lowercase();
+        let account_name = updated_account.prepare_account_name_for_storage();
         let email = updated_account.email.as_ref().to_ascii_lowercase();
         let provider = updated_account.provider.to_string();
         let provider_identity_key = updated_account.provider_identity_key.to_string();
@@ -594,8 +594,10 @@ impl PasswordHashRepository for SqliteAccountRepository {
 
         // TODO: duplicates are prevented with unique indices, but handle error
 
+        use odf::metadata::AsStackString;
+
         let account_name = account_name.as_str();
-        let account_id_stack = account_id.as_did_str().to_stack_string();
+        let account_id_stack = account_id.as_stack_string();
         let account_id = account_id_stack.as_str();
 
         sqlx::query!(

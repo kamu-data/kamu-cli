@@ -12,8 +12,8 @@
 use async_graphql::value;
 use chrono::Duration;
 use indoc::indoc;
-use kamu::testing::MockDatasetChangesService;
 use kamu::MetadataQueryServiceImpl;
+use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::*;
 use kamu_datasets::*;
@@ -27,7 +27,7 @@ use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

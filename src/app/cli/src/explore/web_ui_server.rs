@@ -12,9 +12,9 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 
+use axum::Extension;
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
-use axum::Extension;
 use database_common::DatabaseTransactionRunner;
 use database_common_macros::transactional_handler;
 use dill::{Catalog, CatalogBuilder};
@@ -23,9 +23,9 @@ use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{
     AccountConfig,
+    AccountProvider,
     AuthenticationService,
     PredefinedAccountsConfig,
-    PROVIDER_PASSWORD,
 };
 use kamu_accounts_services::PasswordLoginCredentials;
 use kamu_adapter_http::DatasetAuthorizationLayer;
@@ -105,7 +105,7 @@ impl WebUIServer {
         let gql_schema = kamu_adapter_graphql::schema();
 
         let login_instructions = WebUILoginInstructions {
-            login_method: String::from(PROVIDER_PASSWORD),
+            login_method: AccountProvider::Password.to_string(),
             login_credentials_json: serde_json::to_string(&login_credentials).unwrap(),
         };
 

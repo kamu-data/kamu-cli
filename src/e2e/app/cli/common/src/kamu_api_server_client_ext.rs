@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::str::FromStr;
+use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -15,6 +16,7 @@ use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
+use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataParams,
     DatasetMetadataResponse,
@@ -26,12 +28,11 @@ use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoR
 use kamu_adapter_http::platform::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_auth_rebac::AccountToDatasetRelation;
 use kamu_flow_system::{DatasetFlowType, FlowID};
-use lazy_static::lazy_static;
 use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use thiserror::Error;
-use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
+use tokio_retry::strategy::FixedInterval;
 
 use crate::kamu_api_server_client::LoggedInUser;
 use crate::{AccessToken, GraphQLResponseExt, KamuApiServerClient, RequestBody};
@@ -96,29 +97,28 @@ pub const DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR: &str = indoc::indoc!(
     "#
 );
 
-lazy_static! {
-    /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
-    pub static ref DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: String = {
-        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
-            .escape_default()
-            .to_string()
-    };
+/// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/player-scores.yaml>
+pub static DATASET_ROOT_PLAYER_SCORES_SNAPSHOT: LazyLock<String> = LazyLock::new(|| {
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
+        .escape_default()
+        .to_string()
+});
 
-    pub static ref DATASET_ROOT_PLAYER_NAME: odf::DatasetName = odf::DatasetName::new_unchecked("player-scores");
+pub static DATASET_ROOT_PLAYER_NAME: LazyLock<odf::DatasetName> =
+    LazyLock::new(|| odf::DatasetName::new_unchecked("player-scores"));
 
-    /// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
-    pub static ref DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: String = {
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
-            .escape_default()
-            .to_string()
-    };
+/// <https://github.com/kamu-data/kamu-cli/blob/master/examples/leaderboard/leaderboard.yaml>
+pub static DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: LazyLock<String> = LazyLock::new(|| {
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+        .escape_default()
+        .to_string()
+});
 
-    pub static ref DATASET_DERIVATIVE_LEADERBOARD_NAME: odf::DatasetName =
-        odf::DatasetName::new_unchecked("leaderboard");
+pub static DATASET_DERIVATIVE_LEADERBOARD_NAME: LazyLock<odf::DatasetName> =
+    LazyLock::new(|| odf::DatasetName::new_unchecked("leaderboard"));
 
-    pub static ref E2E_USER_ACCOUNT_NAME: odf::AccountName =
-        odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR);
-}
+pub static E2E_USER_ACCOUNT_NAME: LazyLock<odf::AccountName> =
+    LazyLock::new(|| odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR));
 
 /// <https://raw.githubusercontent.com/kamu-data/kamu-cli/refs/heads/master/examples/leaderboard/data/1.ndjson>
 pub const DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1: &str = indoc::indoc!(
@@ -295,7 +295,7 @@ impl AuthApi<'_> {
             r#"
             mutation {
               auth {
-                login(loginMethod: "oauth_github", loginCredentialsJson: "") {
+                login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "") {
                   accessToken
                   account {
                     id
@@ -315,7 +315,7 @@ impl AuthApi<'_> {
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "oauth_github", loginCredentialsJson: "", deviceCode: "<device_code>") {
+                    login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "", deviceCode: "<device_code>") {
                       accessToken
                       account {
                         id
@@ -337,7 +337,7 @@ impl AuthApi<'_> {
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: "password", loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
+                    login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"<user>\",\"password\":\"<password>\"}") {
                       accessToken
                       account {
                         id
@@ -493,38 +493,49 @@ impl DatasetApi<'_> {
         &self,
         dataset_kind: odf::DatasetKind,
         dataset_alias: &odf::DatasetAlias,
+        dataset_visibility: &odf::DatasetVisibility,
     ) -> CreateDatasetResponse {
-        let create_response = self
-            .client
-            .graphql_api_call(
-                indoc::indoc!(
-                    r#"
-                    mutation {
-                      datasets {
-                        createEmpty(datasetKind: <dataset_kind>, datasetAlias: "<dataset_alias>") {
-                          message
-                          ... on CreateDatasetResultSuccess {
-                            dataset {
-                              id
-                            }
-                          }
-                        }
-                      }
-                    }
-                    "#,
-                )
-                .replace(
-                    "<dataset_kind>",
-                    &format!("{dataset_kind:?}").to_uppercase(),
-                )
-                .replace("<dataset_alias>", &format!("{dataset_alias}"))
-                .as_str(),
-                None,
-            )
-            .await
-            .data();
+        let dataset_visibility_value = if dataset_visibility.is_public() {
+            "PUBLIC"
+        } else {
+            "PRIVATE"
+        };
 
-        let create_response_node = &create_response["datasets"]["createEmpty"];
+        let create_response = self.client
+            .graphql_api_call_ex(
+                async_graphql::Request::new(indoc::indoc!(
+                r#"
+                mutation createEmptyDataset(
+                        $datasetKind: DatasetKind!,
+                        $datasetAlias: DatasetAlias!,
+                        $datasetVisibility: DatasetVisibility!,
+                    ) {
+                        datasets {
+                            createEmpty(datasetKind: $datasetKind, datasetAlias: $datasetAlias, datasetVisibility: $datasetVisibility) {
+                                message
+                                ... on CreateDatasetResultSuccess {
+                                    dataset {
+                                        id
+                                        alias
+                                    }
+                                }
+                            }
+                        }
+                    }
+                "#,
+            ))
+            .variables(async_graphql::Variables::from_value(
+                async_graphql::value!({
+                    "datasetKind": format!("{dataset_kind:?}").to_uppercase(),
+                    "datasetAlias": dataset_alias,
+                    "datasetVisibility": dataset_visibility_value,
+                }),
+            )),
+            )
+            .await;
+
+        let create_response_node =
+            &create_response.data.into_json().unwrap()["datasets"]["createEmpty"];
 
         pretty_assertions::assert_eq!(Some("Success"), create_response_node["message"].as_str());
 
@@ -856,12 +867,10 @@ impl DatasetApi<'_> {
             .await
             .data();
 
-        let content = tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
+        tail_response["datasets"]["byId"]["data"]["tail"]["data"]["content"]
             .as_str()
             .map(ToOwned::to_owned)
-            .unwrap();
-
-        content
+            .unwrap()
     }
 
     pub async fn blocks(&self, dataset_id: &odf::DatasetID) -> DatasetBlocksResponse {
@@ -1205,14 +1214,14 @@ impl DatasetCollaborationApi<'_> {
         };
         let response = self
             .client
-            .graphql_api_call(
-                &indoc::indoc!(
+            .graphql_api_call_ex(
+                async_graphql::Request::new(indoc::indoc!(
                     r#"
-                    mutation {
+                    mutation ($dataset_id: DatasetID!, $account_id: AccountID!, $role: DatasetAccessRole!) {
                       datasets {
-                        byId(datasetId: "<dataset_id>") {
+                        byId(datasetId: $dataset_id) {
                           collaboration {
-                            setRole(accountId: "<account_id>", role: <role>) {
+                            setRole(accountId: $account_id, role: $role) {
                               __typename
                             }
                           }
@@ -1220,32 +1229,31 @@ impl DatasetCollaborationApi<'_> {
                       }
                     }
                     "#,
-                )
-                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
-                .replace("<account_id>", &account_id.as_did_str().to_stack_string())
-                .replace("<role>", role),
-                None,
+                ))
+                .variables(async_graphql::Variables::from_value(
+                    async_graphql::value!({
+                        "dataset_id": dataset_id.as_did_str().to_stack_string().as_str(),
+                        "account_id": account_id.to_string(),
+                        "role": role,
+                    }),
+                )),
             )
             .await;
 
-        match response {
-            Ok(data) => {
-                let dataset = &data["datasets"]["byId"];
+        if response.is_ok() {
+            let dataset = &response.into_json_data()["datasets"]["byId"];
 
-                if dataset.is_null() {
-                    return Err(DatasetCollaborationSetRoleError::DatasetNotFound);
-                }
-
-                Ok(())
+            if dataset.is_null() {
+                return Err(DatasetCollaborationSetRoleError::DatasetNotFound);
             }
-            Err(errors) => {
-                let first_error = errors.first().unwrap();
-                let unexpected_message = first_error.message.as_str();
 
-                Err(format!("Unexpected error message: {unexpected_message}")
+            Ok(())
+        } else {
+            Err(
+                format!("Unexpected error message: {:?}", response.error_messages())
                     .int_err()
-                    .into())
-            }
+                    .into(),
+            )
         }
     }
 
@@ -1629,11 +1637,7 @@ impl FlowApi<'_> {
                 status == "FINISHED"
             });
 
-            if all_finished {
-                Ok(())
-            } else {
-                Err(())
-            }
+            if all_finished { Ok(()) } else { Err(()) }
         })
         .await
         .unwrap();

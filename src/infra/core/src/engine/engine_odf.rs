@@ -20,9 +20,9 @@ use kamu_core::engine::*;
 use kamu_core::*;
 use odf::metadata::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
 
+use super::ODFEngineConfig;
 use super::engine_container::{EngineContainer, LogsConfig};
 use super::engine_io_strategy::*;
-use super::ODFEngineConfig;
 
 pub struct ODFEngine {
     container_runtime: Arc<ContainerRuntime>,

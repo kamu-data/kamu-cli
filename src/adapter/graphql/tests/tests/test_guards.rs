@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::{value, EmptySubscription, Object};
+use async_graphql::{EmptySubscription, Object, value};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_adapter_graphql::{LoggedInGuard, ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE};
+use kamu_adapter_graphql::{ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE, LoggedInGuard};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

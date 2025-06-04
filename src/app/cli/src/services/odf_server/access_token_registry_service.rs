@@ -16,8 +16,8 @@ use kamu_accounts::CurrentAccountSubject;
 use odf::metadata::serde::yaml::Manifest;
 use url::Url;
 
-use crate::odf_server::models::*;
 use crate::WorkspaceLayout;
+use crate::odf_server::models::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -240,12 +240,11 @@ impl AccessTokenRegistryService {
                 || c.frontend_url
                     .as_ref()
                     .is_some_and(|frontend_url| frontend_url == odf_server_url)
-        }) {
-            if token_map.drop_account_token(account_name).is_some() {
-                self.storage
-                    .write_access_tokens_registry(scope, &registry)?;
-                return Ok(true);
-            }
+        }) && token_map.drop_account_token(account_name).is_some()
+        {
+            self.storage
+                .write_access_tokens_registry(scope, &registry)?;
+            return Ok(true);
         }
 
         Ok(false)

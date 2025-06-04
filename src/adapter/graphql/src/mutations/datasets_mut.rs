@@ -14,7 +14,7 @@ use kamu_datasets::CreateDatasetFromSnapshotError;
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
 use crate::queries::{Account, Dataset, DatasetRequestState};
-use crate::{utils, LoggedInGuard};
+use crate::{LoggedInGuard, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,8 +27,10 @@ impl DatasetsMut {
         &self,
         events: Vec<String>,
         events_format: Option<MetadataManifestFormat>,
-    ) -> Result<Vec<odf::metadata::MetadataEvent>, Result<CreateDatasetFromSnapshotResult, GqlError>>
-    {
+    ) -> Result<
+        Vec<odf::metadata::MetadataEvent>,
+        Result<Box<CreateDatasetFromSnapshotResult>, GqlError>,
+    > {
         let mut res = Vec::new();
         match events_format.unwrap_or(MetadataManifestFormat::Yaml) {
             MetadataManifestFormat::Yaml => {
@@ -37,24 +39,24 @@ impl DatasetsMut {
                     match de.read_manifest(event.as_bytes()) {
                         Ok(event) => res.push(event),
                         Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
-                            return Err(Ok(CreateDatasetFromSnapshotResult::Malformed(
+                            return Err(Ok(Box::new(CreateDatasetFromSnapshotResult::Malformed(
                                 MetadataManifestMalformed {
                                     message: e.to_string(),
                                 },
-                            )))
+                            ))));
                         }
                         Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
-                            return Err(Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(
-                                e.into(),
-                            )))
+                            return Err(Ok(Box::new(
+                                CreateDatasetFromSnapshotResult::UnsupportedVersion(e.into()),
+                            )));
                         }
                         Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
-                            return Err(Err(e.int_err().into()))
+                            return Err(Err(e.int_err().into()));
                         }
                     }
                 }
             }
-        };
+        }
         Ok(res)
     }
 }
@@ -158,10 +160,10 @@ impl DatasetsMut {
                     Err(odf::metadata::serde::Error::UnsupportedVersion(e)) => {
                         return Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(
                             e.into(),
-                        ))
+                        ));
                     }
                     Err(e @ odf::metadata::serde::Error::IoError { .. }) => {
-                        return Err(e.int_err().into())
+                        return Err(e.int_err().into());
                     }
                 }
             }
@@ -253,7 +255,7 @@ impl DatasetsMut {
             .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
         {
             Ok(res) => res,
-            Err(Ok(err)) => return Ok(err),
+            Err(Ok(err)) => return Ok(*err),
             Err(Err(err)) => return Err(err),
         };
 
@@ -293,7 +295,7 @@ impl DatasetsMut {
             .parse_metadata_events(extra_events.unwrap_or_default(), extra_events_format)
         {
             Ok(res) => res,
-            Err(Ok(err)) => return Ok(err),
+            Err(Ok(err)) => return Ok(*err),
             Err(Err(err)) => return Err(err),
         };
 

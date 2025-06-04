@@ -11,8 +11,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{
-    parse_macro_input,
-    parse_str,
     ExprArray,
     FnArg,
     GenericArgument,
@@ -26,6 +24,8 @@ use syn::{
     Token,
     Type,
     TypePath,
+    parse_macro_input,
+    parse_str,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -592,7 +592,7 @@ impl Parse for DatabaseTransactionalTestInputArgs {
                     "Unexpected key: {unexpected_key}\nAllowable values: \"storage\", \
                      \"fixture\", \"options\", and \"extra_test_groups\"."
                 ),
-            };
+            }
 
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;

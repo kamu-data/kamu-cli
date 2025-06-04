@@ -123,7 +123,7 @@ impl<'a> VersionedFileMut<'a> {
                         expected_head: e.expected.unwrap().into(),
                         actual_head: e.actual.unwrap().into(),
                     },
-                ))
+                ));
             }
             Err(err) => {
                 return Err(err.int_err().into());

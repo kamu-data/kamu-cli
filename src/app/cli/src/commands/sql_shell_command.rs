@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
 use container_runtime::ContainerRuntime;
@@ -20,25 +20,24 @@ use kamu::*;
 use kamu_datafusion_cli::exec;
 use kamu_datafusion_cli::print_format::PrintFormat;
 use kamu_datafusion_cli::print_options::{MaxRows, PrintOptions};
-use lazy_static::lazy_static;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
+use crate::WorkspaceLayout;
 use crate::explore::SqlShellImpl;
 use crate::output::*;
-use crate::WorkspaceLayout;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const DEFAULT_MAX_ROWS_FOR_OUTPUT: usize = 40;
 
-lazy_static! {
-    static ref SUPPORTED_EXPORT_FORMATS: Vec<OutputFormat> = vec![
+static SUPPORTED_EXPORT_FORMATS: LazyLock<Vec<OutputFormat>> = LazyLock::new(|| {
+    vec![
         OutputFormat::Csv,
         OutputFormat::NdJson,
         OutputFormat::Parquet,
-    ];
-}
+    ]
+});
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 pub enum SqlShellEngine {
@@ -217,7 +216,7 @@ impl Command for SqlShellCommand {
                 _ => {
                     return Err(CLIError::usage_error(
                         "Data export to file(s) is available with DataFusion (default) engine only",
-                    ))
+                    ));
                 }
             }
 

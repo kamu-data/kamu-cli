@@ -18,7 +18,7 @@ use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetResult};
 use kamu_datasets_services::*;
 use serde_json::json;
 
-use crate::utils::{authentication_catalogs_ext, BaseGQLDatasetHarness, PredefinedAccountOpts};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs_ext};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

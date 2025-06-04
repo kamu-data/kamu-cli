@@ -14,14 +14,13 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use axum::{middleware, Extension};
+use axum::{Extension, middleware};
 use database_common_macros::transactional_handler;
-use dill::{Catalog, CatalogBuilder};
 use http_common::ApiError;
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
-use kamu_adapter_http::e2e::e2e_router;
 use kamu_adapter_http::DatasetAuthorizationLayer;
+use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowAgent;
 use kamu_task_system_inmem::domain::TaskAgent;
 use messaging_outbox::OutboxAgent;
@@ -40,12 +39,13 @@ pub struct APIServer {
     task_agent: Arc<dyn TaskAgent>,
     flow_agent: Arc<dyn FlowAgent>,
     outbox_agent: Arc<OutboxAgent>,
+    api_server_catalog: dill::Catalog,
 }
 
 impl APIServer {
     pub async fn new(
-        base_catalog: &Catalog,
-        cli_catalog: &Catalog,
+        base_catalog: &dill::Catalog,
+        cli_catalog: &dill::Catalog,
         tenancy_config: TenancyConfig,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -83,11 +83,11 @@ impl APIServer {
 
         if let Some(path) = e2e_output_data_path {
             fs::write(path, base_url_rest.to_string()).unwrap();
-        };
+        }
 
         let default_protocols = Protocols::default();
 
-        let api_server_catalog = CatalogBuilder::new_chained(base_catalog)
+        let api_server_catalog = dill::CatalogBuilder::new_chained(base_catalog)
             .add_value(ServerUrlConfig::new(Protocols {
                 base_url_rest,
                 base_url_platform: default_protocols.base_url_platform,
@@ -211,7 +211,7 @@ impl APIServer {
         let (router, api) = router.split_for_parts();
         let router = router
             .layer(Extension(gql_schema))
-            .layer(Extension(api_server_catalog))
+            .layer(Extension(api_server_catalog.clone()))
             .layer(Extension(ui_configuration))
             .layer(Extension(Arc::new(api)));
 
@@ -236,11 +236,16 @@ impl APIServer {
             task_agent,
             flow_agent,
             outbox_agent,
+            api_server_catalog,
         })
     }
 
     pub fn local_addr(&self) -> &SocketAddr {
         &self.local_addr
+    }
+
+    pub fn api_server_catalog(&self) -> &dill::Catalog {
+        &self.api_server_catalog
     }
 
     pub async fn run(self) -> Result<(), InternalError> {
@@ -268,7 +273,7 @@ async fn ui_configuration_handler(
 #[transactional_handler]
 async fn graphql_handler(
     Extension(schema): Extension<kamu_adapter_graphql::Schema>,
-    Extension(catalog): Extension<Catalog>,
+    Extension(catalog): Extension<dill::Catalog>,
     req: async_graphql_axum::GraphQLRequest,
 ) -> Result<async_graphql_axum::GraphQLResponse, ApiError> {
     let graphql_request = req.into_inner().data(catalog);

@@ -26,9 +26,9 @@ use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionAutho
 use kamu_core::{auth, *};
 use odf::utils::data::DataFrameExt;
 
+use crate::EngineConfigDatafusionEmbeddedBatchQuery;
 use crate::services::query::*;
 use crate::utils::docker_images;
-use crate::EngineConfigDatafusionEmbeddedBatchQuery;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -564,14 +564,14 @@ impl QueryService for QueryServiceImpl {
 
         let df = df
             .sort(vec![
-                col(Column::from_name(&vocab.offset_column)).sort(false, true)
+                col(Column::from_name(&vocab.offset_column)).sort(false, true),
             ])?
             .limit(
                 usize::try_from(skip).unwrap(),
                 Some(usize::try_from(limit).unwrap()),
             )?
             .sort(vec![
-                col(Column::from_name(&vocab.offset_column)).sort(true, false)
+                col(Column::from_name(&vocab.offset_column)).sort(true, false),
             ])?;
 
         Ok(GetDataResponse {

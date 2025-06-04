@@ -62,11 +62,13 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         &self,
         owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError> {
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
-
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let stack_owner_id = owner_id.as_stack_string();
 
         let dataset_entries_count = sqlx::query_scalar!(
             r#"
@@ -216,7 +218,9 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
+        use odf::metadata::AsStackString;
+
+        let stack_owner_id = owner_id.as_stack_string();
 
         let maybe_dataset_entry_row = sqlx::query_as!(
             DatasetEntryRowModel,
@@ -250,7 +254,9 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
+        use odf::metadata::AsStackString;
+
+        let stack_owner_id = owner_id.as_stack_string();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -280,7 +286,6 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             while let Some(row) = query_stream.try_next().await.int_err()? {
                 yield Ok(row.into());
             }
-
         })
     }
 
@@ -290,8 +295,10 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
     ) -> Result<(), SaveDatasetEntryError> {
         let mut tr = self.transaction.lock().await;
 
+        use odf::metadata::AsStackString;
+
         let stack_dataset_id = dataset_entry.id.as_did_str().to_stack_string();
-        let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
+        let stack_owner_id = dataset_entry.owner_id.as_stack_string();
 
         // Do not provoke conflict of unique violation at Postgres level, if we can
         // avoid it. Note: any unique violation immediately marks the entire

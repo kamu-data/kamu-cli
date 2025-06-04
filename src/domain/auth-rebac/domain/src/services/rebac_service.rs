@@ -13,18 +13,18 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
-    boolean_property_value,
     AccountPropertyName,
     AccountToDatasetRelation,
     DatasetPropertyName,
     EntityNotFoundError,
     EntityWithRelation,
     GetObjectEntityRelationsError,
+    PROPERTY_VALUE_BOOLEAN_TRUE,
     PropertiesCountError,
     PropertyValue,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
-    PROPERTY_VALUE_BOOLEAN_TRUE,
+    boolean_property_value,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,7 +162,7 @@ impl AccountProperties {
             AccountPropertyName::CanProvisionAccounts => {
                 self.can_provision_accounts = value == PROPERTY_VALUE_BOOLEAN_TRUE;
             }
-        };
+        }
     }
 
     pub fn as_property_value<'a>(&self, name: AccountPropertyName) -> PropertyValue<'a> {

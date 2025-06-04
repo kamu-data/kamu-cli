@@ -7,20 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(trait_upcasting)]
-
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::Utc;
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 use kamu::domain::*;
 use kamu::testing::{DatasetTestHelper, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::{
-    SimpleTransferProtocol,
     ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS,
+    SimpleTransferProtocol,
 };
 use kamu::{
     DatasetRegistrySoloUnitBridge,
@@ -196,7 +194,9 @@ async fn build_temp_dirs(rt: &tokio::runtime::Runtime) -> (odf::DatasetAlias, Ur
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn bench_with_1_parallel(c: &mut Criterion) {
-    std::env::set_var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS, "1");
+    unsafe {
+        std::env::set_var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS, "1");
+    }
 
     let rt = Arc::new(tokio::runtime::Runtime::new().unwrap());
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
@@ -227,7 +227,9 @@ fn bench_with_1_parallel(c: &mut Criterion) {
 }
 
 fn bench_with_10_parallels(c: &mut Criterion) {
-    std::env::set_var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS, "10");
+    unsafe {
+        std::env::set_var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS, "10");
+    }
 
     let rt = Arc::new(tokio::runtime::Runtime::new().unwrap());
     let tmp_workspace_dir = tempfile::tempdir().unwrap();

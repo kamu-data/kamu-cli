@@ -198,13 +198,13 @@ impl ConfigService {
         if let Some((head, tail)) = key.split_once('.') {
             let index = serde_yaml::Value::String(head.to_owned());
 
-            if let Some(child) = value.get_mut(&index).and_then(|v| v.as_mapping_mut()) {
-                if self.unset_recursive(tail, child) {
-                    if child.is_empty() {
-                        value.remove(&index);
-                    }
-                    return true;
+            if let Some(child) = value.get_mut(&index).and_then(|v| v.as_mapping_mut())
+                && self.unset_recursive(tail, child)
+            {
+                if child.is_empty() {
+                    value.remove(&index);
                 }
+                return true;
             }
             false
         } else {

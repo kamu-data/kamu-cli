@@ -295,7 +295,7 @@ impl OAuthDeviceCodeRepositoryTestSuiteHarness {
     ) -> [DeviceToken; N] {
         use std::mem::MaybeUninit;
 
-        let mut device_tokens: [MaybeUninit<DeviceToken>; N] = MaybeUninit::uninit_array();
+        let mut device_tokens: [MaybeUninit<DeviceToken>; N] = [const { MaybeUninit::uninit() }; N];
 
         for (i, t) in expired_at.into_iter().enumerate() {
             let new_token = DeviceTokenCreated {
@@ -345,13 +345,13 @@ impl OAuthDeviceCodeRepositoryTestSuiteHarness {
     pub async fn save_accounts<const N: usize>(&self, account_names: [&str; N]) -> [Account; N] {
         use std::mem::MaybeUninit;
 
-        let mut accounts: [MaybeUninit<Account>; N] = MaybeUninit::uninit_array();
+        let mut accounts: [MaybeUninit<Account>; N] = [const { MaybeUninit::uninit() }; N];
 
         for (i, account_name) in account_names.into_iter().enumerate() {
             let new_account = make_test_account(
                 account_name,
                 &format!("{account_name}@example.com"),
-                kamu_adapter_oauth::PROVIDER_GITHUB,
+                AccountProvider::OAuthGitHub.into(),
                 account_name,
             );
 
@@ -373,7 +373,7 @@ impl OAuthDeviceCodeRepositoryTestSuiteHarness {
     ) -> [DeviceToken; N] {
         use std::mem::MaybeUninit;
 
-        let mut device_tokens: [MaybeUninit<DeviceToken>; N] = MaybeUninit::uninit_array();
+        let mut device_tokens: [MaybeUninit<DeviceToken>; N] = [const { MaybeUninit::uninit() }; N];
 
         for (i, (device_token, account)) in device_token_and_account.into_iter().enumerate() {
             let device_token_params_part = DeviceTokenParamsPart {

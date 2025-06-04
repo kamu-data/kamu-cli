@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu::testing::BaseRepoHarness;
 use kamu::DatasetChangesServiceImpl;
+use kamu::testing::BaseRepoHarness;
 use kamu_core::{DatasetChangesService, DatasetIntervalIncrement, TenancyConfig};
 use odf::metadata::testing::MetadataFactory;
 

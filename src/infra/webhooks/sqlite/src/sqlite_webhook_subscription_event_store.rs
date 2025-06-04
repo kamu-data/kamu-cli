@@ -9,7 +9,7 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
+use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::*;
 use futures::TryStreamExt;
 use internal_error::InternalError;

@@ -84,7 +84,7 @@ impl FlowTriggerType {
                 (Self::Push(this), Self::Push(existing))
                     if this.source_name == existing.source_name =>
                 {
-                    return false
+                    return false;
                 }
                 (Self::InputDatasetFlow(this), Self::InputDatasetFlow(existing)) => {
                     if this.is_same_key_as(existing) {
@@ -172,44 +172,50 @@ impl FlowTriggerInputDatasetFlow {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::LazyLock;
+
     use kamu_accounts::DEFAULT_ACCOUNT_ID;
-    use lazy_static::lazy_static;
 
     use super::*;
 
-    lazy_static! {
-        static ref TEST_DATASET_ID: odf::DatasetID = odf::DatasetID::new_seeded_ed25519(b"test");
-        static ref AUTO_POLLING_TRIGGER: FlowTriggerType =
-            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-                trigger_time: Utc::now(),
-            });
-        static ref MANUAL_TRIGGER: FlowTriggerType = FlowTriggerType::Manual(FlowTriggerManual {
+    static TEST_DATASET_ID: LazyLock<odf::DatasetID> =
+        LazyLock::new(|| odf::DatasetID::new_seeded_ed25519(b"test"));
+    static AUTO_POLLING_TRIGGER: LazyLock<FlowTriggerType> = LazyLock::new(|| {
+        FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+            trigger_time: Utc::now(),
+        })
+    });
+    static MANUAL_TRIGGER: LazyLock<FlowTriggerType> = LazyLock::new(|| {
+        FlowTriggerType::Manual(FlowTriggerManual {
             trigger_time: Utc::now(),
             initiator_account_id: DEFAULT_ACCOUNT_ID.clone(),
-        });
-        static ref PUSH_SOURCE_TRIGGER: FlowTriggerType = FlowTriggerType::Push(FlowTriggerPush {
+        })
+    });
+    static PUSH_SOURCE_TRIGGER: LazyLock<FlowTriggerType> = LazyLock::new(|| {
+        FlowTriggerType::Push(FlowTriggerPush {
             trigger_time: Utc::now(),
             source_name: None,
             dataset_id: TEST_DATASET_ID.clone(),
             result: DatasetPushResult::HttpIngest(DatasetPushHttpIngestResult {
                 old_head_maybe: None,
-                new_head: odf::Multihash::from_digest_sha3_256(b"some-slice")
+                new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
             }),
-        });
-        static ref INPUT_DATASET_TRIGGER: FlowTriggerType =
-            FlowTriggerType::InputDatasetFlow(FlowTriggerInputDatasetFlow {
-                trigger_time: Utc::now(),
-                dataset_id: TEST_DATASET_ID.clone(),
-                flow_type: DatasetFlowType::Ingest,
-                flow_id: FlowID::new(5),
-                flow_result: FlowResult::DatasetUpdate(FlowResultDatasetUpdate::Changed(
-                    FlowResultDatasetUpdateChanged {
-                        old_head: None,
-                        new_head: odf::Multihash::from_digest_sha3_256(b"some-slice")
-                    }
-                ))
-            });
-    }
+        })
+    });
+    static INPUT_DATASET_TRIGGER: LazyLock<FlowTriggerType> = LazyLock::new(|| {
+        FlowTriggerType::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+            trigger_time: Utc::now(),
+            dataset_id: TEST_DATASET_ID.clone(),
+            flow_type: DatasetFlowType::Ingest,
+            flow_id: FlowID::new(5),
+            flow_result: FlowResult::DatasetUpdate(FlowResultDatasetUpdate::Changed(
+                FlowResultDatasetUpdateChanged {
+                    old_head: None,
+                    new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
+                },
+            )),
+        })
+    });
 
     #[test]
     fn test_is_unique_auto_polling() {

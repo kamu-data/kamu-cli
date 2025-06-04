@@ -36,7 +36,7 @@ impl SessionAuth for SessionAuthAnonymous {
                 return Err(Status::unauthenticated(
                     "Basic auth is only supported for 'anonymous' accounts with no password. \
                      Authenticated users should use Bearer token auth mechanism.",
-                ))
+                ));
             }
         }
 

@@ -12,8 +12,8 @@ use std::assert_matches::assert_matches;
 use dill::Catalog;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
-use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf::serde::MetadataBlockSerializer;
+use odf::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 
 use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
 
@@ -88,19 +88,22 @@ pub async fn test_has_blocks(catalog: &Catalog) {
     .await;
 
     let repo = catalog.get_one::<dyn DatasetKeyBlockRepository>().unwrap();
-    assert!(!repo
-        .has_blocks(&dataset_id, &odf::BlockRef::Head)
-        .await
-        .unwrap());
+    assert!(
+        !repo
+            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    );
 
     let block = make_seed_block();
     repo.save_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[block])
         .await
         .unwrap();
-    assert!(repo
-        .has_blocks(&dataset_id, &odf::BlockRef::Head)
-        .await
-        .unwrap());
+    assert!(
+        repo.has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -290,10 +293,12 @@ pub async fn test_delete_blocks(catalog: &Catalog) {
     repo.delete_all_for_ref(&dataset_id, &odf::BlockRef::Head)
         .await
         .unwrap();
-    assert!(!repo
-        .has_blocks(&dataset_id, &odf::BlockRef::Head)
-        .await
-        .unwrap());
+    assert!(
+        !repo
+            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -327,19 +332,22 @@ pub async fn test_remove_dataset_entry_removes_key_blocks(catalog: &Catalog) {
     }
 
     // Verify blocks exist
-    assert!(repo
-        .has_blocks(&dataset_id, &odf::BlockRef::Head)
-        .await
-        .unwrap());
+    assert!(
+        repo.has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    );
 
     // Remove dataset entry
     remove_dataset_entry(catalog, &dataset_id).await;
 
     // Verify blocks are removed
-    assert!(!repo
-        .has_blocks(&dataset_id, &odf::BlockRef::Head)
-        .await
-        .unwrap());
+    assert!(
+        !repo
+            .has_blocks(&dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

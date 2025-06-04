@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use std::ops::Deref;
 
 use kamu_auth_rebac::AuthorizedAccount;
-use kamu_core::{auth, DatasetRegistry, ResolvedDataset};
+use kamu_core::{DatasetRegistry, ResolvedDataset, auth};
 use tokio::sync::OnceCell;
 
 use crate::prelude::*;
@@ -23,7 +23,7 @@ use crate::queries::*;
 pub(crate) struct DatasetRequestState {
     dataset_handle: odf::DatasetHandle,
     resolved_dataset: OnceCell<ResolvedDataset>,
-    dataset_statistics: OnceCell<kamu_datasets::DatasetStatistics>,
+    dataset_statistics: OnceCell<Box<kamu_datasets::DatasetStatistics>>,
     allowed_dataset_actions: OnceCell<HashSet<auth::DatasetAction>>,
     authorized_accounts: OnceCell<Vec<AuthorizedAccount>>,
 }
@@ -81,18 +81,20 @@ impl DatasetRequestState {
         &self,
         ctx: &Context<'_>,
     ) -> Result<&kamu_datasets::DatasetStatistics> {
-        self.dataset_statistics
-            .get_or_try_init(|| async {
+        let statistics = self
+            .dataset_statistics
+            .get_or_try_init(async || {
                 let dataset_statistics_service =
                     from_catalog_n!(ctx, dyn kamu_datasets::DatasetStatisticsService);
 
-                let statistics = dataset_statistics_service
+                dataset_statistics_service
                     .get_statistics(self.dataset_id(), &odf::BlockRef::Head)
-                    .await?;
-
-                Ok(statistics)
+                    .await
+                    .map(Box::new)
             })
-            .await
+            .await?;
+
+        Ok(statistics)
     }
 
     pub async fn authorized_accounts(&self, ctx: &Context<'_>) -> Result<&Vec<AuthorizedAccount>> {

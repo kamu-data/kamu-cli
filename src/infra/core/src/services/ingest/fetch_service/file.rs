@@ -128,10 +128,10 @@ impl FetchService {
             .expect("File modification time is not available on this platform")
             .round_subsecs(3);
 
-        if let Some(PollingSourceState::LastModified(last_modified)) = prev_source_state {
-            if *last_modified == mod_time {
-                return Ok(FetchResult::UpToDate);
-            }
+        if let Some(PollingSourceState::LastModified(last_modified)) = prev_source_state
+            && *last_modified == mod_time
+        {
+            return Ok(FetchResult::UpToDate);
         }
 
         let source_event_time = match event_time_source {

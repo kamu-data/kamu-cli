@@ -138,7 +138,7 @@ impl AccountService for AccountServiceImpl {
             .search_accounts_by_name_pattern(name_pattern, filters, pagination)
     }
 
-    async fn create_account(
+    async fn create_password_account(
         &self,
         account_name: &odf::AccountName,
         email: email_utils::Email,
@@ -152,14 +152,16 @@ impl AccountService for AccountServiceImpl {
             account_type: AccountType::User,
             avatar_url: None,
             registered_at: self.time_source.now(),
-            provider: String::from(PROVIDER_PASSWORD),
+            provider: AccountProvider::Password.to_string(),
             provider_identity_key: String::from(account_name.as_str()),
         };
 
         self.account_repo.save_account(&account).await?;
 
         if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
-            let account_id = account.id.as_did_str().to_stack_string();
+            use odf::metadata::AsStackString;
+
+            let account_id = account.id.as_stack_string();
             let did_secret_key = DidSecretKey::try_new(
                 &account_key.into(),
                 did_secret_encryption_key.expose_secret(),

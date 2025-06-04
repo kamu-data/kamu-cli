@@ -99,7 +99,7 @@ bytes = "1"
 cfg-if = "1" # Conditional compilation
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = { version = "6", default-features = false }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 futures = "0.3"
 glob = "0.3" # Used for glob fetch
 indoc = { version = "2" }
@@ -135,7 +135,6 @@ rumqttc = { optional = true, version = "0.24", default-features = false, feature
 ] }
 mockall = { optional = true, version = "0.13", default-features = false }
 oop = { optional = true, version = "0.0.2" }
-lazy_static = { version = "1" }
 
 
 [target.'cfg(unix)'.dependencies]

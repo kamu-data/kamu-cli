@@ -81,10 +81,8 @@ impl DatasetStorageUnit for DatasetStorageUnitLocalFs {
 
             for r_dataset_dir in read_dataset_dir {
                 let dataset_dir_entry = r_dataset_dir.int_err()?;
-                if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                    if s.starts_with('.') {
-                        continue;
-                    }
+                if let Some(s) = dataset_dir_entry.file_name().to_str() && s.starts_with('.') {
+                    continue;
                 }
 
                 let dataset_id = DatasetID::from_multibase_string(dataset_dir_entry.file_name().to_str().unwrap()).int_err()?;
@@ -155,7 +153,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
 
                 // Errors...
                 Err(GetRefError::Access(e)) => {
-                    return Err(StoreDatasetError::Internal(e.int_err()))
+                    return Err(StoreDatasetError::Internal(e.int_err()));
                 }
                 Err(GetRefError::Internal(e)) => return Err(StoreDatasetError::Internal(e)),
             }

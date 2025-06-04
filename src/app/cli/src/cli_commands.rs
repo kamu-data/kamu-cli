@@ -13,7 +13,7 @@ use kamu_accounts::CurrentAccountSubject;
 
 use crate::cli::SystemApiServerSubCommand;
 use crate::commands::*;
-use crate::{accounts, cli, odf_server, WorkspaceService};
+use crate::{WorkspaceService, accounts, cli, odf_server};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

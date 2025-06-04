@@ -69,7 +69,7 @@ impl RemoteStatusServiceImpl {
             Ok(head) => head,
             Err(odf::GetRefError::Access(e)) => return Err(StatusCheckError::Access(e)),
             Err(odf::GetRefError::NotFound(_)) => {
-                return Err(StatusCheckError::RemoteDatasetNotFound)
+                return Err(StatusCheckError::RemoteDatasetNotFound);
             }
             Err(e) => return Err(StatusCheckError::Internal(e.int_err())),
         };

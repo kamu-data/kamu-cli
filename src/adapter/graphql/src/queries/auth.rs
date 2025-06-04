@@ -23,11 +23,21 @@ impl Auth {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[allow(clippy::unused_async)]
-    #[tracing::instrument(level = "info", name = Auth_enabled_login_methods, skip_all)]
-    async fn enabled_login_methods(&self, ctx: &Context<'_>) -> Result<Vec<&'static str>> {
+    #[tracing::instrument(level = "info", name = Auth_enabled_providers, skip_all)]
+    async fn enabled_providers(&self, ctx: &Context<'_>) -> Result<Vec<AccountProvider>> {
+        use std::str::FromStr;
+
         let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
-        Ok(authentication_service.supported_login_methods())
+        let providers = authentication_service
+            .supported_login_methods()
+            .into_iter()
+            .map(kamu_accounts::AccountProvider::from_str)
+            .map(|res| res.map(Into::into))
+            .collect::<Result<Vec<_>, _>>()
+            .int_err()?;
+
+        Ok(providers)
     }
 
     #[tracing::instrument(level = "info", name = Auth_list_access_tokens, skip_all, fields(%account_id, ?page, ?per_page))]

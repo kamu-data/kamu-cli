@@ -9,7 +9,7 @@
 
 use std::sync::Mutex;
 
-use dill::{component, interface, meta, scope, Catalog, Singleton};
+use dill::{Catalog, Singleton, component, interface, meta, scope};
 use internal_error::InternalError;
 use kamu_flow_system::FlowTriggerUpdatedMessage;
 use kamu_flow_system_services::MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE;

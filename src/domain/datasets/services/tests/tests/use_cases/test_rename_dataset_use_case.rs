@@ -36,7 +36,7 @@ async fn test_rename_dataset_success_via_ref() {
     let harness = RenameUseCaseHarness::new(
         mock_authorizer,
         Some(MockDidGenerator::predefined_dataset_ids(vec![
-            foo_id.clone()
+            foo_id.clone(),
         ])),
     )
     .await;

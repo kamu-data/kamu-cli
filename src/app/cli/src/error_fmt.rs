@@ -49,13 +49,13 @@ impl PrettyCLIError<'_> {
         if self.include_backtraces {
             // Print the innermost backtrace
             for e in error_chain.iter().rev() {
-                if let Some(bt) = core::error::request_ref::<Backtrace>(e) {
-                    if bt.status() == BacktraceStatus::Captured {
-                        writeln!(f)?;
-                        writeln!(f, "Backtrace:")?;
-                        writeln!(f, "{}", console::style(bt).dim())?;
-                        break;
-                    }
+                if let Some(bt) = core::error::request_ref::<Backtrace>(e)
+                    && bt.status() == BacktraceStatus::Captured
+                {
+                    writeln!(f)?;
+                    writeln!(f, "Backtrace:")?;
+                    writeln!(f, "{}", console::style(bt).dim())?;
+                    break;
                 }
             }
         }
@@ -122,13 +122,13 @@ impl PrettyCLIError<'_> {
             if self.include_backtraces {
                 // Print the innermost backtrace
                 for e in error_chain.iter().rev() {
-                    if let Some(bt) = core::error::request_ref::<Backtrace>(e) {
-                        if bt.status() == BacktraceStatus::Captured {
-                            writeln!(f)?;
-                            writeln!(f, "Backtrace:")?;
-                            writeln!(f, "{}", console::style(bt).dim())?;
-                            break;
-                        }
+                    if let Some(bt) = core::error::request_ref::<Backtrace>(e)
+                        && bt.status() == BacktraceStatus::Captured
+                    {
+                        writeln!(f)?;
+                        writeln!(f, "Backtrace:")?;
+                        writeln!(f, "{}", console::style(bt).dim())?;
+                        break;
                     }
                 }
             }

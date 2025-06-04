@@ -17,7 +17,7 @@ use crate::TaskOutcome;
 #[async_trait::async_trait]
 pub trait TaskRunner: Send + Sync {
     async fn run_task(&self, task_definition: TaskDefinition)
-        -> Result<TaskOutcome, InternalError>;
+    -> Result<TaskOutcome, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

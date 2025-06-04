@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use axum::extract::ws::{CloseFrame, Message};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
@@ -78,7 +78,7 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
           error_msg = %err,
           "Failed to send error to client with error",
         );
-    };
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

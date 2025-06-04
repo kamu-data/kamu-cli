@@ -56,6 +56,7 @@ server-console = { workspace = true }
 kamu = { workspace = true }
 
 kamu-adapter-auth-oso-rebac = { workspace = true }
+kamu-adapter-auth-web3 = { workspace = true, features = ["did-pkh"] }
 kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
@@ -110,6 +111,11 @@ kamu-search = { workspace = true }
 kamu-search-services = { workspace = true }
 kamu-search-openai = { workspace = true }
 kamu-search-qdrant = { workspace = true }
+
+kamu-auth-web3-inmem = { workspace = true }
+kamu-auth-web3-postgres = { workspace = true }
+kamu-auth-web3-services = { workspace = true }
+kamu-auth-web3-sqlite = { workspace = true }
 
 # Top-level TLS configuration
 # TODO: Include alloy, aws-smithy
@@ -196,7 +202,7 @@ datafusion = { version = "47", default-features = false, features = [
     "unicode_expressions",
     "compression",
 ] }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 dirs = "6"
 fs_extra = "1.3"
 futures = "0.3"
@@ -216,7 +222,6 @@ tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"
 urlencoding = "2"
 whoami = "1.5"
-lazy_static = "1"
 strum = { version = "0.26", features = ["derive"] }
 
 

@@ -471,17 +471,13 @@ impl MoleculeProject {
 
     pub fn to_record_data(&self) -> serde_json::Value {
         let mut r = serde_json::Value::Object(Default::default());
-        r["account_id"] = self.account_id.as_did_str().to_string().into();
+        r["account_id"] = self.account_id.to_string().into();
         r["ipnft_symbol"] = self.ipnft_symbol.clone().into();
         r["ipnft_uid"] = self.ipnft_uid.clone().into();
         r["ipnft_address"] = self.ipnft_address.clone().into();
         r["ipnft_token_id"] = self.ipnft_token_id.clone().into_inner().to_string().into();
-        r["data_room_dataset_id"] = self.data_room_dataset_id.as_did_str().to_string().into();
-        r["announcements_dataset_id"] = self
-            .announcements_dataset_id
-            .as_did_str()
-            .to_string()
-            .into();
+        r["data_room_dataset_id"] = self.data_room_dataset_id.to_string().into();
+        r["announcements_dataset_id"] = self.announcements_dataset_id.to_string().into();
         r
     }
 

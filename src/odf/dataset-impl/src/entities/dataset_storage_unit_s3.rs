@@ -194,7 +194,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
 
                 // Errors...
                 Err(GetRefError::Access(e)) => {
-                    return Err(StoreDatasetError::Internal(e.int_err()))
+                    return Err(StoreDatasetError::Internal(e.int_err()));
                 }
                 Err(GetRefError::Internal(e)) => return Err(StoreDatasetError::Internal(e)),
             }

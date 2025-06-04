@@ -1,0 +1,40 @@
+[package]
+name = "kamu-auth-web3-services"
+description = "Service layer of the Web3 authentication"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+
+
+[dependencies]
+common-macros = { workspace = true }
+init-on-startup = { workspace = true }
+internal-error = { workspace = true }
+kamu-auth-web3 = { workspace = true }
+time-source = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = { version = "0.14", default-features = false }
+tracing = { version = "0.1", default-features = false }
+
+[dev-dependencies]

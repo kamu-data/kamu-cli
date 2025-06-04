@@ -13,7 +13,7 @@ use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -118,6 +118,8 @@ async fn test_single_dataset_search() {
         })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_search_correct_dataset_order_in_response() {
@@ -258,6 +260,8 @@ async fn test_search_correct_dataset_order_in_response() {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_name_lookup_accounts() {
     let harness = GqlSearchHarness::new().await;
@@ -294,6 +298,8 @@ async fn test_name_lookup_accounts() {
         }),
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_name_lookup_accounts_with_excluding() {
@@ -411,13 +417,15 @@ impl GqlSearchHarness {
     }
 
     pub async fn search_authorized(&self, query: &str, options: SearchOptions) -> Response {
+        use std::fmt::Write;
+
         let extra_arguments = {
             let mut s = String::new();
             if let Some(value) = options.page {
-                s += &format!(", page: {value}",);
+                write!(&mut s, ", page: {value}").unwrap();
             }
             if let Some(value) = options.per_page {
-                s += &format!(", perPage: {value}");
+                write!(&mut s, ", perPage: {value}").unwrap();
             }
             s
         };

@@ -26,7 +26,6 @@ database-common = { workspace = true }
 email-utils = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-accounts-services = { workspace = true }
-kamu-adapter-oauth = { workspace = true }
 odf = { workspace = true, default-features = false, features = [
     "arrow",
     "testing"
@@ -34,7 +33,7 @@ odf = { workspace = true, default-features = false, features = [
 
 argon2 = { version = "0.5" }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 futures = "0.3"
 password-hash = { version = "0.5", default-features = false }
 pretty_assertions = { version = "1" }

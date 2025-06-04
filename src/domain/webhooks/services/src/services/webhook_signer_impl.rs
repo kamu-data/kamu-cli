@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use base64::engine::general_purpose;
 use base64::Engine as _;
+use base64::engine::general_purpose;
 use chrono::{DateTime, Utc};
 use dill::*;
 use kamu_webhooks::{WebhookRFC9421Headers, WebhookSigner, WebhookSubscriptionSecret};

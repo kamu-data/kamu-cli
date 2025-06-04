@@ -109,7 +109,7 @@ impl TransformExecutorImpl {
 
         if response.output_schema.is_none() {
             tracing::warn!("Engine did not produce a schema. In future this will become an error.");
-        };
+        }
 
         if let Some(prev_schema) = request.schema {
             // Validate schema
@@ -319,11 +319,11 @@ impl TransformExecutor for TransformExecutorImpl {
             // Parquet format is non-reproducible, so we rely only on logical hash for
             // equivalence test and overwrite the physical hash and size with
             // the expected values for comparison
-            if let Some(actual_slice) = &mut cmp_actual_event.new_data {
-                if let Some(expected_slice) = &expected_event.new_data {
-                    actual_slice.physical_hash = expected_slice.physical_hash.clone();
-                    actual_slice.size = expected_slice.size;
-                }
+            if let Some(actual_slice) = &mut cmp_actual_event.new_data
+                && let Some(expected_slice) = &expected_event.new_data
+            {
+                actual_slice.physical_hash = expected_slice.physical_hash.clone();
+                actual_slice.size = expected_slice.size;
             }
 
             // Currently we're considering checkpoints non-reproducible and thus exclude
