@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::sync::{Arc, LazyLock};
 
 use chrono::{TimeZone, Utc};
@@ -76,7 +75,7 @@ async fn test_incorrect_json() {
 
     let incorrect_json = "{".to_string();
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(incorrect_json).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: Error(\"EOF while parsing an object\", line: 1, column: 1) }"
@@ -98,7 +97,7 @@ async fn test_incorrect_login_fields_json() {
         serde_json::to_string(&correct_json_with_wrong_field).unwrap()
     };
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: Error(\"missing field `message`\", line: 1, column: 38) }"
@@ -123,7 +122,7 @@ async fn test_message_parse_error() {
         serde_json::to_string(&request).unwrap()
     };
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: MessageParseError(Format(\"Unexpected Content\")) }"
@@ -147,7 +146,7 @@ async fn test_missing_expiration_time() {
 
     harness.create_nonce().await;
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: MissingMessageField(MissingMessageFieldError { field: ExpirationTime }) }"
@@ -179,7 +178,7 @@ async fn test_message_expired() {
 
     harness.create_nonce().await;
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: MessageExpired }"
@@ -207,7 +206,7 @@ async fn test_missing_statement() {
 
     harness.create_nonce().await;
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: MissingMessageField(MissingMessageFieldError { field: Statement }) }"
@@ -235,7 +234,7 @@ async fn test_unexpected_statement() {
 
     harness.create_nonce().await;
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: UnexpectedMessageStatement(UnexpectedMessageStatementError { statement: \"This is a stick-up!\" }) }"
@@ -262,7 +261,7 @@ async fn test_unexpected_uri() {
 
     harness.create_nonce().await;
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: UnexpectedMessageUri(UnexpectedMessageUriError { uri: \"http://platform.exam.pl/e.com/v/login\" }) }"
@@ -286,7 +285,7 @@ async fn test_invalid_signature_format() {
 
     harness.create_nonce().await;
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: VerificationError(SignatureLength) }"
@@ -311,7 +310,7 @@ async fn test_signature_verification_error() {
 
     harness.create_nonce().await;
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: VerificationError(Signer) }"
@@ -333,7 +332,7 @@ async fn test_nonce_not_found_error() {
         serde_json::to_string(&request).unwrap()
     };
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: NonceNotFound(NonceNotFoundError { wallet: 0xc945c7ee6360eb2375fb2abcaead114ab4ac733b }) }"
@@ -363,7 +362,7 @@ async fn test_nonce_expired() {
         harness.system_time_source_stub.set(new_now);
     }
 
-    assert_matches!(
+    pretty_assertions::assert_matches!(
         harness.provider.login(json_payload).await,
         Err(ProviderLoginError::InvalidCredentials(e))
             if format!("{e:?}") == "InvalidCredentialsError { source: NonceNotFound(NonceNotFoundError { wallet: 0xc945c7ee6360eb2375fb2abcaead114ab4ac733b }) }"
@@ -396,7 +395,27 @@ async fn test_signature_verified() {
         serde_json::to_string(&request).unwrap()
     };
 
-    assert_matches!(harness.provider.login(json_payload).await, Ok(_));
+    pretty_assertions::assert_matches!(harness.provider.login(json_payload).await, Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_verify_eip4361_message_format_with_device_flow() {
+    let harness = Web3WalletAuthenticationProviderHarness::new();
+
+    let message = harness
+        .provider
+        .parse_siwe_message(&MESSAGE.replace(
+            "http://platform.example.com/v/login",
+            "http://platform.example.com/v/login?deviceCode=1f34515e-8a3d-41b2-b88d-b5fadb793912",
+        ))
+        .unwrap();
+
+    pretty_assertions::assert_matches!(
+        harness.provider.verify_eip4361_message_format(&message),
+        Ok(_)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -404,7 +423,7 @@ async fn test_signature_verified() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct Web3WalletAuthenticationProviderHarness {
-    provider: Arc<dyn AuthenticationProvider>,
+    provider: Arc<Web3WalletAuthenticationProvider>,
     nonce_service: Arc<dyn Web3AuthEip4361NonceService>,
     system_time_source_stub: Arc<SystemTimeSourceStub>,
     nonce_repo: Arc<dyn Web3AuthEip4361NonceRepository>,

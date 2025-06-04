@@ -11,9 +11,11 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [0.240.1] - 2025-06-04
 ### Changed
-- Updated `sqlx` crate to `0.8.6`, Vol. 2
+- Updated `sqlx` crate to `0.8.6`, Vol. 2.
+### Fixed
+- `web3-wallet` authorization provider: interactive login use case support (Device Flow). 
 
 ## [0.240.0] - 2025-06-02
 ### Added
