@@ -75,8 +75,10 @@ impl OAuthDeviceCodeRepository for SqliteOAuthDeviceCodeRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
         let device_code_ref = device_code.as_ref();
-        let account_id_stack = token_params_part.account_id.as_did_str().to_stack_string();
+        let account_id_stack = token_params_part.account_id.as_stack_string();
         let account_id = account_id_stack.as_str();
         let token_iat: i64 = token_params_part.iat.try_into().int_err()?;
         let token_exp: i64 = token_params_part.exp.try_into().int_err()?;

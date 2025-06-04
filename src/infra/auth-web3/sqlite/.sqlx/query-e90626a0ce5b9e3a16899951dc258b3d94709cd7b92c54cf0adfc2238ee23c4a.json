@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM web3_auth_eip4361_nonces\n            WHERE datetime(expires_at) <= datetime($1)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e90626a0ce5b9e3a16899951dc258b3d94709cd7b92c54cf0adfc2238ee23c4a"
+}

@@ -81,7 +81,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
         let created_account = self
             .account_service
-            .create_account(account_name, email)
+            .create_password_account(account_name, email)
             .await?;
 
         // Save account password

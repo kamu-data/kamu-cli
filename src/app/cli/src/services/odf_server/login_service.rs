@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::Duration;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE, PROVIDER_PASSWORD};
+use kamu_accounts::{AccountProvider, OAUTH_DEVICE_ACCESS_TOKEN_GRANT_TYPE};
 use kamu_adapter_http::platform::{
     DeviceAccessTokenError,
     DeviceAccessTokenErrorStatus,
@@ -190,7 +190,7 @@ impl LoginService {
 
         self.invoke_login_method(
             odf_server_backend_url,
-            PROVIDER_PASSWORD,
+            AccountProvider::Password.into(),
             login_credentials_json,
         )
         .await

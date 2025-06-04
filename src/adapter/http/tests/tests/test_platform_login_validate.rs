@@ -153,7 +153,7 @@ async fn test_login_with_password_method_success() {
         let login_response = client
             .post(login_url)
             .json(&LoginRequestBody {
-                login_method: String::from(PROVIDER_PASSWORD),
+                login_method: AccountProvider::Password.to_string(),
                 login_credentials_json,
             })
             .send()
@@ -195,7 +195,7 @@ async fn test_login_with_password_method_invalid_credentials() {
         let login_response = client
             .post(login_url)
             .json(&LoginRequestBody {
-                login_method: String::from(PROVIDER_PASSWORD),
+                login_method: AccountProvider::Password.to_string(),
                 login_credentials_json,
             })
             .send()
@@ -239,7 +239,7 @@ async fn test_login_with_password_method_expired_credentials() {
         let login_response = client
             .post(login_url)
             .json(&LoginRequestBody {
-                login_method: String::from(PROVIDER_PASSWORD),
+                login_method: AccountProvider::Password.to_string(),
                 login_credentials_json,
             })
             .send()

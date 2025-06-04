@@ -17,11 +17,13 @@ pub async fn test_insert_and_locate_did_secret_keys(catalog: &dill::Catalog) {
     let did_secret_key_repository = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
 
     {
+        use odf::metadata::AsStackString;
+
         let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
         let account_did_secret_key =
             DidSecretKey::try_new(&account_key.into(), SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY)
                 .unwrap();
-        let account_id = account_id.as_did_str().to_stack_string();
+        let account_id = account_id.as_stack_string();
 
         test(
             did_secret_key_repository.as_ref(),

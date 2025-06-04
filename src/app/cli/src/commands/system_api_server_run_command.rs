@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use console::style as s;
 use database_common::DatabaseTransactionRunner;
-use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::*;
@@ -55,13 +54,16 @@ pub struct APIServerRunCommand {
 
     // TODO: Reconsider the injection approach
     #[dill::component(explicit)]
-    base_catalog: Catalog,
+    base_catalog: dill::Catalog,
     #[dill::component(explicit)]
-    cli_catalog: Catalog,
+    cli_catalog: dill::Catalog,
 }
 
 impl APIServerRunCommand {
-    async fn get_access_token(&self) -> Result<String, CLIError> {
+    async fn get_access_token(
+        &self,
+        api_server_catalog: dill::Catalog,
+    ) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),
             CurrentAccountSubject::Anonymous(_) => {
@@ -84,11 +86,11 @@ impl APIServerRunCommand {
             password: account_config.get_password(),
         };
 
-        let login_response = DatabaseTransactionRunner::new(self.base_catalog.clone())
+        let login_response = DatabaseTransactionRunner::new(api_server_catalog)
             .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
                 auth_svc
                     .login(
-                        PROVIDER_PASSWORD,
+                        AccountProvider::Password.into(),
                         serde_json::to_string::<PasswordLoginCredentials>(&login_credentials)
                             .map_int_err(CLIError::critical)?,
                         None,
@@ -124,8 +126,6 @@ impl Command for APIServerRunCommand {
     }
 
     async fn run(&self) -> Result<(), CLIError> {
-        let access_token = self.get_access_token().await?;
-
         let api_server = crate::explore::APIServer::new(
             &self.base_catalog,
             &self.cli_catalog,
@@ -138,6 +138,10 @@ impl Command for APIServerRunCommand {
             self.e2e_output_data_path.as_ref(),
         )
         .await?;
+
+        let access_token = self
+            .get_access_token(api_server.api_server_catalog().clone())
+            .await?;
 
         tracing::info!(
             "API server is listening on: http://{}",

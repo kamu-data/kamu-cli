@@ -9,6 +9,7 @@
 
 use kamu_accounts::{CreateAccessTokenError, RevokeTokenError};
 
+use crate::mutations::AuthWeb3Mut;
 use crate::prelude::*;
 use crate::queries::{Account, CreateAccessTokenResultSuccess, CreatedAccessToken};
 use crate::utils::{check_access_token_valid, check_logged_account_id_match};
@@ -20,19 +21,25 @@ pub(crate) struct AuthMut;
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl AuthMut {
-    #[tracing::instrument(level = "info", name = AuthMut_login, skip_all, fields(%login_method))]
+    /// Web3-related functionality group
+    async fn web3(&self) -> AuthWeb3Mut {
+        AuthWeb3Mut
+    }
+
+    #[tracing::instrument(level = "info", name = AuthMut_login, skip_all, fields(?login_method))]
     async fn login(
         &self,
         ctx: &Context<'_>,
-        login_method: String,
+        login_method: AccountProvider,
         login_credentials_json: String,
         device_code: Option<DeviceCode<'_>>,
     ) -> Result<LoginResponse> {
         let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
 
+        let login_method: kamu_accounts::AccountProvider = login_method.into();
         let device_code = device_code.map(Into::into);
         let login_result = authentication_service
-            .login(login_method.as_str(), login_credentials_json, device_code)
+            .login(login_method.into(), login_credentials_json, device_code)
             .await;
 
         match login_result {
@@ -66,9 +73,11 @@ impl AuthMut {
             .create_access_token(&token_name, &account_id)
             .await
         {
-            Ok(created_token) => Ok(CreateTokenResult::Success(CreateAccessTokenResultSuccess {
-                token: CreatedAccessToken::new(created_token, account_id, &token_name),
-            })),
+            Ok(created_token) => Ok(CreateTokenResult::Success(Box::new(
+                CreateAccessTokenResultSuccess {
+                    token: CreatedAccessToken::new(created_token, account_id, &token_name),
+                },
+            ))),
             Err(err) => match err {
                 CreateAccessTokenError::Duplicate(_) => Ok(CreateTokenResult::DuplicateName(
                     CreateAccessTokenResultDuplicate { token_name },
@@ -202,7 +211,7 @@ impl RevokeResultAlreadyRevoked<'_> {
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CreateTokenResult<'a> {
-    Success(CreateAccessTokenResultSuccess<'a>),
+    Success(Box<CreateAccessTokenResultSuccess<'a>>),
     DuplicateName(CreateAccessTokenResultDuplicate),
 }
 
