@@ -9,8 +9,8 @@
 
 use kamu::domain;
 use kamu_accounts::{AccountServiceExt as _, CurrentAccountSubject};
-use kamu_core::auth::DatasetAction;
 use kamu_core::DatasetRegistryExt;
+use kamu_core::auth::DatasetAction;
 
 use crate::prelude::*;
 use crate::queries::{Molecule, MoleculeProject};
@@ -59,7 +59,7 @@ impl MoleculeMut {
             _ => {
                 return Err(GqlError::Access(odf::AccessError::Unauthorized(
                     "Only 'molecule' account can provision new projects".into(),
-                )))
+                )));
             }
         };
 
@@ -338,7 +338,7 @@ impl MoleculeProjectMut {
                         CreateAnnouncementErrorInvalidAttachment {
                             message: err.to_string(),
                         },
-                    ))
+                    ));
                 }
             };
 
