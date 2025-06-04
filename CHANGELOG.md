@@ -11,8 +11,9 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [Unreleased]
 ### Changed
+- Panic's now also log correct tracing message
 - Updated `sqlx` crate to `0.8.6`, Vol. 2
 
 ## [0.240.0] - 2025-06-02
