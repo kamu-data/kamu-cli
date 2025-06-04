@@ -72,8 +72,8 @@ impl DatasetHelper {
         &self,
         mutate_data: Option<Box<dyn FnOnce(RecordBatch) -> RecordBatch>>,
     ) {
-        use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         use datafusion::parquet::arrow::ArrowWriter;
+        use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         use datafusion::parquet::file::properties::WriterProperties;
         use datafusion::parquet::schema::types::ColumnPath;
 

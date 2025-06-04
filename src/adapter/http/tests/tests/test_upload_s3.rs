@@ -15,10 +15,10 @@ use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{FileUploadLimitConfig, ServerUrlConfig, TenancyConfig, UploadContext};
 use kamu_accounts::{
+    DEFAULT_ACCOUNT_ID,
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
-    DEFAULT_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -47,7 +47,7 @@ use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 use tokio::io::AsyncReadExt;
 
-use crate::harness::{await_client_server_flow, TestAPIServer};
+use crate::harness::{TestAPIServer, await_client_server_flow};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -245,10 +245,9 @@ async fn test_attempt_upload_file_authorized() {
         let upload_token = upload_context.upload_token.0;
 
         let expected_key = format!(
-            "{}/{}/{}",
-            DEFAULT_ACCOUNT_ID.as_multibase(),
-            upload_token.upload_id,
-            "test.txt"
+            "{}/{}/test.txt",
+            DEFAULT_ACCOUNT_ID.as_id_without_did_prefix(),
+            upload_token.upload_id
         );
         let file_exists = upload_bucket_context
             .bucket_path_exists(&expected_key)

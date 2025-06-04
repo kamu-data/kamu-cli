@@ -94,7 +94,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                         write!(self.output, r#", "type": "{physical_type}({type_length})""#)?;
                     }
                     _ => write!(self.output, r#", "type": "{physical_type}""#)?,
-                };
+                }
 
                 // Also print logical type if it is available
                 // If there is a logical type, do not print converted type

@@ -11,8 +11,8 @@ use std::assert_matches::assert_matches;
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf_metadata::serde::MetadataBlockSerializer;
+use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf_metadata::*;
 use opendatafabric_storage::*;
 

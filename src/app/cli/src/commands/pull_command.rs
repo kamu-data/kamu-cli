@@ -77,7 +77,7 @@ impl PullCommand {
             None => {
                 return Err(CLIError::usage_error(
                     "When using --as reference should not point to wildcard pattern",
-                ))
+                ));
             }
         };
 
@@ -546,7 +546,7 @@ impl PollingIngestListener for PrettyIngestProgress {
                     ));
             }
             PollingIngestResult::Updated {
-                ref new_head,
+                new_head,
                 uncacheable,
                 ..
             } => {
@@ -559,7 +559,7 @@ impl PollingIngestListener for PrettyIngestProgress {
                             console::style("Data source is uncacheable").yellow(),
                         ));
                     state.curr_progress = self.multi_progress.add(Self::new_spinner(""));
-                };
+                }
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
@@ -572,7 +572,7 @@ impl PollingIngestListener for PrettyIngestProgress {
                         .green(),
                     ));
             }
-        };
+        }
     }
 
     fn error(&self, _error: &PollingIngestError) {
@@ -696,7 +696,7 @@ impl TransformListener for PrettyTransformProgress {
             TransformResult::UpToDate => {
                 console::style("Dataset is up-to-date".to_owned()).yellow()
             }
-            TransformResult::Updated { ref new_head, .. } => console::style(format!(
+            TransformResult::Updated { new_head, .. } => console::style(format!(
                 "Committed new block {}",
                 new_head.as_multibase().short()
             ))
@@ -923,7 +923,7 @@ impl SyncListener for PrettySyncProgress {
         let msg = match result {
             SyncResult::UpToDate => console::style("Dataset is up-to-date".to_owned()).yellow(),
             SyncResult::Updated {
-                ref new_head,
+                new_head,
                 num_blocks,
                 ..
             } => console::style(format!(
@@ -970,7 +970,7 @@ fn sanitize_pull_error(original_pull_error: PullError) -> PullError {
     {
         let dataset_ref = permissions_error.dataset_ref.clone();
         return PullError::NotFound(odf::DatasetNotFoundError { dataset_ref });
-    };
+    }
 
     // No miracle happened, giving away the error that was
     original_pull_error

@@ -30,7 +30,20 @@ testing = []
 common-macros = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
+event-sourcing = { workspace = true }
 internal-error = { workspace = true }
+kamu = { workspace = true }
+kamu-accounts = { workspace = true }
+kamu-accounts-services = { workspace = true }
+kamu-auth-rebac = { workspace = true }
+kamu-auth-web3 = { workspace = true }
+kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-flow-system = { workspace = true }
+kamu-flow-system-services = { workspace = true }
+kamu-search = { workspace = true }
+kamu-webhooks = { workspace = true }
+kamu-task-system = { workspace = true }
 observability = { workspace = true }
 odf = { workspace = true, default-features = false, features = [
     "arrow",
@@ -39,19 +52,6 @@ odf = { workspace = true, default-features = false, features = [
     "s3",
 ] }
 random-strings = { workspace = true }
-
-event-sourcing = { workspace = true }
-kamu = { workspace = true }
-kamu-accounts = { workspace = true }
-kamu-accounts-services = { workspace = true }
-kamu-auth-rebac = { workspace = true }
-kamu-core = { workspace = true }
-kamu-datasets = { workspace = true }
-kamu-flow-system = { workspace = true }
-kamu-flow-system-services = { workspace = true }
-kamu-task-system = { workspace = true }
-kamu-search = { workspace = true }
-kamu-webhooks = { workspace = true }
 
 async-graphql = { version = "7", default-features = false, features = [
     "chrono",
@@ -65,12 +65,11 @@ num-bigint = { version = "0.4", default-features = false }
 chrono = "0.4"
 # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 datafusion = { version = "47", default-features = false, features = ["serde"] }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
 humansize = { version = "2", default-features = false }
 indoc = "2"
 jsonschema = { version = "0.30", default-features = false }
-lazy_static = { version = "1" }
 nutype = { version = "0.6", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }

@@ -11,9 +11,10 @@ use async_graphql::value;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::Component;
 use indoc::indoc;
-use kamu_accounts::testing::{MockAuthenticationService, DUMMY_LOGIN_METHOD};
+use kamu_accounts::testing::{DUMMY_LOGIN_METHOD, MockAuthenticationService};
 use kamu_accounts::{
     AccessTokenLifecycleMessage,
+    AccountProvider,
     AuthenticationService,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
@@ -21,26 +22,26 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::InMemoryAccessTokenRepository;
 use kamu_accounts_services::AccessTokenServiceImpl;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::SystemTimeSourceDefault;
 
-use crate::utils::{authentication_catalogs, PredefinedAccountOpts};
+use crate::utils::{PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_login_request() -> async_graphql::Request {
-    async_graphql::Request::new(format!(
+    async_graphql::Request::new(indoc::indoc!(
         r#"
-        mutation {{
-            auth {{
-                login (loginMethod: "{DUMMY_LOGIN_METHOD}", loginCredentialsJson: "dummy") {{
+        mutation {
+            auth {
+                login (loginMethod: OAUTH_GITHUB, loginCredentialsJson: "dummy") {
                     accessToken
-                    account {{
+                    account {
                         accountName
-                    }}
-                }}
-            }}
-        }}
+                    }
+                }
+            }
+        }
         "#,
     ))
 }
@@ -65,22 +66,22 @@ fn make_account_details_request() -> async_graphql::Request {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_enabled_login_methods() {
+async fn test_enabled_login_providers() {
     let mut mock_authentication_service = MockAuthenticationService::new();
     mock_authentication_service
         .expect_supported_login_methods()
-        .return_once(|| vec![DUMMY_LOGIN_METHOD]);
+        .return_once(|| vec![AccountProvider::OAuthGitHub.into()]);
 
     let harness = AuthGQLHarness::new(mock_authentication_service).await;
-
     let schema = kamu_adapter_graphql::schema_quiet();
+
     let res = schema
         .execute(
             async_graphql::Request::new(
                 r#"
                 query {
                     auth {
-                        enabledLoginMethods
+                        enabledProviders
                     }
                 }
                 "#,
@@ -89,14 +90,16 @@ async fn test_enabled_login_methods() {
         )
         .await;
 
-    assert!(res.is_ok(), "{res:?}");
-    assert_eq!(
-        res.data,
+    pretty_assertions::assert_eq!(
         value!({
             "auth": {
-                "enabledLoginMethods": [ DUMMY_LOGIN_METHOD ]
+                "enabledProviders": [
+                    async_graphql::Name::new("OAUTH_GITHUB")
+                ]
             }
-        })
+        }),
+        res.data,
+        "{res:?}"
     );
 }
 

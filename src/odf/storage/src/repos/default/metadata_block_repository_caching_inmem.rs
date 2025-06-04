@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use dashmap::DashMap;
 use internal_error::ResultIntoInternal;
-use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf_metadata::serde::MetadataBlockSerializer;
+use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf_metadata::*;
 
 use crate::*;
@@ -100,7 +100,7 @@ where
     async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
         if let Some(cached_value) = self.cache.get(hash) {
             return Ok(cached_value.block_data.clone());
-        };
+        }
 
         let get_block_bytes_result = self.wrapped.get_block_bytes(hash).await;
 

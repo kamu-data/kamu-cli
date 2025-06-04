@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use database_common::DEFAULT_WORKSPACE_SQLITE_DATABASE_NAME;
-use kamu::domain::{TenancyConfig, KAMU_WORKSPACE_DIR_NAME};
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu::domain::{KAMU_WORKSPACE_DIR_NAME, TenancyConfig};
 use kamu_cli_puppet::KamuCliPuppet;
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_init_creates_sqlite_database

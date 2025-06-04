@@ -22,11 +22,11 @@ use kamu_datasets::{
     DatasetEntry,
     DatasetEntryRepository,
     DatasetLifecycleMessage,
-    MockDatasetEntryRepository,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+    MockDatasetEntryRepository,
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 

@@ -15,9 +15,9 @@ use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountRepository,
-    GetAccountByNameError,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
+    GetAccountByNameError,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
 };
 use kamu_datasets::{

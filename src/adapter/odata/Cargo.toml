@@ -41,7 +41,7 @@ axum = { version = "0.8", default-features = false, features = [] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "47", default-features = false }
 datafusion-odata = { version = "47", default-features = false }
-dill = { version = "0.13", default-features = false }
+dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false }
 http = "1"
 tracing = "0.1"

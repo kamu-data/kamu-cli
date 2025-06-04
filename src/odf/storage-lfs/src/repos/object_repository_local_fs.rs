@@ -206,13 +206,13 @@ where
             Multihash::from_digest::<D>(Multicodec::try_from(C).unwrap(), data)
         };
 
-        if let Some(expected_hash) = options.expected_hash {
-            if *expected_hash != hash {
-                return Err(InsertError::HashMismatch(HashMismatchError {
-                    expected: expected_hash.clone(),
-                    actual: hash,
-                }));
-            }
+        if let Some(expected_hash) = options.expected_hash
+            && *expected_hash != hash
+        {
+            return Err(InsertError::HashMismatch(HashMismatchError {
+                expected: expected_hash.clone(),
+                actual: hash,
+            }));
         }
 
         let path = self.get_path_write(&hash).int_err()?;
@@ -253,15 +253,15 @@ where
             actual_hash
         };
 
-        if let Some(expected_hash) = options.expected_hash {
-            if *expected_hash != hash {
-                tokio::fs::remove_file(&staging_path).await.int_err()?;
+        if let Some(expected_hash) = options.expected_hash
+            && *expected_hash != hash
+        {
+            tokio::fs::remove_file(&staging_path).await.int_err()?;
 
-                return Err(InsertError::HashMismatch(HashMismatchError {
-                    expected: expected_hash.clone(),
-                    actual: hash,
-                }));
-            }
+            return Err(InsertError::HashMismatch(HashMismatchError {
+                expected: expected_hash.clone(),
+                actual: hash,
+            }));
         }
 
         let path = self.get_path_write(&hash).int_err()?;
@@ -292,13 +292,13 @@ where
             odf_data_utils::data::hash::get_file_physical_hash(src).int_err()?
         };
 
-        if let Some(expected_hash) = options.expected_hash {
-            if *expected_hash != hash {
-                return Err(InsertError::HashMismatch(HashMismatchError {
-                    expected: expected_hash.clone(),
-                    actual: hash,
-                }));
-            }
+        if let Some(expected_hash) = options.expected_hash
+            && *expected_hash != hash
+        {
+            return Err(InsertError::HashMismatch(HashMismatchError {
+                expected: expected_hash.clone(),
+                actual: hash,
+            }));
         }
 
         let path = self.get_path_write(&hash).int_err()?;

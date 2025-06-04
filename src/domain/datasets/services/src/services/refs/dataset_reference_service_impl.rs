@@ -9,16 +9,16 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface, meta, Catalog};
+use dill::{Catalog, component, interface, meta};
 use internal_error::*;
 use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetReferenceRepository,
     DatasetReferenceService,
     GetDatasetReferenceError,
-    SetDatasetReferenceError,
     MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    SetDatasetReferenceError,
 };
 use messaging_outbox::{
     InitialConsumerBoundary,

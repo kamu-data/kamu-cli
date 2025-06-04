@@ -8,17 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{
-    mysql_generate_placeholders_list,
     PaginationOpts,
     TransactionRef,
     TransactionRefT,
+    mysql_generate_placeholders_list,
 };
 use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use sqlx::Row;
 use sqlx::error::DatabaseError;
 use sqlx::mysql::MySqlRow;
-use sqlx::Row;
 
 use crate::domain::*;
 
@@ -90,7 +90,7 @@ impl AccountRepository for MySqlAccountRepository {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             account.id.to_string(),
-            account.account_name.to_ascii_lowercase(),
+            account.prepare_account_name_for_storage(),
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type,
@@ -133,7 +133,7 @@ impl AccountRepository for MySqlAccountRepository {
                 provider_identity_key = ?
             WHERE id = ?
             "#,
-            updated_account.account_name.to_ascii_lowercase(),
+            updated_account.prepare_account_name_for_storage(),
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,
@@ -172,10 +172,13 @@ impl AccountRepository for MySqlAccountRepository {
         account_id: &odf::AccountID,
         new_email: Email,
     ) -> Result<(), UpdateAccountError> {
+        use odf::metadata::AsStackString;
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-        let account_id_stack = account_id.as_did_str().to_stack_string();
+
+        let account_id_stack = account_id.as_stack_string();
 
         let update_result = sqlx::query!(
             r#"
@@ -566,9 +569,11 @@ impl PasswordHashRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
         // TODO: duplicates are prevented with unique indices, but handle error
 
-        let account_id = account_id.as_did_str().to_stack_string();
+        let account_id = account_id.as_stack_string();
 
         sqlx::query!(
             r#"

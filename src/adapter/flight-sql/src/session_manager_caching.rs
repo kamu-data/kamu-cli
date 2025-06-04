@@ -18,7 +18,7 @@ use kamu_core::QueryService;
 use time_source::SystemTimeSource;
 use tonic::Status;
 
-use crate::{internal_error, PlanId, SessionId, SessionManager};
+use crate::{PlanId, SessionId, SessionManager, internal_error};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

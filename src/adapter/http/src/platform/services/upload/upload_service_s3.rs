@@ -15,8 +15,8 @@ use aws_sdk_s3::types::ObjectCannedAcl;
 use bytes::Bytes;
 use dill::*;
 use internal_error::ErrorIntoInternal;
-use kamu_core::services::upload_service::*;
 use kamu_core::MediaType;
+use kamu_core::services::upload_service::*;
 use s3_utils::{PutObjectOptions, S3Context};
 use tokio::io::AsyncRead;
 use uuid::Uuid;
@@ -39,7 +39,9 @@ impl UploadServiceS3 {
         upload_id: &str,
         file_name: &str,
     ) -> String {
-        format!("{}/{}/{}", account_id.as_multibase(), upload_id, file_name,)
+        let account_id_without_prefix = account_id.as_id_without_did_prefix();
+
+        format!("{account_id_without_prefix}/{upload_id}/{file_name}")
     }
 }
 
@@ -76,12 +78,12 @@ impl UploadService for UploadServiceS3 {
             .await
             .map_err(ErrorIntoInternal::int_err)?;
 
-        let owner_account_id_mb = owner_account_id.as_multibase().to_stack_string();
-
+        let owner_account_id_without_prefix =
+            owner_account_id.as_id_without_did_prefix().to_string();
         let upload_token = UploadTokenBase64Json(UploadToken {
             upload_id,
             file_name,
-            owner_account_id: owner_account_id_mb.to_string(),
+            owner_account_id: owner_account_id_without_prefix,
             content_length,
             content_type,
         });

@@ -252,7 +252,7 @@ impl TryFrom<FlowTriggerInput> for FlowTriggerRule {
                     Err(e) => {
                         return Err(Self::Error {
                             reason: e.to_string(),
-                        })
+                        });
                     }
                 };
                 Ok(FlowTriggerRule::Batching(batching_rule))

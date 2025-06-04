@@ -18,10 +18,10 @@ use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
 
 use crate::utils::{
-    authentication_catalogs,
-    expect_anonymous_access_error,
     BaseGQLDatasetHarness,
     PredefinedAccountOpts,
+    authentication_catalogs,
+    expect_anonymous_access_error,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -378,8 +378,8 @@ async fn test_dataset_create_from_snapshot() {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
     use odf::metadata::serde::DatasetSnapshotSerializer;
+    use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
 
     let snapshot_yaml = String::from_utf8_lossy(
         &YamlDatasetSnapshotSerializer
@@ -480,8 +480,8 @@ async fn test_dataset_create_from_snapshot_unauthorized() {
             .push_event(MetadataFactory::set_polling_source().build())
             .build();
 
-        use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
         use odf::metadata::serde::DatasetSnapshotSerializer;
+        use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
 
         String::from_utf8_lossy(
             &YamlDatasetSnapshotSerializer

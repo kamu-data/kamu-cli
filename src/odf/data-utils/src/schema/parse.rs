@@ -35,17 +35,16 @@ pub async fn parse_ddl_to_datafusion_schema(
     // TODO: SEC: should we worry about SQL injections?
     let sql = format!("create table x ({ddl})");
 
-    if let Err(ParserError::ParserError(err)) = Parser::parse_sql(&GenericDialect {}, &sql) {
-        if let Some(err_index) = extract_column_index(&err)
-            && let Some(invalid_field) = extract_problematic_field(&sql, err_index)
-        {
-            return Err(DataFusionError::SQL(
-                ParserError::ParserError(format!(
-                    "Argument '{invalid_field}' is invalid or a reserved keyword"
-                )),
-                None,
-            ));
-        }
+    if let Err(ParserError::ParserError(err)) = Parser::parse_sql(&GenericDialect {}, &sql)
+        && let Some(err_index) = extract_column_index(&err)
+        && let Some(invalid_field) = extract_problematic_field(&sql, err_index)
+    {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(format!(
+                "Argument '{invalid_field}' is invalid or a reserved keyword"
+            )),
+            None,
+        ));
     }
 
     let plan = ctx.state().create_logical_plan(&sql).await?;

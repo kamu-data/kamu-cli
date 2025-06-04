@@ -15,7 +15,7 @@ use chrono::Utc;
 use dill::*;
 use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use kamu_accounts::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::dataset::DUMMY_ODF_ACCESS_TOKEN;
@@ -225,10 +225,13 @@ impl AuthenticationServiceImpl {
 #[async_trait::async_trait]
 impl AuthenticationService for AuthenticationServiceImpl {
     fn supported_login_methods(&self) -> Vec<&'static str> {
-        self.authentication_providers_by_method
+        let mut methods = self
+            .authentication_providers_by_method
             .keys()
             .copied()
-            .collect()
+            .collect::<Vec<_>>();
+        methods.sort_unstable();
+        methods
     }
 
     async fn login(
@@ -237,13 +240,13 @@ impl AuthenticationService for AuthenticationServiceImpl {
         login_credentials_json: String,
         device_code: Option<DeviceCode>,
     ) -> Result<LoginResponse, LoginError> {
-        // Resolve provider via specified login method
+        // Resolve provider via a specified login method
         let provider = self.resolve_authentication_provider(login_method)?;
 
         // Attempt to login via provider
         let provider_response = provider.login(login_credentials_json).await?;
 
-        // Try to resolve existing account via provider's identity key
+        // Try to resolve an existing account via the provider's identity key
         let maybe_account_id = self
             .account_repository
             .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)
@@ -255,12 +258,9 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
             // Account does not exist and needs to be created
             None => {
-                // Generate identity: temporarily we do this via provider, but revise in future
-                let account_id = provider.generate_id(&provider_response.account_name);
-
                 // Create a new account
                 let new_account = Account {
-                    id: account_id,
+                    id: provider_response.account_id,
                     account_name: provider_response.account_name.clone(),
                     email: provider_response.email,
                     display_name: provider_response.display_name,
@@ -271,7 +271,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     provider_identity_key: provider_response.provider_identity_key,
                 };
 
-                // Register account in the repository
+                // Register an account in the repository
                 self.account_repository
                     .save_account(&new_account)
                     .await

@@ -145,11 +145,11 @@ where
             // When failed to read at least one event from source stream,
             // function returns error result immediately
             let (query, event_id, event) = res?;
-            if let Some(agg_result) = agg_results.get_mut(&query) {
-                if let Ok(agg) = agg_result {
-                    if let Err(err) = agg.apply_stored(event_id, event) {
-                        *agg_result = Err(err.into());
-                    }
+            if let Some(agg_result) = agg_results.get_mut(&query)
+                && let Ok(agg) = agg_result
+            {
+                if let Err(err) = agg.apply_stored(event_id, event) {
+                    *agg_result = Err(err.into());
                 }
             } else {
                 let agg_result =
@@ -182,7 +182,7 @@ where
         Ok(result)
     }
 
-    /// Same as [Aggregate::load()] but with extra control knobs
+    /// Same as [`Aggregate::load()`] but with extra control knobs
     #[tracing::instrument(
         level = "debug",
         name = "load",
@@ -240,7 +240,7 @@ where
         self.update_ext(event_store, LoadOpts::default()).await
     }
 
-    /// Same as [Aggregate::update()] but with extra control knobs
+    /// Same as [`Aggregate::update()`] but with extra control knobs
     #[tracing::instrument(
         level = "debug",
         name = "update",
@@ -300,7 +300,7 @@ where
         // Extra check to avoid taking a vec with an allocated buffer
         if self.pending_events.is_empty() {
             return Ok(());
-        };
+        }
 
         let events = self.pending_events.take_inner();
 

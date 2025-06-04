@@ -9,11 +9,11 @@
 
 use std::path::Path;
 
-use kamu::domain::{ResourceError, ResourceLoader};
 use kamu::ResourceLoaderImpl;
+use kamu::domain::{ResourceError, ResourceLoader};
 use odf::metadata::testing::MetadataFactory;
-use odf::serde::yaml::YamlDatasetSnapshotSerializer;
 use odf::serde::DatasetSnapshotSerializer;
+use odf::serde::yaml::YamlDatasetSnapshotSerializer;
 use test_utils::HttpFileServer;
 
 fn create_test_snapshot(path: &Path) -> odf::DatasetSnapshot {

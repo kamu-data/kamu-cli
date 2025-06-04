@@ -10,7 +10,7 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::{future, Future, Stream, TryStreamExt};
+use futures::{Future, Stream, TryStreamExt, future};
 use odf_metadata::*;
 use pin_project::pin_project;
 

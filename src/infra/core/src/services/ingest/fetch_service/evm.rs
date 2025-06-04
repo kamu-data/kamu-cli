@@ -255,7 +255,7 @@ impl FetchService {
         let has_more = state.last_seen_block < block_range_unprocessed.1;
 
         // Write data, if any, to parquet file
-        if coder.len() > 0 {
+        if !coder.is_empty() {
             let batch = coder.finish();
             {
                 let mut writer = datafusion::parquet::arrow::ArrowWriter::try_new(

@@ -12,8 +12,8 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::InternalError;
 use secrecy::ExposeSecret;
-use sqlx::mysql::MySqlConnectOptions;
 use sqlx::MySqlPool;
+use sqlx::mysql::MySqlConnectOptions;
 
 use crate::{DatabaseConnectionSettings, DatabasePasswordProvider, DatabasePasswordRefresher};
 

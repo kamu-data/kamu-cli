@@ -227,8 +227,8 @@ impl oso::FromPolar for DatasetAction {
     fn from_polar(polar_value: oso::PolarValue) -> oso::Result<Self> {
         use std::str::FromStr;
 
-        use oso::errors::{OsoError, TypeError};
         use oso::PolarValue;
+        use oso::errors::{OsoError, TypeError};
 
         let PolarValue::String(raw_dataset_action) = polar_value else {
             return Err(TypeError::expected("String").user());
@@ -338,12 +338,12 @@ where
             let mut chunked_dataset_handles = dataset_handles_stream
                 .try_chunks(STREAM_CHUNK_LEN);
 
-            while let Some(datataset_handles_chunk) =
+            while let Some(dataset_handles_chunk) =
                 chunked_dataset_handles.try_next().await.int_err()?
             {
                 // ... the datasets that are accessed.
                 let hdls = self
-                    .filter_datasets_allowing(datataset_handles_chunk, action)
+                    .filter_datasets_allowing(dataset_handles_chunk, action)
                     .await?;
 
                 for hdl in hdls {

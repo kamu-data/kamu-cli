@@ -44,7 +44,7 @@ impl Command for CompletionsCommand {
             _ => {
                 clap_complete::generate(self.shell, &mut cli, bin_name, &mut std::io::stdout());
             }
-        };
+        }
         Ok(())
     }
 }

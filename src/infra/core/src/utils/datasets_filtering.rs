@@ -10,7 +10,7 @@
 use std::pin::Pin;
 use std::sync::Arc;
 
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, future};
 use internal_error::InternalError;
 use kamu_core::{
     DatasetRegistry,

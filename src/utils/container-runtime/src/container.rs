@@ -317,11 +317,7 @@ impl ContainerRunCommand {
     }
 
     pub fn maybe(self, cond: bool, fun: impl FnOnce(Self) -> Self) -> Self {
-        if cond {
-            fun(self)
-        } else {
-            self
-        }
+        if cond { fun(self) } else { self }
     }
 
     pub fn maybe_or(
@@ -330,11 +326,7 @@ impl ContainerRunCommand {
         fun_if: impl FnOnce(Self) -> Self,
         fun_else: impl FnOnce(Self) -> Self,
     ) -> Self {
-        if cond {
-            fun_if(self)
-        } else {
-            fun_else(self)
-        }
+        if cond { fun_if(self) } else { fun_else(self) }
     }
 
     pub fn map<T>(self, opt: Option<T>, fun: impl FnOnce(Self, T) -> Self) -> Self {

@@ -265,10 +265,10 @@ impl WorkspaceService {
             if self.is_multi_tenant_workspace() {
                 for r_account_dir in self.workspace_layout.datasets_dir.read_dir().int_err()? {
                     let account_dir_entry = r_account_dir.int_err()?;
-                    if let Some(s) = account_dir_entry.file_name().to_str() {
-                        if s.starts_with('.') {
-                            continue;
-                        }
+                    if let Some(s) = account_dir_entry.file_name().to_str()
+                        && s.starts_with('.')
+                    {
+                        continue;
                     }
                     if !account_dir_entry.path().is_dir() {
                         continue;
@@ -277,10 +277,10 @@ impl WorkspaceService {
                     let read_dataset_dir = std::fs::read_dir(account_dir_entry.path()).int_err()?;
                     for r_dataset_dir in read_dataset_dir {
                         let dataset_dir_entry = r_dataset_dir.int_err()?;
-                        if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                            if s.starts_with('.') {
-                                continue;
-                            }
+                        if let Some(s) = dataset_dir_entry.file_name().to_str()
+                            && s.starts_with('.')
+                        {
+                            continue;
                         }
 
                         let dataset_current_path = dataset_dir_entry.path();
@@ -306,10 +306,10 @@ impl WorkspaceService {
             } else {
                 for res in self.workspace_layout.datasets_dir.read_dir().int_err()? {
                     let dataset_dir_entry = res.int_err()?;
-                    if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                        if s.starts_with('.') {
-                            continue;
-                        }
+                    if let Some(s) = dataset_dir_entry.file_name().to_str()
+                        && s.starts_with('.')
+                    {
+                        continue;
                     }
 
                     let dataset_current_path = dataset_dir_entry.path();

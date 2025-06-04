@@ -871,7 +871,7 @@ impl DatasetRefAnyPattern {
             Self::PatternAmbiguous(account_repo_name, _) => {
                 if is_multitenant_mode {
                     return None;
-                };
+                }
                 Some(RepoName::from_str(&account_repo_name.pattern).unwrap())
             }
         }

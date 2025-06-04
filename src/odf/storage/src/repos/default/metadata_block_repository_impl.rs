@@ -10,8 +10,8 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use internal_error::ResultIntoInternal;
-use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf_metadata::serde::MetadataBlockSerializer;
+use odf_metadata::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use odf_metadata::*;
 
 use crate::*;

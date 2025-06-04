@@ -14,7 +14,7 @@ use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
 use crate::mutations::MetadataChainMut;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
-use crate::{utils, LoggedInGuard};
+use crate::{LoggedInGuard, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -90,11 +90,7 @@ impl<'a> DatasetMetadataMut<'a> {
                     path: "README.md".to_string(),
                     content,
                 });
-                if new != old {
-                    Some(new)
-                } else {
-                    None
-                }
+                if new != old { Some(new) } else { None }
             }
         };
 
@@ -125,7 +121,7 @@ impl<'a> DatasetMetadataMut<'a> {
                 })
             }
             Err(odf::dataset::CommitError::Access(_)) => {
-                return Err(utils::make_dataset_access_error(dataset_handle))
+                return Err(utils::make_dataset_access_error(dataset_handle));
             }
             Err(e @ odf::dataset::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };

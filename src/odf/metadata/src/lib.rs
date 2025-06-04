@@ -12,6 +12,7 @@
 
 // Re-exports
 pub use ed25519_dalek::SigningKey;
+pub use multiformats::stack_string::{AsStackString, ToStackString};
 
 pub mod engine;
 

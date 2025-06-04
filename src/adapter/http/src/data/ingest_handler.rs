@@ -24,8 +24,8 @@ use kamu_core::*;
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
-use crate::axum_utils::ensure_authenticated_account;
 use crate::DatasetAliasInPath;
+use crate::axum_utils::ensure_authenticated_account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,8 +71,13 @@ pub async fn dataset_ingest_handler(
     let is_ingest_from_upload = params.upload_token.is_some();
 
     let (data_stream, media_type) = if let Some(upload_token) = params.upload_token {
+        use odf::metadata::AsStackString;
+
         let account_id = ensure_authenticated_account(&catalog).api_err()?;
-        if account_id.as_multibase().to_stack_string().as_str()
+        if account_id
+            .as_id_without_did_prefix()
+            .as_stack_string()
+            .as_str()
             != upload_token.0.owner_account_id.as_str()
         {
             return Err(ApiError::new_forbidden());

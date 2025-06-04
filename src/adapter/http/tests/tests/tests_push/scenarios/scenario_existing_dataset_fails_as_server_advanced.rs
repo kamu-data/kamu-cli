@@ -11,11 +11,11 @@ use kamu::domain::*;
 use odf::metadata::testing::MetadataFactory;
 
 use crate::harness::{
+    ClientSideHarness,
+    ServerSideHarness,
     copy_dataset_files,
     make_dataset_ref,
     write_dataset_alias,
-    ClientSideHarness,
-    ServerSideHarness,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

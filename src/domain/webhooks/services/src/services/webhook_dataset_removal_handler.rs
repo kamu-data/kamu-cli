@@ -13,9 +13,9 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_webhooks::{
+    MESSAGE_CONSUMER_KAMU_WEBHOOK_DATASET_REMOVAL_HANDLER,
     WebhookSubscription,
     WebhookSubscriptionEventStore,
-    MESSAGE_CONSUMER_KAMU_WEBHOOK_DATASET_REMOVAL_HANDLER,
 };
 use messaging_outbox::*;
 

@@ -92,7 +92,10 @@ impl KamuCliPuppet {
         };
 
         for (env_name, env_value) in options.env_vars {
-            std::env::set_var(env_name, env_value);
+            // TODO: Reconsider setting global vars in tests
+            unsafe {
+                std::env::set_var(env_name, env_value);
+            }
         }
 
         inst.execute(arguments).await.success();
@@ -185,7 +188,7 @@ impl KamuCliPuppet {
             for (name, value) in env {
                 command.env(name, value);
             }
-        };
+        }
 
         command.env("RUST_LOG", "info,sqlx=debug");
 

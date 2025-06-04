@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use async_graphql::{value, PathSegment};
+use async_graphql::{PathSegment, value};
 use indoc::indoc;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
@@ -20,7 +20,7 @@ use kamu_webhooks_services::*;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 
-use crate::utils::{authentication_catalogs, BaseGQLDatasetHarness, PredefinedAccountOpts};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

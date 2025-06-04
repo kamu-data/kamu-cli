@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_account_id;
 mod test_dataset_id;
 mod test_dataset_identity;
 mod test_dataset_refs;

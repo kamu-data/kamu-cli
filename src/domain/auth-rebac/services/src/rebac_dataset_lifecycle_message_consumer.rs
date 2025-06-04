@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface, meta, Catalog};
+use dill::{Catalog, component, interface, meta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_auth_rebac::{DatasetPropertyName, RebacService};
 use kamu_datasets::{

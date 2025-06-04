@@ -38,7 +38,7 @@ pub async fn assert_data_eq(df: DataFrameExt, expected: &str) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn assert_parquet_offsets_are_in_order(data_path: &std::path::Path) {
-    use ::datafusion::arrow::array::{downcast_array, Int64Array};
+    use ::datafusion::arrow::array::{Int64Array, downcast_array};
     use ::datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
     let reader = ParquetRecordBatchReaderBuilder::try_new(std::fs::File::open(data_path).unwrap())

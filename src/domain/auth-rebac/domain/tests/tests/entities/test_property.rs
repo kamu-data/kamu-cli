@@ -13,8 +13,8 @@ use std::str::FromStr;
 use kamu_auth_rebac::{
     AccountPropertyName,
     DatasetPropertyName,
-    PropertyName,
     PROPERTY_GROUP_SEPARATOR,
+    PropertyName,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

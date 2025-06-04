@@ -103,8 +103,12 @@ impl LocalS3Server {
     pub async fn new() -> Self {
         let access_key = "AKIAIOSFODNN7EXAMPLE";
         let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-        std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
-        std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
+
+        // TODO: Reconsider this - we should not be modifying global env from tests
+        unsafe {
+            std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
+            std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
+        }
 
         let tmp_dir = tempfile::tempdir().unwrap();
         let bucket = TEST_BUCKET_NAME.to_string();

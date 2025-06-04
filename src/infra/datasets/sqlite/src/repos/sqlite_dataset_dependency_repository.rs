@@ -9,7 +9,7 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{sqlite_generate_placeholders_list, TransactionRef, TransactionRefT};
+use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;

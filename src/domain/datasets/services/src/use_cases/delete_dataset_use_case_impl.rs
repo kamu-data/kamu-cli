@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{auth, DatasetRegistry, DependencyGraphService};
+use kamu_core::{DatasetRegistry, DependencyGraphService, auth};
 use kamu_datasets::{
     DanglingReferenceError,
     DatasetLifecycleMessage,
@@ -71,9 +71,9 @@ impl DeleteDatasetUseCaseImpl {
                         // modes, we might have already deleted this dataset
                     }
                     Err(odf::dataset::DatasetRefUnresolvedError::Internal(e)) => {
-                        return Err(e.into())
+                        return Err(e.into());
                     }
-                };
+                }
             }
 
             if !dangling_children.is_empty() {

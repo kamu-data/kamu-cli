@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu::domain::{DatasetRegistry, DatasetRegistryExt};
-use kamu_accounts::{AccountConfig, AccountRepository, PROVIDER_PASSWORD};
+use kamu_accounts::{AccountConfig, AccountProvider, AccountRepository};
 use kamu_accounts_services::LoginPasswordAuthProvider;
 
 use super::{CLIError, Command};
@@ -74,7 +74,7 @@ impl Command for SystemE2ECommand {
             "account-add" => {
                 if self.arguments.is_empty() {
                     return Err("Account names have not been provided".int_err().into());
-                };
+                }
 
                 for account_name in &self.arguments {
                     eprint!("Add {account_name}... ");
@@ -86,7 +86,7 @@ impl Command for SystemE2ECommand {
 
                     self.account_repo.save_account(&account).await.int_err()?;
 
-                    if account_config.provider == PROVIDER_PASSWORD {
+                    if account_config.provider == <&'static str>::from(AccountProvider::Password) {
                         self.login_password_auth_provider
                             .save_password(&account, account_config.get_password())
                             .await?;

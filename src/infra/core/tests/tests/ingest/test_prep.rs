@@ -163,8 +163,8 @@ fn test_prep_decompress_gzip() {
 
     {
         // Create archive
-        use flate2::write::GzEncoder;
         use flate2::Compression;
+        use flate2::write::GzEncoder;
         let mut gzip = GzEncoder::new(
             std::fs::File::create(&src_path).unwrap(),
             Compression::fast(),

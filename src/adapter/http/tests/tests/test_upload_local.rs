@@ -23,10 +23,10 @@ use kamu::domain::upload_service::{
 use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
+    DEFAULT_ACCOUNT_ID,
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
-    DEFAULT_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -53,7 +53,7 @@ use messaging_outbox::DummyOutboxImpl;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
-use crate::harness::{await_client_server_flow, TestAPIServer};
+use crate::harness::{TestAPIServer, await_client_server_flow};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -144,7 +144,7 @@ impl Harness {
         UploadTokenBase64Json(UploadToken {
             upload_id: "123".to_string(),
             file_name: "someFile.json".to_string(),
-            owner_account_id: DEFAULT_ACCOUNT_ID.as_multibase().to_string(),
+            owner_account_id: DEFAULT_ACCOUNT_ID.as_id_without_did_prefix().to_string(),
             content_length: 123,
             content_type: Some(MediaType::JSON.to_owned()),
         })
@@ -174,7 +174,7 @@ impl Harness {
 
         cache_dir
             .join("uploads")
-            .join(DEFAULT_ACCOUNT_ID.as_multibase().to_string())
+            .join(DEFAULT_ACCOUNT_ID.as_id_without_did_prefix().to_string())
             .join(upload_token.upload_id)
             .join(upload_token.file_name)
     }

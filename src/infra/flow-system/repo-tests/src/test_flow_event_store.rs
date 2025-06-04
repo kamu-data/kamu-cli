@@ -1776,16 +1776,18 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &flow_id,
             Some(EventID::new(15)),
-            vec![FlowEventInitiated {
-                event_time: Utc::now(),
-                flow_key: flow_key.clone(),
-                flow_id,
-                trigger: FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-                    trigger_time: Utc::now(),
-                }),
-                config_snapshot: None,
-            }
-            .into()],
+            vec![
+                FlowEventInitiated {
+                    event_time: Utc::now(),
+                    flow_key: flow_key.clone(),
+                    flow_id,
+                    trigger: FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+                        trigger_time: Utc::now(),
+                    }),
+                    config_snapshot: None,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
@@ -1795,16 +1797,18 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &flow_id,
             None,
-            vec![FlowEventInitiated {
-                event_time: Utc::now(),
-                flow_key,
-                flow_id,
-                trigger: FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-                    trigger_time: Utc::now(),
-                }),
-                config_snapshot: None,
-            }
-            .into()],
+            vec![
+                FlowEventInitiated {
+                    event_time: Utc::now(),
+                    flow_key,
+                    flow_id,
+                    trigger: FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+                        trigger_time: Utc::now(),
+                    }),
+                    config_snapshot: None,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Ok(_));
@@ -1814,11 +1818,13 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &flow_id,
             None,
-            vec![FlowEventAborted {
-                event_time: Utc::now(),
-                flow_id,
-            }
-            .into()],
+            vec![
+                FlowEventAborted {
+                    event_time: Utc::now(),
+                    flow_id,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
@@ -1828,11 +1834,13 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &flow_id,
             Some(EventID::new(15)),
-            vec![FlowEventAborted {
-                event_time: Utc::now(),
-                flow_id,
-            }
-            .into()],
+            vec![
+                FlowEventAborted {
+                    event_time: Utc::now(),
+                    flow_id,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
@@ -1842,11 +1850,13 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
         .save_events(
             &flow_id,
             Some(EventID::new(1)),
-            vec![FlowEventAborted {
-                event_time: Utc::now(),
-                flow_id,
-            }
-            .into()],
+            vec![
+                FlowEventAborted {
+                    event_time: Utc::now(),
+                    flow_id,
+                }
+                .into(),
+            ],
         )
         .await;
     assert_matches!(res, Ok(_));
@@ -1870,16 +1880,18 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
         .save_events(
             &flow_id,
             None,
-            vec![FlowEventInitiated {
-                event_time: start_moment,
-                flow_key,
-                flow_id,
-                trigger: FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
-                    trigger_time: start_moment,
-                }),
-                config_snapshot: None,
-            }
-            .into()],
+            vec![
+                FlowEventInitiated {
+                    event_time: start_moment,
+                    flow_key,
+                    flow_id,
+                    trigger: FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+                        trigger_time: start_moment,
+                    }),
+                    config_snapshot: None,
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -1891,15 +1903,17 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
         .save_events(
             &flow_id,
             Some(last_event_id),
-            vec![FlowEventStartConditionUpdated {
-                flow_id,
-                event_time: Utc::now(),
-                start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
-                    wake_up_at: activation_moment,
-                }),
-                last_trigger_index: 0,
-            }
-            .into()],
+            vec![
+                FlowEventStartConditionUpdated {
+                    flow_id,
+                    event_time: Utc::now(),
+                    start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                        wake_up_at: activation_moment,
+                    }),
+                    last_trigger_index: 0,
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -1918,12 +1932,14 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
         .save_events(
             &flow_id,
             Some(last_event_id),
-            vec![FlowEventScheduledForActivation {
-                flow_id,
-                event_time: Utc::now(),
-                scheduled_for_activation_at: activation_moment,
-            }
-            .into()],
+            vec![
+                FlowEventScheduledForActivation {
+                    flow_id,
+                    event_time: Utc::now(),
+                    scheduled_for_activation_at: activation_moment,
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -1942,12 +1958,14 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
         .save_events(
             &flow_id,
             Some(last_event_id),
-            vec![FlowEventTaskScheduled {
-                flow_id,
-                event_time: activation_moment + Duration::milliseconds(100),
-                task_id: TaskID::new(1),
-            }
-            .into()],
+            vec![
+                FlowEventTaskScheduled {
+                    flow_id,
+                    event_time: activation_moment + Duration::milliseconds(100),
+                    task_id: TaskID::new(1),
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -1966,12 +1984,14 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
         .save_events(
             &flow_id,
             Some(last_event_id),
-            vec![FlowEventTaskRunning {
-                flow_id,
-                event_time: activation_moment + Duration::milliseconds(500),
-                task_id: TaskID::new(1),
-            }
-            .into()],
+            vec![
+                FlowEventTaskRunning {
+                    flow_id,
+                    event_time: activation_moment + Duration::milliseconds(500),
+                    task_id: TaskID::new(1),
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -1990,13 +2010,15 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
         .save_events(
             &flow_id,
             Some(last_event_id),
-            vec![FlowEventTaskFinished {
-                flow_id,
-                event_time: activation_moment + Duration::milliseconds(1500),
-                task_id: TaskID::new(1),
-                task_outcome: TaskOutcome::Success(TaskResult::Empty),
-            }
-            .into()],
+            vec![
+                FlowEventTaskFinished {
+                    flow_id,
+                    event_time: activation_moment + Duration::milliseconds(1500),
+                    task_id: TaskID::new(1),
+                    task_outcome: TaskOutcome::Success(TaskResult::Empty),
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();
@@ -2064,11 +2086,13 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
         .save_events(
             &flow_id,
             Some(last_event_id),
-            vec![FlowEventAborted {
-                event_time: abortion_moment,
-                flow_id,
-            }
-            .into()],
+            vec![
+                FlowEventAborted {
+                    event_time: abortion_moment,
+                    flow_id,
+                }
+                .into(),
+            ],
         )
         .await
         .unwrap();

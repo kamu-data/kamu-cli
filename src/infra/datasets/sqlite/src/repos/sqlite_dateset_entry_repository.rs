@@ -12,10 +12,10 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use database_common::{
-    sqlite_generate_placeholders_list,
     PaginationOpts,
     TransactionRef,
     TransactionRefT,
+    sqlite_generate_placeholders_list,
 };
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -69,12 +69,14 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         &self,
         owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError> {
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
-        let owner_id_as_str = stack_owner_id.as_str();
-
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let stack_owner_id = owner_id.as_stack_string();
+        let owner_id_as_str = stack_owner_id.as_str();
 
         let dataset_entries_count = sqlx::query_scalar!(
             r#"
@@ -239,7 +241,9 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
+        use odf::metadata::AsStackString;
+
+        let stack_owner_id = owner_id.as_stack_string();
         let owner_id_as_str = stack_owner_id.as_str();
         let dataset_name_as_str = name.as_str();
 
@@ -275,7 +279,9 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
-        let stack_owner_id = owner_id.as_did_str().to_stack_string();
+        use odf::metadata::AsStackString;
+
+        let stack_owner_id = owner_id.as_stack_string();
 
         let limit = i64::try_from(pagination.limit).unwrap();
         let offset = i64::try_from(pagination.offset).unwrap();
@@ -322,9 +328,11 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+
         let stack_dataset_id = dataset_entry.id.as_did_str().to_stack_string();
         let dataset_id_as_str = stack_dataset_id.as_str();
-        let stack_owner_id = dataset_entry.owner_id.as_did_str().to_stack_string();
+        let stack_owner_id = dataset_entry.owner_id.as_stack_string();
         let owner_id_as_str = stack_owner_id.as_str();
         let owner_name_as_str = dataset_entry.owner_name.as_str();
         let dataset_name_as_str = dataset_entry.name.as_str();

@@ -149,11 +149,11 @@ pub(crate) fn check_logged_account_id_match(
 ) -> Result<(), GqlError> {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
-    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_id == **account_id {
-            return Ok(());
-        }
-    };
+    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
+        && logged_account.account_id == **account_id
+    {
+        return Ok(());
+    }
 
     Err(GqlError::gql_extended("Account access error", |eev| {
         eev.set("account_id", account_id.to_string());
@@ -180,11 +180,11 @@ pub(crate) async fn check_access_token_valid(
             GetAccessTokenError::Internal(e) => GqlError::Internal(e),
         })?;
 
-    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_id == existing_access_token.account_id {
-            return Ok(());
-        }
-    };
+    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
+        && logged_account.account_id == existing_access_token.account_id
+    {
+        return Ok(());
+    }
 
     Err(GqlError::gql_extended("Access token access error", |eev| {
         eev.set("account_id", existing_access_token.account_id.to_string());
@@ -199,11 +199,11 @@ pub(crate) fn check_logged_account_name_match(
 ) -> Result<(), GqlError> {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
-    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() {
-        if logged_account.account_name == *account_name {
-            return Ok(());
-        }
-    };
+    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
+        && logged_account.account_name == *account_name
+    {
+        return Ok(());
+    }
 
     Err(GqlError::gql_extended("Account access error", |eev| {
         eev.set("account_name", account_name.to_string());

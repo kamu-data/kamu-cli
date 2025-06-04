@@ -8,53 +8,204 @@
 // by the Apache License, Version 2.0.
 
 use ed25519_dalek::SigningKey;
+use multiformats::stack_string::AsStackString;
 
 use crate::formats::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const MAX_ACCOUNT_ID_STRING_REPR_LEN: usize = {
+    let a = MAX_DID_CANONICAL_STRING_REPR_LEN;
+    #[cfg(feature = "did-pkh")]
+    let b = MAX_DID_PKH_STRING_REPR_LEN;
+    #[cfg(not(feature = "did-pkh"))]
+    let b = a;
+
+    if a > b {
+        a
+    } else {
+        b
+    }
+};
+
+pub const MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
+    let a = MAX_DID_CANONICAL_STRING_REPR_LEN
+        .checked_sub(DID_ODF_PREFIX.len())
+        .unwrap();
+    #[cfg(feature = "did-pkh")]
+    let b = CAIP_10_ACCOUNT_ADDRESS_MAX_LENGTH
+        .checked_sub(DID_PKH_PREFIX.len())
+        .unwrap();
+    #[cfg(not(feature = "did-pkh"))]
+    let b = a;
+
+    if a > b {
+        a
+    } else {
+        b
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Unique identifier of the account
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct AccountID {
-    did: DidOdf,
+pub enum AccountID {
+    Odf(DidOdf),
+
+    #[cfg(feature = "did-pkh")]
+    Pkh(DidPkh),
 }
 
 impl AccountID {
-    pub fn new(did: DidOdf) -> Self {
-        Self { did }
-    }
-
-    /// Creates `AccountID` from generated key pair using cryptographically
+    /// Creates `AccountID` from a generated key pair using cryptographically
     /// secure RNG
     pub fn new_generated_ed25519() -> (SigningKey, Self) {
         let (key, did) = DidOdf::new_generated_ed25519();
-        (key, Self::new(did))
+        (key, Self::Odf(did))
     }
 
     /// For testing purposes only. Use [`AccountID::new_generated_ed25519`] for
     /// cryptographically secure generation
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {
-        Self::new(DidOdf::new_seeded_ed25519(seed))
+        Self::Odf(DidOdf::new_seeded_ed25519(seed))
     }
 
-    pub fn as_did(&self) -> &DidOdf {
-        &self.did
+    pub fn as_did_odf(&self) -> Option<&DidOdf> {
+        match self {
+            Self::Odf(did) => Some(did),
+            #[cfg(feature = "did-pkh")]
+            Self::Pkh(_) => None,
+        }
+    }
+
+    #[cfg(feature = "did-pkh")]
+    pub fn as_did_pkh(&self) -> Option<&DidPkh> {
+        match self {
+            Self::Odf(_) => None,
+            Self::Pkh(pkh) => Some(pkh),
+        }
     }
 
     /// Reads `AccountID` from canonical byte representation
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, DeserializeError<DidKey>> {
-        Ok(Self::new(DidOdf::from_bytes(bytes)?))
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, AccountIdParseBytesError> {
+        if bytes.starts_with(DID_ODF_PREFIX.as_bytes()) {
+            return Ok(Self::Odf(DidOdf::from_bytes(bytes)?));
+        }
+
+        #[cfg(feature = "did-pkh")]
+        if bytes.starts_with(DID_PKH_PREFIX.as_bytes()) {
+            unimplemented!("Use AccountID::from_did_str() for {DID_PKH_PREFIX}")
+        }
+
+        Err(AccountIdParseBytesError::InvalidValueFormat)
     }
 
-    /// Parses `AccountID` from a canonical `did:odf:<multibase>` string
-    pub fn from_did_str(s: &str) -> Result<Self, ParseError<DidOdf>> {
-        Ok(Self::new(DidOdf::from_did_str(s)?))
+    /// Parses `AccountID` from a canonical `did:odf:<multibase>`
+    /// or `did:pkh:<account_id(CAIP-10)>` string
+    pub fn from_did_str(s: &str) -> Result<Self, AccountIdParseStrError> {
+        if let Some(stripped) = s.strip_prefix(DID_ODF_PREFIX) {
+            return Self::from_multibase_string(stripped).map_err(Into::into);
+        }
+
+        #[cfg(feature = "did-pkh")]
+        if let Some(stripped) = s.strip_prefix(DID_PKH_PREFIX) {
+            return Self::parse_caip10_account_id(stripped).map_err(Into::into);
+        }
+
+        Err(AccountIdParseStrError::InvalidValueFormat {
+            value: s.to_string(),
+        })
+    }
+
+    pub fn parse_id_without_did_prefix(s: &str) -> Result<Self, AccountIdParseStrError> {
+        if let Ok(id) = Self::from_multibase_string(s) {
+            return Ok(id);
+        }
+
+        #[cfg(feature = "did-pkh")]
+        if let Ok(id) = Self::parse_caip10_account_id(s) {
+            return Ok(id);
+        }
+
+        Err(AccountIdParseStrError::InvalidValueFormat {
+            value: s.to_string(),
+        })
     }
 
     /// Parses `AccountID` from a multibase string (without `did:odf:`) prefix
     pub fn from_multibase_string(s: &str) -> Result<Self, ParseError<DidOdf>> {
-        Ok(Self::new(DidOdf::from_multibase(s)?))
+        Ok(Self::Odf(DidOdf::from_multibase(s)?))
     }
+
+    /// Parses `AccountID` from a CAIP-10 account ID string (without `did:pkh:`)
+    /// prefix
+    #[cfg(feature = "did-pkh")]
+    pub fn parse_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
+        Ok(Self::Pkh(DidPkh::parse_caip10_account_id(s)?))
+    }
+
+    pub fn as_id_without_did_prefix(&self) -> IdWithoutDidPrefixFmt {
+        IdWithoutDidPrefixFmt { value: self }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct IdWithoutDidPrefixFmt<'a> {
+    value: &'a AccountID,
+}
+
+impl std::fmt::Display for IdWithoutDidPrefixFmt<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.value {
+            AccountID::Odf(odf) => write!(f, "{}", odf.as_multibase()),
+            #[cfg(feature = "did-pkh")]
+            AccountID::Pkh(pkh) => {
+                let wallet = pkh.wallet_address();
+
+                // NOTE: We explicitly use only the address part (w/o chain id (CAIP-2))
+                //       since the wallet address is already unique.
+                write!(f, "{}", wallet.strip_prefix("0x").unwrap_or(wallet))
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for AccountID {}
+impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for &AccountID {}
+
+impl AsStackString<MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN>
+    for IdWithoutDidPrefixFmt<'_>
+{
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum AccountIdParseStrError {
+    #[error(transparent)]
+    OdfParseError(#[from] ParseError<DidOdf>),
+
+    #[cfg(feature = "did-pkh")]
+    #[error(transparent)]
+    PkhParseError(#[from] DidPkhParseError),
+
+    #[error("Invalid value format: {value}")]
+    InvalidValueFormat { value: String },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum AccountIdParseBytesError {
+    #[error(transparent)]
+    OdfDeserializeError(#[from] DeserializeError<DidKey>),
+
+    #[error("Invalid value format")]
+    InvalidValueFormat,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,35 +218,22 @@ impl Multiformat for AccountID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::ops::Deref for AccountID {
-    type Target = DidOdf;
-
-    fn deref(&self) -> &Self::Target {
-        &self.did
-    }
-}
-
 impl From<DidOdf> for AccountID {
     fn from(did: DidOdf) -> Self {
-        Self::new(did)
+        Self::Odf(did)
     }
 }
 
 impl From<DidKey> for AccountID {
-    fn from(did: DidKey) -> Self {
-        Self::new(DidOdf::from(did))
+    fn from(odf: DidKey) -> Self {
+        Self::Odf(DidOdf::from(odf))
     }
 }
 
-impl From<AccountID> for DidOdf {
-    fn from(val: AccountID) -> Self {
-        val.did
-    }
-}
-
-impl From<AccountID> for DidKey {
-    fn from(val: AccountID) -> Self {
-        val.did.into()
+#[cfg(feature = "did-pkh")]
+impl From<DidPkh> for AccountID {
+    fn from(pkh: DidPkh) -> Self {
+        Self::Pkh(pkh)
     }
 }
 
@@ -103,9 +241,14 @@ impl From<AccountID> for DidKey {
 
 impl std::fmt::Debug for AccountID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple(&format!("AccountID<{:?}>", Multicodec::Ed25519Pub))
-            .field(&self.did.as_multibase())
-            .finish()
+        match self {
+            Self::Odf(odf) => f
+                .debug_tuple(&format!("AccountID<{:?}>", Multicodec::Ed25519Pub))
+                .field(&odf.as_multibase())
+                .finish(),
+            #[cfg(feature = "did-pkh")]
+            Self::Pkh(pkh) => f.debug_tuple("AccountID").field(&pkh).finish(),
+        }
     }
 }
 
@@ -113,40 +256,15 @@ impl std::fmt::Debug for AccountID {
 
 impl std::fmt::Display for AccountID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_did_str())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Formats [`AccountID`] as a canonical `did:odf:<multibase>` string
-pub struct AccountIDFmt<'a> {
-    inner: DidKeyMultibaseFmt<'a>,
-}
-
-impl<'a> AccountIDFmt<'a> {
-    pub fn new(value: &'a DidKey) -> Self {
-        Self {
-            inner: DidKeyMultibaseFmt::new(value, Multibase::Base16),
+        match self {
+            Self::Odf(odf) => {
+                write!(f, "{}", odf.as_did_str())
+            }
+            #[cfg(feature = "did-pkh")]
+            Self::Pkh(pkh) => {
+                write!(f, "{}", pkh.as_did_str())
+            }
         }
-    }
-
-    pub fn encoding(self, encoding: Multibase) -> Self {
-        Self {
-            inner: self.inner.encoding(encoding),
-        }
-    }
-}
-
-impl std::fmt::Debug for AccountIDFmt<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self}")
-    }
-}
-
-impl std::fmt::Display for AccountIDFmt<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "did:odf:{}", self.inner)
     }
 }
 
@@ -156,7 +274,11 @@ impl std::fmt::Display for AccountIDFmt<'_> {
 
 impl serde::Serialize for AccountID {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_str(&self.did.as_did_str())
+        match &self {
+            Self::Odf(odf) => serializer.collect_str(&odf.as_did_str()),
+            #[cfg(feature = "did-pkh")]
+            Self::Pkh(pkh) => serializer.collect_str(&pkh.as_did_str()),
+        }
     }
 }
 
@@ -193,12 +315,20 @@ impl utoipa::ToSchema for AccountID {}
 #[cfg(feature = "utoipa")]
 impl utoipa::PartialSchema for AccountID {
     fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use serde_json::json;
         use utoipa::openapi::schema::*;
 
         Schema::Object(
             ObjectBuilder::new()
                 .schema_type(SchemaType::Type(Type::String))
-                .examples([serde_json::json!(AccountID::new_seeded_ed25519(b"account"))])
+                .examples([
+                    json!(AccountID::new_seeded_ed25519(b"account")),
+                    #[cfg(feature = "did-pkh")]
+                    json!(AccountID::parse_caip10_account_id(
+                        "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+                    )
+                    .unwrap()),
+                ])
                 .build(),
         )
         .into()

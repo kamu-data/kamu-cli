@@ -11,8 +11,8 @@ use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use chrono::prelude::*;
 use chrono::Utc;
+use chrono::prelude::*;
 use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
@@ -347,7 +347,10 @@ async fn test_fetch_url_http_env_interpolation() {
         Err(_)
     );
 
-    std::env::set_var("KAMU_TEST", "data.csv");
+    // TODO: Reconsider setting env vars in tests
+    unsafe {
+        std::env::set_var("KAMU_TEST", "data.csv");
+    }
 
     let res = harness
         .fetch_svc
@@ -835,7 +838,6 @@ async fn test_fetch_mqtt_one_record() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
-#[ignore]
 #[test_log::test(tokio::test)]
 async fn test_fetch_container_ok() {
     let harness = FetchTestHarness::new();

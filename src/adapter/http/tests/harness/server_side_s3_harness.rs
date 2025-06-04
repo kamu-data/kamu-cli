@@ -41,7 +41,7 @@ use kamu_datasets_inmem::{
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::{register_message_dispatcher, Outbox, OutboxImmediateImpl};
+use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::dataset::DatasetLayout;
 use s3_utils::S3Context;
 use test_utils::LocalS3Server;
@@ -49,13 +49,13 @@ use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
 
 use super::{
-    create_cli_user_catalog,
-    create_web_user_catalog,
-    make_server_account,
+    SERVER_ACCOUNT_NAME,
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
-    SERVER_ACCOUNT_NAME,
+    create_cli_user_catalog,
+    create_web_user_catalog,
+    make_server_account,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

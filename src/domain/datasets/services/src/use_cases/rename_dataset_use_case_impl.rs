@@ -15,10 +15,10 @@ use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::auth;
 use kamu_datasets::{
     DatasetLifecycleMessage,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     NameCollisionError,
     RenameDatasetError,
     RenameDatasetUseCase,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use messaging_outbox::{Outbox, OutboxExt};
 

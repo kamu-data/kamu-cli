@@ -10,6 +10,7 @@
 use bytes::Bytes;
 use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_core::MediaType;
 use kamu_core::services::upload_service::{
     MakeUploadContextError,
     SaveUploadError,
@@ -18,9 +19,8 @@ use kamu_core::services::upload_service::{
     UploadTokenBase64Json,
     UploadTokenIntoStreamError,
 };
-use kamu_core::MediaType;
-use serde::de::IntoDeserializer as _;
 use serde::Deserialize as _;
+use serde::de::IntoDeserializer as _;
 use thiserror::Error;
 
 use crate::axum_utils::{ensure_authenticated_account, from_catalog_n};
@@ -113,7 +113,7 @@ pub struct UploadFromPath {
     upload_token: UploadTokenBase64Json,
 }
 
-/// Upload file to temporary storage
+/// Upload a file to temporary storage
 #[utoipa::path(
     post,
     path = "/file/upload/{upload_token}",
@@ -131,8 +131,13 @@ pub async fn file_upload_post_handler(
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
     mut multipart: axum::extract::Multipart,
 ) -> Result<(), ApiError> {
+    use odf::metadata::AsStackString;
+
     let account_id = ensure_authenticated_account(&catalog).api_err()?;
-    if account_id.as_multibase().to_stack_string().as_str()
+    if account_id
+        .as_id_without_did_prefix()
+        .as_stack_string()
+        .as_str()
         != upload_param.upload_token.0.owner_account_id.as_str()
     {
         return Err(ApiError::new_forbidden());

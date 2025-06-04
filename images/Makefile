@@ -4,8 +4,10 @@ IMAGE_JUPYTER_TAG = 0.7.1
 
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
 
-SQLX_VERSION = 0.8.2
+SQLX_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "sqlx") | .version')
 IMAGE_SQLX_TAG = $(SQLX_VERSION)-1
+RUSTC_VERSION = $(shell rustc --version | grep -oP 'rustc \K\d+\.\d+')
+RUSTC_PREVIOUS_STABLE_VERSION = $(shell echo "$(RUSTC_VERSION) - 0.01" | bc)
 
 ################################################################################
 
@@ -85,10 +87,18 @@ kamu-base-with-data-mt-push:
 
 ################################################################################
 
+
 sqlx-cli sqlx-cli-push: SQLX_CLI_IMAGE_EXISTS = $(shell \
 		docker manifest inspect $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) > /dev/null 2>&1 \
 			&& echo yes \
 			|| echo no \
+	)
+
+# We sometimes use versions that did not have stable releases -- in such cases, we need to take the previous one
+sqlx-cli sqlx-cli-push: SQLX_RUSTC_VERSION = $(shell \
+		docker manifest inspect rust:$(RUSTC_VERSION)-alpine > /dev/null 2>&1 \
+			&& echo $(RUSTC_VERSION) \
+			|| echo $(RUSTC_PREVIOUS_STABLE_VERSION) \
 	)
 
 
@@ -98,14 +108,15 @@ sqlx-cli:
 		echo "sqlx-cli:$(IMAGE_SQLX_TAG) image exists, skip this step" ; \
 	else \
 		docker build \
-			--build-arg VERSION=$(SQLX_VERSION) \
+			--build-arg RUSTC_VERSION=$(SQLX_RUSTC_VERSION) \
+			--build-arg SQLX_VERSION=$(SQLX_VERSION) \
 			-t $(IMAGE_REPO)/sqlx-cli:$(IMAGE_SQLX_TAG) \
 			sqlx-cli/ \
 			; \
 	fi
 
 
-.PHONY: sqlx-push
+.PHONY: sqlx-cli-push
 sqlx-cli-push:
 	@if [ "$(SQLX_CLI_IMAGE_EXISTS)" = "yes" ]; then \
 		echo "sqlx-cli:$(IMAGE_SQLX_TAG) image exists, skip this step" ; \

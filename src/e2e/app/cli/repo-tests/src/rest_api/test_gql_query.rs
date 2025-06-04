@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
-use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
 use odf::metadata::serde::DatasetSnapshotSerializer;
+use odf::metadata::serde::yaml::YamlDatasetSnapshotSerializer;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

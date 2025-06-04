@@ -13,4 +13,5 @@ mod test_dataset;
 mod test_ingest;
 mod test_odf_core;
 mod test_odf_query;
+mod test_search;
 mod test_upload;
