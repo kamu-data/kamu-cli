@@ -21,7 +21,7 @@ fn main() {
     let workspace_layout = kamu_cli::WorkspaceService::find_workspace();
     let args = kamu_cli::cli::Cli::parse();
     let propagate_default_panic = args.verbose == 0;
-    observability::axum::set_hook_capture_panic_backtraces_no_propagate(propagate_default_panic);
+    observability::panic_handler::set_hook_trace_panics(propagate_default_panic);
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let result = runtime.block_on(kamu_cli::run(workspace_layout, args));
