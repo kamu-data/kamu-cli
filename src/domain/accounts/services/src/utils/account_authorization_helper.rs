@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::{CurrentAccountSubject, DeleteAccountByNameError, RenameAccountError};
+use kamu_accounts::{CurrentAccountSubject, DeleteAccountError, RenameAccountError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,7 +75,7 @@ impl AccountAuthorizationHelper {
         if !self.can_modify_account(account_name).await? {
             return Err(EnsureAccountCanBeRenamedError::Access(
                 odf::AccessError::Unauthenticated(
-                    AccountDeletionNotAuthorizedError {
+                    AccountRenameNotAuthorizedError {
                         subject_account: self.current_account_subject.maybe_account_name().cloned(),
                         object_account: account_name.clone(),
                     }
@@ -132,7 +132,7 @@ impl std::fmt::Display for AccountDeletionNotAuthorizedError {
     }
 }
 
-impl From<EnsureAccountCanBeDeletedError> for DeleteAccountByNameError {
+impl From<EnsureAccountCanBeDeletedError> for DeleteAccountError {
     fn from(e: EnsureAccountCanBeDeletedError) -> Self {
         use EnsureAccountCanBeDeletedError as E;
 

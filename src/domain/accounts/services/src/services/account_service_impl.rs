@@ -185,10 +185,6 @@ impl AccountService for AccountServiceImpl {
         account: &Account,
         new_name: odf::AccountName,
     ) -> Result<(), RenameAccountError> {
-        if new_name == account.account_name {
-            return Ok(()); // No change needed
-        }
-
         let mut updated_account = account.clone();
         updated_account.account_name = new_name;
 
@@ -204,7 +200,7 @@ impl AccountService for AccountServiceImpl {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), InternalError> {
-        use DeleteAccountError as E;
+        use DeleteAccountByNameError as E;
 
         match self.account_repo.delete_account_by_name(account_name).await {
             Ok(_) | Err(E::NotFound(_)) => Ok(()),

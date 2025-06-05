@@ -442,7 +442,7 @@ impl AccountRepository for PostgresAccountRepository {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError> {
+    ) -> Result<(), DeleteAccountByNameError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -462,9 +462,11 @@ impl AccountRepository for PostgresAccountRepository {
         if delete_result.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
-                account_name: account_name.clone(),
-            }))
+            Err(DeleteAccountByNameError::NotFound(
+                AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                },
+            ))
         }
     }
 }

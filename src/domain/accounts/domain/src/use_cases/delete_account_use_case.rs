@@ -16,7 +16,7 @@ use crate::Account;
 
 #[async_trait::async_trait]
 pub trait DeleteAccountUseCase: Send + Sync {
-    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountByNameError>;
+    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +24,7 @@ pub trait DeleteAccountUseCase: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum DeleteAccountByNameError {
+pub enum DeleteAccountError {
     #[error(transparent)]
     Access(
         #[from]

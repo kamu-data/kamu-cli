@@ -111,7 +111,7 @@ impl AccountMut {
 
         let delete_account_use_case = from_catalog_n!(ctx, dyn DeleteAccountUseCase);
 
-        use DeleteAccountByNameError as E;
+        use DeleteAccountError as E;
 
         match delete_account_use_case.execute(&self.account).await {
             Ok(_) => Ok(DeleteAccountResult::Success(Default::default())),

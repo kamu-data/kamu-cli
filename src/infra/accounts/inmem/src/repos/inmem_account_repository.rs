@@ -361,7 +361,7 @@ impl AccountRepository for InMemoryAccountRepository {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError> {
+    ) -> Result<(), DeleteAccountByNameError> {
         let mut guard = self.state.lock().unwrap();
 
         let maybe_deleted_account = guard.accounts_by_name.remove(account_name);
@@ -375,9 +375,11 @@ impl AccountRepository for InMemoryAccountRepository {
 
             Ok(())
         } else {
-            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
-                account_name: account_name.clone(),
-            }))
+            Err(DeleteAccountByNameError::NotFound(
+                AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                },
+            ))
         }
     }
 }

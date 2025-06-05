@@ -44,6 +44,10 @@ impl RenameAccountUseCase for RenameAccountUseCaseImpl {
             .ensure_account_can_be_renamed(&account.account_name)
             .await?;
 
+        if account.account_name == new_name {
+            return Ok(());
+        }
+
         self.account_service
             .rename_account(account, new_name.clone())
             .await?;
