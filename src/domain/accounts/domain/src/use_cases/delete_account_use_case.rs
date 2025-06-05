@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Account, AccountNotFoundByNameError, DeleteAccountError};
+use crate::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,21 +33,7 @@ pub enum DeleteAccountByNameError {
     ),
 
     #[error(transparent)]
-    NotFound(AccountNotFoundByNameError),
-
-    #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl From<DeleteAccountError> for DeleteAccountByNameError {
-    fn from(e: DeleteAccountError) -> Self {
-        use internal_error::ErrorIntoInternal;
-
-        match e {
-            DeleteAccountError::NotFound(e) => Self::NotFound(e),
-            DeleteAccountError::Internal(_) => Self::Internal(e.int_err()),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -266,6 +266,33 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Ok(())
     }
 
+    async fn update_owner_entries_after_rename(
+        &self,
+        owner_id: &odf::AccountID,
+        new_owner_name: &odf::AccountName,
+    ) -> Result<(), InternalError> {
+        let mut writable_state = self.state.write().await;
+
+        let owner_entries = if let Some(entries) = writable_state.rows_by_owner.get(owner_id) {
+            entries.iter().cloned().collect::<Vec<_>>()
+        } else {
+            return Ok(());
+        };
+
+        for dataset_id in owner_entries {
+            let maybe_dataset_entry = writable_state.rows.get_mut(&dataset_id);
+            if let Some(dataset_entry) = maybe_dataset_entry {
+                dataset_entry.owner_name = new_owner_name.clone();
+            } else {
+                panic!(
+                    "InMemoryDatasetEntryRepository: Dataset entry with ID {dataset_id} not found"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     async fn delete_dataset_entry(
         &self,
         dataset_id: &odf::DatasetID,

@@ -32,6 +32,13 @@ pub trait DatasetEntryWriter: Send + Sync {
     ) -> Result<(), RenameDatasetEntryError>;
 
     async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError>;
+
+    async fn update_owner_entries_after_rename(
+        &self,
+        owner_account_id: &odf::AccountID,
+        old_owner_account_name: &odf::AccountName,
+        new_owner_account_name: &odf::AccountName,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

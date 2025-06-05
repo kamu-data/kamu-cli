@@ -61,6 +61,7 @@ pub trait AccountRepository: Send + Sync {
 
     async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError>;
 
+    // TODO: evaluate if we really need this method vs `update_account`
     async fn update_account_email(
         &self,
         account_id: &odf::AccountID,

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::{CurrentAccountSubject, DeleteAccountByNameError};
+use kamu_accounts::{CurrentAccountSubject, DeleteAccountByNameError, RenameAccountError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +27,7 @@ pub struct AccountAuthorizationHelper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl AccountAuthorizationHelper {
-    pub async fn can_delete_account(
+    pub async fn can_modify_account(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<bool, InternalError> {
@@ -53,8 +53,27 @@ impl AccountAuthorizationHelper {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureAccountCanBeDeletedError> {
-        if !self.can_delete_account(account_name).await? {
+        if !self.can_modify_account(account_name).await? {
             return Err(EnsureAccountCanBeDeletedError::Access(
+                odf::AccessError::Unauthenticated(
+                    AccountDeletionNotAuthorizedError {
+                        subject_account: self.current_account_subject.maybe_account_name().cloned(),
+                        object_account: account_name.clone(),
+                    }
+                    .into(),
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub async fn ensure_account_can_be_renamed(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<(), EnsureAccountCanBeRenamedError> {
+        if !self.can_modify_account(account_name).await? {
+            return Err(EnsureAccountCanBeRenamedError::Access(
                 odf::AccessError::Unauthenticated(
                     AccountDeletionNotAuthorizedError {
                         subject_account: self.current_account_subject.maybe_account_name().cloned(),
@@ -116,6 +135,59 @@ impl std::fmt::Display for AccountDeletionNotAuthorizedError {
 impl From<EnsureAccountCanBeDeletedError> for DeleteAccountByNameError {
     fn from(e: EnsureAccountCanBeDeletedError) -> Self {
         use EnsureAccountCanBeDeletedError as E;
+
+        match e {
+            E::Access(e) => Self::Access(e),
+            e @ E::Internal(_) => Self::Internal(e.int_err()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum EnsureAccountCanBeRenamedError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub struct AccountRenameNotAuthorizedError {
+    pub subject_account: Option<odf::AccountName>,
+    pub object_account: odf::AccountName,
+}
+
+impl std::fmt::Display for AccountRenameNotAuthorizedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let object_account = &self.object_account;
+
+        if let Some(subject_account) = &self.subject_account {
+            write!(
+                f,
+                "Account '{subject_account}' is not authorized to rename account \
+                 '{object_account}'"
+            )?;
+        } else {
+            write!(
+                f,
+                "Anonymous is not authorized to rename account '{object_account}'"
+            )?;
+        }
+
+        Ok(())
+    }
+}
+
+impl From<EnsureAccountCanBeRenamedError> for RenameAccountError {
+    fn from(e: EnsureAccountCanBeRenamedError) -> Self {
+        use EnsureAccountCanBeRenamedError as E;
 
         match e {
             E::Access(e) => Self::Access(e),

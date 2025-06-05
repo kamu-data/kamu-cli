@@ -7,40 +7,40 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Account, AccountNotFoundByNameError, ModifyPasswordHashError, Password};
+use crate::{Account, AccountErrorDuplicate};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ModifyAccountPasswordUseCase: Send + Sync {
+pub trait RenameAccountUseCase: Send + Sync {
     async fn execute(
         &self,
         account: &Account,
-        password: Password,
-    ) -> Result<(), ModifyAccountPasswordError>;
+        new_name: odf::AccountName,
+    ) -> Result<(), RenameAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum ModifyAccountPasswordError {
+pub enum RenameAccountError {
+    #[error(transparent)]
+    Duplicate(AccountErrorDuplicate),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
-
-    #[error(transparent)]
-    AccountNotFound(#[from] AccountNotFoundByNameError),
-}
-
-impl From<ModifyPasswordHashError> for ModifyAccountPasswordError {
-    fn from(value: ModifyPasswordHashError) -> Self {
-        match value {
-            ModifyPasswordHashError::AccountNotFound(err) => Self::AccountNotFound(err),
-            e @ ModifyPasswordHashError::Internal(_) => Self::Internal(e.int_err()),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
