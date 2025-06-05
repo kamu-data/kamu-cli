@@ -29,7 +29,7 @@ async fn test_subscriptions_removed_with_dataset() {
         let mut subscription_id_1_1 = WebhookSubscription::new(
             WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
             url::Url::parse("https://example.com/webhook/1/1").unwrap(),
-            WebhookSubscriptionLabel::new(""),
+            WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             WebhookSubscriptionSecret::try_new("secret_1_1").unwrap(),
@@ -44,7 +44,7 @@ async fn test_subscriptions_removed_with_dataset() {
         let mut subscription_id_1_2 = WebhookSubscription::new(
             WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
             url::Url::parse("https://example.com/webhook/1/2").unwrap(),
-            WebhookSubscriptionLabel::new(""),
+            WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             WebhookSubscriptionSecret::try_new("secret_1_2").unwrap(),
@@ -59,7 +59,7 @@ async fn test_subscriptions_removed_with_dataset() {
         let mut subscription_id_2 = WebhookSubscription::new(
             WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
             url::Url::parse("https://example.com/webhook/2").unwrap(),
-            WebhookSubscriptionLabel::new(""),
+            WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id_2.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             WebhookSubscriptionSecret::try_new("secret_2").unwrap(),

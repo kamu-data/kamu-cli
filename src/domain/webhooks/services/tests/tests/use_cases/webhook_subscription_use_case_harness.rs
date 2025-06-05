@@ -54,7 +54,7 @@ impl WebhookSubscriptionUseCaseHarness {
         let mut subscription = WebhookSubscription::new(
             WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
             url::Url::parse("https://example.com/webhook").unwrap(),
-            label.unwrap_or_else(|| WebhookSubscriptionLabel::new("test_label")),
+            label.unwrap_or_else(|| WebhookSubscriptionLabel::try_new("test_label").unwrap()),
             Some(dataset_id),
             vec![WebhookEventTypeCatalog::test()],
             WebhookSubscriptionSecret::try_new("secret").unwrap(),

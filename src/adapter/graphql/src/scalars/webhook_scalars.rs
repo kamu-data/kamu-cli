@@ -68,3 +68,33 @@ impl ScalarType for WebhookEventType {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebhookSubscriptionlabel(pub kamu_webhooks::WebhookSubscriptionLabel);
+
+impl FromStr for WebhookSubscriptionlabel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        kamu_webhooks::WebhookSubscriptionLabel::try_new(s)
+            .map(WebhookSubscriptionlabel)
+            .map_err(|e| e.to_string())
+    }
+}
+
+#[Scalar()]
+impl ScalarType for WebhookSubscriptionlabel {
+    fn parse(value: Value) -> InputValueResult<Self> {
+        if let Value::String(s) = &value {
+            WebhookSubscriptionlabel::from_str(s).map_err(InputValueError::custom)
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.0.to_string())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
