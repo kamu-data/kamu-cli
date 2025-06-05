@@ -89,6 +89,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = dataset_entry_repo::test_owner_of_entries_renamed,
+    harness = InMemoryDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = dataset_entry_repo::test_delete_dataset_entry,
     harness = InMemoryDatasetEntryRepositoryHarness
 );
