@@ -439,6 +439,31 @@ async fn test_empty_labels_arent_duplicates() {
 
     assert!(res.is_ok(), "{res:?}");
 
+    let subscription_id_1 = res.data.clone().into_json().unwrap()["datasets"]["byId"]["webhooks"]
+        ["createSubscription"]["subscriptionId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "createSubscription": {
+                            "__typename": "CreateWebhookSubscriptionResultSuccess",
+                            "message": "Success",
+                            "subscriptionId": subscription_id_1,
+                            "secret": FIXED_SECRET
+                        }
+                    }
+                }
+
+            }
+        })
+    );
+
     let res = schema
         .execute(
             async_graphql::Request::new(
@@ -455,6 +480,31 @@ async fn test_empty_labels_arent_duplicates() {
         .await;
 
     assert!(res.is_ok());
+
+    let subscription_id_2 = res.data.clone().into_json().unwrap()["datasets"]["byId"]["webhooks"]
+        ["createSubscription"]["subscriptionId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "createSubscription": {
+                            "__typename": "CreateWebhookSubscriptionResultSuccess",
+                            "message": "Success",
+                            "subscriptionId": subscription_id_2,
+                            "secret": FIXED_SECRET
+                        }
+                    }
+                }
+
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -516,6 +566,31 @@ async fn test_label_length_validation() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
+
+    let subscription_id = res.data.clone().into_json().unwrap()["datasets"]["byId"]["webhooks"]
+        ["createSubscription"]["subscriptionId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "createSubscription": {
+                            "__typename": "CreateWebhookSubscriptionResultSuccess",
+                            "message": "Success",
+                            "subscriptionId": subscription_id,
+                            "secret": FIXED_SECRET
+                        }
+                    }
+                }
+
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
