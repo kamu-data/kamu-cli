@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - Missing length validation for webhook subscription labels.
+- Unexpected webhook label duplication for empty labels.
 
 ## [0.240.1] - 2025-06-04
 ### Changed
