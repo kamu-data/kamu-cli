@@ -190,7 +190,7 @@ async fn test_subscription_non_matching_event_type() {
         let mut subscription = WebhookSubscription::new(
             subscription_id,
             url::Url::parse("https://example.com/webhook/").unwrap(),
-            WebhookSubscriptionLabel::new(""),
+            WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::test()],
             WebhookSubscriptionSecret::try_new("secret").unwrap(),
@@ -285,7 +285,7 @@ impl TestWebhookDeliverySchedulerHarness {
         let mut subscription = WebhookSubscription::new(
             subscription_id,
             url::Url::parse("https://example.com/webhook/").unwrap(),
-            WebhookSubscriptionLabel::new(""),
+            WebhookSubscriptionLabel::try_new("").unwrap(),
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             WebhookSubscriptionSecret::try_new("secret").unwrap(),

@@ -14,6 +14,7 @@ use nutype::nutype;
 // Note: empty label is fine
 #[nutype(
     sanitize(trim),
+    validate(len_char_max = 100,),
     derive(Debug, Display, AsRef, Clone, Eq, PartialEq, Serialize, Deserialize)
 )]
 pub struct WebhookSubscriptionLabel(String);
