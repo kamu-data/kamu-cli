@@ -123,7 +123,7 @@ impl<'a> DatasetWebhooksMut<'a> {
 pub struct WebhookSubscriptionInput {
     pub target_url: GqlUrl,
     pub event_types: Vec<WebhookEventType>,
-    pub label: WebhookSubscriptionlabel,
+    pub label: WebhookSubscriptionLabel,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

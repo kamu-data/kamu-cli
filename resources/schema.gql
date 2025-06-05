@@ -3921,13 +3921,15 @@ scalar WebhookSubscriptionID
 input WebhookSubscriptionInput {
 	targetUrl: URL!
 	eventTypes: [WebhookEventType!]!
-	label: WebhookSubscriptionlabel!
+	label: WebhookSubscriptionLabel!
 }
 
 type WebhookSubscriptionInvalidTargetUrl implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
 	innerMessage: String!
 	message: String!
 }
+
+scalar WebhookSubscriptionLabel
 
 type WebhookSubscriptionMut {
 	update(input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
@@ -3948,8 +3950,6 @@ enum WebhookSubscriptionStatus {
 	UNREACHABLE
 	REMOVED
 }
-
-scalar WebhookSubscriptionlabel
 
 type Webhooks {
 	"""
