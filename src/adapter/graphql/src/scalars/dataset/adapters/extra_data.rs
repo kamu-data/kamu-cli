@@ -9,6 +9,8 @@
 
 use std::sync::LazyLock;
 
+use kamu_core::ExtraDataFields;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static EXTRA_DATA_JSONSCHEMA_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
@@ -78,3 +80,9 @@ fn invalid_input_error(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<ExtraData> for ExtraDataFields {
+    fn from(value: ExtraData) -> Self {
+        Self::new(value.into_inner())
+    }
+}

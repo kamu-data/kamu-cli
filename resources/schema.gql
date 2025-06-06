@@ -1272,7 +1272,7 @@ type DatasetMut {
 	"""
 	Downcast a dataset to a versioned file interface
 	"""
-	asVersionedFile: VersionedFileMut
+	asVersionedFile: VersionedFileMut!
 	"""
 	Downcast a dataset to a collection interface
 	"""
@@ -3379,13 +3379,6 @@ type SqlQueryStep {
 	query: String!
 }
 
-type StartUploadVersionErrorTooLarge implements StartUploadVersionResult {
-	uploadSize: Int!
-	uploadLimit: Int!
-	isSuccess: Boolean!
-	message: String!
-}
-
 interface StartUploadVersionResult {
 	isSuccess: Boolean!
 	message: String!
@@ -3627,6 +3620,13 @@ type UpdateWebhookSubscriptionResultSuccess implements UpdateWebhookSubscription
 
 type UpdateWebhookSubscriptionResultUnexpected implements UpdateWebhookSubscriptionResult {
 	status: WebhookSubscriptionStatus!
+	message: String!
+}
+
+type UploadVersionErrorTooLarge implements UpdateVersionResult & StartUploadVersionResult {
+	uploadSize: Int!
+	uploadLimit: Int!
+	isSuccess: Boolean!
 	message: String!
 }
 

@@ -11,6 +11,7 @@ use base64::Engine;
 use bon::bon;
 use indoc::indoc;
 use kamu::testing::MockDatasetActionAuthorizer;
+use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_core::*;
 use kamu_datasets_services::*;
 use serde_json::json;
@@ -33,37 +34,12 @@ async fn test_versioned_file_create_in_band() {
         .await;
 
     // Create versioned file dataset
-    let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                mutation ($datasetAlias: DatasetAlias!) {
-                    datasets {
-                        createVersionedFile(
-                            datasetAlias: $datasetAlias,
-                            datasetVisibility: PUBLIC,
-                        ) {
-                            ... on CreateDatasetResultSuccess {
-                                dataset {
-                                    id
-                                }
-                            }
-                        }
-                    }
-                }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetAlias": "x",
-            }))),
-        )
+    let did = harness
+        .create_versioned_file(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("x"),
+        ))
         .await;
-
-    assert!(res.is_ok(), "{res:#?}");
-    let did = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
 
     // Check no versions
     let res = harness
@@ -127,34 +103,9 @@ async fn test_versioned_file_create_in_band() {
 
     // Upload first version
     let res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-                mutation ($datasetId: DatasetID!, $content: Base64Usnp!) {
-                    datasets {
-                        byId(datasetId: $datasetId) {
-                            asVersionedFile {
-                                uploadNewVersion(content: $content) {
-                                    ... on UpdateVersionSuccess {
-                                        newVersion
-                                        contentHash
-                                        newHead
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": &did,
-                "content": base64usnp_encode(b"hello"),
-            }))),
-        )
+        .in_band_upload_versioned_file(&did, base64usnp_encode(b"hello").as_str())
         .await;
 
-    assert!(res.is_ok(), "{res:#?}");
     let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
         ["uploadNewVersion"]
         .clone();
@@ -481,6 +432,44 @@ async fn test_versioned_file_create_in_band() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_versioned_file_create_in_band_size_limit() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    // Create versioned file dataset
+    let did = harness
+        .create_versioned_file(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+        ))
+        .await;
+
+    // Try to upload file which exceeds size limit
+    let res = harness
+        .in_band_upload_versioned_file(
+            &did,
+            base64usnp_encode(b"large file exceeds size limit").as_str(),
+        )
+        .await;
+
+    let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+        ["uploadNewVersion"]
+        .clone();
+    pretty_assertions::assert_eq!(
+        upload_result,
+        json!({
+            "message": "Upload of 29 B exceeds the 24 B limit",
+            "uploadLimit": 24,
+            "uploadSize": 29,
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_versioned_file_extra_data() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
@@ -753,12 +742,17 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::QueryServiceImpl>()
             .add::<kamu::ObjectStoreRegistryImpl>()
             .add::<kamu::ObjectStoreBuilderLocalFs>()
+            .add_value(FileUploadLimitConfig::new_in_bytes(24))
             .add_value(kamu::EngineConfigDatafusionEmbeddedIngest::default())
             .add::<kamu::EngineProvisionerNull>()
             .add::<kamu::DataFormatRegistryImpl>()
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<kamu::UpdateVersionFileUseCaseImpl>()
+            .add::<UploadServiceLocal>()
+            .add_value(ServerUrlConfig::new_test(None))
+            .add_value(CacheDir::new(cache_dir))
             .build();
 
         let (_catalog_anonymous, catalog_authorized) =
@@ -777,6 +771,85 @@ impl GraphQLDatasetsHarness {
         kamu_adapter_graphql::schema_quiet()
             .execute(query.into().data(self.catalog_authorized.clone()))
             .await
+    }
+
+    pub async fn create_versioned_file(&self, dataset_alias: &odf::DatasetAlias) -> String {
+        let res = self
+            .execute_authorized_query(
+                async_graphql::Request::new(indoc!(
+                    r#"
+                    mutation ($datasetAlias: DatasetAlias!) {
+                        datasets {
+                            createVersionedFile(
+                                datasetAlias: $datasetAlias,
+                                datasetVisibility: PUBLIC,
+                            ) {
+                                ... on CreateDatasetResultSuccess {
+                                    dataset {
+                                        id
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "#
+                ))
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetAlias": dataset_alias,
+                }))),
+            )
+            .await;
+
+        assert!(res.is_ok(), "{res:#?}");
+
+        // Return created did
+        res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    pub async fn in_band_upload_versioned_file(
+        &self,
+        dataset_did_str: &str,
+        content: &str,
+    ) -> async_graphql::Response {
+        let res = self
+            .execute_authorized_query(
+                async_graphql::Request::new(indoc!(
+                    r#"
+                    mutation ($datasetId: DatasetID!, $content: Base64Usnp!) {
+                        datasets {
+                            byId(datasetId: $datasetId) {
+                                asVersionedFile {
+                                    uploadNewVersion(content: $content) {
+                                        ... on UpdateVersionSuccess {
+                                            newVersion
+                                            contentHash
+                                            newHead
+                                        }
+                                        ... on UploadVersionErrorTooLarge {
+                                            message
+                                            uploadSize
+                                            uploadLimit
+
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "#
+                ))
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": dataset_did_str,
+                    "content": content,
+                }))),
+            )
+            .await;
+
+        assert!(res.is_ok(), "{res:#?}");
+        res
     }
 }
 

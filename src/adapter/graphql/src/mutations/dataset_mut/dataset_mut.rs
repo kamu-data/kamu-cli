@@ -206,10 +206,9 @@ impl DatasetMut {
     }
 
     /// Downcast a dataset to a versioned file interface
-    async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileMut>> {
-        Ok(Some(VersionedFileMut::new(
-            self.dataset_request_state.resolved_dataset(ctx).await?,
-        )))
+    #[expect(clippy::unused_async)]
+    async fn as_versioned_file(&self) -> Result<VersionedFileMut> {
+        Ok(VersionedFileMut::new(&self.dataset_request_state))
     }
 
     /// Downcast a dataset to a collection interface

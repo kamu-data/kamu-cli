@@ -13,6 +13,7 @@ mod push_dataset_use_case_impl;
 mod push_ingest_data_use_case_impl;
 mod reset_dataset_use_case_impl;
 mod set_watermark_use_case_impl;
+mod update_version_file_use_case_impl;
 mod verify_dataset_use_case_impl;
 
 pub use compact_dataset_use_case_impl::*;
@@ -21,4 +22,5 @@ pub use push_dataset_use_case_impl::*;
 pub use push_ingest_data_use_case_impl::*;
 pub use reset_dataset_use_case_impl::*;
 pub use set_watermark_use_case_impl::*;
+pub use update_version_file_use_case_impl::*;
 pub use verify_dataset_use_case_impl::*;

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::{MediaType, MediaTypeRef, ResolvedDataset};
+use kamu_core::ResolvedDataset;
 
 use crate::prelude::*;
 
@@ -47,35 +47,6 @@ pub struct VersionedFileEntry {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl VersionedFileEntry {
-    pub const DEFAULT_CONTENT_TYPE: MediaTypeRef<'static> =
-        MediaTypeRef("application/octet-stream");
-
-    pub fn new(
-        dataset: ResolvedDataset,
-        version: FileVersion,
-        content_hash: odf::Multihash,
-        content_length: usize,
-        content_type: Option<impl Into<MediaType>>,
-        extra_data: Option<ExtraData>,
-    ) -> Self {
-        let extra_data = extra_data.unwrap_or_default();
-        let now = Utc::now();
-
-        Self {
-            dataset,
-            system_time: now,
-            event_time: now,
-            version,
-            content_length,
-            content_type: content_type
-                .map(Into::into)
-                .unwrap_or_else(|| Self::DEFAULT_CONTENT_TYPE.to_owned())
-                .to_string(),
-            content_hash: content_hash.into(),
-            extra_data,
-        }
-    }
-
     pub fn from_json(dataset: ResolvedDataset, record: serde_json::Value) -> Self {
         let serde_json::Value::Object(mut record) = record else {
             unreachable!()
@@ -138,22 +109,6 @@ impl VersionedFileEntry {
             content_hash,
             extra_data: ExtraData::new(record.into()),
         }
-    }
-
-    #[expect(clippy::wrong_self_convention)]
-    pub fn to_record_data(self) -> serde_json::Value {
-        let mut record: serde_json::Value = self.extra_data.into();
-        record["version"] = self.version.into();
-        record["content_hash"] = self.content_hash.to_string().into();
-        record["content_length"] = self.content_length.into();
-        record["content_type"] = self.content_type.clone().into();
-        record
-    }
-
-    #[expect(clippy::wrong_self_convention)]
-    pub fn to_bytes(self) -> bytes::Bytes {
-        let buf = self.to_record_data().to_string().into_bytes();
-        bytes::Bytes::from_owner(buf)
     }
 }
 
