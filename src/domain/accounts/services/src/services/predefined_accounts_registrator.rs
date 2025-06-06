@@ -31,6 +31,7 @@ pub struct PredefinedAccountsRegistrator {
     account_repository: Arc<dyn AccountRepository>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
+    password_hash_repository: Arc<dyn PasswordHashRepository>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
@@ -48,6 +49,7 @@ impl PredefinedAccountsRegistrator {
         account_repository: Arc<dyn AccountRepository>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
+        password_hash_repository: Arc<dyn PasswordHashRepository>,
         outbox: Arc<dyn messaging_outbox::Outbox>,
     ) -> Self {
         Self {
@@ -56,6 +58,7 @@ impl PredefinedAccountsRegistrator {
             account_repository,
             rebac_service,
             default_account_properties,
+            password_hash_repository,
             outbox,
         }
     }
@@ -137,6 +140,13 @@ impl PredefinedAccountsRegistrator {
                     account.account_name,
                     new_account_name
                 );
+
+                // Update account name in the password hash repository
+                self.password_hash_repository
+                    .on_account_renamed(&account.account_name, &new_account_name)
+                    .await
+                    .int_err()?;
+
                 self.outbox
                     .post_message(
                         MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,

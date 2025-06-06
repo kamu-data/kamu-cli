@@ -465,6 +465,32 @@ impl PasswordHashRepository for InMemoryAccountRepository {
             .cloned();
         Ok(maybe_hash_as_string)
     }
+
+    async fn on_account_renamed(
+        &self,
+        old_account_name: &odf::AccountName,
+        new_account_name: &odf::AccountName,
+    ) -> Result<(), PasswordAccountRenamedError> {
+        let mut writable_state = self.state.lock().unwrap();
+
+        let maybe_password_hash = writable_state
+            .password_hash_by_account_name
+            .remove(old_account_name);
+
+        if let Some(password_hash) = maybe_password_hash {
+            writable_state
+                .password_hash_by_account_name
+                .insert(new_account_name.clone(), password_hash);
+        } else {
+            return Err(PasswordAccountRenamedError::AccountNotFound(
+                AccountNotFoundByNameError {
+                    account_name: old_account_name.clone(),
+                },
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

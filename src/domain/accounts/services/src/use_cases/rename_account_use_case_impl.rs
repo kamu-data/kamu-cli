@@ -14,6 +14,7 @@ use kamu_accounts::{
     AccountLifecycleMessage,
     AccountService,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    PasswordAccountRenamedError,
     RenameAccountError,
     RenameAccountUseCase,
 };
@@ -28,6 +29,7 @@ use crate::utils;
 pub struct RenameAccountUseCaseImpl {
     account_authorization_helper: Arc<utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
+    password_hash_repository: Arc<dyn kamu_accounts::PasswordHashRepository>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
@@ -51,6 +53,20 @@ impl RenameAccountUseCase for RenameAccountUseCaseImpl {
         self.account_service
             .rename_account(account, new_name.clone())
             .await?;
+
+        // TODO: avoid binding passwords to account names, refactor to identifiers
+        match self
+            .password_hash_repository
+            .on_account_renamed(&account.account_name, &new_name)
+            .await
+        {
+            // It's fine if account is not found,
+            // it means that the account was never registered with a password.
+            Ok(_) | Err(PasswordAccountRenamedError::AccountNotFound(_)) => {}
+            Err(PasswordAccountRenamedError::Internal(e)) => {
+                return Err(RenameAccountError::Internal(e));
+            }
+        }
 
         self.outbox
             .post_message(
