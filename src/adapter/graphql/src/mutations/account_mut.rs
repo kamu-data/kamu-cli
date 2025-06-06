@@ -151,7 +151,7 @@ pub struct RenameAccountSuccess {
 #[ComplexObject]
 impl RenameAccountSuccess {
     pub async fn message(&self) -> String {
-        "Success".to_string()
+        "Account renamed".to_string()
     }
 }
 
