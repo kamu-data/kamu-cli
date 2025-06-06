@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`
+
 ## [0.241.0] - 2025-06-06
 ### Added
 - Support renaming accounts via GraphQL API:
