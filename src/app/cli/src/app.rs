@@ -533,6 +533,11 @@ pub fn configure_base_catalog(
 
     explore::register_dependencies(&mut b);
 
+    register_message_dispatcher::<AccountLifecycleMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    );
+
     register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
         &mut b,
         kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
@@ -608,10 +613,7 @@ pub fn configure_server_catalog(
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
     );
     register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_AGENT);
-    register_message_dispatcher::<AccountLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-    );
+
     register_message_dispatcher::<AccessTokenLifecycleMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,

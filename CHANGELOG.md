@@ -12,6 +12,11 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- Support renaming accounts via GraphQL API:
+  - automatically actualizes dataset entries (denormalized account names)
+  - automatically updates alias files in ODF storage layer
+  - properly handling account renames when it's initiated by updates to predefined configuration
 ### Fixed
 - Missing length validation for webhook subscription labels.
 - Unexpected webhook label duplication for empty labels.

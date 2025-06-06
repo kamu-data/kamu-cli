@@ -17,6 +17,7 @@ use internal_error::*;
 use kamu_accounts::*;
 use kamu_auth_rebac::{AccountPropertyName, RebacService, boolean_property_value};
 use kamu_auth_rebac_services::DefaultAccountProperties;
+use messaging_outbox::OutboxExt;
 use odf::AccountID;
 
 use crate::LoginPasswordAuthProvider;
@@ -30,6 +31,7 @@ pub struct PredefinedAccountsRegistrator {
     account_repository: Arc<dyn AccountRepository>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
+    outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
 #[component(pub)]
@@ -46,6 +48,7 @@ impl PredefinedAccountsRegistrator {
         account_repository: Arc<dyn AccountRepository>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
+        outbox: Arc<dyn messaging_outbox::Outbox>,
     ) -> Self {
         Self {
             predefined_accounts_config,
@@ -53,6 +56,7 @@ impl PredefinedAccountsRegistrator {
             account_repository,
             rebac_service,
             default_account_properties,
+            outbox,
         }
     }
 
@@ -119,10 +123,33 @@ impl PredefinedAccountsRegistrator {
                 account,
                 updated_account
             );
+            let new_account_name = updated_account.account_name.clone();
+
             self.account_repository
                 .update_account(updated_account)
                 .await
                 .int_err()?;
+
+            // Renaming is a bit special event, and we have associated handlers for it
+            if account.account_name != new_account_name {
+                tracing::info!(
+                    "Detected rename of predefined account from '{}' to '{}'",
+                    account.account_name,
+                    new_account_name
+                );
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+                        AccountLifecycleMessage::renamed(
+                            account.id.clone(),
+                            account.email.clone(),
+                            account.account_name.clone(),
+                            new_account_name,
+                            account.display_name.clone(),
+                        ),
+                    )
+                    .await?;
+            }
         }
 
         Ok(())

@@ -32,6 +32,7 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
+use messaging_outbox::DummyOutboxImpl;
 use odf::AccountName;
 use time_source::SystemTimeSourceDefault;
 
@@ -114,7 +115,8 @@ impl CreateAccountUseCaseImplHarness {
             .add_value(DefaultAccountProperties::default())
             .add_value(DefaultDatasetProperties::default())
             .add::<CreateAccountUseCaseImpl>()
-            .add::<PredefinedAccountsRegistrator>();
+            .add::<PredefinedAccountsRegistrator>()
+            .add::<DummyOutboxImpl>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 
