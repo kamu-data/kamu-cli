@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::*;
@@ -112,6 +113,11 @@ impl PredefinedAccountsRegistrator {
         };
 
         if account != updated_account {
+            tracing::info!(
+                "Updating modified predefined account: old: {:?}, new: {:?}",
+                account,
+                updated_account
+            );
             self.account_repository
                 .update_account(updated_account)
                 .await
@@ -132,7 +138,23 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         name = "PredefinedAccountsRegistrator::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        // If there are duplicates by account ID, skip them.
+        // This could happen i.e., when a predefined user gets renamed,
+        // but the implicit CLI config for current user still points to same ID
+        let mut account_config_by_id = HashMap::new();
         for account_config in &self.predefined_accounts_config.predefined {
+            let account_id = account_config.get_id();
+            if account_config_by_id.contains_key(&account_id) {
+                tracing::warn!(
+                    "Duplicate account configuration found for account ID: {}. Skipping.",
+                    account_id
+                );
+            } else {
+                account_config_by_id.insert(account_id, account_config);
+            }
+        }
+
+        for account_config in account_config_by_id.values() {
             let account_id = account_config.get_id();
             match self.account_repository.get_account_by_id(&account_id).await {
                 Ok(account) => {
