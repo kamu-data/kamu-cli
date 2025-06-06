@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use dill::*;
@@ -144,13 +145,16 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         let mut account_config_by_id = HashMap::new();
         for account_config in &self.predefined_accounts_config.predefined {
             let account_id = account_config.get_id();
-            if account_config_by_id.contains_key(&account_id) {
-                tracing::warn!(
-                    "Duplicate account configuration found for account ID: {}. Skipping.",
-                    account_id
-                );
-            } else {
-                account_config_by_id.insert(account_id, account_config);
+            match account_config_by_id.entry(account_id.clone()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(account_config);
+                }
+                Entry::Occupied(_) => {
+                    tracing::warn!(
+                        "Duplicate account configuration found for account ID: {}. Skipping.",
+                        account_id
+                    );
+                }
             }
         }
 

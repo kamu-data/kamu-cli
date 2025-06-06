@@ -35,6 +35,9 @@ impl AccountMut {
         ctx: &Context<'_>,
         new_name: AccountName<'_>,
     ) -> Result<RenameAccountResult> {
+        // This operation is not allowed in single-tenant mode
+        utils::check_multi_tenant_config(ctx)?;
+
         let rename_account_use_case = from_catalog_n!(ctx, dyn RenameAccountUseCase);
 
         match rename_account_use_case
@@ -107,7 +110,8 @@ impl AccountMut {
     /// Delete a selected account. Allowed only for admin users
     #[tracing::instrument(level = "info", name = AccountMut_delete, skip_all)]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
-        // NOTE: DeleteAccountUseCase handles access verification
+        // This operation is not allowed in single-tenant mode
+        utils::check_multi_tenant_config(ctx)?;
 
         let delete_account_use_case = from_catalog_n!(ctx, dyn DeleteAccountUseCase);
 

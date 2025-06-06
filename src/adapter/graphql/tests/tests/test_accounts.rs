@@ -1055,6 +1055,7 @@ impl GraphQLAccountsHarness {
 
         let catalog = b.build();
         let final_catalog = dill::CatalogBuilder::new_chained(&catalog)
+            .add_value(kamu_core::TenancyConfig::MultiTenant)
             .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
             .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
             .add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>()
