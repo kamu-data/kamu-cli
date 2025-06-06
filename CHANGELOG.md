@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`
+
 ## [0.241.1] - 2025-06-06
 ### Fixed
 - Account name in password hashes table should be updated as well during a rename
