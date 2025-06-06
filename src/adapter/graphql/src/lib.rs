@@ -28,5 +28,5 @@ pub use guards::*;
 pub use root::*;
 
 pub mod molecule {
-    pub use crate::queries::molecule::Molecule;
+    pub use crate::queries::molecule::{Molecule, molecule_subject};
 }

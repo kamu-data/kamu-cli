@@ -13,15 +13,11 @@ use kamu_core::DatasetRegistryExt;
 use kamu_core::auth::DatasetAction;
 
 use crate::prelude::*;
-use crate::queries::{Molecule, MoleculeProject};
+use crate::queries::{Molecule, MoleculeProject, molecule_subject};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct MoleculeMut;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const MOLECULE_ORG_ACCOUNTS: [&str; 2] = ["molecule", "molecule.dev"];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,35 +56,20 @@ impl MoleculeMut {
         );
 
         // Check auth
-        let subject_molecule = match subject.as_ref() {
-            CurrentAccountSubject::Logged(subj)
-                if MOLECULE_ORG_ACCOUNTS.contains(&subj.account_name.as_str()) =>
-            {
-                subj
-            }
-            _ => {
-                return Err(GqlError::Access(odf::AccessError::Unauthorized(
-                    format!(
-                        "Only accounts {} can provision new projects",
-                        MOLECULE_ORG_ACCOUNTS
-                            .iter()
-                            .map(|account_name| format!("'{account_name}'"))
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )
-                    .as_str()
-                    .into(),
-                )));
-            }
-        };
+        let subject_molecule = molecule_subject(ctx)?;
 
         if ipnft_uid != format!("{ipnft_address}_{}", ipnft_token_id.as_ref()) {
             return Err(Error::new("Inconsistent ipnft info").into());
         }
 
         // Resolve projects dataset
-        let projects_dataset =
-            Molecule::get_projects_dataset(ctx, DatasetAction::Write, true).await?;
+        let projects_dataset = Molecule::get_projects_dataset(
+            ctx,
+            &subject_molecule.account_name,
+            DatasetAction::Write,
+            true,
+        )
+        .await?;
 
         // Check for conflicts
         let query_res = query_svc
@@ -258,9 +239,16 @@ impl MoleculeMut {
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
+        let subject_molecule = molecule_subject(ctx)?;
+
         // Resolve projects dataset
-        let projects_dataset =
-            Molecule::get_projects_dataset(ctx, DatasetAction::Read, false).await?;
+        let projects_dataset = Molecule::get_projects_dataset(
+            ctx,
+            &subject_molecule.account_name,
+            DatasetAction::Read,
+            false,
+        )
+        .await?;
 
         // Query data
         let query_res = query_svc

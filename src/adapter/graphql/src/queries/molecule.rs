@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use kamu::domain;
+use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::auth::DatasetAction;
 use kamu_core::{DatasetRegistryExt, ResolvedDataset};
@@ -173,13 +174,21 @@ impl Molecule {
 
     pub async fn get_projects_dataset(
         ctx: &Context<'_>,
+        molecule_account_name: &odf::AccountName,
         action: DatasetAction,
         create_if_not_exist: bool,
     ) -> Result<domain::ResolvedDataset> {
         let dataset_reg = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
 
+        const PROJECTS_DATASET_NAME: &str = "projects";
+
+        let projects_dataset_alias = odf::DatasetAlias::new(
+            Some(molecule_account_name.clone()),
+            odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
+        );
+
         match dataset_reg
-            .resolve_dataset_by_ref(&"molecule/projects".parse().unwrap(), action)
+            .resolve_dataset_by_ref(&projects_dataset_alias.as_local_ref(), action)
             .await
         {
             Ok(ds) => Ok(ds),
@@ -189,7 +198,7 @@ impl Molecule {
 
                 let snapshot = Self::dataset_snapshot_projects(odf::DatasetAlias::new(
                     None,
-                    odf::DatasetName::new_unchecked("projects"),
+                    odf::DatasetName::new_unchecked(PROJECTS_DATASET_NAME),
                 ));
 
                 let create_res = create_dataset_use_case
@@ -233,8 +242,16 @@ impl Molecule {
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
+        let subject_molecule = molecule_subject(ctx)?;
+
         // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(ctx, DatasetAction::Read, false).await?;
+        let projects_dataset = Self::get_projects_dataset(
+            ctx,
+            &subject_molecule.account_name,
+            DatasetAction::Read,
+            false,
+        )
+        .await?;
 
         // Query data
         let query_res = match query_svc
@@ -288,8 +305,16 @@ impl Molecule {
 
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
+        let subject_molecule = molecule_subject(ctx)?;
+
         // Resolve projects dataset
-        let projects_dataset = Self::get_projects_dataset(ctx, DatasetAction::Read, false).await?;
+        let projects_dataset = Self::get_projects_dataset(
+            ctx,
+            &subject_molecule.account_name,
+            DatasetAction::Read,
+            false,
+        )
+        .await?;
 
         // Query data
         let query_res = query_svc
@@ -857,5 +882,38 @@ page_based_stream_connection!(
     MoleculeProjectEventConnection,
     MoleculeProjectEventEdge
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const MOLECULE_ORG_ACCOUNTS: [&str; 2] = ["molecule", "molecule.dev"];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn molecule_subject(ctx: &Context<'_>) -> Result<LoggedAccount> {
+    // Check auth
+    let subject = from_catalog_n!(ctx, CurrentAccountSubject);
+    let subject_molecule = match subject.as_ref() {
+        CurrentAccountSubject::Logged(subj)
+            if MOLECULE_ORG_ACCOUNTS.contains(&subj.account_name.as_str()) =>
+        {
+            subj
+        }
+        _ => {
+            return Err(GqlError::Access(odf::AccessError::Unauthorized(
+                format!(
+                    "Only accounts {} can provision projects",
+                    MOLECULE_ORG_ACCOUNTS
+                        .iter()
+                        .map(|account_name| format!("'{account_name}'"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .as_str()
+                .into(),
+            )));
+        }
+    };
+    Ok(subject_molecule.clone())
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
