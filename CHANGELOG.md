@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.241.0] - 2025-06-06
 ### Added
 - Support renaming accounts via GraphQL API:
   - automatically actualizes dataset entries (denormalized account names)

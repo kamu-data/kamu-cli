@@ -369,7 +369,6 @@ type BlockRef {
 	blockHash: Multihash!
 }
 
-
 type BuildInfo {
 	appVersion: String!
 	buildTimestamp: String
@@ -1848,7 +1847,6 @@ type FlightSqlDesc {
 	url: String!
 }
 
-
 type Flow {
 	"""
 	Unique identifier of the flow
@@ -2231,7 +2229,6 @@ type GetFlowSuccess implements GetFlowResult {
 	message: String!
 }
 
-
 input IngestConditionInput {
 	"""
 	Flag indicates to ignore cache during ingest step for API calls
@@ -2243,7 +2240,6 @@ input InitiatorFilterInput @oneOf {
 	system: Boolean
 	accounts: [AccountID!]
 }
-
 
 type JdbcDesc {
 	url: String!
@@ -3418,7 +3414,6 @@ type StartUploadVersionSuccess implements StartUploadVersionResult {
 	message: String!
 }
 
-
 type Task {
 	"""
 	Unique and stable identifier of this task
@@ -3975,9 +3970,21 @@ type Webhooks {
 	eventTypes: [String!]!
 }
 
+"""
+Directs the executor to include this field or fragment only when the `if` argument is true.
+"""
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Indicates that an Input Object is a OneOf Input Object (and thus requires exactly one of its field be provided)
+"""
 directive @oneOf on INPUT_OBJECT
+"""
+Directs the executor to skip this field or fragment when the `if` argument is true.
+"""
 directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Provides a scalar specification URL for specifying the behavior of custom scalar types.
+"""
 directive @specifiedBy(url: String!) on SCALAR
 schema {
 	query: Query
