@@ -684,8 +684,8 @@ impl PasswordHashRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let old_account_name_str = old_account_name.to_string();
-        let new_account_name_str = new_account_name.to_string();
+        let old_account_name_str = old_account_name.as_str();
+        let new_account_name_str = new_account_name.as_str();
 
         let update_result = sqlx::query!(
             r#"

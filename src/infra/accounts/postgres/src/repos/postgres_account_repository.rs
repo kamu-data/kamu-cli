@@ -636,8 +636,8 @@ impl PasswordHashRepository for PostgresAccountRepository {
                 SET account_name = $1
                 WHERE lower(account_name) = lower($2)
             "#,
-            new_account_name.to_string(),
-            old_account_name.to_string(),
+            new_account_name.as_str(),
+            old_account_name.as_str(),
         )
         .execute(connection_mut)
         .await

@@ -663,8 +663,8 @@ impl PasswordHashRepository for MySqlAccountRepository {
                 SET account_name = ?
                 WHERE account_name = ?
             "#,
-            new_account_name.to_string(),
-            old_account_name.to_string(),
+            new_account_name.as_str(),
+            old_account_name.as_str(),
         )
         .execute(connection_mut)
         .await
