@@ -18,6 +18,10 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
 
+## [0.241.1] - 2025-06-06
+### Fixed
+- Account name in password hashes table should be updated as well during a rename
+
 ## [0.241.0] - 2025-06-06
 ### Added
 - Support renaming accounts via GraphQL API:
