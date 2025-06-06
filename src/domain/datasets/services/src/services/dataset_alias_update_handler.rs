@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::InternalError;
+use kamu_accounts::{AccountLifecycleMessage, MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE};
 use kamu_core::{DatasetRegistry, DatasetRegistryExt};
 use kamu_datasets::{
     DatasetLifecycleMessage,
@@ -23,10 +24,12 @@ use messaging_outbox::*;
 
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<AccountLifecycleMessage>)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_DATASET_ALIAS_UPDATE_HANDLER,
     feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
     // Only write aliases after reference transaction succeeds!
@@ -59,7 +62,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetAliasUpdateHandler {
 
         // Potential extensions:
         //  - dataset transfer to another owner
-        //  - owner profile is renamed
 
         match message {
             // Only react to renaming, creation writes alias immediately
@@ -91,6 +93,58 @@ impl MessageConsumerT<DatasetLifecycleMessage> for DatasetAliasUpdateHandler {
             }
 
             DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Deleted(_) => {
+                // No action required
+                Ok(())
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<AccountLifecycleMessage> for DatasetAliasUpdateHandler {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "DatasetAliasUpdateHandler[AccountLifecycleMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        _: &Catalog,
+        message: &AccountLifecycleMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received account lifecycle message");
+
+        match message {
+            AccountLifecycleMessage::Renamed(renamed_message) => {
+                // Update dataset aliases for all datasets owned by the renamed account
+                let mut owned_dataset_stream = self
+                    .dataset_registry
+                    .all_dataset_handles_by_owner_id(&renamed_message.account_id);
+
+                use tokio_stream::StreamExt;
+                while let Some(dataset_handle) = owned_dataset_stream.try_next().await? {
+                    // Resolve the dataset handle
+                    let target = self
+                        .dataset_registry
+                        .get_dataset_by_handle(&dataset_handle)
+                        .await;
+
+                    // Write the updated alias
+                    odf::dataset::write_dataset_alias(
+                        target.as_ref(),
+                        &odf::DatasetAlias::new(
+                            Some(renamed_message.new_account_name.clone()),
+                            dataset_handle.alias.dataset_name,
+                        ),
+                    )
+                    .await?;
+                }
+                Ok(())
+            }
+
+            AccountLifecycleMessage::Created(_) | AccountLifecycleMessage::Deleted(_) => {
                 // No action required
                 Ok(())
             }

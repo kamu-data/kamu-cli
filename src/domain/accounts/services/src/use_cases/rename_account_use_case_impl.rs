@@ -9,39 +9,57 @@
 
 use std::sync::Arc;
 
-use kamu_accounts::*;
+use kamu_accounts::{
+    Account,
+    AccountLifecycleMessage,
+    AccountService,
+    MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    RenameAccountError,
+    RenameAccountUseCase,
+};
+use messaging_outbox::OutboxExt;
 
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn DeleteAccountUseCase)]
-pub struct DeleteAccountUseCaseImpl {
+#[dill::interface(dyn RenameAccountUseCase)]
+pub struct RenameAccountUseCaseImpl {
     account_authorization_helper: Arc<utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
-impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
-    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountError> {
+impl RenameAccountUseCase for RenameAccountUseCaseImpl {
+    async fn execute(
+        &self,
+        account: &Account,
+        new_name: odf::AccountName,
+    ) -> Result<(), RenameAccountError> {
         self.account_authorization_helper
-            .ensure_account_can_be_deleted(&account.account_name)
+            .ensure_account_can_be_renamed(&account.account_name)
             .await?;
+
+        if account.account_name == new_name {
+            return Ok(());
+        }
 
         self.account_service
-            .delete_account_by_name(&account.account_name)
+            .rename_account(account, new_name.clone())
             .await?;
-
-        use messaging_outbox::OutboxExt;
 
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-                AccountLifecycleMessage::deleted(
+                AccountLifecycleMessage::renamed(
                     account.id.clone(),
                     account.email.clone(),
+                    account.account_name.clone(),
+                    new_name,
                     account.display_name.clone(),
                 ),
             )

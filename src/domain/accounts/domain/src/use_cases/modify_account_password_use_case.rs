@@ -29,6 +29,7 @@ pub trait ModifyAccountPasswordUseCase: Send + Sync {
 pub enum ModifyAccountPasswordError {
     #[error(transparent)]
     Internal(#[from] InternalError),
+
     #[error(transparent)]
     AccountNotFound(#[from] AccountNotFoundByNameError),
 }

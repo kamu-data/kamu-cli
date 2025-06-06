@@ -409,6 +409,36 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         Ok(())
     }
 
+    async fn update_owner_entries_after_rename(
+        &self,
+        owner_id: &odf::AccountID,
+        new_owner_name: &odf::AccountName,
+    ) -> Result<(), InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+        let new_owner_name_as_str = new_owner_name.as_str();
+        let stack_owner_id = owner_id.as_stack_string();
+        let stack_owner_id_as_str = stack_owner_id.as_str();
+
+        sqlx::query!(
+            r#"
+            UPDATE dataset_entries
+                SET owner_name = $1
+                WHERE owner_id = $2
+            "#,
+            new_owner_name_as_str,
+            stack_owner_id_as_str,
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+
     async fn delete_dataset_entry(
         &self,
         dataset_id: &odf::DatasetID,

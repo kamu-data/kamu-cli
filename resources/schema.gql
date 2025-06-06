@@ -140,6 +140,10 @@ input AccountLookupFilter {
 
 type AccountMut {
 	"""
+	Update account name
+	"""
+	rename(newName: AccountName!): RenameAccountResult!
+	"""
 	Update account email
 	"""
 	updateEmail(newEmail: Email!): UpdateEmailResult!
@@ -2951,6 +2955,19 @@ interface RemoveWebhookSubscriptionResult {
 
 type RemoveWebhookSubscriptionResultSuccess implements RemoveWebhookSubscriptionResult {
 	removed: Boolean!
+	message: String!
+}
+
+type RenameAccountNameNotUnique implements RenameAccountResult {
+	message: String!
+}
+
+interface RenameAccountResult {
+	message: String!
+}
+
+type RenameAccountSuccess implements RenameAccountResult {
+	newName: String!
 	message: String!
 }
 
