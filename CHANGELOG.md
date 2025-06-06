@@ -17,6 +17,16 @@ Recommendation: for ease of reading, use the following order:
 ### Changed
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 
+## [0.241.0] - 2025-06-06
+### Added
+- Support renaming accounts via GraphQL API:
+  - automatically actualizes dataset entries (denormalized account names)
+  - automatically updates alias files in ODF storage layer
+  - properly handling account renames when it's initiated by updates to predefined configuration
+### Fixed
+- Missing length validation for webhook subscription labels.
+- Unexpected webhook label duplication for empty labels.
+
 ## [0.240.1] - 2025-06-04
 ### Changed
 - Updated `sqlx` crate to `0.8.6`, Vol. 2.

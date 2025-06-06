@@ -7,5 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod services;
-mod use_cases;
+mod test_create_account_use_case_impl;
+mod test_delete_account_use_case_impl;
+mod test_modify_password_use_case_impl;
+mod test_rename_account_use_case_impl;

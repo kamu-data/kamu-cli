@@ -76,7 +76,7 @@ pub(crate) async fn new_webhook_subscription(catalog: &dill::Catalog) -> Webhook
     let mut webhook_subscription = WebhookSubscription::new(
         webhook_subscription_id,
         Url::parse("https://example.com").unwrap(),
-        WebhookSubscriptionLabel::new("test".to_string()),
+        WebhookSubscriptionLabel::try_new("test".to_string()).unwrap(),
         None,
         vec![WebhookEventTypeCatalog::test()],
         WebhookSubscriptionSecret::try_new("some-secret").unwrap(),

@@ -161,7 +161,7 @@ impl TestWebhookDeliveryWorkerHarness {
         let mut subscription = WebhookSubscription::new(
             subscription_id,
             Url::parse("https://example.com/webhook").unwrap(),
-            WebhookSubscriptionLabel::new("test".to_string()),
+            WebhookSubscriptionLabel::try_new("test".to_string()).unwrap(),
             None,
             vec![WebhookEventTypeCatalog::test()],
             WebhookSubscriptionSecret::try_new("some-secret").unwrap(),

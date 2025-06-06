@@ -10,13 +10,17 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::Account;
+use crate::{Account, AccountErrorDuplicate};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DeleteAccountUseCase: Send + Sync {
-    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountError>;
+pub trait RenameAccountUseCase: Send + Sync {
+    async fn execute(
+        &self,
+        account: &Account,
+        new_name: odf::AccountName,
+    ) -> Result<(), RenameAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +28,10 @@ pub trait DeleteAccountUseCase: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum DeleteAccountError {
+pub enum RenameAccountError {
+    #[error(transparent)]
+    Duplicate(AccountErrorDuplicate),
+
     #[error(transparent)]
     Access(
         #[from]

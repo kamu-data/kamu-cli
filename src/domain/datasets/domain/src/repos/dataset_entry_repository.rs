@@ -65,6 +65,12 @@ pub trait DatasetEntryRepository: Send + Sync {
         new_name: &odf::DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError>;
 
+    async fn update_owner_entries_after_rename(
+        &self,
+        owner_id: &odf::AccountID,
+        new_owner_name: &odf::AccountName,
+    ) -> Result<(), InternalError>;
+
     async fn delete_dataset_entry(
         &self,
         dataset_id: &odf::DatasetID,

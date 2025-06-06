@@ -18,6 +18,7 @@ use crate::{
     AccountPageStream,
     CreateAccountError,
     GetAccountByIdError,
+    RenameAccountError,
     SearchAccountsByNamePatternFilters,
 };
 
@@ -67,6 +68,12 @@ pub trait AccountService: Sync + Send {
         account_name: &odf::AccountName,
         email: email_utils::Email,
     ) -> Result<Account, CreateAccountError>;
+
+    async fn rename_account(
+        &self,
+        account: &Account,
+        new_name: odf::AccountName,
+    ) -> Result<(), RenameAccountError>;
 
     async fn delete_account_by_name(
         &self,

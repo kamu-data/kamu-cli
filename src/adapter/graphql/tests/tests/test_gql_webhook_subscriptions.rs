@@ -416,6 +416,186 @@ async fn test_duplicate_labels() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_empty_labels_arent_duplicates() {
+    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let create_result = harness.create_root_dataset("foo").await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "targetUrl": "https://example.com/webhook/1",
+                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                "label": "",
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+
+    let subscription_id_1 = res.data.clone().into_json().unwrap()["datasets"]["byId"]["webhooks"]
+        ["createSubscription"]["subscriptionId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "createSubscription": {
+                            "__typename": "CreateWebhookSubscriptionResultSuccess",
+                            "message": "Success",
+                            "subscriptionId": subscription_id_1,
+                            "secret": FIXED_SECRET
+                        }
+                    }
+                }
+
+            }
+        })
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "targetUrl": "https://example.com/webhook/2",
+                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                "label": "",
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok());
+
+    let subscription_id_2 = res.data.clone().into_json().unwrap()["datasets"]["byId"]["webhooks"]
+        ["createSubscription"]["subscriptionId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "createSubscription": {
+                            "__typename": "CreateWebhookSubscriptionResultSuccess",
+                            "message": "Success",
+                            "subscriptionId": subscription_id_2,
+                            "secret": FIXED_SECRET
+                        }
+                    }
+                }
+
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_label_length_validation() {
+    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let create_result = harness.create_root_dataset("foo").await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "targetUrl": "https://example.com/webhook",
+                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                "label": "My Very Very Very Very Very Very Very Long Webhook Subscription Label That Exceeds The Maximum Length",
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_err(), "{res:?}");
+
+    let errors = res.errors;
+    assert_eq!(errors.len(), 1);
+    assert!(errors[0].message.contains(
+        "WebhookSubscriptionLabel is too long. The value length must be less than 100 character(s)"
+    ),);
+
+    assert_eq!(
+        errors[0].path,
+        &[
+            PathSegment::Field("datasets".into()),
+            PathSegment::Field("byId".into()),
+            PathSegment::Field("webhooks".into()),
+            PathSegment::Field("createSubscription".into()),
+        ],
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+            )
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": create_result.dataset_handle.id.to_string(),
+                "targetUrl": "https://example.com/webhook",
+                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                // Exactly 100 characters
+                "label": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            })))
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+
+    let subscription_id = res.data.clone().into_json().unwrap()["datasets"]["byId"]["webhooks"]
+        ["createSubscription"]["subscriptionId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "webhooks": {
+                        "createSubscription": {
+                            "__typename": "CreateWebhookSubscriptionResultSuccess",
+                            "message": "Success",
+                            "subscriptionId": subscription_id,
+                            "secret": FIXED_SECRET
+                        }
+                    }
+                }
+
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_update_subscription() {
     let harness = WebhookSubscriptiuonsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
