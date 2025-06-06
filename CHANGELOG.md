@@ -16,6 +16,7 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `BigInt` scalar
 ### Changed
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
+- Allow `molecule` and `molecule.dev` accounts separation
 
 ## [0.241.0] - 2025-06-06
 ### Added

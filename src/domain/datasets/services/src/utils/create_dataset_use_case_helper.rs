@@ -71,18 +71,23 @@ impl CreateDatasetUseCaseHelper {
                     // TODO: HACK: SEC: Validate subject account has permissions to create datasets
                     // in target account e.g. by checking `member-of` relationship for
                     // organizations. Currently only allowing cross-account creation for `kamu` and
-                    // `molecule`.
+                    // `molecule` / `molecule.dev`.
                     //
                     // See: https://github.com/kamu-data/kamu-node/issues/233
-                    if let Some(account_id) = self
+                    if let Some(account) = self
                         .account_svc
                         .get()
                         .int_err()?
-                        .find_account_id_by_name(account_name)
+                        .account_by_name(account_name)
                         .await?
-                        && (subject.account_name == "kamu" || subject.account_name == "molecule")
+                        && (subject.account_name == "kamu"
+                            || subject.account_name == "molecule"
+                            || subject.account_name == "molecule.dev")
+                        && account
+                            .account_name
+                            .starts_with(subject.account_name.as_str())
                     {
-                        Ok((CanonicalDatasetAlias::new(raw_alias.clone()), account_id))
+                        Ok((CanonicalDatasetAlias::new(raw_alias.clone()), account.id))
                     } else {
                         Err(odf::AccessError::Unauthorized(
                             format!("Cannot create a dataset in account {account_name}").into(),

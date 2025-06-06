@@ -19,6 +19,12 @@ use crate::queries::{Molecule, MoleculeProject};
 
 pub(crate) struct MoleculeMut;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const MOLECULE_ORG_ACCOUNTS: [&str; 2] = ["molecule", "molecule.dev"];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl MoleculeMut {
@@ -55,10 +61,23 @@ impl MoleculeMut {
 
         // Check auth
         let subject_molecule = match subject.as_ref() {
-            CurrentAccountSubject::Logged(subj) if subj.account_name == "molecule" => subj,
+            CurrentAccountSubject::Logged(subj)
+                if MOLECULE_ORG_ACCOUNTS.contains(&subj.account_name.as_str()) =>
+            {
+                subj
+            }
             _ => {
                 return Err(GqlError::Access(odf::AccessError::Unauthorized(
-                    "Only 'molecule' account can provision new projects".into(),
+                    format!(
+                        "Only accounts {} can provision new projects",
+                        MOLECULE_ORG_ACCOUNTS
+                            .iter()
+                            .map(|account_name| format!("'{account_name}'"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                    .as_str()
+                    .into(),
                 )));
             }
         };
@@ -112,7 +131,9 @@ impl MoleculeMut {
             .unwrap();
 
         let project_account_name: odf::AccountName =
-            format!("molecule.{ipnft_symbol}").parse().int_err()?;
+            format!("{}.{ipnft_symbol}", molecule_account.account_name)
+                .parse()
+                .int_err()?;
 
         let project_email = format!("support+{project_account_name}@kamu.dev")
             .parse()
