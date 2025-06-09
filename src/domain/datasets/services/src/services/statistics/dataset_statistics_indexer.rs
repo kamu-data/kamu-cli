@@ -65,6 +65,8 @@ impl DatasetStatisticsIndexer {
             .try_collect()
             .await?;
 
+        dbg!("!!!", &dataset_ids);
+
         for dataset_id in dataset_ids {
             let dataset = self
                 .dataset_storage_unit
