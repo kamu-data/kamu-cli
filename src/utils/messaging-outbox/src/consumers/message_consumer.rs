@@ -43,6 +43,8 @@ pub struct MessageConsumerMeta {
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum MessageDeliveryMechanism {
     Transactional,
+    /// Mechanism for logical separation within a domain. Please refrain from
+    /// using for cross-domain interaction.
     Immediate,
 }
 
