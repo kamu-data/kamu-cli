@@ -54,8 +54,6 @@ impl DatasetStorageUnitS3 {
             .s3_context
             .get_key(&dataset_id.as_multibase().to_stack_string());
 
-        dbg!("!!!", &dataset_key_prefix);
-
         self.s3_context.recursive_delete(dataset_key_prefix).await
     }
 

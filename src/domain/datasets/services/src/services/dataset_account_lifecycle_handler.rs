@@ -70,8 +70,6 @@ impl DatasetAccountLifecycleHandler {
 
         // TODO: PERF: Batch/concurrent processing
         while let Some(dataset_handle) = owned_dataset_stream.try_next().await? {
-            dbg!("!!!", &dataset_handle);
-
             match self
                 .delete_dataset_use_case
                 .execute_via_handle(&dataset_handle)
