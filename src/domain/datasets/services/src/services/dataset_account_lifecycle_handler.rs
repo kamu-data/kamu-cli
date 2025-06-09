@@ -32,8 +32,7 @@ use crate::DatasetEntryWriter;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ],
-    // NOTE: To update database rows in a single transaction, process the message immediately
-    delivery: MessageDeliveryMechanism::Immediate,
+    delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetAccountLifecycleHandler {
