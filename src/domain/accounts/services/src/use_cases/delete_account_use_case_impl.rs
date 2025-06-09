@@ -30,22 +30,11 @@ impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
             .ensure_account_can_be_deleted(&account.account_name)
             .await?;
 
-        use messaging_outbox::OutboxExt;
-
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-                AccountLifecycleMessage::before_deletion(
-                    account.id.clone(),
-                    account.email.clone(),
-                    account.display_name.clone(),
-                ),
-            )
-            .await?;
-
         self.account_service
             .delete_account_by_name(&account.account_name)
             .await?;
+
+        use messaging_outbox::OutboxExt;
 
         self.outbox
             .post_message(

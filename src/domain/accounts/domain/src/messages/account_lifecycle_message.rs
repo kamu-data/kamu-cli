@@ -28,9 +28,6 @@ pub enum AccountLifecycleMessage {
     /// Message indicating that an account has been renamed
     Renamed(AccountLifecycleMessageRenamed),
 
-    /// Message indicating that an account will be deleted
-    BeforeDeletion(AccountLifecycleMessageBeforeDeletion),
-
     /// Message indicating that an account has been deleted
     Deleted(AccountLifecycleMessageDeleted),
 }
@@ -60,18 +57,6 @@ impl AccountLifecycleMessage {
             email,
             old_account_name,
             new_account_name,
-            display_name,
-        })
-    }
-
-    pub fn before_deletion(
-        account_id: odf::AccountID,
-        email: Email,
-        display_name: AccountDisplayName,
-    ) -> Self {
-        Self::BeforeDeletion(AccountLifecycleMessageBeforeDeletion {
-            account_id,
-            email,
             display_name,
         })
     }
@@ -127,20 +112,6 @@ pub struct AccountLifecycleMessageRenamed {
 
     /// The new name of the account
     pub new_account_name: odf::AccountName,
-
-    /// The display name of the account
-    pub display_name: AccountDisplayName,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AccountLifecycleMessageBeforeDeletion {
-    /// The unique identifier of the account
-    pub account_id: odf::AccountID,
-
-    /// The email address associated with the account
-    pub email: Email,
 
     /// The display name of the account
     pub display_name: AccountDisplayName,

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountLifecycleMessage,
-    AccountLifecycleMessageBeforeDeletion,
+    AccountLifecycleMessageDeleted,
     AccountLifecycleMessageRenamed,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
 };
@@ -58,9 +58,9 @@ impl DatasetAccountLifecycleHandler {
         Ok(())
     }
 
-    async fn handle_account_lifecycle_before_deletion_message(
+    async fn handle_account_lifecycle_deleted_message(
         &self,
-        message: &AccountLifecycleMessageBeforeDeletion,
+        message: &AccountLifecycleMessageDeleted,
     ) -> Result<(), InternalError> {
         let mut owned_dataset_stream = self
             .dataset_registry
@@ -111,12 +111,11 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetAccountLifecycleHandle
                 self.handle_account_lifecycle_renamed_message(message).await
             }
 
-            AccountLifecycleMessage::BeforeDeletion(message) => {
-                self.handle_account_lifecycle_before_deletion_message(message)
-                    .await
+            AccountLifecycleMessage::Deleted(message) => {
+                self.handle_account_lifecycle_deleted_message(message).await
             }
 
-            AccountLifecycleMessage::Created(_) | AccountLifecycleMessage::Deleted(_) => {
+            AccountLifecycleMessage::Created(_) => {
                 // No action required
                 Ok(())
             }

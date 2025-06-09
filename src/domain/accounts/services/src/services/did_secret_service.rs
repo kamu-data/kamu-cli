@@ -107,9 +107,7 @@ impl MessageConsumerT<AccountLifecycleMessage> for DidSecretService {
                 self.handle_account_lifecycle_deleted_message(message).await
             }
 
-            AccountLifecycleMessage::Created(_)
-            | AccountLifecycleMessage::Renamed(_)
-            | AccountLifecycleMessage::BeforeDeletion(_) => {
+            AccountLifecycleMessage::Created(_) | AccountLifecycleMessage::Renamed(_) => {
                 // No action required
                 Ok(())
             }
