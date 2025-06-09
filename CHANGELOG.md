@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Fixed
-- `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`.
+- `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage` (#1273).
 - `DeleteAccountUseCaseImpl`: complete deletion of datasets, not just database entries.
 
 ## [0.241.1] - 2025-06-06
