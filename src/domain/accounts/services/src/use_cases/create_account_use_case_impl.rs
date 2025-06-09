@@ -14,9 +14,11 @@ use email_utils::Email;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
+    AccountLifecycleMessage,
     AccountService,
     CreateAccountError,
     CreateAccountUseCase,
+    MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     PasswordHashRepository,
 };
 use random_strings::AllowedSymbols;
@@ -27,6 +29,7 @@ pub struct CreateAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
     password_hash_repository: Arc<dyn PasswordHashRepository>,
     password_hashing_mode: PasswordHashingMode,
+    outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
 #[dill::component(pub)]
@@ -37,12 +40,14 @@ impl CreateAccountUseCaseImpl {
         account_service: Arc<dyn AccountService>,
         password_hash_repository: Arc<dyn PasswordHashRepository>,
         password_hashing_mode: Option<Arc<PasswordHashingMode>>,
+        outbox: Arc<dyn messaging_outbox::Outbox>,
     ) -> Self {
         Self {
             account_service,
             password_hash_repository,
             password_hashing_mode: password_hashing_mode
                 .map_or(PasswordHashingMode::Default, |mode| *mode),
+            outbox,
         }
     }
 
@@ -57,6 +62,21 @@ impl CreateAccountUseCaseImpl {
         );
 
         Email::parse(&email_str).int_err()
+    }
+
+    async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {
+        use messaging_outbox::OutboxExt;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+                AccountLifecycleMessage::created(
+                    new_account.id.clone(),
+                    new_account.email.clone(),
+                    new_account.display_name.clone(),
+                ),
+            )
+            .await
     }
 }
 
@@ -94,6 +114,8 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             .save_password_hash(&created_account.id, account_name, password_hash)
             .await
             .int_err()?;
+
+        self.notify_account_created(&created_account).await?;
 
         Ok(created_account)
     }
