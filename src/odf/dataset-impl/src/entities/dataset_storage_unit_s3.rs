@@ -53,6 +53,9 @@ impl DatasetStorageUnitS3 {
         let dataset_key_prefix = self
             .s3_context
             .get_key(&dataset_id.as_multibase().to_stack_string());
+
+        dbg!("!!!", &dataset_key_prefix);
+
         self.s3_context.recursive_delete(dataset_key_prefix).await
     }
 
@@ -130,6 +133,7 @@ impl DatasetStorageUnit for DatasetStorageUnitS3 {
 
     #[tracing::instrument(level = "debug", name = DatasetStorageUnitS3_stored_dataset_ids, skip_all)]
     fn stored_dataset_ids(&self) -> DatasetIDStream<'_> {
+        //
         Box::pin(async_stream::try_stream! {
             for dataset_id in self.list_dataset_ids_maybe_cached().await? {
                 // Head must exist, otherwise it's a garbage
