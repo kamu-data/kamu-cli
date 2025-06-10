@@ -187,6 +187,9 @@ impl AccountService for AccountServiceImpl {
     ) -> Result<(), RenameAccountError> {
         let mut updated_account = account.clone();
         updated_account.account_name = new_name;
+        if updated_account.provider == AccountProvider::Password.to_string() {
+            updated_account.provider_identity_key = updated_account.account_name.to_string();
+        }
 
         match self.account_repo.update_account(updated_account).await {
             Ok(_) => Ok(()),
