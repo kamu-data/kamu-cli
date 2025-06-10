@@ -763,7 +763,8 @@ pub fn register_config_in_catalog(
                 ))
                 .set_display_name(AccountService::default_user_name(
                     TenancyConfig::MultiTenant,
-                )),
+                ))
+                .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
             );
 
             if is_e2e_testing {
