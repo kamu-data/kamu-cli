@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Fixed
 - `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`.
 - `DeleteAccountUseCaseImpl`: complete deletion of datasets, not just database entries (#1273).
+- `kamu system api-server gql-query`: authorization based on the current subject (#1273).
 
 ## [0.241.1] - 2025-06-06
 ### Fixed

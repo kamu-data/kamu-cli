@@ -363,7 +363,7 @@ pub fn get_command(
                     .cast(),
                 ),
                 Some(cli::SystemApiServerSubCommand::GqlQuery(ssc)) => Box::new(
-                    APIServerGqlQueryCommand::builder(base_catalog.clone(), ssc.query, ssc.full)
+                    APIServerGqlQueryCommand::builder(cli_catalog.clone(), ssc.query, ssc.full)
                         .cast(),
                 ),
                 Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => {
@@ -459,7 +459,12 @@ pub fn get_command(
 pub fn command_needs_transaction(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
-            cli::SystemSubCommand::ApiServer(_) => false,
+            cli::SystemSubCommand::ApiServer(sas) => {
+                matches!(
+                    &sas.subcommand,
+                    Some(SystemApiServerSubCommand::GqlQuery(_))
+                )
+            }
             _ => true,
         },
         cli::Command::Ui(_) | cli::Command::Login(_) => false,
