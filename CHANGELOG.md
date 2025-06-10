@@ -14,7 +14,28 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Changed
 - Panic's now also log correct tracing message
-- Updated `sqlx` crate to `0.8.6`, Vol. 2
+### Fixed
+- `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`
+
+## [0.241.1] - 2025-06-06
+### Fixed
+- Account name in password hashes table should be updated as well during a rename
+
+## [0.241.0] - 2025-06-06
+### Added
+- Support renaming accounts via GraphQL API:
+  - automatically actualizes dataset entries (denormalized account names)
+  - automatically updates alias files in ODF storage layer
+  - properly handling account renames when it's initiated by updates to predefined configuration
+### Fixed
+- Missing length validation for webhook subscription labels.
+- Unexpected webhook label duplication for empty labels.
+
+## [0.240.1] - 2025-06-04
+### Changed
+- Updated `sqlx` crate to `0.8.6`, Vol. 2.
+### Fixed
+- `web3-wallet` authorization provider: interactive login use case support (Device Flow). 
 
 ## [0.240.0] - 2025-06-02
 ### Added

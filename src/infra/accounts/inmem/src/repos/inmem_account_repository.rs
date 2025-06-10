@@ -361,7 +361,7 @@ impl AccountRepository for InMemoryAccountRepository {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError> {
+    ) -> Result<(), DeleteAccountByNameError> {
         let mut guard = self.state.lock().unwrap();
 
         let maybe_deleted_account = guard.accounts_by_name.remove(account_name);
@@ -375,9 +375,11 @@ impl AccountRepository for InMemoryAccountRepository {
 
             Ok(())
         } else {
-            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
-                account_name: account_name.clone(),
-            }))
+            Err(DeleteAccountByNameError::NotFound(
+                AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                },
+            ))
         }
     }
 }
@@ -462,6 +464,32 @@ impl PasswordHashRepository for InMemoryAccountRepository {
             .get(account_name)
             .cloned();
         Ok(maybe_hash_as_string)
+    }
+
+    async fn on_account_renamed(
+        &self,
+        old_account_name: &odf::AccountName,
+        new_account_name: &odf::AccountName,
+    ) -> Result<(), PasswordAccountRenamedError> {
+        let mut writable_state = self.state.lock().unwrap();
+
+        let maybe_password_hash = writable_state
+            .password_hash_by_account_name
+            .remove(old_account_name);
+
+        if let Some(password_hash) = maybe_password_hash {
+            writable_state
+                .password_hash_by_account_name
+                .insert(new_account_name.clone(), password_hash);
+        } else {
+            return Err(PasswordAccountRenamedError::AccountNotFound(
+                AccountNotFoundByNameError {
+                    account_name: old_account_name.clone(),
+                },
+            ));
+        }
+
+        Ok(())
     }
 }
 

@@ -25,6 +25,9 @@ pub enum AccountLifecycleMessage {
     /// Message indicating that an account has been created
     Created(AccountLifecycleMessageCreated),
 
+    /// Message indicating that an account has been renamed
+    Renamed(AccountLifecycleMessageRenamed),
+
     /// Message indicating that an account has been deleted
     Deleted(AccountLifecycleMessageDeleted),
 }
@@ -38,6 +41,22 @@ impl AccountLifecycleMessage {
         Self::Created(AccountLifecycleMessageCreated {
             account_id,
             email,
+            display_name,
+        })
+    }
+
+    pub fn renamed(
+        account_id: odf::AccountID,
+        email: Email,
+        old_account_name: odf::AccountName,
+        new_account_name: odf::AccountName,
+        display_name: AccountDisplayName,
+    ) -> Self {
+        Self::Renamed(AccountLifecycleMessageRenamed {
+            account_id,
+            email,
+            old_account_name,
+            new_account_name,
             display_name,
         })
     }
@@ -73,6 +92,26 @@ pub struct AccountLifecycleMessageCreated {
 
     /// The email address associated with the account
     pub email: Email,
+
+    /// The display name of the account
+    pub display_name: AccountDisplayName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountLifecycleMessageRenamed {
+    /// The unique identifier of the account
+    pub account_id: odf::AccountID,
+
+    /// The email address associated with the account
+    pub email: Email,
+
+    /// The old name of the account
+    pub old_account_name: odf::AccountName,
+
+    /// The new name of the account
+    pub new_account_name: odf::AccountName,
 
     /// The display name of the account
     pub display_name: AccountDisplayName,

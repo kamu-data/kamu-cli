@@ -61,6 +61,16 @@ impl DatasetEntryWriter for FakeConnectingDatasetEntryWriter {
 
         Ok(())
     }
+
+    async fn update_owner_entries_after_rename(
+        &self,
+        _owner_account_id: &odf::AccountID,
+        _old_owner_account_name: &odf::AccountName,
+        _new_owner_account_name: &odf::AccountName,
+    ) -> Result<(), InternalError> {
+        // Nothing to do
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

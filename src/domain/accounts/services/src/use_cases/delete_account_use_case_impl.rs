@@ -25,7 +25,7 @@ pub struct DeleteAccountUseCaseImpl {
 
 #[async_trait::async_trait]
 impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
-    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountByNameError> {
+    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountError> {
         self.account_authorization_helper
             .ensure_account_can_be_deleted(&account.account_name)
             .await?;

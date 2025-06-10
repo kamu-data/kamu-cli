@@ -10,7 +10,7 @@
 use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
-use kamu_core::auth;
+use kamu_core::{TenancyConfig, auth};
 use kamu_datasets::DatasetEnvVarsConfig;
 use kamu_task_system as ts;
 
@@ -208,6 +208,20 @@ pub(crate) fn check_logged_account_name_match(
     Err(GqlError::gql_extended("Account access error", |eev| {
         eev.set("account_name", account_name.to_string());
     }))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn check_multi_tenant_config(ctx: &Context<'_>) -> Result<(), GqlError> {
+    let tenancy_config = from_catalog_n!(ctx, TenancyConfig);
+
+    if *tenancy_config == TenancyConfig::MultiTenant {
+        return Ok(());
+    }
+
+    Err(GqlError::gql(
+        "Operation is not possible in single-tenant configuration",
+    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -180,11 +180,27 @@ impl AccountService for AccountServiceImpl {
         Ok(account)
     }
 
+    async fn rename_account(
+        &self,
+        account: &Account,
+        new_name: odf::AccountName,
+    ) -> Result<(), RenameAccountError> {
+        let mut updated_account = account.clone();
+        updated_account.account_name = new_name;
+
+        match self.account_repo.update_account(updated_account).await {
+            Ok(_) => Ok(()),
+            Err(UpdateAccountError::Duplicate(e)) => Err(RenameAccountError::Duplicate(e)),
+            Err(UpdateAccountError::NotFound(e)) => Err(RenameAccountError::Internal(e.int_err())),
+            Err(UpdateAccountError::Internal(e)) => Err(RenameAccountError::Internal(e)),
+        }
+    }
+
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), InternalError> {
-        use DeleteAccountError as E;
+        use DeleteAccountByNameError as E;
 
         match self.account_repo.delete_account_by_name(account_name).await {
             Ok(_) | Err(E::NotFound(_)) => Ok(()),

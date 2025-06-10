@@ -34,7 +34,7 @@ async fn test_create_in_dataset_success() {
             Some(dataset_id),
             url::Url::parse("https://example.com").unwrap(),
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
     assert!(res.is_ok(), "Failed to create subscription: {res:?}",);
@@ -63,7 +63,7 @@ async fn test_invalid_target_url_rejected() {
                 Some(dataset_id.clone()),
                 url::Url::parse(invalid_url).unwrap(),
                 vec![WebhookEventTypeCatalog::test()],
-                WebhookSubscriptionLabel::new("test_label"),
+                WebhookSubscriptionLabel::try_new("test_label").unwrap(),
             )
             .await;
         assert_matches!(
@@ -87,7 +87,7 @@ async fn test_no_event_types_rejected() {
             Some(dataset_id.clone()),
             url::Url::parse("https://example.com/webhook").unwrap(),
             vec![],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
     assert_matches!(
@@ -113,7 +113,7 @@ async fn test_event_types_deduplicated() {
                 WebhookEventTypeCatalog::test(),
                 WebhookEventTypeCatalog::test(),
             ],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
     assert!(res.is_ok(), "Failed to create subscription: {res:?}",);
@@ -148,7 +148,7 @@ async fn test_label_unique_in_dataset() {
             Some(dataset_id_1.clone()),
             url::Url::parse("https://example.com/webhook/1").unwrap(),
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
     assert!(res.is_ok(), "Failed to create subscription: {res:?}",);
@@ -160,7 +160,7 @@ async fn test_label_unique_in_dataset() {
             Some(dataset_id_1),
             url::Url::parse("https://example.com/webhook/2").unwrap(),
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
     assert_matches!(
@@ -176,7 +176,7 @@ async fn test_label_unique_in_dataset() {
             Some(dataset_id_2),
             url::Url::parse("https://example.com/webhook/3").unwrap(),
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
     assert!(res.is_ok(), "Failed to create subscription: {res:?}",);

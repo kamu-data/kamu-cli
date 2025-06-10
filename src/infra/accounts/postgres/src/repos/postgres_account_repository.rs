@@ -442,7 +442,7 @@ impl AccountRepository for PostgresAccountRepository {
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
-    ) -> Result<(), DeleteAccountError> {
+    ) -> Result<(), DeleteAccountByNameError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -462,9 +462,11 @@ impl AccountRepository for PostgresAccountRepository {
         if delete_result.rows_affected() > 0 {
             Ok(())
         } else {
-            Err(DeleteAccountError::NotFound(AccountNotFoundByNameError {
-                account_name: account_name.clone(),
-            }))
+            Err(DeleteAccountByNameError::NotFound(
+                AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                },
+            ))
         }
     }
 }
@@ -617,6 +619,39 @@ impl PasswordHashRepository for PostgresAccountRepository {
         .int_err()?;
 
         Ok(maybe_password_row.map(|password_row| password_row.password_hash))
+    }
+
+    async fn on_account_renamed(
+        &self,
+        old_account_name: &odf::AccountName,
+        new_account_name: &odf::AccountName,
+    ) -> Result<(), PasswordAccountRenamedError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let update_result = sqlx::query!(
+            r#"
+            UPDATE accounts_passwords
+                SET account_name = $1
+                WHERE lower(account_name) = lower($2)
+            "#,
+            new_account_name.as_str(),
+            old_account_name.as_str(),
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        if update_result.rows_affected() == 0 {
+            return Err(PasswordAccountRenamedError::AccountNotFound(
+                AccountNotFoundByNameError {
+                    account_name: old_account_name.clone(),
+                },
+            ));
+        }
+
+        Ok(())
     }
 }
 

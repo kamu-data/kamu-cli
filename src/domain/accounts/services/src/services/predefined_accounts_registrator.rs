@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use dill::*;
@@ -15,6 +17,7 @@ use internal_error::*;
 use kamu_accounts::*;
 use kamu_auth_rebac::{AccountPropertyName, RebacService, boolean_property_value};
 use kamu_auth_rebac_services::DefaultAccountProperties;
+use messaging_outbox::OutboxExt;
 use odf::AccountID;
 
 use crate::LoginPasswordAuthProvider;
@@ -28,6 +31,8 @@ pub struct PredefinedAccountsRegistrator {
     account_repository: Arc<dyn AccountRepository>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
+    password_hash_repository: Arc<dyn PasswordHashRepository>,
+    outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
 #[component(pub)]
@@ -44,6 +49,8 @@ impl PredefinedAccountsRegistrator {
         account_repository: Arc<dyn AccountRepository>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
+        password_hash_repository: Arc<dyn PasswordHashRepository>,
+        outbox: Arc<dyn messaging_outbox::Outbox>,
     ) -> Self {
         Self {
             predefined_accounts_config,
@@ -51,6 +58,8 @@ impl PredefinedAccountsRegistrator {
             account_repository,
             rebac_service,
             default_account_properties,
+            password_hash_repository,
+            outbox,
         }
     }
 
@@ -112,10 +121,45 @@ impl PredefinedAccountsRegistrator {
         };
 
         if account != updated_account {
+            tracing::info!(
+                "Updating modified predefined account: old: {:?}, new: {:?}",
+                account,
+                updated_account
+            );
+            let new_account_name = updated_account.account_name.clone();
+
             self.account_repository
                 .update_account(updated_account)
                 .await
                 .int_err()?;
+
+            // Renaming is a bit special event, and we have associated handlers for it
+            if account.account_name != new_account_name {
+                tracing::info!(
+                    "Detected rename of predefined account from '{}' to '{}'",
+                    account.account_name,
+                    new_account_name
+                );
+
+                // Update account name in the password hash repository
+                self.password_hash_repository
+                    .on_account_renamed(&account.account_name, &new_account_name)
+                    .await
+                    .int_err()?;
+
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+                        AccountLifecycleMessage::renamed(
+                            account.id.clone(),
+                            account.email.clone(),
+                            account.account_name.clone(),
+                            new_account_name,
+                            account.display_name.clone(),
+                        ),
+                    )
+                    .await?;
+            }
         }
 
         Ok(())
@@ -132,7 +176,26 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         name = "PredefinedAccountsRegistrator::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        // If there are duplicates by account ID, skip them.
+        // This could happen i.e., when a predefined user gets renamed,
+        // but the implicit CLI config for current user still points to same ID
+        let mut account_config_by_id = HashMap::new();
         for account_config in &self.predefined_accounts_config.predefined {
+            let account_id = account_config.get_id();
+            match account_config_by_id.entry(account_id.clone()) {
+                Entry::Vacant(entry) => {
+                    entry.insert(account_config);
+                }
+                Entry::Occupied(_) => {
+                    tracing::warn!(
+                        "Duplicate account configuration found for account ID: {}. Skipping.",
+                        account_id
+                    );
+                }
+            }
+        }
+
+        for account_config in account_config_by_id.values() {
             let account_id = account_config.get_id();
             match self.account_repository.get_account_by_id(&account_id).await {
                 Ok(account) => {

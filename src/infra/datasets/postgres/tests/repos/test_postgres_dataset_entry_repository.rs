@@ -91,6 +91,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = dataset_entry_repo::test_owner_of_entries_renamed,
+    harness = PostgresDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = dataset_entry_repo::test_delete_dataset_entry,
     harness = PostgresDatasetEntryRepositoryHarness
 );

@@ -645,6 +645,7 @@ async fn test_delete_own_account() {
             "accounts": {
                 "byName": {
                     "delete": {
+                        "__typename": "DeleteAccountSuccess",
                         "message": "Account deleted",
                     }
                 }
@@ -703,6 +704,7 @@ async fn test_admin_delete_other_account() {
             "accounts": {
                 "byName": {
                     "delete": {
+                        "__typename": "DeleteAccountSuccess",
                         "message": "Account deleted",
                     }
                 }
@@ -774,6 +776,273 @@ async fn test_non_admin_try_to_delete_other_account() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_rename_own_account() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        is_admin: false,
+        can_provision_accounts: true,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let default_test_account = CurrentAccountSubject::new_test();
+    const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
+
+    let res = schema
+        .execute(
+            rename_account_request(
+                default_test_account.account_name(),
+                RENAMED_ANOTHER_ACCOUNT_NAME,
+            )
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        &value!({
+            "accounts": {
+                "byName": {
+                    "rename": {
+                        "__typename": "RenameAccountSuccess",
+                        "message": "Account renamed",
+                    }
+                }
+            }
+        }),
+        &res.data,
+        "{res:?}"
+    );
+
+    let res = schema
+        .execute(
+            account_by_name_request(default_test_account.account_name())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    pretty_assertions::assert_eq!(
+        &res.data,
+        &value!({
+            "accounts": {
+                "byName": null
+            }
+        }),
+        "{res:?}"
+    );
+
+    let res = schema
+        .execute(
+            account_by_name_request(RENAMED_ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized),
+        )
+        .await;
+    pretty_assertions::assert_eq!(
+        &res.data,
+        &value!({
+            "accounts": {
+                "byName": {
+                    "accountName": RENAMED_ANOTHER_ACCOUNT_NAME
+                }
+            }
+        }),
+        "{res:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_rename_own_account_taken_name() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        is_admin: false,
+        can_provision_accounts: true,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let default_test_account = CurrentAccountSubject::new_test();
+    const TAKEN_ACCOUNT_NAME: &str = "taken-account-name";
+
+    let res = schema
+        .execute(
+            create_account_request(TAKEN_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let res = schema
+        .execute(
+            rename_account_request(default_test_account.account_name(), TAKEN_ACCOUNT_NAME)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        &value!({
+            "accounts": {
+                "byName": {
+                    "rename": {
+                        "__typename": "RenameAccountNameNotUnique",
+                        "message": "Non-unique account name",
+                    }
+                }
+            }
+        }),
+        &res.data,
+        "{res:?}"
+    );
+
+    // Idempotent behavior
+    let res = schema
+        .execute(
+            rename_account_request(
+                default_test_account.account_name(),
+                default_test_account.account_name(),
+            )
+            .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        &value!({
+            "accounts": {
+                "byName": {
+                    "rename": {
+                        "__typename": "RenameAccountSuccess",
+                        "message": "Account renamed",
+                    }
+                }
+            }
+        }),
+        &res.data,
+        "{res:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_admin_renames_other_account() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        can_provision_accounts: true,
+        is_admin: true,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    const ANOTHER_ACCOUNT_NAME: &str = "another-user";
+    const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
+
+    let res = schema
+        .execute(
+            create_account_request(ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let res = schema
+        .execute(
+            rename_account_request(ANOTHER_ACCOUNT_NAME, RENAMED_ANOTHER_ACCOUNT_NAME)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    pretty_assertions::assert_eq!(
+        &value!({
+            "accounts": {
+                "byName": {
+                    "rename": {
+                        "__typename": "RenameAccountSuccess",
+                        "message": "Account renamed",
+                    }
+                }
+            }
+        }),
+        &res.data,
+        "{res:?}"
+    );
+
+    let res = schema
+        .execute(
+            account_by_name_request(ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    pretty_assertions::assert_eq!(
+        &res.data,
+        &value!({
+            "accounts": {
+                "byName": null
+            }
+        }),
+        "{res:?}"
+    );
+
+    let res = schema
+        .execute(
+            account_by_name_request(RENAMED_ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized),
+        )
+        .await;
+    pretty_assertions::assert_eq!(
+        &res.data,
+        &value!({
+            "accounts": {
+                "byName": {
+                    "accountName": RENAMED_ANOTHER_ACCOUNT_NAME
+                }
+            }
+        }),
+        "{res:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_anonymous_try_to_rename_account() {
+    let harness = GraphQLAccountsHarness::new(Default::default()).await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let default_test_account = CurrentAccountSubject::new_test();
+
+    let res = schema
+        .execute(
+            rename_account_request(default_test_account.account_name(), "renamed-user")
+                .data(harness.catalog_anonymous),
+        )
+        .await;
+    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_non_admin_try_to_rename_other_account() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        is_admin: false,
+        can_provision_accounts: true,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    const ANOTHER_ACCOUNT_NAME: &str = "another-user";
+    const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
+
+    let res = schema
+        .execute(
+            create_account_request(ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let res = schema
+        .execute(
+            rename_account_request(ANOTHER_ACCOUNT_NAME, RENAMED_ANOTHER_ACCOUNT_NAME)
+                .data(harness.catalog_authorized),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct GraphQLAccountsHarness {
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
@@ -786,6 +1055,7 @@ impl GraphQLAccountsHarness {
 
         let catalog = b.build();
         let final_catalog = dill::CatalogBuilder::new_chained(&catalog)
+            .add_value(kamu_core::TenancyConfig::MultiTenant)
             .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
             .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
             .add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>()
@@ -794,6 +1064,7 @@ impl GraphQLAccountsHarness {
             .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
             .add::<kamu_accounts_services::ModifyAccountPasswordUseCaseImpl>()
             .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
+            .add::<kamu_accounts_services::RenameAccountUseCaseImpl>()
             .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
             .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
             .add::<kamu_accounts_services::utils::AccountAuthorizationHelper>()
@@ -897,6 +1168,7 @@ fn delete_account_request(account_name: &str) -> async_graphql::Request {
           accounts {
             byName(accountName: $accountName) {
               delete {
+                __typename
                 message
               }
             }
@@ -906,6 +1178,29 @@ fn delete_account_request(account_name: &str) -> async_graphql::Request {
     ))
     .variables(async_graphql::Variables::from_value(value!({
         "accountName": account_name,
+    })))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn rename_account_request(account_name: &str, new_account_name: &str) -> async_graphql::Request {
+    async_graphql::Request::new(indoc!(
+        r#"
+        mutation ($accountName: AccountName!, $newAccountName: AccountName!) {
+          accounts {
+            byName(accountName: $accountName) {
+              rename(newName: $newAccountName) {
+                __typename
+                message
+              }
+            }
+          }
+        }
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(value!({
+        "accountName": account_name,
+        "newAccountName": new_account_name,
     })))
 }
 

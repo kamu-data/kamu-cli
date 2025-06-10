@@ -91,6 +91,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = dataset_entry_repo::test_owner_of_entries_renamed,
+    harness = SqliteDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = dataset_entry_repo::test_delete_dataset_entry,
     harness = SqliteDatasetEntryRepositoryHarness
 );

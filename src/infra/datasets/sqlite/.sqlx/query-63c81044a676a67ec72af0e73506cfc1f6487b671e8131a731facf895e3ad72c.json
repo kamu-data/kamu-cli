@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE dataset_entries\n                SET owner_name = $1\n                WHERE owner_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "63c81044a676a67ec72af0e73506cfc1f6487b671e8131a731facf895e3ad72c"
+}
