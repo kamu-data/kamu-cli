@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Changed
+- Panic's now also log correct tracing message
 ### Fixed
 - `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`
 - Renaming `provider_identity_key` field with account name for password accounts
