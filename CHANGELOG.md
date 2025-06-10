@@ -14,6 +14,7 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`
+- Renaming `provider_identity_key` field with account name for password accounts
 
 ## [0.241.1] - 2025-06-06
 ### Fixed
