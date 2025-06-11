@@ -12,8 +12,12 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
-use kamu_core::DependencyGraphService;
-use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt, DatasetIncrementQueryService};
+use kamu_datasets::{
+    DatasetEntryService,
+    DatasetEntryServiceExt,
+    DatasetIncrementQueryService,
+    DependencyGraphService,
+};
 use kamu_flow_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;

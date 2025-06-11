@@ -13,6 +13,7 @@ mod dataset_increment_query_service;
 mod dataset_key_value_service;
 mod dataset_reference_service;
 mod dataset_statistics_service;
+mod dependency_graph_service;
 
 pub use dataset_entry_service::*;
 pub use dataset_env_var_service::*;
@@ -20,3 +21,4 @@ pub use dataset_increment_query_service::*;
 pub use dataset_key_value_service::*;
 pub use dataset_reference_service::*;
 pub use dataset_statistics_service::*;
+pub use dependency_graph_service::*;
