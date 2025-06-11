@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use kamu_core::{DatasetChangesService, GetIncrementError};
+use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
 use kamu_flow_system::{self as fs, FlowResultDatasetUpdate};
 
 use crate::prelude::*;
@@ -108,7 +108,7 @@ impl FlowDescriptionUpdateResult {
     async fn from_maybe_flow_outcome(
         maybe_outcome: Option<&fs::FlowOutcome>,
         dataset_id: &odf::DatasetID,
-        dataset_changes_service: &dyn DatasetChangesService,
+        increment_query_service: &dyn DatasetIncrementQueryService,
     ) -> Result<Option<Self>, InternalError> {
         if let Some(outcome) = maybe_outcome {
             match outcome {
@@ -118,7 +118,7 @@ impl FlowDescriptionUpdateResult {
                     | fs::FlowResult::DatasetReset(_) => Ok(None),
                     fs::FlowResult::DatasetUpdate(update) => match update {
                         FlowResultDatasetUpdate::Changed(update_result) => {
-                            match dataset_changes_service
+                            match increment_query_service
                                 .get_increment_between(
                                     dataset_id,
                                     update_result.old_head.as_ref(),
@@ -323,11 +323,12 @@ impl FlowDescriptionBuilder {
     ) -> Result<FlowDescriptionDataset> {
         Ok(match dataset_key.flow_type {
             fs::DatasetFlowType::Ingest => {
-                let dataset_changes_svc = from_catalog_n!(ctx, dyn DatasetChangesService);
+                let increment_query_service =
+                    from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
                 let ingest_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                     flow_state.outcome.as_ref(),
                     &dataset_key.dataset_id,
-                    dataset_changes_svc.as_ref(),
+                    increment_query_service.as_ref(),
                 )
                 .await
                 .int_err()?;
@@ -356,14 +357,15 @@ impl FlowDescriptionBuilder {
                 }
             }
             fs::DatasetFlowType::ExecuteTransform => {
-                let dataset_changes_svc = from_catalog_n!(ctx, dyn DatasetChangesService);
+                let increment_query_service =
+                    from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
 
                 FlowDescriptionDataset::ExecuteTransform(FlowDescriptionDatasetExecuteTransform {
                     dataset_id: dataset_key.dataset_id.clone().into(),
                     transform_result: FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                         flow_state.outcome.as_ref(),
                         &dataset_key.dataset_id,
-                        dataset_changes_svc.as_ref(),
+                        increment_query_service.as_ref(),
                     )
                     .await
                     .int_err()?,

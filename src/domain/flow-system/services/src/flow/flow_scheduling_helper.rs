@@ -12,8 +12,8 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
-use kamu_core::{DatasetChangesService, DependencyGraphService};
-use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
+use kamu_core::DependencyGraphService;
+use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt, DatasetIncrementQueryService};
 use kamu_flow_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
@@ -28,7 +28,7 @@ pub(crate) struct FlowSchedulingHelper {
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
     outbox: Arc<dyn Outbox>,
-    dataset_changes_service: Arc<dyn DatasetChangesService>,
+    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -42,7 +42,7 @@ impl FlowSchedulingHelper {
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         flow_trigger_service: Arc<dyn FlowTriggerService>,
         outbox: Arc<dyn Outbox>,
-        dataset_changes_service: Arc<dyn DatasetChangesService>,
+        dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_entry_service: Arc<dyn DatasetEntryService>,
         time_source: Arc<dyn SystemTimeSource>,
@@ -53,7 +53,7 @@ impl FlowSchedulingHelper {
             flow_configuration_service,
             flow_trigger_service,
             outbox,
-            dataset_changes_service,
+            dataset_increment_query_service,
             dependency_graph_service,
             dataset_entry_service,
             time_source,
@@ -539,7 +539,7 @@ impl FlowSchedulingHelper {
                             // We are only recording the first trigger of particular dataset.
                             if let FlowResultDatasetUpdate::Changed(update_result) = update {
                                 let increment = self
-                                    .dataset_changes_service
+                                    .dataset_increment_query_service
                                     .get_increment_since(
                                         &trigger_type.dataset_id,
                                         update_result.old_head.as_ref(),
@@ -569,7 +569,7 @@ impl FlowSchedulingHelper {
                     };
 
                     let increment = self
-                        .dataset_changes_service
+                        .dataset_increment_query_service
                         .get_increment_since(&trigger_type.dataset_id, old_head_maybe)
                         .await
                         .int_err()?;

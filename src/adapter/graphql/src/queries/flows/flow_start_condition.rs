@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::{DatasetChangesService, DatasetIntervalIncrement};
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
 use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
@@ -35,7 +35,8 @@ impl FlowStartCondition {
             }),
             fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
             fs::FlowStartCondition::Batching(b) => {
-                let dataset_changes_service = from_catalog_n!(ctx, dyn DatasetChangesService);
+                let increment_query_service =
+                    from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
 
                 // Start from zero increment
                 let mut total_increment = DatasetIntervalIncrement::default();
@@ -50,7 +51,7 @@ impl FlowStartCondition {
                             &dataset_trigger.flow_result
                         && let fs::FlowResultDatasetUpdate::Changed(update_result) = dataset_update
                     {
-                        total_increment += dataset_changes_service
+                        total_increment += increment_query_service
                             .get_increment_since(
                                 &dataset_trigger.dataset_id,
                                 update_result.old_head.as_ref(),

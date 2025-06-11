@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{DatasetChangesService, DatasetIntervalIncrement, GetIncrementError};
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, GetIncrementError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mockall::mock! {
-    pub DatasetChangesService {}
+    pub DatasetIncrementQueryService {}
 
     #[async_trait::async_trait]
-    impl DatasetChangesService for DatasetChangesService {
+    impl DatasetIncrementQueryService for DatasetIncrementQueryService {
         #[allow(clippy::ref_option_ref)]
         async fn get_increment_between<'a>(
             &'a self,
@@ -35,9 +35,9 @@ mockall::mock! {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MockDatasetChangesService {
+impl MockDatasetIncrementQueryService {
     pub fn with_increment_between(increment: DatasetIntervalIncrement) -> Self {
-        let mut dataset_changes_mock = MockDatasetChangesService::default();
+        let mut dataset_changes_mock = MockDatasetIncrementQueryService::default();
         dataset_changes_mock
             .expect_get_increment_between()
             .returning(move |_, _, _| Ok(increment));
@@ -45,7 +45,7 @@ impl MockDatasetChangesService {
     }
 
     pub fn with_increment_since(increment: DatasetIntervalIncrement) -> Self {
-        let mut dataset_changes_mock = MockDatasetChangesService::default();
+        let mut dataset_changes_mock = MockDatasetIncrementQueryService::default();
         dataset_changes_mock
             .expect_get_increment_since()
             .returning(move |_, _| Ok(increment));
