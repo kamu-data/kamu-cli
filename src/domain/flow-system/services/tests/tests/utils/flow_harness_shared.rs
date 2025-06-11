@@ -12,19 +12,18 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
-use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_core::*;
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetEntry,
+    DatasetIncrementQueryService,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use kamu_datasets_services::testing::FakeDatasetEntryService;
+use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrementQueryService};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -70,7 +69,7 @@ pub(crate) struct FlowHarness {
 pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
-    pub mock_dataset_changes: Option<MockDatasetChangesService>,
+    pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
 }
 
 impl FlowHarness {
@@ -114,7 +113,7 @@ impl FlowHarness {
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add_value(mock_dataset_changes)
-            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+            .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<TaskSchedulerImpl>()

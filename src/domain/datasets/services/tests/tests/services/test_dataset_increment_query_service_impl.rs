@@ -10,16 +10,17 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu::DatasetChangesServiceImpl;
 use kamu::testing::BaseRepoHarness;
-use kamu_core::{DatasetChangesService, DatasetIntervalIncrement, TenancyConfig};
+use kamu_core::TenancyConfig;
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
+use kamu_datasets_services::DatasetIncrementQueryServiceImpl;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_initial_increment() {
-    let harness = DatasetChangesHarness::new();
+    let harness = DatasetIncrementQueryServiceHarness::new();
 
     let foo = harness
         .create_root_dataset(&odf::DatasetAlias::new(
@@ -31,7 +32,7 @@ async fn test_initial_increment() {
     // "foo" initially has Seed and SetPollingSource events
 
     let increment_between = harness
-        .dataset_changes_service
+        .dataset_increment_query_service
         .get_increment_between(&foo.dataset_handle.id, None, &foo.head)
         .await
         .unwrap();
@@ -45,7 +46,7 @@ async fn test_initial_increment() {
     );
 
     let increment_since = harness
-        .dataset_changes_service
+        .dataset_increment_query_service
         .get_increment_since(&foo.dataset_handle.id, None)
         .await
         .unwrap();
@@ -63,7 +64,7 @@ async fn test_initial_increment() {
 
 #[test_log::test(tokio::test)]
 async fn test_no_changes_with_same_bounds() {
-    let harness = DatasetChangesHarness::new();
+    let harness = DatasetIncrementQueryServiceHarness::new();
 
     let foo = harness
         .create_root_dataset(&odf::DatasetAlias::new(
@@ -73,14 +74,14 @@ async fn test_no_changes_with_same_bounds() {
         .await;
 
     let increment_between = harness
-        .dataset_changes_service
+        .dataset_increment_query_service
         .get_increment_between(&foo.dataset_handle.id, Some(&foo.head), &foo.head)
         .await
         .unwrap();
     assert_eq!(increment_between, DatasetIntervalIncrement::default());
 
     let increment_since = harness
-        .dataset_changes_service
+        .dataset_increment_query_service
         .get_increment_since(&foo.dataset_handle.id, Some(&foo.head))
         .await
         .unwrap();
@@ -91,7 +92,7 @@ async fn test_no_changes_with_same_bounds() {
 
 #[test_log::test(tokio::test)]
 async fn test_add_data_differences() {
-    let harness = DatasetChangesHarness::new();
+    let harness = DatasetIncrementQueryServiceHarness::new();
 
     let foo = harness
         .create_root_dataset(&odf::DatasetAlias::new(
@@ -282,7 +283,7 @@ async fn test_add_data_differences() {
 
 #[test_log::test(tokio::test)]
 async fn test_execute_transform_differences() {
-    let harness = DatasetChangesHarness::new();
+    let harness = DatasetIncrementQueryServiceHarness::new();
 
     let foo = harness
         .create_root_dataset(&odf::DatasetAlias::new(
@@ -479,7 +480,7 @@ async fn test_execute_transform_differences() {
 
 #[test_log::test(tokio::test)]
 async fn test_multiple_watermarks_within_interval() {
-    let harness = DatasetChangesHarness::new();
+    let harness = DatasetIncrementQueryServiceHarness::new();
 
     let foo = harness
         .create_root_dataset(&odf::DatasetAlias::new(
@@ -625,7 +626,7 @@ async fn test_multiple_watermarks_within_interval() {
 
 #[test_log::test(tokio::test)]
 async fn test_older_watermark_before_interval() {
-    let harness = DatasetChangesHarness::new();
+    let harness = DatasetIncrementQueryServiceHarness::new();
 
     let foo = harness
         .create_root_dataset(&odf::DatasetAlias::new(
@@ -802,26 +803,28 @@ async fn test_older_watermark_before_interval() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
-struct DatasetChangesHarness {
+struct DatasetIncrementQueryServiceHarness {
     base_repo_harness: BaseRepoHarness,
-    dataset_changes_service: Arc<dyn DatasetChangesService>,
+    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
 
-impl DatasetChangesHarness {
+impl DatasetIncrementQueryServiceHarness {
     fn new() -> Self {
         let base_repo_harness = BaseRepoHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
             .build();
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
-            .add::<DatasetChangesServiceImpl>()
+            .add::<DatasetIncrementQueryServiceImpl>()
             .build();
 
-        let dataset_changes_service = catalog.get_one::<dyn DatasetChangesService>().unwrap();
+        let dataset_increment_query_service = catalog
+            .get_one::<dyn DatasetIncrementQueryService>()
+            .unwrap();
 
         Self {
             base_repo_harness,
-            dataset_changes_service,
+            dataset_increment_query_service,
         }
     }
 
@@ -836,7 +839,7 @@ impl DatasetChangesHarness {
     ) {
         for (index, (old_head, new_head, expected_increment)) in between_cases.iter().enumerate() {
             assert_eq!(
-                self.dataset_changes_service
+                self.dataset_increment_query_service
                     .get_increment_between(dataset_id, *old_head, new_head,)
                     .await
                     .unwrap(),
@@ -853,7 +856,7 @@ impl DatasetChangesHarness {
     ) {
         for (index, (old_head, expected_increment)) in since_cases.iter().enumerate() {
             assert_eq!(
-                self.dataset_changes_service
+                self.dataset_increment_query_service
                     .get_increment_since(dataset_id, *old_head)
                     .await
                     .unwrap(),

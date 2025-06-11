@@ -585,8 +585,6 @@ pub fn configure_server_catalog(
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
-    b.add::<DatasetChangesServiceImpl>();
-
     kamu_task_system_services::register_dependencies(&mut b);
 
     kamu_flow_system_services::register_dependencies(&mut b);

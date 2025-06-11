@@ -28,7 +28,6 @@ pub use sync::*;
 pub use transform::*;
 pub use watermark::*;
 
-mod dataset_changes_service_impl;
 mod dataset_registry_solo_unit_bridge;
 mod export_service_impl;
 mod metadata_query_service_impl;
@@ -39,7 +38,6 @@ mod query_service_impl;
 
 mod verification_service_impl;
 
-pub use dataset_changes_service_impl::*;
 pub use dataset_registry_solo_unit_bridge::*;
 pub use export_service_impl::*;
 pub use metadata_query_service_impl::*;
