@@ -230,8 +230,8 @@ impl Projection for FlowState {
                                     ..s
                                 }),
                                 // TODO: support retries
-                                ts::TaskOutcome::Failed(task_error) => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Failed(task_error.into())),
+                                ts::TaskOutcome::Failed(_) => Ok(FlowState {
+                                    outcome: Some(FlowOutcome::Failed),
                                     timing,
                                     ..s
                                 }),
