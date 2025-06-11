@@ -112,7 +112,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     let mut maybe_metrics_registry = None;
 
-    // NOTE: A closure is used so "?" does not cause exit from run() function.
+    // NOTE: An async block is used so "?" does not cause exit from run() function.
     let command_result: Result<(), CLIError> = async {
         let workspace_version = workspace_svc.workspace_version()?;
 
@@ -264,10 +264,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 .await?;
         }
 
-        let is_outbox_processing_required = maybe_db_connection_settings.is_some()
-            && cli_commands::command_needs_outbox_processing(&args);
         let is_transactional = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_transaction(&args);
+        let is_outbox_processing_required = maybe_db_connection_settings.is_some()
+            && cli_commands::command_needs_outbox_processing(&args);
         let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
         maybe_transactional(
@@ -303,7 +303,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         .await?;
 
         if is_outbox_processing_required {
-            // If successful, then process the Outbox messages while they are present
+            // Process the Outbox messages while they are present
             let outbox_agent = cli_catalog
                 .get_one::<messaging_outbox::OutboxAgent>()
                 .int_err()?;
@@ -1053,7 +1053,7 @@ fn configure_logging(
                 If the issue persists, help us \
                  by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
             )
-                .bold()
+            .bold()
         );
     });
 

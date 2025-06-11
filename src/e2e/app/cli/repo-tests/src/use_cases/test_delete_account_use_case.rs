@@ -19,6 +19,9 @@ use odf::metadata::testing::MetadataFactory;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_account_with_datasets_mt(mut kamu: KamuCliPuppet) {
+    // NOTE: When running through kamu-cli we automatically simulate kamu-api-server
+    //       restarts and various reindexing operations.
+
     let alice = odf::AccountName::new_unchecked("alice");
     let bob = odf::AccountName::new_unchecked("bob");
 
