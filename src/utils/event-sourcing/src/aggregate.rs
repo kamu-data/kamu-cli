@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::*;
 
@@ -180,6 +180,20 @@ where
             result.push(item);
         }
         Ok(result)
+    }
+
+    /// Same as `load_multi()` but returns a vector of loaded states and single
+    /// error
+    pub async fn load_multi_simple(
+        queries: Vec<Proj::Query>,
+        event_store: &Store,
+    ) -> Result<Vec<Self>, InternalError> {
+        Self::load_multi(queries, event_store)
+            .await
+            .int_err()?
+            .into_iter()
+            .map(|res| res.map_err(ErrorIntoInternal::int_err))
+            .collect()
     }
 
     /// Same as [`Aggregate::load()`] but with extra control knobs
