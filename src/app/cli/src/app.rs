@@ -11,7 +11,6 @@ use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
-use async_utils::ResultAsync;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use crypto_utils::AesGcmEncryptor;
@@ -113,7 +112,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     let mut maybe_metrics_registry = None;
 
     // NOTE: A closure is used so "?" does not cause exit from run() function.
-    let general_command_result = async {
+    let command_result: Result<(), CLIError> = async {
         let workspace_version = workspace_svc.workspace_version()?;
 
         tracing::info!("Workspace version: {workspace_version:?}");
@@ -239,112 +238,89 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         }
 
         // Some extra steps are necessary for commands that require workspace
-        let mut command_result: Result<(), CLIError> =
-            if cli_commands::command_needs_workspace(&args) {
-                if !is_in_workspace {
-                    Err(CLIError::usage_error_from(NotInWorkspace))
-                } else if is_workspace_upgrade_needed {
-                    Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-                } else if current_account.is_explicit()
-                    && tenancy_config == TenancyConfig::SingleTenant
-                {
-                    Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-                } else {
-                    Ok(())
-                }
+        if cli_commands::command_needs_workspace(&args) {
+            if !is_in_workspace {
+                Err(CLIError::usage_error_from(NotInWorkspace))
+            } else if is_workspace_upgrade_needed {
+                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+            } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant
+            {
+                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
             } else {
                 Ok(())
-            };
+            }
+        } else {
+            Ok(())
+        }?;
 
         if cli_commands::command_needs_startup_jobs(&args) {
-            command_result = command_result
-                .and_then_async(|_| async {
-                    run_startup_initializations(&cli_catalog)
-                        .instrument(tracing::debug_span!("app::run_startup_initializations"))
-                        .await
-                })
-                .await;
+            run_startup_initializations(&cli_catalog)
+                .instrument(tracing::debug_span!("app::run_startup_initializations"))
+                .await?;
         }
 
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
+        let is_transactional = maybe_db_connection_settings.is_some()
+            && cli_commands::command_needs_transaction(&args);
+        let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
-        command_result = command_result
-            .and_then_async(|_| async {
-                let is_transactional = maybe_db_connection_settings.is_some()
-                    && cli_commands::command_needs_transaction(&args);
-                let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
+        maybe_transactional(
+            is_transactional,
+            cli_catalog.clone(),
+            |maybe_transactional_cli_catalog: Catalog| async move {
+                let command_builder = cli_commands::get_command(
+                    work_catalog,
+                    &maybe_transactional_cli_catalog,
+                    args,
+                    current_account,
+                )?;
 
-                maybe_transactional(
-                    is_transactional,
-                    cli_catalog.clone(),
-                    |maybe_transactional_cli_catalog: Catalog| async move {
-                        let command_builder = cli_commands::get_command(
-                            work_catalog,
-                            &maybe_transactional_cli_catalog,
-                            args,
-                            current_account,
-                        )?;
+                let command = command_builder
+                    .get(&maybe_transactional_cli_catalog)
+                    .int_err()?;
 
-                        let command = command_builder
-                            .get(&maybe_transactional_cli_catalog)
-                            .int_err()?;
+                command.validate_args().await?;
 
-                        command.validate_args().await?;
+                let command_name = command.name();
 
-                        let command_name = command.name();
-
-                        command
-                            .run()
-                            .instrument(tracing::info_span!(
-                                "Running command",
-                                %is_transactional,
-                                %command_name,
-                            ))
-                            .await
-                    },
-                )
-                .instrument(tracing::debug_span!("app::run_command"))
-                .await
-            })
-            .await;
+                command
+                    .run()
+                    .instrument(tracing::info_span!(
+                        "Running command",
+                        %is_transactional,
+                        %command_name,
+                    ))
+                    .await
+            },
+        )
+        .instrument(tracing::debug_span!("app::run_command"))
+        .await?;
 
         if is_outbox_processing_required {
             // If successful, then process the Outbox messages while they are present
-            command_result = command_result
-                .and_then_async(|_| async {
-                    let outbox_agent = cli_catalog
-                        .get_one::<messaging_outbox::OutboxAgent>()
-                        .int_err()?;
-                    outbox_agent.run_while_has_tasks().await?;
-                    Ok(())
-                })
+            let outbox_agent = cli_catalog
+                .get_one::<messaging_outbox::OutboxAgent>()
+                .int_err()?;
+            outbox_agent
+                .run_while_has_tasks()
                 .instrument(tracing::debug_span!(
                     "Consume accumulated the Outbox messages"
                 ))
-                .await;
+                .await?;
         }
 
         // If we had a temporary directory, we move the database from it
         // to the expected location.
-        command_result = command_result
-            .and_then_async(|_| async {
-                move_initial_database_to_workspace_if_needed(
-                    &workspace_layout,
-                    maybe_temp_database_path,
-                )
-                .await
-                .int_err()?;
+        move_initial_database_to_workspace_if_needed(&workspace_layout, maybe_temp_database_path)
+            .await
+            .int_err()?;
 
-                Ok(())
-            })
-            .await;
-
-        command_result
+        Ok(())
     }
     .await;
 
-    match &general_command_result {
+    match &command_result {
         Ok(()) => {
             tracing::info!("Command successful");
         }
@@ -378,7 +354,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let _ = explore::TraceServer::maybe_serve_in_browser(trace_file).await;
     }
 
-    general_command_result
+    command_result
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
