@@ -11,9 +11,10 @@ use std::str::FromStr;
 
 use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
-use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_core::*;
+use kamu_datasets::DatasetIntervalIncrement;
+use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 
@@ -2991,7 +2992,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
 #[test_log::test(tokio::test)]
 async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_since(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 3,
@@ -3372,7 +3373,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
         mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)), /* 100ms */
-        mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_since(
             DatasetIntervalIncrement {
                 num_blocks: 2,
                 num_records: 7,
@@ -3831,7 +3832,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
 async fn test_batching_condition_records_reached() {
     let mut seq = mockall::Sequence::new();
 
-    let mut mock_dataset_changes = MockDatasetChangesService::new();
+    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
     mock_dataset_changes
         .expect_get_increment_since()
         .times(1)
@@ -4162,7 +4163,7 @@ async fn test_batching_condition_records_reached() {
 async fn test_batching_condition_timeout() {
     let mut seq = mockall::Sequence::new();
 
-    let mut mock_dataset_changes = MockDatasetChangesService::new();
+    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
     mock_dataset_changes
         .expect_get_increment_since()
         .times(1)
@@ -4433,7 +4434,7 @@ async fn test_batching_condition_timeout() {
 async fn test_batching_condition_watermark() {
     let mut seq = mockall::Sequence::new();
 
-    let mut mock_dataset_changes = MockDatasetChangesService::new();
+    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
     mock_dataset_changes
         .expect_get_increment_since()
         .times(1)
@@ -4704,7 +4705,7 @@ async fn test_batching_condition_watermark() {
 async fn test_batching_condition_with_2_inputs() {
     let mut seq = mockall::Sequence::new();
 
-    let mut mock_dataset_changes = MockDatasetChangesService::new();
+    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
     // 'foo': first reading of task 3 after 'foo' task 3
     mock_dataset_changes
         .expect_get_increment_since()
@@ -6491,7 +6492,7 @@ async fn test_trigger_enable_during_flow_throttling() {
 #[test_log::test(tokio::test)]
 async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_since(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 0,

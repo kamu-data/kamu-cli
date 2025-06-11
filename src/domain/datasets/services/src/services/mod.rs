@@ -9,6 +9,7 @@
 
 mod dataset_account_lifecycle_handler;
 mod dataset_alias_update_handler;
+mod dataset_increment_query_service_impl;
 mod entry;
 mod env;
 mod graph;
@@ -19,6 +20,7 @@ mod statistics;
 
 pub use dataset_account_lifecycle_handler::*;
 pub use dataset_alias_update_handler::*;
+pub use dataset_increment_query_service_impl::*;
 pub use entry::*;
 pub use env::*;
 pub use graph::*;

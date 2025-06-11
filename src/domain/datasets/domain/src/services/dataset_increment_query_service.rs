@@ -14,7 +14,7 @@ use thiserror::Error;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetChangesService: Sync + Send {
+pub trait DatasetIncrementQueryService: Sync + Send {
     /// Computes incremental stats between two given blocks of the dataset
     async fn get_increment_between<'a>(
         &'a self,

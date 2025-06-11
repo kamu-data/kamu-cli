@@ -12,22 +12,15 @@ use chrono::{DateTime, Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
-use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::{
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
     LoggedAccount,
 };
-use kamu_core::{
-    CompactionResult,
-    DatasetChangesService,
-    DatasetIntervalIncrement,
-    PullResult,
-    ResetResult,
-    TenancyConfig,
-};
-use kamu_datasets::*;
+use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
+use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::{
@@ -52,7 +45,7 @@ use crate::utils::{
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 12,
@@ -404,7 +397,7 @@ async fn test_trigger_ingest_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_root_dataset_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::default()),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -568,7 +561,7 @@ async fn test_trigger_reset_root_dataset_flow() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::default()),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -663,7 +656,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_execute_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 5,
@@ -881,7 +874,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 12,
@@ -2593,7 +2586,7 @@ async fn test_history_of_completed_flow() {
 #[test_log::test(tokio::test)]
 async fn test_execute_transfrom_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 12,
@@ -2933,7 +2926,7 @@ async fn test_anonymous_operation_fails() {
 #[test_log::test(tokio::test)]
 async fn test_config_snapshot_returned_correctly() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 12,
@@ -3067,7 +3060,7 @@ struct FlowRunsHarness {
 
 #[derive(Default)]
 struct FlowRunsHarnessOverrides {
-    dataset_changes_mock: Option<MockDatasetChangesService>,
+    dataset_changes_mock: Option<MockDatasetIncrementQueryService>,
 }
 
 impl FlowRunsHarness {
@@ -3083,7 +3076,7 @@ impl FlowRunsHarness {
 
             b.add::<MetadataQueryServiceImpl>()
                 .add_value(dataset_changes_mock)
-                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+                .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowEventStore>()

@@ -12,27 +12,21 @@ use std::sync::Arc;
 use dill::*;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_core::{
-    DatasetChangesService,
-    DatasetIntervalIncrement,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    GetIncrementError,
-    ResolvedDataset,
-};
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, GetIncrementError};
 use odf::IterBlocksError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetChangesServiceImpl {
+pub struct DatasetIncrementQueryServiceImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn DatasetChangesService)]
-impl DatasetChangesServiceImpl {
+#[interface(dyn DatasetIncrementQueryService)]
+impl DatasetIncrementQueryServiceImpl {
     pub fn new(dataset_registry: Arc<dyn DatasetRegistry>) -> Self {
         Self { dataset_registry }
     }
@@ -194,7 +188,7 @@ impl DatasetChangesServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetChangesService for DatasetChangesServiceImpl {
+impl DatasetIncrementQueryService for DatasetIncrementQueryServiceImpl {
     async fn get_increment_between<'a>(
         &'a self,
         dataset_id: &'a odf::DatasetID,
