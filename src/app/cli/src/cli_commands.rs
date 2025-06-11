@@ -525,6 +525,7 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
     }
 }
 
+#[expect(clippy::match_like_matches_macro)]
 pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
     // ToDo: Revisit and decide do all commands that require workspace
     // also require startup jobs
@@ -532,14 +533,18 @@ pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
         return true;
     }
 
-    if let cli::Command::Complete(_) = &args.command {
-        return true;
+    match &args.command {
+        cli::Command::Complete(_) => true,
+        cli::Command::Init(_) => {
+            // NOTE: When initializing, we need to run initialization at least to create
+            //       user accounts.
+            true
+        }
+        _ => false,
     }
-
-    false
 }
 
-#[allow(clippy::match_like_matches_macro)]
+#[expect(clippy::match_like_matches_macro)]
 pub fn command_needs_server_components(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
