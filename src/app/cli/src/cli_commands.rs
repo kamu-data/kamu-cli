@@ -11,6 +11,7 @@ use dill::*;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 
+use crate::accounts::CurrentAccountIndication;
 use crate::cli::SystemApiServerSubCommand;
 use crate::commands::*;
 use crate::{WorkspaceService, accounts, cli, odf_server};
@@ -21,6 +22,7 @@ pub fn get_command(
     base_catalog: &Catalog,
     cli_catalog: &Catalog,
     args: cli::Cli,
+    current_account_indication: CurrentAccountIndication,
 ) -> Result<Box<dyn TypedBuilder<dyn Command>>, CLIError> {
     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
     let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
@@ -125,7 +127,7 @@ pub fn get_command(
 
         cli::Command::List(c) => Box::new(
             ListCommand::builder(
-                accounts::AccountService::current_account_indication(args.account, tenancy_config),
+                current_account_indication,
                 accounts::AccountService::related_account_indication(
                     c.target_account,
                     c.all_accounts,
@@ -525,7 +527,7 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
     }
 }
 
-#[expect(clippy::match_like_matches_macro)]
+#[expect(clippy::match_same_arms)]
 pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
     // ToDo: Revisit and decide do all commands that require workspace
     // also require startup jobs

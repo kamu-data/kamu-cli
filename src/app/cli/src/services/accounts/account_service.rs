@@ -32,13 +32,13 @@ impl AccountService {
     }
 
     pub fn current_account_indication(
-        account: Option<String>,
+        maybe_specified_account: Option<String>,
         tenancy_config: TenancyConfig,
-    ) -> CurrentAccountIndication {
+    ) -> Result<CurrentAccountIndication, odf::metadata::ParseError<odf::AccountName>> {
         let (current_account, user_name, specified_explicitly) = {
             let default_account_name = Self::default_account_name(tenancy_config);
 
-            if let Some(account) = account {
+            if let Some(account) = maybe_specified_account {
                 (
                     account.clone(),
                     if *account == default_account_name {

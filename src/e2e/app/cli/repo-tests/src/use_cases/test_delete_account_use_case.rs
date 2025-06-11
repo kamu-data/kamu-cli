@@ -8,7 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_cli_puppet::extensions::{AddDatasetOptions, DeleteAccountResult, KamuCliPuppetExt};
+use kamu_cli_puppet::extensions::{
+    AddDatasetOptions,
+    DatasetListOptions,
+    DeleteAccountResult,
+    KamuCliPuppetExt,
+};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,7 +84,7 @@ pub async fn test_delete_account_with_datasets_mt(mut kamu: KamuCliPuppet) {
             ),
         ],
         *kamu
-            .list_datasets()
+            .list_datasets_ex(DatasetListOptions::builder().all_accounts(true).build())
             .await
             .into_iter()
             .map(|dataset| (dataset.owner, dataset.name))
@@ -103,7 +108,7 @@ pub async fn test_delete_account_with_datasets_mt(mut kamu: KamuCliPuppet) {
             ),
         ],
         *kamu
-            .list_datasets()
+            .list_datasets_ex(DatasetListOptions::builder().all_accounts(true).build())
             .await
             .into_iter()
             .map(|dataset| (dataset.owner, dataset.name))

@@ -81,17 +81,16 @@ pub fn get_app_database_config(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn move_initial_database_to_workspace_if_needed(
+pub async fn move_initial_database_to_workspace(
     workspace_layout: &WorkspaceLayout,
-    maybe_temp_database_path: Option<OwnedTempPath>,
-) -> Result<(), std::io::Error> {
-    if let Some(temp_database_path) = maybe_temp_database_path {
-        tokio::fs::copy(
-            temp_database_path.path(),
-            workspace_layout.default_workspace_database_path(),
-        )
-        .await?;
-    }
+    temp_database_path: OwnedTempPath,
+) -> Result<(), InternalError> {
+    tokio::fs::copy(
+        temp_database_path.path(),
+        workspace_layout.default_workspace_database_path(),
+    )
+    .await
+    .int_err()?;
 
     Ok(())
 }
@@ -304,6 +303,24 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
                 .await
                 .int_err()
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn database_flash(base_catalog: &Catalog) -> Result<(), InternalError> {
+    let db_connection_settings = base_catalog
+        .get_one::<DatabaseConnectionSettings>()
+        .int_err()?;
+
+    match db_connection_settings.provider {
+        DatabaseProvider::Sqlite => {
+            let pool = base_catalog.get_one::<sqlx::SqlitePool>().int_err()?;
+            SqlitePlugin::force_wal_checkpoints_save(pool.as_ref())
+                .await
+                .int_err()
+        }
+        DatabaseProvider::Postgres | DatabaseProvider::MySql | DatabaseProvider::MariaDB => Ok(()),
     }
 }
 

@@ -232,7 +232,7 @@ pub struct AccountApi<'a> {
 }
 
 impl AccountApi<'_> {
-    pub async fn me(&mut self) -> Result<AccountResponse, AccountMeError> {
+    pub async fn me(&self) -> Result<AccountResponse, AccountMeError> {
         let response = self
             .client
             .rest_api_call(Method::GET, "/accounts/me", None)

@@ -7,7 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::CurrentAccountSubject;
+use std::sync::Arc;
+
+use internal_error::InternalError;
+use kamu::domain::TenancyConfig;
+use kamu_accounts::{
+    AccountService,
+    CurrentAccountSubject,
+    DEFAULT_ACCOUNT_ID,
+    DEFAULT_ACCOUNT_NAME,
+};
+use thiserror::Error;
+
+use crate::WorkspaceStatus;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,28 +55,83 @@ pub struct CurrentAccountIndication {
 }
 
 impl CurrentAccountIndication {
-    pub fn new<A, U>(account_name: A, user_name: U, specified_explicitly: bool) -> Self
+    pub fn new<A, U>(
+        account_name: A,
+        user_name: U,
+        specified_explicitly: bool,
+    ) -> Result<Self, odf::metadata::ParseError<odf::AccountName>>
     where
         A: Into<String>,
         U: Into<String>,
     {
-        Self {
-            account_name: odf::AccountName::try_from(account_name.into()).unwrap(),
+        let account_name = odf::AccountName::try_from(account_name.into())?;
+
+        Ok(Self {
+            account_name,
             user_name: user_name.into(),
             specified_explicitly,
-        }
+        })
     }
 
     pub fn is_explicit(&self) -> bool {
         self.specified_explicitly
     }
 
-    pub fn to_current_account_subject(&self) -> CurrentAccountSubject {
-        CurrentAccountSubject::logged(
-            odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes()),
-            self.account_name.clone(),
-        )
+    pub async fn to_current_account_subject(
+        &self,
+        tenancy_config: TenancyConfig,
+        workspace_status: WorkspaceStatus,
+        account_service: Arc<dyn AccountService>,
+    ) -> Result<CurrentAccountSubject, ToCurrentAccountSubjectError> {
+        match tenancy_config {
+            TenancyConfig::SingleTenant => {
+                // NOTE: At this stage, we don't care whether the argument applies
+                //       in the case of multi-tenant workspace -- this will be checked later.
+                Ok(CurrentAccountSubject::logged(
+                    DEFAULT_ACCOUNT_ID.clone(),
+                    DEFAULT_ACCOUNT_NAME.clone(),
+                ))
+            }
+            TenancyConfig::MultiTenant => {
+                match workspace_status {
+                    WorkspaceStatus::NoWorkspace | WorkspaceStatus::AboutToBeCreated(_) => {
+                        // NOTE: At this stage, real accounts do not exist yet.
+                        let dummy_subject = CurrentAccountSubject::logged(
+                            odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes()),
+                            self.account_name.clone(),
+                        );
+
+                        Ok(dummy_subject)
+                    }
+                    WorkspaceStatus::Created(_) => {
+                        let maybe_account =
+                            account_service.account_by_name(&self.account_name).await?;
+                        let Some(account) = maybe_account else {
+                            return Err(ToCurrentAccountSubjectError::NotRegisteredAccount {
+                                account: self.account_name.clone(),
+                            });
+                        };
+
+                        let subject =
+                            CurrentAccountSubject::logged(account.id, account.account_name);
+
+                        Ok(subject)
+                    }
+                }
+            }
+        }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum ToCurrentAccountSubjectError {
+    #[error("Account '{account}' not registered")]
+    NotRegisteredAccount { account: odf::AccountName },
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

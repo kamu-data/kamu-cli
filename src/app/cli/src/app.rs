@@ -54,9 +54,10 @@ use crate::{
     configure_database_components,
     configure_in_memory_components,
     connect_database_initially,
+    database_flash,
     explore,
     get_app_database_config,
-    move_initial_database_to_workspace_if_needed,
+    move_initial_database_to_workspace,
     odf_server,
     spawn_password_refreshing_job,
 };
@@ -181,12 +182,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             let base_catalog = base_catalog_builder.build();
 
             // Database requires extra actions:
-            let final_base_catalog = if let Some(db_config) = database_config {
+            let final_base_catalog = if let Some(db_config) = &database_config {
                 // Connect a database and get a connection pool
                 let catalog_with_pool = connect_database_initially(&base_catalog).await?;
 
                 // Periodically refresh password in the connection pool, if configured
-                spawn_password_refreshing_job(&db_config, &catalog_with_pool).await;
+                spawn_password_refreshing_job(db_config, &catalog_with_pool).await;
 
                 catalog_with_pool
             } else {
@@ -210,7 +211,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                                 transactional_final_base_catalog.get_one().int_err()?;
 
                             current_account
-                                .to_current_account_subject(workspace_status, account_service)
+                                .to_current_account_subject(
+                                    tenancy_config,
+                                    workspace_status,
+                                    account_service,
+                                )
                                 .await
                                 .int_err()
                         })
@@ -310,11 +315,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 .await?;
         }
 
-        // If we had a temporary directory, we move the database from it
-        // to the expected location.
-        move_initial_database_to_workspace_if_needed(&workspace_layout, maybe_temp_database_path)
-            .await
-            .int_err()?;
+        if let Some(temp_database_path) = maybe_temp_database_path {
+            // If we had a temporary directory, we move the database from it
+            // to the expected location.
+            database_flash(&base_catalog).await?;
+            move_initial_database_to_workspace(&workspace_layout, temp_database_path).await?;
+        }
 
         Ok(())
     }

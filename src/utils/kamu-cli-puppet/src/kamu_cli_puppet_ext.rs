@@ -79,6 +79,8 @@ pub trait KamuCliPuppetExt {
 
     async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
+    async fn list_datasets_ex(&self, options: DatasetListOptions) -> Vec<DatasetRecord>;
+
     async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot, options: AddDatasetOptions);
 
     async fn list_blocks(&self, dataset_name: &odf::DatasetName) -> Vec<BlockRecord>;
@@ -129,16 +131,16 @@ impl KamuCliPuppetExt for KamuCliPuppet {
     }
 
     async fn list_datasets(&self) -> Vec<DatasetRecord> {
-        let assert = self
-            .execute([
-                "list",
-                "--all-accounts",
-                "--wide",
-                "--output-format",
-                "json",
-            ])
-            .await
-            .success();
+        self.list_datasets_ex(Default::default()).await
+    }
+
+    async fn list_datasets_ex(&self, options: DatasetListOptions) -> Vec<DatasetRecord> {
+        let mut cmd = vec!["list", "--wide", "--output-format", "json"];
+        if options.all_accounts {
+            cmd.push("--all-accounts");
+        }
+
+        let assert = self.execute(cmd).await.success();
 
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
@@ -447,11 +449,9 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             .await
             .success();
 
-        let stdout = std::str::from_utf8(&assert.get_output().stdout)
+        std::str::from_utf8(&assert.get_output().stdout)
             .unwrap()
-            .to_string();
-
-        stdout
+            .to_string()
     }
 
     async fn create_account(&self, account_name: &odf::AccountName) {
@@ -576,6 +576,11 @@ pub struct DatasetRecord {
     pub size: usize,
     pub watermark: Option<DateTime<Utc>>,
     pub visibility: Option<odf::DatasetVisibility>,
+}
+
+#[derive(Debug, bon::Builder, Default)]
+pub struct DatasetListOptions {
+    all_accounts: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
