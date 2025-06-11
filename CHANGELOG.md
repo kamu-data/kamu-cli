@@ -15,12 +15,14 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - `kamu system api-server gql-query`: support for authorization and, as a result, mutation requests (#1273).
 ### Changed
+- Panic's now also log a correct tracing message.
 - `kamu`: improved logging, especially in failure cases (#1273).
 - `kamu --account <NAME>`: added checks for account existence (multi-tenant mode) (#1273).
 - `kamu init`: flush database after successful command completion (#1273).
 ### Fixed
-- User in single-tenant mode now has administrator privileges (#1273).
 - `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`.
+- Renaming `provider_identity_key` field with account name for password accounts.
+- User in single-tenant mode now has administrator privileges (#1273).
 - `DeleteAccountUseCaseImpl`: complete deletion of datasets, not just database entries (#1273).
 - `kamu system api-server gql-query`: authorization based on the current subject (#1273).
 

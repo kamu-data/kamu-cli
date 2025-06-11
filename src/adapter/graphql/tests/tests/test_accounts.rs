@@ -845,6 +845,50 @@ async fn test_rename_own_account() {
         }),
         "{res:?}"
     );
+
+    // Try login with the new name
+    let res = schema
+        .execute(
+            login_via_password_request(
+                // login is new, the renamed account name
+                RENAMED_ANOTHER_ACCOUNT_NAME,
+                // password is still the same
+                default_test_account.account_name(),
+            )
+            .data(harness.catalog_anonymous.clone()),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        &value!({
+            "auth": {
+                "login": {
+                    "account": {
+                        "accountName": RENAMED_ANOTHER_ACCOUNT_NAME
+                    }
+                }
+            }
+        }),
+        &res.data,
+        "{res:?}"
+    );
+
+    // An attempt to login under the old name should fail
+    let res = schema
+        .execute(
+            login_via_password_request(
+                default_test_account.account_name(),
+                default_test_account.account_name(),
+            )
+            .data(harness.catalog_anonymous.clone()),
+        )
+        .await;
+    assert!(res.is_err(), "{res:?}");
+    assert!(res.errors.len() == 1);
+    assert_eq!(
+        res.errors[0].message,
+        "Rejected credentials: invalid login or password".to_string()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1201,6 +1245,29 @@ fn rename_account_request(account_name: &str, new_account_name: &str) -> async_g
     .variables(async_graphql::Variables::from_value(value!({
         "accountName": account_name,
         "newAccountName": new_account_name,
+    })))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn login_via_password_request(account_name: &str, password: &str) -> async_graphql::Request {
+    let credentials = format!(r#"{{"login": "{account_name}", "password": "{password}"}}"#,);
+
+    async_graphql::Request::new(indoc!(
+        r#"
+        mutation($credentials: String!) {
+          auth {
+            login(loginMethod: PASSWORD, loginCredentialsJson: $credentials) {
+              account {
+                accountName
+              }
+            }
+          }
+        }
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(value!({
+        "credentials": credentials,
     })))
 }
 
