@@ -23,7 +23,6 @@ pub use transform::*;
 pub use watermark::*;
 
 pub mod dataset_registry;
-pub mod dependency_graph_service;
 mod did_generator;
 pub mod engine_provisioner;
 pub mod export_service;
@@ -45,7 +44,6 @@ pub mod upload_service;
 pub mod verification_service;
 
 pub use dataset_registry::*;
-pub use dependency_graph_service::*;
 pub use did_generator::*;
 pub use engine_provisioner::*;
 pub use export_service::*;

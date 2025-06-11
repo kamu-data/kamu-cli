@@ -13,7 +13,12 @@ use futures::{StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
-use kamu_datasets::{DeleteDatasetError, DeleteDatasetUseCase};
+use kamu_datasets::{
+    DeleteDatasetError,
+    DeleteDatasetUseCase,
+    DependencyGraphService,
+    DependencyOrder,
+};
 
 use super::{CLIError, Command};
 use crate::ConfirmDeleteService;
