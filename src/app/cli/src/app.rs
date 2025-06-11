@@ -48,6 +48,7 @@ use crate::{
     GcService,
     WorkspaceLayout,
     WorkspaceService,
+    WorkspaceVersion,
     build_db_connection_settings,
     cli,
     cli_commands,
@@ -79,7 +80,6 @@ const LOG_LEVELS: [&str; 5] = [
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Errors before commands are executed are not output anywhere -- log them
 pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<(), CLIError> {
     // Always capture backtraces for logging - we will separately decide whether to
     // display them to the user based on verbosity level
@@ -101,210 +101,265 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         Arc::new(workspace_layout.clone()),
         init_multi_tenant_workspace,
     );
-    let workspace_version = workspace_svc.workspace_version()?;
+    let output_config = configure_output_format(&args, &workspace_svc);
+    let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
 
-    let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
-        TenancyConfig::MultiTenant
-    } else {
-        TenancyConfig::SingleTenant
-    };
-    let is_in_workspace = workspace_svc.is_in_workspace();
-    let workspace_status = match (maybe_init_command.is_some(), is_in_workspace) {
-        (false, false) => WorkspaceStatus::NoWorkspace,
-        (true, false) => WorkspaceStatus::AboutToBeCreated(tenancy_config),
-        (_, true) => WorkspaceStatus::Created(tenancy_config),
-    };
+    // NOTE: A closure is used so "?" does not cause exit from run() function.
+    let (command_result, maybe_metrics_registry) =
+        async || -> (Result<(), CLIError>, Option<Arc<prometheus::Registry>>) {
+            let workspace_version = match workspace_svc.workspace_version() {
+                Ok(wv) => wv,
+                // todo wrap с чем-нибудб? тут и ниже
+                Err(e) => return (Err(e.into()), None),
+            };
+            let is_workspace_upgrade_needed = match workspace_svc.is_upgrade_needed() {
+                Ok(needed) => needed,
+                // todo wrap с чем-нибудб?
+                Err(e) => return (Err(e.into()), None),
+            };
 
-    let config = load_config(&workspace_layout);
-    let current_account =
-        AccountService::current_account_indication(args.account.clone(), tenancy_config);
+            let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
+                TenancyConfig::MultiTenant
+            } else {
+                TenancyConfig::SingleTenant
+            };
+            let is_in_workspace = workspace_svc.is_in_workspace();
+            let workspace_status = match (maybe_init_command.is_some(), is_in_workspace) {
+                (false, false) => WorkspaceStatus::NoWorkspace,
+                (true, false) => WorkspaceStatus::AboutToBeCreated(tenancy_config),
+                (_, true) => WorkspaceStatus::Created(tenancy_config),
+            };
 
-    prepare_run_dir(&workspace_layout.run_info_dir);
+            let config = load_config(&workspace_layout);
+            let current_account = match AccountService::current_account_indication(
+                args.account.clone(),
+                tenancy_config,
+            )
+            .map_err(CLIError::usage_error_from)
+            {
+                Ok(v) => v,
+                // todo wrap с чем-нибудб?
+                Err(e) => return (Err(e), None),
+            };
 
-    let app_database_config = get_app_database_config(&workspace_layout, &config, workspace_status);
-    let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
-    let maybe_db_connection_settings = database_config.as_ref().map(build_db_connection_settings);
+            prepare_run_dir(&workspace_layout.run_info_dir);
 
-    // Configure application
-    let (guards, base_catalog, cli_catalog, maybe_server_catalog, output_config) = {
-        let is_e2e_testing = args.e2e_output_data_path.is_some();
+            let app_database_config =
+                get_app_database_config(&workspace_layout, &config, workspace_status);
+            let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
+            let maybe_db_connection_settings =
+                database_config.as_ref().map(build_db_connection_settings);
 
-        let mut base_catalog_builder = configure_base_catalog(
-            &workspace_layout,
-            workspace_status,
-            tenancy_config,
-            args.system_time.map(Into::into),
-            is_e2e_testing,
-        );
+            // Configure application
+            let (base_catalog, cli_catalog, maybe_server_catalog) = {
+                let is_e2e_testing = args.e2e_output_data_path.is_some();
 
-        base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
-        base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
+                let mut base_catalog_builder = configure_base_catalog(
+                    &workspace_layout,
+                    workspace_status,
+                    tenancy_config,
+                    args.system_time.map(Into::into),
+                    is_e2e_testing,
+                );
 
-        if let Some(db_connection_settings) = maybe_db_connection_settings.as_ref() {
-            configure_database_components(
-                &mut base_catalog_builder,
-                database_config.as_ref().unwrap(),
-                db_connection_settings.clone(),
-            );
-        } else {
-            configure_in_memory_components(&mut base_catalog_builder);
-        }
+                base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
+                base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
 
-        let output_config = configure_output_format(&args, &workspace_svc);
-        base_catalog_builder.add_value(output_config.clone());
-        base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
+                if let Some(db_connection_settings) = maybe_db_connection_settings.as_ref() {
+                    configure_database_components(
+                        &mut base_catalog_builder,
+                        database_config.as_ref().unwrap(),
+                        db_connection_settings.clone(),
+                    );
+                } else {
+                    configure_in_memory_components(&mut base_catalog_builder);
+                }
 
-        let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
+                base_catalog_builder.add_value(output_config.clone());
+                base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
 
-        tracing::info!(
-            version = VERSION,
-            args = ?std::env::args().collect::<Vec<_>>(),
-            ?workspace_version,
-            workspace_root = ?workspace_layout.root_dir,
-            "Initializing {BINARY_NAME}"
-        );
+                tracing::info!(
+                    version = VERSION,
+                    args = ?std::env::args().collect::<Vec<_>>(),
+                    ?workspace_version,
+                    workspace_root = ?workspace_layout.root_dir,
+                    "Initializing {BINARY_NAME}"
+                );
 
-        register_config_in_catalog(
-            &config,
-            &mut base_catalog_builder,
-            workspace_status,
-            args.password_hashing_mode,
-            is_e2e_testing,
-        )?;
+                if let e @ Err(_) = register_config_in_catalog(
+                    &config,
+                    &mut base_catalog_builder,
+                    workspace_status,
+                    args.password_hashing_mode,
+                    is_e2e_testing,
+                ) {
+                    return (e, None);
+                }
 
-        let base_catalog = base_catalog_builder.build();
+                let base_catalog = base_catalog_builder.build();
 
-        // Database requires extra actions:
-        let final_base_catalog = if let Some(db_config) = database_config {
-            // Connect a database and get a connection pool
-            let catalog_with_pool = connect_database_initially(&base_catalog).await?;
+                // Database requires extra actions:
+                let final_base_catalog = if let Some(db_config) = database_config {
+                    // Connect a database and get a connection pool
+                    let catalog_with_pool = match connect_database_initially(&base_catalog).await {
+                        Ok(c) => c,
+                        Err(e) => return (Err(e.into()), None),
+                    };
 
-            // Periodically refresh password in the connection pool, if configured
-            spawn_password_refreshing_job(&db_config, &catalog_with_pool).await;
+                    // Periodically refresh password in the connection pool, if configured
+                    spawn_password_refreshing_job(&db_config, &catalog_with_pool).await;
 
-            catalog_with_pool
-        } else {
-            base_catalog
-        };
+                    catalog_with_pool
+                } else {
+                    base_catalog
+                };
 
-        let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog =
-                configure_server_catalog(&final_base_catalog, tenancy_config).build();
-            Some(server_catalog)
-        } else {
-            None
-        };
+                let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
+                    let server_catalog =
+                        configure_server_catalog(&final_base_catalog, tenancy_config).build();
+                    Some(server_catalog)
+                } else {
+                    None
+                };
 
-        let cli_catalog = configure_cli_catalog(
-            maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog),
-            tenancy_config,
-        )
-        .add_value(current_account.to_current_account_subject())
-        .build();
+                let cli_catalog = {
+                    let current_account = current_account.clone();
+                    let r = DatabaseTransactionRunner::new(final_base_catalog.clone())
+                        .transactional(|transactional_final_base_catalog| async move {
+                            // todo remove unwrap?
+                            let account_service =
+                                transactional_final_base_catalog.get_one().unwrap();
 
-        (
-            guards,
-            final_base_catalog,
-            cli_catalog,
-            maybe_server_catalog,
-            output_config,
-        )
-    };
+                            current_account
+                                .to_current_account_subject(workspace_status, account_service)
+                                .await
+                                .map_err(CLIError::usage_error_from)
 
-    // Register metrics
-    let metrics_registry = observability::metrics::register_all(&cli_catalog);
+                            // f(transactional_final_base_catalog).await
+                        })
+                        .await;
 
-    let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
+                    let current_account_subject = match r {
+                        Ok(s) => s,
+                        Err(e) => return (Err(e.into()), None),
+                    };
+                    let cli_base_catalog =
+                        maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog);
 
-    if is_in_workspace && !is_workspace_upgrade_needed {
-        // Evict cache
-        cli_catalog.get_one::<GcService>()?.evict_cache()?;
-    }
+                    configure_cli_catalog(cli_base_catalog, tenancy_config)
+                        .add_value(current_account_subject)
+                        .build()
+                };
 
-    // Some extra steps are necessary for commands that require workspace
-    let mut command_result: Result<(), CLIError> = if cli_commands::command_needs_workspace(&args) {
-        if !workspace_svc.is_in_workspace() {
-            Err(CLIError::usage_error_from(NotInWorkspace))
-        } else if is_workspace_upgrade_needed {
-            Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-        } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant {
-            Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-        } else {
-            Ok(())
-        }
-    } else {
-        Ok(())
-    };
+                // todo снова пересмотреть нужен ли maybe_server_catalog
+                (final_base_catalog, cli_catalog, maybe_server_catalog)
+            };
 
-    if command_result.is_ok() && cli_commands::command_needs_startup_jobs(&args) {
-        command_result = run_startup_initializations(&cli_catalog).await;
-    }
+            // Register metrics
+            let metrics_registry = observability::metrics::register_all(&cli_catalog);
 
-    if command_result.is_ok() {
-        let is_transactional = maybe_db_connection_settings.is_some()
-            && cli_commands::command_needs_transaction(&args);
-        let is_outbox_processing_required = maybe_db_connection_settings.is_some()
-            && cli_commands::command_needs_outbox_processing(&args);
-        let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
+            if is_in_workspace && !is_workspace_upgrade_needed {
+                // TODO: Extract to an InitOnStartup job
+                // Evict cache
+                let gc_service = cli_catalog.get_one::<GcService>().unwrap();
+                gc_service.evict_cache().unwrap();
+            }
 
-        command_result = maybe_transactional(
-            is_transactional,
-            cli_catalog.clone(),
-            |maybe_transactional_cli_catalog: Catalog| async move {
-                let command_builder = cli_commands::get_command(
-                    work_catalog,
-                    &maybe_transactional_cli_catalog,
-                    args,
-                )?;
+            // Some extra steps are necessary for commands that require workspace
+            let mut command_result: Result<(), CLIError> =
+                if cli_commands::command_needs_workspace(&args) {
+                    if !is_in_workspace {
+                        Err(CLIError::usage_error_from(NotInWorkspace))
+                    } else if is_workspace_upgrade_needed {
+                        Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+                    } else if current_account.is_explicit()
+                        && tenancy_config == TenancyConfig::SingleTenant
+                    {
+                        Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+                    } else {
+                        Ok(())
+                    }
+                } else {
+                    Ok(())
+                };
 
-                let command = command_builder
-                    .get(&maybe_transactional_cli_catalog)
-                    .int_err()?;
+            if command_result.is_ok() && cli_commands::command_needs_startup_jobs(&args) {
+                command_result = run_startup_initializations(&cli_catalog).await;
+            }
 
-                command.validate_args().await?;
+            if command_result.is_ok() {
+                let is_transactional = maybe_db_connection_settings.is_some()
+                    && cli_commands::command_needs_transaction(&args);
+                let is_outbox_processing_required = maybe_db_connection_settings.is_some()
+                    && cli_commands::command_needs_outbox_processing(&args);
+                let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
-                let command_name = command.name();
+                command_result = maybe_transactional(
+                    is_transactional,
+                    cli_catalog.clone(),
+                    |maybe_transactional_cli_catalog: Catalog| async move {
+                        let command_builder = cli_commands::get_command(
+                            work_catalog,
+                            &maybe_transactional_cli_catalog,
+                            args,
+                            current_account,
+                        )?;
 
-                command
-                    .run()
-                    .instrument(tracing::info_span!(
-                        "Running command",
-                        %is_transactional,
-                        %command_name,
-                    ))
-                    .await
-            },
-        )
-        .instrument(tracing::debug_span!("app::run_command"))
-        .await;
+                        let command = command_builder
+                            .get(&maybe_transactional_cli_catalog)
+                            .int_err()?;
 
-        if is_outbox_processing_required {
-            command_result = command_result
-                // If successful, then process the Outbox messages while they are present
-                .and_then_async(|_| async {
-                    let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
-                    outbox_agent
-                        .run_while_has_tasks()
-                        .await
-                        .map_err(CLIError::critical)
-                })
-                .instrument(tracing::debug_span!(
-                    "Consume accumulated the Outbox messages"
-                ))
-                .await
-                // If we had a temporary directory, we move the database from it to the expected
-                // location.
-                .and_then_async(|_| async {
-                    move_initial_database_to_workspace_if_needed(
-                        &workspace_layout,
-                        maybe_temp_database_path,
-                    )
-                    .await
-                    .map_int_err(CLIError::critical)
-                })
+                        command.validate_args().await?;
+
+                        let command_name = command.name();
+
+                        command
+                            .run()
+                            .instrument(tracing::info_span!(
+                                "Running command",
+                                %is_transactional,
+                                %command_name,
+                            ))
+                            .await
+                    },
+                )
+                .instrument(tracing::debug_span!("app::run_command"))
                 .await;
-        }
-    }
+
+                if is_outbox_processing_required {
+                    // If successful, then process the Outbox messages while they are present
+                    command_result = command_result
+                        .and_then_async(|_| async {
+                            let outbox_agent =
+                                cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
+                            outbox_agent
+                                .run_while_has_tasks()
+                                .await
+                                .map_err(CLIError::critical)
+                        })
+                        .instrument(tracing::debug_span!(
+                            "Consume accumulated the Outbox messages"
+                        ))
+                        .await;
+                }
+
+                // If we had a temporary directory, we move the database from it
+                // to the expected location.
+                command_result = command_result
+                    .and_then_async(|_| async {
+                        move_initial_database_to_workspace_if_needed(
+                            &workspace_layout,
+                            maybe_temp_database_path,
+                        )
+                        .await
+                        .map_int_err(CLIError::critical)
+                    })
+                    .await;
+            }
+
+            (command_result, Some(metrics_registry))
+        }()
+        .await;
 
     match &command_result {
         Ok(()) => {
@@ -328,6 +383,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     if let Some(metrics_file) = &output_config.metrics_file
         && let Ok(mut file) = std::fs::File::create(metrics_file)
+        && let Some(metrics_registry) = maybe_metrics_registry
     {
         use prometheus::Encoder as _;
         let _ = prometheus::TextEncoder::new().encode(&metrics_registry.gather(), &mut file);
@@ -1032,7 +1088,7 @@ fn configure_logging(
                 If the issue persists, help us \
                  by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
             )
-            .bold()
+                .bold()
         );
     });
 
