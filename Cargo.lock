@@ -7688,7 +7688,6 @@ dependencies = [
  "indoc 2.0.6",
  "init-on-startup",
  "internal-error",
- "kamu",
  "kamu-accounts",
  "kamu-core",
  "kamu-datasets",
