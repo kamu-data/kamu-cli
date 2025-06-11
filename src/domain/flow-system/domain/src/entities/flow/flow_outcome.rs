@@ -8,9 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::{CompactionResult, PullResult, PullResultUpToDate};
-use kamu_task_system::{self as ts, ResetDatasetTaskError, UpdateDatasetTaskError};
+use kamu_task_system::{self as ts};
 use serde::{Deserialize, Serialize};
-use ts::TaskError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +18,7 @@ pub enum FlowOutcome {
     /// Flow succeeded
     Success(FlowResult),
     /// Flow failed to complete, even after retry logic
-    Failed(FlowError),
+    Failed,
     /// Flow was aborted by user or by system
     Aborted,
 }
@@ -50,36 +49,6 @@ impl FlowResult {
             FlowResult::DatasetUpdate(_)
             | FlowResult::DatasetCompact(_)
             | FlowResult::DatasetReset(_) => false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FlowError {
-    Failed,
-    InputDatasetCompacted(FlowInputDatasetCompactedError),
-    ResetHeadNotFound,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowInputDatasetCompactedError {
-    pub dataset_id: odf::DatasetID,
-}
-
-impl From<&TaskError> for FlowError {
-    fn from(value: &TaskError) -> Self {
-        match value {
-            TaskError::Empty => Self::Failed,
-            TaskError::UpdateDatasetError(update_dataset_error) => match update_dataset_error {
-                UpdateDatasetTaskError::InputDatasetCompacted(err) => {
-                    Self::InputDatasetCompacted(FlowInputDatasetCompactedError {
-                        dataset_id: err.dataset_id.clone(),
-                    })
-                }
-            },
-            TaskError::ResetDatasetError(reset_dataset_error) => match reset_dataset_error {
-                ResetDatasetTaskError::ResetHeadNotFound => Self::ResetHeadNotFound,
-            },
         }
     }
 }

@@ -72,7 +72,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for WebhookDatasetRemovalHandler 
                 tracing::debug!(subscription_ids = ?subscription_ids, "Found subscriptions for removed dataset");
 
                 // Load these subscriptions
-                let subscriptions = WebhookSubscription::load_multi(
+                let subscriptions = WebhookSubscription::load_multi_simple(
                     subscription_ids,
                     self.webhook_subscription_event_store.as_ref(),
                 )
@@ -82,9 +82,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for WebhookDatasetRemovalHandler 
                 tracing::debug!(subscriptions = ?subscriptions, "Loaded subscriptions");
 
                 // Remove each subscription automatically
-                for subscription in subscriptions {
-                    let mut subscription = subscription.int_err()?;
-
+                for mut subscription in subscriptions {
                     subscription.remove().int_err()?;
                     subscription
                         .save(self.webhook_subscription_event_store.as_ref())
