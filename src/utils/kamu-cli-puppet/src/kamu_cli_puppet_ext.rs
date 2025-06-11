@@ -105,6 +105,12 @@ pub trait KamuCliPuppetExt {
     );
 
     async fn login_to_node(&self, node_url: &Url, account_name: &str, password: &str);
+
+    async fn gql_query(&self, query: &str) -> String;
+
+    async fn create_account(&self, account_name: &odf::AccountName);
+
+    async fn delete_account(&self, account_name: &odf::AccountName) -> DeleteAccountResult;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,7 +130,13 @@ impl KamuCliPuppetExt for KamuCliPuppet {
 
     async fn list_datasets(&self) -> Vec<DatasetRecord> {
         let assert = self
-            .execute(["list", "--wide", "--output-format", "json"])
+            .execute([
+                "list",
+                "--all-accounts",
+                "--wide",
+                "--output-format",
+                "json",
+            ])
             .await
             .success();
 
@@ -428,6 +440,114 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             maybe_expected_stderr,
         );
     }
+
+    async fn gql_query(&self, query: &str) -> String {
+        let assert = self
+            .execute(["system", "api-server", "gql-query", query])
+            .await
+            .success();
+
+        let stdout = std::str::from_utf8(&assert.get_output().stdout)
+            .unwrap()
+            .to_string();
+
+        stdout
+    }
+
+    async fn create_account(&self, account_name: &odf::AccountName) {
+        let res = self
+            .gql_query(
+                &indoc::indoc!(
+                    r#"
+                    mutation {
+                      accounts {
+                        createAccount(accountName: "$accountName") {
+                          message
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("$accountName", account_name.as_str()),
+            )
+            .await;
+
+        pretty_assertions::assert_eq!(
+            indoc::indoc!(
+                r#"
+                {
+                  "accounts": {
+                    "createAccount": {
+                      "message": "Account created"
+                    }
+                  }
+                }
+                "#
+            ),
+            res
+        );
+    }
+
+    async fn delete_account(&self, account_name: &odf::AccountName) -> DeleteAccountResult {
+        let res = self
+            .gql_query(
+                &indoc::indoc!(
+                    r#"
+                    mutation {
+                      accounts {
+                        byName(accountName: "$accountName") {
+                          delete {
+                            message
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("$accountName", account_name.as_str()),
+            )
+            .await;
+
+        const DELETED: &str = indoc::indoc!(
+            r#"
+            {
+              "accounts": {
+                "byName": {
+                  "delete": {
+                    "message": "Account deleted"
+                  }
+                }
+              }
+            }
+            "#
+        );
+        const NOT_FOUND: &str = indoc::indoc!(
+            r#"
+            {
+              "accounts": {
+                "byName": null
+              }
+            }
+            "#
+        );
+
+        if res == DELETED {
+            DeleteAccountResult::Deleted
+        } else if res == NOT_FOUND {
+            DeleteAccountResult::NotFound
+        } else {
+            DeleteAccountResult::UnexpectedResult(res)
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum DeleteAccountResult {
+    Deleted,
+    NotFound,
+    UnexpectedResult(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -444,6 +564,7 @@ pub struct ServerOutput {
 pub struct DatasetRecord {
     #[serde(rename = "ID")]
     pub id: odf::DatasetID,
+    pub owner: Option<odf::AccountName>,
     pub name: odf::DatasetName,
     // CLI returns regular ENUM DatasetKind(Root/Derivative) for local datasets
     // but for remote it is Remote(DatasetKind) type
