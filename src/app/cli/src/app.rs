@@ -144,7 +144,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             database_config.as_ref().map(build_db_connection_settings);
 
         // Configure application
-        let (base_catalog, cli_catalog, maybe_server_catalog) = {
+        let base_catalog = {
             let is_e2e_testing = args.e2e_output_data_path.is_some();
 
             let mut base_catalog_builder = configure_base_catalog(
@@ -179,55 +179,53 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 is_e2e_testing,
             )?;
 
-            let base_catalog = base_catalog_builder.build();
+            base_catalog_builder.build()
+        };
 
-            // Database requires extra actions:
-            let final_base_catalog = if let Some(db_config) = &database_config {
-                // Connect a database and get a connection pool
-                let catalog_with_pool = connect_database_initially(&base_catalog).await?;
+        // Database requires extra actions:
+        let final_base_catalog = if let Some(db_config) = &database_config {
+            // Connect a database and get a connection pool
+            let catalog_with_pool = connect_database_initially(&base_catalog).await?;
 
-                // Periodically refresh password in the connection pool, if configured
-                spawn_password_refreshing_job(db_config, &catalog_with_pool).await;
+            // Periodically refresh password in the connection pool, if configured
+            spawn_password_refreshing_job(db_config, &catalog_with_pool).await;
 
-                catalog_with_pool
-            } else {
-                base_catalog
-            };
+            catalog_with_pool
+        } else {
+            base_catalog
+        };
 
-            let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-                let server_catalog =
-                    configure_server_catalog(&final_base_catalog, tenancy_config).build();
-                Some(server_catalog)
-            } else {
-                None
-            };
+        let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
+            let server_catalog =
+                configure_server_catalog(&final_base_catalog, tenancy_config).build();
+            Some(server_catalog)
+        } else {
+            None
+        };
 
-            let cli_catalog = {
-                let current_account = current_account.clone();
-                let current_account_subject =
-                    DatabaseTransactionRunner::new(final_base_catalog.clone())
-                        .transactional(|transactional_final_base_catalog| async move {
-                            let account_service =
-                                transactional_final_base_catalog.get_one().int_err()?;
+        let cli_catalog = {
+            let current_account = current_account.clone();
+            let current_account_subject =
+                DatabaseTransactionRunner::new(final_base_catalog.clone())
+                    .transactional(|transactional_final_base_catalog| async move {
+                        let account_service =
+                            transactional_final_base_catalog.get_one().int_err()?;
 
-                            current_account
-                                .to_current_account_subject(
-                                    tenancy_config,
-                                    workspace_status,
-                                    account_service,
-                                )
-                                .await
-                                .int_err()
-                        })
-                        .await?;
-                let cli_base_catalog = maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog);
+                        current_account
+                            .to_current_account_subject(
+                                tenancy_config,
+                                workspace_status,
+                                account_service,
+                            )
+                            .await
+                            .int_err()
+                    })
+                    .await?;
+            let cli_base_catalog = maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog);
 
-                configure_cli_catalog(cli_base_catalog, tenancy_config)
-                    .add_value(current_account_subject)
-                    .build()
-            };
-
-            (final_base_catalog, cli_catalog, maybe_server_catalog)
+            configure_cli_catalog(cli_base_catalog, tenancy_config)
+                .add_value(current_account_subject)
+                .build()
         };
 
         // Register metrics
