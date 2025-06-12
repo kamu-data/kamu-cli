@@ -184,12 +184,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             // Database requires extra actions:
             if let Some(db_config) = &database_config {
                 // Connect a database and get a connection pool
-                let catalog_with_pool = connect_database_initially(&base_catalog).await?;
+                let base_catalog_with_pool = connect_database_initially(&base_catalog).await?;
 
                 // Periodically refresh password in the connection pool, if configured
-                spawn_password_refreshing_job(db_config, &catalog_with_pool).await;
+                spawn_password_refreshing_job(db_config, &base_catalog_with_pool).await;
 
-                catalog_with_pool
+                base_catalog_with_pool
             } else {
                 base_catalog
             }
@@ -204,6 +204,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         let cli_catalog = build_cli_catalog(
             &base_catalog,
+            maybe_server_catalog.as_ref(),
             current_account.clone(),
             workspace_status,
             tenancy_config,
@@ -581,6 +582,7 @@ pub fn configure_cli_catalog(
 
 async fn build_cli_catalog(
     base_catalog: &Catalog,
+    maybe_server_catalog: Option<&Catalog>,
     current_account_indication: CurrentAccountIndication,
     workspace_status: WorkspaceStatus,
     tenancy_config: TenancyConfig,
@@ -595,8 +597,9 @@ async fn build_cli_catalog(
                 .int_err()
         })
         .await?;
+    let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
 
-    Ok(configure_cli_catalog(base_catalog, tenancy_config)
+    Ok(configure_cli_catalog(cli_base_catalog, tenancy_config)
         .add_value(current_account_subject)
         .build())
 }
