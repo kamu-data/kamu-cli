@@ -13,7 +13,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::use_cases::test_delete_account_with_datasets_mt,
+    fixture = kamu_cli_e2e_repo_tests::scenarios::test_delete_account_with_datasets_mt,
     options = Options::default().with_multi_tenant(),
 );
 

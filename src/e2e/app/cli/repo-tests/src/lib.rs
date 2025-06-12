@@ -11,11 +11,11 @@
 
 pub mod commands;
 pub mod rest_api;
+pub mod scenarios;
 mod test_flow;
 mod test_private_datasets;
 mod test_selftest;
 mod test_smart_transfer_protocol;
-pub mod use_cases;
 pub mod utils;
 
 pub mod private_datasets {

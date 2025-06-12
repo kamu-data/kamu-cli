@@ -527,7 +527,6 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
     }
 }
 
-#[expect(clippy::match_same_arms)]
 pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
     // ToDo: Revisit and decide do all commands that require workspace
     // also require startup jobs
