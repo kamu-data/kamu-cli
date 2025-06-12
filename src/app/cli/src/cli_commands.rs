@@ -537,7 +537,7 @@ pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
 
     match &args.command {
         cli::Command::Complete(_) => true,
-        cli::Command::Init(_) => {
+        cli::Command::Init(c) if !c.pull_images => {
             // NOTE: When initializing, we need to run initialization at least to create
             //       user accounts.
             true
