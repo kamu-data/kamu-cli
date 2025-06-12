@@ -11,6 +11,7 @@
 
 pub mod commands;
 pub mod rest_api;
+pub mod scenarios;
 mod test_flow;
 mod test_private_datasets;
 mod test_selftest;

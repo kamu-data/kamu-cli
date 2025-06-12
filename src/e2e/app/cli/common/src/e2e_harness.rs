@@ -18,7 +18,7 @@ use crate::{KamuApiServerClient, api_server_e2e_test};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 enum PotentialWorkspace {
     NoWorkspace,
     #[default]
@@ -28,7 +28,7 @@ enum PotentialWorkspace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct KamuCliApiServerHarnessOptions {
     potential_workspace: PotentialWorkspace,
     env_vars: Vec<(String, String)>,

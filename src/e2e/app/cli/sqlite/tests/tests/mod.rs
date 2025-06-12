@@ -13,3 +13,4 @@ mod test_flow;
 mod test_private_datasets;
 mod test_selftest;
 mod test_smart_transfer_protocol;
+mod use_cases;

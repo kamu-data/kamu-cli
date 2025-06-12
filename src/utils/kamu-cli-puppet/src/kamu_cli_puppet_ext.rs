@@ -79,6 +79,8 @@ pub trait KamuCliPuppetExt {
 
     async fn list_datasets(&self) -> Vec<DatasetRecord>;
 
+    async fn list_datasets_ex(&self, options: DatasetListOptions) -> Vec<DatasetRecord>;
+
     async fn add_dataset(&self, dataset_snapshot: odf::DatasetSnapshot, options: AddDatasetOptions);
 
     async fn list_blocks(&self, dataset_name: &odf::DatasetName) -> Vec<BlockRecord>;
@@ -105,6 +107,12 @@ pub trait KamuCliPuppetExt {
     );
 
     async fn login_to_node(&self, node_url: &Url, account_name: &str, password: &str);
+
+    async fn gql_query(&self, query: &str) -> String;
+
+    async fn create_account(&self, account_name: &odf::AccountName);
+
+    async fn delete_account(&self, account_name: &odf::AccountName) -> DeleteAccountResult;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,10 +131,16 @@ impl KamuCliPuppetExt for KamuCliPuppet {
     }
 
     async fn list_datasets(&self) -> Vec<DatasetRecord> {
-        let assert = self
-            .execute(["list", "--wide", "--output-format", "json"])
-            .await
-            .success();
+        self.list_datasets_ex(Default::default()).await
+    }
+
+    async fn list_datasets_ex(&self, options: DatasetListOptions) -> Vec<DatasetRecord> {
+        let mut cmd = vec!["list", "--wide", "--output-format", "json"];
+        if options.all_accounts {
+            cmd.push("--all-accounts");
+        }
+
+        let assert = self.execute(cmd).await.success();
 
         let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
 
@@ -428,6 +442,112 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             maybe_expected_stderr,
         );
     }
+
+    async fn gql_query(&self, query: &str) -> String {
+        let assert = self
+            .execute(["system", "api-server", "gql-query", query])
+            .await
+            .success();
+
+        std::str::from_utf8(&assert.get_output().stdout)
+            .unwrap()
+            .to_string()
+    }
+
+    async fn create_account(&self, account_name: &odf::AccountName) {
+        let res = self
+            .gql_query(
+                &indoc::indoc!(
+                    r#"
+                    mutation {
+                      accounts {
+                        createAccount(accountName: "$accountName") {
+                          message
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("$accountName", account_name.as_str()),
+            )
+            .await;
+
+        pretty_assertions::assert_eq!(
+            indoc::indoc!(
+                r#"
+                {
+                  "accounts": {
+                    "createAccount": {
+                      "message": "Account created"
+                    }
+                  }
+                }
+                "#
+            ),
+            res
+        );
+    }
+
+    async fn delete_account(&self, account_name: &odf::AccountName) -> DeleteAccountResult {
+        let res = self
+            .gql_query(
+                &indoc::indoc!(
+                    r#"
+                    mutation {
+                      accounts {
+                        byName(accountName: "$accountName") {
+                          delete {
+                            message
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("$accountName", account_name.as_str()),
+            )
+            .await;
+
+        const DELETED: &str = indoc::indoc!(
+            r#"
+            {
+              "accounts": {
+                "byName": {
+                  "delete": {
+                    "message": "Account deleted"
+                  }
+                }
+              }
+            }
+            "#
+        );
+        const NOT_FOUND: &str = indoc::indoc!(
+            r#"
+            {
+              "accounts": {
+                "byName": null
+              }
+            }
+            "#
+        );
+
+        if res == DELETED {
+            DeleteAccountResult::Deleted
+        } else if res == NOT_FOUND {
+            DeleteAccountResult::NotFound
+        } else {
+            DeleteAccountResult::UnexpectedResult(res)
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum DeleteAccountResult {
+    Deleted,
+    NotFound,
+    UnexpectedResult(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -444,6 +564,7 @@ pub struct ServerOutput {
 pub struct DatasetRecord {
     #[serde(rename = "ID")]
     pub id: odf::DatasetID,
+    pub owner: Option<odf::AccountName>,
     pub name: odf::DatasetName,
     // CLI returns regular ENUM DatasetKind(Root/Derivative) for local datasets
     // but for remote it is Remote(DatasetKind) type
@@ -455,6 +576,11 @@ pub struct DatasetRecord {
     pub size: usize,
     pub watermark: Option<DateTime<Utc>>,
     pub visibility: Option<odf::DatasetVisibility>,
+}
+
+#[derive(Debug, bon::Builder, Default)]
+pub struct DatasetListOptions {
+    all_accounts: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Deserialize)]
