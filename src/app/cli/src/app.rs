@@ -54,7 +54,7 @@ use crate::{
     configure_database_components,
     configure_in_memory_components,
     connect_database_initially,
-    database_flash,
+    database_flush,
     explore,
     get_app_database_config,
     move_initial_database_to_workspace,
@@ -318,7 +318,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         if let Some(temp_database_path) = maybe_temp_database_path {
             // If we had a temporary directory, we move the database from it
             // to the expected location.
-            database_flash(&base_catalog).await?;
+            database_flush(&base_catalog).await?;
             move_initial_database_to_workspace(&workspace_layout, temp_database_path).await?;
         }
 

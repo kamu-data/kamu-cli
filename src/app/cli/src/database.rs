@@ -308,7 +308,7 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn database_flash(base_catalog: &Catalog) -> Result<(), InternalError> {
+pub async fn database_flush(base_catalog: &Catalog) -> Result<(), InternalError> {
     let db_connection_settings = base_catalog
         .get_one::<DatabaseConnectionSettings>()
         .int_err()?;
