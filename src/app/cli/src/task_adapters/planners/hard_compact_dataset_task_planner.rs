@@ -14,6 +14,8 @@ use internal_error::InternalError;
 use kamu::domain::{CompactionOptions, CompactionPlanner, DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
+use crate::task_adapters::TaskDefinitionDatasetHardCompact;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
@@ -47,7 +49,7 @@ impl HardCompactDatasetTaskPlanner {
 
         target.detach_from_transaction();
 
-        Ok(TaskDefinition::HardCompact(TaskDefinitionHardCompact {
+        Ok(TaskDefinition::new(TaskDefinitionDatasetHardCompact {
             target,
             compaction_plan,
         }))
@@ -59,7 +61,7 @@ impl HardCompactDatasetTaskPlanner {
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_HARD_COMPACT_DATASET
+        TaskDefinitionDatasetHardCompact::TASK_TYPE
     }
 
     async fn prepare_task_definition(

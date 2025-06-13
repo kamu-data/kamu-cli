@@ -22,6 +22,8 @@ use kamu::domain::{
 use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
 use kamu_task_system::*;
 
+use crate::task_adapters::TaskDefinitionDatasetUpdate;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
@@ -71,7 +73,7 @@ impl UpdateDatasetTaskPlanner {
             Ok(pull_job) => {
                 pull_job.detach_from_transaction();
 
-                Ok(TaskDefinition::Update(TaskDefinitionUpdate {
+                Ok(TaskDefinition::new(TaskDefinitionDatasetUpdate {
                     pull_options,
                     pull_job,
                 }))
@@ -94,7 +96,7 @@ impl UpdateDatasetTaskPlanner {
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for UpdateDatasetTaskPlanner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_DATASET_UPDATE
+        TaskDefinitionDatasetUpdate::TASK_TYPE
     }
 
     async fn prepare_task_definition(

@@ -13,6 +13,8 @@ use internal_error::InternalError;
 use kamu_task_system::*;
 use kamu_webhooks::WebhookDeliveryWorker;
 
+use crate::task_adapters::TaskDefinitionWebhookDeliver;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
@@ -25,7 +27,7 @@ impl DeliverWebhookTaskRunner {
     #[tracing::instrument(level = "debug", skip_all, fields(?task_webhook))]
     async fn run_deliver_webhook(
         &self,
-        task_webhook: TaskDefinitionDeliverWebhook,
+        task_webhook: TaskDefinitionWebhookDeliver,
     ) -> Result<TaskOutcome, InternalError> {
         match self
             .webhook_delivery_worker
@@ -50,20 +52,18 @@ impl DeliverWebhookTaskRunner {
 #[async_trait::async_trait]
 impl TaskRunner for DeliverWebhookTaskRunner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_DELIVER_WEBHOOK
+        TaskDefinitionWebhookDeliver::TASK_TYPE
     }
 
     async fn run_task(
         &self,
         task_definition: kamu_task_system::TaskDefinition,
     ) -> Result<TaskOutcome, InternalError> {
-        let kamu_task_system::TaskDefinition::DeliverWebhook(task_deliver) = task_definition else {
-            panic!(
-                "DeliverWebhookTaskRunner received an unsupported task type: {task_definition:?}",
-            );
-        };
+        let task_deliver = task_definition
+            .downcast::<TaskDefinitionWebhookDeliver>()
+            .expect("Mismatched task type for DeliverWebhookTaskRunner");
 
-        self.run_deliver_webhook(task_deliver).await
+        self.run_deliver_webhook(*task_deliver).await
     }
 }
 

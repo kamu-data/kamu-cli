@@ -7,18 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::InternalError;
+use std::any::Any;
 
-use crate::{TaskDefinition, TaskOutcome};
+use kamu::domain::{PullOptions, PullPlanIterationJob};
+use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait TaskRunner: Send + Sync {
-    fn supported_task_type(&self) -> &str;
+#[derive(Debug)]
+pub struct TaskDefinitionDatasetUpdate {
+    pub pull_options: PullOptions,
+    pub pull_job: PullPlanIterationJob,
+}
 
-    async fn run_task(&self, task_definition: TaskDefinition)
-    -> Result<TaskOutcome, InternalError>;
+impl TaskDefinitionDatasetUpdate {
+    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.update";
+}
+
+#[async_trait::async_trait]
+impl ts::TaskDefinitionBody for TaskDefinitionDatasetUpdate {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+
+    fn task_type(&self) -> &'static str {
+        Self::TASK_TYPE
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

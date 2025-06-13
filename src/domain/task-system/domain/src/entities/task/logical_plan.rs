@@ -10,14 +10,7 @@
 use enum_variants::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    TASK_TYPE_DATASET_UPDATE,
-    TASK_TYPE_DELIVER_WEBHOOK,
-    TASK_TYPE_HARD_COMPACT_DATASET,
-    TASK_TYPE_PROBE,
-    TASK_TYPE_RESET_DATASET,
-    TaskOutcome,
-};
+use crate::TaskOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,12 +43,13 @@ impl LogicalPlan {
     }
 
     pub fn task_type(&self) -> &'static str {
+        // TODO: get rid of these direct string copies
         match self {
-            LogicalPlan::UpdateDataset(_) => TASK_TYPE_DATASET_UPDATE,
-            LogicalPlan::Probe(_) => TASK_TYPE_PROBE,
-            LogicalPlan::HardCompactDataset(_) => TASK_TYPE_HARD_COMPACT_DATASET,
-            LogicalPlan::ResetDataset(_) => TASK_TYPE_RESET_DATASET,
-            LogicalPlan::DeliverWebhook(_) => TASK_TYPE_DELIVER_WEBHOOK,
+            LogicalPlan::UpdateDataset(_) => "dev.kamu.tasks.dataset.update",
+            LogicalPlan::Probe(_) => "dev.kamu.tasks.probe",
+            LogicalPlan::HardCompactDataset(_) => "dev.kamu.tasks.dataset.hard_compact",
+            LogicalPlan::ResetDataset(_) => "dev.kamu.tasks.dataset.reset",
+            LogicalPlan::DeliverWebhook(_) => "dev.kamu.tasks.webhook.deliver",
         }
     }
 }

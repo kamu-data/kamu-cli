@@ -14,6 +14,8 @@ use internal_error::InternalError;
 use kamu::domain::{DatasetRegistry, DatasetRegistryExt, ResetPlanner};
 use kamu_task_system::*;
 
+use crate::task_adapters::TaskDefinitionDatasetReset;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
@@ -45,7 +47,7 @@ impl ResetDatasetTaskPlanner {
 
         target.detach_from_transaction();
 
-        Ok(TaskDefinition::Reset(TaskDefinitionReset {
+        Ok(TaskDefinition::new(TaskDefinitionDatasetReset {
             dataset_handle: target.take_handle(),
             reset_plan,
         }))
@@ -57,7 +59,7 @@ impl ResetDatasetTaskPlanner {
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_RESET_DATASET
+        TaskDefinitionDatasetReset::TASK_TYPE
     }
 
     async fn prepare_task_definition(

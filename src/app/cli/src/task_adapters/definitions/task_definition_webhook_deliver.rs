@@ -7,18 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::InternalError;
+use std::any::Any;
 
-use crate::{TaskDefinition, TaskOutcome};
+use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait TaskRunner: Send + Sync {
-    fn supported_task_type(&self) -> &str;
+#[derive(Debug)]
+pub struct TaskDefinitionWebhookDeliver {
+    pub task_id: ts::TaskID,
+    pub webhook_subscription_id: uuid::Uuid,
+    pub webhook_event_id: uuid::Uuid,
+}
 
-    async fn run_task(&self, task_definition: TaskDefinition)
-    -> Result<TaskOutcome, InternalError>;
+impl TaskDefinitionWebhookDeliver {
+    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.webhook.deliver";
+}
+
+#[async_trait::async_trait]
+impl ts::TaskDefinitionBody for TaskDefinitionWebhookDeliver {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+
+    fn task_type(&self) -> &'static str {
+        Self::TASK_TYPE
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

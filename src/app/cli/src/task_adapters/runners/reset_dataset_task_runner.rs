@@ -14,6 +14,8 @@ use internal_error::InternalError;
 use kamu::domain::{DatasetRegistry, ResetExecutionError, ResetExecutor};
 use kamu_task_system::*;
 
+use crate::task_adapters::TaskDefinitionDatasetReset;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
@@ -28,7 +30,7 @@ impl ResetDatasetTaskRunner {
     #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn run_reset(
         &self,
-        task_reset: TaskDefinitionReset,
+        task_reset: TaskDefinitionDatasetReset,
     ) -> Result<TaskOutcome, InternalError> {
         let target = dataset_registry
             .get_dataset_by_handle(&task_reset.dataset_handle)
@@ -68,18 +70,18 @@ impl ResetDatasetTaskRunner {
 #[async_trait::async_trait]
 impl TaskRunner for ResetDatasetTaskRunner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_RESET_DATASET
+        TaskDefinitionDatasetReset::TASK_TYPE
     }
 
     async fn run_task(
         &self,
         task_definition: kamu_task_system::TaskDefinition,
     ) -> Result<TaskOutcome, InternalError> {
-        let kamu_task_system::TaskDefinition::Reset(task_reset) = task_definition else {
-            panic!("ResetDatasetTaskRunner received an unsupported task type: {task_definition:?}",);
-        };
+        let task_reset = task_definition
+            .downcast::<TaskDefinitionDatasetReset>()
+            .expect("Mismatched task type for ResetDatasetTaskRunner");
 
-        self.run_reset(task_reset).await
+        self.run_reset(*task_reset).await
     }
 }
 

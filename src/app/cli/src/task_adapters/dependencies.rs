@@ -17,13 +17,11 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<UpdateDatasetTaskPlanner>();
     catalog_builder.add::<DeliverWebhookTaskPlanner>();
     catalog_builder.add::<HardCompactDatasetTaskPlanner>();
-    catalog_builder.add::<ProbeTaskPlanner>();
     catalog_builder.add::<ResetDatasetTaskPlanner>();
 
     catalog_builder.add::<UpdateDatasetTaskRunner>();
     catalog_builder.add::<DeliverWebhookTaskRunner>();
     catalog_builder.add::<HardCompactDatasetTaskRunner>();
-    catalog_builder.add::<ProbeTaskRunner>();
     catalog_builder.add::<ResetDatasetTaskRunner>();
 }
 

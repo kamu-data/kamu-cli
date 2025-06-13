@@ -14,6 +14,8 @@ use internal_error::InternalError;
 use kamu::domain::{CompactionExecutor, CompactionResult, DatasetRegistry};
 use kamu_task_system::*;
 
+use crate::task_adapters::TaskDefinitionDatasetHardCompact;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
@@ -27,7 +29,7 @@ impl HardCompactDatasetTaskRunner {
     #[tracing::instrument(level = "debug", skip_all, fields(?task_compact))]
     async fn run_hard_compact(
         &self,
-        task_compact: TaskDefinitionHardCompact,
+        task_compact: TaskDefinitionDatasetHardCompact,
     ) -> Result<TaskOutcome, InternalError> {
         // Run compaction execution without transaction
         let compaction_result = self
@@ -105,21 +107,18 @@ impl HardCompactDatasetTaskRunner {
 #[async_trait::async_trait]
 impl TaskRunner for HardCompactDatasetTaskRunner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_HARD_COMPACT_DATASET
+        TaskDefinitionDatasetHardCompact::TASK_TYPE
     }
 
     async fn run_task(
         &self,
         task_definition: kamu_task_system::TaskDefinition,
     ) -> Result<kamu_task_system::TaskOutcome, kamu_task_system::InternalError> {
-        let kamu_task_system::TaskDefinition::HardCompact(task_compact) = task_definition else {
-            panic!(
-                "HardCompactDatasetTaskRunner received an unsupported task type: \
-                 {task_definition:?}",
-            );
-        };
+        let task_compact = task_definition
+            .downcast::<TaskDefinitionDatasetHardCompact>()
+            .expect("Mismatched task type for HardCompactDatasetTaskRunner");
 
-        self.run_hard_compact(task_compact).await
+        self.run_hard_compact(*task_compact).await
     }
 }
 

@@ -9,12 +9,10 @@
 
 mod deliver_webhook_task_planner;
 mod hard_compact_dataset_task_planner;
-mod probe_task_planner;
 mod reset_dataset_task_planner;
 mod update_dataset_task_planner;
 
 pub use deliver_webhook_task_planner::*;
 pub use hard_compact_dataset_task_planner::*;
-pub use probe_task_planner::*;
 pub use reset_dataset_task_planner::*;
 pub use update_dataset_task_planner::*;

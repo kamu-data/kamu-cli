@@ -10,6 +10,8 @@
 use internal_error::InternalError;
 use kamu_task_system::*;
 
+use crate::task_adapters::TaskDefinitionWebhookDeliver;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
@@ -23,7 +25,7 @@ impl DeliverWebhookTaskPlanner {}
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_DELIVER_WEBHOOK
+        TaskDefinitionWebhookDeliver::TASK_TYPE
     }
 
     async fn prepare_task_definition(
@@ -38,13 +40,11 @@ impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
             );
         };
 
-        Ok(TaskDefinition::DeliverWebhook(
-            TaskDefinitionDeliverWebhook {
-                task_id,
-                webhook_subscription_id: webhook_plan.webhook_subscription_id,
-                webhook_event_id: webhook_plan.webhook_event_id,
-            },
-        ))
+        Ok(TaskDefinition::new(TaskDefinitionWebhookDeliver {
+            task_id,
+            webhook_subscription_id: webhook_plan.webhook_subscription_id,
+            webhook_event_id: webhook_plan.webhook_event_id,
+        }))
     }
 }
 

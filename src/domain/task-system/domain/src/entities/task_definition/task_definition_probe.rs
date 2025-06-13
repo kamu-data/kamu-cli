@@ -7,12 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::any::Any;
+
+use crate::{LogicalPlanProbe, TaskDefinitionBody};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const TASK_TYPE_DATASET_UPDATE: &str = "dataset_update";
-pub const TASK_TYPE_DELIVER_WEBHOOK: &str = "deliver_webhook";
-pub const TASK_TYPE_HARD_COMPACT_DATASET: &str = "hard_compact_dataset";
-pub const TASK_TYPE_PROBE: &str = "probe";
-pub const TASK_TYPE_RESET_DATASET: &str = "reset_dataset";
+#[derive(Debug)]
+pub struct TaskDefinitionProbe {
+    pub probe: LogicalPlanProbe,
+}
+
+impl TaskDefinitionProbe {
+    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.probe";
+}
+
+#[async_trait::async_trait]
+impl TaskDefinitionBody for TaskDefinitionProbe {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+
+    fn task_type(&self) -> &'static str {
+        Self::TASK_TYPE
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
