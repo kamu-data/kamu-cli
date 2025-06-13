@@ -73,6 +73,7 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-postgres = { workspace = true }
 kamu-flow-system-sqlite = { workspace = true }
 
+kamu-task-system = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-postgres = { workspace = true }
@@ -102,6 +103,7 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-auth-rebac-postgres = { workspace = true }
 kamu-auth-rebac-sqlite = { workspace = true }
 
+kamu-webhooks = { workspace = true }
 kamu-webhooks-services = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-postgres = { workspace = true }

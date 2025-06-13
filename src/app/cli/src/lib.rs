@@ -26,6 +26,7 @@ pub(crate) mod error_fmt;
 pub mod explore;
 pub mod output;
 pub mod services;
+pub mod task_runners;
 
 pub use app::*;
 pub use cli_commands::*;

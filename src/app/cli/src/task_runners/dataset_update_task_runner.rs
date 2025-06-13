@@ -10,67 +10,23 @@
 use std::sync::Arc;
 
 use database_common_macros::transactional_method1;
-use dill::*;
 use internal_error::InternalError;
-use kamu_core::*;
+use kamu::domain::*;
 use kamu_task_system::*;
-use kamu_webhooks::WebhookDeliveryWorker;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TaskRunnerImpl {
-    catalog: Catalog,
+#[dill::component(pub)]
+#[dill::interface(dyn TaskRunner)]
+pub struct DatasetUpdateTaskRunner {
+    catalog: dill::Catalog,
     polling_ingest_service: Arc<dyn PollingIngestService>,
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
-    reset_executor: Arc<dyn ResetExecutor>,
-    compaction_executor: Arc<dyn CompactionExecutor>,
     sync_service: Arc<dyn SyncService>,
-    webhook_sender: Arc<dyn WebhookDeliveryWorker>,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[component(pub)]
-#[interface(dyn TaskRunner)]
-impl TaskRunnerImpl {
-    pub fn new(
-        catalog: Catalog,
-        polling_ingest_service: Arc<dyn PollingIngestService>,
-        transform_elaboration_service: Arc<dyn TransformElaborationService>,
-        transform_executor: Arc<dyn TransformExecutor>,
-        reset_executor: Arc<dyn ResetExecutor>,
-        compaction_executor: Arc<dyn CompactionExecutor>,
-        sync_service: Arc<dyn SyncService>,
-        webhook_sender: Arc<dyn WebhookDeliveryWorker>,
-    ) -> Self {
-        Self {
-            catalog,
-            polling_ingest_service,
-            transform_elaboration_service,
-            transform_executor,
-            reset_executor,
-            compaction_executor,
-            sync_service,
-            webhook_sender,
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?task_probe))]
-    async fn run_probe(
-        &self,
-        task_probe: TaskDefinitionProbe,
-    ) -> Result<TaskOutcome, InternalError> {
-        if let Some(busy_time) = task_probe.probe.busy_time {
-            tokio::time::sleep(busy_time).await;
-        }
-        Ok(task_probe
-            .probe
-            .end_with_outcome
-            .clone()
-            .unwrap_or(TaskOutcome::Success(TaskResult::Empty)))
-    }
-
+impl DatasetUpdateTaskRunner {
     #[tracing::instrument(level = "debug", skip_all, fields(?task_update))]
     async fn run_update(
         &self,
@@ -224,117 +180,6 @@ impl TaskRunnerImpl {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?task_reset))]
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn run_reset(
-        &self,
-        task_reset: TaskDefinitionReset,
-    ) -> Result<TaskOutcome, InternalError> {
-        let target = dataset_registry
-            .get_dataset_by_handle(&task_reset.dataset_handle)
-            .await;
-
-        let reset_result_maybe = self
-            .reset_executor
-            .execute(target, task_reset.reset_plan)
-            .await;
-
-        match reset_result_maybe {
-            Ok(reset_result) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
-                TaskResetDatasetResult { reset_result },
-            ))),
-            Err(err) => match err {
-                ResetExecutionError::SetReferenceFailed(
-                    odf::dataset::SetChainRefError::BlockNotFound(_),
-                ) => Ok(TaskOutcome::Failed(TaskError::ResetDatasetError(
-                    ResetDatasetTaskError::ResetHeadNotFound,
-                ))),
-                err => {
-                    tracing::error!(
-                        error = ?err,
-                        error_msg = %err,
-                        "Reset failed",
-                    );
-
-                    Ok(TaskOutcome::Failed(TaskError::Empty))
-                }
-            },
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?task_compact))]
-    async fn run_hard_compaction(
-        &self,
-        task_compact: TaskDefinitionHardCompact,
-    ) -> Result<TaskOutcome, InternalError> {
-        // Run compaction execution without transaction
-        let compaction_result = self
-            .compaction_executor
-            .execute(
-                task_compact.target.clone(),
-                task_compact.compaction_plan,
-                None,
-            )
-            .await;
-
-        // Handle result
-        match compaction_result {
-            // Compaction finished without errors
-            Ok(compaction_result) => {
-                // Do we have a new HEAD suggestion?
-                if let CompactionResult::Success {
-                    old_head, new_head, ..
-                } = &compaction_result
-                {
-                    // Update the reference transactionally
-                    self.update_dataset_head(
-                        task_compact.target.get_handle(),
-                        Some(old_head),
-                        new_head,
-                    )
-                    .await?;
-                }
-
-                Ok(TaskOutcome::Success(TaskResult::CompactionDatasetResult(
-                    compaction_result.into(),
-                )))
-            }
-
-            // Compaction failed
-            Err(err) => {
-                tracing::error!(
-                    error = ?err,
-                    error_msg = %err,
-                    "Hard compaction failed",
-                );
-
-                Ok(TaskOutcome::Failed(TaskError::Empty))
-            }
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?task_webhook))]
-    async fn run_deliver_webhook(
-        &self,
-        task_webhook: TaskDefinitionDeliverWebhook,
-    ) -> Result<TaskOutcome, InternalError> {
-        match self
-            .webhook_sender
-            .deliver_webhook(
-                task_webhook.task_id,
-                task_webhook.webhook_subscription_id,
-                task_webhook.webhook_event_id,
-            )
-            .await
-        {
-            Ok(_) => Ok(TaskOutcome::Success(TaskResult::Empty)),
-            Err(err) => {
-                tracing::error!(error = ?err, "Send webhook failed");
-                Ok(TaskOutcome::Failed(TaskError::Empty))
-            }
-        }
-    }
-
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_handle, %new_head))]
     #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn update_dataset_head(
@@ -363,25 +208,26 @@ impl TaskRunnerImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskRunner for TaskRunnerImpl {
-    #[tracing::instrument(level = "debug", skip_all)]
+impl TaskRunner for DatasetUpdateTaskRunner {
+    fn id(&self) -> &'static str {
+        "dev.kamu.cli.task_runners.DatasetUpdateTaskRunner"
+    }
+
+    fn supported_task_types(&self) -> &[&str] {
+        &[TASK_TYPE_DATASET_UPDATE]
+    }
+
     async fn run_task(
         &self,
-        task_definition: TaskDefinition,
-    ) -> Result<TaskOutcome, InternalError> {
-        tracing::debug!(?task_definition, "Running task");
-
-        let task_outcome = match task_definition {
-            TaskDefinition::Probe(td_probe) => self.run_probe(td_probe).await?,
-            TaskDefinition::Update(td_update) => self.run_update(td_update).await?,
-            TaskDefinition::Reset(td_reset) => self.run_reset(td_reset).await?,
-            TaskDefinition::HardCompact(td_compact) => self.run_hard_compaction(td_compact).await?,
-            TaskDefinition::DeliverWebhook(td_webhook) => {
-                self.run_deliver_webhook(td_webhook).await?
-            }
+        task_definition: kamu_task_system::TaskDefinition,
+    ) -> Result<kamu_task_system::TaskOutcome, kamu_task_system::InternalError> {
+        let kamu_task_system::TaskDefinition::Update(task_update) = task_definition else {
+            panic!(
+                "DatasetUpdateTaskRunner received an unsupported task type: {task_definition:?}",
+            );
         };
 
-        Ok(task_outcome)
+        self.run_update(task_update).await
     }
 }
 

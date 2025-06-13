@@ -9,14 +9,16 @@
 
 use dill::CatalogBuilder;
 
-use crate::*;
+use super::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<TaskAgentImpl>();
-    catalog_builder.add::<TaskSchedulerImpl>();
-    catalog_builder.add::<TaskDefinitionPlannerImpl>();
+    catalog_builder.add::<DatasetUpdateTaskRunner>();
+    catalog_builder.add::<DeliverWebhookTaskRunner>();
+    catalog_builder.add::<HardCompactDatasetTaskRunner>();
+    catalog_builder.add::<ProbeTaskRunner>();
+    catalog_builder.add::<ResetDatasetTaskRunner>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

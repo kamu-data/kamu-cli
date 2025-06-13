@@ -10,7 +10,16 @@
 use internal_error::InternalError;
 use kamu_core::{CompactionPlan, PullOptions, PullPlanIterationJob, ResetPlan, ResolvedDataset};
 
-use crate::{LogicalPlan, LogicalPlanProbe, TaskID};
+use crate::{
+    LogicalPlan,
+    LogicalPlanProbe,
+    TASK_TYPE_DATASET_UPDATE,
+    TASK_TYPE_DELIVER_WEBHOOK,
+    TASK_TYPE_HARD_COMPACT_DATASET,
+    TASK_TYPE_PROBE,
+    TASK_TYPE_RESET_DATASET,
+    TaskID,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,6 +41,18 @@ pub enum TaskDefinition {
     Reset(TaskDefinitionReset),
     HardCompact(TaskDefinitionHardCompact),
     DeliverWebhook(TaskDefinitionDeliverWebhook),
+}
+
+impl TaskDefinition {
+    pub fn task_type(&self) -> &str {
+        match self {
+            TaskDefinition::Probe(_) => TASK_TYPE_PROBE,
+            TaskDefinition::Update(_) => TASK_TYPE_DATASET_UPDATE,
+            TaskDefinition::Reset(_) => TASK_TYPE_RESET_DATASET,
+            TaskDefinition::HardCompact(_) => TASK_TYPE_HARD_COMPACT_DATASET,
+            TaskDefinition::DeliverWebhook(_) => TASK_TYPE_DELIVER_WEBHOOK,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
