@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod logical_plan;
 mod task;
 mod task_definition;
 
+pub use logical_plan::*;
 pub use task::*;
 pub use task_definition::*;

@@ -7,21 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use serde::{Deserialize, Serialize};
 
-use crate::{LogicalPlan, TaskDefinition, TaskID};
+use crate::TaskOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait TaskDefinitionPlanner: Send + Sync {
-    fn supported_logic_plan_type(&self) -> &str;
+/// A task that can be used for testing the scheduling system
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct LogicalPlanProbe {
+    /// ID of the dataset this task should be associated with
+    pub dataset_id: Option<odf::DatasetID>,
+    pub busy_time: Option<std::time::Duration>,
+    pub end_with_outcome: Option<TaskOutcome>,
+}
 
-    async fn prepare_task_definition(
-        &self,
-        task_id: TaskID,
-        logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError>;
+impl LogicalPlanProbe {
+    pub const SERIALIZATION_TYPE_ID: &str = "Probe";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

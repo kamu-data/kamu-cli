@@ -10,8 +10,11 @@
 mod dependencies;
 pub use dependencies::*;
 
-mod definitions;
-pub use definitions::*;
+mod logical_plans;
+pub use logical_plans::*;
+
+mod task_definitions;
+pub use task_definitions::*;
 
 mod planners;
 pub use planners::*;
@@ -20,4 +23,7 @@ mod runners;
 pub use runners::*;
 
 mod flow_task_factory_impl;
+mod webhook_task_factory_impl;
+
 pub use flow_task_factory_impl::*;
+pub use webhook_task_factory_impl::*;

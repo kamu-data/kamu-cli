@@ -8,20 +8,19 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_task_system as ts;
 
-use crate::{LogicalPlan, TaskDefinition, TaskID};
+use crate::{WebhookEventID, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TaskDefinitionPlanner: Send + Sync {
-    fn supported_logic_plan_type(&self) -> &str;
-
-    async fn prepare_task_definition(
+pub trait WebhookTaskFactory: Send + Sync {
+    async fn build_delivery_task_plan(
         &self,
-        task_id: TaskID,
-        logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError>;
+        subscription_id: WebhookSubscriptionID,
+        event_id: WebhookEventID,
+    ) -> Result<ts::LogicalPlan, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

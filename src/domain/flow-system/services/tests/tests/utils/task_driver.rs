@@ -106,20 +106,7 @@ impl TaskDriver {
             .expect("Task does not exist yet");
 
         pretty_assertions::assert_eq!(self.args.expected_logical_plan, task.logical_plan);
-
-        match &task.logical_plan {
-            LogicalPlan::UpdateDataset(ud) => {
-                assert!(self.args.dataset_id.is_some());
-                pretty_assertions::assert_eq!(
-                    self.args.dataset_id.as_ref().unwrap(),
-                    &ud.dataset_id,
-                );
-            }
-            LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
-            LogicalPlan::HardCompactDataset(_)
-            | LogicalPlan::ResetDataset(_)
-            | LogicalPlan::DeliverWebhook(_) => (),
-        }
+        pretty_assertions::assert_eq!(self.args.dataset_id, task.logical_plan.dataset_id());
     }
 }
 

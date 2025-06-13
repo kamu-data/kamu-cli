@@ -59,5 +59,6 @@ cron = { version = "0.15", default-features = false }
 indoc = "2"
 mockall = "0.13"
 pretty_assertions = "1"
+serde_json = { version = "1", default-features = false }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

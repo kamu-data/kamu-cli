@@ -14,7 +14,7 @@ use internal_error::InternalError;
 use kamu_core::{CompactionOptions, CompactionPlanner, DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
-use crate::TaskDefinitionDatasetHardCompact;
+use crate::{LogicalPlanDatasetHardCompact, TaskDefinitionDatasetHardCompact};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +29,7 @@ impl HardCompactDatasetTaskPlanner {
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn plan_hard_compaction(
         &self,
-        args: &LogicalPlanHardCompactDataset,
+        args: &LogicalPlanDatasetHardCompact,
     ) -> Result<TaskDefinition, InternalError> {
         let target = dataset_registry
             .get_dataset_by_ref(&args.dataset_id.as_local_ref())
@@ -60,8 +60,8 @@ impl HardCompactDatasetTaskPlanner {
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionDatasetHardCompact::TASK_TYPE
+    fn supported_logic_plan_type(&self) -> &str {
+        LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -69,14 +69,22 @@ impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
     ) -> Result<TaskDefinition, InternalError> {
-        let kamu_task_system::LogicalPlan::HardCompactDataset(compact_plan) = logical_plan else {
-            panic!(
-                "HardCompactDatasetTaskPlanner received an unsupported logical plan type: \
-                 {logical_plan:?}",
-            );
-        };
+        assert_eq!(
+            logical_plan.plan_type,
+            LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID,
+            "HardCompactDatasetTaskPlanner received an unsupported logical plan type: \
+             {logical_plan:?}",
+        );
 
-        self.plan_hard_compaction(compact_plan).await
+        let compact_plan: LogicalPlanDatasetHardCompact =
+            serde_json::from_value(logical_plan.payload.clone()).unwrap_or_else(|_| {
+                panic!(
+                    "HardCompactDatasetTaskPlanner received an invalid logical plan payload: \
+                     {logical_plan:?}"
+                )
+            });
+
+        self.plan_hard_compaction(&compact_plan).await
     }
 }
 

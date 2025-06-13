@@ -45,7 +45,8 @@ impl SqliteTaskEventStore {
         let connection_mut = tr.connection_mut().await?;
 
         let task_id: i64 = task_id.try_into().unwrap();
-        let maybe_dataset_id = logical_plan.dataset_id().map(ToString::to_string);
+        let maybe_dataset_id = logical_plan.dataset_id();
+        let maybe_dataset_id_str = maybe_dataset_id.as_ref().map(ToString::to_string);
 
         sqlx::query!(
             r#"
@@ -53,7 +54,7 @@ impl SqliteTaskEventStore {
                 VALUES ($1, $2, 'queued', NULL)
             "#,
             task_id,
-            maybe_dataset_id,
+            maybe_dataset_id_str,
         )
         .execute(connection_mut)
         .await

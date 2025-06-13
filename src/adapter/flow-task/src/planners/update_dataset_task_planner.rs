@@ -22,7 +22,7 @@ use kamu_core::{
 use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
 use kamu_task_system::*;
 
-use crate::TaskDefinitionDatasetUpdate;
+use crate::{LogicalPlanDatasetUpdate, TaskDefinitionDatasetUpdate};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,7 +41,7 @@ impl UpdateDatasetTaskPlanner {
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn plan_update(
         &self,
-        args: &LogicalPlanUpdateDataset,
+        args: &LogicalPlanDatasetUpdate,
     ) -> Result<TaskDefinition, InternalError> {
         let dataset_env_vars = dataset_env_vars_svc
             .get_all_dataset_env_vars_by_dataset_id(&args.dataset_id, None)
@@ -95,8 +95,8 @@ impl UpdateDatasetTaskPlanner {
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for UpdateDatasetTaskPlanner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionDatasetUpdate::TASK_TYPE
+    fn supported_logic_plan_type(&self) -> &str {
+        LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -104,14 +104,21 @@ impl TaskDefinitionPlanner for UpdateDatasetTaskPlanner {
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
     ) -> Result<TaskDefinition, InternalError> {
-        let kamu_task_system::LogicalPlan::UpdateDataset(update_plan) = logical_plan else {
-            panic!(
-                "UpdateDatasetTaskPlanner received an unsupported logical plan type: \
-                 {logical_plan:?}",
-            );
-        };
+        assert_eq!(
+            logical_plan.plan_type,
+            LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID,
+            "UpdateDatasetTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
+        );
 
-        self.plan_update(update_plan).await
+        let update_plan: LogicalPlanDatasetUpdate =
+            serde_json::from_value(logical_plan.payload.clone()).unwrap_or_else(|_| {
+                panic!(
+                    "UpdateDatasetTaskPlanner received an invalid logical plan payload: \
+                     {logical_plan:?}"
+                )
+            });
+
+        self.plan_update(&update_plan).await
     }
 }
 

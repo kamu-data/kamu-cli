@@ -13,6 +13,7 @@ use chrono::Utc;
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
+use kamu_adapter_flow_task::{LogicalPlanWebhookDeliver, WebhookTaskFactoryImpl};
 use kamu_datasets::{
     DatasetEntry,
     DatasetReferenceMessage,
@@ -247,7 +248,8 @@ impl TestWebhookDeliverySchedulerHarness {
             .add::<InMemoryWebhookEventRepository>()
             .add_value(mock_task_scheduler)
             .bind::<dyn TaskScheduler, MockTaskScheduler>()
-            .add::<FakeDatasetEntryService>();
+            .add::<FakeDatasetEntryService>()
+            .add::<WebhookTaskFactoryImpl>();
 
         register_message_dispatcher::<DatasetReferenceMessage>(
             &mut b,
@@ -309,8 +311,11 @@ impl TestWebhookDeliverySchedulerHarness {
         mock_task_scheduler
             .expect_create_task()
             .withf(move |plan, _| {
-                matches!(plan, LogicalPlan::DeliverWebhook(p)
-                    if p.webhook_subscription_id == subscription_id_uuid)
+                plan.plan_type == LogicalPlanWebhookDeliver::SERIALIZATION_TYPE_ID
+                    && serde_json::from_value::<LogicalPlanWebhookDeliver>(plan.payload.clone())
+                        .unwrap()
+                        .webhook_subscription_id
+                        == subscription_id_uuid
             })
             .returning(|plan, _| {
                 let task_id = TaskID::new(35);

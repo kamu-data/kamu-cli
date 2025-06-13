@@ -14,7 +14,7 @@ use internal_error::InternalError;
 use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResetPlanner};
 use kamu_task_system::*;
 
-use crate::TaskDefinitionDatasetReset;
+use crate::{LogicalPlanDatasetReset, TaskDefinitionDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +29,7 @@ impl ResetDatasetTaskPlanner {
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn plan_reset(
         &self,
-        args: &LogicalPlanResetDataset,
+        args: &LogicalPlanDatasetReset,
     ) -> Result<TaskDefinition, InternalError> {
         let target = dataset_registry
             .get_dataset_by_ref(&args.dataset_id.as_local_ref())
@@ -58,8 +58,8 @@ impl ResetDatasetTaskPlanner {
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionDatasetReset::TASK_TYPE
+    fn supported_logic_plan_type(&self) -> &str {
+        LogicalPlanDatasetReset::SERIALIZATION_TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -67,14 +67,21 @@ impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
     ) -> Result<TaskDefinition, InternalError> {
-        let kamu_task_system::LogicalPlan::ResetDataset(reset_plan) = logical_plan else {
-            panic!(
-                "ResetDatasetTaskPlanner received an unsupported logical plan type: \
-                 {logical_plan:?}",
-            );
-        };
+        assert_eq!(
+            logical_plan.plan_type,
+            LogicalPlanDatasetReset::SERIALIZATION_TYPE_ID,
+            "ResetDatasetTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
+        );
 
-        self.plan_reset(reset_plan).await
+        let reset_plan: LogicalPlanDatasetReset =
+            serde_json::from_value(logical_plan.payload.clone()).unwrap_or_else(|_| {
+                panic!(
+                    "ResetDatasetTaskPlanner received an invalid logical plan payload: \
+                     {logical_plan:?}"
+                )
+            });
+
+        self.plan_reset(&reset_plan).await
     }
 }
 

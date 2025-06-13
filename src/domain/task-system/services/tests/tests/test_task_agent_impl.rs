@@ -260,8 +260,13 @@ impl TaskAgentHarness {
     }
 
     async fn schedule_probe_task(&self, probe_plan: LogicalPlanProbe) -> TaskID {
+        let probe_plan = LogicalPlan {
+            plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
+            payload: serde_json::to_value(probe_plan).unwrap(),
+        };
+
         self.task_scheduler
-            .create_task(probe_plan.into(), None)
+            .create_task(probe_plan, None)
             .await
             .unwrap()
             .task_id
@@ -318,8 +323,8 @@ impl TaskAgentHarness {
         mock_task_runner: &mut MockTaskRunner,
     ) {
         mock_task_planner
-            .expect_supported_task_type()
-            .return_const(TaskDefinitionProbe::TASK_TYPE);
+            .expect_supported_logic_plan_type()
+            .return_const(LogicalPlanProbe::SERIALIZATION_TYPE_ID);
 
         mock_task_runner
             .expect_supported_task_type()
@@ -336,11 +341,9 @@ impl TaskAgentHarness {
         mock_task_planner
             .expect_prepare_task_definition()
             .withf(move |_task_id, plan| {
-                matches!(
-                    plan,
-                    LogicalPlan::Probe(probe_)
-                    if probe_ == &probe_clone
-                )
+                plan.plan_type == LogicalPlanProbe::SERIALIZATION_TYPE_ID
+                    && serde_json::from_value::<LogicalPlanProbe>(plan.payload.clone()).unwrap()
+                        == probe_clone
             })
             .times(times)
             .returning(move |_, _| {
@@ -393,7 +396,7 @@ mockall::mock! {
 
     #[async_trait::async_trait]
     impl TaskDefinitionPlanner for TaskDefinitionPlanner {
-        fn supported_task_type(&self) -> &'static str;
+        fn supported_logic_plan_type(&self) -> &'static str;
 
         async fn prepare_task_definition(
             &self,

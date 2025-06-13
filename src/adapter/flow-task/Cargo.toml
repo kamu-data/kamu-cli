@@ -39,6 +39,8 @@ odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.14", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", default-features = false }
 tracing = "0.1"
 uuid = { version = "1", default-features = false }
 

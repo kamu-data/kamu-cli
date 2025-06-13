@@ -25,6 +25,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<ResetDatasetTaskRunner>();
 
     catalog_builder.add::<FlowTaskFactoryImpl>();
+    catalog_builder.add::<WebhookTaskFactoryImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -51,12 +51,12 @@ impl TaskAgentImpl {
         let task_planners_by_type = task_planners.into_iter().fold(
             HashMap::new(),
             |mut acc: HashMap<String, Arc<dyn TaskDefinitionPlanner>>, planner| {
-                let task_type = planner.supported_task_type().to_string();
+                let logic_plan_type = planner.supported_logic_plan_type().to_string();
                 assert!(
-                    !acc.contains_key(&task_type),
-                    "Task planner for type '{task_type}' already exists",
+                    !acc.contains_key(&logic_plan_type),
+                    "Task planner for logic plan type '{logic_plan_type}' already exists",
                 );
-                acc.insert(task_type, planner.clone());
+                acc.insert(logic_plan_type, planner.clone());
                 acc
             },
         );
@@ -84,11 +84,10 @@ impl TaskAgentImpl {
     }
 
     fn get_task_planner_for(&self, plan: &LogicalPlan) -> Arc<dyn TaskDefinitionPlanner> {
-        let task_type = plan.task_type();
         self.task_planners_by_type
-            .get(task_type)
+            .get(&plan.plan_type)
             .cloned()
-            .unwrap_or_else(|| panic!("No task definition planner found for {task_type}",))
+            .unwrap_or_else(|| panic!("No task definition planner found for {}", plan.plan_type))
     }
 
     fn get_task_runner_for(&self, task_definition: &TaskDefinition) -> Arc<dyn TaskRunner> {
