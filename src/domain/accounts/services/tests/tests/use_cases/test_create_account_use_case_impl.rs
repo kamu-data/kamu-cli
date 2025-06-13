@@ -109,7 +109,6 @@ async fn test_create_account_use_case() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CreateAccountUseCaseImplHarness {
-    _catalog: dill::Catalog,
     use_case: Arc<dyn CreateAccountUseCase>,
     account_service: Arc<dyn AccountService>,
 }
@@ -153,7 +152,6 @@ impl CreateAccountUseCaseImplHarness {
         Self {
             use_case: catalog.get_one().unwrap(),
             account_service: catalog.get_one().unwrap(),
-            _catalog: catalog,
         }
     }
 }

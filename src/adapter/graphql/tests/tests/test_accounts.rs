@@ -1111,7 +1111,7 @@ impl GraphQLAccountsHarness {
             .add::<kamu_accounts_services::RenameAccountUseCaseImpl>()
             .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
             .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
-            .add::<kamu_accounts_services::utils::AccountAuthorizationHelper>()
+            .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
             .add::<time_source::SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
             .add_builder(

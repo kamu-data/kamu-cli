@@ -152,6 +152,10 @@ type AccountMut {
 	"""
 	modifyPassword(password: AccountPassword!): ModifyPasswordResult!
 	"""
+	Reset password for a selected account. Allowed only for admin users
+	"""
+	modifyPasswordWithConfirmation(oldPassword: AccountPassword!, newPassword: AccountPassword!): ModifyPasswordResult!
+	"""
 	Delete a selected account. Allowed only for admin users
 	"""
 	delete: DeleteAccountResult!
@@ -2463,6 +2467,10 @@ type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapsh
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
 	isSuccess: Boolean!
+	message: String!
+}
+
+type ModifyPasswordIncorrectPassword implements ModifyPasswordResult {
 	message: String!
 }
 

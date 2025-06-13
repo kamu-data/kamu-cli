@@ -7,6 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod account_authorization_helper;
+pub mod account_authorization_helper_impl;
 
-pub use account_authorization_helper::*;
+pub use account_authorization_helper_impl::*;

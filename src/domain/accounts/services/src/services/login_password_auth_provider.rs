@@ -29,10 +29,8 @@ impl LoginPasswordAuthProvider {
     pub async fn save_password(
         &self,
         account: &Account,
-        password: String,
+        password: Password,
     ) -> Result<(), InternalError> {
-        let password = Password::try_new(password).int_err()?;
-
         self.account_service
             .save_account_password(account, &password)
             .await

@@ -25,7 +25,7 @@ use crate::utils;
 #[dill::component(pub)]
 #[dill::interface(dyn ModifyAccountPasswordUseCase)]
 pub struct ModifyAccountPasswordUseCaseImpl {
-    account_authorization_helper: Arc<utils::AccountAuthorizationHelper>,
+    account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
 }
 
@@ -38,7 +38,9 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
         account: &Account,
         password: Password,
     ) -> Result<(), ModifyAccountPasswordError> {
-        self.account_authorization_helper.is_admin().await?;
+        self.account_authorization_helper
+            .ensure_account_password_can_be_modified(&account.account_name)
+            .await?;
 
         self.account_service
             .modify_account_password(&account.account_name, &password)

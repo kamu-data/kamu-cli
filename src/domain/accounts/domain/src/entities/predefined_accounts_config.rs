@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![expect(clippy::unsafe_derive_deserialize)]
+
 use chrono::{DateTime, Utc};
 use email_utils::Email;
 use kamu_auth_rebac::AccountPropertyName;
@@ -21,6 +23,7 @@ use crate::{
     AccountType,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
+    Password,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -163,13 +166,16 @@ impl AccountConfig {
         }
     }
 
-    pub fn get_password(&self) -> String {
-        if let Some(password) = &self.password {
+    pub fn get_password(&self) -> Password {
+        let raw_password = if let Some(password) = self.password.clone() {
             password.clone()
         } else {
             // Use same password as login name by default
             self.account_name.to_string()
-        }
+        };
+
+        // NOTE: We can ignore validation rules here as the username can be short
+        unsafe { Password::new_unchecked(raw_password) }
     }
 
     pub fn get_display_name(&self) -> AccountDisplayName {

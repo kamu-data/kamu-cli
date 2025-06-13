@@ -6581,6 +6581,7 @@ dependencies = [
  "jsonwebtoken",
  "kamu-accounts",
  "kamu-accounts-inmem",
+ "kamu-accounts-services",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",

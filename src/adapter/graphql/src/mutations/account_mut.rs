@@ -104,7 +104,8 @@ impl AccountMut {
             Ok(_) => Ok(ModifyPasswordResult::Success(
                 ModifyPasswordSuccess::default(),
             )),
-            Err(e @ (E::Internal(_) | E::AccountNotFound(_))) => Err(e.int_err().into()),
+            Err(E::Access(e)) => Err(e.into()),
+            Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
@@ -131,10 +132,11 @@ impl AccountMut {
             Ok(_) => Ok(ModifyPasswordResult::Success(
                 ModifyPasswordSuccess::default(),
             )),
+            Err(E::Access(e)) => Err(e.into()),
             Err(E::IncorrectPassword(_)) => Ok(ModifyPasswordResult::IncorrectPassword(
                 ModifyPasswordIncorrectPassword::default(),
             )),
-            Err(e @ (E::Internal(_) | E::AccountNotFound(_))) => Err(e.int_err().into()),
+            Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
     }
 
