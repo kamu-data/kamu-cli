@@ -216,6 +216,7 @@ tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"
 urlencoding = "2"
+uuid = { version = "1", default-features = false, features = ["v4"] }
 whoami = "1.5"
 strum = { version = "0.26", features = ["derive"] }
 

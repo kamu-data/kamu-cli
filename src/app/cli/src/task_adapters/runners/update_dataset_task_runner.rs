@@ -14,6 +14,8 @@ use internal_error::InternalError;
 use kamu::domain::*;
 use kamu_task_system::*;
 
+use crate::task_adapters::TaskDefinitionDatasetUpdate;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
@@ -30,7 +32,7 @@ impl UpdateDatasetTaskRunner {
     #[tracing::instrument(level = "debug", skip_all, fields(?task_update))]
     async fn run_update(
         &self,
-        task_update: TaskDefinitionUpdate,
+        task_update: TaskDefinitionDatasetUpdate,
     ) -> Result<TaskOutcome, InternalError> {
         match task_update.pull_job {
             PullPlanIterationJob::Ingest(ingest_item) => {
@@ -210,20 +212,18 @@ impl UpdateDatasetTaskRunner {
 #[async_trait::async_trait]
 impl TaskRunner for UpdateDatasetTaskRunner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_DATASET_UPDATE
+        TaskDefinitionDatasetUpdate::TASK_TYPE
     }
 
     async fn run_task(
         &self,
-        task_definition: kamu_task_system::TaskDefinition,
+        task_definition: TaskDefinition,
     ) -> Result<kamu_task_system::TaskOutcome, kamu_task_system::InternalError> {
-        let kamu_task_system::TaskDefinition::Update(task_update) = task_definition else {
-            panic!(
-                "UpdateDatasetTaskRunner received an unsupported task type: {task_definition:?}",
-            );
-        };
+        let task_update = task_definition
+            .downcast::<TaskDefinitionDatasetUpdate>()
+            .expect("Mismatched task type for UpdateDatasetTaskRunner");
 
-        self.run_update(task_update).await
+        self.run_update(*task_update).await
     }
 }
 

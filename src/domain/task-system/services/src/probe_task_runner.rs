@@ -38,18 +38,18 @@ impl ProbeTaskRunner {
 #[async_trait::async_trait]
 impl TaskRunner for ProbeTaskRunner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_PROBE
+        TaskDefinitionProbe::TASK_TYPE
     }
 
     async fn run_task(
         &self,
         task_definition: kamu_task_system::TaskDefinition,
     ) -> Result<TaskOutcome, InternalError> {
-        let kamu_task_system::TaskDefinition::Probe(task_probe) = task_definition else {
-            panic!("ProbeTaskRunner received an unsupported task type: {task_definition:?}",);
-        };
+        let task_probe = task_definition
+            .downcast::<TaskDefinitionProbe>()
+            .expect("Mismatched task type for ProbeTaskRunner");
 
-        self.run_probe(task_probe).await
+        self.run_probe(*task_probe).await
     }
 }
 

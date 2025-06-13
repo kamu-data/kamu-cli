@@ -11,9 +11,13 @@
 pub use kamu_task_system as domain;
 
 mod dependencies;
+mod probe_task_planner;
+mod probe_task_runner;
 mod task_agent_impl;
 mod task_scheduler_impl;
 
 pub use dependencies::*;
+pub use probe_task_planner::*;
+pub use probe_task_runner::*;
 pub use task_agent_impl::*;
 pub use task_scheduler_impl::*;
