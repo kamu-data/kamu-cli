@@ -9,23 +9,23 @@
 
 use std::any::Any;
 
-use kamu::domain::{PullOptions, PullPlanIterationJob};
+use kamu_core::{CompactionPlan, ResolvedDataset};
 use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct TaskDefinitionDatasetUpdate {
-    pub pull_options: PullOptions,
-    pub pull_job: PullPlanIterationJob,
+pub struct TaskDefinitionDatasetHardCompact {
+    pub target: ResolvedDataset,
+    pub compaction_plan: CompactionPlan,
 }
 
-impl TaskDefinitionDatasetUpdate {
-    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.update";
+impl TaskDefinitionDatasetHardCompact {
+    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.hard_compact";
 }
 
 #[async_trait::async_trait]
-impl ts::TaskDefinitionBody for TaskDefinitionDatasetUpdate {
+impl ts::TaskDefinitionBody for TaskDefinitionDatasetHardCompact {
     fn as_any(&self) -> &dyn Any {
         self
     }

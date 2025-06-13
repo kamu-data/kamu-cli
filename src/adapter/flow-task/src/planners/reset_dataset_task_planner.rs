@@ -11,47 +11,45 @@ use std::sync::Arc;
 
 use database_common_macros::transactional_method2;
 use internal_error::InternalError;
-use kamu::domain::{CompactionOptions, CompactionPlanner, DatasetRegistry, DatasetRegistryExt};
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResetPlanner};
 use kamu_task_system::*;
 
-use crate::task_adapters::TaskDefinitionDatasetHardCompact;
+use crate::TaskDefinitionDatasetReset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskDefinitionPlanner)]
-pub struct HardCompactDatasetTaskPlanner {
+pub struct ResetDatasetTaskPlanner {
     catalog: dill::Catalog,
 }
 
-impl HardCompactDatasetTaskPlanner {
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
+impl ResetDatasetTaskPlanner {
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, reset_planner: Arc<dyn ResetPlanner>)]
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
-    async fn plan_hard_compaction(
+    async fn plan_reset(
         &self,
-        args: &LogicalPlanHardCompactDataset,
+        args: &LogicalPlanResetDataset,
     ) -> Result<TaskDefinition, InternalError> {
         let target = dataset_registry
             .get_dataset_by_ref(&args.dataset_id.as_local_ref())
             .await
             .int_err()?;
 
-        let compaction_options = CompactionOptions {
-            max_slice_size: args.max_slice_size,
-            max_slice_records: args.max_slice_records,
-            keep_metadata_only: args.keep_metadata_only,
-        };
-
-        let compaction_plan = compaction_planner
-            .plan_compaction(target.clone(), compaction_options, None)
+        let reset_plan = reset_planner
+            .plan_reset(
+                target.clone(),
+                args.new_head_hash.as_ref(),
+                args.old_head_hash.as_ref(),
+            )
             .await
             .int_err()?;
 
         target.detach_from_transaction();
 
-        Ok(TaskDefinition::new(TaskDefinitionDatasetHardCompact {
-            target,
-            compaction_plan,
+        Ok(TaskDefinition::new(TaskDefinitionDatasetReset {
+            dataset_handle: target.take_handle(),
+            reset_plan,
         }))
     }
 }
@@ -59,9 +57,9 @@ impl HardCompactDatasetTaskPlanner {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
+impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
     fn supported_task_type(&self) -> &str {
-        TaskDefinitionDatasetHardCompact::TASK_TYPE
+        TaskDefinitionDatasetReset::TASK_TYPE
     }
 
     async fn prepare_task_definition(
@@ -69,14 +67,14 @@ impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
     ) -> Result<TaskDefinition, InternalError> {
-        let kamu_task_system::LogicalPlan::HardCompactDataset(compact_plan) = logical_plan else {
+        let kamu_task_system::LogicalPlan::ResetDataset(reset_plan) = logical_plan else {
             panic!(
-                "HardCompactDatasetTaskPlanner received an unsupported logical plan type: \
+                "ResetDatasetTaskPlanner received an unsupported logical plan type: \
                  {logical_plan:?}",
             );
         };
 
-        self.plan_hard_compaction(compact_plan).await
+        self.plan_reset(reset_plan).await
     }
 }
 

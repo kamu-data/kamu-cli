@@ -9,23 +9,23 @@
 
 use std::any::Any;
 
-use kamu::domain::ResetPlan;
+use kamu_core::{PullOptions, PullPlanIterationJob};
 use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct TaskDefinitionDatasetReset {
-    pub dataset_handle: odf::DatasetHandle,
-    pub reset_plan: ResetPlan,
+pub struct TaskDefinitionDatasetUpdate {
+    pub pull_options: PullOptions,
+    pub pull_job: PullPlanIterationJob,
 }
 
-impl TaskDefinitionDatasetReset {
-    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.reset";
+impl TaskDefinitionDatasetUpdate {
+    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.update";
 }
 
 #[async_trait::async_trait]
-impl ts::TaskDefinitionBody for TaskDefinitionDatasetReset {
+impl ts::TaskDefinitionBody for TaskDefinitionDatasetUpdate {
     fn as_any(&self) -> &dyn Any {
         self
     }

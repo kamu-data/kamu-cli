@@ -9,23 +9,23 @@
 
 use std::any::Any;
 
-use kamu::domain::{CompactionPlan, ResolvedDataset};
+use kamu_core::ResetPlan;
 use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct TaskDefinitionDatasetHardCompact {
-    pub target: ResolvedDataset,
-    pub compaction_plan: CompactionPlan,
+pub struct TaskDefinitionDatasetReset {
+    pub dataset_handle: odf::DatasetHandle,
+    pub reset_plan: ResetPlan,
 }
 
-impl TaskDefinitionDatasetHardCompact {
-    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.hard_compact";
+impl TaskDefinitionDatasetReset {
+    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.reset";
 }
 
 #[async_trait::async_trait]
-impl ts::TaskDefinitionBody for TaskDefinitionDatasetHardCompact {
+impl ts::TaskDefinitionBody for TaskDefinitionDatasetReset {
     fn as_any(&self) -> &dyn Any {
         self
     }
