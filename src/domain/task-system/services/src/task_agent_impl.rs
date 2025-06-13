@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::{DatabaseTransactionRunner, PaginationOpts};
@@ -22,7 +23,7 @@ use tracing::Instrument as _;
 
 pub struct TaskAgentImpl {
     catalog: Catalog,
-    task_runner: Arc<dyn TaskRunner>,
+    task_runners_by_type: HashMap<String, Vec<Arc<dyn TaskRunner>>>,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<TaskAgentConfig>,
 }
@@ -41,16 +42,37 @@ pub struct TaskAgentImpl {
 impl TaskAgentImpl {
     pub fn new(
         catalog: Catalog,
-        task_runner: Arc<dyn TaskRunner>,
+        task_runners: Vec<Arc<dyn TaskRunner>>,
         time_source: Arc<dyn SystemTimeSource>,
         agent_config: Arc<TaskAgentConfig>,
     ) -> Self {
+        let task_runners_by_type = task_runners.into_iter().fold(
+            HashMap::new(),
+            |mut acc: HashMap<String, Vec<_>>, runner| {
+                for supported_task_type in runner.supported_task_types() {
+                    acc.entry((*supported_task_type).to_string())
+                        .or_default()
+                        .push(runner.clone());
+                }
+                acc
+            },
+        );
+
         Self {
             catalog,
-            task_runner,
+            task_runners_by_type,
             time_source,
             agent_config,
         }
+    }
+
+    fn get_task_runner_for(&self, task_definition: &TaskDefinition) -> Arc<dyn TaskRunner> {
+        let task_type = task_definition.task_type();
+        self.task_runners_by_type
+            .get(task_type)
+            .and_then(|runners| runners.first())
+            .cloned()
+            .expect("No task runner found for task type")
     }
 
     async fn run_task_iteration(&self) -> Result<(), InternalError> {
@@ -175,8 +197,9 @@ impl TaskAgentImpl {
             }
         };
 
-        // Run task via definition
-        let task_run_result = self.task_runner.run_task(task_definition).await;
+        // Find a runner and run task via definition
+        let task_runner = self.get_task_runner_for(&task_definition);
+        let task_run_result = task_runner.run_task(task_definition).await;
 
         // Deal with errors: we should not interrupt the main loop if task fails
         let task_outcome = match task_run_result {
