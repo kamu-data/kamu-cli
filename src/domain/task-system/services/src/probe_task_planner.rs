@@ -32,8 +32,8 @@ impl ProbeTaskPlanner {
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for ProbeTaskPlanner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionProbe::TASK_TYPE
+    fn supported_logic_plan_type(&self) -> &str {
+        LogicalPlanProbe::SERIALIZATION_TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -41,11 +41,20 @@ impl TaskDefinitionPlanner for ProbeTaskPlanner {
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
     ) -> Result<TaskDefinition, InternalError> {
-        let kamu_task_system::LogicalPlan::Probe(probe_plan) = logical_plan else {
-            panic!("ProbeTaskPlanner received an unsupported logical plan type: {logical_plan:?}",);
-        };
+        assert_eq!(
+            logical_plan.plan_type,
+            LogicalPlanProbe::SERIALIZATION_TYPE_ID,
+            "ProbeTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
+        );
 
-        self.plan_probe(probe_plan).await
+        let probe_plan: LogicalPlanProbe = serde_json::from_value(logical_plan.payload.clone())
+            .unwrap_or_else(|_| {
+                panic!(
+                    "ProbeTaskPlanner received an invalid logical plan payload: {logical_plan:?}"
+                )
+            });
+
+        self.plan_probe(&probe_plan).await
     }
 }
 

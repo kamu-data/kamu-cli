@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use enum_variants::*;
 use serde::{Deserialize, Serialize};
 
-use super::*;
+use crate::{LogicalPlan, TaskID, TaskMetadata, TaskOutcome, TaskStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

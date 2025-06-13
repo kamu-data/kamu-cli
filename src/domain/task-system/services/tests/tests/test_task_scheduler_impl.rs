@@ -21,10 +21,10 @@ use time_source::SystemTimeSourceStub;
 async fn test_creates_task() {
     let task_sched = create_task_scheduler();
 
-    let logical_plan_expected: LogicalPlan = LogicalPlanProbe {
-        ..LogicalPlanProbe::default()
-    }
-    .into();
+    let logical_plan_expected = LogicalPlan {
+        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
+        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
+    };
 
     let metadata_expected = TaskMetadata::from(vec![("foo", "x"), ("bar", "y")]);
 
@@ -59,26 +59,19 @@ async fn test_queues_tasks() {
     let maybe_task_0 = task_sched.try_take().await.unwrap();
     assert!(maybe_task_0.is_none());
 
+    let logical_plan = LogicalPlan {
+        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
+        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
+    };
+
     let task_id_1 = task_sched
-        .create_task(
-            LogicalPlanProbe {
-                ..LogicalPlanProbe::default()
-            }
-            .into(),
-            None,
-        )
+        .create_task(logical_plan.clone(), None)
         .await
         .unwrap()
         .task_id;
 
     let task_id_2 = task_sched
-        .create_task(
-            LogicalPlanProbe {
-                ..LogicalPlanProbe::default()
-            }
-            .into(),
-            None,
-        )
+        .create_task(logical_plan, None)
         .await
         .unwrap()
         .task_id;
@@ -99,26 +92,19 @@ async fn test_queues_tasks() {
 async fn test_task_taken_task_is_running() {
     let task_sched = create_task_scheduler();
 
+    let logical_plan = LogicalPlan {
+        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
+        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
+    };
+
     let task_id_1 = task_sched
-        .create_task(
-            LogicalPlanProbe {
-                ..LogicalPlanProbe::default()
-            }
-            .into(),
-            None,
-        )
+        .create_task(logical_plan.clone(), None)
         .await
         .unwrap()
         .task_id;
 
     let task_id_2 = task_sched
-        .create_task(
-            LogicalPlanProbe {
-                ..LogicalPlanProbe::default()
-            }
-            .into(),
-            None,
-        )
+        .create_task(logical_plan, None)
         .await
         .unwrap()
         .task_id;
@@ -142,26 +128,19 @@ async fn test_task_taken_task_is_running() {
 async fn test_task_cancellation() {
     let task_sched = create_task_scheduler();
 
+    let logical_plan = LogicalPlan {
+        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
+        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
+    };
+
     let task_id_1 = task_sched
-        .create_task(
-            LogicalPlanProbe {
-                ..LogicalPlanProbe::default()
-            }
-            .into(),
-            None,
-        )
+        .create_task(logical_plan.clone(), None)
         .await
         .unwrap()
         .task_id;
 
     let task_id_2 = task_sched
-        .create_task(
-            LogicalPlanProbe {
-                ..LogicalPlanProbe::default()
-            }
-            .into(),
-            None,
-        )
+        .create_task(logical_plan, None)
         .await
         .unwrap()
         .task_id;

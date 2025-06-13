@@ -7,14 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod task_event;
-mod task_id;
-mod task_metadata;
-mod task_state;
-mod task_status;
+mod logical_plan;
+mod logical_plan_probe;
 
-pub use task_event::*;
-pub use task_id::*;
-pub use task_metadata::*;
-pub use task_state::*;
-pub use task_status::*;
+pub use logical_plan::*;
+pub use logical_plan_probe::*;

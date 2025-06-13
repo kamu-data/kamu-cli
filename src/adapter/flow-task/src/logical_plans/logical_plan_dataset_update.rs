@@ -7,21 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-
-use crate::{LogicalPlan, TaskDefinition, TaskID};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait TaskDefinitionPlanner: Send + Sync {
-    fn supported_logic_plan_type(&self) -> &str;
+/// A task to perform the resetting of a dataset
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct LogicalPlanDatasetUpdate {
+    pub dataset_id: odf::DatasetID,
+    pub fetch_uncacheable: bool,
+}
 
-    async fn prepare_task_definition(
-        &self,
-        task_id: TaskID,
-        logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError>;
+impl LogicalPlanDatasetUpdate {
+    pub const SERIALIZATION_TYPE_ID: &str = "UpdateDataset";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
