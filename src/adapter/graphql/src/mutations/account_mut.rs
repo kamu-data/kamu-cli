@@ -108,6 +108,36 @@ impl AccountMut {
         }
     }
 
+    /// Reset password for a selected account. Allowed only for admin users
+    #[tracing::instrument(level = "info", name = AccountMut_modify_password_with_confirmation, skip_all)]
+    #[graphql(guard = "AdminGuard")]
+    async fn modify_password_with_confirmation(
+        &self,
+        ctx: &Context<'_>,
+        old_password: AccountPassword<'_>,
+        new_password: AccountPassword<'_>,
+    ) -> Result<ModifyPasswordResult> {
+        // NOTE: Access verification is handled by the use-case
+
+        let modify_account_password_use_case =
+            from_catalog_n!(ctx, dyn ModifyAccountPasswordUseCase);
+
+        use ModifyAccountPasswordWithConfirmationError as E;
+
+        match modify_account_password_use_case
+            .execute_with_confirmation(&self.account, old_password.into(), new_password.into())
+            .await
+        {
+            Ok(_) => Ok(ModifyPasswordResult::Success(
+                ModifyPasswordSuccess::default(),
+            )),
+            Err(E::IncorrectPassword(_)) => Ok(ModifyPasswordResult::IncorrectPassword(
+                ModifyPasswordIncorrectPassword::default(),
+            )),
+            Err(e @ (E::Internal(_) | E::AccountNotFound(_))) => Err(e.int_err().into()),
+        }
+    }
+
     /// Delete a selected account. Allowed only for admin users
     #[tracing::instrument(level = "info", name = AccountMut_delete, skip_all)]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
@@ -224,6 +254,7 @@ impl Default for UpdateEmailNonUnique {
 #[graphql(field(name = "message", ty = "&String"))]
 pub enum ModifyPasswordResult {
     Success(ModifyPasswordSuccess),
+    IncorrectPassword(ModifyPasswordIncorrectPassword),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -237,6 +268,19 @@ impl Default for ModifyPasswordSuccess {
     fn default() -> Self {
         Self {
             message: "Password modified".to_string(),
+        }
+    }
+}
+
+#[derive(SimpleObject)]
+pub struct ModifyPasswordIncorrectPassword {
+    pub message: String,
+}
+
+impl Default for ModifyPasswordIncorrectPassword {
+    fn default() -> Self {
+        Self {
+            message: "Incorrect password".to_string(),
         }
     }
 }
