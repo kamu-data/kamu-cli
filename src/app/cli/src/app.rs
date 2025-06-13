@@ -25,7 +25,7 @@ use kamu_accounts::*;
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_flow_system_inmem::domain::{
+use kamu_flow_system::{
     FlowConfigurationUpdatedMessage,
     FlowProgressMessage,
     FlowTriggerUpdatedMessage,
@@ -633,7 +633,7 @@ pub fn configure_server_catalog(
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
-    crate::task_adapters::register_dependencies(&mut b);
+    kamu_adapter_flow_task::register_dependencies(&mut b);
 
     kamu_task_system_services::register_dependencies(&mut b);
 
@@ -932,7 +932,7 @@ pub fn register_config_in_catalog(
     let kamu_flow_system_config = config.flow_system.as_ref().unwrap();
     let flow_agent_config = kamu_flow_system_config.flow_agent.as_ref().unwrap();
 
-    catalog_builder.add_value(kamu_flow_system_inmem::domain::FlowAgentConfig::new(
+    catalog_builder.add_value(kamu_flow_system::FlowAgentConfig::new(
         Duration::seconds(flow_agent_config.awaiting_step_secs.unwrap()),
         Duration::seconds(flow_agent_config.mandatory_throttling_period_secs.unwrap()),
     ));

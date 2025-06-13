@@ -22,8 +22,8 @@ use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyCon
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_adapter_http::e2e::e2e_router;
-use kamu_flow_system_inmem::domain::FlowAgent;
-use kamu_task_system_inmem::domain::TaskAgent;
+use kamu_flow_system::FlowAgent;
+use kamu_task_system::TaskAgent;
 use messaging_outbox::OutboxAgent;
 use observability::axum::{panic_handler, unknown_fallback_handler};
 use tokio::sync::Notify;

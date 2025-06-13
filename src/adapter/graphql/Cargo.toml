@@ -88,6 +88,7 @@ kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
+kamu-adapter-flow-task = { workspace = true }
 kamu-adapter-graphql = { workspace = true, features = ["testing"] }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }

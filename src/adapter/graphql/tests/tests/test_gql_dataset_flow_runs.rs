@@ -18,6 +18,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     LoggedAccount,
 };
+use kamu_adapter_flow_task::FlowTaskFactoryImpl;
 use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
 use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
@@ -3085,7 +3086,8 @@ impl FlowRunsHarness {
                     Duration::minutes(1),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>();
+                .add::<InMemoryTaskEventStore>()
+                .add::<FlowTaskFactoryImpl>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 
