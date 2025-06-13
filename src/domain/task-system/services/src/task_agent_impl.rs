@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, PaginationOpts};
+use database_common::PaginationOpts;
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -23,7 +23,8 @@ use tracing::Instrument as _;
 
 pub struct TaskAgentImpl {
     catalog: Catalog,
-    task_runners_by_type: HashMap<String, Vec<Arc<dyn TaskRunner>>>,
+    task_planners_by_type: HashMap<String, Arc<dyn TaskDefinitionPlanner>>,
+    task_runners_by_type: HashMap<String, Arc<dyn TaskRunner>>,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<TaskAgentConfig>,
 }
@@ -42,37 +43,60 @@ pub struct TaskAgentImpl {
 impl TaskAgentImpl {
     pub fn new(
         catalog: Catalog,
+        task_planners: Vec<Arc<dyn TaskDefinitionPlanner>>,
         task_runners: Vec<Arc<dyn TaskRunner>>,
         time_source: Arc<dyn SystemTimeSource>,
         agent_config: Arc<TaskAgentConfig>,
     ) -> Self {
+        let task_planners_by_type = task_planners.into_iter().fold(
+            HashMap::new(),
+            |mut acc: HashMap<String, Arc<dyn TaskDefinitionPlanner>>, planner| {
+                let task_type = planner.supported_task_type().to_string();
+                assert!(
+                    !acc.contains_key(&task_type),
+                    "Task planner for type '{task_type}' already exists",
+                );
+                acc.insert(task_type, planner.clone());
+                acc
+            },
+        );
+
         let task_runners_by_type = task_runners.into_iter().fold(
             HashMap::new(),
-            |mut acc: HashMap<String, Vec<_>>, runner| {
-                for supported_task_type in runner.supported_task_types() {
-                    acc.entry((*supported_task_type).to_string())
-                        .or_default()
-                        .push(runner.clone());
-                }
+            |mut acc: HashMap<String, Arc<dyn TaskRunner + 'static>>, runner| {
+                let task_type = runner.supported_task_type().to_string();
+                assert!(
+                    !acc.contains_key(&task_type),
+                    "Task runner for type '{task_type}' already exists",
+                );
+                acc.insert(task_type, runner.clone());
                 acc
             },
         );
 
         Self {
             catalog,
+            task_planners_by_type,
             task_runners_by_type,
             time_source,
             agent_config,
         }
     }
 
+    fn get_task_planner_for(&self, plan: &LogicalPlan) -> Arc<dyn TaskDefinitionPlanner> {
+        let task_type = plan.task_type();
+        self.task_planners_by_type
+            .get(task_type)
+            .cloned()
+            .unwrap_or_else(|| panic!("No task definition planner found for {task_type}",))
+    }
+
     fn get_task_runner_for(&self, task_definition: &TaskDefinition) -> Arc<dyn TaskRunner> {
         let task_type = task_definition.task_type();
         self.task_runners_by_type
             .get(task_type)
-            .and_then(|runners| runners.first())
             .cloned()
-            .expect("No task runner found for task type")
+            .unwrap_or_else(|| panic!("No task runner found for {task_type}",))
     }
 
     async fn run_task_iteration(&self) -> Result<(), InternalError> {
@@ -174,15 +198,10 @@ impl TaskAgentImpl {
             "Preparing task to run",
         );
 
-        // Prepare task definition (requires transaction)
-        let task_definition = match DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                |task_definition_planner: Arc<dyn TaskDefinitionPlanner>| async move {
-                    task_definition_planner
-                        .prepare_task_definition(task.task_id, &task.logical_plan)
-                        .await
-                },
-            )
+        // Find a planner and build a task definition
+        let task_planner = self.get_task_planner_for(&task.logical_plan);
+        let task_definition = match task_planner
+            .prepare_task_definition(task.task_id, &task.logical_plan)
             .await
         {
             Ok(task_definition) => task_definition,

@@ -25,6 +25,8 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait TaskDefinitionPlanner: Send + Sync {
+    fn supported_task_type(&self) -> &str;
+
     async fn prepare_task_definition(
         &self,
         task_id: TaskID,

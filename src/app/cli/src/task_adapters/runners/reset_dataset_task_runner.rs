@@ -67,12 +67,8 @@ impl ResetDatasetTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for ResetDatasetTaskRunner {
-    fn id(&self) -> &'static str {
-        "dev.kamu.cli.task_runners.ResetDatasetTaskRunner"
-    }
-
-    fn supported_task_types(&self) -> &[&str] {
-        &[TASK_TYPE_RESET_DATASET]
+    fn supported_task_type(&self) -> &str {
+        TASK_TYPE_RESET_DATASET
     }
 
     async fn run_task(
