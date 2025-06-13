@@ -10,7 +10,14 @@
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
-use crate::{Account, AccountNotFoundByNameError, ModifyPasswordHashError, Password};
+use crate::{
+    Account,
+    AccountNotFoundByNameError,
+    IncorrectPasswordError,
+    ModifyPasswordHashError,
+    Password,
+    VerifyPasswordError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,17 +28,26 @@ pub trait ModifyAccountPasswordUseCase: Send + Sync {
         account: &Account,
         password: Password,
     ) -> Result<(), ModifyAccountPasswordError>;
+
+    async fn execute_with_confirmation(
+        &self,
+        account: &Account,
+        old_password: Password,
+        new_password: Password,
+    ) -> Result<(), ModifyAccountPasswordWithConfirmationError>;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
 pub enum ModifyAccountPasswordError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    AccountNotFound(#[from] AccountNotFoundByNameError),
 
     #[error(transparent)]
-    AccountNotFound(#[from] AccountNotFoundByNameError),
+    Internal(#[from] InternalError),
 }
 
 impl From<ModifyPasswordHashError> for ModifyAccountPasswordError {
@@ -39,6 +55,39 @@ impl From<ModifyPasswordHashError> for ModifyAccountPasswordError {
         match value {
             ModifyPasswordHashError::AccountNotFound(err) => Self::AccountNotFound(err),
             e @ ModifyPasswordHashError::Internal(_) => Self::Internal(e.int_err()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum ModifyAccountPasswordWithConfirmationError {
+    #[error(transparent)]
+    AccountNotFound(#[from] AccountNotFoundByNameError),
+
+    #[error(transparent)]
+    IncorrectPassword(#[from] IncorrectPasswordError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<VerifyPasswordError> for ModifyAccountPasswordWithConfirmationError {
+    fn from(e: VerifyPasswordError) -> Self {
+        match e {
+            VerifyPasswordError::AccountNotFound(e) => Self::AccountNotFound(e),
+            VerifyPasswordError::IncorrectPassword(e) => Self::IncorrectPassword(e),
+            e @ VerifyPasswordError::Internal(_) => Self::Internal(e.int_err()),
+        }
+    }
+}
+
+impl From<ModifyAccountPasswordError> for ModifyAccountPasswordWithConfirmationError {
+    fn from(e: ModifyAccountPasswordError) -> Self {
+        match e {
+            ModifyAccountPasswordError::AccountNotFound(e) => Self::AccountNotFound(e),
+            e @ ModifyAccountPasswordError::Internal(_) => Self::Internal(e.int_err()),
         }
     }
 }

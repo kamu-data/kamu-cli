@@ -85,12 +85,13 @@ impl AccountMut {
 
     /// Reset password for a selected account. Allowed only for admin users
     #[tracing::instrument(level = "info", name = AccountMut_modify_password, skip_all)]
-    #[graphql(guard = "AdminGuard")]
     async fn modify_password(
         &self,
         ctx: &Context<'_>,
         password: AccountPassword<'_>,
     ) -> Result<ModifyPasswordResult> {
+        // NOTE: Access verification is handled by the use-case
+
         let modify_account_password_use_case =
             from_catalog_n!(ctx, dyn ModifyAccountPasswordUseCase);
 

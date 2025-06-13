@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crypto_utils::{Argon2Hasher, PasswordHashingMode};
 use database_common::PaginationOpts;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
@@ -23,6 +24,8 @@ pub struct AccountServiceImpl {
     account_repo: Arc<dyn AccountRepository>,
     time_source: Arc<dyn SystemTimeSource>,
     did_secret_encryption_key: Option<SecretString>,
+    password_hash_repository: Arc<dyn PasswordHashRepository>,
+    password_hashing_mode: PasswordHashingMode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,12 +33,14 @@ pub struct AccountServiceImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn AccountService)]
 impl AccountServiceImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn new(
         did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
         account_repo: Arc<dyn AccountRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
+        password_hash_repository: Arc<dyn PasswordHashRepository>,
+        maybe_password_hashing_mode: Option<Arc<PasswordHashingMode>>,
     ) -> Self {
         Self {
             did_secret_key_repo,
@@ -45,6 +50,11 @@ impl AccountServiceImpl {
                 .encryption_key
                 .as_ref()
                 .map(|encryption_key| SecretString::from(encryption_key.clone())),
+            password_hash_repository,
+            // When hashing mode is unspecified, safely assume the default mode.
+            // Higher security by default is better than forgetting to configure
+            password_hashing_mode: maybe_password_hashing_mode
+                .map_or(PasswordHashingMode::Default, |mode| *mode),
         }
     }
 }
@@ -66,6 +76,13 @@ impl AccountService for AccountServiceImpl {
             .get_accounts_by_ids(account_ids)
             .await
             .int_err()
+    }
+
+    async fn get_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<Account, GetAccountByNameError> {
+        self.account_repo.get_account_by_name(account_name).await
     }
 
     async fn get_account_map(
@@ -158,6 +175,20 @@ impl AccountService for AccountServiceImpl {
 
         self.account_repo.save_account(&account).await?;
 
+        {
+            const RANDOM_PASSWORD_LENGTH: usize = 16;
+
+            let random_password = Password::try_new(random_strings::get_random_string(
+                None,
+                RANDOM_PASSWORD_LENGTH,
+                &random_strings::AllowedSymbols::AsciiSymbols,
+            ))
+            .int_err()?;
+
+            self.save_account_password(&account, &random_password)
+                .await?;
+        }
+
         if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
             use odf::metadata::AsStackString;
 
@@ -209,6 +240,79 @@ impl AccountService for AccountServiceImpl {
             Ok(_) | Err(E::NotFound(_)) => Ok(()),
             Err(e @ E::Internal(_)) => Err(e.int_err()),
         }
+    }
+
+    async fn save_account_password(
+        &self,
+        account: &Account,
+        password: &Password,
+    ) -> Result<(), InternalError> {
+        // Save account password
+        let password_hash =
+            Argon2Hasher::hash_async(password.as_bytes(), self.password_hashing_mode)
+                .await
+                .int_err()?;
+
+        self.password_hash_repository
+            .save_password_hash(&account.id, &account.account_name, password_hash)
+            .await
+            .int_err()
+    }
+
+    async fn verify_account_password(
+        &self,
+        account_name: &odf::AccountName,
+        password: &Password,
+    ) -> Result<(), VerifyPasswordError> {
+        let password_hash = match self
+            .password_hash_repository
+            .find_password_hash_by_account_name(account_name)
+            .await
+        {
+            Ok(Some(password_hash)) => password_hash,
+            Ok(None) => {
+                return Err(AccountNotFoundByNameError {
+                    account_name: account_name.clone(),
+                }
+                .into());
+            }
+            Err(e) => {
+                return Err(VerifyPasswordError::Internal(e.int_err()));
+            }
+        };
+
+        let is_password_correct = Argon2Hasher::verify_async(
+            password.as_bytes(),
+            password_hash.as_str(),
+            self.password_hashing_mode,
+        )
+        .await
+        .int_err()?;
+
+        if !is_password_correct {
+            return Err(VerifyPasswordError::IncorrectPassword(
+                IncorrectPasswordError,
+            ));
+        }
+
+        Ok(())
+    }
+
+    async fn modify_account_password(
+        &self,
+        account_name: &odf::AccountName,
+        new_password: &Password,
+    ) -> Result<(), ModifyAccountPasswordError> {
+        let password_hash =
+            Argon2Hasher::hash_async(new_password.as_bytes(), self.password_hashing_mode)
+                .await
+                .int_err()?;
+
+        self.password_hash_repository
+            .modify_password_hash(account_name, password_hash)
+            .await?;
+
+        Ok(())
     }
 }
 

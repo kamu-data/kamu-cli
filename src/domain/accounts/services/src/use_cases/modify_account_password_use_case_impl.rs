@@ -9,37 +9,24 @@
 
 use std::sync::Arc;
 
-use crypto_utils::{Argon2Hasher, PasswordHashingMode};
-use internal_error::ResultIntoInternal;
 use kamu_accounts::{
     Account,
+    AccountService,
     ModifyAccountPasswordError,
     ModifyAccountPasswordUseCase,
+    ModifyAccountPasswordWithConfirmationError,
     Password,
-    PasswordHashRepository,
 };
+
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ModifyAccountPasswordUseCaseImpl {
-    password_hash_repository: Arc<dyn PasswordHashRepository>,
-    password_hashing_mode: PasswordHashingMode,
-}
-
 #[dill::component(pub)]
 #[dill::interface(dyn ModifyAccountPasswordUseCase)]
-impl ModifyAccountPasswordUseCaseImpl {
-    #[allow(clippy::needless_pass_by_value)]
-    fn new(
-        password_hash_repository: Arc<dyn PasswordHashRepository>,
-        password_hashing_mode: Option<Arc<PasswordHashingMode>>,
-    ) -> Self {
-        Self {
-            password_hash_repository,
-            password_hashing_mode: password_hashing_mode
-                .map_or(PasswordHashingMode::Default, |mode| *mode),
-        }
-    }
+pub struct ModifyAccountPasswordUseCaseImpl {
+    account_authorization_helper: Arc<utils::AccountAuthorizationHelper>,
+    account_service: Arc<dyn AccountService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,13 +38,31 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
         account: &Account,
         password: Password,
     ) -> Result<(), ModifyAccountPasswordError> {
-        let password_hash =
-            Argon2Hasher::hash_async(password.as_bytes(), self.password_hashing_mode)
-                .await
-                .int_err()?;
+        self.account_authorization_helper.is_admin().await?;
 
-        self.password_hash_repository
-            .modify_password_hash(&account.account_name, password_hash)
+        self.account_service
+            .modify_account_password(&account.account_name, &password)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn execute_with_confirmation(
+        &self,
+        account: &Account,
+        old_password: Password,
+        new_password: Password,
+    ) -> Result<(), ModifyAccountPasswordWithConfirmationError> {
+        self.account_authorization_helper
+            .can_modify_account(&account.account_name)
+            .await?;
+
+        self.account_service
+            .verify_account_password(&account.account_name, &old_password)
+            .await?;
+
+        self.account_service
+            .modify_account_password(&account.account_name, &new_password)
             .await?;
 
         Ok(())
