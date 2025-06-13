@@ -32,7 +32,10 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_pre_run_requeues_running_tasks() {
-    let harness = TaskAgentHarness::new(MockOutbox::new(), MockTaskRunner::new());
+    let mut mock_task_runner = MockTaskRunner::new();
+    TaskAgentHarness::add_supported_task_types_expectations(&mut mock_task_runner);
+
+    let harness = TaskAgentHarness::new(MockOutbox::new(), mock_task_runner);
 
     // Schedule 3 tasks
     let task_id_1 = harness
@@ -83,6 +86,7 @@ async fn test_run_single_task() {
 
     // Expect logical plan runner to run probe
     let mut mock_task_runner = MockTaskRunner::new();
+    TaskAgentHarness::add_supported_task_types_expectations(&mut mock_task_runner);
     TaskAgentHarness::add_run_probe_plan_expectations(
         &mut mock_task_runner,
         LogicalPlanProbe::default(),
@@ -116,6 +120,7 @@ async fn test_run_two_of_three_tasks() {
 
     // Expect logical plan runner to run probe twice
     let mut mock_task_runner = MockTaskRunner::new();
+    TaskAgentHarness::add_supported_task_types_expectations(&mut mock_task_runner);
     TaskAgentHarness::add_run_probe_plan_expectations(
         &mut mock_task_runner,
         LogicalPlanProbe::default(),
@@ -281,6 +286,12 @@ impl TaskAgentHarness {
             .returning(|_, _, _| Ok(()));
     }
 
+    fn add_supported_task_types_expectations(mock_task_runner: &mut MockTaskRunner) {
+        mock_task_runner
+            .expect_supported_task_types()
+            .return_const(vec![TASK_TYPE_PROBE]);
+    }
+
     fn add_run_probe_plan_expectations(
         mock_task_runner: &mut MockTaskRunner,
         probe: LogicalPlanProbe,
@@ -314,6 +325,10 @@ mockall::mock! {
 
     #[async_trait::async_trait]
     impl TaskRunner for TaskRunner {
+        fn id(&self) -> &str;
+
+        fn supported_task_types(&self) -> &[&'static str];
+
         async fn run_task(&self, task_definition: TaskDefinition) -> Result<TaskOutcome, InternalError>;
     }
 }

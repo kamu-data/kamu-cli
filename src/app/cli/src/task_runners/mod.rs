@@ -7,15 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Re-exports
-pub use kamu_task_system as domain;
+mod dataset_update_task_runner;
+mod deliver_webhook_task_runner;
+mod hard_compact_dataset_task_runner;
+mod probe_task_runner;
+mod reset_dataset_task_runner;
+
+pub use dataset_update_task_runner::*;
+pub use deliver_webhook_task_runner::*;
+pub use hard_compact_dataset_task_runner::*;
+pub use probe_task_runner::*;
+pub use reset_dataset_task_runner::*;
 
 mod dependencies;
-mod task_agent_impl;
-mod task_definition_planner_impl;
-mod task_scheduler_impl;
-
 pub use dependencies::*;
-pub use task_agent_impl::*;
-pub use task_definition_planner_impl::*;
-pub use task_scheduler_impl::*;

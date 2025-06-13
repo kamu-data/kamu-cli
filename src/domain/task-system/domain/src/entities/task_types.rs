@@ -7,16 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<TaskAgentImpl>();
-    catalog_builder.add::<TaskSchedulerImpl>();
-    catalog_builder.add::<TaskDefinitionPlannerImpl>();
-}
+pub const TASK_TYPE_DATASET_UPDATE: &str = "dataset_update";
+pub const TASK_TYPE_DELIVER_WEBHOOK: &str = "deliver_webhook";
+pub const TASK_TYPE_HARD_COMPACT_DATASET: &str = "hard_compact_dataset";
+pub const TASK_TYPE_PROBE: &str = "probe";
+pub const TASK_TYPE_RESET_DATASET: &str = "reset_dataset";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
