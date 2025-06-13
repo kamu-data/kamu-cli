@@ -10,8 +10,9 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
+use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
-use kamu_flow_system::{self as fs, FlowResultDatasetUpdate};
+use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::prelude::*;
 
@@ -113,17 +114,13 @@ impl FlowDescriptionUpdateResult {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
-                    fs::FlowResult::Empty
-                    | fs::FlowResult::DatasetCompact(_)
-                    | fs::FlowResult::DatasetReset(_) => Ok(None),
-                    fs::FlowResult::DatasetUpdate(update) => match update {
-                        FlowResultDatasetUpdate::Changed(update_result) => {
+                    ts::TaskResult::Empty
+                    | ts::TaskResult::CompactionDatasetResult(_)
+                    | ts::TaskResult::ResetDatasetResult(_) => Ok(None),
+                    ts::TaskResult::UpdateDatasetResult(update) => {
+                        if let Some((old_head, new_head)) = update.try_as_increment() {
                             match increment_query_service
-                                .get_increment_between(
-                                    dataset_id,
-                                    update_result.old_head.as_ref(),
-                                    &update_result.new_head,
-                                )
+                                .get_increment_between(dataset_id, old_head, new_head)
                                 .await
                             {
                                 Ok(increment) => {
@@ -146,13 +143,28 @@ impl FlowDescriptionUpdateResult {
                                     })))
                                 }
                             }
+                        } else if let Some(up_to_date_result) = update.try_as_up_to_date() {
+                            match up_to_date_result {
+                                PullResultUpToDate::PollingIngest(pi) => {
+                                    Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
+                                        uncacheable: pi.uncacheable,
+                                    })))
+                                }
+                                PullResultUpToDate::PushIngest(pi) => {
+                                    Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
+                                        uncacheable: pi.uncacheable,
+                                    })))
+                                }
+                                PullResultUpToDate::Sync | PullResultUpToDate::Transform => {
+                                    Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
+                                        uncacheable: false,
+                                    })))
+                                }
+                            }
+                        } else {
+                            unreachable!()
                         }
-                        FlowResultDatasetUpdate::UpToDate(up_to_date_result) => {
-                            Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
-                                uncacheable: up_to_date_result.uncacheable,
-                            })))
-                        }
-                    },
+                    }
                 },
                 _ => Ok(None),
             }
@@ -195,17 +207,26 @@ impl FlowDescriptionDatasetHardCompactionResult {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
-                    fs::FlowResult::DatasetUpdate(_) | fs::FlowResult::DatasetReset(_) => None,
-                    fs::FlowResult::Empty => Some(Self::NothingToDo(
+                    ts::TaskResult::UpdateDatasetResult(_)
+                    | ts::TaskResult::ResetDatasetResult(_) => None,
+                    ts::TaskResult::Empty => Some(Self::NothingToDo(
                         FlowDescriptionHardCompactionNothingToDo::default(),
                     )),
-                    fs::FlowResult::DatasetCompact(compact) => {
-                        Some(Self::Success(FlowDescriptionHardCompactionSuccess {
-                            original_blocks_count: compact.old_num_blocks as u64,
-                            resulting_blocks_count: compact.new_num_blocks as u64,
-                            new_head: compact.new_head.clone().into(),
-                        }))
-                    }
+                    ts::TaskResult::CompactionDatasetResult(r) => match r.compaction_result {
+                        CompactionResult::NothingToDo => Some(Self::NothingToDo(
+                            FlowDescriptionHardCompactionNothingToDo::default(),
+                        )),
+                        CompactionResult::Success {
+                            old_head: _,
+                            ref new_head,
+                            old_num_blocks,
+                            new_num_blocks,
+                        } => Some(Self::Success(FlowDescriptionHardCompactionSuccess {
+                            original_blocks_count: old_num_blocks as u64,
+                            resulting_blocks_count: new_num_blocks as u64,
+                            new_head: new_head.clone().into(),
+                        })),
+                    },
                 },
                 _ => None,
             }
@@ -227,11 +248,11 @@ impl FlowDescriptionResetResult {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result {
-                    fs::FlowResult::Empty
-                    | fs::FlowResult::DatasetCompact(_)
-                    | fs::FlowResult::DatasetUpdate(_) => None,
-                    fs::FlowResult::DatasetReset(reset_result) => Some(Self {
-                        new_head: reset_result.new_head.clone().into(),
+                    ts::TaskResult::Empty
+                    | ts::TaskResult::CompactionDatasetResult(_)
+                    | ts::TaskResult::UpdateDatasetResult(_) => None,
+                    ts::TaskResult::ResetDatasetResult(r) => Some(Self {
+                        new_head: r.reset_result.new_head.clone().into(),
                     }),
                 },
                 _ => None,

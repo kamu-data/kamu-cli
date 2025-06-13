@@ -19,6 +19,7 @@ use kamu_datasets::{
     DependencyGraphService,
 };
 use kamu_flow_system::*;
+use kamu_task_system as ts;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
@@ -532,22 +533,19 @@ impl FlowSchedulingHelper {
         for trigger in &flow.triggers {
             match trigger {
                 FlowTriggerType::InputDatasetFlow(trigger_type) => {
-                    match &trigger_type.flow_result {
-                        FlowResult::Empty | FlowResult::DatasetReset(_) => {}
-                        FlowResult::DatasetCompact(_) => {
+                    match &trigger_type.task_result {
+                        ts::TaskResult::Empty | ts::TaskResult::ResetDatasetResult(_) => {}
+                        ts::TaskResult::CompactionDatasetResult(_) => {
                             is_compacted = true;
                         }
-                        FlowResult::DatasetUpdate(update) => {
+                        ts::TaskResult::UpdateDatasetResult(update) => {
                             // Compute increment since the first trigger by this dataset.
                             // Note: there might have been multiple updates since that time.
                             // We are only recording the first trigger of particular dataset.
-                            if let FlowResultDatasetUpdate::Changed(update_result) = update {
+                            if let Some((old_head, _)) = update.try_as_increment() {
                                 let increment = self
                                     .dataset_increment_query_service
-                                    .get_increment_since(
-                                        &trigger_type.dataset_id,
-                                        update_result.old_head.as_ref(),
-                                    )
+                                    .get_increment_since(&trigger_type.dataset_id, old_head)
                                     .await
                                     .int_err()?;
 

@@ -46,7 +46,7 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu-accounts = { workspace = true }
-kamu-core = { workspace = true }
+kamu-core ={ workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
