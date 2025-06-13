@@ -13,6 +13,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
+use kamu_adapter_flow_task::FlowTaskFactoryImpl;
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetEntry,
@@ -119,7 +120,8 @@ impl FlowHarness {
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<DatabaseTransactionRunner>()
-            .add::<FakeDatasetEntryService>();
+            .add::<FakeDatasetEntryService>()
+            .add::<FlowTaskFactoryImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

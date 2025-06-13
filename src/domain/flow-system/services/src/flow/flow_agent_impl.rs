@@ -49,15 +49,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct FlowAgentImpl {
-    catalog: Catalog,
-    time_source: Arc<dyn SystemTimeSource>,
-    agent_config: Arc<FlowAgentConfig>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[component(pub)]
+#[component]
 #[interface(dyn FlowAgent)]
 #[interface(dyn FlowAgentTestDriver)]
 #[interface(dyn MessageConsumer)]
@@ -83,19 +75,16 @@ pub struct FlowAgentImpl {
     requires_transaction: false,
 })]
 #[scope(Singleton)]
-impl FlowAgentImpl {
-    pub fn new(
-        catalog: Catalog,
-        time_source: Arc<dyn SystemTimeSource>,
-        agent_config: Arc<FlowAgentConfig>,
-    ) -> Self {
-        Self {
-            catalog,
-            time_source,
-            agent_config,
-        }
-    }
+pub struct FlowAgentImpl {
+    catalog: Catalog,
+    time_source: Arc<dyn SystemTimeSource>,
+    flow_task_factory: Arc<dyn FlowTaskFactory>,
+    agent_config: Arc<FlowAgentConfig>,
+}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl FlowAgentImpl {
     #[transactional_method]
     #[tracing::instrument(level = "info", skip_all)]
     async fn recover_initial_flows_state(
@@ -330,8 +319,10 @@ impl FlowAgentImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan =
-            self.make_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref())?;
+        let logical_plan = self
+            .flow_task_factory
+            .build_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref())
+            .await?;
 
         let task_scheduler = target_catalog.get_one::<dyn TaskScheduler>().unwrap();
         let task = task_scheduler
@@ -360,77 +351,6 @@ impl FlowAgentImpl {
         flow.save(flow_event_store.as_ref()).await.int_err()?;
 
         Ok(task.task_id)
-    }
-
-    /// Creates task logical plan that corresponds to template
-    pub fn make_task_logical_plan(
-        &self,
-        flow_key: &FlowKey,
-        maybe_config_snapshot: Option<&FlowConfigurationRule>,
-    ) -> Result<LogicalPlan, InternalError> {
-        match flow_key {
-            FlowKey::Dataset(flow_key) => match flow_key.flow_type {
-                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                    let mut fetch_uncacheable = false;
-                    if let Some(config_snapshot) = maybe_config_snapshot
-                        && let FlowConfigurationRule::IngestRule(ingest_rule) = config_snapshot
-                    {
-                        fetch_uncacheable = ingest_rule.fetch_uncacheable;
-                    }
-                    Ok(LogicalPlan::UpdateDataset(LogicalPlanUpdateDataset {
-                        dataset_id: flow_key.dataset_id.clone(),
-                        fetch_uncacheable,
-                    }))
-                }
-                DatasetFlowType::HardCompaction => {
-                    let mut max_slice_size: Option<u64> = None;
-                    let mut max_slice_records: Option<u64> = None;
-                    let mut keep_metadata_only = false;
-
-                    if let Some(config_snapshot) = maybe_config_snapshot
-                        && let FlowConfigurationRule::CompactionRule(compaction_rule) =
-                            config_snapshot
-                    {
-                        max_slice_size = compaction_rule.max_slice_size();
-                        max_slice_records = compaction_rule.max_slice_records();
-                        keep_metadata_only =
-                            matches!(compaction_rule, CompactionRule::MetadataOnly(_));
-                    }
-
-                    Ok(LogicalPlan::HardCompactDataset(
-                        LogicalPlanHardCompactDataset {
-                            dataset_id: flow_key.dataset_id.clone(),
-                            max_slice_size,
-                            max_slice_records,
-                            keep_metadata_only,
-                        },
-                    ))
-                }
-                DatasetFlowType::Reset => {
-                    if let Some(config_rule) = maybe_config_snapshot
-                        && let FlowConfigurationRule::ResetRule(reset_rule) = config_rule
-                    {
-                        return Ok(LogicalPlan::ResetDataset(LogicalPlanResetDataset {
-                            dataset_id: flow_key.dataset_id.clone(),
-                            new_head_hash: reset_rule.new_head_hash.clone(),
-                            old_head_hash: reset_rule.old_head_hash.clone(),
-                            recursive: reset_rule.recursive,
-                        }));
-                    }
-                    InternalError::bail("Reset flow cannot be called without configuration")
-                }
-            },
-            FlowKey::System(flow_key) => {
-                match flow_key.flow_type {
-                    // TODO: replace on correct logical plan
-                    SystemFlowType::GC => Ok(LogicalPlan::Probe(LogicalPlanProbe {
-                        dataset_id: None,
-                        busy_time: Some(std::time::Duration::from_secs(20)),
-                        end_with_outcome: Some(TaskOutcome::Success(TaskResult::Empty)),
-                    })),
-                }
-            }
-        }
     }
 
     fn flow_id_from_task_metadata(

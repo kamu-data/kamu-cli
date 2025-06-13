@@ -58,6 +58,7 @@ kamu = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-auth-web3 = { workspace = true, features = ["did-pkh"] }
 kamu-adapter-flight-sql = { workspace = true }
+kamu-adapter-flow-task = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
     "e2e",
@@ -68,6 +69,7 @@ kamu-datafusion-cli = { workspace = true }
 odf = { workspace = true, features = ["http", "s3"] }
 random-strings = { workspace = true }
 
+kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-postgres = { workspace = true }
@@ -216,7 +218,6 @@ tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"
 urlencoding = "2"
-uuid = { version = "1", default-features = false, features = ["v4"] }
 whoami = "1.5"
 strum = { version = "0.26", features = ["derive"] }
 

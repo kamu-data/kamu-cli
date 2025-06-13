@@ -1,0 +1,48 @@
+[package]
+name = "kamu-adapter-flow-task"
+description = "Adapter for Kamu's flow, task abstract interactions with other systems."
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+testing = []
+
+
+[dependencies]
+kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-flow-system = { workspace = true }
+kamu-task-system = { workspace = true }
+kamu-webhooks = { workspace = true }
+database-common = { workspace = true }
+database-common-macros = { workspace = true }
+internal-error = { workspace = true }
+odf = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+dill = { version = "0.14", default-features = false }
+tracing = "0.1"
+uuid = { version = "1", default-features = false }
+
+
+
+[dev-dependencies]
+test-log = { version = "0.2", features = ["trace"] }

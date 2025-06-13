@@ -6725,6 +6725,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-flow-task"
+version = "0.242.1"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-flow-system",
+ "kamu-task-system",
+ "kamu-webhooks",
+ "opendatafabric",
+ "test-log",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-adapter-graphql"
 version = "0.242.1"
 dependencies = [
@@ -6752,6 +6772,7 @@ dependencies = [
  "kamu-accounts-inmem",
  "kamu-accounts-services",
  "kamu-adapter-auth-oso-rebac",
+ "kamu-adapter-flow-task",
  "kamu-adapter-graphql",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
@@ -7160,6 +7181,7 @@ dependencies = [
  "kamu-adapter-auth-oso-rebac",
  "kamu-adapter-auth-web3",
  "kamu-adapter-flight-sql",
+ "kamu-adapter-flow-task",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-adapter-oauth",
@@ -7180,6 +7202,7 @@ dependencies = [
  "kamu-datasets-postgres",
  "kamu-datasets-services",
  "kamu-datasets-sqlite",
+ "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-postgres",
  "kamu-flow-system-services",
@@ -7252,7 +7275,6 @@ dependencies = [
  "urlencoding",
  "utoipa",
  "utoipa-axum",
- "uuid",
  "vergen",
  "webbrowser",
  "whoami",
@@ -7692,6 +7714,7 @@ dependencies = [
  "init-on-startup",
  "internal-error",
  "kamu-accounts",
+ "kamu-adapter-flow-task",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",

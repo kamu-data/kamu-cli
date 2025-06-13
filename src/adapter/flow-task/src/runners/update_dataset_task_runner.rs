@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use database_common_macros::transactional_method1;
 use internal_error::InternalError;
-use kamu::domain::*;
+use kamu_core::*;
 use kamu_task_system::*;
 
-use crate::task_adapters::TaskDefinitionDatasetUpdate;
+use crate::TaskDefinitionDatasetUpdate;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

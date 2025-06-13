@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_task_system::*;
 
-use crate::task_adapters::TaskDefinitionWebhookDeliver;
+use crate::TaskDefinitionWebhookDeliver;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use database_common_macros::transactional_method2;
 use internal_error::InternalError;
-use kamu::domain::{
+use kamu_core::{
     PollingIngestOptions,
     PullOptions,
     PullRequest,
@@ -22,7 +22,7 @@ use kamu::domain::{
 use kamu_datasets::{DatasetEnvVar, DatasetEnvVarService};
 use kamu_task_system::*;
 
-use crate::task_adapters::TaskDefinitionDatasetUpdate;
+use crate::TaskDefinitionDatasetUpdate;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
