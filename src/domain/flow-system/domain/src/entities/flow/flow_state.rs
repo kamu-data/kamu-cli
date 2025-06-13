@@ -65,10 +65,10 @@ impl FlowState {
         }
     }
 
-    pub fn try_result_as_ref(&self) -> Option<&FlowResult> {
+    pub fn try_task_result_as_ref(&self) -> Option<&ts::TaskResult> {
         self.outcome
             .as_ref()
-            .and_then(|outcome| outcome.try_result_as_ref())
+            .and_then(|outcome| outcome.try_task_result_as_ref())
     }
 
     pub fn can_schedule(&self) -> bool {
@@ -220,7 +220,7 @@ impl Projection for FlowState {
                             };
                             match task_outcome {
                                 ts::TaskOutcome::Success(task_result) => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Success(task_result.clone().into())),
+                                    outcome: Some(FlowOutcome::Success(task_result.clone())),
                                     timing,
                                     ..s
                                 }),

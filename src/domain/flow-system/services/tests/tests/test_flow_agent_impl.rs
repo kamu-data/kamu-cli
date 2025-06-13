@@ -12,7 +12,7 @@ use std::str::FromStr;
 use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
-use kamu_core::*;
+use kamu_core::{CompactionResult, PullResult, ResetResult};
 use kamu_datasets::DatasetIntervalIncrement;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;

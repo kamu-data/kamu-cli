@@ -28,7 +28,6 @@ event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
-kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
@@ -49,3 +48,4 @@ serde_with = { version = "3", default-features = false, features = [
 
 [dev-dependencies]
 kamu-accounts = { workspace = true }
+kamu-core = { workspace = true }
