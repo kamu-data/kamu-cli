@@ -16,6 +16,9 @@ use crate::*;
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<TaskAgentImpl>();
     catalog_builder.add::<TaskSchedulerImpl>();
+
+    catalog_builder.add::<ProbeTaskPlanner>();
+    catalog_builder.add::<ProbeTaskRunner>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

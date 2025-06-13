@@ -7,18 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::InternalError;
+use std::any::Any;
 
-use crate::{TaskDefinition, TaskOutcome};
+use kamu::domain::{CompactionPlan, ResolvedDataset};
+use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait TaskRunner: Send + Sync {
-    fn supported_task_type(&self) -> &str;
+#[derive(Debug)]
+pub struct TaskDefinitionDatasetHardCompact {
+    pub target: ResolvedDataset,
+    pub compaction_plan: CompactionPlan,
+}
 
-    async fn run_task(&self, task_definition: TaskDefinition)
-    -> Result<TaskOutcome, InternalError>;
+impl TaskDefinitionDatasetHardCompact {
+    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.hard_compact";
+}
+
+#[async_trait::async_trait]
+impl ts::TaskDefinitionBody for TaskDefinitionDatasetHardCompact {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
+        self
+    }
+
+    fn task_type(&self) -> &'static str {
+        Self::TASK_TYPE
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -22,7 +22,7 @@ impl ProbeTaskPlanner {
         &self,
         probe_plan: &LogicalPlanProbe,
     ) -> Result<TaskDefinition, InternalError> {
-        Ok(TaskDefinition::Probe(TaskDefinitionProbe {
+        Ok(TaskDefinition::new(TaskDefinitionProbe {
             probe: probe_plan.clone(),
         }))
     }
@@ -33,7 +33,7 @@ impl ProbeTaskPlanner {
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for ProbeTaskPlanner {
     fn supported_task_type(&self) -> &str {
-        TASK_TYPE_PROBE
+        TaskDefinitionProbe::TASK_TYPE
     }
 
     async fn prepare_task_definition(

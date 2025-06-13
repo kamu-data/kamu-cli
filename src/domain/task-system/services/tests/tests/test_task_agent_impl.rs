@@ -319,11 +319,11 @@ impl TaskAgentHarness {
     ) {
         mock_task_planner
             .expect_supported_task_type()
-            .return_const(TASK_TYPE_PROBE);
+            .return_const(TaskDefinitionProbe::TASK_TYPE);
 
         mock_task_runner
             .expect_supported_task_type()
-            .return_const(TASK_TYPE_PROBE);
+            .return_const(TaskDefinitionProbe::TASK_TYPE);
     }
 
     fn add_plan_probe_plan_expectations(
@@ -344,7 +344,7 @@ impl TaskAgentHarness {
             })
             .times(times)
             .returning(move |_, _| {
-                Ok(TaskDefinition::Probe(TaskDefinitionProbe {
+                Ok(TaskDefinition::new(TaskDefinitionProbe {
                     probe: probe.clone(),
                 }))
             });
@@ -360,11 +360,8 @@ impl TaskAgentHarness {
         mock_task_runner
             .expect_run_task()
             .withf(move |td| {
-                matches!(
-                    td,
-                    TaskDefinition::Probe(TaskDefinitionProbe { probe: probe_ })
-                    if probe_ == &probe_plan
-                )
+                td.downcast_ref::<TaskDefinitionProbe>()
+                    .is_some_and(|task_probe| task_probe.probe == probe_plan)
             })
             .times(times)
             .returning(move |_| {
