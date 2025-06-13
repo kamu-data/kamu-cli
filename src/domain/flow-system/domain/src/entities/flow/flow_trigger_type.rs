@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use kamu_task_system as ts;
 use serde::{Deserialize, Serialize};
 
 use crate::*;
@@ -159,7 +160,7 @@ pub struct FlowTriggerInputDatasetFlow {
     pub dataset_id: odf::DatasetID,
     pub flow_type: DatasetFlowType,
     pub flow_id: FlowID,
-    pub flow_result: FlowResult,
+    pub task_result: ts::TaskResult,
 }
 
 impl FlowTriggerInputDatasetFlow {
@@ -208,12 +209,12 @@ mod tests {
             dataset_id: TEST_DATASET_ID.clone(),
             flow_type: DatasetFlowType::Ingest,
             flow_id: FlowID::new(5),
-            flow_result: FlowResult::DatasetUpdate(FlowResultDatasetUpdate::Changed(
-                FlowResultDatasetUpdateChanged {
+            task_result: ts::TaskResult::UpdateDatasetResult(ts::TaskUpdateDatasetResult {
+                pull_result: kamu_core::PullResult::Updated {
                     old_head: None,
                     new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
                 },
-            )),
+            }),
         })
     });
 
@@ -290,7 +291,7 @@ mod tests {
                     dataset_id: TEST_DATASET_ID.clone(),
                     flow_type: DatasetFlowType::HardCompaction, // unrelated
                     flow_id: FlowID::new(7),
-                    flow_result: FlowResult::Empty
+                    task_result: ts::TaskResult::Empty
                 }
             )])
         );
@@ -303,7 +304,7 @@ mod tests {
                     dataset_id: odf::DatasetID::new_seeded_ed25519(b"different"),
                     flow_type: DatasetFlowType::Ingest,
                     flow_id: FlowID::new(7),
-                    flow_result: FlowResult::Empty
+                    task_result: ts::TaskResult::Empty
                 }
             )])
         );
