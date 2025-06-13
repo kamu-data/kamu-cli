@@ -75,7 +75,7 @@ pub enum ModifyAccountPasswordWithConfirmationError {
     ),
 
     #[error(transparent)]
-    IncorrectPassword(#[from] IncorrectPasswordError),
+    WrongOldPassword(#[from] IncorrectPasswordError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -86,7 +86,7 @@ impl From<VerifyPasswordError> for ModifyAccountPasswordWithConfirmationError {
         use VerifyPasswordError as E;
 
         match e {
-            E::IncorrectPassword(e) => Self::IncorrectPassword(e),
+            E::IncorrectPassword(e) => Self::WrongOldPassword(e),
             e @ (E::AccountNotFound(_) | E::Internal(_)) => Self::Internal(e.int_err()),
         }
     }

@@ -133,8 +133,8 @@ impl AccountMut {
                 ModifyPasswordSuccess::default(),
             )),
             Err(E::Access(e)) => Err(e.into()),
-            Err(E::IncorrectPassword(_)) => Ok(ModifyPasswordResult::IncorrectPassword(
-                ModifyPasswordIncorrectPassword::default(),
+            Err(E::WrongOldPassword(_)) => Ok(ModifyPasswordResult::WrongOldPassword(
+                ModifyPasswordWrongOldPassword::default(),
             )),
             Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
@@ -256,7 +256,7 @@ impl Default for UpdateEmailNonUnique {
 #[graphql(field(name = "message", ty = "&String"))]
 pub enum ModifyPasswordResult {
     Success(ModifyPasswordSuccess),
-    IncorrectPassword(ModifyPasswordIncorrectPassword),
+    WrongOldPassword(ModifyPasswordWrongOldPassword),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -275,14 +275,14 @@ impl Default for ModifyPasswordSuccess {
 }
 
 #[derive(SimpleObject)]
-pub struct ModifyPasswordIncorrectPassword {
+pub struct ModifyPasswordWrongOldPassword {
     pub message: String,
 }
 
-impl Default for ModifyPasswordIncorrectPassword {
+impl Default for ModifyPasswordWrongOldPassword {
     fn default() -> Self {
         Self {
-            message: "Incorrect password".to_string(),
+            message: "Wrong old password".to_string(),
         }
     }
 }
