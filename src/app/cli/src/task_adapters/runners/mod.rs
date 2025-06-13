@@ -7,17 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_update_task_runner;
 mod deliver_webhook_task_runner;
 mod hard_compact_dataset_task_runner;
 mod probe_task_runner;
 mod reset_dataset_task_runner;
+mod update_dataset_task_runner;
 
-pub use dataset_update_task_runner::*;
 pub use deliver_webhook_task_runner::*;
 pub use hard_compact_dataset_task_runner::*;
 pub use probe_task_runner::*;
 pub use reset_dataset_task_runner::*;
-
-mod dependencies;
-pub use dependencies::*;
+pub use update_dataset_task_runner::*;

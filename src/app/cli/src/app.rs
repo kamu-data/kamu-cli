@@ -63,7 +63,6 @@ use crate::{
     move_initial_database_to_workspace,
     odf_server,
     spawn_password_refreshing_job,
-    task_runners,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -634,7 +633,7 @@ pub fn configure_server_catalog(
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
-    task_runners::register_dependencies(&mut b);
+    crate::task_adapters::register_dependencies(&mut b);
 
     kamu_task_system_services::register_dependencies(&mut b);
 

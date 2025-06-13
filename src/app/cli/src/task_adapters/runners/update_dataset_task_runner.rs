@@ -18,7 +18,7 @@ use kamu_task_system::*;
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskRunner)]
-pub struct DatasetUpdateTaskRunner {
+pub struct UpdateDatasetTaskRunner {
     catalog: dill::Catalog,
     polling_ingest_service: Arc<dyn PollingIngestService>,
     transform_elaboration_service: Arc<dyn TransformElaborationService>,
@@ -26,7 +26,7 @@ pub struct DatasetUpdateTaskRunner {
     sync_service: Arc<dyn SyncService>,
 }
 
-impl DatasetUpdateTaskRunner {
+impl UpdateDatasetTaskRunner {
     #[tracing::instrument(level = "debug", skip_all, fields(?task_update))]
     async fn run_update(
         &self,
@@ -208,13 +208,9 @@ impl DatasetUpdateTaskRunner {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl TaskRunner for DatasetUpdateTaskRunner {
-    fn id(&self) -> &'static str {
-        "dev.kamu.cli.task_runners.DatasetUpdateTaskRunner"
-    }
-
-    fn supported_task_types(&self) -> &[&str] {
-        &[TASK_TYPE_DATASET_UPDATE]
+impl TaskRunner for UpdateDatasetTaskRunner {
+    fn supported_task_type(&self) -> &str {
+        TASK_TYPE_DATASET_UPDATE
     }
 
     async fn run_task(
@@ -223,7 +219,7 @@ impl TaskRunner for DatasetUpdateTaskRunner {
     ) -> Result<kamu_task_system::TaskOutcome, kamu_task_system::InternalError> {
         let kamu_task_system::TaskDefinition::Update(task_update) = task_definition else {
             panic!(
-                "DatasetUpdateTaskRunner received an unsupported task type: {task_definition:?}",
+                "UpdateDatasetTaskRunner received an unsupported task type: {task_definition:?}",
             );
         };
 

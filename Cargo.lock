@@ -8002,7 +8002,6 @@ dependencies = [
  "kamu-datasets-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
- "kamu-webhooks",
  "messaging-outbox",
  "mockall",
  "observability",
