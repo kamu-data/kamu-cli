@@ -104,12 +104,8 @@ impl HardCompactDatasetTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for HardCompactDatasetTaskRunner {
-    fn id(&self) -> &'static str {
-        "dev.kamu.cli.task_runners.HardCompactDatasetTaskRunner"
-    }
-
-    fn supported_task_types(&self) -> &[&str] {
-        &[TASK_TYPE_HARD_COMPACT_DATASET]
+    fn supported_task_type(&self) -> &str {
+        TASK_TYPE_HARD_COMPACT_DATASET
     }
 
     async fn run_task(

@@ -10,7 +10,14 @@
 use enum_variants::*;
 use serde::{Deserialize, Serialize};
 
-use crate::TaskOutcome;
+use crate::{
+    TASK_TYPE_DATASET_UPDATE,
+    TASK_TYPE_DELIVER_WEBHOOK,
+    TASK_TYPE_HARD_COMPACT_DATASET,
+    TASK_TYPE_PROBE,
+    TASK_TYPE_RESET_DATASET,
+    TaskOutcome,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,6 +46,16 @@ impl LogicalPlan {
             LogicalPlan::HardCompactDataset(hard_compaction) => Some(&hard_compaction.dataset_id),
             LogicalPlan::ResetDataset(reset) => Some(&reset.dataset_id),
             LogicalPlan::DeliverWebhook(_) => None,
+        }
+    }
+
+    pub fn task_type(&self) -> &'static str {
+        match self {
+            LogicalPlan::UpdateDataset(_) => TASK_TYPE_DATASET_UPDATE,
+            LogicalPlan::Probe(_) => TASK_TYPE_PROBE,
+            LogicalPlan::HardCompactDataset(_) => TASK_TYPE_HARD_COMPACT_DATASET,
+            LogicalPlan::ResetDataset(_) => TASK_TYPE_RESET_DATASET,
+            LogicalPlan::DeliverWebhook(_) => TASK_TYPE_DELIVER_WEBHOOK,
         }
     }
 }

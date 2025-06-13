@@ -49,12 +49,8 @@ impl DeliverWebhookTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for DeliverWebhookTaskRunner {
-    fn id(&self) -> &'static str {
-        "dev.kamu.cli.task_runners.DeliverWebhookTaskRunner"
-    }
-
-    fn supported_task_types(&self) -> &[&str] {
-        &[TASK_TYPE_DELIVER_WEBHOOK]
+    fn supported_task_type(&self) -> &str {
+        TASK_TYPE_DELIVER_WEBHOOK
     }
 
     async fn run_task(

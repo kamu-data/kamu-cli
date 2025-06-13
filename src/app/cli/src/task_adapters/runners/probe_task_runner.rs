@@ -37,12 +37,8 @@ impl ProbeTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for ProbeTaskRunner {
-    fn id(&self) -> &'static str {
-        "dev.kamu.cli.task_runners.ProbeTaskRunner"
-    }
-
-    fn supported_task_types(&self) -> &[&str] {
-        &[TASK_TYPE_PROBE]
+    fn supported_task_type(&self) -> &str {
+        TASK_TYPE_PROBE
     }
 
     async fn run_task(
