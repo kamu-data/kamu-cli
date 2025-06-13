@@ -8,7 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_task_system::LogicalPlanProbe;
+use kamu_webhooks::ResultIntoInternal;
 use {kamu_flow_system as fs, kamu_task_system as ts};
+
+use crate::{LogicalPlanDatasetHardCompact, LogicalPlanDatasetReset, LogicalPlanDatasetUpdate};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,12 +38,16 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
                     {
                         fetch_uncacheable = ingest_rule.fetch_uncacheable;
                     }
-                    Ok(ts::LogicalPlan::UpdateDataset(
-                        ts::LogicalPlanUpdateDataset {
-                            dataset_id: flow_key.dataset_id.clone(),
-                            fetch_uncacheable,
-                        },
-                    ))
+
+                    let plan = LogicalPlanDatasetUpdate {
+                        dataset_id: flow_key.dataset_id.clone(),
+                        fetch_uncacheable,
+                    };
+
+                    Ok(ts::LogicalPlan {
+                        plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                        payload: serde_json::to_value(plan).int_err()?,
+                    })
                 }
                 fs::DatasetFlowType::HardCompaction => {
                     let mut max_slice_size: Option<u64> = None;
@@ -56,37 +64,53 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
                             matches!(compaction_rule, fs::CompactionRule::MetadataOnly(_));
                     }
 
-                    Ok(ts::LogicalPlan::HardCompactDataset(
-                        ts::LogicalPlanHardCompactDataset {
-                            dataset_id: flow_key.dataset_id.clone(),
-                            max_slice_size,
-                            max_slice_records,
-                            keep_metadata_only,
-                        },
-                    ))
+                    let plan = LogicalPlanDatasetHardCompact {
+                        dataset_id: flow_key.dataset_id.clone(),
+                        max_slice_size,
+                        max_slice_records,
+                        keep_metadata_only,
+                    };
+
+                    Ok(ts::LogicalPlan {
+                        plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                        payload: serde_json::to_value(plan).int_err()?,
+                    })
                 }
                 fs::DatasetFlowType::Reset => {
                     if let Some(config_rule) = maybe_config_snapshot
                         && let fs::FlowConfigurationRule::ResetRule(reset_rule) = config_rule
                     {
-                        return Ok(ts::LogicalPlan::ResetDataset(ts::LogicalPlanResetDataset {
+                        let plan = LogicalPlanDatasetReset {
                             dataset_id: flow_key.dataset_id.clone(),
                             new_head_hash: reset_rule.new_head_hash.clone(),
                             old_head_hash: reset_rule.old_head_hash.clone(),
                             recursive: reset_rule.recursive,
-                        }));
+                        };
+
+                        Ok(ts::LogicalPlan {
+                            plan_type: LogicalPlanDatasetReset::SERIALIZATION_TYPE_ID.to_string(),
+                            payload: serde_json::to_value(plan).int_err()?,
+                        })
+                    } else {
+                        InternalError::bail("Reset flow cannot be called without configuration")
                     }
-                    InternalError::bail("Reset flow cannot be called without configuration")
                 }
             },
             fs::FlowKey::System(flow_key) => {
                 match flow_key.flow_type {
                     // TODO: replace on correct logical plan
-                    fs::SystemFlowType::GC => Ok(ts::LogicalPlan::Probe(ts::LogicalPlanProbe {
-                        dataset_id: None,
-                        busy_time: Some(std::time::Duration::from_secs(20)),
-                        end_with_outcome: Some(ts::TaskOutcome::Success(ts::TaskResult::Empty)),
-                    })),
+                    fs::SystemFlowType::GC => {
+                        let plan = LogicalPlanProbe {
+                            dataset_id: None,
+                            busy_time: Some(std::time::Duration::from_secs(20)),
+                            end_with_outcome: Some(ts::TaskOutcome::Success(ts::TaskResult::Empty)),
+                        };
+
+                        Ok(ts::LogicalPlan {
+                            plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
+                            payload: serde_json::to_value(plan).int_err()?,
+                        })
+                    }
                 }
             }
         }
