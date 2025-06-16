@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use crypto_utils::{Argon2Hasher, PasswordHashingMode};
 use database_common::PaginationOpts;
+use email_utils::Email;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
 use secrecy::{ExposeSecret, SecretString};
@@ -189,6 +190,54 @@ impl AccountService for AccountServiceImpl {
                 .await?;
         }
 
+        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
+            use odf::metadata::AsStackString;
+
+            let account_id = account.id.as_stack_string();
+            let did_secret_key = DidSecretKey::try_new(
+                &account_key.into(),
+                did_secret_encryption_key.expose_secret(),
+            )
+            .int_err()?;
+
+            self.did_secret_key_repo
+                .save_did_secret_key(
+                    &DidEntity::new_account(account_id.as_str()),
+                    &did_secret_key,
+                )
+                .await
+                .int_err()?;
+        }
+
+        Ok(account)
+    }
+
+    async fn create_password_account_ex(
+        &self,
+        account_name: &odf::AccountName,
+        password: Password,
+        email: Email,
+    ) -> Result<Account, CreateAccountError> {
+        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
+        let account = Account {
+            id: account_id,
+            account_name: account_name.clone(),
+            email,
+            display_name: account_name.to_string(),
+            account_type: AccountType::User,
+            avatar_url: None,
+            registered_at: self.time_source.now(),
+            provider: AccountProvider::Password.to_string(),
+            provider_identity_key: String::from(account_name.as_str()),
+        };
+
+        // 1. Save an account
+        self.account_repo.save_account(&account).await?;
+
+        // 2. Save an account password
+        self.save_account_password(&account, &password).await?;
+
+        // 3. Save a DID secret key
         if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
             use odf::metadata::AsStackString;
 

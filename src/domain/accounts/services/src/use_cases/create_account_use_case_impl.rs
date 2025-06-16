@@ -17,7 +17,9 @@ use kamu_accounts::{
     AccountService,
     CreateAccountError,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    Password,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,6 +43,18 @@ impl CreateAccountUseCaseImpl {
         );
 
         Email::parse(&email_str).int_err()
+    }
+
+    fn generate_password() -> Result<Password, InternalError> {
+        const RANDOM_PASSWORD_LENGTH: usize = 16;
+
+        let random_password = random_strings::get_random_string(
+            None,
+            RANDOM_PASSWORD_LENGTH,
+            &random_strings::AllowedSymbols::AsciiSymbols,
+        );
+
+        Password::try_new(random_password).int_err()
     }
 
     async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {
@@ -78,6 +92,34 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         let created_account = self
             .account_service
             .create_password_account(account_name, email)
+            .await?;
+
+        self.notify_account_created(&created_account).await?;
+
+        Ok(created_account)
+    }
+
+    async fn execute_ex(
+        &self,
+        creator_account: &Account,
+        account_name: &odf::AccountName,
+        options: CreateAccountUseCaseOptions,
+    ) -> Result<Account, CreateAccountError> {
+        let email = if let Some(email) = options.email {
+            email
+        } else {
+            Self::generate_email(creator_account, account_name)?
+        };
+
+        let password = if let Some(password) = options.password {
+            password
+        } else {
+            Self::generate_password()?
+        };
+
+        let created_account = self
+            .account_service
+            .create_password_account_ex(account_name, password, email)
             .await?;
 
         self.notify_account_created(&created_account).await?;

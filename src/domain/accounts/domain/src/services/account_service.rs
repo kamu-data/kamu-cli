@@ -77,6 +77,13 @@ pub trait AccountService: Sync + Send {
         email: email_utils::Email,
     ) -> Result<Account, CreateAccountError>;
 
+    async fn create_password_account_ex(
+        &self,
+        account_name: &odf::AccountName,
+        password: Password,
+        email: email_utils::Email,
+    ) -> Result<Account, CreateAccountError>;
+
     async fn rename_account(
         &self,
         account: &Account,

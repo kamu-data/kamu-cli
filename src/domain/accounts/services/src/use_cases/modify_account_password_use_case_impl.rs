@@ -56,7 +56,7 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
         new_password: Password,
     ) -> Result<(), ModifyAccountPasswordWithConfirmationError> {
         self.account_authorization_helper
-            .can_modify_account(&account.account_name)
+            .ensure_account_password_with_confirmation_can_be_modified(&account.account_name)
             .await?;
 
         self.account_service

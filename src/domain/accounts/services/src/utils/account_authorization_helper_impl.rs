@@ -41,7 +41,7 @@ pub trait AccountAuthorizationHelper: Send + Sync {
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError>;
 
-    async fn ensure_account_password_with_confirmation_can_be_deleted(
+    async fn ensure_account_password_with_confirmation_can_be_modified(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError>;
@@ -104,7 +104,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
         Ok(())
     }
 
-    async fn ensure_account_password_with_confirmation_can_be_deleted(
+    async fn ensure_account_password_with_confirmation_can_be_modified(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError> {
@@ -173,7 +173,7 @@ impl MockAccountAuthorizationHelper {
         mock.expect_can_modify_account().returning(|_| Ok(true));
         mock.expect_ensure_account_password_can_be_modified()
             .returning(|_| Ok(()));
-        mock.expect_ensure_account_password_with_confirmation_can_be_deleted()
+        mock.expect_ensure_account_password_with_confirmation_can_be_modified()
             .returning(|_| Ok(()));
         mock.expect_ensure_account_can_be_deleted()
             .returning(|_| Ok(()));
@@ -184,7 +184,7 @@ impl MockAccountAuthorizationHelper {
     }
 
     pub fn disallowing() -> Self {
-        let subject_account = odf::AccountName::new_unchecked("not-admin");
+        let subject_account = odf::AccountName::new_unchecked("user-without-access");
 
         let mut mock = Self::new();
 
@@ -206,7 +206,7 @@ impl MockAccountAuthorizationHelper {
             });
 
         let subject_account_clone = subject_account.clone();
-        mock.expect_ensure_account_password_with_confirmation_can_be_deleted()
+        mock.expect_ensure_account_password_with_confirmation_can_be_modified()
             .returning(move |account_name| {
                 Err(EnsureNotAuthorizedError::Access(
                     odf::AccessError::Unauthenticated(

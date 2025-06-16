@@ -6453,6 +6453,7 @@ version = "0.241.1"
 dependencies = [
  "async-trait",
  "base32",
+ "bon",
  "chrono",
  "crc32fast",
  "crypto-utils",

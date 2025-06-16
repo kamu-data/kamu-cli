@@ -14,11 +14,13 @@ use kamu_accounts::{
     Account,
     AccountService,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     DidSecretEncryptionConfig,
     ModifyAccountPasswordError,
     ModifyAccountPasswordUseCase,
     ModifyAccountPasswordWithConfirmationError,
     Password,
+    TEST_PASSWORD,
     VerifyPasswordError,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -34,13 +36,23 @@ use time_source::SystemTimeSourceDefault;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_modify_account_password_use_case_success() {
+async fn test_modify_account_password_success() {
     let harness =
         ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::allowing())
             .await;
 
-    let account = harness.create_account().await;
-    let new_password = Password::try_new("new_password_1").unwrap();
+    let initial_password = TEST_PASSWORD.clone();
+    let account = harness.create_account(initial_password.clone()).await;
+
+    pretty_assertions::assert_matches!(
+        harness
+            .account_service
+            .verify_account_password(&account.account_name, &initial_password)
+            .await,
+        Ok(_),
+    );
+
+    let new_password = Password::try_new("new_password").unwrap();
 
     pretty_assertions::assert_matches!(
         harness
@@ -53,26 +65,7 @@ async fn test_modify_account_password_use_case_success() {
     pretty_assertions::assert_matches!(
         harness
             .account_service
-            .verify_account_password(&account.account_name, &new_password)
-            .await,
-        Ok(_),
-    );
-
-    let old_password = new_password;
-    let new_password = Password::try_new("new_password_2").unwrap();
-
-    pretty_assertions::assert_matches!(
-        harness
-            .modify_use_case
-            .execute(&account, new_password.clone())
-            .await,
-        Ok(_),
-    );
-
-    pretty_assertions::assert_matches!(
-        harness
-            .account_service
-            .verify_account_password(&account.account_name, &old_password)
+            .verify_account_password(&account.account_name, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
@@ -88,12 +81,12 @@ async fn test_modify_account_password_use_case_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_modify_account_password_use_case_not_admin() {
+async fn test_modify_account_password_not_admin() {
     let harness =
         ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::disallowing())
             .await;
 
-    let account = harness.create_account().await;
+    let account = harness.create_account(TEST_PASSWORD.clone()).await;
     let new_password = Password::try_new("new_password_1").unwrap();
 
     pretty_assertions::assert_matches!(
@@ -102,7 +95,7 @@ async fn test_modify_account_password_use_case_not_admin() {
             .execute(&account, new_password.clone())
             .await,
         Err(ModifyAccountPasswordError::Access(odf::AccessError::Unauthenticated(e)))
-            if e.to_string() == "Account 'not-admin' is not authorized to modify account's password 'new-account'"
+            if e.to_string() == "Account 'user-without-access' is not authorized to modify account's password 'new-account'"
     );
     pretty_assertions::assert_matches!(
         harness
@@ -116,29 +109,34 @@ async fn test_modify_account_password_use_case_not_admin() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_modify_account_password_use_case_with_confirmation_success() {
+async fn test_modify_account_password_with_confirmation_success() {
     let harness =
         ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::allowing())
             .await;
 
-    let account = harness.create_account().await;
-    let new_password = Password::try_new("new_password_1").unwrap();
+    let initial_password = TEST_PASSWORD.clone();
+    let account = harness.create_account(initial_password.clone()).await;
+    let new_password = Password::try_new("new_password").unwrap();
 
     pretty_assertions::assert_matches!(
         harness
             .modify_use_case
-            .execute(&account, new_password.clone())
+            .execute_with_confirmation(&account, initial_password.clone(), new_password.clone())
             .await,
         Ok(_),
     );
 
-    let old_password = new_password;
-    let new_password = Password::try_new("new_password_2").unwrap();
-
     pretty_assertions::assert_matches!(
         harness
-            .modify_use_case
-            .execute_with_confirmation(&account, old_password, new_password)
+            .account_service
+            .verify_account_password(&account.account_name, &initial_password)
+            .await,
+        Err(VerifyPasswordError::IncorrectPassword(_)),
+    );
+    pretty_assertions::assert_matches!(
+        harness
+            .account_service
+            .verify_account_password(&account.account_name, &new_password)
             .await,
         Ok(_),
     );
@@ -147,24 +145,16 @@ async fn test_modify_account_password_use_case_with_confirmation_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_modify_account_password_use_case_with_confirmation_incorrect_old_password() {
+async fn test_modify_account_password_with_confirmation_incorrect_old_password() {
     let harness =
         ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::allowing())
             .await;
 
-    let account = harness.create_account().await;
-    let new_password = Password::try_new("new_password_1").unwrap();
-
-    pretty_assertions::assert_matches!(
-        harness
-            .modify_use_case
-            .execute(&account, new_password.clone())
-            .await,
-        Ok(_),
-    );
+    let initial_password = TEST_PASSWORD.clone();
+    let account = harness.create_account(initial_password).await;
 
     let wrong_old_password = Password::try_new("wrong-old-password").unwrap();
-    let new_password = Password::try_new("new_password_2").unwrap();
+    let new_password = Password::try_new("new_password").unwrap();
 
     pretty_assertions::assert_matches!(
         harness
@@ -172,6 +162,28 @@ async fn test_modify_account_password_use_case_with_confirmation_incorrect_old_p
             .execute_with_confirmation(&account, wrong_old_password, new_password)
             .await,
         Err(ModifyAccountPasswordWithConfirmationError::WrongOldPassword(_)),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_modify_account_password_with_confirmation_incorrect_not_enough_permissions() {
+    let harness =
+        ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::disallowing())
+            .await;
+
+    let initial_password = TEST_PASSWORD.clone();
+    let account = harness.create_account(initial_password.clone()).await;
+    let new_password = Password::try_new("new_password").unwrap();
+
+    pretty_assertions::assert_matches!(
+        harness
+            .modify_use_case
+            .execute_with_confirmation(&account, initial_password, new_password)
+            .await,
+        Err(ModifyAccountPasswordWithConfirmationError::Access(odf::AccessError::Unauthenticated(e)))
+            if e.to_string() == "Account 'user-without-access' is not authorized to modify account's password 'new-account'"
     );
 }
 
@@ -212,13 +224,19 @@ impl ModifyAccountPasswordUseCaseImplHarness {
         }
     }
 
-    async fn create_account(&self) -> Account {
+    async fn create_account(&self, password: Password) -> Account {
         let creator_account = Account::dummy();
         let account_name = odf::AccountName::new_unchecked("new-account");
 
         match self
             .create_use_case
-            .execute(&creator_account, &account_name, None)
+            .execute_ex(
+                &creator_account,
+                &account_name,
+                CreateAccountUseCaseOptions::builder()
+                    .password(password)
+                    .build(),
+            )
             .await
         {
             Ok(account) => account,
