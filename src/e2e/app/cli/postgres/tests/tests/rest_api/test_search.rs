@@ -24,18 +24,7 @@ kamu_cli_run_api_server_e2e_test!(
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_search_dataset_by_account_substring,
     options = Options::default()
         .with_multi_tenant()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-        kind: CLIConfig
-        version: 1
-        content:
-          users:
-            predefined:
-              - accountName: kamu
-                email: kamu@example.com
-                properties: [admin,canProvisionAccounts]
-        "#
-        ))
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER)
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
