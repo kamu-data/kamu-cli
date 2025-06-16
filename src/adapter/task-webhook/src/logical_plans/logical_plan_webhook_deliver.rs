@@ -17,7 +17,7 @@ pub struct LogicalPlanWebhookDeliver {
 }
 
 impl LogicalPlanWebhookDeliver {
-    pub const SERIALIZATION_TYPE_ID: &str = "DeliverWebhook";
+    pub const TYPE_ID: &str = "DeliverWebhook";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

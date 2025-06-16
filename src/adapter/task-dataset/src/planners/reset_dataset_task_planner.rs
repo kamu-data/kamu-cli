@@ -59,7 +59,7 @@ impl ResetDatasetTaskPlanner {
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
     fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanDatasetReset::SERIALIZATION_TYPE_ID
+        LogicalPlanDatasetReset::TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -69,7 +69,7 @@ impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
     ) -> Result<TaskDefinition, InternalError> {
         assert_eq!(
             logical_plan.plan_type,
-            LogicalPlanDatasetReset::SERIALIZATION_TYPE_ID,
+            LogicalPlanDatasetReset::TYPE_ID,
             "ResetDatasetTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
         );
 

@@ -19,7 +19,7 @@ pub struct LogicalPlanDatasetHardCompact {
 }
 
 impl LogicalPlanDatasetHardCompact {
-    pub const SERIALIZATION_TYPE_ID: &str = "HardCompactDataset";
+    pub const TYPE_ID: &str = "HardCompactDataset";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

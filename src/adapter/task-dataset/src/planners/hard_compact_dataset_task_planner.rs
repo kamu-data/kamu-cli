@@ -61,7 +61,7 @@ impl HardCompactDatasetTaskPlanner {
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
     fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID
+        LogicalPlanDatasetHardCompact::TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -71,7 +71,7 @@ impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
     ) -> Result<TaskDefinition, InternalError> {
         assert_eq!(
             logical_plan.plan_type,
-            LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID,
+            LogicalPlanDatasetHardCompact::TYPE_ID,
             "HardCompactDatasetTaskPlanner received an unsupported logical plan type: \
              {logical_plan:?}",
         );

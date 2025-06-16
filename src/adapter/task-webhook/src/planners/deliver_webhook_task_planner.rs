@@ -25,7 +25,7 @@ impl DeliverWebhookTaskPlanner {}
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
     fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanWebhookDeliver::SERIALIZATION_TYPE_ID
+        LogicalPlanWebhookDeliver::TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -35,7 +35,7 @@ impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
     ) -> Result<TaskDefinition, InternalError> {
         assert_eq!(
             logical_plan.plan_type,
-            LogicalPlanWebhookDeliver::SERIALIZATION_TYPE_ID,
+            LogicalPlanWebhookDeliver::TYPE_ID,
             "DeliverWebhookTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
         );
 

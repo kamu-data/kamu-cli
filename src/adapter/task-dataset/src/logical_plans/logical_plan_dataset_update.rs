@@ -17,7 +17,7 @@ pub struct LogicalPlanDatasetUpdate {
 }
 
 impl LogicalPlanDatasetUpdate {
-    pub const SERIALIZATION_TYPE_ID: &str = "UpdateDataset";
+    pub const TYPE_ID: &str = "UpdateDataset";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
