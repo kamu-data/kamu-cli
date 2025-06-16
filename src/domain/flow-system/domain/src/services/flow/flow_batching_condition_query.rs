@@ -7,23 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use super::*;
+use internal_error::InternalError;
+use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<UpdateDatasetTaskPlanner>();
-    catalog_builder.add::<HardCompactDatasetTaskPlanner>();
-    catalog_builder.add::<ResetDatasetTaskPlanner>();
+#[async_trait::async_trait]
+pub trait FlowBatchingConditionQuery: Send + Sync {
+    async fn interpret_input_dataset_result(
+        &self,
+        dataset_id: &odf::DatasetID,
+        input_result: &ts::TaskResult,
+    ) -> Result<FlowInputResultInterpretation, InternalError>;
+}
 
-    catalog_builder.add::<UpdateDatasetTaskRunner>();
-    catalog_builder.add::<HardCompactDatasetTaskRunner>();
-    catalog_builder.add::<ResetDatasetTaskRunner>();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    catalog_builder.add::<FlowTaskFactoryImpl>();
-    catalog_builder.add::<FlowBatchingConditionQueryImpl>();
+pub struct FlowInputResultInterpretation {
+    pub new_records_count: u64,
+    pub was_compacted: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

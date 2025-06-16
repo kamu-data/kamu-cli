@@ -16,29 +16,29 @@ use crate::queries::{Account, Dataset};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union)]
-pub(crate) enum FlowTriggerType {
+pub(crate) enum FlowTriggerInstance {
     Manual(FlowTriggerManual),
     AutoPolling(FlowTriggerAutoPolling),
     Push(FlowTriggerPush),
     InputDatasetFlow(FlowTriggerInputDatasetFlow),
 }
 
-impl FlowTriggerType {
+impl FlowTriggerInstance {
     pub async fn build(
-        trigger: &fs::FlowTriggerType,
+        trigger: &fs::FlowTriggerInstance,
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(match &trigger {
-            fs::FlowTriggerType::Manual(manual) => {
+            fs::FlowTriggerInstance::Manual(manual) => {
                 let initiator =
                     Account::from_account_id(ctx, manual.initiator_account_id.clone()).await?;
                 Self::Manual(FlowTriggerManual { initiator })
             }
-            fs::FlowTriggerType::AutoPolling(auto_polling) => {
+            fs::FlowTriggerInstance::AutoPolling(auto_polling) => {
                 Self::AutoPolling(auto_polling.clone().into())
             }
-            fs::FlowTriggerType::Push(push) => Self::Push(push.clone().into()),
-            fs::FlowTriggerType::InputDatasetFlow(input) => {
+            fs::FlowTriggerInstance::Push(push) => Self::Push(push.clone().into()),
+            fs::FlowTriggerInstance::InputDatasetFlow(input) => {
                 let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
 
                 let hdl = dataset_registry

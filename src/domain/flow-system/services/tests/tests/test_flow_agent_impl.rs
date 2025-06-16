@@ -221,7 +221,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     event_time: start_time,
                     flow_id,
                     flow_key: foo_flow_key.clone(),
-                    trigger: FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: start_time,
                     }),
                     config_snapshot: None,

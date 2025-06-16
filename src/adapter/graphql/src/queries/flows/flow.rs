@@ -17,7 +17,7 @@ use super::{
     FlowEvent,
     FlowOutcome,
     FlowStartCondition,
-    FlowTriggerType,
+    FlowTriggerInstance,
 };
 use crate::prelude::*;
 use crate::queries::{Account, Task};
@@ -172,8 +172,11 @@ impl Flow {
     }
 
     /// Primary flow trigger
-    async fn primary_trigger(&self, ctx: &Context<'_>) -> Result<FlowTriggerType, InternalError> {
-        FlowTriggerType::build(self.flow_state.primary_trigger(), ctx).await
+    async fn primary_trigger(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<FlowTriggerInstance, InternalError> {
+        FlowTriggerInstance::build(self.flow_state.primary_trigger(), ctx).await
     }
 
     /// Start condition

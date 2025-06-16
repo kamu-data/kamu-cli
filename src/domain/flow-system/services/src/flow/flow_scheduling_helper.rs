@@ -15,11 +15,10 @@ use internal_error::InternalError;
 use kamu_datasets::{
     DatasetEntryService,
     DatasetEntryServiceExt,
-    //     DatasetIncrementQueryService,
+    DatasetIncrementQueryService,
     DependencyGraphService,
 };
 use kamu_flow_system::*;
-//use kamu_task_system as ts;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
@@ -32,8 +31,9 @@ pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
+    flow_batching_condition_query: Arc<dyn FlowBatchingConditionQuery>,
     outbox: Arc<dyn Outbox>,
-    //  dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
+    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -46,8 +46,9 @@ impl FlowSchedulingHelper {
         flow_event_store: Arc<dyn FlowEventStore>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         flow_trigger_service: Arc<dyn FlowTriggerService>,
+        flow_batching_condition_query: Arc<dyn FlowBatchingConditionQuery>,
         outbox: Arc<dyn Outbox>,
-        //        dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
+        dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_entry_service: Arc<dyn DatasetEntryService>,
         time_source: Arc<dyn SystemTimeSource>,
@@ -57,8 +58,9 @@ impl FlowSchedulingHelper {
             flow_event_store,
             flow_configuration_service,
             flow_trigger_service,
+            flow_batching_condition_query,
             outbox,
-            //            dataset_increment_query_service,
+            dataset_increment_query_service,
             dependency_graph_service,
             dataset_entry_service,
             time_source,
@@ -83,7 +85,7 @@ impl FlowSchedulingHelper {
                         self.trigger_flow_common(
                             &flow_key,
                             Some(FlowTriggerRule::Batching(*batching_rule)),
-                            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+                            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                                 trigger_time: start_time,
                             }),
                             None,
@@ -138,7 +140,7 @@ impl FlowSchedulingHelper {
         &self,
         dataset_id: &odf::DatasetID,
         flow_type: DatasetFlowType,
-        trigger_type: FlowTriggerType,
+        trigger_type: FlowTriggerInstance,
         config_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
         let fk_dataset = FlowKeyDataset {
@@ -299,7 +301,7 @@ impl FlowSchedulingHelper {
         self.trigger_flow_common(
             flow_key,
             Some(FlowTriggerRule::Schedule(schedule.clone())),
-            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: start_time,
             }),
             None,
@@ -316,7 +318,7 @@ impl FlowSchedulingHelper {
         self.trigger_flow_common(
             flow_key,
             None,
-            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: start_time,
             }),
             None,
@@ -328,7 +330,7 @@ impl FlowSchedulingHelper {
         &self,
         flow_key: &FlowKey,
         trigger_rule_maybe: Option<FlowTriggerRule>,
-        trigger_type: FlowTriggerType,
+        trigger_type: FlowTriggerInstance,
         config_snapshot_maybe: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
@@ -531,33 +533,25 @@ impl FlowSchedulingHelper {
         let mut is_compacted = false;
 
         // Scan each accumulated trigger to decide
-        // TODO: refactor
-        /*for trigger in &flow.triggers {
+        for trigger in &flow.triggers {
             match trigger {
-                FlowTriggerType::InputDatasetFlow(trigger_type) => {
-                    match &trigger_type.task_result {
-                        ts::TaskResult::Empty | ts::TaskResult::ResetDatasetResult(_) => {}
-                        ts::TaskResult::CompactionDatasetResult(_) => {
-                            is_compacted = true;
-                        }
-                        ts::TaskResult::UpdateDatasetResult(update) => {
-                            // Compute increment since the first trigger by this dataset.
-                            // Note: there might have been multiple updates since that time.
-                            // We are only recording the first trigger of particular dataset.
-                            if let Some((old_head, _)) = update.try_as_increment() {
-                                let increment = self
-                                    .dataset_increment_query_service
-                                    .get_increment_since(&trigger_type.dataset_id, old_head)
-                                    .await
-                                    .int_err()?;
+                FlowTriggerInstance::InputDatasetFlow(trigger_type) => {
+                    let interpretation = self
+                        .flow_batching_condition_query
+                        .interpret_input_dataset_result(
+                            &trigger_type.dataset_id,
+                            &trigger_type.task_result,
+                        )
+                        .await?;
 
-                                accumulated_records_count += increment.num_records;
-                                accumulated_something = true;
-                            }
-                        }
+                    if interpretation.was_compacted {
+                        is_compacted = true;
+                    } else {
+                        accumulated_records_count += interpretation.new_records_count;
+                        accumulated_something = true;
                     }
                 }
-                FlowTriggerType::Push(trigger_type) => {
+                FlowTriggerInstance::Push(trigger_type) => {
                     let old_head_maybe = match trigger_type.result {
                         DatasetPushResult::HttpIngest(ref update_result) => {
                             update_result.old_head_maybe.as_ref()
@@ -583,7 +577,7 @@ impl FlowSchedulingHelper {
                 }
                 _ => {}
             }
-        }*/
+        }
 
         // The timeout for batching will happen at:
         let batching_deadline =
@@ -678,7 +672,7 @@ impl FlowSchedulingHelper {
         &self,
         flow_event_store: &dyn FlowEventStore,
         flow_key: FlowKey,
-        trigger_type: &FlowTriggerType,
+        trigger_type: &FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(flow_key = ?flow_key, trigger = ?trigger_type, "Creating new flow");

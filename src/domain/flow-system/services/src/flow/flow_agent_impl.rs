@@ -161,7 +161,7 @@ impl FlowAgentImpl {
                         .trigger_flow_common(
                             &flow.flow_key,
                             Some(FlowTriggerRule::Batching(b.active_batching_rule)),
-                            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+                            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                                 trigger_time: start_time,
                             }),
                             None,
@@ -498,7 +498,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 FlowSuccessFollowupMethod::Ignore => {}
                                 FlowSuccessFollowupMethod::TriggerDependent => {
                                     if let FlowKey::Dataset(fk_dataset) = &flow.flow_key {
-                                        let trigger_type = FlowTriggerType::InputDatasetFlow(
+                                        let trigger_type = FlowTriggerInstance::InputDatasetFlow(
                                             FlowTriggerInputDatasetFlow {
                                                 trigger_time: finish_time,
                                                 dataset_id: fk_dataset.dataset_id.clone(),
@@ -694,7 +694,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
 
         let (trigger_type, dataset_id) = match message {
             DatasetExternallyChangedMessage::HttpIngest(update_message) => (
-                FlowTriggerType::Push(FlowTriggerPush {
+                FlowTriggerInstance::Push(FlowTriggerPush {
                     trigger_time: time_source.now(),
                     source_name: None,
                     dataset_id: update_message.dataset_id.clone(),
@@ -706,7 +706,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
                 &update_message.dataset_id,
             ),
             DatasetExternallyChangedMessage::SmartTransferProtocolSync(update_message) => (
-                FlowTriggerType::Push(FlowTriggerPush {
+                FlowTriggerInstance::Push(FlowTriggerPush {
                     trigger_time: time_source.now(),
                     source_name: None,
                     dataset_id: update_message.dataset_id.clone(),

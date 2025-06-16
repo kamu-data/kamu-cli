@@ -165,10 +165,10 @@ impl std::fmt::Display for FlowSystemTestListener {
                             f,
                             " {}",
                             match flow_state.primary_trigger() {
-                                FlowTriggerType::Manual(_) => String::from("Manual"),
-                                FlowTriggerType::AutoPolling(_) => String::from("AutoPolling"),
-                                FlowTriggerType::Push(_) => String::from("Push"),
-                                FlowTriggerType::InputDatasetFlow(i) => format!(
+                                FlowTriggerInstance::Manual(_) => String::from("Manual"),
+                                FlowTriggerInstance::AutoPolling(_) => String::from("AutoPolling"),
+                                FlowTriggerInstance::Push(_) => String::from("Push"),
+                                FlowTriggerInstance::InputDatasetFlow(i) => format!(
                                     "Input({})",
                                     state
                                         .dataset_display_names

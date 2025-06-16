@@ -19,6 +19,7 @@ use kamu_accounts::{
     LoggedAccount,
 };
 use kamu_adapter_task_dataset::{
+    FlowBatchingConditionQueryImpl,
     FlowTaskFactoryImpl,
     InputDatasetCompactedError,
     TaskErrorDatasetUpdate,
@@ -2490,7 +2491,7 @@ async fn test_history_of_completed_flow() {
     harness
         .mimic_flow_secondary_trigger(
             flow_id,
-            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: Utc::now(),
             }),
         )
@@ -3100,7 +3101,8 @@ impl FlowRunsHarness {
                 ))
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>()
-                .add::<FlowTaskFactoryImpl>();
+                .add::<FlowTaskFactoryImpl>()
+                .add::<FlowBatchingConditionQueryImpl>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 
@@ -3241,7 +3243,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn mimic_flow_secondary_trigger(&self, flow_id: &str, flow_trigger: FlowTriggerType) {
+    async fn mimic_flow_secondary_trigger(&self, flow_id: &str, flow_trigger: FlowTriggerInstance) {
         let flow_event_store = self
             .catalog_authorized
             .get_one::<dyn FlowEventStore>()

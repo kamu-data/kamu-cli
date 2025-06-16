@@ -1887,7 +1887,7 @@ type Flow {
 	"""
 	Primary flow trigger
 	"""
-	primaryTrigger: FlowTriggerType!
+	primaryTrigger: FlowTriggerInstance!
 	"""
 	Start condition
 	"""
@@ -2048,7 +2048,7 @@ type FlowEventAborted implements FlowEvent {
 type FlowEventInitiated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	trigger: FlowTriggerType!
+	trigger: FlowTriggerInstance!
 }
 
 type FlowEventScheduledForActivation implements FlowEvent {
@@ -2074,7 +2074,7 @@ type FlowEventTaskChanged implements FlowEvent {
 type FlowEventTriggerAdded implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	trigger: FlowTriggerType!
+	trigger: FlowTriggerInstance!
 }
 
 type FlowFailedError {
@@ -2208,6 +2208,8 @@ type FlowTriggerInputDatasetFlow {
 	flowId: FlowID!
 }
 
+union FlowTriggerInstance = FlowTriggerManual | FlowTriggerAutoPolling | FlowTriggerPush | FlowTriggerInputDatasetFlow
+
 type FlowTriggerManual {
 	initiator: Account!
 }
@@ -2217,8 +2219,6 @@ type FlowTriggerPush {
 }
 
 union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression
-
-union FlowTriggerType = FlowTriggerManual | FlowTriggerAutoPolling | FlowTriggerPush | FlowTriggerInputDatasetFlow
 
 type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowTriggerResult {
 	message: String!
