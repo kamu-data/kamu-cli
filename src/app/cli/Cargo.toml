@@ -58,7 +58,8 @@ kamu = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-auth-web3 = { workspace = true, features = ["did-pkh"] }
 kamu-adapter-flight-sql = { workspace = true }
-kamu-adapter-flow-task = { workspace = true }
+kamu-adapter-task-dataset = { workspace = true }
+kamu-adapter-task-webhook = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
     "e2e",

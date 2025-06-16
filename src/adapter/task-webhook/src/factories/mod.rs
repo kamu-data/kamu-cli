@@ -7,12 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod task_definition_dataset_hard_compact;
-mod task_definition_dataset_reset;
-mod task_definition_dataset_update;
-mod task_definition_webhook_deliver;
+mod webhook_task_factory_impl;
 
-pub use task_definition_dataset_hard_compact::*;
-pub use task_definition_dataset_reset::*;
-pub use task_definition_dataset_update::*;
-pub use task_definition_webhook_deliver::*;
+pub use webhook_task_factory_impl::*;

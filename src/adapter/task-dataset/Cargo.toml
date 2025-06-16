@@ -1,6 +1,6 @@
 [package]
-name = "kamu-adapter-flow-task"
-description = "Adapter for Kamu's flow, task abstract interactions with other systems."
+name = "kamu-adapter-task-dataset"
+description = "Adapter for Kamu's task system's abstract interactions with dataset operations."
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -47,4 +47,3 @@ uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
-test-log = { version = "0.2", features = ["trace"] }

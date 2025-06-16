@@ -12,7 +12,7 @@ use std::str::FromStr;
 use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
-use kamu_adapter_flow_task::{
+use kamu_adapter_task_dataset::{
     LogicalPlanDatasetHardCompact,
     LogicalPlanDatasetReset,
     LogicalPlanDatasetUpdate,

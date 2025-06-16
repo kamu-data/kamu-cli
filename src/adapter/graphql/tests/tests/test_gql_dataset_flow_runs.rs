@@ -18,7 +18,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     LoggedAccount,
 };
-use kamu_adapter_flow_task::FlowTaskFactoryImpl;
+use kamu_adapter_task_dataset::FlowTaskFactoryImpl;
 use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
 use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;

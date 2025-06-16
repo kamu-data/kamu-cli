@@ -633,7 +633,8 @@ pub fn configure_server_catalog(
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
-    kamu_adapter_flow_task::register_dependencies(&mut b);
+    kamu_adapter_task_dataset::register_dependencies(&mut b);
+    kamu_adapter_task_webhook::register_dependencies(&mut b);
 
     kamu_task_system_services::register_dependencies(&mut b);
 

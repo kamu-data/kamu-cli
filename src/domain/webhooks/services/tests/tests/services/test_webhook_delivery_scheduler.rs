@@ -13,7 +13,7 @@ use chrono::Utc;
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
-use kamu_adapter_flow_task::{LogicalPlanWebhookDeliver, WebhookTaskFactoryImpl};
+use kamu_adapter_task_webhook::{LogicalPlanWebhookDeliver, WebhookTaskFactoryImpl};
 use kamu_datasets::{
     DatasetEntry,
     DatasetReferenceMessage,
