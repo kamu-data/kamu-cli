@@ -14,8 +14,9 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - `kamu system api-server gql-query`: support for authorization and, as a result, mutation requests (#1273).
+- GQL: `AccountMut::modifyPasswordWithConfirmation()`: for user's password change (#1277).
 ### Changed
-- Panic's now also log a correct tracing message.
+- Panic's now also logs a correct tracing message.
 - `kamu`: improved logging, especially in failure cases (#1273).
 - `kamu --account <NAME>`: added checks for account existence (multi-tenant mode) (#1273).
 - `kamu init`: flush database after successful command completion (#1273).
