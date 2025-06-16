@@ -17,10 +17,12 @@ use kamu_accounts::*;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
+    AccountServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
     OAuthDeviceCodeGeneratorDefault,
@@ -81,6 +83,9 @@ impl Harness {
                 .add_value(SystemTimeSourceStub::new())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<LoginPasswordAuthProvider>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
                 .add_value(JwtAuthenticationConfig::default())
                 .add::<DatabaseTransactionRunner>()
                 .add::<AccessTokenServiceImpl>()

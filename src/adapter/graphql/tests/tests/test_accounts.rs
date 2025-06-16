@@ -614,11 +614,7 @@ async fn test_modify_password_non_admin() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
-        ["Access restricted to administrators only"],
-        *res.error_messages(),
-        "{res:?}"
-    );
+    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

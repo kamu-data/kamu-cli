@@ -183,7 +183,7 @@ async fn test_modify_account_password_with_confirmation_incorrect_not_enough_per
             .execute_with_confirmation(&account, initial_password, new_password)
             .await,
         Err(ModifyAccountPasswordWithConfirmationError::Access(odf::AccessError::Unauthenticated(e)))
-            if e.to_string() == "Account 'user-without-access' is not authorized to modify account's password 'new-account'"
+            if e.to_string() == "Account 'user-without-access' is not authorized to modify account's password with confirmation 'new-account'"
     );
 }
 
