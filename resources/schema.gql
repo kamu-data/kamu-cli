@@ -152,7 +152,7 @@ type AccountMut {
 	"""
 	modifyPassword(password: AccountPassword!): ModifyPasswordResult!
 	"""
-	Reset password for a selected account. Allowed only for admin users
+	Change password with confirmation
 	"""
 	modifyPasswordWithConfirmation(oldPassword: AccountPassword!, newPassword: AccountPassword!): ModifyPasswordResult!
 	"""
@@ -2470,15 +2470,15 @@ type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetF
 	message: String!
 }
 
-type ModifyPasswordIncorrectPassword implements ModifyPasswordResult {
-	message: String!
-}
-
 interface ModifyPasswordResult {
 	message: String!
 }
 
 type ModifyPasswordSuccess implements ModifyPasswordResult {
+	message: String!
+}
+
+type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 	message: String!
 }
 

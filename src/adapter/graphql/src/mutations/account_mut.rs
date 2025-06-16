@@ -11,7 +11,7 @@ use kamu_accounts::*;
 
 use super::AccountFlowsMut;
 use crate::prelude::*;
-use crate::{AdminGuard, utils};
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,9 +109,8 @@ impl AccountMut {
         }
     }
 
-    /// Reset password for a selected account. Allowed only for admin users
+    /// Change password with confirmation
     #[tracing::instrument(level = "info", name = AccountMut_modify_password_with_confirmation, skip_all)]
-    #[graphql(guard = "AdminGuard")]
     async fn modify_password_with_confirmation(
         &self,
         ctx: &Context<'_>,
