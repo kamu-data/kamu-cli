@@ -16,14 +16,14 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FlowTriggerType {
+pub enum FlowTriggerInstance {
     Manual(FlowTriggerManual),
     AutoPolling(FlowTriggerAutoPolling),
     Push(FlowTriggerPush),
     InputDatasetFlow(FlowTriggerInputDatasetFlow),
 }
 
-impl FlowTriggerType {
+impl FlowTriggerInstance {
     pub fn trigger_time(&self) -> DateTime<Utc> {
         match self {
             Self::Manual(t) => t.trigger_time,
@@ -76,7 +76,7 @@ impl FlowTriggerType {
     }
 
     /// Checks if new trigger is unique compared to the existing triggers
-    pub fn is_unique_vs(&self, existing_triggers: &[FlowTriggerType]) -> bool {
+    pub fn is_unique_vs(&self, existing_triggers: &[FlowTriggerInstance]) -> bool {
         // Try finding a similar existing trigger and abort early, when found
         for existing in existing_triggers {
             match (self, existing) {
@@ -181,19 +181,19 @@ mod tests {
 
     static TEST_DATASET_ID: LazyLock<odf::DatasetID> =
         LazyLock::new(|| odf::DatasetID::new_seeded_ed25519(b"test"));
-    static AUTO_POLLING_TRIGGER: LazyLock<FlowTriggerType> = LazyLock::new(|| {
-        FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+    static AUTO_POLLING_TRIGGER: LazyLock<FlowTriggerInstance> = LazyLock::new(|| {
+        FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
             trigger_time: Utc::now(),
         })
     });
-    static MANUAL_TRIGGER: LazyLock<FlowTriggerType> = LazyLock::new(|| {
-        FlowTriggerType::Manual(FlowTriggerManual {
+    static MANUAL_TRIGGER: LazyLock<FlowTriggerInstance> = LazyLock::new(|| {
+        FlowTriggerInstance::Manual(FlowTriggerManual {
             trigger_time: Utc::now(),
             initiator_account_id: DEFAULT_ACCOUNT_ID.clone(),
         })
     });
-    static PUSH_SOURCE_TRIGGER: LazyLock<FlowTriggerType> = LazyLock::new(|| {
-        FlowTriggerType::Push(FlowTriggerPush {
+    static PUSH_SOURCE_TRIGGER: LazyLock<FlowTriggerInstance> = LazyLock::new(|| {
+        FlowTriggerInstance::Push(FlowTriggerPush {
             trigger_time: Utc::now(),
             source_name: None,
             dataset_id: TEST_DATASET_ID.clone(),
@@ -203,8 +203,8 @@ mod tests {
             }),
         })
     });
-    static INPUT_DATASET_TRIGGER: LazyLock<FlowTriggerType> = LazyLock::new(|| {
-        FlowTriggerType::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+    static INPUT_DATASET_TRIGGER: LazyLock<FlowTriggerInstance> = LazyLock::new(|| {
+        FlowTriggerInstance::InputDatasetFlow(FlowTriggerInputDatasetFlow {
             trigger_time: Utc::now(),
             dataset_id: TEST_DATASET_ID.clone(),
             flow_type: DatasetFlowType::Ingest,
@@ -236,7 +236,7 @@ mod tests {
 
         let initiator_account_id = odf::AccountID::new_seeded_ed25519(b"different");
         assert!(
-            MANUAL_TRIGGER.is_unique_vs(&[FlowTriggerType::Manual(FlowTriggerManual {
+            MANUAL_TRIGGER.is_unique_vs(&[FlowTriggerInstance::Manual(FlowTriggerManual {
                 trigger_time: Utc::now(),
                 initiator_account_id,
             })])
@@ -255,7 +255,7 @@ mod tests {
         ]));
 
         assert!(
-            PUSH_SOURCE_TRIGGER.is_unique_vs(&[FlowTriggerType::Push(FlowTriggerPush {
+            PUSH_SOURCE_TRIGGER.is_unique_vs(&[FlowTriggerInstance::Push(FlowTriggerPush {
                 trigger_time: Utc::now(),
                 source_name: Some("some-source".to_string()),
                 dataset_id: TEST_DATASET_ID.clone(),
@@ -280,7 +280,7 @@ mod tests {
 
         // Test unrelated flow for same dataset
         assert!(
-            INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTriggerType::InputDatasetFlow(
+            INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTriggerInstance::InputDatasetFlow(
                 FlowTriggerInputDatasetFlow {
                     trigger_time: Utc::now(),
                     dataset_id: TEST_DATASET_ID.clone(),
@@ -293,7 +293,7 @@ mod tests {
 
         // Test same flow type for different dataset
         assert!(
-            INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTriggerType::InputDatasetFlow(
+            INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTriggerInstance::InputDatasetFlow(
                 FlowTriggerInputDatasetFlow {
                     trigger_time: Utc::now(),
                     dataset_id: odf::DatasetID::new_seeded_ed25519(b"different"),

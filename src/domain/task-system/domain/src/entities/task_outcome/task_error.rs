@@ -92,7 +92,7 @@ impl<'de> Deserialize<'de> for TaskError {
             }
         }
 
-        deserializer.deserialize_map(TaskErrorVisitor)
+        deserializer.deserialize_any(TaskErrorVisitor)
     }
 }
 

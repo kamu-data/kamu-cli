@@ -92,7 +92,7 @@ impl<'de> Deserialize<'de> for TaskResult {
             }
         }
 
-        deserializer.deserialize_map(TaskResultVisitor)
+        deserializer.deserialize_any(TaskResultVisitor)
     }
 }
 

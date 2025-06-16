@@ -263,7 +263,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .trigger_flow_common(
                 &flow_key,
                 None,
-                FlowTriggerType::Manual(FlowTriggerManual {
+                FlowTriggerInstance::Manual(FlowTriggerManual {
                     trigger_time: activation_time,
                     initiator_account_id,
                 }),
