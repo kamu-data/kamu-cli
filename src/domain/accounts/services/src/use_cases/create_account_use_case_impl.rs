@@ -81,28 +81,6 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        maybe_email: Option<Email>,
-    ) -> Result<Account, CreateAccountError> {
-        let email = if let Some(email) = maybe_email {
-            email
-        } else {
-            Self::generate_email(creator_account, account_name)?
-        };
-
-        let created_account = self
-            .account_service
-            .create_password_account(account_name, email)
-            .await?;
-
-        self.notify_account_created(&created_account).await?;
-
-        Ok(created_account)
-    }
-
-    async fn execute_ex(
-        &self,
-        creator_account: &Account,
-        account_name: &odf::AccountName,
         options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError> {
         let email = if let Some(email) = options.email {
@@ -119,7 +97,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
         let created_account = self
             .account_service
-            .create_password_account_ex(account_name, password, email)
+            .create_password_account(account_name, password, email)
             .await?;
 
         self.notify_account_created(&created_account).await?;

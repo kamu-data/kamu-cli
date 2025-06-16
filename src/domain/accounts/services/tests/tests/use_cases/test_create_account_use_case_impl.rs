@@ -18,6 +18,7 @@ use kamu_accounts::{
     AccountLifecycleMessage,
     AccountService,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     DidSecretEncryptionConfig,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     PredefinedAccountsConfig,
@@ -87,7 +88,10 @@ async fn test_create_account_use_case() {
     assert_matches!(
         harness
             .use_case
-            .execute(&creator_account, &new_account_name_with_email, Some(new_account_email.clone()))
+            .execute(
+                &creator_account,
+                &new_account_name_with_email,
+                CreateAccountUseCaseOptions::builder().email(new_account_email.clone()).build())
             .await,
         Ok(account)
             if account.email == new_account_email
@@ -98,7 +102,11 @@ async fn test_create_account_use_case() {
     assert_matches!(
         harness
             .use_case
-            .execute(&creator_account, &new_account_name_without_email, None)
+            .execute(
+                &creator_account,
+                &new_account_name_without_email,
+                CreateAccountUseCaseOptions::default()
+            )
             .await,
         Ok(account)
             if account.email == new_account_name_without_generated_email

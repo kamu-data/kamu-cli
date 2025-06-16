@@ -159,62 +159,6 @@ impl AccountService for AccountServiceImpl {
     async fn create_password_account(
         &self,
         account_name: &odf::AccountName,
-        email: email_utils::Email,
-    ) -> Result<Account, CreateAccountError> {
-        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
-        let account = Account {
-            id: account_id,
-            account_name: account_name.clone(),
-            email,
-            display_name: account_name.to_string(),
-            account_type: AccountType::User,
-            avatar_url: None,
-            registered_at: self.time_source.now(),
-            provider: AccountProvider::Password.to_string(),
-            provider_identity_key: String::from(account_name.as_str()),
-        };
-
-        self.account_repo.save_account(&account).await?;
-
-        {
-            const RANDOM_PASSWORD_LENGTH: usize = 16;
-
-            let random_password = Password::try_new(random_strings::get_random_string(
-                None,
-                RANDOM_PASSWORD_LENGTH,
-                &random_strings::AllowedSymbols::AsciiSymbols,
-            ))
-            .int_err()?;
-
-            self.save_account_password(&account, &random_password)
-                .await?;
-        }
-
-        if let Some(did_secret_encryption_key) = &self.did_secret_encryption_key {
-            use odf::metadata::AsStackString;
-
-            let account_id = account.id.as_stack_string();
-            let did_secret_key = DidSecretKey::try_new(
-                &account_key.into(),
-                did_secret_encryption_key.expose_secret(),
-            )
-            .int_err()?;
-
-            self.did_secret_key_repo
-                .save_did_secret_key(
-                    &DidEntity::new_account(account_id.as_str()),
-                    &did_secret_key,
-                )
-                .await
-                .int_err()?;
-        }
-
-        Ok(account)
-    }
-
-    async fn create_password_account_ex(
-        &self,
-        account_name: &odf::AccountName,
         password: Password,
         email: Email,
     ) -> Result<Account, CreateAccountError> {

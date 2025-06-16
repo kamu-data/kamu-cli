@@ -21,6 +21,7 @@ use kamu_accounts::{
     DidSecretKeyRepository,
     PredefinedAccountsConfig,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
+    TEST_PASSWORD,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
@@ -130,7 +131,11 @@ async fn test_create_account() {
 
     let new_account_name = AccountName::new_unchecked("new_account");
     account_svc
-        .create_password_account(&new_account_name, Email::parse("new_email@com").unwrap())
+        .create_password_account(
+            &new_account_name,
+            TEST_PASSWORD.clone(),
+            Email::parse("new_email@com").unwrap(),
+        )
         .await
         .unwrap();
 

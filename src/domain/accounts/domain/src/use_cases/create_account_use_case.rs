@@ -19,13 +19,6 @@ pub trait CreateAccountUseCase: Send + Sync {
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        email_maybe: Option<Email>,
-    ) -> Result<Account, CreateAccountError>;
-
-    async fn execute_ex(
-        &self,
-        creator_account: &Account,
-        account_name: &odf::AccountName,
         options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
 }

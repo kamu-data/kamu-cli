@@ -164,7 +164,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(any(feature = "testing", test), mockall::automock)]
+#[cfg(any(feature = "testing", test))]
 impl MockAccountAuthorizationHelper {
     pub fn allowing() -> Self {
         let mut mock = Self::new();

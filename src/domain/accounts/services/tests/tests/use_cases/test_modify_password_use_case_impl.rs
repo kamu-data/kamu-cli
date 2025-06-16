@@ -228,9 +228,8 @@ impl ModifyAccountPasswordUseCaseImplHarness {
         let creator_account = Account::dummy();
         let account_name = odf::AccountName::new_unchecked("new-account");
 
-        match self
-            .create_use_case
-            .execute_ex(
+        self.create_use_case
+            .execute(
                 &creator_account,
                 &account_name,
                 CreateAccountUseCaseOptions::builder()
@@ -238,10 +237,7 @@ impl ModifyAccountPasswordUseCaseImplHarness {
                     .build(),
             )
             .await
-        {
-            Ok(account) => account,
-            Err(e) => panic!("{e}"),
-        }
+            .unwrap()
     }
 }
 
