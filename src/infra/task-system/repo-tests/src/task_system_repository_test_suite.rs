@@ -279,7 +279,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     let event_2_3 = TaskEventFinished {
         event_time: Utc::now(),
         task_id: task_id_2,
-        outcome: TaskOutcome::Failed(TaskError::Empty),
+        outcome: TaskOutcome::Failed(TaskError::empty()),
     };
 
     event_store
@@ -604,7 +604,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
                 TaskEventFinished {
                     event_time: Utc::now(),
                     task_id: task_id_1,
-                    outcome: TaskOutcome::Success(TaskResult::Empty),
+                    outcome: TaskOutcome::Success(TaskResult::empty()),
                 }
                 .into(),
             ],
@@ -691,7 +691,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
                 TaskEventFinished {
                     event_time: Utc::now(),
                     task_id: task_ids[1],
-                    outcome: TaskOutcome::Success(TaskResult::Empty),
+                    outcome: TaskOutcome::Success(TaskResult::empty()),
                 }
                 .into(),
             ],
@@ -737,7 +737,7 @@ pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
                 TaskEventFinished {
                     event_time: Utc::now(),
                     task_id: task_ids[0],
-                    outcome: TaskOutcome::Success(TaskResult::Empty),
+                    outcome: TaskOutcome::Success(TaskResult::empty()),
                 }
                 .into(),
             ],
@@ -922,7 +922,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
                 TaskEventFinished {
                     event_time: Utc::now(),
                     task_id: task_ids[1],
-                    outcome: TaskOutcome::Success(TaskResult::Empty),
+                    outcome: TaskOutcome::Success(TaskResult::empty()),
                 }
                 .into(),
             ],

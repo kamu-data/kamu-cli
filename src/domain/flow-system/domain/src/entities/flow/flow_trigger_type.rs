@@ -209,12 +209,7 @@ mod tests {
             dataset_id: TEST_DATASET_ID.clone(),
             flow_type: DatasetFlowType::Ingest,
             flow_id: FlowID::new(5),
-            task_result: ts::TaskResult::UpdateDatasetResult(ts::TaskUpdateDatasetResult {
-                pull_result: kamu_core::PullResult::Updated {
-                    old_head: None,
-                    new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
-                },
-            }),
+            task_result: ts::TaskResult::empty(),
         })
     });
 
@@ -291,7 +286,7 @@ mod tests {
                     dataset_id: TEST_DATASET_ID.clone(),
                     flow_type: DatasetFlowType::HardCompaction, // unrelated
                     flow_id: FlowID::new(7),
-                    task_result: ts::TaskResult::Empty
+                    task_result: ts::TaskResult::empty()
                 }
             )])
         );
@@ -304,7 +299,7 @@ mod tests {
                     dataset_id: odf::DatasetID::new_seeded_ed25519(b"different"),
                     flow_type: DatasetFlowType::Ingest,
                     flow_id: FlowID::new(7),
-                    task_result: ts::TaskResult::Empty
+                    task_result: ts::TaskResult::empty()
                 }
             )])
         );

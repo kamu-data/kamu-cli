@@ -29,7 +29,7 @@ impl ProbeTaskRunner {
             .probe
             .end_with_outcome
             .clone()
-            .unwrap_or(TaskOutcome::Success(TaskResult::Empty)))
+            .unwrap_or(TaskOutcome::Success(TaskResult::empty())))
     }
 }
 

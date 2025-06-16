@@ -25,7 +25,7 @@ impl TaskDefinitionWebhookDeliver {
 }
 
 #[async_trait::async_trait]
-impl ts::TaskDefinitionBody for TaskDefinitionWebhookDeliver {
+impl ts::TaskDefinitionInner for TaskDefinitionWebhookDeliver {
     fn as_any(&self) -> &dyn Any {
         self
     }

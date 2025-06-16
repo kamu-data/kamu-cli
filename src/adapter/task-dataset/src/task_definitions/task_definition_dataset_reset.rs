@@ -25,7 +25,7 @@ impl TaskDefinitionDatasetReset {
 }
 
 #[async_trait::async_trait]
-impl ts::TaskDefinitionBody for TaskDefinitionDatasetReset {
+impl ts::TaskDefinitionInner for TaskDefinitionDatasetReset {
     fn as_any(&self) -> &dyn Any {
         self
     }

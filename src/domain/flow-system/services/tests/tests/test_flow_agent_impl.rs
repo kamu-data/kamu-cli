@@ -16,6 +16,9 @@ use kamu_adapter_task_dataset::{
     LogicalPlanDatasetHardCompact,
     LogicalPlanDatasetReset,
     LogicalPlanDatasetUpdate,
+    TaskResultDatasetHardCompact,
+    TaskResultDatasetReset,
+    TaskResultDatasetUpdate,
 };
 use kamu_core::{CompactionResult, PullResult, ResetResult};
 use kamu_datasets::DatasetIntervalIncrement;
@@ -80,7 +83,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                         plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                         payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -97,7 +100,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -259,7 +262,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(110),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -349,7 +352,7 @@ async fn test_cron_config() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::seconds(6),
-                    finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -474,7 +477,7 @@ async fn test_manual_trigger() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -491,7 +494,7 @@ async fn test_manual_trigger() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(60),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -508,7 +511,7 @@ async fn test_manual_trigger() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::milliseconds(100),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -700,7 +703,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -717,7 +720,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(60),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -734,7 +737,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::milliseconds(100),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -910,7 +913,7 @@ async fn test_manual_trigger_compaction() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
@@ -928,7 +931,7 @@ async fn test_manual_trigger_compaction() {
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                   expected_logical_plan: LogicalPlan {
                     plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                     payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
@@ -1064,10 +1067,10 @@ async fn test_manual_trigger_reset() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(20),
                     finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(
-                      TaskResult::ResetDatasetResult(TaskResetDatasetResult {
+                      TaskResultDatasetReset {
                         reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-slice") },
-                      })
-                    ))),
+                      }.into_task_result())
+                    )),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetReset::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetReset {
@@ -1200,9 +1203,9 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               dataset_id: Some(foo_id.clone()),
               run_since_start: Duration::milliseconds(20),
               finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(
-                TaskResult::ResetDatasetResult(TaskResetDatasetResult {
+                TaskResultDatasetReset {
                   reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-slice") }
-                })
+                }.into_task_result()
               ))),
               expected_logical_plan: LogicalPlan {
                 plan_type: LogicalPlanDatasetReset::TYPE_ID.to_string(),
@@ -1225,15 +1228,15 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               finish_in_with: Some(
                 (
                   Duration::milliseconds(70),
-                  TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                  TaskOutcome::Success(TaskResultDatasetHardCompact {
                     compaction_result: CompactionResult::Success {
                       old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
                       new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                       old_num_blocks: 5,
                       new_num_blocks: 4,
                     }
-                  }
-                ))
+                  }.into_task_result()
+                )
               )),
               expected_logical_plan: LogicalPlan {
                 plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
@@ -1256,15 +1259,15 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               finish_in_with: Some(
                 (
                   Duration::milliseconds(40),
-                  TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                  TaskOutcome::Success(TaskResultDatasetHardCompact {
                     compaction_result: CompactionResult::Success {
                       old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
                       new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                       old_num_blocks: 8,
                       new_num_blocks: 3,
                     }
-                  }
-                ))
+                  }.into_task_result()
+                )
               )),
               expected_logical_plan: LogicalPlan {
                 plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
@@ -1400,7 +1403,7 @@ async fn test_manual_trigger_compaction_with_config() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(30),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
@@ -1512,121 +1515,121 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+        // Run API service
+        res = harness.flow_agent.run() => res.int_err(),
 
-      // Run simulation script and task drivers
-      _ = async {
-          let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-              flow_key: foo_flow_key,
-              run_since_start: Duration::milliseconds(10),
-              initiator_id: None,
-              flow_configuration_snapshot_maybe: None,
-          });
-          let trigger0_handle = trigger0_driver.run();
+        // Run simulation script and task drivers
+        _ = async {
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                flow_key: foo_flow_key,
+                run_since_start: Duration::milliseconds(10),
+                initiator_id: None,
+                flow_configuration_snapshot_maybe: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-          // Task 0: "foo" start running at 20ms, finish at 90ms
-          let task0_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(0),
-              task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-              dataset_id: Some(foo_id.clone()),
-              run_since_start: Duration::milliseconds(20),
-              finish_in_with: Some(
-                (
-                  Duration::milliseconds(70),
-                  TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
-                    compaction_result: CompactionResult::Success {
-                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
-                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                      old_num_blocks: 5,
-                      new_num_blocks: 4,
-                    }
-                  }))
-                )
-              ),
-              expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                  dataset_id: foo_id.clone(),
-                  max_slice_size: Some(max_slice_size),
-                  max_slice_records: Some(max_slice_records),
-                  keep_metadata_only: false,
-                }).unwrap(),
-              },
-          });
-          let task0_handle = task0_driver.run();
+            // Task 0: "foo" start running at 20ms, finish at 90ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some(
+                  (
+                    Duration::milliseconds(70),
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
+                      compaction_result: CompactionResult::Success {
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                        old_num_blocks: 5,
+                        new_num_blocks: 4,
+                      }
+                    }.into_task_result())
+                  )
+                ),
+                expected_logical_plan: LogicalPlan {
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
+                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
+                    dataset_id: foo_id.clone(),
+                    max_slice_size: Some(max_slice_size),
+                    max_slice_records: Some(max_slice_records),
+                    keep_metadata_only: false,
+                  }).unwrap(),
+                },
+            });
+            let task0_handle = task0_driver.run();
 
-          // Task 1: "foo_baz" start running at 110ms, finish at 180sms
-          let task1_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(1),
-              task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-              dataset_id: Some(foo_baz_id.clone()),
-              run_since_start: Duration::milliseconds(110),
-              finish_in_with: Some(
-                (
-                  Duration::milliseconds(70),
-                  TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
-                    compaction_result: CompactionResult::Success {
-                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
-                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
-                      old_num_blocks: 5,
-                      new_num_blocks: 4,
-                    }
-                  }
-                ))
-              )),
-              expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                  dataset_id: foo_baz_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
-                }).unwrap(),
-              },
-          });
-          let task1_handle = task1_driver.run();
+            // Task 1: "foo_baz" start running at 110ms, finish at 180sms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_baz_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: Some(
+                  (
+                    Duration::milliseconds(70),
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
+                      compaction_result: CompactionResult::Success {
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
+                        old_num_blocks: 5,
+                        new_num_blocks: 4,
+                      }
+                    }.into_task_result()
+                  )
+                )),
+                expected_logical_plan: LogicalPlan {
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
+                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
+                    dataset_id: foo_baz_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                    keep_metadata_only: true,
+                  }).unwrap(),
+                },
+            });
+            let task1_handle = task1_driver.run();
 
-          // Task 2: "foo_bar" start running at 200ms, finish at 240ms
-          let task2_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(2),
-              task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-              dataset_id: Some(foo_bar_id.clone()),
-              run_since_start: Duration::milliseconds(200),
-              finish_in_with: Some(
-                (
-                  Duration::milliseconds(40),
-                  TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
-                    compaction_result: CompactionResult::Success {
-                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
-                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
-                      old_num_blocks: 8,
-                      new_num_blocks: 3,
-                    }
-                  }
-                ))
-              )),
-              expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                  dataset_id: foo_bar_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
-                }).unwrap(),
-              },
-          });
-          let task2_handle = task2_driver.run();
+            // Task 2: "foo_bar" start running at 200ms, finish at 240ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_bar_id.clone()),
+                run_since_start: Duration::milliseconds(200),
+                finish_in_with: Some(
+                  (
+                    Duration::milliseconds(40),
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
+                      compaction_result: CompactionResult::Success {
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
+                        old_num_blocks: 8,
+                        new_num_blocks: 3,
+                      }
+                    }.into_task_result()
+                  )
+                )),
+                expected_logical_plan: LogicalPlan {
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
+                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
+                    dataset_id: foo_bar_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                    keep_metadata_only: true,
+                  }).unwrap(),
+                },
+            });
+            let task2_handle = task2_driver.run();
 
-          // Main simulation script
-          let main_handle = async {
-              harness.advance_time(Duration::milliseconds(300)).await;
-          };
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(300)).await;
+            };
 
-          tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
-      } => Ok(())
-  }
-  .unwrap();
+            tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
+        } => Ok(())
+    }
+    .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -1770,14 +1773,14 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
                       compaction_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                       }
-                    }))
+                    }.into_task_result())
                   )
                 ),
                 expected_logical_plan: LogicalPlan {
@@ -1801,15 +1804,15 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
                       compaction_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                       }
-                    }
-                  ))
+                    }.into_task_result()
+                  )
                 )),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
@@ -1832,15 +1835,15 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(40),
-                    TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
                       compaction_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                         old_num_blocks: 8,
                         new_num_blocks: 3,
                       }
-                    }
-                  ))
+                    }.into_task_result()
+                  )
                 )),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
@@ -2008,14 +2011,14 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                 finish_in_with: Some(
                   (
                     Duration::milliseconds(70),
-                    TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
                       compaction_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                       }
-                    }))
+                    }.into_task_result())
                   )
                 ),
                 expected_logical_plan: LogicalPlan {
@@ -2132,13 +2135,18 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
-                  compaction_result: CompactionResult::Success {
-                    old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                    old_num_blocks: 5,
-                    new_num_blocks: 4,
-                }})))),
+                finish_in_with: Some((
+                  Duration::milliseconds(70),
+                  TaskOutcome::Success(TaskResultDatasetHardCompact {
+                    compaction_result: CompactionResult::Success {
+                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                      old_num_blocks: 5,
+                      new_num_blocks: 4,
+                    }
+                  }.into_task_result()
+                  )
+                )),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
@@ -2166,13 +2174,18 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 dataset_id: Some(foo_bar_id.clone()),
                 run_since_start: Duration::milliseconds(110),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(TaskResult::CompactionDatasetResult(TaskCompactionDatasetResult {
-                  compaction_result: CompactionResult::Success {
-                    old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                    old_num_blocks: 5,
-                    new_num_blocks: 4,
-                }})))),
+                finish_in_with: Some((
+                  Duration::milliseconds(70),
+                  TaskOutcome::Success(
+                    TaskResultDatasetHardCompact {
+                      compaction_result: CompactionResult::Success {
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                        old_num_blocks: 5,
+                        new_num_blocks: 4,
+                      }
+                    }.into_task_result()
+                ))),
                 // Make sure we will take config from root dataset
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
@@ -2300,7 +2313,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -2317,7 +2330,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -2531,7 +2544,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -2548,7 +2561,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -2750,7 +2763,7 @@ async fn test_dataset_deleted() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -2767,7 +2780,7 @@ async fn test_dataset_deleted() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -2939,7 +2952,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -2956,7 +2969,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3168,7 +3181,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3186,12 +3199,17 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                  },
-                })))),
+                finish_in_with: Some((
+                  Duration::milliseconds(10),
+                  TaskOutcome::Success(
+                    TaskResultDatasetUpdate {
+                      pull_result: PullResult::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                      },
+                    }.into_task_result()
+                  )
+                )),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3209,12 +3227,17 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                  },
-                })))),
+                finish_in_with: Some((
+                  Duration::milliseconds(10),
+                  TaskOutcome::Success(
+                    TaskResultDatasetUpdate {
+                      pull_result: PullResult::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                      },
+                    }.into_task_result()
+                  )
+                )),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3231,7 +3254,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3433,7 +3456,7 @@ async fn test_throttling_manual_triggers() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(40),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3580,12 +3603,17 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3602,12 +3630,17 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(20),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3624,7 +3657,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::milliseconds(30),
-            finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
+            finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3641,12 +3674,17 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(130),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                      old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                      new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3663,7 +3701,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::milliseconds(160),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -3680,12 +3718,17 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(190),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4062,12 +4105,17 @@ async fn test_batching_condition_records_reached() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4084,12 +4132,17 @@ async fn test_batching_condition_records_reached() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(20),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4106,12 +4159,17 @@ async fn test_batching_condition_records_reached() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(80),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4128,12 +4186,17 @@ async fn test_batching_condition_records_reached() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(150),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4150,12 +4213,17 @@ async fn test_batching_condition_records_reached() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(170),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4397,12 +4465,17 @@ async fn test_batching_condition_timeout() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4419,12 +4492,17 @@ async fn test_batching_condition_timeout() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(20),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4441,12 +4519,17 @@ async fn test_batching_condition_timeout() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(80),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4465,12 +4548,17 @@ async fn test_batching_condition_timeout() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(250),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4680,12 +4768,17 @@ async fn test_batching_condition_watermark() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4702,12 +4795,17 @@ async fn test_batching_condition_watermark() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(20),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4724,12 +4822,17 @@ async fn test_batching_condition_watermark() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(70),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -4748,12 +4851,17 @@ async fn test_batching_condition_watermark() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(290),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5029,12 +5137,17 @@ async fn test_batching_condition_with_2_inputs() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(10),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5051,12 +5164,17 @@ async fn test_batching_condition_with_2_inputs() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(20),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5073,12 +5191,17 @@ async fn test_batching_condition_with_2_inputs() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::milliseconds(30),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-old-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5095,12 +5218,17 @@ async fn test_batching_condition_with_2_inputs() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(110),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                  }
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5117,12 +5245,17 @@ async fn test_batching_condition_with_2_inputs() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "4")]),
             dataset_id: Some(bar_id.clone()),
             run_since_start: Duration::milliseconds(160),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5139,12 +5272,17 @@ async fn test_batching_condition_with_2_inputs() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "6")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(210),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5161,12 +5299,17 @@ async fn test_batching_condition_with_2_inputs() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "5")]),
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::milliseconds(230),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
-                pull_result: PullResult::Updated {
-                old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-new-slice")),
-                new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
-                },
-            })))),
+            finish_in_with: Some((
+              Duration::milliseconds(10),
+              TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
+                  },
+                }.into_task_result()
+              )
+            )),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5500,7 +5643,7 @@ async fn test_list_all_flow_initiators() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
@@ -5518,7 +5661,7 @@ async fn test_list_all_flow_initiators() {
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                   expected_logical_plan: LogicalPlan {
                     plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                     payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
@@ -5654,7 +5797,7 @@ async fn test_list_all_datasets_with_flow() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
@@ -5672,7 +5815,7 @@ async fn test_list_all_datasets_with_flow() {
                   task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
-                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                   expected_logical_plan: LogicalPlan {
                     plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                     payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
@@ -5798,7 +5941,7 @@ async fn test_abort_flow_before_scheduling_tasks() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5893,7 +6036,7 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -5993,7 +6136,7 @@ async fn test_abort_flow_after_task_running_has_started() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(100), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(100), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6082,7 +6225,7 @@ async fn test_abort_flow_after_task_finishes() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6099,7 +6242,7 @@ async fn test_abort_flow_after_task_finishes() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(90),
-                finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6235,7 +6378,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6252,7 +6395,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6426,7 +6569,7 @@ async fn test_disable_trigger_on_flow_fail() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6443,7 +6586,7 @@ async fn test_disable_trigger_on_flow_fail() {
                     task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::Empty))),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
                     expected_logical_plan: LogicalPlan {
                       plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6597,7 +6740,7 @@ async fn test_trigger_enable_during_flow_throttling() {
           task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(40),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
           expected_logical_plan: LogicalPlan {
             plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
             payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6613,7 +6756,7 @@ async fn test_trigger_enable_during_flow_throttling() {
             task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(250),
-            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+            finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
             expected_logical_plan: LogicalPlan {
               plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6629,7 +6772,7 @@ async fn test_trigger_enable_during_flow_throttling() {
           task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(520),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
           expected_logical_plan: LogicalPlan {
             plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
             payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6809,7 +6952,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6827,12 +6970,17 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                  },
-                })))),
+                finish_in_with: Some((
+                  Duration::milliseconds(10),
+                  TaskOutcome::Success(
+                    TaskResultDatasetUpdate {
+                      pull_result: PullResult::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                      },
+                    }.into_task_result()
+                  )
+                )),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6850,12 +6998,17 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
                 // Send some PullResult with records to bypass batching condition
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
-                  pull_result: PullResult::Updated {
-                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                    new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                  },
-                })))),
+                finish_in_with: Some((
+                  Duration::milliseconds(10),
+                  TaskOutcome::Success(
+                    TaskResultDatasetUpdate {
+                      pull_result: PullResult::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                      },
+                    }.into_task_result()
+                  )
+                )),
                 expected_logical_plan:LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
@@ -6872,7 +7025,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "3")]),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
                 expected_logical_plan: LogicalPlan {
                   plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {

@@ -18,7 +18,14 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     LoggedAccount,
 };
-use kamu_adapter_task_dataset::FlowTaskFactoryImpl;
+use kamu_adapter_task_dataset::{
+    FlowTaskFactoryImpl,
+    InputDatasetCompactedError,
+    TaskErrorDatasetUpdate,
+    TaskResultDatasetHardCompact,
+    TaskResultDatasetReset,
+    TaskResultDatasetUpdate,
+};
 use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
 use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
@@ -308,14 +315,15 @@ async fn test_trigger_ingest_root_dataset() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
-                ts::TaskUpdateDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetUpdate {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -469,13 +477,14 @@ async fn test_trigger_reset_root_dataset_flow() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::ResetDatasetResult(
-                ts::TaskResetDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetReset {
                     reset_result: ResetResult {
                         new_head: root_dataset_blocks[1].0.clone(),
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -785,14 +794,15 @@ async fn test_trigger_execute_transform_derived_dataset() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
-                ts::TaskUpdateDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetUpdate {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -1139,16 +1149,17 @@ async fn test_trigger_compaction_root_dataset() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
-                ts::TaskCompactionDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetHardCompact {
                     compaction_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -2407,7 +2418,7 @@ async fn test_cancel_already_succeeded_flow() {
             flow_task_id,
             flow_task_metadata,
             Utc::now(),
-            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+            ts::TaskOutcome::Success(ts::TaskResult::empty()),
         )
         .await;
 
@@ -2494,7 +2505,7 @@ async fn test_history_of_completed_flow() {
             flow_task_id,
             flow_task_metadata,
             Utc::now(),
-            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+            ts::TaskOutcome::Success(ts::TaskResult::empty()),
         )
         .await;
 
@@ -2656,16 +2667,17 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
-                ts::TaskCompactionDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetHardCompact {
                     compaction_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -2801,11 +2813,12 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Failed(ts::TaskError::UpdateDatasetError(
-                ts::UpdateDatasetTaskError::InputDatasetCompacted(ts::InputDatasetCompactedError {
+            ts::TaskOutcome::Failed(
+                TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
                     dataset_id: create_root_result.dataset_handle.id.clone(),
-                }),
-            )),
+                })
+                .into_task_error(),
+            ),
         )
         .await;
 

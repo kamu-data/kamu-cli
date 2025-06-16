@@ -211,7 +211,7 @@ impl TaskAgentImpl {
                     error_msg = %e,
                     "Task definition preparation failed"
                 );
-                return Ok(TaskOutcome::Failed(TaskError::Empty));
+                return Ok(TaskOutcome::Failed(TaskError::empty()));
             }
         };
 
@@ -230,7 +230,7 @@ impl TaskAgentImpl {
                     error_msg = %e,
                     "Task run failed"
                 );
-                TaskOutcome::Failed(TaskError::Empty)
+                TaskOutcome::Failed(TaskError::empty())
             }
         };
 
