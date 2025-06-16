@@ -14,7 +14,12 @@ use internal_error::InternalError;
 use kamu_core::*;
 use kamu_task_system::*;
 
-use crate::TaskDefinitionDatasetUpdate;
+use crate::{
+    InputDatasetCompactedError,
+    TaskDefinitionDatasetUpdate,
+    TaskErrorDatasetUpdate,
+    TaskResultDatasetUpdate,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,12 +74,13 @@ impl UpdateDatasetTaskRunner {
 
         let sync_response = self.sync_service.sync(sync_request, sync_opts, None).await;
         match sync_response {
-            Ok(sync_result) => Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
-                TaskUpdateDatasetResult {
+            Ok(sync_result) => Ok(TaskOutcome::Success(
+                TaskResultDatasetUpdate {
                     pull_result: sync_result.into(),
-                },
-            ))),
-            Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
+                }
+                .into_task_result(),
+            )),
+            Err(_) => Ok(TaskOutcome::Failed(TaskError::empty())),
         }
     }
 
@@ -108,13 +114,14 @@ impl UpdateDatasetTaskRunner {
                     .await?;
                 }
 
-                Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
-                    TaskUpdateDatasetResult {
+                Ok(TaskOutcome::Success(
+                    TaskResultDatasetUpdate {
                         pull_result: ingest_result.into(),
-                    },
-                )))
+                    }
+                    .into_task_result(),
+                ))
             }
-            Err(_) => Ok(TaskOutcome::Failed(TaskError::Empty)),
+            Err(_) => Ok(TaskOutcome::Failed(TaskError::empty())),
         }
     }
 
@@ -135,11 +142,12 @@ impl UpdateDatasetTaskRunner {
             Ok(request) => Ok(request),
             // Special case: input dataset compacted
             Err(TransformElaborateError::InvalidInputInterval(e)) => {
-                return Ok(TaskOutcome::Failed(TaskError::UpdateDatasetError(
-                    UpdateDatasetTaskError::InputDatasetCompacted(InputDatasetCompactedError {
+                return Ok(TaskOutcome::Failed(
+                    TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
                         dataset_id: e.input_dataset_id,
-                    }),
-                )));
+                    })
+                    .into_task_error(),
+                ));
             }
             Err(e) => {
                 tracing::error!(error = ?e, "Update failed");
@@ -166,19 +174,20 @@ impl UpdateDatasetTaskRunner {
                             .await?;
                         }
 
-                        Ok(TaskOutcome::Success(TaskResult::UpdateDatasetResult(
-                            TaskUpdateDatasetResult {
+                        Ok(TaskOutcome::Success(
+                            TaskResultDatasetUpdate {
                                 pull_result: transform_result.into(),
-                            },
-                        )))
+                            }
+                            .into_task_result(),
+                        ))
                     }
                     Err(e) => {
                         tracing::error!(error = ?e, "Transform execution failed");
-                        Ok(TaskOutcome::Failed(TaskError::Empty))
+                        Ok(TaskOutcome::Failed(TaskError::empty()))
                     }
                 }
             }
-            TransformElaboration::UpToDate => Ok(TaskOutcome::Success(TaskResult::Empty)),
+            TransformElaboration::UpToDate => Ok(TaskOutcome::Success(TaskResult::empty())),
         }
     }
 

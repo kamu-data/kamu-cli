@@ -38,10 +38,10 @@ impl DeliverWebhookTaskRunner {
             )
             .await
         {
-            Ok(_) => Ok(TaskOutcome::Success(TaskResult::Empty)),
+            Ok(_) => Ok(TaskOutcome::Success(TaskResult::empty())),
             Err(err) => {
                 tracing::error!(error = ?err, "Send webhook failed");
-                Ok(TaskOutcome::Failed(TaskError::Empty))
+                Ok(TaskOutcome::Failed(TaskError::empty()))
             }
         }
     }

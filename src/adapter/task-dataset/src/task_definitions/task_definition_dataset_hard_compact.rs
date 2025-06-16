@@ -25,7 +25,7 @@ impl TaskDefinitionDatasetHardCompact {
 }
 
 #[async_trait::async_trait]
-impl ts::TaskDefinitionBody for TaskDefinitionDatasetHardCompact {
+impl ts::TaskDefinitionInner for TaskDefinitionDatasetHardCompact {
     fn as_any(&self) -> &dyn Any {
         self
     }

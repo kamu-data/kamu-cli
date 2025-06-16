@@ -15,11 +15,11 @@ use internal_error::InternalError;
 use kamu_datasets::{
     DatasetEntryService,
     DatasetEntryServiceExt,
-    DatasetIncrementQueryService,
+    //     DatasetIncrementQueryService,
     DependencyGraphService,
 };
 use kamu_flow_system::*;
-use kamu_task_system as ts;
+//use kamu_task_system as ts;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
@@ -33,7 +33,7 @@ pub(crate) struct FlowSchedulingHelper {
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
     outbox: Arc<dyn Outbox>,
-    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
+    //  dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -47,7 +47,7 @@ impl FlowSchedulingHelper {
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         flow_trigger_service: Arc<dyn FlowTriggerService>,
         outbox: Arc<dyn Outbox>,
-        dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
+        //        dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_entry_service: Arc<dyn DatasetEntryService>,
         time_source: Arc<dyn SystemTimeSource>,
@@ -58,7 +58,7 @@ impl FlowSchedulingHelper {
             flow_configuration_service,
             flow_trigger_service,
             outbox,
-            dataset_increment_query_service,
+            //            dataset_increment_query_service,
             dependency_graph_service,
             dataset_entry_service,
             time_source,
@@ -509,6 +509,7 @@ impl FlowSchedulingHelper {
         }
     }
 
+    #[allow(unused_mut)]
     async fn evaluate_flow_batching_rule(
         &self,
         evaluation_time: DateTime<Utc>,
@@ -530,7 +531,8 @@ impl FlowSchedulingHelper {
         let mut is_compacted = false;
 
         // Scan each accumulated trigger to decide
-        for trigger in &flow.triggers {
+        // TODO: refactor
+        /*for trigger in &flow.triggers {
             match trigger {
                 FlowTriggerType::InputDatasetFlow(trigger_type) => {
                     match &trigger_type.task_result {
@@ -581,7 +583,7 @@ impl FlowSchedulingHelper {
                 }
                 _ => {}
             }
-        }
+        }*/
 
         // The timeout for batching will happen at:
         let batching_deadline =

@@ -54,7 +54,7 @@ impl<'de> Deserialize<'de> for LogicalPlan {
             type Value = LogicalPlan;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a map with one key representing the task type")
+                formatter.write_str("a map with one key representing the plan type")
             }
 
             fn visit_map<M>(self, mut map: M) -> Result<LogicalPlan, M::Error>

@@ -25,7 +25,7 @@ impl TaskDefinitionDatasetUpdate {
 }
 
 #[async_trait::async_trait]
-impl ts::TaskDefinitionBody for TaskDefinitionDatasetUpdate {
+impl ts::TaskDefinitionInner for TaskDefinitionDatasetUpdate {
     fn as_any(&self) -> &dyn Any {
         self
     }

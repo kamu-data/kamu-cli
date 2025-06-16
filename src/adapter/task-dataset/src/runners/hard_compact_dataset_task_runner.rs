@@ -14,7 +14,7 @@ use internal_error::InternalError;
 use kamu_core::{CompactionExecutor, CompactionResult, DatasetRegistry};
 use kamu_task_system::*;
 
-use crate::TaskDefinitionDatasetHardCompact;
+use crate::{TaskDefinitionDatasetHardCompact, TaskResultDatasetHardCompact};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,9 +59,9 @@ impl HardCompactDatasetTaskRunner {
                     .await?;
                 }
 
-                Ok(TaskOutcome::Success(TaskResult::CompactionDatasetResult(
-                    compaction_result.into(),
-                )))
+                Ok(TaskOutcome::Success(
+                    TaskResultDatasetHardCompact { compaction_result }.into_task_result(),
+                ))
             }
 
             // Compaction failed
@@ -72,7 +72,7 @@ impl HardCompactDatasetTaskRunner {
                     "Hard compaction failed",
                 );
 
-                Ok(TaskOutcome::Failed(TaskError::Empty))
+                Ok(TaskOutcome::Failed(TaskError::empty()))
             }
         }
     }

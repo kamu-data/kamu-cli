@@ -7967,7 +7967,6 @@ dependencies = [
  "enum-variants",
  "event-sourcing",
  "internal-error",
- "kamu-core",
  "messaging-outbox",
  "mockall",
  "opendatafabric",

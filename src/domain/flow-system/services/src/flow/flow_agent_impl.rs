@@ -492,7 +492,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         // In case of success:
                         //  - execute follow-up method
                         if let Some(task_result) = flow.try_task_result_as_ref()
-                            && !matches!(task_result, TaskResult::Empty)
+                            && !task_result.is_empty()
                         {
                             match flow.flow_key.get_type().success_followup_method() {
                                 FlowSuccessFollowupMethod::Ignore => {}

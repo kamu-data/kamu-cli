@@ -14,7 +14,7 @@ use internal_error::InternalError;
 use kamu_core::{DatasetRegistry, ResetExecutionError, ResetExecutor};
 use kamu_task_system::*;
 
-use crate::TaskDefinitionDatasetReset;
+use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,15 +42,15 @@ impl ResetDatasetTaskRunner {
             .await;
 
         match reset_result_maybe {
-            Ok(reset_result) => Ok(TaskOutcome::Success(TaskResult::ResetDatasetResult(
-                TaskResetDatasetResult { reset_result },
-            ))),
+            Ok(reset_result) => Ok(TaskOutcome::Success(
+                TaskResultDatasetReset { reset_result }.into_task_result(),
+            )),
             Err(err) => match err {
                 ResetExecutionError::SetReferenceFailed(
                     odf::dataset::SetChainRefError::BlockNotFound(_),
-                ) => Ok(TaskOutcome::Failed(TaskError::ResetDatasetError(
-                    ResetDatasetTaskError::ResetHeadNotFound,
-                ))),
+                ) => Ok(TaskOutcome::Failed(
+                    TaskErrorDatasetReset::ResetHeadNotFound.into_task_error(),
+                )),
                 err => {
                     tracing::error!(
                         error = ?err,
@@ -58,7 +58,7 @@ impl ResetDatasetTaskRunner {
                         "Reset failed",
                     );
 
-                    Ok(TaskOutcome::Failed(TaskError::Empty))
+                    Ok(TaskOutcome::Failed(TaskError::empty()))
                 }
             },
         }

@@ -10,6 +10,11 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
+use kamu_adapter_task_dataset::{
+    TaskResultDatasetHardCompact,
+    TaskResultDatasetReset,
+    TaskResultDatasetUpdate,
+};
 use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
 use {kamu_flow_system as fs, kamu_task_system as ts};
@@ -113,11 +118,13 @@ impl FlowDescriptionUpdateResult {
     ) -> Result<Option<Self>, InternalError> {
         if let Some(outcome) = maybe_outcome {
             match outcome {
-                fs::FlowOutcome::Success(result) => match result {
-                    ts::TaskResult::Empty
-                    | ts::TaskResult::CompactionDatasetResult(_)
-                    | ts::TaskResult::ResetDatasetResult(_) => Ok(None),
-                    ts::TaskResult::UpdateDatasetResult(update) => {
+                fs::FlowOutcome::Success(result) => match result.result_type.as_str() {
+                    ts::TaskResult::TASK_RESULT_EMPTY
+                    | TaskResultDatasetHardCompact::TYPE_ID
+                    | TaskResultDatasetReset::TYPE_ID => Ok(None),
+
+                    TaskResultDatasetUpdate::TYPE_ID => {
+                        let update = TaskResultDatasetUpdate::from_task_result(result)?;
                         if let Some((old_head, new_head)) = update.try_as_increment() {
                             match increment_query_service
                                 .get_increment_between(dataset_id, old_head, new_head)
@@ -165,6 +172,15 @@ impl FlowDescriptionUpdateResult {
                             unreachable!()
                         }
                     }
+
+                    _ => {
+                        tracing::error!(
+                            "Unexpected task result type: {} for flow outcome: {:?}",
+                            result.result_type,
+                            outcome
+                        );
+                        Ok(None)
+                    }
                 },
                 _ => Ok(None),
             }
@@ -203,35 +219,49 @@ impl FlowDescriptionHardCompactionNothingToDo {
 }
 
 impl FlowDescriptionDatasetHardCompactionResult {
-    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Option<Self> {
+    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Result<Option<Self>> {
         if let Some(outcome) = maybe_outcome {
             match outcome {
-                fs::FlowOutcome::Success(result) => match result {
-                    ts::TaskResult::UpdateDatasetResult(_)
-                    | ts::TaskResult::ResetDatasetResult(_) => None,
-                    ts::TaskResult::Empty => Some(Self::NothingToDo(
+                fs::FlowOutcome::Success(result) => match result.result_type.as_str() {
+                    TaskResultDatasetReset::TYPE_ID | TaskResultDatasetUpdate::TYPE_ID => Ok(None),
+
+                    ts::TaskResult::TASK_RESULT_EMPTY => Ok(Some(Self::NothingToDo(
                         FlowDescriptionHardCompactionNothingToDo::default(),
-                    )),
-                    ts::TaskResult::CompactionDatasetResult(r) => match r.compaction_result {
-                        CompactionResult::NothingToDo => Some(Self::NothingToDo(
-                            FlowDescriptionHardCompactionNothingToDo::default(),
-                        )),
-                        CompactionResult::Success {
-                            old_head: _,
-                            ref new_head,
-                            old_num_blocks,
-                            new_num_blocks,
-                        } => Some(Self::Success(FlowDescriptionHardCompactionSuccess {
-                            original_blocks_count: old_num_blocks as u64,
-                            resulting_blocks_count: new_num_blocks as u64,
-                            new_head: new_head.clone().into(),
-                        })),
-                    },
+                    ))),
+
+                    TaskResultDatasetHardCompact::TYPE_ID => {
+                        let r = TaskResultDatasetHardCompact::from_task_result(result)?;
+                        match r.compaction_result {
+                            CompactionResult::NothingToDo => Ok(Some(Self::NothingToDo(
+                                FlowDescriptionHardCompactionNothingToDo::default(),
+                            ))),
+                            CompactionResult::Success {
+                                old_head: _,
+                                ref new_head,
+                                old_num_blocks,
+                                new_num_blocks,
+                            } => Ok(Some(Self::Success(FlowDescriptionHardCompactionSuccess {
+                                original_blocks_count: old_num_blocks as u64,
+                                resulting_blocks_count: new_num_blocks as u64,
+                                new_head: new_head.clone().into(),
+                            }))),
+                        }
+                    }
+
+                    _ => {
+                        tracing::error!(
+                            "Unexpected task result type: {} for flow outcome: {:?}",
+                            result.result_type,
+                            outcome
+                        );
+                        Ok(None)
+                    }
                 },
-                _ => None,
+
+                _ => Ok(None),
             }
         } else {
-            None
+            Ok(None)
         }
     }
 }
@@ -244,21 +274,34 @@ struct FlowDescriptionResetResult {
 }
 
 impl FlowDescriptionResetResult {
-    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Option<Self> {
+    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Result<Option<Self>> {
         if let Some(outcome) = maybe_outcome {
             match outcome {
-                fs::FlowOutcome::Success(result) => match result {
-                    ts::TaskResult::Empty
-                    | ts::TaskResult::CompactionDatasetResult(_)
-                    | ts::TaskResult::UpdateDatasetResult(_) => None,
-                    ts::TaskResult::ResetDatasetResult(r) => Some(Self {
-                        new_head: r.reset_result.new_head.clone().into(),
-                    }),
+                fs::FlowOutcome::Success(result) => match result.result_type.as_str() {
+                    ts::TaskResult::TASK_RESULT_EMPTY
+                    | TaskResultDatasetHardCompact::TYPE_ID
+                    | TaskResultDatasetUpdate::TYPE_ID => Ok(None),
+
+                    TaskResultDatasetReset::TYPE_ID => {
+                        let r = TaskResultDatasetReset::from_task_result(result)?;
+                        Ok(Some(Self {
+                            new_head: r.reset_result.new_head.clone().into(),
+                        }))
+                    }
+
+                    _ => {
+                        tracing::error!(
+                            "Unexpected task result type: {} for flow outcome: {:?}",
+                            result.result_type,
+                            outcome
+                        );
+                        Ok(None)
+                    }
                 },
-                _ => None,
+                _ => Ok(None),
             }
         } else {
-            None
+            Ok(None)
         }
     }
 }
@@ -398,7 +441,7 @@ impl FlowDescriptionBuilder {
                     compaction_result:
                         FlowDescriptionDatasetHardCompactionResult::from_maybe_flow_outcome(
                             flow_state.outcome.as_ref(),
-                        ),
+                        )?,
                 })
             }
             fs::DatasetFlowType::Reset => {
@@ -406,7 +449,7 @@ impl FlowDescriptionBuilder {
                     dataset_id: dataset_key.dataset_id.clone().into(),
                     reset_result: FlowDescriptionResetResult::from_maybe_flow_outcome(
                         flow_state.outcome.as_ref(),
-                    ),
+                    )?,
                 })
             }
         })

@@ -7,9 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{CompactionResult, PullResult, PullResultUpToDate, ResetResult};
-use serde::{Deserialize, Serialize};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::Type)]
@@ -21,103 +18,6 @@ pub enum TaskStatus {
     Running,
     /// Task has reached a certain final outcome
     Finished,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskOutcome {
-    /// Task succeeded
-    Success(TaskResult),
-    /// Task failed to complete
-    Failed(TaskError),
-    /// Task was cancelled by a user
-    Cancelled,
-    // /// Task was dropped in favor of another task
-    // Replaced(TaskID),
-}
-
-impl TaskOutcome {
-    pub fn is_success(&self) -> bool {
-        matches!(self, Self::Success(_))
-    }
-
-    pub fn is_failed(&self) -> bool {
-        matches!(self, Self::Failed(_))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskResult {
-    Empty,
-    UpdateDatasetResult(TaskUpdateDatasetResult),
-    ResetDatasetResult(TaskResetDatasetResult),
-    CompactionDatasetResult(TaskCompactionDatasetResult),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskUpdateDatasetResult {
-    pub pull_result: PullResult,
-}
-
-impl TaskUpdateDatasetResult {
-    pub fn try_as_increment(&self) -> Option<(Option<&odf::Multihash>, &odf::Multihash)> {
-        match &self.pull_result {
-            PullResult::Updated { old_head, new_head } => Some((old_head.as_ref(), new_head)),
-            PullResult::UpToDate(_) => None,
-        }
-    }
-
-    pub fn try_as_up_to_date(&self) -> Option<&PullResultUpToDate> {
-        match &self.pull_result {
-            PullResult::UpToDate(up_to_date) => Some(up_to_date),
-            PullResult::Updated { .. } => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskResetDatasetResult {
-    pub reset_result: ResetResult,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskCompactionDatasetResult {
-    pub compaction_result: CompactionResult,
-}
-
-impl From<CompactionResult> for TaskCompactionDatasetResult {
-    fn from(value: CompactionResult) -> Self {
-        Self {
-            compaction_result: value,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskError {
-    Empty,
-    UpdateDatasetError(UpdateDatasetTaskError),
-    ResetDatasetError(ResetDatasetTaskError),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum UpdateDatasetTaskError {
-    InputDatasetCompacted(InputDatasetCompactedError),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct InputDatasetCompactedError {
-    pub dataset_id: odf::DatasetID,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ResetDatasetTaskError {
-    ResetHeadNotFound,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

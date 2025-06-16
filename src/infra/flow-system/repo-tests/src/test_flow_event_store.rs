@@ -1228,7 +1228,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Flow successeds
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::Empty))
+        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
         .await;
 
     // Finally, stats got updated
@@ -1283,7 +1283,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Now finish the flow with failure
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::Empty))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
         .await;
 
     // Stats got updated: success stayed as previously, attempt refreshed
@@ -1357,7 +1357,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Flow successeds
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::Empty))
+        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
         .await;
 
     // Finally, stats got updated
@@ -1409,7 +1409,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Now finish the flow with failure
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::Empty))
+        .finish_running_flow(flow_id, TaskOutcome::Failed(TaskError::empty()))
         .await;
 
     // Stats got updated: success stayed as previously, attempt refreshed
@@ -1477,7 +1477,7 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
     assert_eq!(res, Some(flow_id));
 
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::Empty))
+        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
         .await;
 
     // No more pending
@@ -1561,7 +1561,7 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 
     // Ingest finishes with success
     flow_generator
-        .finish_running_flow(flow_id_ingest, TaskOutcome::Success(TaskResult::Empty))
+        .finish_running_flow(flow_id_ingest, TaskOutcome::Success(TaskResult::empty()))
         .await;
 
     let res = flow_event_store
@@ -1577,7 +1577,7 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 
     // Compact finishes with failure
     flow_generator
-        .finish_running_flow(flow_id_compact, TaskOutcome::Failed(TaskError::Empty))
+        .finish_running_flow(flow_id_compact, TaskOutcome::Failed(TaskError::empty()))
         .await;
 
     let res = flow_event_store
@@ -1678,12 +1678,15 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
         .start_running_flow(flow_id_foo_compacting)
         .await;
     foo_flow_generator
-        .finish_running_flow(flow_id_foo_ingest, TaskOutcome::Success(TaskResult::Empty))
+        .finish_running_flow(
+            flow_id_foo_ingest,
+            TaskOutcome::Success(TaskResult::empty()),
+        )
         .await;
     foo_flow_generator
         .finish_running_flow(
             flow_id_foo_compacting,
-            TaskOutcome::Success(TaskResult::Empty),
+            TaskOutcome::Success(TaskResult::empty()),
         )
         .await;
 
@@ -1752,7 +1755,7 @@ pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
 
     // Finish flow
     flow_generator
-        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::Empty))
+        .finish_running_flow(flow_id, TaskOutcome::Success(TaskResult::empty()))
         .await;
 
     let res = flow_event_store
@@ -2015,7 +2018,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
                     flow_id,
                     event_time: activation_moment + Duration::milliseconds(1500),
                     task_id: TaskID::new(1),
-                    task_outcome: TaskOutcome::Success(TaskResult::Empty),
+                    task_outcome: TaskOutcome::Success(TaskResult::empty()),
                 }
                 .into(),
             ],
@@ -2663,7 +2666,7 @@ fn drive_flow_to_status(flow: &mut Flow, expected_status: FlowStatus) {
             flow.on_task_finished(
                 start_moment + Duration::minutes(10),
                 task_id,
-                TaskOutcome::Success(TaskResult::Empty),
+                TaskOutcome::Success(TaskResult::empty()),
             )
             .unwrap();
         } else if expected_status != FlowStatus::Running {

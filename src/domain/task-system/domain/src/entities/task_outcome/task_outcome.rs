@@ -7,33 +7,31 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::any::Any;
+use serde::{Deserialize, Serialize};
 
-use crate::{LogicalPlanProbe, TaskDefinitionInner};
+use crate::{TaskError, TaskResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct TaskDefinitionProbe {
-    pub probe: LogicalPlanProbe,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskOutcome {
+    /// Task succeeded
+    Success(TaskResult),
+    /// Task failed to complete
+    Failed(TaskError),
+    /// Task was cancelled by a user
+    Cancelled,
+    // /// Task was dropped in favor of another task
+    // Replaced(TaskID),
 }
 
-impl TaskDefinitionProbe {
-    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.probe";
-}
-
-#[async_trait::async_trait]
-impl TaskDefinitionInner for TaskDefinitionProbe {
-    fn as_any(&self) -> &dyn Any {
-        self
+impl TaskOutcome {
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success(_))
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
-    }
-
-    fn task_type(&self) -> &'static str {
-        Self::TASK_TYPE
+    pub fn is_failed(&self) -> bool {
+        matches!(self, Self::Failed(_))
     }
 }
 

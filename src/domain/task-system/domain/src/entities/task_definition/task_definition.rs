@@ -13,11 +13,11 @@ use std::any::Any;
 
 #[derive(Debug)]
 pub struct TaskDefinition {
-    inner: Box<dyn TaskDefinitionBody>,
+    inner: Box<dyn TaskDefinitionInner>,
 }
 
 impl TaskDefinition {
-    pub fn new<T: TaskDefinitionBody + 'static>(inner: T) -> Self {
+    pub fn new<T: TaskDefinitionInner + 'static>(inner: T) -> Self {
         Self {
             inner: Box::new(inner),
         }
@@ -42,12 +42,12 @@ impl TaskDefinition {
             Ok(b) => Ok(b),
             Err(failed) => Err(TaskDefinition {
                 inner: failed
-                    .downcast::<Box<dyn TaskDefinitionBody>>()
+                    .downcast::<Box<dyn TaskDefinitionInner>>()
                     .map(|b| *b)
                     .unwrap_or_else(|_| {
                         panic!(
                             "Infallible invariant: boxed_any was not created from \
-                             TaskDefinitionBody"
+                             TaskDefinitionInner"
                         )
                     }),
             }),
@@ -58,7 +58,7 @@ impl TaskDefinition {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TaskDefinitionBody: Send + Sync + std::fmt::Debug {
+pub trait TaskDefinitionInner: Send + Sync + std::fmt::Debug {
     fn as_any(&self) -> &dyn Any;
 
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
