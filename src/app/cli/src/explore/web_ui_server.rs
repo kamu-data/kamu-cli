@@ -99,7 +99,7 @@ impl WebUIServer {
 
         let login_credentials = PasswordLoginCredentials {
             login: current_account_name.to_string(),
-            password: account_config.get_password(),
+            password: account_config.get_password().into_inner(),
         };
 
         let gql_schema = kamu_adapter_graphql::schema();
