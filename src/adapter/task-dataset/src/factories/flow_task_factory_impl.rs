@@ -45,7 +45,7 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
                     };
 
                     Ok(ts::LogicalPlan {
-                        plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                        plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                         payload: serde_json::to_value(plan).int_err()?,
                     })
                 }
@@ -72,7 +72,7 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
                     };
 
                     Ok(ts::LogicalPlan {
-                        plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                        plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                         payload: serde_json::to_value(plan).int_err()?,
                     })
                 }
@@ -88,7 +88,7 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
                         };
 
                         Ok(ts::LogicalPlan {
-                            plan_type: LogicalPlanDatasetReset::SERIALIZATION_TYPE_ID.to_string(),
+                            plan_type: LogicalPlanDatasetReset::TYPE_ID.to_string(),
                             payload: serde_json::to_value(plan).int_err()?,
                         })
                     } else {

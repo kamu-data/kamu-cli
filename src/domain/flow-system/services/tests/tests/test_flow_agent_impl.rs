@@ -82,7 +82,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                        plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                        plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                         payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                           dataset_id: foo_id.clone(),
                           fetch_uncacheable: false
@@ -99,7 +99,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     run_since_start: Duration::milliseconds(90),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: false
@@ -261,7 +261,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     run_since_start: Duration::milliseconds(110),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: false
@@ -351,7 +351,7 @@ async fn test_cron_config() {
                     run_since_start: Duration::seconds(6),
                     finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: false
@@ -476,7 +476,7 @@ async fn test_manual_trigger() {
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: false
@@ -493,7 +493,7 @@ async fn test_manual_trigger() {
                     run_since_start: Duration::milliseconds(60),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: false
@@ -510,7 +510,7 @@ async fn test_manual_trigger() {
                     run_since_start: Duration::milliseconds(100),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: bar_id.clone(),
                         fetch_uncacheable: true
@@ -702,7 +702,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: true
@@ -719,7 +719,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     run_since_start: Duration::milliseconds(60),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: true
@@ -736,7 +736,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     run_since_start: Duration::milliseconds(100),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: bar_id.clone(),
                         fetch_uncacheable: false
@@ -912,7 +912,7 @@ async fn test_manual_trigger_compaction() {
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                         dataset_id: foo_id.clone(),
                         max_slice_size: None,
@@ -930,7 +930,7 @@ async fn test_manual_trigger_compaction() {
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                   expected_logical_plan: LogicalPlan {
-                    plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                    plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                     payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                       dataset_id: bar_id.clone(),
                       max_slice_size: None,
@@ -1069,7 +1069,7 @@ async fn test_manual_trigger_reset() {
                       })
                     ))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetReset::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetReset::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetReset {
                         dataset_id: foo_id.clone(),
                         // By default, should reset to seed block
@@ -1205,7 +1205,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                 })
               ))),
               expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetReset::SERIALIZATION_TYPE_ID.to_string(),
+                plan_type: LogicalPlanDatasetReset::TYPE_ID.to_string(),
                 payload: serde_json::to_value(LogicalPlanDatasetReset {
                   dataset_id: foo_id.clone(),
                   new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
@@ -1236,7 +1236,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                 ))
               )),
               expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                 payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                   dataset_id: foo_baz_id.clone(),
                   max_slice_size: None,
@@ -1267,7 +1267,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                 ))
               )),
               expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                 payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                   dataset_id: foo_bar_id.clone(),
                   max_slice_size: None,
@@ -1402,7 +1402,7 @@ async fn test_manual_trigger_compaction_with_config() {
                     run_since_start: Duration::milliseconds(30),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                         dataset_id: foo_id.clone(),
                         max_slice_size: Some(max_slice_size),
@@ -1545,7 +1545,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                 )
               ),
               expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                 payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                   dataset_id: foo_id.clone(),
                   max_slice_size: Some(max_slice_size),
@@ -1576,7 +1576,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                 ))
               )),
               expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                 payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                   dataset_id: foo_baz_id.clone(),
                   max_slice_size: None,
@@ -1607,7 +1607,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                 ))
               )),
               expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                 payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                   dataset_id: foo_bar_id.clone(),
                   max_slice_size: None,
@@ -1781,7 +1781,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                   )
                 ),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                     dataset_id: foo_id.clone(),
                     max_slice_size: None,
@@ -1812,7 +1812,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                   ))
                 )),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                     dataset_id: foo_bar_id.clone(),
                     max_slice_size: None,
@@ -1843,7 +1843,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                   ))
                 )),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                     dataset_id: foo_bar_baz_id.clone(),
                     max_slice_size: None,
@@ -2019,7 +2019,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                   )
                 ),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                     dataset_id: foo_id.clone(),
                     max_slice_size: None,
@@ -2140,7 +2140,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                     new_num_blocks: 4,
                 }})))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                     dataset_id: foo_id.clone(),
                     max_slice_size: None,
@@ -2175,7 +2175,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 }})))),
                 // Make sure we will take config from root dataset
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                     dataset_id: foo_bar_id.clone(),
                     max_slice_size: None,
@@ -2302,7 +2302,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -2319,7 +2319,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false
@@ -2533,7 +2533,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -2550,7 +2550,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false
@@ -2752,7 +2752,7 @@ async fn test_dataset_deleted() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -2769,7 +2769,7 @@ async fn test_dataset_deleted() {
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false
@@ -2941,7 +2941,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -2958,7 +2958,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false
@@ -2975,7 +2975,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 run_since_start: Duration::milliseconds(30),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Cancelled)),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: baz_id.clone(),
                     fetch_uncacheable: false
@@ -3170,7 +3170,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -3193,7 +3193,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                   },
                 })))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false
@@ -3216,7 +3216,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                   },
                 })))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -3233,7 +3233,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 run_since_start: Duration::milliseconds(130),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false
@@ -3435,7 +3435,7 @@ async fn test_throttling_manual_triggers() {
             run_since_start: Duration::milliseconds(40),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -3587,7 +3587,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -3609,7 +3609,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -3626,7 +3626,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             run_since_start: Duration::milliseconds(30),
             finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: baz_id.clone(),
                 fetch_uncacheable: false
@@ -3648,7 +3648,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -3665,7 +3665,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             run_since_start: Duration::milliseconds(160),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: baz_id.clone(),
                 fetch_uncacheable: false
@@ -3687,7 +3687,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -4069,7 +4069,7 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -4091,7 +4091,7 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -4113,7 +4113,7 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -4135,7 +4135,7 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -4157,7 +4157,7 @@ async fn test_batching_condition_records_reached() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -4404,7 +4404,7 @@ async fn test_batching_condition_timeout() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -4426,7 +4426,7 @@ async fn test_batching_condition_timeout() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -4448,7 +4448,7 @@ async fn test_batching_condition_timeout() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -4472,7 +4472,7 @@ async fn test_batching_condition_timeout() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -4687,7 +4687,7 @@ async fn test_batching_condition_watermark() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -4709,7 +4709,7 @@ async fn test_batching_condition_watermark() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -4731,7 +4731,7 @@ async fn test_batching_condition_watermark() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -4755,7 +4755,7 @@ async fn test_batching_condition_watermark() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -5036,7 +5036,7 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -5058,7 +5058,7 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -5080,7 +5080,7 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: baz_id.clone(),
                 fetch_uncacheable: false
@@ -5102,7 +5102,7 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -5124,7 +5124,7 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: bar_id.clone(),
                 fetch_uncacheable: false
@@ -5146,7 +5146,7 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -5168,7 +5168,7 @@ async fn test_batching_condition_with_2_inputs() {
                 },
             })))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: baz_id.clone(),
                 fetch_uncacheable: false
@@ -5502,7 +5502,7 @@ async fn test_list_all_flow_initiators() {
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                         dataset_id: foo_id.clone(),
                         max_slice_size: None,
@@ -5520,7 +5520,7 @@ async fn test_list_all_flow_initiators() {
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                   expected_logical_plan: LogicalPlan {
-                    plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                    plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                     payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                       dataset_id: bar_id.clone(),
                       max_slice_size: None,
@@ -5656,7 +5656,7 @@ async fn test_list_all_datasets_with_flow() {
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                         dataset_id: foo_id.clone(),
                         max_slice_size: None,
@@ -5674,7 +5674,7 @@ async fn test_list_all_datasets_with_flow() {
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                   expected_logical_plan: LogicalPlan {
-                    plan_type: LogicalPlanDatasetHardCompact::SERIALIZATION_TYPE_ID.to_string(),
+                    plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
                     payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
                       dataset_id: bar_id.clone(),
                       max_slice_size: None,
@@ -5800,7 +5800,7 @@ async fn test_abort_flow_before_scheduling_tasks() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -5895,7 +5895,7 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -5995,7 +5995,7 @@ async fn test_abort_flow_after_task_running_has_started() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(100), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6084,7 +6084,7 @@ async fn test_abort_flow_after_task_finishes() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6101,7 +6101,7 @@ async fn test_abort_flow_after_task_finishes() {
                 run_since_start: Duration::milliseconds(90),
                 finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6237,7 +6237,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6254,7 +6254,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false
@@ -6428,7 +6428,7 @@ async fn test_disable_trigger_on_flow_fail() {
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: false
@@ -6445,7 +6445,7 @@ async fn test_disable_trigger_on_flow_fail() {
                     run_since_start: Duration::milliseconds(90),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::Empty))),
                     expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                       payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                         dataset_id: foo_id.clone(),
                         fetch_uncacheable: false
@@ -6599,7 +6599,7 @@ async fn test_trigger_enable_during_flow_throttling() {
           run_since_start: Duration::milliseconds(40),
           finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
           expected_logical_plan: LogicalPlan {
-            plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+            plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
             payload: serde_json::to_value(LogicalPlanDatasetUpdate {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
@@ -6615,7 +6615,7 @@ async fn test_trigger_enable_during_flow_throttling() {
             run_since_start: Duration::milliseconds(250),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
               payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                 dataset_id: foo_id.clone(),
                 fetch_uncacheable: false
@@ -6631,7 +6631,7 @@ async fn test_trigger_enable_during_flow_throttling() {
           run_since_start: Duration::milliseconds(520),
           finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
           expected_logical_plan: LogicalPlan {
-            plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+            plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
             payload: serde_json::to_value(LogicalPlanDatasetUpdate {
               dataset_id: foo_id.clone(),
               fetch_uncacheable: false
@@ -6811,7 +6811,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6834,7 +6834,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                   },
                 })))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false
@@ -6857,7 +6857,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                   },
                 })))),
                 expected_logical_plan:LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false
@@ -6874,7 +6874,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 run_since_start: Duration::milliseconds(130),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID.to_string(),
+                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
                   payload: serde_json::to_value(LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
                     fetch_uncacheable: false

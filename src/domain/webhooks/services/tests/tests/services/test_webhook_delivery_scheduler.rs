@@ -311,7 +311,7 @@ impl TestWebhookDeliverySchedulerHarness {
         mock_task_scheduler
             .expect_create_task()
             .withf(move |plan, _| {
-                plan.plan_type == LogicalPlanWebhookDeliver::SERIALIZATION_TYPE_ID
+                plan.plan_type == LogicalPlanWebhookDeliver::TYPE_ID
                     && serde_json::from_value::<LogicalPlanWebhookDeliver>(plan.payload.clone())
                         .unwrap()
                         .webhook_subscription_id

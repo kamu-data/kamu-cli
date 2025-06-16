@@ -96,7 +96,7 @@ impl UpdateDatasetTaskPlanner {
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for UpdateDatasetTaskPlanner {
     fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID
+        LogicalPlanDatasetUpdate::TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -106,7 +106,7 @@ impl TaskDefinitionPlanner for UpdateDatasetTaskPlanner {
     ) -> Result<TaskDefinition, InternalError> {
         assert_eq!(
             logical_plan.plan_type,
-            LogicalPlanDatasetUpdate::SERIALIZATION_TYPE_ID,
+            LogicalPlanDatasetUpdate::TYPE_ID,
             "UpdateDatasetTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
         );
 

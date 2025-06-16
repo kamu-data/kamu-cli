@@ -19,7 +19,7 @@ pub struct LogicalPlanDatasetReset {
 }
 
 impl LogicalPlanDatasetReset {
-    pub const SERIALIZATION_TYPE_ID: &str = "ResetDataset";
+    pub const TYPE_ID: &str = "ResetDataset";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -34,7 +34,7 @@ impl WebhookTaskFactory for WebhookTaskFactoryImpl {
         };
 
         Ok(ts::LogicalPlan {
-            plan_type: LogicalPlanWebhookDeliver::SERIALIZATION_TYPE_ID.to_string(),
+            plan_type: LogicalPlanWebhookDeliver::TYPE_ID.to_string(),
             payload: serde_json::to_value(plan).int_err()?,
         })
     }
