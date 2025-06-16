@@ -9,6 +9,7 @@
 
 #![feature(error_generic_member_access)]
 #![feature(let_chains)]
+#![feature(never_type)]
 
 mod entities;
 mod jobs;

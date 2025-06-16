@@ -83,7 +83,7 @@ impl APIServerRunCommand {
 
         let login_credentials = PasswordLoginCredentials {
             login: current_account_name.to_string(),
-            password: account_config.get_password().into_inner(),
+            password: account_config.password.into_inner(),
         };
 
         let login_response = DatabaseTransactionRunner::new(api_server_catalog)

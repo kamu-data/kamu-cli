@@ -29,10 +29,10 @@ impl LoginPasswordAuthProvider {
     pub async fn save_password(
         &self,
         account: &Account,
-        password: Password,
+        password: &Password,
     ) -> Result<(), InternalError> {
         self.account_service
-            .save_account_password(account, &password)
+            .save_account_password(account, password)
             .await
     }
 }
@@ -57,9 +57,10 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         // Extract account name and password
         let account_name =
             odf::AccountName::from_str(&password_login_credentials.login).int_err()?;
+        let password = Password::try_new(password_login_credentials.password).int_err()?;
 
         self.account_service
-            .verify_account_password(&account_name, &password_login_credentials.password)
+            .verify_account_password(&account_name, &password)
             .await
             .map_err(|e| {
                 use VerifyPasswordError as E;

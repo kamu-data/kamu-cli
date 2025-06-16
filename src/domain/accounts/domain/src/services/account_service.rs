@@ -97,15 +97,10 @@ pub trait AccountService: Sync + Send {
         password: &Password,
     ) -> Result<(), InternalError>;
 
-    /// NOTE: For automatically generated passwords of pre-configured users
-    ///       in test environments, login credentials can be short,
-    ///       like `bob:bob`.
-    ///
-    ///       Therefore, we deliberately don't use the [Password] type here.
     async fn verify_account_password(
         &self,
         account_name: &odf::AccountName,
-        password: &str,
+        password: &Password,
     ) -> Result<(), VerifyPasswordError>;
 
     async fn modify_account_password(

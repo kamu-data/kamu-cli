@@ -17,7 +17,7 @@ pub const MIN_PASSWORD_LENGTH: usize = 8;
     sanitize(trim),
     new_unchecked,
     validate(with = validate_password, error = PasswordValidationError),
-    derive(Debug, PartialEq, Eq, Clone, Deref)
+    derive(Debug, PartialEq, Eq, Clone, Deref, Serialize, Deserialize)
 )]
 pub struct Password(String);
 

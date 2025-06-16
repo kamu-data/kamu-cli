@@ -152,7 +152,7 @@ async fn test_login_logout_password(
     .await;
 
     kamu.assert_success_command_execution(
-        ["login", "password", "kamu", "kamu", kamu_node_url],
+        ["login", "password", "kamu", "kamu.dev", kamu_node_url],
         None,
         Some([format!("Login successful: {kamu_node_url}").as_str()]),
     )
@@ -353,7 +353,7 @@ async fn test_login_password_add_repo(
                 "--skip-add-repo",
                 "password",
                 "kamu",
-                "kamu",
+                "kamu.dev",
                 kamu_node_url,
             ],
             None,
@@ -372,7 +372,7 @@ async fn test_login_password_add_repo(
         .await;
 
         kamu.assert_success_command_execution(
-            ["login", "password", "kamu", "kamu", kamu_node_url],
+            ["login", "password", "kamu", "kamu.dev", kamu_node_url],
             None,
             Some([format!("Login successful: {kamu_node_url}").as_str()]),
         )
@@ -401,7 +401,7 @@ async fn test_login_password_add_repo(
                 "kamu-node",
                 "password",
                 "kamu",
-                "kamu",
+                "kamu.dev",
                 kamu_node_url,
             ],
             None,

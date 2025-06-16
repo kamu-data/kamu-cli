@@ -255,7 +255,7 @@ impl AccountService for AccountServiceImpl {
     async fn verify_account_password(
         &self,
         account_name: &odf::AccountName,
-        password: &str,
+        password: &Password,
     ) -> Result<(), VerifyPasswordError> {
         let password_hash = match self
             .password_hash_repository
