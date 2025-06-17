@@ -12,47 +12,32 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CompactionRule {
-    Full(CompactionRuleFull),
-    MetadataOnly(CompactionRuleMetadataOnly),
-}
-
-impl From<CompactionRuleFull> for CompactionRule {
-    fn from(value: CompactionRuleFull) -> Self {
-        Self::Full(value)
+kamu_flow_system::flow_config_enum! {
+    pub enum FlowConfigRuleCompact {
+        Full(FlowConfigRuleCompactFull),
+        MetadataOnly { recursive: bool },
     }
-}
-
-impl From<CompactionRuleMetadataOnly> for CompactionRule {
-    fn from(value: CompactionRuleMetadataOnly) -> Self {
-        Self::MetadataOnly(value)
-    }
+    => "CompactionRule"
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CompactionRuleFull {
+pub struct FlowConfigRuleCompactFull {
     max_slice_size: u64,
     max_slice_records: u64,
     recursive: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CompactionRuleMetadataOnly {
-    pub recursive: bool,
-}
-
-impl CompactionRuleFull {
+impl FlowConfigRuleCompactFull {
     pub fn new_checked(
         max_slice_size: u64,
         max_slice_records: u64,
         recursive: bool,
-    ) -> Result<Self, CompactionRuleValidationError> {
+    ) -> Result<Self, FlowConfigRuleCompactValidationError> {
         if max_slice_size == 0 {
-            return Err(CompactionRuleValidationError::MaxSliceSizeNotPositive);
+            return Err(FlowConfigRuleCompactValidationError::MaxSliceSizeNotPositive);
         }
         if max_slice_records == 0 {
-            return Err(CompactionRuleValidationError::MaxSliceRecordsNotPositive);
+            return Err(FlowConfigRuleCompactValidationError::MaxSliceRecordsNotPositive);
         }
 
         Ok(Self {
@@ -78,7 +63,7 @@ impl CompactionRuleFull {
     }
 }
 
-impl CompactionRule {
+impl FlowConfigRuleCompact {
     #[inline]
     pub fn max_slice_size(&self) -> Option<u64> {
         match self {
@@ -98,7 +83,7 @@ impl CompactionRule {
     #[inline]
     pub fn recursive(&self) -> bool {
         match self {
-            Self::MetadataOnly(compaction_rule) => compaction_rule.recursive,
+            Self::MetadataOnly { recursive } => *recursive,
             Self::Full(full_compaction_rule) => full_compaction_rule.recursive,
         }
     }
@@ -107,7 +92,7 @@ impl CompactionRule {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum CompactionRuleValidationError {
+pub enum FlowConfigRuleCompactValidationError {
     #[error("Maximum slice records must be a positive number")]
     MaxSliceRecordsNotPositive,
 
@@ -121,31 +106,31 @@ pub enum CompactionRuleValidationError {
 mod tests {
     use std::assert_matches::assert_matches;
 
-    use crate::{CompactionRuleFull, CompactionRuleValidationError};
+    use crate::{FlowConfigRuleCompactFull, FlowConfigRuleCompactValidationError};
 
     #[test]
     fn test_valid_compaction_rule() {
-        assert_matches!(CompactionRuleFull::new_checked(1, 1, false), Ok(_));
+        assert_matches!(FlowConfigRuleCompactFull::new_checked(1, 1, false), Ok(_));
         assert_matches!(
-            CompactionRuleFull::new_checked(1_000_000, 1_000_000, false),
+            FlowConfigRuleCompactFull::new_checked(1_000_000, 1_000_000, false),
             Ok(_)
         );
-        assert_matches!(CompactionRuleFull::new_checked(1, 20, false), Ok(_));
+        assert_matches!(FlowConfigRuleCompactFull::new_checked(1, 20, false), Ok(_));
     }
 
     #[test]
     fn test_non_positive_max_slice_records() {
         assert_matches!(
-            CompactionRuleFull::new_checked(100, 0, false),
-            Err(CompactionRuleValidationError::MaxSliceRecordsNotPositive)
+            FlowConfigRuleCompactFull::new_checked(100, 0, false),
+            Err(FlowConfigRuleCompactValidationError::MaxSliceRecordsNotPositive)
         );
     }
 
     #[test]
     fn test_non_positive_max_slice_size() {
         assert_matches!(
-            CompactionRuleFull::new_checked(0, 100, false),
-            Err(CompactionRuleValidationError::MaxSliceSizeNotPositive)
+            FlowConfigRuleCompactFull::new_checked(0, 100, false),
+            Err(FlowConfigRuleCompactValidationError::MaxSliceSizeNotPositive)
         );
     }
 }

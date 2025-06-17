@@ -44,24 +44,6 @@ pub trait FlowConfigurationService: Sync + Send {
 
 #[async_trait::async_trait]
 pub trait FlowConfigurationServiceExt {
-    async fn try_get_dataset_ingest_rule(
-        &self,
-        dataset_id: odf::DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<IngestRule>, FindFlowConfigurationError>;
-
-    async fn try_get_dataset_compaction_rule(
-        &self,
-        dataset_id: odf::DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<CompactionRule>, FindFlowConfigurationError>;
-
-    async fn try_get_dataset_reset_rule(
-        &self,
-        dataset_id: odf::DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<ResetRule>, FindFlowConfigurationError>;
-
     async fn try_get_config_snapshot_by_key(
         &self,
         flow_key: FlowKey,
@@ -70,96 +52,12 @@ pub trait FlowConfigurationServiceExt {
 
 #[async_trait::async_trait]
 impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
-    async fn try_get_dataset_ingest_rule(
-        &self,
-        dataset_id: odf::DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<IngestRule>, FindFlowConfigurationError> {
-        let maybe_config = self
-            .find_configuration(FlowKey::dataset(dataset_id, flow_type))
-            .await?;
-        Ok(
-            if let Some(config) = maybe_config
-                && config.is_active()
-            {
-                config.try_get_ingest_rule()
-            } else {
-                None
-            },
-        )
-    }
-
-    async fn try_get_dataset_compaction_rule(
-        &self,
-        dataset_id: odf::DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<CompactionRule>, FindFlowConfigurationError> {
-        let maybe_config = self
-            .find_configuration(FlowKey::dataset(dataset_id, flow_type))
-            .await?;
-        Ok(
-            if let Some(config) = maybe_config
-                && config.is_active()
-            {
-                config.try_get_compaction_rule()
-            } else {
-                None
-            },
-        )
-    }
-
-    async fn try_get_dataset_reset_rule(
-        &self,
-        dataset_id: odf::DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<ResetRule>, FindFlowConfigurationError> {
-        let maybe_config = self
-            .find_configuration(FlowKey::dataset(dataset_id, flow_type))
-            .await?;
-        Ok(
-            if let Some(config) = maybe_config
-                && config.is_active()
-            {
-                config.try_get_reset_rule()
-            } else {
-                None
-            },
-        )
-    }
-
     async fn try_get_config_snapshot_by_key(
         &self,
         flow_key: FlowKey,
     ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError> {
-        let maybe_snapshot = match flow_key {
-            FlowKey::System(_) => None,
-            FlowKey::Dataset(dataset_flow_key) => match dataset_flow_key.flow_type {
-                DatasetFlowType::ExecuteTransform => None,
-                DatasetFlowType::Ingest => self
-                    .try_get_dataset_ingest_rule(
-                        dataset_flow_key.dataset_id,
-                        dataset_flow_key.flow_type,
-                    )
-                    .await?
-                    .map(FlowConfigurationRule::IngestRule),
-                DatasetFlowType::Reset => self
-                    .try_get_dataset_reset_rule(
-                        dataset_flow_key.dataset_id,
-                        dataset_flow_key.flow_type,
-                    )
-                    .await?
-                    .map(FlowConfigurationRule::ResetRule),
-                DatasetFlowType::HardCompaction => self
-                    .try_get_dataset_compaction_rule(
-                        dataset_flow_key.dataset_id,
-                        dataset_flow_key.flow_type,
-                    )
-                    .await?
-                    .map(FlowConfigurationRule::CompactionRule),
-            },
-        };
-
-        Ok(maybe_snapshot)
+        let maybe_config = self.find_configuration(flow_key).await?;
+        Ok(maybe_config.map(|config| config.rule))
     }
 }
 

@@ -7,25 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-use kamu_task_system as ts;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait FlowBatchingConditionQuery: Send + Sync {
-    async fn interpret_input_dataset_result(
-        &self,
-        dataset_id: &odf::DatasetID,
-        input_result: &ts::TaskResult,
-    ) -> Result<FlowInputResultInterpretation, InternalError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct FlowInputResultInterpretation {
-    pub new_records_count: u64,
-    pub was_compacted: bool,
+kamu_flow_system::flow_config_struct! {
+    pub struct FlowConfigRuleIngest {
+        pub fetch_uncacheable: bool,
+    }
+    => "IngestRule"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

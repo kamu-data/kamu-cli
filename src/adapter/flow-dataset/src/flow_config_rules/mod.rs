@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
+mod flow_config_rule_compact;
+mod flow_config_rule_ingest;
+mod flow_config_rule_reset;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct IngestRule {
-    pub fetch_uncacheable: bool,
-}
+pub use flow_config_rule_compact::*;
+pub use flow_config_rule_ingest::*;
+pub use flow_config_rule_reset::*;

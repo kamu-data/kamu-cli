@@ -26,6 +26,8 @@ database-common = { workspace = true }
 odf = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
+kamu-adapter-flow-dataset = { workspace = true }
+
 
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.14", default-features = false }

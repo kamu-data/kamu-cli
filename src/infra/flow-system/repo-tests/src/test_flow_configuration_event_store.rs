@@ -11,6 +11,7 @@ use chrono::Utc;
 use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
+use kamu_adapter_flow_dataset::FlowConfigRuleCompact;
 use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,16 +61,12 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key_1.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: false },
-        )),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
     };
     let event_1_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_key: flow_key_1.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: true },
-        )),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
     };
 
     event_store
@@ -91,9 +88,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_2 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key_2.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: false },
-        )),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
     };
 
     event_store
@@ -109,9 +104,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key_3.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: true },
-        )),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
     };
 
     event_store
@@ -182,23 +175,17 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let event_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: false },
-        )),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
     };
     let event_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: true },
-        )),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
     };
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_key: flow_key.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: false },
-        )),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
     };
 
     let latest_event_id = event_store

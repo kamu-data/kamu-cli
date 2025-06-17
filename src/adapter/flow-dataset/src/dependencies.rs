@@ -15,7 +15,7 @@ use super::*;
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowTaskFactoryImpl>();
-    catalog_builder.add::<FlowBatchingConditionQueryImpl>();
+    catalog_builder.add::<FlowSupportServiceImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

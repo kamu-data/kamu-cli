@@ -18,18 +18,20 @@ use kamu_adapter_task_dataset::{
 use kamu_datasets::DatasetIncrementQueryService;
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
+use crate::{FlowConfigRuleCompact, FlowConfigRuleReset};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn fs::FlowBatchingConditionQuery)]
-pub struct FlowBatchingConditionQueryImpl {
+#[dill::interface(dyn fs::FlowSupportService)]
+pub struct FlowSupportServiceImpl {
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl fs::FlowBatchingConditionQuery for FlowBatchingConditionQueryImpl {
+impl fs::FlowSupportService for FlowSupportServiceImpl {
     async fn interpret_input_dataset_result(
         &self,
         dataset_id: &odf::DatasetID,
@@ -82,6 +84,51 @@ impl fs::FlowBatchingConditionQuery for FlowBatchingConditionQueryImpl {
                 })
             }
         }
+    }
+
+    fn classify_dependent_trigger_type(
+        &self,
+        dataset_flow_type: fs::DatasetFlowType,
+        maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
+    ) -> Result<fs::DownstreamDependencyTriggerType, InternalError> {
+        use fs::{DatasetFlowType, DownstreamDependencyTriggerType};
+        match dataset_flow_type {
+            DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                Ok(DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform)
+            }
+            DatasetFlowType::HardCompaction => {
+                if let Some(config_snapshot) = &maybe_config_snapshot
+                    && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
+                {
+                    let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
+                    if compaction_rule.recursive() {
+                        Ok(DownstreamDependencyTriggerType::TriggerOwnHardCompaction)
+                    } else {
+                        Ok(DownstreamDependencyTriggerType::Empty)
+                    }
+                } else {
+                    Ok(fs::DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform)
+                }
+            }
+            DatasetFlowType::Reset => {
+                if let Some(config_snapshot) = &maybe_config_snapshot
+                    && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
+                {
+                    let reset_rule = FlowConfigRuleReset::from_flow_config(config_snapshot)?;
+                    if reset_rule.recursive {
+                        Ok(DownstreamDependencyTriggerType::TriggerOwnHardCompaction)
+                    } else {
+                        Ok(DownstreamDependencyTriggerType::Empty)
+                    }
+                } else {
+                    Ok(DownstreamDependencyTriggerType::Empty)
+                }
+            }
+        }
+    }
+
+    fn make_resursive_compaction_config(&self) -> fs::FlowConfigurationRule {
+        FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config()
     }
 }
 

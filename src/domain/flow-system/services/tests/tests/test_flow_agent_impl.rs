@@ -12,6 +12,12 @@ use std::str::FromStr;
 use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
+use kamu_adapter_flow_dataset::{
+    FlowConfigRuleCompact,
+    FlowConfigRuleCompactFull,
+    FlowConfigRuleIngest,
+    FlowConfigRuleReset,
+};
 use kamu_adapter_task_dataset::{
     LogicalPlanDatasetHardCompact,
     LogicalPlanDatasetReset,
@@ -54,7 +60,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
         .set_dataset_flow_ingest(
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
+            FlowConfigRuleIngest {
                 fetch_uncacheable: false,
             },
         )
@@ -515,9 +521,9 @@ async fn test_manual_trigger() {
                     flow_key: bar_flow_key,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: Some(FlowConfigurationRule::IngestRule(IngestRule {
+                    flow_configuration_snapshot_maybe: Some(FlowConfigRuleIngest {
                       fetch_uncacheable: true
-                    })),
+                    }.into_flow_config()),
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -647,7 +653,7 @@ async fn test_ingest_trigger_with_ingest_config() {
         .set_dataset_flow_ingest(
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
+            FlowConfigRuleIngest {
                 fetch_uncacheable: true,
             },
         )
@@ -1004,7 +1010,7 @@ async fn test_manual_trigger_reset() {
         .set_dataset_flow_reset_rule(
             foo_id.clone(),
             DatasetFlowType::Reset,
-            ResetRule {
+            FlowConfigRuleReset {
                 new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                 old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                 recursive: false,
@@ -1125,7 +1131,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
         .set_dataset_flow_reset_rule(
             foo_id.clone(),
             DatasetFlowType::Reset,
-            ResetRule {
+            FlowConfigRuleReset {
                 new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                 old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                 recursive: true,
@@ -1330,8 +1336,9 @@ async fn test_manual_trigger_compaction_with_config() {
         .set_dataset_flow_compaction_rule(
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
-            CompactionRule::Full(
-                CompactionRuleFull::new_checked(max_slice_size, max_slice_records, false).unwrap(),
+            FlowConfigRuleCompact::Full(
+                FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records, false)
+                    .unwrap(),
             ),
         )
         .await;
@@ -1446,8 +1453,9 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
         .set_dataset_flow_compaction_rule(
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
-            CompactionRule::Full(
-                CompactionRuleFull::new_checked(max_slice_size, max_slice_records, true).unwrap(),
+            FlowConfigRuleCompact::Full(
+                FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records, true)
+                    .unwrap(),
             ),
         )
         .await;
@@ -1674,7 +1682,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
         .set_dataset_flow_compaction_rule(
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
-            CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
+            FlowConfigRuleCompact::MetadataOnly { recursive: true },
         )
         .await;
 
@@ -1903,7 +1911,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
         .set_dataset_flow_compaction_rule(
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
-            CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: false }),
+            FlowConfigRuleCompact::MetadataOnly { recursive: false },
         )
         .await;
 
@@ -2036,7 +2044,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
         .set_dataset_flow_compaction_rule(
             foo_id.clone(),
             DatasetFlowType::HardCompaction,
-            CompactionRule::MetadataOnly(CompactionRuleMetadataOnly { recursive: true }),
+            FlowConfigRuleCompact::MetadataOnly { recursive: true },
         )
         .await;
 
@@ -6307,7 +6315,7 @@ async fn test_disable_trigger_on_flow_fail() {
         .set_dataset_flow_ingest(
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            IngestRule {
+            FlowConfigRuleIngest {
                 fetch_uncacheable: false,
             },
         )

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod flow_configuration_event;
+mod flow_configuration_macro;
 mod flow_configuration_rule;
 mod flow_configuration_state;
 mod flow_configuration_status;
