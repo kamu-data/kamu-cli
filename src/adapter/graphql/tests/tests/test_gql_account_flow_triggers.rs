@@ -14,7 +14,7 @@ use chrono::Duration;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_adapter_task_dataset::{FlowBatchingConditionQueryImpl, FlowTaskFactoryImpl};
+use kamu_adapter_flow_dataset::*;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
