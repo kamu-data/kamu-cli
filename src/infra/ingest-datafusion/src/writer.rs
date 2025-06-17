@@ -207,7 +207,7 @@ impl DataWriterDataFusion {
             df.with_column(
                 &self.meta.vocab.event_time_column,
                 cast(
-                    Expr::Literal(datafusion::scalar::ScalarValue::Null),
+                    Expr::Literal(datafusion::scalar::ScalarValue::Null, None),
                     data_type,
                 ),
             )
@@ -281,10 +281,13 @@ impl DataWriterDataFusion {
         let df = df
             .with_column(
                 &self.meta.vocab.system_time_column,
-                Expr::Literal(ScalarValue::TimestampMillisecond(
-                    Some(system_time.timestamp_millis()),
-                    Some("UTC".into()),
-                )),
+                Expr::Literal(
+                    ScalarValue::TimestampMillisecond(
+                        Some(system_time.timestamp_millis()),
+                        Some("UTC".into()),
+                    ),
+                    None,
+                ),
             )
             .int_err()?;
 
@@ -306,10 +309,13 @@ impl DataWriterDataFusion {
                 when(
                     col(Column::from_name(&self.meta.vocab.event_time_column)).is_null(),
                     cast(
-                        Expr::Literal(ScalarValue::TimestampMillisecond(
-                            Some(fallback_event_time.timestamp_millis()),
-                            Some("UTC".into()),
-                        )),
+                        Expr::Literal(
+                            ScalarValue::TimestampMillisecond(
+                                Some(fallback_event_time.timestamp_millis()),
+                                Some("UTC".into()),
+                            ),
+                            None,
+                        ),
                         event_time_data_type,
                     ),
                 )

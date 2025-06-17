@@ -12,7 +12,6 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use datafusion::arrow;
-use datafusion::error::DataFusionError;
 use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
@@ -188,8 +187,7 @@ impl QueryServiceImpl {
 
             // TODO: Replace with "remote catalog" pattern
             // See: https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs#L78
-            let statements = datafusion::sql::parser::DFParser::parse_sql(sql)
-                .map_err(|e| DataFusionError::SQL(e, None))?;
+            let statements = datafusion::sql::parser::DFParser::parse_sql(sql)?;
 
             for stmt in statements {
                 match stmt {
