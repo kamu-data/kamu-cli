@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResetRule {
-    pub new_head_hash: Option<odf::Multihash>,
-    pub old_head_hash: Option<odf::Multihash>,
-    pub recursive: bool,
+kamu_flow_system::flow_config_struct! {
+    pub struct FlowConfigRuleReset {
+        pub new_head_hash: Option<odf::Multihash>,
+        pub old_head_hash: Option<odf::Multihash>,
+        pub recursive: bool,
+    }
+    => "ResetRule"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

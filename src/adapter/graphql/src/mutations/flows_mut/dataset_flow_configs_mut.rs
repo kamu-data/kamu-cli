@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{
-    CompactionRuleFull,
-    CompactionRuleMetadataOnly,
-    FlowConfigurationRule,
-    FlowConfigurationService,
-    FlowKeyDataset,
-    IngestRule,
+use kamu_adapter_flow_dataset::{
+    FlowConfigRuleCompact,
+    FlowConfigRuleCompactFull,
+    FlowConfigRuleIngest,
 };
+use kamu_flow_system::{FlowConfigurationRule, FlowConfigurationService, FlowKeyDataset};
 
 use super::{
     FlowIncompatibleDatasetKind,
@@ -154,26 +152,26 @@ impl TryFrom<FlowConfigurationInput> for FlowConfigurationRule {
     fn try_from(value: FlowConfigurationInput) -> std::result::Result<Self, Self::Error> {
         match value {
             FlowConfigurationInput::Ingest(ingest_input) => {
-                let ingest_rule: IngestRule = ingest_input.into();
-                Ok(Self::IngestRule(ingest_rule))
+                let ingest_rule: FlowConfigRuleIngest = ingest_input.into();
+                Ok(ingest_rule.into_flow_config())
             }
             FlowConfigurationInput::Compaction(compaction_input) => match compaction_input {
-                CompactionConditionInput::Full(compaction_args) => CompactionRuleFull::new_checked(
-                    compaction_args.max_slice_size,
-                    compaction_args.max_slice_records,
-                    compaction_args.recursive,
-                )
-                .map_err(|err| Self::Error {
-                    reason: err.to_string(),
-                })
-                .map(|rule| Self::CompactionRule(rule.into())),
+                CompactionConditionInput::Full(compaction_args) => {
+                    FlowConfigRuleCompactFull::new_checked(
+                        compaction_args.max_slice_size,
+                        compaction_args.max_slice_records,
+                        compaction_args.recursive,
+                    )
+                    .map_err(|err| Self::Error {
+                        reason: err.to_string(),
+                    })
+                    .map(|rule| FlowConfigRuleCompact::Full(rule).into_flow_config())
+                }
                 CompactionConditionInput::MetadataOnly(compaction_args) => {
-                    Ok(Self::CompactionRule(
-                        CompactionRuleMetadataOnly {
-                            recursive: compaction_args.recursive,
-                        }
-                        .into(),
-                    ))
+                    let compaction_rule = FlowConfigRuleCompact::MetadataOnly {
+                        recursive: compaction_args.recursive,
+                    };
+                    Ok(compaction_rule.into_flow_config())
                 }
             },
         }

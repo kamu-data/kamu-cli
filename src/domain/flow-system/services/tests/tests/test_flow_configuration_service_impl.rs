@@ -13,6 +13,11 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
+use kamu_adapter_flow_dataset::{
+    FlowConfigRuleCompact,
+    FlowConfigRuleCompactFull,
+    FlowConfigRuleIngest,
+};
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -32,9 +37,11 @@ async fn test_visibility() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let foo_ingest_config = FlowConfigurationRule::IngestRule(IngestRule {
+    let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: false,
-    });
+    }
+    .into_flow_config();
+
     harness
         .set_dataset_flow_config(
             foo_id.clone(),
@@ -43,9 +50,10 @@ async fn test_visibility() {
         )
         .await;
 
-    let foo_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
-        CompactionRuleFull::new_checked(2, 3, false).unwrap(),
-    ));
+    let foo_compaction_config =
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3, false).unwrap())
+            .into_flow_config();
+
     harness
         .set_dataset_flow_config(
             foo_id.clone(),
@@ -54,9 +62,10 @@ async fn test_visibility() {
         )
         .await;
 
-    let bar_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
-        CompactionRuleFull::new_checked(3, 4, false).unwrap(),
-    ));
+    let bar_compaction_config =
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(3, 4, false).unwrap())
+            .into_flow_config();
+
     harness
         .set_dataset_flow_config(
             bar_id.clone(),
@@ -95,9 +104,10 @@ async fn test_modify() {
 
     // Make a dataset and configure compaction config
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let foo_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
-        CompactionRuleFull::new_checked(1, 2, false).unwrap(),
-    ));
+    let foo_compaction_config =
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(1, 2, false).unwrap())
+            .into_flow_config();
+
     harness
         .set_dataset_flow_config(
             foo_id.clone(),
@@ -117,9 +127,10 @@ async fn test_modify() {
     );
 
     // Now make the config with different parameters
-    let foo_compaction_config_2 = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
-        CompactionRuleFull::new_checked(2, 3, false).unwrap(),
-    ));
+    let foo_compaction_config_2 =
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3, false).unwrap())
+            .into_flow_config();
+
     harness
         .set_dataset_flow_config(
             foo_id.clone(),
@@ -148,9 +159,11 @@ async fn test_dataset_deleted() {
 
     // Make a dataset and configure ingest rule
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let foo_ingest_config = FlowConfigurationRule::IngestRule(IngestRule {
+    let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: true,
-    });
+    }
+    .into_flow_config();
+
     harness
         .set_dataset_flow_config(
             foo_id.clone(),
@@ -182,9 +195,10 @@ async fn test_dataset_deleted() {
         .await;
     assert_eq!(
         flow_config_state.rule,
-        FlowConfigurationRule::IngestRule(IngestRule {
-            fetch_uncacheable: true,
-        })
+        FlowConfigRuleIngest {
+            fetch_uncacheable: true
+        }
+        .into_flow_config()
     );
 }
 

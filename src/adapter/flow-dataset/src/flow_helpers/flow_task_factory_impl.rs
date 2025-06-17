@@ -15,6 +15,8 @@ use kamu_adapter_task_dataset::{
 };
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
+use crate::{FlowConfigRuleCompact, FlowConfigRuleIngest, FlowConfigRuleReset};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -35,8 +37,9 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
                 fs::DatasetFlowType::Ingest | fs::DatasetFlowType::ExecuteTransform => {
                     let mut fetch_uncacheable = false;
                     if let Some(config_snapshot) = maybe_config_snapshot
-                        && let fs::FlowConfigurationRule::IngestRule(ingest_rule) = config_snapshot
+                        && config_snapshot.rule_type == FlowConfigRuleIngest::TYPE_ID
                     {
+                        let ingest_rule = FlowConfigRuleIngest::from_flow_config(config_snapshot)?;
                         fetch_uncacheable = ingest_rule.fetch_uncacheable;
                     }
 
@@ -52,13 +55,14 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
                     let mut keep_metadata_only = false;
 
                     if let Some(config_snapshot) = maybe_config_snapshot
-                        && let fs::FlowConfigurationRule::CompactionRule(compaction_rule) =
-                            config_snapshot
+                        && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
                     {
+                        let compaction_rule =
+                            FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
                         max_slice_size = compaction_rule.max_slice_size();
                         max_slice_records = compaction_rule.max_slice_records();
                         keep_metadata_only =
-                            matches!(compaction_rule, fs::CompactionRule::MetadataOnly(_));
+                            matches!(compaction_rule, FlowConfigRuleCompact::MetadataOnly { .. });
                     }
 
                     Ok(LogicalPlanDatasetHardCompact {
@@ -70,9 +74,10 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
                     .into_logical_plan())
                 }
                 fs::DatasetFlowType::Reset => {
-                    if let Some(config_rule) = maybe_config_snapshot
-                        && let fs::FlowConfigurationRule::ResetRule(reset_rule) = config_rule
+                    if let Some(config_snapshot) = maybe_config_snapshot
+                        && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
                     {
+                        let reset_rule = FlowConfigRuleReset::from_flow_config(config_snapshot)?;
                         Ok(LogicalPlanDatasetReset {
                             dataset_id: flow_key.dataset_id.clone(),
                             new_head_hash: reset_rule.new_head_hash.clone(),

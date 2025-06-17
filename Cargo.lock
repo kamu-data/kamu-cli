@@ -6968,7 +6968,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -7677,6 +7676,7 @@ dependencies = [
  "messaging-outbox",
  "opendatafabric",
  "serde",
+ "serde_json",
  "serde_with",
  "sqlx",
  "strum 0.26.3",
@@ -7734,6 +7734,7 @@ dependencies = [
  "database-common",
  "dill",
  "futures",
+ "kamu-adapter-flow-dataset",
  "kamu-flow-system",
  "kamu-task-system",
  "opendatafabric",

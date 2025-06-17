@@ -3095,7 +3095,7 @@ impl FlowRunsHarness {
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>()
                 .add::<FlowTaskFactoryImpl>()
-                .add::<FlowBatchingConditionQueryImpl>();
+                .add::<FlowSupportServiceImpl>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 

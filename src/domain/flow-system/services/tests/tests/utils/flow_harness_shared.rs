@@ -13,7 +13,13 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_adapter_flow_dataset::{FlowBatchingConditionQueryImpl, FlowTaskFactoryImpl};
+use kamu_adapter_flow_dataset::{
+    FlowConfigRuleCompact,
+    FlowConfigRuleIngest,
+    FlowConfigRuleReset,
+    FlowSupportServiceImpl,
+    FlowTaskFactoryImpl,
+};
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetEntry,
@@ -122,7 +128,7 @@ impl FlowHarness {
             .add::<DatabaseTransactionRunner>()
             .add::<FakeDatasetEntryService>()
             .add::<FlowTaskFactoryImpl>()
-            .add::<FlowBatchingConditionQueryImpl>();
+            .add::<FlowSupportServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -297,12 +303,12 @@ impl FlowHarness {
         &self,
         dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
-        ingest_rule: IngestRule,
+        ingest_rule: FlowConfigRuleIngest,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                FlowConfigurationRule::IngestRule(ingest_rule),
+                ingest_rule.into_flow_config(),
             )
             .await
             .unwrap();
@@ -312,12 +318,12 @@ impl FlowHarness {
         &self,
         dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
-        reset_rule: ResetRule,
+        reset_rule: FlowConfigRuleReset,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                FlowConfigurationRule::ResetRule(reset_rule),
+                reset_rule.into_flow_config(),
             )
             .await
             .unwrap();
@@ -327,12 +333,12 @@ impl FlowHarness {
         &self,
         dataset_id: odf::DatasetID,
         dataset_flow_type: DatasetFlowType,
-        compaction_rule: CompactionRule,
+        compaction_rule: FlowConfigRuleCompact,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                FlowConfigurationRule::CompactionRule(compaction_rule),
+                compaction_rule.into_flow_config(),
             )
             .await
             .unwrap();

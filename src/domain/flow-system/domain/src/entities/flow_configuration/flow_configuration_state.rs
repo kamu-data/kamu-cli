@@ -27,30 +27,6 @@ impl FlowConfigurationState {
     pub fn is_active(&self) -> bool {
         self.status.is_active()
     }
-
-    pub fn try_get_ingest_rule(self) -> Option<IngestRule> {
-        if let FlowConfigurationRule::IngestRule(ingest_rule) = self.rule {
-            Some(ingest_rule)
-        } else {
-            None
-        }
-    }
-
-    pub fn try_get_compaction_rule(self) -> Option<CompactionRule> {
-        if let FlowConfigurationRule::CompactionRule(compation_rule) = self.rule {
-            Some(compation_rule)
-        } else {
-            None
-        }
-    }
-
-    pub fn try_get_reset_rule(self) -> Option<ResetRule> {
-        if let FlowConfigurationRule::ResetRule(reset_rule) = self.rule {
-            Some(reset_rule)
-        } else {
-            None
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

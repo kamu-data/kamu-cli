@@ -23,7 +23,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 use super::{DownstreamDependencyFlowPlan, FlowTriggerContext};
-use crate::{DownstreamDependencyTriggerType, MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE};
+use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +31,7 @@ pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
-    flow_batching_condition_query: Arc<dyn FlowBatchingConditionQuery>,
+    flow_support_service: Arc<dyn FlowSupportService>,
     outbox: Arc<dyn Outbox>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -46,7 +46,7 @@ impl FlowSchedulingHelper {
         flow_event_store: Arc<dyn FlowEventStore>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         flow_trigger_service: Arc<dyn FlowTriggerService>,
-        flow_batching_condition_query: Arc<dyn FlowBatchingConditionQuery>,
+        flow_support_service: Arc<dyn FlowSupportService>,
         outbox: Arc<dyn Outbox>,
         dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -58,7 +58,7 @@ impl FlowSchedulingHelper {
             flow_event_store,
             flow_configuration_service,
             flow_trigger_service,
-            flow_batching_condition_query,
+            flow_support_service,
             outbox,
             dataset_increment_query_service,
             dependency_graph_service,
@@ -189,7 +189,10 @@ impl FlowSchedulingHelper {
             return Ok(plans);
         }
 
-        match self.classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot) {
+        match self
+            .flow_support_service
+            .classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot)?
+        {
             DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform => {
                 for dataset_id in dependent_dataset_ids {
                     if let Some(batching_rule) = self
@@ -239,11 +242,9 @@ impl FlowSchedulingHelper {
                             flow_trigger_rule: None,
                             // Currently we trigger Hard compaction recursively only in keep
                             // metadata only mode
-                            maybe_config_snapshot: Some(FlowConfigurationRule::CompactionRule(
-                                CompactionRule::MetadataOnly(CompactionRuleMetadataOnly {
-                                    recursive: true,
-                                }),
-                            )),
+                            maybe_config_snapshot: Some(
+                                self.flow_support_service.make_resursive_compaction_config(),
+                            ),
                         });
                     }
                 }
@@ -253,41 +254,6 @@ impl FlowSchedulingHelper {
         }
 
         Ok(plans)
-    }
-
-    fn classify_dependent_trigger_type(
-        &self,
-        dataset_flow_type: DatasetFlowType,
-        maybe_config_snapshot: Option<&FlowConfigurationRule>,
-    ) -> DownstreamDependencyTriggerType {
-        match dataset_flow_type {
-            DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform
-            }
-            DatasetFlowType::HardCompaction => {
-                if let Some(config_snapshot) = &maybe_config_snapshot
-                    && let FlowConfigurationRule::CompactionRule(compaction_rule) = config_snapshot
-                {
-                    if compaction_rule.recursive() {
-                        DownstreamDependencyTriggerType::TriggerOwnHardCompaction
-                    } else {
-                        DownstreamDependencyTriggerType::Empty
-                    }
-                } else {
-                    DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform
-                }
-            }
-            DatasetFlowType::Reset => {
-                if let Some(config_snapshot) = &maybe_config_snapshot
-                    && let FlowConfigurationRule::ResetRule(reset_rule) = config_snapshot
-                    && reset_rule.recursive
-                {
-                    DownstreamDependencyTriggerType::TriggerOwnHardCompaction
-                } else {
-                    DownstreamDependencyTriggerType::Empty
-                }
-            }
-        }
     }
 
     pub(crate) async fn schedule_auto_polling_flow(
@@ -537,7 +503,7 @@ impl FlowSchedulingHelper {
             match trigger {
                 FlowTriggerInstance::InputDatasetFlow(trigger_type) => {
                     let interpretation = self
-                        .flow_batching_condition_query
+                        .flow_support_service
                         .interpret_input_dataset_result(
                             &trigger_type.dataset_id,
                             &trigger_type.task_result,
