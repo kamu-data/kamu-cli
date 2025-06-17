@@ -33,7 +33,7 @@ impl ProbeTaskPlanner {
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for ProbeTaskPlanner {
     fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanProbe::SERIALIZATION_TYPE_ID
+        LogicalPlanProbe::TYPE_ID
     }
 
     async fn prepare_task_definition(
@@ -43,17 +43,11 @@ impl TaskDefinitionPlanner for ProbeTaskPlanner {
     ) -> Result<TaskDefinition, InternalError> {
         assert_eq!(
             logical_plan.plan_type,
-            LogicalPlanProbe::SERIALIZATION_TYPE_ID,
+            LogicalPlanProbe::TYPE_ID,
             "ProbeTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
         );
 
-        let probe_plan: LogicalPlanProbe = serde_json::from_value(logical_plan.payload.clone())
-            .unwrap_or_else(|_| {
-                panic!(
-                    "ProbeTaskPlanner received an invalid logical plan payload: {logical_plan:?}"
-                )
-            });
-
+        let probe_plan = LogicalPlanProbe::from_logical_plan(logical_plan)?;
         self.plan_probe(&probe_plan).await
     }
 }

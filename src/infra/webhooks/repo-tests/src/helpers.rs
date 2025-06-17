@@ -29,17 +29,9 @@ pub(crate) async fn new_task(catalog: &dill::Catalog) -> ts::TaskID {
 
     let task_id = task_event_store.new_task_id().await.unwrap();
 
-    let plan = ts::LogicalPlanProbe::default();
+    let plan = ts::LogicalPlanProbe::default().into_logical_plan();
 
-    let mut task = ts::Task::new(
-        Utc::now(),
-        task_id,
-        ts::LogicalPlan {
-            plan_type: ts::LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-            payload: serde_json::to_value(plan).unwrap(),
-        },
-        None,
-    );
+    let mut task = ts::Task::new(Utc::now(), task_id, plan, None);
 
     task.save(task_event_store.as_ref()).await.unwrap();
 

@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::{InternalError, ResultIntoInternal};
 use serde::{Deserialize, Serialize};
 
-use crate::TaskOutcome;
+use crate::{LogicalPlan, TaskOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +24,19 @@ pub struct LogicalPlanProbe {
 }
 
 impl LogicalPlanProbe {
-    pub const SERIALIZATION_TYPE_ID: &str = "Probe";
+    pub const TYPE_ID: &str = "Probe";
+
+    pub fn into_logical_plan(self) -> LogicalPlan {
+        LogicalPlan {
+            plan_type: Self::TYPE_ID.to_string(),
+            payload: serde_json::to_value(self)
+                .expect("Failed to serialize impl LogicalPlanProbe into JSON"),
+        }
+    }
+
+    pub fn from_logical_plan(logical_plan: &LogicalPlan) -> Result<Self, InternalError> {
+        serde_json::from_value(logical_plan.payload.clone()).int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

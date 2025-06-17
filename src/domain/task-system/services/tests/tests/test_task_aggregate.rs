@@ -21,10 +21,7 @@ async fn test_task_agg_create_new() {
 
     let metadata = TaskMetadata::from(vec![("foo", "x"), ("bar", "y")]);
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     let mut task = Task::new(
         Utc::now(),
@@ -54,10 +51,7 @@ async fn test_task_save_load_update() {
     let event_store = InMemoryTaskEventStore::new();
     let task_id = event_store.new_task_id().await.unwrap();
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     let mut task = Task::new(Utc::now(), task_id, logical_plan, None);
     task.save(&event_store).await.unwrap();
@@ -104,10 +98,7 @@ async fn test_task_save_load_update() {
 async fn test_task_load_multi() {
     let event_store = InMemoryTaskEventStore::new();
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     for _ in 0..5000 {
         let task_id = event_store.new_task_id().await.unwrap();
@@ -141,10 +132,7 @@ async fn test_task_load_multi() {
 async fn test_task_agg_illegal_transition() {
     let event_store = InMemoryTaskEventStore::new();
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     let mut task = Task::new(
         Utc::now(),
@@ -164,10 +152,7 @@ async fn test_task_agg_illegal_transition() {
 async fn test_task_requeue() {
     let event_store = InMemoryTaskEventStore::new();
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     let mut task = Task::new(
         Utc::now(),

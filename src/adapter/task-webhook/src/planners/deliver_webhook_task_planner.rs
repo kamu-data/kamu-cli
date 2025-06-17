@@ -39,13 +39,7 @@ impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
             "DeliverWebhookTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
         );
 
-        let webhook_plan: LogicalPlanWebhookDeliver =
-            serde_json::from_value(logical_plan.payload.clone()).unwrap_or_else(|_| {
-                panic!(
-                    "DeliverWebhookTaskPlanner received an invalid logical plan payload: \
-                     {logical_plan:?}"
-                )
-            });
+        let webhook_plan = LogicalPlanWebhookDeliver::from_logical_plan(logical_plan)?;
 
         Ok(TaskDefinition::new(TaskDefinitionWebhookDeliver {
             task_id,

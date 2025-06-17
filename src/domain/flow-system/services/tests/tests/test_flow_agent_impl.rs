@@ -84,13 +84,10 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                        plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                        payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                          dataset_id: foo_id.clone(),
-                          fetch_uncacheable: false
-                        }).unwrap(),
-                    },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -101,13 +98,10 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: false
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
                 });
                 let foo_task1_handle = foo_task1_driver.run();
 
@@ -263,13 +257,10 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(110),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: false
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -353,13 +344,10 @@ async fn test_cron_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::seconds(6),
                     finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: false
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false,
+                    }.into_logical_plan(),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -478,13 +466,10 @@ async fn test_manual_trigger() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: false
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -495,13 +480,10 @@ async fn test_manual_trigger() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(60),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: false
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
                 });
                 let task1_handle = task1_driver.run();
 
@@ -512,13 +494,10 @@ async fn test_manual_trigger() {
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::milliseconds(100),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: bar_id.clone(),
-                        fetch_uncacheable: true
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: bar_id.clone(),
+                      fetch_uncacheable: true
+                    }.into_logical_plan(),
                 });
                 let task2_handle = task2_driver.run();
 
@@ -704,13 +683,10 @@ async fn test_ingest_trigger_with_ingest_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: true
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: true
+                    }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -721,13 +697,10 @@ async fn test_ingest_trigger_with_ingest_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(60),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: true
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: true
+                    }.into_logical_plan(),
                 });
                 let task1_handle = task1_driver.run();
 
@@ -738,13 +711,10 @@ async fn test_ingest_trigger_with_ingest_config() {
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::milliseconds(100),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: bar_id.clone(),
-                        fetch_uncacheable: false
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: bar_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
                 });
                 let task2_handle = task2_driver.run();
 
@@ -914,15 +884,12 @@ async fn test_manual_trigger_compaction() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                        dataset_id: foo_id.clone(),
-                        max_slice_size: None,
-                        max_slice_records: None,
-                        keep_metadata_only: false,
-                      }).unwrap(),
-                  }
+                    expected_logical_plan: LogicalPlanDatasetHardCompact {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: None,
+                      max_slice_records: None,
+                      keep_metadata_only: false,
+                    }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -932,15 +899,12 @@ async fn test_manual_trigger_compaction() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                  expected_logical_plan: LogicalPlan {
-                    plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                    payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                      dataset_id: bar_id.clone(),
-                      max_slice_size: None,
-                      max_slice_records: None,
-                      keep_metadata_only: false,
-                    }).unwrap(),
-                  },
+                  expected_logical_plan: LogicalPlanDatasetHardCompact {
+                    dataset_id: bar_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                    keep_metadata_only: false,
+                  }.into_logical_plan(),
                 });
                 let task1_handle = task1_driver.run();
 
@@ -1071,16 +1035,13 @@ async fn test_manual_trigger_reset() {
                         reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-slice") },
                       }.into_task_result())
                     )),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetReset::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetReset {
-                        dataset_id: foo_id.clone(),
-                        // By default, should reset to seed block
-                        new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                        old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        recursive: false,
-                      }).unwrap(),
-                    },
+                    expected_logical_plan: LogicalPlanDatasetReset {
+                      dataset_id: foo_id.clone(),
+                      // By default, should reset to seed block
+                      new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                      old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                      recursive: false,
+                    }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -1207,15 +1168,12 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                   reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-slice") }
                 }.into_task_result()
               ))),
-              expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetReset::TYPE_ID.to_string(),
-                payload: serde_json::to_value(LogicalPlanDatasetReset {
-                  dataset_id: foo_id.clone(),
-                  new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                  old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                  recursive: true,
-                }).unwrap(),
-              },
+              expected_logical_plan: LogicalPlanDatasetReset {
+                dataset_id: foo_id.clone(),
+                new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                recursive: true,
+              }.into_logical_plan(),
           });
           let task0_handle = task0_driver.run();
 
@@ -1238,15 +1196,12 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                   }.into_task_result()
                 )
               )),
-              expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                  dataset_id: foo_baz_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
-                }).unwrap(),
-              },
+              expected_logical_plan: LogicalPlanDatasetHardCompact {
+                dataset_id: foo_baz_id.clone(),
+                max_slice_size: None,
+                max_slice_records: None,
+                keep_metadata_only: true,
+              }.into_logical_plan(),
           });
           let task1_handle = task1_driver.run();
 
@@ -1269,15 +1224,12 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
                   }.into_task_result()
                 )
               )),
-              expected_logical_plan: LogicalPlan {
-                plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                  dataset_id: foo_bar_id.clone(),
-                  max_slice_size: None,
-                  max_slice_records: None,
-                  keep_metadata_only: true,
-                }).unwrap(),
-              },
+              expected_logical_plan: LogicalPlanDatasetHardCompact {
+                dataset_id: foo_bar_id.clone(),
+                max_slice_size: None,
+                max_slice_records: None,
+                keep_metadata_only: true,
+              }.into_logical_plan(),
           });
           let task2_handle = task2_driver.run();
 
@@ -1404,15 +1356,12 @@ async fn test_manual_trigger_compaction_with_config() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(30),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                        dataset_id: foo_id.clone(),
-                        max_slice_size: Some(max_slice_size),
-                        max_slice_records: Some(max_slice_records),
-                        keep_metadata_only: false,
-                      }).unwrap(),
-                    },
+                    expected_logical_plan: LogicalPlanDatasetHardCompact {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: Some(max_slice_size),
+                      max_slice_records: Some(max_slice_records),
+                      keep_metadata_only: false,
+                    }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -1547,15 +1496,12 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                     }.into_task_result())
                   )
                 ),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_id.clone(),
-                    max_slice_size: Some(max_slice_size),
-                    max_slice_records: Some(max_slice_records),
-                    keep_metadata_only: false,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_id.clone(),
+                  max_slice_size: Some(max_slice_size),
+                  max_slice_records: Some(max_slice_records),
+                  keep_metadata_only: false,
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -1578,15 +1524,12 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_baz_id.clone(),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                    keep_metadata_only: true,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_baz_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -1609,15 +1552,12 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_bar_id.clone(),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                    keep_metadata_only: true,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_bar_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
 
@@ -1783,15 +1723,12 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }.into_task_result())
                   )
                 ),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_id.clone(),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                    keep_metadata_only: true,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -1814,15 +1751,12 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_bar_id.clone(),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                    keep_metadata_only: true,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_bar_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -1845,15 +1779,12 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_bar_baz_id.clone(),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                    keep_metadata_only: true,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_bar_baz_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
 
@@ -2021,15 +1952,12 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                     }.into_task_result())
                   )
                 ),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_id.clone(),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                    keep_metadata_only: true,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2147,15 +2075,12 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                   }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_id.clone(),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                    keep_metadata_only: true,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2187,15 +2112,12 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                     }.into_task_result()
                 ))),
                 // Make sure we will take config from root dataset
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                    dataset_id: foo_bar_id.clone(),
-                    max_slice_size: None,
-                    max_slice_records: None,
-                    keep_metadata_only: true,
-                  }).unwrap(),
-                },
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_bar_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -2314,13 +2236,10 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2331,13 +2250,10 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -2545,13 +2461,10 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
           });
           let task0_handle = task0_driver.run();
 
@@ -2562,13 +2475,10 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
           });
           let task1_handle = task1_driver.run();
 
@@ -2764,13 +2674,10 @@ async fn test_dataset_deleted() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false,
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2781,13 +2688,10 @@ async fn test_dataset_deleted() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -2953,13 +2857,10 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -2970,13 +2871,10 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -2987,13 +2885,10 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 dataset_id: Some(baz_id.clone()),
                 run_since_start: Duration::milliseconds(30),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Cancelled)),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: baz_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: baz_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
 
@@ -3182,13 +3077,10 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -3210,13 +3102,10 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -3238,13 +3127,10 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
 
@@ -3255,13 +3141,10 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task3_handle = task3_driver.run();
 
@@ -3457,13 +3340,10 @@ async fn test_throttling_manual_triggers() {
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(40),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task0_handle = task0_driver.run();
 
@@ -3614,13 +3494,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task0_handle = task0_driver.run();
 
@@ -3641,13 +3518,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task1_handle = task1_driver.run();
 
@@ -3658,13 +3532,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::milliseconds(30),
             finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: baz_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: baz_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task2_handle = task2_driver.run();
 
@@ -3685,13 +3556,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task3_handle = task3_driver.run();
 
@@ -3702,13 +3570,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             dataset_id: Some(baz_id.clone()),
             run_since_start: Duration::milliseconds(160),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: baz_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: baz_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task4_handle = task4_driver.run();
 
@@ -3729,13 +3594,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task5_handle = task5_driver.run();
 
@@ -4116,13 +3978,10 @@ async fn test_batching_condition_records_reached() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task0_handle = task0_driver.run();
 
@@ -4143,13 +4002,10 @@ async fn test_batching_condition_records_reached() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task1_handle = task1_driver.run();
 
@@ -4170,13 +4026,10 @@ async fn test_batching_condition_records_reached() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task2_handle = task2_driver.run();
 
@@ -4197,13 +4050,10 @@ async fn test_batching_condition_records_reached() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task3_handle = task3_driver.run();
 
@@ -4224,13 +4074,10 @@ async fn test_batching_condition_records_reached() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task4_handle = task4_driver.run();
 
@@ -4476,13 +4323,10 @@ async fn test_batching_condition_timeout() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task0_handle = task0_driver.run();
 
@@ -4503,13 +4347,10 @@ async fn test_batching_condition_timeout() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task1_handle = task1_driver.run();
 
@@ -4530,13 +4371,10 @@ async fn test_batching_condition_timeout() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task2_handle = task2_driver.run();
 
@@ -4559,13 +4397,10 @@ async fn test_batching_condition_timeout() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task4_handle = task4_driver.run();
 
@@ -4779,13 +4614,10 @@ async fn test_batching_condition_watermark() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task0_handle = task0_driver.run();
 
@@ -4806,13 +4638,10 @@ async fn test_batching_condition_watermark() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task1_handle = task1_driver.run();
 
@@ -4833,13 +4662,10 @@ async fn test_batching_condition_watermark() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task2_handle = task2_driver.run();
 
@@ -4862,13 +4688,10 @@ async fn test_batching_condition_watermark() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task4_handle = task4_driver.run();
 
@@ -5148,13 +4971,10 @@ async fn test_batching_condition_with_2_inputs() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task0_handle = task0_driver.run();
 
@@ -5175,13 +4995,10 @@ async fn test_batching_condition_with_2_inputs() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task1_handle = task1_driver.run();
 
@@ -5202,13 +5019,10 @@ async fn test_batching_condition_with_2_inputs() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: baz_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: baz_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task2_handle = task2_driver.run();
 
@@ -5229,13 +5043,10 @@ async fn test_batching_condition_with_2_inputs() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task3_handle = task3_driver.run();
 
@@ -5256,13 +5067,10 @@ async fn test_batching_condition_with_2_inputs() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: bar_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: bar_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task4_handle = task4_driver.run();
 
@@ -5283,13 +5091,10 @@ async fn test_batching_condition_with_2_inputs() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task5_handle = task5_driver.run();
 
@@ -5310,13 +5115,10 @@ async fn test_batching_condition_with_2_inputs() {
                 }.into_task_result()
               )
             )),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: baz_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: baz_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
         let task6_handle = task6_driver.run();
 
@@ -5644,15 +5446,12 @@ async fn test_list_all_flow_initiators() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                        dataset_id: foo_id.clone(),
-                        max_slice_size: None,
-                        max_slice_records: None,
-                        keep_metadata_only: false,
-                      }).unwrap(),
-                    },
+                    expected_logical_plan: LogicalPlanDatasetHardCompact {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: None,
+                      max_slice_records: None,
+                      keep_metadata_only: false,
+                    }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -5662,15 +5461,12 @@ async fn test_list_all_flow_initiators() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                  expected_logical_plan: LogicalPlan {
-                    plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                    payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                      dataset_id: bar_id.clone(),
-                      max_slice_size: None,
-                      max_slice_records: None,
-                      keep_metadata_only: false,
-                    }).unwrap(),
-                  },
+                  expected_logical_plan: LogicalPlanDatasetHardCompact {
+                    dataset_id: bar_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                    keep_metadata_only: false,
+                  }.into_logical_plan(),
                 });
                 let task1_handle = task1_driver.run();
 
@@ -5798,15 +5594,12 @@ async fn test_list_all_datasets_with_flow() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                        dataset_id: foo_id.clone(),
-                        max_slice_size: None,
-                        max_slice_records: None,
-                        keep_metadata_only: false,
-                      }).unwrap(),
-                    },
+                    expected_logical_plan: LogicalPlanDatasetHardCompact {
+                      dataset_id: foo_id.clone(),
+                      max_slice_size: None,
+                      max_slice_records: None,
+                      keep_metadata_only: false,
+                    }.into_logical_plan(),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -5816,15 +5609,12 @@ async fn test_list_all_datasets_with_flow() {
                   dataset_id: Some(bar_id.clone()),
                   run_since_start: Duration::milliseconds(60),
                   finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                  expected_logical_plan: LogicalPlan {
-                    plan_type: LogicalPlanDatasetHardCompact::TYPE_ID.to_string(),
-                    payload: serde_json::to_value(LogicalPlanDatasetHardCompact {
-                      dataset_id: bar_id.clone(),
-                      max_slice_size: None,
-                      max_slice_records: None,
-                      keep_metadata_only: false,
-                    }).unwrap(),
-                  },
+                  expected_logical_plan: LogicalPlanDatasetHardCompact {
+                    dataset_id: bar_id.clone(),
+                    max_slice_size: None,
+                    max_slice_records: None,
+                    keep_metadata_only: false,
+                  }.into_logical_plan(),
                 });
                 let task1_handle = task1_driver.run();
 
@@ -5942,13 +5732,10 @@ async fn test_abort_flow_before_scheduling_tasks() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let foo_task0_handle = foo_task0_driver.run();
 
@@ -6037,13 +5824,10 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let foo_task0_handle = foo_task0_driver.run();
 
@@ -6137,13 +5921,10 @@ async fn test_abort_flow_after_task_running_has_started() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(100), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let foo_task0_handle = foo_task0_driver.run();
 
@@ -6226,13 +6007,10 @@ async fn test_abort_flow_after_task_finishes() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let foo_task0_handle = foo_task0_driver.run();
 
@@ -6243,13 +6021,10 @@ async fn test_abort_flow_after_task_finishes() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(90),
                 finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let foo_task1_handle = foo_task1_driver.run();
 
@@ -6379,13 +6154,10 @@ async fn test_respect_last_success_time_when_activate_configuration() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
           });
           let task0_handle = task0_driver.run();
 
@@ -6396,13 +6168,10 @@ async fn test_respect_last_success_time_when_activate_configuration() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
           });
           let task1_handle = task1_driver.run();
 
@@ -6570,13 +6339,10 @@ async fn test_disable_trigger_on_flow_fail() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: false
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -6587,13 +6353,10 @@ async fn test_disable_trigger_on_flow_fail() {
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
-                    expected_logical_plan: LogicalPlan {
-                      plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                      payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                        dataset_id: foo_id.clone(),
-                        fetch_uncacheable: false
-                      }).unwrap(),
-                  },
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
                 });
                 let foo_task1_handle = foo_task1_driver.run();
 
@@ -6741,13 +6504,10 @@ async fn test_trigger_enable_during_flow_throttling() {
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(40),
           finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-          expected_logical_plan: LogicalPlan {
-            plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-            payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }).unwrap(),
-        },
+          expected_logical_plan: LogicalPlanDatasetUpdate {
+            dataset_id: foo_id.clone(),
+            fetch_uncacheable: false
+          }.into_logical_plan(),
         });
 
         // Task 1: "foo" start running at 250ms, finish at 260ms
@@ -6757,13 +6517,10 @@ async fn test_trigger_enable_during_flow_throttling() {
             dataset_id: Some(foo_id.clone()),
             run_since_start: Duration::milliseconds(250),
             finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-            expected_logical_plan: LogicalPlan {
-              plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-              payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                dataset_id: foo_id.clone(),
-                fetch_uncacheable: false
-              }).unwrap(),
-          },
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+              dataset_id: foo_id.clone(),
+              fetch_uncacheable: false
+            }.into_logical_plan(),
         });
 
         // Task 2: "foo" start running at 260ms, finish at 160ms
@@ -6773,13 +6530,10 @@ async fn test_trigger_enable_during_flow_throttling() {
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(520),
           finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-          expected_logical_plan: LogicalPlan {
-            plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-            payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-              dataset_id: foo_id.clone(),
-              fetch_uncacheable: false
-            }).unwrap(),
-        },
+          expected_logical_plan: LogicalPlanDatasetUpdate {
+            dataset_id: foo_id.clone(),
+            fetch_uncacheable: false
+          }.into_logical_plan(),
       });
 
         let task0_handle = task0_driver.run();
@@ -6953,13 +6707,10 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task0_handle = task0_driver.run();
 
@@ -6981,13 +6732,10 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task1_handle = task1_driver.run();
 
@@ -7009,13 +6757,10 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                     }.into_task_result()
                   )
                 )),
-                expected_logical_plan:LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: foo_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task2_handle = task2_driver.run();
 
@@ -7026,13 +6771,10 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::empty()))),
-                expected_logical_plan: LogicalPlan {
-                  plan_type: LogicalPlanDatasetUpdate::TYPE_ID.to_string(),
-                  payload: serde_json::to_value(LogicalPlanDatasetUpdate {
-                    dataset_id: bar_id.clone(),
-                    fetch_uncacheable: false
-                  }).unwrap(),
-              },
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                  dataset_id: bar_id.clone(),
+                  fetch_uncacheable: false
+                }.into_logical_plan(),
             });
             let task3_handle = task3_driver.run();
 

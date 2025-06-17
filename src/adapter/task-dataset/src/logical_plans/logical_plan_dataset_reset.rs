@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_task_system as ts;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A task to perform the resetting of a dataset
@@ -20,6 +23,18 @@ pub struct LogicalPlanDatasetReset {
 
 impl LogicalPlanDatasetReset {
     pub const TYPE_ID: &str = "ResetDataset";
+
+    pub fn into_logical_plan(self) -> ts::LogicalPlan {
+        ts::LogicalPlan {
+            plan_type: Self::TYPE_ID.to_string(),
+            payload: serde_json::to_value(self)
+                .expect("Failed to serialize LogicalPlanDatasetReset into JSON"),
+        }
+    }
+
+    pub fn from_logical_plan(logical_plan: &ts::LogicalPlan) -> Result<Self, InternalError> {
+        serde_json::from_value(logical_plan.payload.clone()).int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

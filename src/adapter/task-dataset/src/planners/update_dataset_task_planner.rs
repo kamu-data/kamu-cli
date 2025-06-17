@@ -110,14 +110,7 @@ impl TaskDefinitionPlanner for UpdateDatasetTaskPlanner {
             "UpdateDatasetTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
         );
 
-        let update_plan: LogicalPlanDatasetUpdate =
-            serde_json::from_value(logical_plan.payload.clone()).unwrap_or_else(|_| {
-                panic!(
-                    "UpdateDatasetTaskPlanner received an invalid logical plan payload: \
-                     {logical_plan:?}"
-                )
-            });
-
+        let update_plan = LogicalPlanDatasetUpdate::from_logical_plan(logical_plan)?;
         self.plan_update(&update_plan).await
     }
 }
