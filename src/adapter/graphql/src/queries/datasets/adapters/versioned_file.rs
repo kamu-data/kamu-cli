@@ -24,7 +24,7 @@ impl VersionedFile {
         Self { dataset }
     }
 
-    pub fn dataset_shapshot(
+    pub fn dataset_snapshot(
         alias: odf::DatasetAlias,
         extra_columns: Vec<ColumnInput>,
         extra_events: Vec<odf::MetadataEvent>,

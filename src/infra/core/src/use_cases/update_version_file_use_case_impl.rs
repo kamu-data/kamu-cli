@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::io::Cursor;
 use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
-    ContentSource,
+    ContentInfo,
     DatasetRegistry,
     ExtraDataFields,
     FileUploadLimitConfig,
@@ -25,13 +24,9 @@ use kamu_core::{
     UpdateVersionFileResult,
     UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
-    UploadService,
-    UploadTokenBase64Json,
     UploadTooLargeError,
     VersionedFileEntity,
 };
-use sha3::Digest;
-use tokio::io::{AsyncRead, AsyncReadExt, BufReader};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,7 +35,6 @@ use tokio::io::{AsyncRead, AsyncReadExt, BufReader};
 pub struct UpdateVersionFileUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     upload_config: Arc<FileUploadLimitConfig>,
-    upload_service: Arc<dyn UploadService>,
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
 }
@@ -118,72 +112,6 @@ impl UpdateVersionFileUseCaseImpl {
             content_type: Some(content_type),
         }))
     }
-
-    async fn content_source_to_content_info<'a>(
-        &'a self,
-        content_source: ContentSource<'a>,
-        content_type: Option<MediaType>,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<ContentInfo, InternalError> {
-        match content_source {
-            ContentSource::Empty => Ok(self
-                .get_content_info_from_latest_entry(dataset_ref)
-                .await?
-                .unwrap()),
-            ContentSource::Bytes(bytes) => {
-                let reader = BufReader::new(Cursor::new(bytes.to_owned()));
-
-                Ok(ContentInfo {
-                    content_length: bytes.len(),
-                    content_stream: Some(Box::new(reader)),
-                    content_hash: odf::Multihash::from_digest_sha3_256(bytes),
-                    content_type,
-                })
-            }
-            ContentSource::Token(token) => {
-                // ToDo add error
-                let upload_token: UploadTokenBase64Json = token.parse().unwrap();
-
-                let mut stream = self
-                    .upload_service
-                    .upload_token_into_stream(&upload_token.0)
-                    .await
-                    .int_err()?;
-
-                let mut digest = sha3::Sha3_256::new();
-                let mut buf = [0u8; 2048];
-
-                loop {
-                    let read = stream.read(&mut buf).await.int_err()?;
-                    if read == 0 {
-                        break;
-                    }
-                    digest.update(&buf[..read]);
-                }
-
-                let digest = digest.finalize();
-                let content_hash =
-                    odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest).unwrap();
-
-                // Get the stream again and copy data from uploads to storage using computed
-                // hash
-                // TODO: PERF: Should we create file in the final storage directly to avoid
-                // copying?
-                let content_stream = self
-                    .upload_service
-                    .upload_token_into_stream(&upload_token.0)
-                    .await
-                    .int_err()?;
-
-                Ok(ContentInfo {
-                    content_length: upload_token.0.content_length,
-                    content_hash,
-                    content_stream: Some(content_stream),
-                    content_type: upload_token.0.content_type,
-                })
-            }
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -193,11 +121,10 @@ impl UpdateVersionFileUseCaseImpl {
 impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
     // ToDo Add fields
     #[tracing::instrument(level = "info", name = UpdateVersionFileUseCaseImpl_execute, skip_all)]
-    async fn execute<'a>(
-        &'a self,
-        dataset_handle: &'a odf::DatasetHandle,
-        content_source: ContentSource<'a>,
-        content_type: Option<MediaType>,
+    async fn execute(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        content_info_maybe: Option<ContentInfo>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,
     ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError> {
@@ -207,14 +134,13 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
             .await
             .clone();
 
-        let content_info = self
-            .content_source_to_content_info(
-                content_source,
-                content_type,
-                &resolved_dataset.get_handle().as_local_ref(),
-            )
-            .await
-            .int_err()?;
+        let content_info = if let Some(ci) = content_info_maybe {
+            ci
+        } else {
+            self.get_content_info_from_latest_entry(&dataset_handle.as_local_ref())
+                .await?
+                .unwrap()
+        };
 
         if content_info.content_length > self.upload_config.max_file_size_in_bytes() {
             return Err(UpdateVersionFileUseCaseError::TooLarge(
@@ -287,10 +213,3 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct ContentInfo {
-    pub content_length: usize,
-    pub content_hash: odf::Multihash,
-    pub content_stream: Option<Box<dyn AsyncRead + Send + Unpin>>,
-    pub content_type: Option<MediaType>,
-}

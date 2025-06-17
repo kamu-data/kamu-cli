@@ -10,6 +10,7 @@
 use internal_error::{ErrorIntoInternal, InternalError};
 use odf::dataset::RefCASError;
 use thiserror::Error;
+use tokio::io::AsyncRead;
 
 use crate::{ExtraDataFields, FileVersion, MediaType, PushIngestDataError, PushIngestError};
 
@@ -17,11 +18,10 @@ use crate::{ExtraDataFields, FileVersion, MediaType, PushIngestDataError, PushIn
 
 #[async_trait::async_trait]
 pub trait UpdateVersionFileUseCase: Send + Sync {
-    async fn execute<'a>(
-        &'a self,
-        dataset_handle: &'a odf::DatasetHandle,
-        content_source: ContentSource<'a>,
-        content_type: Option<MediaType>,
+    async fn execute(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        content_info_maybe: Option<ContentInfo>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,
     ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError>;
@@ -37,6 +37,16 @@ pub enum ContentSource<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct ContentInfo {
+    pub content_length: usize,
+    pub content_hash: odf::Multihash,
+    pub content_stream: Option<Box<dyn AsyncRead + Send + Unpin>>,
+    pub content_type: Option<MediaType>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
 pub struct UpdateVersionFileResult {
     pub new_version: FileVersion,
     pub old_head: odf::Multihash,

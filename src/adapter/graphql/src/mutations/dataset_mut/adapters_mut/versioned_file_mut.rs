@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::io::Cursor;
+
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::UpdateVersionFileUseCaseError;
+use kamu_core::{ContentInfo, MediaType, UpdateVersionFileUseCaseError};
+use tokio::io::BufReader;
 
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, FileVersion};
@@ -19,6 +22,77 @@ use crate::queries::{DatasetRequestState, FileVersion};
 #[derive(Debug)]
 pub struct VersionedFileMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
+}
+
+impl<'a> VersionedFileMut<'a> {
+    async fn get_content_info(
+        &'a self,
+        ctx: &Context<'_>,
+        content_source: ContentSource<'a>,
+        content_type: Option<MediaType>,
+    ) -> Result<ContentInfo> {
+        use sha3::Digest;
+        use tokio::io::AsyncReadExt;
+
+        match content_source {
+            ContentSource::Bytes(bytes) => {
+                let reader = BufReader::new(Cursor::new(bytes.to_owned()));
+
+                Ok(ContentInfo {
+                    content_length: bytes.len(),
+                    content_stream: Some(Box::new(reader)),
+                    content_hash: odf::Multihash::from_digest_sha3_256(bytes),
+                    content_type,
+                })
+            }
+            ContentSource::Token(token) => {
+                let upload_token: domain::UploadTokenBase64Json =
+                    token
+                        .parse()
+                        .map_err(|e: domain::UploadTokenBase64JsonDecodeError| {
+                            async_graphql::Error::new(e.message)
+                        })?;
+
+                let upload_service = from_catalog_n!(ctx, dyn domain::UploadService);
+
+                let mut stream = upload_service
+                    .upload_token_into_stream(&upload_token.0)
+                    .await
+                    .int_err()?;
+
+                let mut digest = sha3::Sha3_256::new();
+                let mut buf = [0u8; 2048];
+
+                loop {
+                    let read = stream.read(&mut buf).await.int_err()?;
+                    if read == 0 {
+                        break;
+                    }
+                    digest.update(&buf[..read]);
+                }
+
+                let digest = digest.finalize();
+                let content_hash =
+                    odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest).unwrap();
+
+                // Get the stream again and copy data from uploads to storage using computed
+                // hash
+                // TODO: PERF: Should we create file in the final storage directly to avoid
+                // copying?
+                let content_stream = upload_service
+                    .upload_token_into_stream(&upload_token.0)
+                    .await
+                    .int_err()?;
+
+                Ok(ContentInfo {
+                    content_length: upload_token.0.content_length,
+                    content_hash,
+                    content_stream: Some(content_stream),
+                    content_type: upload_token.0.content_type,
+                })
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,11 +127,18 @@ impl<'a> VersionedFileMut<'a> {
         let update_version_file_use_case =
             from_catalog_n!(ctx, dyn domain::use_cases::UpdateVersionFileUseCase);
 
+        let content_info = self
+            .get_content_info(
+                ctx,
+                ContentSource::Bytes(&content),
+                content_type.map(Into::into),
+            )
+            .await?;
+
         match update_version_file_use_case
             .execute(
                 self.dataset_request_state.dataset_handle(),
-                kamu_core::ContentSource::Bytes(&content),
-                content_type.map(Into::into),
+                Some(content_info),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
             )
@@ -153,11 +234,14 @@ impl<'a> VersionedFileMut<'a> {
         let update_version_file_use_case =
             from_catalog_n!(ctx, dyn domain::use_cases::UpdateVersionFileUseCase);
 
+        let content_info = self
+            .get_content_info(ctx, ContentSource::Token(upload_token), None)
+            .await?;
+
         match update_version_file_use_case
             .execute(
                 self.dataset_request_state.dataset_handle(),
-                kamu_core::ContentSource::Token(upload_token),
-                None,
+                Some(content_info),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
             )
@@ -206,7 +290,6 @@ impl<'a> VersionedFileMut<'a> {
         match update_version_file_use_case
             .execute(
                 self.dataset_request_state.dataset_handle(),
-                kamu_core::ContentSource::Empty,
                 None,
                 expected_head.map(Into::into),
                 Some(extra_data.into()),
@@ -375,6 +458,13 @@ impl From<domain::UploadContext> for UploadContext {
             upload_token: value.upload_token.to_string(),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum ContentSource<'a> {
+    Bytes(&'a [u8]),
+    Token(String),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
