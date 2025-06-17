@@ -31,7 +31,6 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
-kamu-webhooks = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 internal-error = { workspace = true }
