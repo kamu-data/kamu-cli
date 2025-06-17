@@ -21,6 +21,11 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+testing = ["dep:mockall"]
+
+
 [dependencies]
 common-macros = { workspace = true }
 crypto-utils = { workspace = true }
@@ -49,13 +54,21 @@ tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
 
+# Optional
+mockall = { optional = true, version = "0.13", default-features = false }
+
 
 [dev-dependencies]
-kamu-accounts = { workspace = true, default-features = false, features = ["testing"] }
-kamu-auth-rebac-services = { workspace = true }
+kamu-accounts = { workspace = true, default-features = false, features = [
+    "testing",
+] }
 kamu-accounts-inmem = { workspace = true }
+kamu-accounts-services = { workspace = true, default-features = false, features = [
+    "testing",
+] }
 kamu-auth-rebac-inmem = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 
-mockall = "0.13"
-pretty_assertions = { version = "1" }
+mockall = { version = "0.13", default-features = false }
+pretty_assertions = { version = "1", default-features = false, features = ["unstable"] }
 test-log = { version = "0.2", features = ["trace"] }

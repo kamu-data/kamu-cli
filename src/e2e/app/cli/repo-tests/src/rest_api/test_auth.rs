@@ -29,7 +29,7 @@ pub async fn test_login_password_predefined_successful(
                 r#"
                 mutation {
                   auth {
-                    login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                    login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu.dev\"}") {
                       account {
                         accountName
                       }
@@ -185,7 +185,7 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
           r#"
           mutation {
               auth {
-                  login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu\"}") {
+                  login(loginMethod: PASSWORD, loginCredentialsJson: "{\"login\":\"kamu\",\"password\":\"kamu.dev\"}") {
                       accessToken,
                       account {
                           id
@@ -274,7 +274,7 @@ pub async fn test_token_validate(mut kamu_api_server_client: KamuApiServerClient
 pub async fn test_login_via_rest_password(mut kamu_api_server_client: KamuApiServerClient) {
     let login_credentials_json = json!({
         "login": "kamu",
-        "password": "kamu"
+        "password": "kamu.dev"
     });
 
     assert_matches!(

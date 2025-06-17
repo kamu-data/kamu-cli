@@ -7,20 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
-use async_utils::ResultAsync;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use crypto_utils::AesGcmEncryptor;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
+use init_on_startup::RunStartupJobsOptions;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
+use kamu_accounts_services::{PasswordPolicyConfig, PredefinedAccountsRegistrator};
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system_inmem::domain::{
@@ -39,7 +41,7 @@ use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatche
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{Instrument, warn};
 
-use crate::accounts::AccountService;
+use crate::accounts::{AccountService, CurrentAccountIndication};
 use crate::cli::Command;
 use crate::error::*;
 use crate::output::*;
@@ -55,9 +57,10 @@ use crate::{
     configure_database_components,
     configure_in_memory_components,
     connect_database_initially,
+    database_flush,
     explore,
     get_app_database_config,
-    move_initial_database_to_workspace_if_needed,
+    move_initial_database_to_workspace,
     odf_server,
     spawn_password_refreshing_job,
 };
@@ -79,7 +82,6 @@ const LOG_LEVELS: [&str; 5] = [
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Errors before commands are executed are not output anywhere -- log them
 pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<(), CLIError> {
     // Always capture backtraces for logging - we will separately decide whether to
     // display them to the user based on verbosity level
@@ -101,153 +103,162 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         Arc::new(workspace_layout.clone()),
         init_multi_tenant_workspace,
     );
-    let workspace_version = workspace_svc.workspace_version()?;
+    let output_config = configure_output_format(&args, &workspace_svc);
+    let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
 
-    let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
-        TenancyConfig::MultiTenant
-    } else {
-        TenancyConfig::SingleTenant
-    };
-    let is_in_workspace = workspace_svc.is_in_workspace();
-    let workspace_status = match (maybe_init_command.is_some(), is_in_workspace) {
-        (false, false) => WorkspaceStatus::NoWorkspace,
-        (true, false) => WorkspaceStatus::AboutToBeCreated(tenancy_config),
-        (_, true) => WorkspaceStatus::Created(tenancy_config),
-    };
+    tracing::info!(
+        version = VERSION,
+        args = ?std::env::args().collect::<Vec<_>>(),
+        workspace_root = ?workspace_layout.root_dir,
+        "Initializing {BINARY_NAME}"
+    );
 
-    let config = load_config(&workspace_layout);
-    let current_account =
-        AccountService::current_account_indication(args.account.clone(), tenancy_config);
+    let mut maybe_metrics_registry = None;
 
-    prepare_run_dir(&workspace_layout.run_info_dir);
+    // NOTE: An async block is used so "?" does not cause exit from run() function.
+    let command_result: Result<(), CLIError> = async {
+        let workspace_version = workspace_svc.workspace_version()?;
 
-    let app_database_config = get_app_database_config(&workspace_layout, &config, workspace_status);
-    let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
-    let maybe_db_connection_settings = database_config.as_ref().map(build_db_connection_settings);
+        tracing::info!("Workspace version: {workspace_version:?}");
 
-    // Configure application
-    let (guards, base_catalog, cli_catalog, maybe_server_catalog, output_config) = {
-        let is_e2e_testing = args.e2e_output_data_path.is_some();
-
-        let mut base_catalog_builder = configure_base_catalog(
-            &workspace_layout,
-            workspace_status,
-            tenancy_config,
-            args.system_time.map(Into::into),
-            is_e2e_testing,
-        );
-
-        base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
-        base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
-
-        if let Some(db_connection_settings) = maybe_db_connection_settings.as_ref() {
-            configure_database_components(
-                &mut base_catalog_builder,
-                database_config.as_ref().unwrap(),
-                db_connection_settings.clone(),
-            );
+        let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
+            TenancyConfig::MultiTenant
         } else {
-            configure_in_memory_components(&mut base_catalog_builder);
-        }
-
-        let output_config = configure_output_format(&args, &workspace_svc);
-        base_catalog_builder.add_value(output_config.clone());
-        base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
-
-        let guards = configure_logging(&output_config, &workspace_layout, args.no_color);
-
-        tracing::info!(
-            version = VERSION,
-            args = ?std::env::args().collect::<Vec<_>>(),
-            ?workspace_version,
-            workspace_root = ?workspace_layout.root_dir,
-            "Initializing {BINARY_NAME}"
-        );
-
-        register_config_in_catalog(
-            &config,
-            &mut base_catalog_builder,
-            workspace_status,
-            args.password_hashing_mode,
-            is_e2e_testing,
-        )?;
-
-        let base_catalog = base_catalog_builder.build();
-
-        // Database requires extra actions:
-        let final_base_catalog = if let Some(db_config) = database_config {
-            // Connect a database and get a connection pool
-            let catalog_with_pool = connect_database_initially(&base_catalog).await?;
-
-            // Periodically refresh password in the connection pool, if configured
-            spawn_password_refreshing_job(&db_config, &catalog_with_pool).await;
-
-            catalog_with_pool
-        } else {
-            base_catalog
+            TenancyConfig::SingleTenant
+        };
+        let is_in_workspace = workspace_svc.is_in_workspace();
+        let workspace_status = match (maybe_init_command.is_some(), is_in_workspace) {
+            (false, false) => WorkspaceStatus::NoWorkspace,
+            (true, false) => WorkspaceStatus::AboutToBeCreated(tenancy_config),
+            (_, true) => WorkspaceStatus::Created(tenancy_config),
         };
 
+        let config = load_config(&workspace_layout);
+        let current_account =
+            AccountService::current_account_indication(args.account.clone(), tenancy_config)
+                .map_err(CLIError::usage_error_from)?;
+
+        prepare_run_dir(&workspace_layout.run_info_dir);
+
+        let app_database_config =
+            get_app_database_config(&workspace_layout, &config, workspace_status);
+        let (database_config, maybe_temp_database_path) = app_database_config.into_inner();
+        let maybe_db_connection_settings =
+            database_config.as_ref().map(build_db_connection_settings);
+
+        // Configure application
+        let base_catalog = {
+            let is_e2e_testing = args.e2e_output_data_path.is_some();
+
+            let mut base_catalog_builder = configure_base_catalog(
+                &workspace_layout,
+                workspace_status,
+                tenancy_config,
+                args.system_time.map(Into::into),
+                is_e2e_testing,
+            );
+
+            base_catalog_builder.add_value(JwtAuthenticationConfig::load_from_env());
+            base_catalog_builder.add_value(GithubAuthenticationConfig::load_from_env());
+
+            if let Some(db_connection_settings) = maybe_db_connection_settings.as_ref() {
+                configure_database_components(
+                    &mut base_catalog_builder,
+                    database_config.as_ref().unwrap(),
+                    db_connection_settings.clone(),
+                );
+            } else {
+                configure_in_memory_components(&mut base_catalog_builder);
+            }
+
+            base_catalog_builder.add_value(output_config.clone());
+            base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
+
+            register_config_in_catalog(
+                &config,
+                &mut base_catalog_builder,
+                workspace_status,
+                args.password_hashing_mode,
+                is_e2e_testing,
+            )?;
+
+            let base_catalog = base_catalog_builder.build();
+
+            // Database requires extra actions:
+            if let Some(db_config) = &database_config {
+                // Connect a database and get a connection pool
+                let base_catalog_with_pool = connect_database_initially(&base_catalog).await?;
+
+                // Periodically refresh password in the connection pool, if configured
+                spawn_password_refreshing_job(db_config, &base_catalog_with_pool).await;
+
+                base_catalog_with_pool
+            } else {
+                base_catalog
+            }
+        };
+
+        let startup_jobs_to_skip = post_build_base_catalog_actions(&base_catalog)
+            .instrument(tracing::debug_span!("app::post_build_base_catalog_actions"))
+            .await?;
+
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
-            let server_catalog =
-                configure_server_catalog(&final_base_catalog, tenancy_config).build();
+            let server_catalog = configure_server_catalog(&base_catalog, tenancy_config).build();
             Some(server_catalog)
         } else {
             None
         };
 
-        let cli_catalog = configure_cli_catalog(
-            maybe_server_catalog.as_ref().unwrap_or(&final_base_catalog),
+        let cli_catalog = build_cli_catalog(
+            &base_catalog,
+            maybe_server_catalog.as_ref(),
+            current_account.clone(),
+            workspace_status,
             tenancy_config,
         )
-        .add_value(current_account.to_current_account_subject())
-        .build();
+        .await?;
 
-        (
-            guards,
-            final_base_catalog,
-            cli_catalog,
-            maybe_server_catalog,
-            output_config,
-        )
-    };
+        // Register metrics
+        maybe_metrics_registry = Some(observability::metrics::register_all(&cli_catalog));
 
-    // Register metrics
-    let metrics_registry = observability::metrics::register_all(&cli_catalog);
+        let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
 
-    let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
+        if is_in_workspace && !is_workspace_upgrade_needed {
+            // TODO: Extract to an InitOnStartup job
+            // Evict cache
+            let gc_service = cli_catalog.get_one::<GcService>().unwrap();
+            gc_service.evict_cache().unwrap();
+        }
 
-    if is_in_workspace && !is_workspace_upgrade_needed {
-        // Evict cache
-        cli_catalog.get_one::<GcService>()?.evict_cache()?;
-    }
-
-    // Some extra steps are necessary for commands that require workspace
-    let mut command_result: Result<(), CLIError> = if cli_commands::command_needs_workspace(&args) {
-        if !workspace_svc.is_in_workspace() {
-            Err(CLIError::usage_error_from(NotInWorkspace))
-        } else if is_workspace_upgrade_needed {
-            Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-        } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant {
-            Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+        // Some extra steps are necessary for commands that require workspace
+        if cli_commands::command_needs_workspace(&args) {
+            if !is_in_workspace {
+                Err(CLIError::usage_error_from(NotInWorkspace))
+            } else if is_workspace_upgrade_needed {
+                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+            } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant
+            {
+                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+            } else {
+                Ok(())
+            }
         } else {
             Ok(())
+        }?;
+
+        if cli_commands::command_needs_startup_jobs(&args) {
+            run_startup_initializations(&cli_catalog, startup_jobs_to_skip)
+                .instrument(tracing::debug_span!("app::run_startup_initializations"))
+                .await?;
         }
-    } else {
-        Ok(())
-    };
 
-    if command_result.is_ok() && cli_commands::command_needs_startup_jobs(&args) {
-        command_result = run_startup_initializations(&cli_catalog).await;
-    }
-
-    if command_result.is_ok() {
         let is_transactional = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_transaction(&args);
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
         let work_catalog = maybe_server_catalog.as_ref().unwrap_or(&base_catalog);
 
-        command_result = maybe_transactional(
+        maybe_transactional(
             is_transactional,
             cli_catalog.clone(),
             |maybe_transactional_cli_catalog: Catalog| async move {
@@ -255,6 +266,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                     work_catalog,
                     &maybe_transactional_cli_catalog,
                     args,
+                    current_account,
                 )?;
 
                 let command = command_builder
@@ -276,35 +288,31 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             },
         )
         .instrument(tracing::debug_span!("app::run_command"))
-        .await;
+        .await?;
 
         if is_outbox_processing_required {
-            command_result = command_result
-                // If successful, then process the Outbox messages while they are present
-                .and_then_async(|_| async {
-                    let outbox_agent = cli_catalog.get_one::<messaging_outbox::OutboxAgent>()?;
-                    outbox_agent
-                        .run_while_has_tasks()
-                        .await
-                        .map_err(CLIError::critical)
-                })
+            // Process the Outbox messages while they are present
+            let outbox_agent = cli_catalog
+                .get_one::<messaging_outbox::OutboxAgent>()
+                .int_err()?;
+            outbox_agent
+                .run_while_has_tasks()
                 .instrument(tracing::debug_span!(
                     "Consume accumulated the Outbox messages"
                 ))
-                .await
-                // If we had a temporary directory, we move the database from it to the expected
-                // location.
-                .and_then_async(|_| async {
-                    move_initial_database_to_workspace_if_needed(
-                        &workspace_layout,
-                        maybe_temp_database_path,
-                    )
-                    .await
-                    .map_int_err(CLIError::critical)
-                })
-                .await;
+                .await?;
         }
+
+        if let Some(temp_database_path) = maybe_temp_database_path {
+            // If we had a temporary directory, we move the database from it
+            // to the expected location.
+            database_flush(&base_catalog).await?;
+            move_initial_database_to_workspace(&workspace_layout, temp_database_path).await?;
+        }
+
+        Ok(())
     }
+    .await;
 
     match &command_result {
         Ok(()) => {
@@ -328,6 +336,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
     if let Some(metrics_file) = &output_config.metrics_file
         && let Ok(mut file) = std::fs::File::create(metrics_file)
+        && let Some(metrics_registry) = maybe_metrics_registry
     {
         use prometheus::Encoder as _;
         let _ = prometheus::TextEncoder::new().encode(&metrics_registry.gather(), &mut file);
@@ -534,6 +543,11 @@ pub fn configure_base_catalog(
 
     explore::register_dependencies(&mut b);
 
+    register_message_dispatcher::<AccountLifecycleMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    );
+
     register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
         &mut b,
         kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
@@ -557,6 +571,27 @@ pub fn configure_base_catalog(
     b
 }
 
+// NOTE: We need to perform some initialization jobs before creating cli_catalog
+async fn post_build_base_catalog_actions(
+    base_catalog: &Catalog,
+) -> Result<HashSet<&'static str>, InternalError> {
+    DatabaseTransactionRunner::new(base_catalog.clone())
+        .transactional_with(
+            |account_registrator: Arc<PredefinedAccountsRegistrator>| async move {
+                use init_on_startup::InitOnStartup;
+
+                account_registrator.run_initialization().await.int_err()?;
+
+                Ok(())
+            },
+        )
+        .await?;
+
+    let completed_jobs = HashSet::from([JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR]);
+
+    Ok(completed_jobs)
+}
+
 // Public only for tests
 pub fn configure_cli_catalog(
     base_catalog: &Catalog,
@@ -572,6 +607,30 @@ pub fn configure_cli_catalog(
     b.add::<ConfirmDeleteService>();
 
     b
+}
+
+async fn build_cli_catalog(
+    base_catalog: &Catalog,
+    maybe_server_catalog: Option<&Catalog>,
+    current_account_indication: CurrentAccountIndication,
+    workspace_status: WorkspaceStatus,
+    tenancy_config: TenancyConfig,
+) -> Result<Catalog, InternalError> {
+    let current_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
+        .transactional_with(
+            |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
+                current_account_indication
+                    .to_current_account_subject(tenancy_config, workspace_status, account_service)
+                    .await
+                    .int_err()
+            },
+        )
+        .await?;
+    let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
+
+    Ok(configure_cli_catalog(cli_base_catalog, tenancy_config)
+        .add_value(current_account_subject)
+        .build())
 }
 
 // Public only for tests
@@ -609,10 +668,7 @@ pub fn configure_server_catalog(
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
     );
     register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_AGENT);
-    register_message_dispatcher::<AccountLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-    );
+
     register_message_dispatcher::<AccessTokenLifecycleMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
@@ -621,10 +677,18 @@ pub fn configure_server_catalog(
     b
 }
 
-async fn run_startup_initializations(catalog: &Catalog) -> Result<(), CLIError> {
-    let init_result = init_on_startup::run_startup_jobs(catalog)
-        .await
-        .map_err(CLIError::failure);
+async fn run_startup_initializations(
+    catalog: &Catalog,
+    skip_jobs: HashSet<&'static str>,
+) -> Result<(), CLIError> {
+    let init_result = init_on_startup::run_startup_jobs_ex(
+        catalog,
+        RunStartupJobsOptions::builder()
+            .skip_completed_jobs(skip_jobs)
+            .build(),
+    )
+    .await
+    .map_err(CLIError::failure);
 
     if let Err(e) = init_result {
         tracing::error!(
@@ -762,7 +826,8 @@ pub fn register_config_in_catalog(
                 ))
                 .set_display_name(AccountService::default_user_name(
                     TenancyConfig::MultiTenant,
-                )),
+                ))
+                .set_properties(vec![kamu_auth_rebac::AccountPropertyName::IsAdmin]),
             );
 
             if is_e2e_testing {
@@ -886,7 +951,7 @@ pub fn register_config_in_catalog(
     //
 
     // Search configuration
-    let crate::config::SearchConfig {
+    let config::SearchConfig {
         indexer,
         embeddings_chunker,
         embeddings_encoder,
@@ -956,6 +1021,8 @@ pub fn register_config_in_catalog(
         }
     }
     //
+
+    catalog_builder.add_value(PasswordPolicyConfig::default());
 
     Ok(())
 }

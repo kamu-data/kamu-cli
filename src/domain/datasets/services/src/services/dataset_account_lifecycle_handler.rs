@@ -13,11 +13,14 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     AccountLifecycleMessage,
     AccountLifecycleMessageDeleted,
+    AccountLifecycleMessageRenamed,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
 };
 use kamu_core::DatasetRegistry;
 use kamu_datasets::*;
 use messaging_outbox::prelude::*;
+
+use crate::DatasetEntryWriter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,20 +28,35 @@ use messaging_outbox::prelude::*;
 #[dill::interface(dyn MessageConsumer)]
 #[dill::interface(dyn MessageConsumerT<AccountLifecycleMessage>)]
 #[dill::meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_DATASETS_DELETION_HANDLER,
+    consumer_name: MESSAGE_CONSUMER_KAMU_DATASETS_LIFECYCLE_HANDLER,
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ],
-    // NOTE: To clean up database rows in a single transaction, process the message immediately
-    delivery: MessageDeliveryMechanism::Immediate,
+    delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
-pub struct DatasetAccountDeletionHandler {
+pub struct DatasetAccountLifecycleHandler {
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     delete_dataset_use_case: Arc<dyn DeleteDatasetUseCase>,
 }
 
-impl DatasetAccountDeletionHandler {
+impl DatasetAccountLifecycleHandler {
+    async fn handle_account_lifecycle_renamed_message(
+        &self,
+        message: &AccountLifecycleMessageRenamed,
+    ) -> Result<(), InternalError> {
+        self.dataset_entry_writer
+            .update_owner_entries_after_rename(
+                &message.account_id,
+                &message.old_account_name,
+                &message.new_account_name,
+            )
+            .await?;
+
+        Ok(())
+    }
+
     async fn handle_account_lifecycle_deleted_message(
         &self,
         message: &AccountLifecycleMessageDeleted,
@@ -67,12 +85,12 @@ impl DatasetAccountDeletionHandler {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for DatasetAccountDeletionHandler {}
+impl MessageConsumer for DatasetAccountLifecycleHandler {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<AccountLifecycleMessage> for DatasetAccountDeletionHandler {
+impl MessageConsumerT<AccountLifecycleMessage> for DatasetAccountLifecycleHandler {
     #[tracing::instrument(
         level = "debug",
         skip_all,
@@ -86,6 +104,10 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetAccountDeletionHandler
         tracing::debug!(received_message = ?message, "Received account lifecycle message");
 
         match message {
+            AccountLifecycleMessage::Renamed(message) => {
+                self.handle_account_lifecycle_renamed_message(message).await
+            }
+
             AccountLifecycleMessage::Deleted(message) => {
                 self.handle_account_lifecycle_deleted_message(message).await
             }

@@ -81,7 +81,7 @@ impl SqlitePlugin {
             .connect_lazy_with(sqlite_options)
     }
 
-    async fn force_wal_checkpoints_save(sqlite_pool: &SqlitePool) -> Result<(), DatabaseError> {
+    pub async fn force_wal_checkpoints_save(sqlite_pool: &SqlitePool) -> Result<(), DatabaseError> {
         // Based on:
         // java - Android sqlite flush WAL file contents into main database file
         // https://stackoverflow.com/questions/30276789/android-sqlite-flush-wal-file-contents-into-main-database-file/69028219#69028219

@@ -13,6 +13,7 @@ use kamu_accounts::{
     AccountServiceExt,
     CreateAccountError,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     CurrentAccountSubject,
 };
 
@@ -83,7 +84,9 @@ impl AccountsMut {
             .execute(
                 &logged_account,
                 account_name.as_ref(),
-                email.map(Into::into),
+                CreateAccountUseCaseOptions::builder()
+                    .maybe_email(email.map(Into::into))
+                    .build(),
             )
             .await
         {

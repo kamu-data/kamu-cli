@@ -7,19 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use nutype::nutype;
-use thiserror::Error;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const MIN_PASSWORD_LENGTH: usize = 8;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(
+#[nutype::nutype(
     sanitize(trim),
+    new_unchecked,
     validate(with = validate_password, error = PasswordValidationError),
-    derive(Debug, PartialEq, Eq, Clone, Deref)
+    derive(Debug, PartialEq, Eq, Clone, Deref, Serialize, Deserialize)
 )]
 pub struct Password(String);
 
@@ -31,7 +29,7 @@ impl std::fmt::Display for Password {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum PasswordValidationError {
     TooShort,
     NonAscii,
@@ -59,5 +57,11 @@ fn validate_password(password: &str) -> Result<(), PasswordValidationError> {
     }
     Ok(())
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(any(feature = "testing", test))]
+pub static TEST_PASSWORD: std::sync::LazyLock<Password> =
+    std::sync::LazyLock::new(|| Password::try_new("p4sSw0Rd").unwrap());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

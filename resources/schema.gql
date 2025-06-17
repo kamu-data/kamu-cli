@@ -140,6 +140,10 @@ input AccountLookupFilter {
 
 type AccountMut {
 	"""
+	Update account name
+	"""
+	rename(newName: AccountName!): RenameAccountResult!
+	"""
 	Update account email
 	"""
 	updateEmail(newEmail: Email!): UpdateEmailResult!
@@ -147,6 +151,10 @@ type AccountMut {
 	Reset password for a selected account. Allowed only for admin users
 	"""
 	modifyPassword(password: AccountPassword!): ModifyPasswordResult!
+	"""
+	Change password with confirmation
+	"""
+	modifyPasswordWithConfirmation(oldPassword: AccountPassword!, newPassword: AccountPassword!): ModifyPasswordResult!
 	"""
 	Delete a selected account. Allowed only for admin users
 	"""
@@ -364,7 +372,6 @@ type BlockRef {
 	name: String!
 	blockHash: Multihash!
 }
-
 
 type BuildInfo {
 	appVersion: String!
@@ -1272,7 +1279,7 @@ type DatasetMut {
 	"""
 	Downcast a dataset to a versioned file interface
 	"""
-	asVersionedFile: VersionedFileMut!
+	asVersionedFile: VersionedFileMut
 	"""
 	Downcast a dataset to a collection interface
 	"""
@@ -1844,7 +1851,6 @@ type FlightSqlDesc {
 	url: String!
 }
 
-
 type Flow {
 	"""
 	Unique identifier of the flow
@@ -2227,7 +2233,6 @@ type GetFlowSuccess implements GetFlowResult {
 	message: String!
 }
 
-
 input IngestConditionInput {
 	"""
 	Flag indicates to ignore cache during ingest step for API calls
@@ -2239,7 +2244,6 @@ input InitiatorFilterInput @oneOf {
 	system: Boolean
 	accounts: [AccountID!]
 }
-
 
 type JdbcDesc {
 	url: String!
@@ -2471,6 +2475,10 @@ interface ModifyPasswordResult {
 }
 
 type ModifyPasswordSuccess implements ModifyPasswordResult {
+	message: String!
+}
+
+type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 	message: String!
 }
 
@@ -2954,6 +2962,19 @@ type RemoveWebhookSubscriptionResultSuccess implements RemoveWebhookSubscription
 	message: String!
 }
 
+type RenameAccountNameNotUnique implements RenameAccountResult {
+	message: String!
+}
+
+interface RenameAccountResult {
+	message: String!
+}
+
+type RenameAccountSuccess implements RenameAccountResult {
+	newName: String!
+	message: String!
+}
+
 interface RenameResult {
 	message: String!
 }
@@ -3393,7 +3414,6 @@ type StartUploadVersionSuccess implements StartUploadVersionResult {
 	isSuccess: Boolean!
 	message: String!
 }
-
 
 type Task {
 	"""
@@ -3921,13 +3941,15 @@ scalar WebhookSubscriptionID
 input WebhookSubscriptionInput {
 	targetUrl: URL!
 	eventTypes: [WebhookEventType!]!
-	label: String!
+	label: WebhookSubscriptionLabel!
 }
 
 type WebhookSubscriptionInvalidTargetUrl implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
 	innerMessage: String!
 	message: String!
 }
+
+scalar WebhookSubscriptionLabel
 
 type WebhookSubscriptionMut {
 	update(input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
@@ -3956,9 +3978,21 @@ type Webhooks {
 	eventTypes: [String!]!
 }
 
+"""
+Directs the executor to include this field or fragment only when the `if` argument is true.
+"""
 directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Indicates that an Input Object is a OneOf Input Object (and thus requires exactly one of its field be provided)
+"""
 directive @oneOf on INPUT_OBJECT
+"""
+Directs the executor to skip this field or fragment when the `if` argument is true.
+"""
 directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
+"""
+Provides a scalar specification URL for specifying the behavior of custom scalar types.
+"""
 directive @specifiedBy(url: String!) on SCALAR
 schema {
 	query: Query

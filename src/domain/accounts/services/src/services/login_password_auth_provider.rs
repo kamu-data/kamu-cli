@@ -10,57 +10,45 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crypto_utils::{Argon2Hasher, PasswordHashingMode};
-use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LoginPasswordAuthProvider {
-    account_repository: Arc<dyn AccountRepository>,
-    password_hash_repository: Arc<dyn PasswordHashRepository>,
-    password_hashing_mode: PasswordHashingMode,
+#[derive(Debug)]
+pub struct PasswordPolicyConfig {
+    pub min_new_password_length: usize,
 }
 
-#[component(pub)]
-#[interface(dyn AuthenticationProvider)]
-impl LoginPasswordAuthProvider {
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn new(
-        account_repository: Arc<dyn AccountRepository>,
-        password_hash_repository: Arc<dyn PasswordHashRepository>,
-        password_hashing_mode: Option<Arc<PasswordHashingMode>>,
-    ) -> Self {
+impl Default for PasswordPolicyConfig {
+    fn default() -> Self {
         Self {
-            account_repository,
-            password_hash_repository,
-            // When hashing mode is unspecified, safely assume default mode.
-            // Higher security by default is better than forgetting to configure
-            password_hashing_mode: password_hashing_mode
-                .map_or(PasswordHashingMode::Default, |mode| *mode),
+            min_new_password_length: MIN_PASSWORD_LENGTH,
         }
     }
+}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component(pub)]
+#[dill::interface(dyn AuthenticationProvider)]
+pub struct LoginPasswordAuthProvider {
+    account_service: Arc<dyn AccountService>,
+}
+
+impl LoginPasswordAuthProvider {
+    // TODO: Remove this method during refactoring:
+    //       https://github.com/kamu-data/kamu-cli/issues/1270
     pub async fn save_password(
         &self,
         account: &Account,
-        password: String,
+        password: &Password,
     ) -> Result<(), InternalError> {
-        let password_hash =
-            Argon2Hasher::hash_async(password.as_bytes(), self.password_hashing_mode)
-                .await
-                .int_err()?;
-
-        // Save hash in the repository
-        self.password_hash_repository
-            .save_password_hash(&account.id, &account.account_name, password_hash)
+        self.account_service
+            .save_account_password(account, password)
             .await
-            .int_err()?;
-
-        Ok(())
     }
 }
 
@@ -81,48 +69,28 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             serde_json::from_str::<PasswordLoginCredentials>(login_credentials_json.as_str())
                 .map_err(ProviderLoginError::invalid_credentials)?;
 
-        // Extract account name
+        // Extract account name and password
         let account_name =
             odf::AccountName::from_str(&password_login_credentials.login).int_err()?;
+        let password = Password::try_new(password_login_credentials.password)
+            .map_err(|_| ProviderLoginError::RejectedCredentials(RejectedCredentialsError {}))?;
 
-        // Locate password hash associated with this account name
-        let password_hash = match self
-            .password_hash_repository
-            .find_password_hash_by_account_name(&account_name)
+        self.account_service
+            .verify_account_password(&account_name, &password)
             .await
-        {
-            // Found
-            Ok(Some(password_hash)) => password_hash,
-
-            // Not found => error
-            Ok(None) => {
-                return Err(ProviderLoginError::RejectedCredentials(
-                    RejectedCredentialsError {},
-                ));
-            }
-
-            // Internal issue => error
-            Err(e) => match e {
-                FindPasswordHashError::Internal(e) => return Err(ProviderLoginError::Internal(e)),
-            },
-        };
-
-        if !Argon2Hasher::verify_async(
-            password_login_credentials.password.as_bytes(),
-            password_hash.as_str(),
-            self.password_hashing_mode,
-        )
-        .await
-        .int_err()?
-        {
-            return Err(ProviderLoginError::RejectedCredentials(
-                RejectedCredentialsError {},
-            ));
-        }
+            .map_err(|e| {
+                use VerifyPasswordError as E;
+                match e {
+                    E::AccountNotFound(_) | E::IncorrectPassword(_) => {
+                        ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
+                    }
+                    e @ E::Internal(_) => ProviderLoginError::Internal(e.int_err()),
+                }
+            })?;
 
         // Extract known account data
         let account = self
-            .account_repository
+            .account_service
             .get_account_by_name(&account_name)
             .await
             .int_err()?;

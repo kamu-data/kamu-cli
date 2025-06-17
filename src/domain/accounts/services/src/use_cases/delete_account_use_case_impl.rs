@@ -18,14 +18,14 @@ use crate::utils;
 #[dill::component]
 #[dill::interface(dyn DeleteAccountUseCase)]
 pub struct DeleteAccountUseCaseImpl {
-    account_authorization_helper: Arc<utils::AccountAuthorizationHelper>,
+    account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
 #[async_trait::async_trait]
 impl DeleteAccountUseCase for DeleteAccountUseCaseImpl {
-    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountByNameError> {
+    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountError> {
         self.account_authorization_helper
             .ensure_account_can_be_deleted(&account.account_name)
             .await?;

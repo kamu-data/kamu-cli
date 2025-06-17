@@ -54,7 +54,7 @@ impl<'a> DatasetWebhooksMut<'a> {
                     .into_iter()
                     .map(|et| kamu_webhooks::WebhookEventType::try_new(et.0).unwrap())
                     .collect::<Vec<_>>(),
-                kamu_webhooks::WebhookSubscriptionLabel::new(&input.label),
+                input.label.0.clone(),
             )
             .await
         {
@@ -81,7 +81,9 @@ impl<'a> DatasetWebhooksMut<'a> {
 
             Err(kamu_webhooks::CreateWebhookSubscriptionError::DuplicateLabel(_)) => {
                 Ok(CreateWebhookSubscriptionResult::DuplicateLabel(
-                    WebhookSubscriptionDuplicateLabel { label: input.label },
+                    WebhookSubscriptionDuplicateLabel {
+                        label: input.label.0.to_string(),
+                    },
                 ))
             }
 
@@ -121,7 +123,7 @@ impl<'a> DatasetWebhooksMut<'a> {
 pub struct WebhookSubscriptionInput {
     pub target_url: GqlUrl,
     pub event_types: Vec<WebhookEventType>,
-    pub label: String,
+    pub label: WebhookSubscriptionLabel,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

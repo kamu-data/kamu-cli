@@ -152,8 +152,8 @@ impl SyncServiceImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?src, %dst_url, ?opts))]
-    async fn sync_smart_push_transfer_protocol<'a>(
-        &'a self,
+    async fn sync_smart_push_transfer_protocol(
+        &self,
         src: SyncRef,
         dst_url: &Url,
         opts: SyncOptions,

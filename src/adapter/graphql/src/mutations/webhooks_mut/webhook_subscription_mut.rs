@@ -51,7 +51,7 @@ impl WebhookSubscriptionMut {
                     .into_iter()
                     .map(|et| kamu_webhooks::WebhookEventType::try_new(et.0).unwrap())
                     .collect::<Vec<_>>(),
-                kamu_webhooks::WebhookSubscriptionLabel::new(&input.label),
+                input.label.0.clone(),
             )
             .await
         {
@@ -83,7 +83,9 @@ impl WebhookSubscriptionMut {
 
             Err(kamu_webhooks::UpdateWebhookSubscriptionError::DuplicateLabel(_)) => {
                 Ok(UpdateWebhookSubscriptionResult::DuplicateLabel(
-                    WebhookSubscriptionDuplicateLabel { label: input.label },
+                    WebhookSubscriptionDuplicateLabel {
+                        label: input.label.0.to_string(),
+                    },
                 ))
             }
 

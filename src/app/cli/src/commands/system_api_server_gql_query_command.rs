@@ -11,11 +11,13 @@ use dill::Catalog;
 
 use super::{CLIError, Command};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct APIServerGqlQueryCommand {
     #[dill::component(explicit)]
-    base_catalog: Catalog,
+    cli_catalog: Catalog,
 
     #[dill::component(explicit)]
     query: String,
@@ -27,10 +29,10 @@ pub struct APIServerGqlQueryCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerGqlQueryCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        // TODO: Access token? Not every GraphQL can run unauthorized
         let gql_schema = kamu_adapter_graphql::schema();
+        // NOTE: Authorization based on the current subject from the CLI catalog
         let response = gql_schema
-            .execute(async_graphql::Request::new(&self.query).data(self.base_catalog.clone()))
+            .execute(async_graphql::Request::new(&self.query).data(self.cli_catalog.clone()))
             .await;
 
         let data = if self.full {
@@ -54,3 +56,5 @@ impl Command for APIServerGqlQueryCommand {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

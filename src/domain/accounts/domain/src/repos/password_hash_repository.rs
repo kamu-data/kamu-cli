@@ -33,6 +33,12 @@ pub trait PasswordHashRepository: Send + Sync {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<Option<String>, FindPasswordHashError>;
+
+    async fn on_account_renamed(
+        &self,
+        old_account_name: &odf::AccountName,
+        new_account_name: &odf::AccountName,
+    ) -> Result<(), PasswordAccountRenamedError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,6 +65,17 @@ pub enum ModifyPasswordHashError {
 pub enum FindPasswordHashError {
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum PasswordAccountRenamedError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+
+    #[error(transparent)]
+    AccountNotFound(#[from] AccountNotFoundByNameError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

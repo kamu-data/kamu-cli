@@ -4,13 +4,15 @@ content:
   users:
     predefined:
       - accountName: kamu
-        properties: [admin]
+        password: kamu.dev
+        properties: [ admin ]
         avatarUrl: https://avatars.githubusercontent.com/u/50896974?s=200&v=4
         email: support+kamu@kamu.dev
       - accountName: rijkswaterstaat.nl
+        password: rijkswaterstaat.nl
         avatarUrl: https://www.shutterstock.com/image-vector/royal-exclusive-badge-logo-two-260nw-236025661.jpg
         email: support+rijkswaterstaat.nl@kamu.dev
       - accountName: deltares.nl
+        password: deltares.nl
         avatarUrl: https://avatars.githubusercontent.com/u/6613768?s=200&v=4
         email: support+deltares.nl@kamu.dev
-        

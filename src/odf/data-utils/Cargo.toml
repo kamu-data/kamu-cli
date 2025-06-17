@@ -34,7 +34,7 @@ arrow = { version = "55", default-features = false }
 arrow-digest = { version = "55", default-features = false }
 arrow-json = { version = "55", default-features = false }
 arrow-schema = { version = "55", default-features = false, features = ["serde"] }
-datafusion = { version = "47", default-features = false, features = ["parquet", "serde"] }
+datafusion = { version = "48", default-features = false, features = ["parquet", "serde"] }
 digest = "0.10"
 hex = "0.4"
 sha3 = "0.10"

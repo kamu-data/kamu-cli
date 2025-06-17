@@ -11,10 +11,47 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## Unreleased
+## [Unreleased]
+### Added
+- `kamu system api-server gql-query`: support for authorization and, as a result, mutation requests (#1273).
+- GQL: `AccountMut::modifyPasswordWithConfirmation()`: for user's password change (#1277).
+- `UIConfiguration`: added `min_new_password_length` parameter (#1277).
 ### Changed
-- Updated `sqlx` crate to `0.8.6`, Vol. 2
+- Panic's now also logs a correct tracing message.
+- `kamu`: improved logging, especially in failure cases (#1273).
+- `kamu --account <NAME>`: added checks for account existence (multi-tenant mode) (#1273).
+- `kamu init`: flush database after successful command completion (#1273).
+- Upgraded to `datafusion v48`
+- Configuration, predefined accounts: `password` field is now mandatory (#1277).
+- `kamu`: a start-up job by `PredefinedAccountsRegistrator` will be called earlier, right after creating
+  `base_catalog` (#1277).
 - Refactor: move logic for versioned files from GQL level to use_case
+### Fixed
+- `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`.
+- Renaming `provider_identity_key` field with account name for password accounts.
+- User in single-tenant mode now has administrator privileges (#1273).
+- `DeleteAccountUseCaseImpl`: complete deletion of datasets, not just database entries (#1273).
+- `kamu system api-server gql-query`: authorization based on the current subject (#1273).
+
+## [0.241.1] - 2025-06-06
+### Fixed
+- Account name in password hashes table should be updated as well during a rename
+
+## [0.241.0] - 2025-06-06
+### Added
+- Support renaming accounts via GraphQL API:
+  - automatically actualizes dataset entries (denormalized account names)
+  - automatically updates alias files in ODF storage layer
+  - properly handling account renames when it's initiated by updates to predefined configuration
+### Fixed
+- Missing length validation for webhook subscription labels.
+- Unexpected webhook label duplication for empty labels.
+
+## [0.240.1] - 2025-06-04
+### Changed
+- Updated `sqlx` crate to `0.8.6`, Vol. 2.
+### Fixed
+- `web3-wallet` authorization provider: interactive login use case support (Device Flow). 
 
 ## [0.240.0] - 2025-06-02
 ### Added

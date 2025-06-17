@@ -11,13 +11,17 @@ use std::collections::HashMap;
 
 use database_common::PaginationOpts;
 use internal_error::InternalError;
-use thiserror::Error;
 
 use crate::{
     Account,
+    AccountNotFoundByNameError,
     AccountPageStream,
     CreateAccountError,
     GetAccountByIdError,
+    GetAccountByNameError,
+    ModifyAccountPasswordError,
+    Password,
+    RenameAccountError,
     SearchAccountsByNamePatternFilters,
 };
 
@@ -34,6 +38,11 @@ pub trait AccountService: Sync + Send {
         &self,
         account_ids: &[odf::AccountID],
     ) -> Result<Vec<Account>, InternalError>;
+
+    async fn get_account_by_name(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<Account, GetAccountByNameError>;
 
     async fn get_account_map(
         &self,
@@ -65,13 +74,40 @@ pub trait AccountService: Sync + Send {
     async fn create_password_account(
         &self,
         account_name: &odf::AccountName,
+        password: Password,
         email: email_utils::Email,
     ) -> Result<Account, CreateAccountError>;
+
+    async fn rename_account(
+        &self,
+        account: &Account,
+        new_name: odf::AccountName,
+    ) -> Result<(), RenameAccountError>;
 
     async fn delete_account_by_name(
         &self,
         account_name: &odf::AccountName,
     ) -> Result<(), InternalError>;
+
+    // TODO: Remove this method during refactoring:
+    //       https://github.com/kamu-data/kamu-cli/issues/1270
+    async fn save_account_password(
+        &self,
+        account: &Account,
+        password: &Password,
+    ) -> Result<(), InternalError>;
+
+    async fn verify_account_password(
+        &self,
+        account_name: &odf::AccountName,
+        password: &Password,
+    ) -> Result<(), VerifyPasswordError>;
+
+    async fn modify_account_password(
+        &self,
+        account_name: &odf::AccountName,
+        new_password: &Password,
+    ) -> Result<(), ModifyAccountPasswordError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,13 +135,29 @@ impl<T: AccountService + ?Sized> AccountServiceExt for T {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Error
+// Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum GetAccountMapError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+#[derive(thiserror::Error, Debug)]
+pub enum VerifyPasswordError {
+    #[error(transparent)]
+    AccountNotFound(#[from] AccountNotFoundByNameError),
+
+    #[error(transparent)]
+    IncorrectPassword(#[from] IncorrectPasswordError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Password is incorrect")]
+pub struct IncorrectPasswordError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -33,7 +33,7 @@ async fn test_update_in_dataset_success() {
             &mut subscription,
             url::Url::parse("https://example.com/updated").unwrap(),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-            WebhookSubscriptionLabel::new("test_label_updated"),
+            WebhookSubscriptionLabel::try_new("test_label_updated").unwrap(),
         )
         .await;
     assert!(res.is_ok(), "Failed to update subscription: {res:?}",);
@@ -71,7 +71,7 @@ async fn test_invalid_target_url_rejected() {
                 &mut subscription,
                 url::Url::parse(invalid_url).unwrap(),
                 vec![WebhookEventTypeCatalog::test()],
-                WebhookSubscriptionLabel::new("test_label"),
+                WebhookSubscriptionLabel::try_new("test_label").unwrap(),
             )
             .await;
 
@@ -95,7 +95,7 @@ async fn test_no_event_types_rejected() {
             &mut subscription,
             url::Url::parse("https://example.com").unwrap(),
             vec![],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
 
@@ -121,7 +121,7 @@ async fn test_event_types_deduplicated() {
                 WebhookEventTypeCatalog::test(),
                 WebhookEventTypeCatalog::test(),
             ],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
     assert!(res.is_ok(), "Failed to update subscription: {res:?}",);
@@ -149,19 +149,19 @@ async fn test_label_unique_in_dataset() {
     let _subscription_1_1 = harness
         .create_subscription_in_dataset(
             dataset_id_1.clone(),
-            Some(WebhookSubscriptionLabel::new("test-label-1")),
+            Some(WebhookSubscriptionLabel::try_new("test-label-1").unwrap()),
         )
         .await;
     let mut subscription_1_2 = harness
         .create_subscription_in_dataset(
             dataset_id_1,
-            Some(WebhookSubscriptionLabel::new("test-label-2")),
+            Some(WebhookSubscriptionLabel::try_new("test-label-2").unwrap()),
         )
         .await;
     let _subscription_2 = harness
         .create_subscription_in_dataset(
             dataset_id_2,
-            Some(WebhookSubscriptionLabel::new("test-label-another")),
+            Some(WebhookSubscriptionLabel::try_new("test-label-another").unwrap()),
         )
         .await;
 
@@ -171,7 +171,7 @@ async fn test_label_unique_in_dataset() {
             &mut subscription_1_2,
             url::Url::parse("https://example.com/webhook/2").unwrap(),
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionLabel::new("test-label-1"),
+            WebhookSubscriptionLabel::try_new("test-label-1").unwrap(),
         )
         .await;
     assert_matches!(
@@ -186,7 +186,7 @@ async fn test_label_unique_in_dataset() {
             &mut subscription_1_2,
             url::Url::parse("https://example.com/webhook/2").unwrap(),
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionLabel::new("test-label-another"),
+            WebhookSubscriptionLabel::try_new("test-label-another").unwrap(),
         )
         .await;
     assert!(res.is_ok(), "Failed to update subscription: {res:?}",);
@@ -206,7 +206,7 @@ async fn test_update_unexpected() {
             &mut subscription,
             url::Url::parse("https://example.com").unwrap(),
             vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionLabel::new("test_label"),
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await;
 

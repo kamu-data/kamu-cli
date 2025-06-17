@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 
 use database_common::PaginationOpts;
 use dill::Catalog;
-use kamu_accounts::AccountRepository;
+use kamu_accounts::{Account, AccountRepository};
 use kamu_datasets::{
     DatasetEntriesResolution,
     DatasetEntryByNameNotFoundError,
@@ -639,6 +639,69 @@ pub async fn test_update_dataset_entry_name(catalog: &Catalog) {
 
         assert_matches!(count_res, Ok(1));
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_owner_of_entries_renamed(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    let account_1 = new_account_with_name(&account_repo, "user1").await;
+    let account_2 = new_account_with_name(&account_repo, "user2").await;
+
+    let entry_1 = new_dataset_entry_with(&account_1, "dataset1", odf::DatasetKind::Root);
+    let entry_2 = new_dataset_entry_with(&account_1, "dataset2", odf::DatasetKind::Root);
+    let entry_3 = new_dataset_entry_with(&account_2, "dataset3", odf::DatasetKind::Root);
+
+    {
+        let save_res = dataset_entry_repo.save_dataset_entry(&entry_1).await;
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let save_res = dataset_entry_repo.save_dataset_entry(&entry_2).await;
+        assert_matches!(save_res, Ok(_));
+    }
+    {
+        let save_res = dataset_entry_repo.save_dataset_entry(&entry_3).await;
+        assert_matches!(save_res, Ok(_));
+    }
+
+    let new_account_name = odf::AccountName::new_unchecked("user1-renamed");
+    account_repo
+        .update_account(Account {
+            account_name: new_account_name.clone(),
+            ..account_1.clone()
+        })
+        .await
+        .unwrap();
+
+    dataset_entry_repo
+        .update_owner_entries_after_rename(&account_1.id, &new_account_name)
+        .await
+        .unwrap();
+
+    use futures::TryStreamExt;
+    let get_res = dataset_entry_repo
+        .get_dataset_entries(PaginationOpts {
+            limit: 100,
+            offset: 0,
+        })
+        .await
+        .try_collect::<Vec<_>>()
+        .await;
+    assert!(get_res.is_ok());
+
+    let mut actual_dataset_entries = get_res.unwrap();
+    actual_dataset_entries.sort_by(|e1, e2| e1.name.cmp(&e2.name));
+    assert_eq!(actual_dataset_entries[0].owner_name, "user1-renamed");
+    assert_eq!(actual_dataset_entries[0].name, "dataset1");
+
+    assert_eq!(actual_dataset_entries[1].owner_name, "user1-renamed");
+    assert_eq!(actual_dataset_entries[1].name, "dataset2");
+
+    assert_eq!(actual_dataset_entries[2].owner_name, "user2");
+    assert_eq!(actual_dataset_entries[2].name, "dataset3");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

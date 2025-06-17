@@ -412,7 +412,7 @@ async fn test_data_query_error_sql_unparsable() {
 
     pretty_assertions::assert_eq!(
         json!({
-            "errorMessage": "sql parser error: Expected end of statement, found: ?",
+            "errorMessage": "sql parser error: Expected: end of statement, found: ? at Line: 1, Column: 9",
             "errorKind": "INVALID_SQL",
         }),
         json["data"]["query"],

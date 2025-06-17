@@ -643,6 +643,43 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
 
         Ok(())
     }
+
+    async fn update_owner_entries_after_rename(
+        &self,
+        owner_account_id: &odf::AccountID,
+        old_owner_account_name: &odf::AccountName,
+        new_owner_account_name: &odf::AccountName,
+    ) -> Result<(), InternalError> {
+        self.dataset_entry_repo
+            .update_owner_entries_after_rename(owner_account_id, new_owner_account_name)
+            .await?;
+
+        // Update owner name in cache, if cached
+        {
+            let mut writable_cache = self.cache.write().unwrap();
+
+            // Accounts
+            if let Some(account_id) = writable_cache
+                .accounts
+                .names2ids
+                .remove(old_owner_account_name)
+            {
+                writable_cache
+                    .accounts
+                    .names2ids
+                    .insert(new_owner_account_name.clone(), account_id);
+            }
+
+            // Entries
+            for entry in writable_cache.datasets.entries_by_id.values_mut() {
+                if entry.owner_id == *owner_account_id {
+                    entry.owner_name = new_owner_account_name.clone();
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

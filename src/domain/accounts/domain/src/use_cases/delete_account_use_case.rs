@@ -10,13 +10,13 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{Account, AccountNotFoundByNameError, DeleteAccountError};
+use crate::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DeleteAccountUseCase: Send + Sync {
-    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountByNameError>;
+    async fn execute(&self, account: &Account) -> Result<(), DeleteAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +24,7 @@ pub trait DeleteAccountUseCase: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum DeleteAccountByNameError {
+pub enum DeleteAccountError {
     #[error(transparent)]
     Access(
         #[from]
@@ -33,21 +33,7 @@ pub enum DeleteAccountByNameError {
     ),
 
     #[error(transparent)]
-    NotFound(AccountNotFoundByNameError),
-
-    #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-impl From<DeleteAccountError> for DeleteAccountByNameError {
-    fn from(e: DeleteAccountError) -> Self {
-        use internal_error::ErrorIntoInternal;
-
-        match e {
-            DeleteAccountError::NotFound(e) => Self::NotFound(e),
-            DeleteAccountError::Internal(_) => Self::Internal(e.int_err()),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

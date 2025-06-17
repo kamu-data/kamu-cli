@@ -70,6 +70,11 @@ pub(crate) async fn validate_webhook_subscription_label_unique_in_dataset(
     dataset_id: &odf::DatasetID,
     label: &WebhookSubscriptionLabel,
 ) -> Result<(), ValidateWebhookSubscriptionLabelError> {
+    // Ignore empty labels
+    if label.as_ref().is_empty() {
+        return Ok(());
+    }
+
     let maybe_subscription_id = subscription_event_store
         .find_subscription_id_by_dataset_and_label(dataset_id, label)
         .await
