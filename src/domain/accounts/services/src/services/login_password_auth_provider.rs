@@ -72,7 +72,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         // Extract account name and password
         let account_name =
             odf::AccountName::from_str(&password_login_credentials.login).int_err()?;
-        let password = Password::try_new(password_login_credentials.password).int_err()?;
+        let password = Password::try_new(password_login_credentials.password)
+            .map_err(|_| ProviderLoginError::RejectedCredentials(RejectedCredentialsError {}))?;
 
         self.account_service
             .verify_account_password(&account_name, &password)
