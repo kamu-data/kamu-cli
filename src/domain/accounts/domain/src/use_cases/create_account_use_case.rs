@@ -9,7 +9,7 @@
 
 use email_utils::Email;
 
-use crate::{Account, CreateAccountError};
+use crate::{Account, CreateAccountError, Password};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,8 +19,16 @@ pub trait CreateAccountUseCase: Send + Sync {
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        email_maybe: Option<Email>,
+        options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(bon::Builder, Default)]
+pub struct CreateAccountUseCaseOptions {
+    pub email: Option<Email>,
+    pub password: Option<Password>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

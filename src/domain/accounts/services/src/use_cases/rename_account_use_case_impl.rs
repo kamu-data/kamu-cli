@@ -27,7 +27,7 @@ use crate::utils;
 #[dill::component]
 #[dill::interface(dyn RenameAccountUseCase)]
 pub struct RenameAccountUseCaseImpl {
-    account_authorization_helper: Arc<utils::AccountAuthorizationHelper>,
+    account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
     password_hash_repository: Arc<dyn kamu_accounts::PasswordHashRepository>,
     outbox: Arc<dyn messaging_outbox::Outbox>,

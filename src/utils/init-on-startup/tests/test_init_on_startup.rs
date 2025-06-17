@@ -7,15 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
-
-use std::assert_matches::assert_matches;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
-use init_on_startup::{InitOnStartup, InitOnStartupMeta, StartupJobsError, run_startup_jobs};
+use init_on_startup::{
+    InitOnStartup,
+    InitOnStartupMeta,
+    RunStartupJobsOptions,
+    StartupJobsError,
+    run_startup_jobs,
+    run_startup_jobs_ex,
+};
 use internal_error::InternalError;
+use pretty_assertions::{assert_eq, assert_matches};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,6 +118,37 @@ async fn test_independent_jobs() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_independent_jobs_skip_completed() {
+    test_startup_job!(A, &[]);
+    test_startup_job!(B, &[]);
+    test_startup_job!(C, &[]);
+
+    let catalog = CatalogBuilder::new()
+        .add::<JobExecutions>()
+        .add::<TestJobA>()
+        .add::<TestJobB>()
+        .add::<TestJobC>()
+        .build();
+
+    run_startup_jobs_ex(
+        &catalog,
+        RunStartupJobsOptions::builder()
+            .skip_completed_jobs(HashSet::from(["TestJobA"]))
+            .build(),
+    )
+    .await
+    .unwrap();
+
+    let executions = catalog.get_one::<JobExecutions>().unwrap();
+    assert_eq!(
+        ["TestJobB", "TestJobC"].into_iter().collect::<HashSet<_>>(),
+        executions.job_names().into_iter().collect(),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_linear_dependency() {
     test_startup_job!(A, &[]);
     test_startup_job!(B, &["TestJobA"]);
@@ -133,6 +169,35 @@ async fn test_linear_dependency() {
         vec!["TestJobA", "TestJobB", "TestJobC"],
         executions.job_names(),
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_linear_dependency_skip_completed() {
+    test_startup_job!(A, &[]);
+    test_startup_job!(B, &["TestJobA"]);
+    test_startup_job!(C, &["TestJobB"]);
+
+    let catalog = CatalogBuilder::new()
+        .add::<JobExecutions>()
+        .add::<TestJobA>()
+        .add::<TestJobB>()
+        .add::<TestJobC>()
+        .build();
+
+    run_startup_jobs_ex(
+        &catalog,
+        RunStartupJobsOptions::builder()
+            .skip_completed_jobs(HashSet::from(["TestJobB"]))
+            .build(),
+    )
+    .await
+    .unwrap();
+
+    // The order of executions must respect dependencies
+    let executions = catalog.get_one::<JobExecutions>().unwrap();
+    assert_eq!(vec!["TestJobA", "TestJobC"], executions.job_names(),);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

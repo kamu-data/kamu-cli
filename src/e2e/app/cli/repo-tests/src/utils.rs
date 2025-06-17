@@ -16,11 +16,11 @@ pub(crate) async fn make_logged_client(
     account_name: &str,
 ) -> KamuApiServerClient {
     let mut new_client = anonymous.clone();
-    let password_same_as_account_name = account_name;
+    let password = generate_password(&account_name);
 
     new_client
         .auth()
-        .login_with_password(account_name, password_same_as_account_name)
+        .login_with_password(account_name, &password)
         .await;
 
     new_client
@@ -43,6 +43,12 @@ pub(crate) async fn make_logged_clients<const N: usize>(
     }
 
     unsafe { logged_clients.map(|item| item.assume_init()) }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn generate_password(account_name: &impl AsRef<str>) -> String {
+    format!("test#{}", account_name.as_ref())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

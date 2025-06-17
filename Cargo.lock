@@ -5934,11 +5934,13 @@ name = "init-on-startup"
 version = "0.241.1"
 dependencies = [
  "async-trait",
+ "bon",
  "database-common",
  "dill",
  "internal-error",
  "paste",
  "petgraph 0.7.1",
+ "pretty_assertions",
  "test-log",
  "thiserror 2.0.12",
  "tokio",
@@ -6454,6 +6456,7 @@ version = "0.241.1"
 dependencies = [
  "async-trait",
  "base32",
+ "bon",
  "chrono",
  "crc32fast",
  "crypto-utils",
@@ -6582,6 +6585,7 @@ dependencies = [
  "jsonwebtoken",
  "kamu-accounts",
  "kamu-accounts-inmem",
+ "kamu-accounts-services",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",

@@ -614,11 +614,7 @@ async fn test_modify_password_non_admin() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
-        ["Access restricted to administrators only"],
-        *res.error_messages(),
-        "{res:?}"
-    );
+    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -786,6 +782,8 @@ async fn test_rename_own_account() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let default_test_account = CurrentAccountSubject::new_test();
+    let default_password = AccountConfig::generate_password(default_test_account.account_name());
+
     const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
 
     let res = schema
@@ -853,7 +851,7 @@ async fn test_rename_own_account() {
                 // login is new, the renamed account name
                 RENAMED_ANOTHER_ACCOUNT_NAME,
                 // password is still the same
-                default_test_account.account_name(),
+                &default_password,
             )
             .data(harness.catalog_anonymous.clone()),
         )
@@ -876,11 +874,8 @@ async fn test_rename_own_account() {
     // An attempt to login under the old name should fail
     let res = schema
         .execute(
-            login_via_password_request(
-                default_test_account.account_name(),
-                default_test_account.account_name(),
-            )
-            .data(harness.catalog_anonymous.clone()),
+            login_via_password_request(default_test_account.account_name(), &default_password)
+                .data(harness.catalog_anonymous.clone()),
         )
         .await;
     assert!(res.is_err(), "{res:?}");
@@ -1111,7 +1106,7 @@ impl GraphQLAccountsHarness {
             .add::<kamu_accounts_services::RenameAccountUseCaseImpl>()
             .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
             .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
-            .add::<kamu_accounts_services::utils::AccountAuthorizationHelper>()
+            .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
             .add::<time_source::SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
             .add_builder(

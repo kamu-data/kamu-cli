@@ -14,12 +14,17 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Added
 - `kamu system api-server gql-query`: support for authorization and, as a result, mutation requests (#1273).
+- GQL: `AccountMut::modifyPasswordWithConfirmation()`: for user's password change (#1277).
+- `UIConfiguration`: added `min_new_password_length` parameter (#1277).
 ### Changed
-- Panic's now also log a correct tracing message.
+- Panic's now also logs a correct tracing message.
 - `kamu`: improved logging, especially in failure cases (#1273).
 - `kamu --account <NAME>`: added checks for account existence (multi-tenant mode) (#1273).
 - `kamu init`: flush database after successful command completion (#1273).
 - Upgraded to `datafusion v48`
+- Configuration, predefined accounts: `password` field is now mandatory (#1277).
+- `kamu`: a start-up job by `PredefinedAccountsRegistrator` will be called earlier, right after creating
+  `base_catalog` (#1277).
 ### Fixed
 - `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`.
 - Renaming `provider_identity_key` field with account name for password accounts.

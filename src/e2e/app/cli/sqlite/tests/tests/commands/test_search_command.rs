@@ -23,19 +23,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(
-            indoc::indoc!(
-                r#"
-                kind: CLIConfig
-                version: 1
-                content:
-                  users:
-                    predefined:
-                      - accountName: kamu
-                        email: kamu@example.com
-                "#
-            )
-        ),
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
     extra_test_groups = "engine, ingest, datafusion"
 );
 
@@ -50,19 +38,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(
-            indoc::indoc!(
-                r#"
-                kind: CLIConfig
-                version: 1
-                content:
-                  users:
-                    predefined:
-                      - accountName: kamu
-                        email: kamu@example.com
-                "#
-            )
-        ),
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
     extra_test_groups = "engine, ingest, datafusion"
 );
 

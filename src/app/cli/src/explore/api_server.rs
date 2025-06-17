@@ -19,6 +19,7 @@ use database_common_macros::transactional_handler;
 use http_common::ApiError;
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
+use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_adapter_http::e2e::e2e_router;
 use kamu_flow_system_inmem::domain::FlowAgent;
@@ -35,7 +36,7 @@ use super::{UIConfiguration, UIFeatureFlags};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServer {
-    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>>,
+    server_future: Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send>>,
     local_addr: SocketAddr,
     task_agent: Arc<dyn TaskAgent>,
     flow_agent: Arc<dyn FlowAgent>,
@@ -50,10 +51,11 @@ impl APIServer {
         tenancy_config: TenancyConfig,
         address: Option<IpAddr>,
         port: Option<u16>,
-        file_upload_limit_config: Arc<FileUploadLimitConfig>,
+        file_upload_limit_config: &FileUploadLimitConfig,
         enable_dataset_env_vars_management: bool,
         external_address: Option<IpAddr>,
         e2e_output_data_path: Option<&PathBuf>,
+        password_policy_config: &PasswordPolicyConfig,
     ) -> Result<Self, InternalError> {
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
@@ -99,6 +101,7 @@ impl APIServer {
 
         let ui_configuration = UIConfiguration {
             ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),
+            min_new_password_length: password_policy_config.min_new_password_length,
             feature_flags: UIFeatureFlags {
                 enable_logout: true,
                 enable_scheduling: true,
@@ -265,7 +268,7 @@ impl APIServer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn ui_configuration_handler(
-    ui_configuration: axum::extract::Extension<UIConfiguration>,
+    ui_configuration: Extension<UIConfiguration>,
 ) -> axum::Json<UIConfiguration> {
     axum::Json(ui_configuration.0)
 }

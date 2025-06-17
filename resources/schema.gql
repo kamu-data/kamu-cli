@@ -152,6 +152,10 @@ type AccountMut {
 	"""
 	modifyPassword(password: AccountPassword!): ModifyPasswordResult!
 	"""
+	Change password with confirmation
+	"""
+	modifyPasswordWithConfirmation(oldPassword: AccountPassword!, newPassword: AccountPassword!): ModifyPasswordResult!
+	"""
 	Delete a selected account. Allowed only for admin users
 	"""
 	delete: DeleteAccountResult!
@@ -2471,6 +2475,10 @@ interface ModifyPasswordResult {
 }
 
 type ModifyPasswordSuccess implements ModifyPasswordResult {
+	message: String!
+}
+
+type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
 	message: String!
 }
 

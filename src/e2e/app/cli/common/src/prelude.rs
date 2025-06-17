@@ -13,4 +13,8 @@ pub use kamu_cli_e2e_common_macros::{
     kamu_cli_run_api_server_e2e_test,
 };
 
-pub use crate::e2e_harness::{KamuCliApiServerHarness, KamuCliApiServerHarnessOptions as Options};
+pub use crate::e2e_harness::{
+    KamuCliApiServerHarness,
+    KamuCliApiServerHarnessOptions as Options,
+    MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER,
+};

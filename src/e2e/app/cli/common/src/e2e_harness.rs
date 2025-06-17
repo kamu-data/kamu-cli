@@ -18,6 +18,22 @@ use crate::{KamuApiServerClient, api_server_e2e_test};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      users:
+        predefined:
+          - accountName: kamu
+            password: kamu.dev
+            email: kamu@example.com
+            properties: [ admin ]
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Default, PartialEq)]
 enum PotentialWorkspace {
     NoWorkspace,

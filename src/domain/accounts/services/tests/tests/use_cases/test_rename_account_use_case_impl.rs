@@ -190,7 +190,7 @@ impl RenameAccountUseCaseImplHarness {
         b.add::<kamu_accounts_services::RenameAccountUseCaseImpl>();
         b.add::<kamu_accounts_services::LoginPasswordAuthProvider>();
         b.add::<kamu_accounts_services::PredefinedAccountsRegistrator>();
-        b.add::<kamu_accounts_services::utils::AccountAuthorizationHelper>();
+        b.add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>();
         b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
         b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
         b.add_value(outbox);

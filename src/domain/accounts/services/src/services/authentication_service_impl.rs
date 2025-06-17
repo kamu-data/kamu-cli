@@ -12,7 +12,6 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use chrono::Utc;
-use dill::*;
 use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -44,9 +43,9 @@ pub struct AuthenticationServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AuthenticationService)]
-#[interface(dyn JwtTokenIssuer)]
+#[dill::component(pub)]
+#[dill::interface(dyn AuthenticationService)]
+#[dill::interface(dyn JwtTokenIssuer)]
 impl AuthenticationServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(

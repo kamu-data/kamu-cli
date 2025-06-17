@@ -16,6 +16,7 @@ use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
+use kamu_accounts_services::domain::DEFAULT_PASSWORD_STR;
 use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataParams,
@@ -286,7 +287,7 @@ impl AuthApi<'_> {
     }
 
     pub async fn login_as_kamu(&mut self) -> AccessToken {
-        self.login_with_password("kamu", "kamu").await
+        self.login_with_password("kamu", DEFAULT_PASSWORD_STR).await
     }
 
     pub async fn login_as_e2e_user(&mut self) -> AccessToken {
