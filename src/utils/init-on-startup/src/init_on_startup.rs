@@ -12,7 +12,7 @@ use std::hash::RandomState;
 
 use database_common::DatabaseTransactionRunner;
 use dill::{Builder, BuilderExt, Catalog, TypecastBuilder};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use petgraph::algo::toposort;
 use petgraph::graph::NodeIndex;
 use petgraph::stable_graph::StableDiGraph;

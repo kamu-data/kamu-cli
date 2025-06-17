@@ -17,6 +17,21 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
+pub struct PasswordPolicyConfig {
+    pub min_new_password_length: usize,
+}
+
+impl Default for PasswordPolicyConfig {
+    fn default() -> Self {
+        Self {
+            min_new_password_length: MIN_PASSWORD_LENGTH,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[dill::component(pub)]
 #[dill::interface(dyn AuthenticationProvider)]
 pub struct LoginPasswordAuthProvider {

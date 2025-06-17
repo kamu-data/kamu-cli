@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following order:
 ### Added
 - `kamu system api-server gql-query`: support for authorization and, as a result, mutation requests (#1273).
 - GQL: `AccountMut::modifyPasswordWithConfirmation()`: for user's password change (#1277).
+- `UIConfiguration`: added `min_new_password_length` parameter (#1277).
 ### Changed
 - Panic's now also logs a correct tracing message.
 - `kamu`: improved logging, especially in failure cases (#1273).

@@ -16,7 +16,7 @@ use database_common::DatabaseTransactionRunner;
 use internal_error::ResultIntoInternal;
 use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::*;
-use kamu_accounts_services::PasswordLoginCredentials;
+use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_oauth::*;
 use kamu_datasets::DatasetEnvVarsConfig;
 use tracing::Instrument;
@@ -36,6 +36,7 @@ pub struct APIServerRunCommand {
     dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
     account_subject: Arc<CurrentAccountSubject>,
     github_auth_config: Arc<GithubAuthenticationConfig>,
+    password_policy_config: Arc<PasswordPolicyConfig>,
 
     #[dill::component(explicit)]
     address: Option<IpAddr>,
@@ -132,10 +133,11 @@ impl Command for APIServerRunCommand {
             self.tenancy_config,
             self.address,
             self.port,
-            self.file_upload_limit_config.clone(),
+            self.file_upload_limit_config.as_ref(),
             self.dataset_env_vars_config.is_enabled(),
             self.external_address,
             self.e2e_output_data_path.as_ref(),
+            self.password_policy_config.as_ref(),
         )
         .await?;
 

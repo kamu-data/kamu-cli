@@ -27,7 +27,7 @@ use kamu_accounts::{
     AuthenticationService,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_services::PasswordLoginCredentials;
+use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use observability::axum::unknown_fallback_handler;
 use rust_embed::RustEmbed;
@@ -63,7 +63,7 @@ struct WebUILoginInstructions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WebUIServer {
-    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>>,
+    server_future: Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send>>,
     local_addr: SocketAddr,
     access_token: String,
 }
@@ -75,11 +75,12 @@ impl WebUIServer {
         server_catalog: Catalog,
         tenancy_config: TenancyConfig,
         current_account_name: odf::AccountName,
-        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-        file_upload_limit_config: Arc<FileUploadLimitConfig>,
+        predefined_accounts_config: &PredefinedAccountsConfig,
+        file_upload_limit_config: &FileUploadLimitConfig,
         enable_dataset_env_vars_management: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
+        password_policy_config: &PasswordPolicyConfig,
     ) -> Result<Self, InternalError> {
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
@@ -99,7 +100,7 @@ impl WebUIServer {
 
         let login_credentials = PasswordLoginCredentials {
             login: current_account_name.to_string(),
-            password: account_config.get_password().into_inner(),
+            password: account_config.password.into_inner(),
         };
 
         let gql_schema = kamu_adapter_graphql::schema();
@@ -119,6 +120,7 @@ impl WebUIServer {
 
         let ui_configuration = UIConfiguration {
             ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),
+            min_new_password_length: password_policy_config.min_new_password_length,
             feature_flags: UIFeatureFlags {
                 // No way to log out, always logging in a predefined user
                 enable_logout: false,

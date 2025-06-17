@@ -19,6 +19,7 @@ use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::PredefinedAccountsConfig;
+use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_datasets::DatasetEnvVarsConfig;
 
 use super::{CLIError, Command};
@@ -34,6 +35,7 @@ pub struct UICommand {
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
     dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
     output_config: Arc<OutputConfig>,
+    password_policy_config: Arc<PasswordPolicyConfig>,
 
     #[dill::component(explicit)]
     current_account_name: odf::AccountName,
@@ -60,11 +62,12 @@ impl Command for UICommand {
             self.base_catalog.clone(),
             self.tenancy_config,
             self.current_account_name.clone(),
-            self.predefined_accounts_config.clone(),
-            self.file_upload_limit_config.clone(),
+            self.predefined_accounts_config.as_ref(),
+            self.file_upload_limit_config.as_ref(),
             self.dataset_env_vars_config.is_enabled(),
             self.address,
             self.port,
+            self.password_policy_config.as_ref(),
         )
         .await?;
 

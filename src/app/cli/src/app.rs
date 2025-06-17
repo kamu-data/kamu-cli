@@ -22,7 +22,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_services::PredefinedAccountsRegistrator;
+use kamu_accounts_services::{PasswordPolicyConfig, PredefinedAccountsRegistrator};
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system_inmem::domain::{
@@ -950,7 +950,7 @@ pub fn register_config_in_catalog(
     //
 
     // Search configuration
-    let crate::config::SearchConfig {
+    let config::SearchConfig {
         indexer,
         embeddings_chunker,
         embeddings_encoder,
@@ -1020,6 +1020,8 @@ pub fn register_config_in_catalog(
         }
     }
     //
+
+    catalog_builder.add_value(PasswordPolicyConfig::default());
 
     Ok(())
 }
