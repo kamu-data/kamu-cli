@@ -76,14 +76,7 @@ impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
              {logical_plan:?}",
         );
 
-        let compact_plan: LogicalPlanDatasetHardCompact =
-            serde_json::from_value(logical_plan.payload.clone()).unwrap_or_else(|_| {
-                panic!(
-                    "HardCompactDatasetTaskPlanner received an invalid logical plan payload: \
-                     {logical_plan:?}"
-                )
-            });
-
+        let compact_plan = LogicalPlanDatasetHardCompact::from_logical_plan(logical_plan)?;
         self.plan_hard_compaction(&compact_plan).await
     }
 }

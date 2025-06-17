@@ -23,6 +23,7 @@ use tracing::Instrument as _;
 
 pub struct TaskAgentImpl {
     catalog: Catalog,
+    // TODO: think of dill::Bulder here
     task_planners_by_type: HashMap<String, Arc<dyn TaskDefinitionPlanner>>,
     task_runners_by_type: HashMap<String, Arc<dyn TaskRunner>>,
     time_source: Arc<dyn SystemTimeSource>,

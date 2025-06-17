@@ -55,14 +55,11 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let task_id_2 = event_store.new_task_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe {
-            dataset_id: Some(dataset_id.clone()),
-            ..LogicalPlanProbe::default()
-        })
-        .unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe {
+        dataset_id: Some(dataset_id.clone()),
+        ..LogicalPlanProbe::default()
+    }
+    .into_logical_plan();
 
     let event_1 = TaskEventCreated {
         event_time: Utc::now(),
@@ -134,14 +131,11 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let task_id = event_store.new_task_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe {
-            dataset_id: Some(dataset_id.clone()),
-            ..LogicalPlanProbe::default()
-        })
-        .unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe {
+        dataset_id: Some(dataset_id.clone()),
+        ..LogicalPlanProbe::default()
+    }
+    .into_logical_plan();
 
     let event_1 = TaskEventCreated {
         event_time: Utc::now(),
@@ -237,14 +231,11 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
     let task_id_2 = event_store.new_task_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe {
-            dataset_id: Some(dataset_id.clone()),
-            ..LogicalPlanProbe::default()
-        })
-        .unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe {
+        dataset_id: Some(dataset_id.clone()),
+        ..LogicalPlanProbe::default()
+    }
+    .into_logical_plan();
 
     let event_1_1 = TaskEventCreated {
         event_time: Utc::now(),
@@ -352,23 +343,17 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     let dataset_id_foo = odf::DatasetID::new_seeded_ed25519(b"foo");
     let dataset_id_bar = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let logical_plan_foo = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe {
-            dataset_id: Some(dataset_id_foo.clone()),
-            ..LogicalPlanProbe::default()
-        })
-        .unwrap(),
-    };
+    let logical_plan_foo = LogicalPlanProbe {
+        dataset_id: Some(dataset_id_foo.clone()),
+        ..LogicalPlanProbe::default()
+    }
+    .into_logical_plan();
 
-    let logical_plan_bar = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe {
-            dataset_id: Some(dataset_id_bar.clone()),
-            ..LogicalPlanProbe::default()
-        })
-        .unwrap(),
-    };
+    let logical_plan_bar = LogicalPlanProbe {
+        dataset_id: Some(dataset_id_bar.clone()),
+        ..LogicalPlanProbe::default()
+    }
+    .into_logical_plan();
 
     let event_1_1 = TaskEventCreated {
         event_time: Utc::now(),
@@ -522,10 +507,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
     let maybe_task_id = event_store.try_get_queued_task().await.unwrap();
     assert!(maybe_task_id.is_none());
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     // Schedule a task
     let task_id_1 = event_store.new_task_id().await.unwrap();
@@ -622,10 +604,7 @@ pub async fn test_event_store_try_get_queued_single_task(catalog: &Catalog) {
 pub async fn test_event_store_try_get_queued_multiple_tasks(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskEventStore>().unwrap();
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     // Schedule a few tasks
     let mut task_ids = Vec::new();
@@ -790,10 +769,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
         .unwrap();
     assert!(running_task_ids.is_empty());
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     // Schedule a few tasks
     let mut task_ids = Vec::new();
@@ -984,10 +960,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
 
     let task_id = event_store.new_task_id().await.unwrap();
 
-    let logical_plan = LogicalPlan {
-        plan_type: LogicalPlanProbe::SERIALIZATION_TYPE_ID.to_string(),
-        payload: serde_json::to_value(LogicalPlanProbe::default()).unwrap(),
-    };
+    let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
     // Nothing stored yet, but prev stored event id sent => CM
     let res = event_store
