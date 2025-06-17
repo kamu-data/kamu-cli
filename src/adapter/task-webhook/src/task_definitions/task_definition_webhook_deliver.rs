@@ -7,36 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::any::Any;
-
 use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct TaskDefinitionWebhookDeliver {
-    pub task_id: ts::TaskID,
-    pub webhook_subscription_id: uuid::Uuid,
-    pub webhook_event_id: uuid::Uuid,
-}
-
-impl TaskDefinitionWebhookDeliver {
-    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.webhook.deliver";
-}
-
-#[async_trait::async_trait]
-impl ts::TaskDefinitionInner for TaskDefinitionWebhookDeliver {
-    fn as_any(&self) -> &dyn Any {
-        self
+ts::task_definition_struct! {
+    pub struct TaskDefinitionWebhookDeliver {
+        pub task_id: ts::TaskID,
+        pub webhook_subscription_id: uuid::Uuid,
+        pub webhook_event_id: uuid::Uuid,
     }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
-    }
-
-    fn task_type(&self) -> &'static str {
-        Self::TASK_TYPE
-    }
+    => "dev.kamu.tasks.webhook.deliver"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

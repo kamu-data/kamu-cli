@@ -97,3 +97,42 @@ impl<'de> Deserialize<'de> for TaskResult {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Macro to generate task result structs with serialization helpers
+#[macro_export]
+macro_rules! task_result_struct {
+    (
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident {
+            $($field_vis:vis $field:ident : $ty:ty),* $(,)?
+        }
+        => $type_id:expr
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        $vis struct $name {
+            $($field_vis $field : $ty),*
+        }
+
+        impl $name {
+            pub const TYPE_ID: &'static str = $type_id;
+
+            pub fn into_task_result(self) -> $crate::TaskResult {
+                $crate::TaskResult {
+                    result_type: Self::TYPE_ID.to_string(),
+                    payload: serde_json::to_value(self)
+                        .expect(concat!("Failed to serialize ", stringify!($name), " into JSON")),
+                }
+            }
+
+            pub fn from_task_result(
+                task_result: &$crate::TaskResult,
+            ) -> Result<Self, internal_error::InternalError> {
+                use internal_error::ResultIntoInternal;
+                serde_json::from_value(task_result.payload.clone()).int_err()
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

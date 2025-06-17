@@ -7,36 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::any::Any;
-
 use kamu_core::{CompactionPlan, ResolvedDataset};
-use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct TaskDefinitionDatasetHardCompact {
-    pub target: ResolvedDataset,
-    pub compaction_plan: CompactionPlan,
-}
-
-impl TaskDefinitionDatasetHardCompact {
-    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.hard_compact";
-}
-
-#[async_trait::async_trait]
-impl ts::TaskDefinitionInner for TaskDefinitionDatasetHardCompact {
-    fn as_any(&self) -> &dyn Any {
-        self
+kamu_task_system::task_definition_struct! {
+    pub struct TaskDefinitionDatasetHardCompact {
+        pub target: ResolvedDataset,
+        pub compaction_plan: CompactionPlan,
     }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
-    }
-
-    fn task_type(&self) -> &'static str {
-        Self::TASK_TYPE
-    }
+    => "dev.kamu.tasks.dataset.hard_compact"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

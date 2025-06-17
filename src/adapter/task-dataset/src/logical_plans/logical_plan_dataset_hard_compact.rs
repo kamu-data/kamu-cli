@@ -7,34 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_task_system as ts;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A task to perform the resetting of a dataset
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct LogicalPlanDatasetHardCompact {
-    pub dataset_id: odf::DatasetID,
-    pub max_slice_size: Option<u64>,
-    pub max_slice_records: Option<u64>,
-    pub keep_metadata_only: bool,
-}
-
-impl LogicalPlanDatasetHardCompact {
-    pub const TYPE_ID: &str = "HardCompactDataset";
-
-    pub fn into_logical_plan(self) -> ts::LogicalPlan {
-        ts::LogicalPlan {
-            plan_type: Self::TYPE_ID.to_string(),
-            payload: serde_json::to_value(self)
-                .expect("Failed to serialize LogicalPlanDatasetHardCompact into JSON"),
-        }
+kamu_task_system::logical_plan_struct! {
+    /// A task to perform the harc compacting of a dataset
+    pub struct LogicalPlanDatasetHardCompact {
+        pub dataset_id: odf::DatasetID,
+        pub max_slice_size: Option<u64>,
+        pub max_slice_records: Option<u64>,
+        pub keep_metadata_only: bool,
     }
-
-    pub fn from_logical_plan(logical_plan: &ts::LogicalPlan) -> Result<Self, InternalError> {
-        serde_json::from_value(logical_plan.payload.clone()).int_err()
-    }
+    => "HardCompactDataset"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

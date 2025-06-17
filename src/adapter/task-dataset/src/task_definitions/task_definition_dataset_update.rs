@@ -7,36 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::any::Any;
-
 use kamu_core::{PullOptions, PullPlanIterationJob};
-use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct TaskDefinitionDatasetUpdate {
-    pub pull_options: PullOptions,
-    pub pull_job: PullPlanIterationJob,
-}
-
-impl TaskDefinitionDatasetUpdate {
-    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.update";
-}
-
-#[async_trait::async_trait]
-impl ts::TaskDefinitionInner for TaskDefinitionDatasetUpdate {
-    fn as_any(&self) -> &dyn Any {
-        self
+kamu_task_system::task_definition_struct! {
+    pub struct TaskDefinitionDatasetUpdate {
+        pub pull_options: PullOptions,
+        pub pull_job: PullPlanIterationJob,
     }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
-    }
-
-    fn task_type(&self) -> &'static str {
-        Self::TASK_TYPE
-    }
+    => "dev.kamu.tasks.dataset.update"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod logical_plan;
+mod logical_plan_macro;
 mod logical_plan_probe;
 
 pub use logical_plan::*;

@@ -97,3 +97,42 @@ impl<'de> Deserialize<'de> for TaskError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Macro to generate task error enums with serialization helpers
+#[macro_export]
+macro_rules! task_error_enum {
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $name:ident {
+            $($variant:tt)*
+        }
+        => $type_id:expr
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        $vis enum $name {
+            $($variant)*
+        }
+
+        impl $name {
+            pub const TYPE_ID: &'static str = $type_id;
+
+            pub fn into_task_error(self) -> $crate::TaskError {
+                $crate::TaskError {
+                    error_type: Self::TYPE_ID.to_string(),
+                    payload: serde_json::to_value(self)
+                        .expect(concat!("Failed to serialize ", stringify!($name), " into JSON")),
+                }
+            }
+
+            pub fn from_task_error(
+                task_error: &$crate::TaskError,
+            ) -> Result<Self, internal_error::InternalError> {
+                use internal_error::ResultIntoInternal;
+                serde_json::from_value(task_error.payload.clone()).int_err()
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

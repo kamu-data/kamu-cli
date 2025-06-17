@@ -7,36 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::any::Any;
-
 use kamu_core::ResetPlan;
-use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct TaskDefinitionDatasetReset {
-    pub dataset_handle: odf::DatasetHandle,
-    pub reset_plan: ResetPlan,
-}
-
-impl TaskDefinitionDatasetReset {
-    pub const TASK_TYPE: &'static str = "dev.kamu.tasks.dataset.reset";
-}
-
-#[async_trait::async_trait]
-impl ts::TaskDefinitionInner for TaskDefinitionDatasetReset {
-    fn as_any(&self) -> &dyn Any {
-        self
+kamu_task_system::task_definition_struct! {
+    pub struct TaskDefinitionDatasetReset {
+        pub dataset_handle: odf::DatasetHandle,
+        pub reset_plan: ResetPlan,
     }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
-    }
-
-    fn task_type(&self) -> &'static str {
-        Self::TASK_TYPE
-    }
+    => "dev.kamu.tasks.dataset.reset"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
