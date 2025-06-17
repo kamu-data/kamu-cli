@@ -6962,7 +6962,6 @@ dependencies = [
  "internal-error",
  "kamu-core",
  "kamu-datasets",
- "kamu-flow-system",
  "kamu-task-system",
  "opendatafabric",
  "serde",
