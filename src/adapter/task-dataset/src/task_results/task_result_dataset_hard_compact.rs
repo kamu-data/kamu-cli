@@ -7,32 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::CompactionResult;
-use kamu_task_system as ts;
-use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TaskResultDatasetHardCompact {
-    pub compaction_result: CompactionResult,
-}
-
-impl TaskResultDatasetHardCompact {
-    pub const TYPE_ID: &str = "CompactionDatasetResult";
-
-    pub fn into_task_result(self) -> ts::TaskResult {
-        ts::TaskResult {
-            result_type: Self::TYPE_ID.to_string(),
-            payload: serde_json::to_value(self)
-                .expect("Failed to serialize TaskResultDatasetHardCompact into JSON"),
-        }
+kamu_task_system::task_result_struct! {
+    pub struct TaskResultDatasetHardCompact {
+        pub compaction_result: CompactionResult,
     }
-
-    pub fn from_task_result(task_result: &ts::TaskResult) -> Result<Self, InternalError> {
-        serde_json::from_value(task_result.payload.clone()).int_err()
-    }
+    => "CompactionDatasetResult"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

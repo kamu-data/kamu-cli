@@ -7,36 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_task_system as ts;
-use serde::{Deserialize, Serialize};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskErrorDatasetUpdate {
-    InputDatasetCompacted(InputDatasetCompactedError),
-}
-
-impl TaskErrorDatasetUpdate {
-    pub const TYPE_ID: &str = "UpdateDatasetError";
-
-    pub fn into_task_error(self) -> ts::TaskError {
-        ts::TaskError {
-            error_type: Self::TYPE_ID.to_string(),
-            payload: serde_json::to_value(self)
-                .expect("Failed to serialize TaskErrorDatasetUpdate into JSON"),
-        }
+kamu_task_system::task_error_enum! {
+    pub enum TaskErrorDatasetUpdate {
+        InputDatasetCompacted(InputDatasetCompactedError),
     }
-
-    pub fn from_task_error(task_error: &ts::TaskError) -> Result<Self, InternalError> {
-        serde_json::from_value(task_error.payload.clone()).int_err()
-    }
+    => "UpdateDatasetError"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InputDatasetCompactedError {
     pub dataset_id: odf::DatasetID,
 }

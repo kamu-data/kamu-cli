@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod task_definition;
+mod task_definition_macro;
 mod task_definition_probe;
 
 pub use task_definition::*;

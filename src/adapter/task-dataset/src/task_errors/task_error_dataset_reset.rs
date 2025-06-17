@@ -7,31 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_task_system as ts;
-use serde::{Deserialize, Serialize};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskErrorDatasetReset {
-    ResetHeadNotFound,
-}
-
-impl TaskErrorDatasetReset {
-    pub const TYPE_ID: &str = "ResetDatasetError";
-
-    pub fn into_task_error(self) -> ts::TaskError {
-        ts::TaskError {
-            error_type: Self::TYPE_ID.to_string(),
-            payload: serde_json::to_value(self)
-                .expect("Failed to serialize TaskErrorDatasetReset into JSON"),
-        }
+kamu_task_system::task_error_enum! {
+    pub enum TaskErrorDatasetReset {
+        ResetHeadNotFound,
     }
-
-    pub fn from_task_error(task_error: &ts::TaskError) -> Result<Self, InternalError> {
-        serde_json::from_value(task_error.payload.clone()).int_err()
-    }
+    => "ResetDatasetError"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

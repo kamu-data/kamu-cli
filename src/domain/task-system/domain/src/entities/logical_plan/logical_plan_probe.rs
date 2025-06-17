@@ -7,36 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
-use serde::{Deserialize, Serialize};
-
-use crate::{LogicalPlan, TaskOutcome};
+use crate::{TaskOutcome, logical_plan_struct};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A task that can be used for testing the scheduling system
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub struct LogicalPlanProbe {
-    /// ID of the dataset this task should be associated with
-    pub dataset_id: Option<odf::DatasetID>,
-    pub busy_time: Option<std::time::Duration>,
-    pub end_with_outcome: Option<TaskOutcome>,
-}
-
-impl LogicalPlanProbe {
-    pub const TYPE_ID: &str = "Probe";
-
-    pub fn into_logical_plan(self) -> LogicalPlan {
-        LogicalPlan {
-            plan_type: Self::TYPE_ID.to_string(),
-            payload: serde_json::to_value(self)
-                .expect("Failed to serialize impl LogicalPlanProbe into JSON"),
-        }
+logical_plan_struct! {
+    /// A task that can be used for testing the scheduling system
+    #[derive(Default)]
+    pub struct LogicalPlanProbe {
+        pub dataset_id: Option<odf::DatasetID>,
+        pub busy_time: Option<std::time::Duration>,
+        pub end_with_outcome: Option<TaskOutcome>,
     }
-
-    pub fn from_logical_plan(logical_plan: &LogicalPlan) -> Result<Self, InternalError> {
-        serde_json::from_value(logical_plan.payload.clone()).int_err()
-    }
+    => "Probe"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
