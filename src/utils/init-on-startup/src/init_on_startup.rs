@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::hash::RandomState;
 
 use database_common::DatabaseTransactionRunner;
 use dill::{Builder, BuilderExt, Catalog, TypecastBuilder};
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use petgraph::algo::toposort;
 use petgraph::graph::NodeIndex;
 use petgraph::stable_graph::StableDiGraph;
@@ -73,8 +74,23 @@ pub struct StartupJobsDependsOnLoopError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(bon::Builder, Default)]
+pub struct RunStartupJobsOptions {
+    pub skip_completed_jobs: Option<HashSet<&'static str, RandomState>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError> {
+    run_startup_jobs_ex(catalog, RunStartupJobsOptions::default()).await
+}
+
+#[tracing::instrument(level = "debug", skip_all)]
+pub async fn run_startup_jobs_ex(
+    catalog: &Catalog,
+    options: RunStartupJobsOptions,
+) -> Result<(), StartupJobsError> {
     let job_builders_by_name = {
         let mut job_builders_by_name = HashMap::new();
 
@@ -97,6 +113,15 @@ pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError>
     };
     tracing::debug!("Defined {} startup jobs", job_builders_by_name.len());
 
+    let skip_completed_jobs = options.skip_completed_jobs.unwrap_or_default();
+
+    if !skip_completed_jobs.is_empty() {
+        tracing::debug!(
+            "Skipping {} completed startup jobs: {skip_completed_jobs:?}",
+            skip_completed_jobs.len(),
+        );
+    }
+
     check_startup_job_dependencies(&job_builders_by_name)?;
     tracing::debug!("Startup job dependencies checked");
 
@@ -104,6 +129,10 @@ pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError>
     tracing::debug!("Topological order of startup jobs: {topological_order:?}");
 
     for job_name in topological_order {
+        if skip_completed_jobs.contains(job_name) {
+            continue;
+        }
+
         let (job_builder, job_metadata) = job_builders_by_name
             .get(job_name)
             .expect("Job builder must be present");

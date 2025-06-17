@@ -21,6 +21,8 @@ Recommendation: for ease of reading, use the following order:
 - `kamu --account <NAME>`: added checks for account existence (multi-tenant mode) (#1273).
 - `kamu init`: flush database after successful command completion (#1273).
 - Configuration, predefined accounts: `password` field is now mandatory (#1277).
+- `kamu`: a start-up job by `PredefinedAccountsRegistrator` will be called earlier, right after creating
+  `base_catalog` (#1277).
 ### Fixed
 - `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`.
 - Renaming `provider_identity_key` field with account name for password accounts.

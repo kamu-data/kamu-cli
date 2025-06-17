@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
@@ -16,10 +17,12 @@ use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use crypto_utils::AesGcmEncryptor;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
+use init_on_startup::RunStartupJobsOptions;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
+use kamu_accounts_services::PredefinedAccountsRegistrator;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system_inmem::domain::{
@@ -195,6 +198,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             }
         };
 
+        let startup_jobs_to_skip = post_build_base_catalog_actions(&base_catalog)
+            .instrument(tracing::debug_span!("app::post_build_base_catalog_actions"))
+            .await?;
+
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
             let server_catalog = configure_server_catalog(&base_catalog, tenancy_config).build();
             Some(server_catalog)
@@ -240,7 +247,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         }?;
 
         if cli_commands::command_needs_startup_jobs(&args) {
-            run_startup_initializations(&cli_catalog)
+            run_startup_initializations(&cli_catalog, startup_jobs_to_skip)
                 .instrument(tracing::debug_span!("app::run_startup_initializations"))
                 .await?;
         }
@@ -563,6 +570,27 @@ pub fn configure_base_catalog(
     b
 }
 
+// NOTE: We need to perform some initialization jobs before creating cli_catalog
+async fn post_build_base_catalog_actions(
+    base_catalog: &Catalog,
+) -> Result<HashSet<&'static str>, InternalError> {
+    DatabaseTransactionRunner::new(base_catalog.clone())
+        .transactional_with(
+            |account_registrator: Arc<PredefinedAccountsRegistrator>| async move {
+                use init_on_startup::InitOnStartup;
+
+                account_registrator.run_initialization().await.int_err()?;
+
+                Ok(())
+            },
+        )
+        .await?;
+
+    let completed_jobs = HashSet::from([JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR]);
+
+    Ok(completed_jobs)
+}
+
 // Public only for tests
 pub fn configure_cli_catalog(
     base_catalog: &Catalog,
@@ -586,16 +614,16 @@ async fn build_cli_catalog(
     current_account_indication: CurrentAccountIndication,
     workspace_status: WorkspaceStatus,
     tenancy_config: TenancyConfig,
-) -> Result<Catalog, CLIError> {
+) -> Result<Catalog, InternalError> {
     let current_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
-        .transactional(|transactional_base_catalog| async move {
-            let account_service = transactional_base_catalog.get_one().int_err()?;
-
-            current_account_indication
-                .to_current_account_subject(tenancy_config, workspace_status, account_service)
-                .await
-                .int_err()
-        })
+        .transactional_with(
+            |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
+                current_account_indication
+                    .to_current_account_subject(tenancy_config, workspace_status, account_service)
+                    .await
+                    .int_err()
+            },
+        )
         .await?;
     let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
 
@@ -648,10 +676,18 @@ pub fn configure_server_catalog(
     b
 }
 
-async fn run_startup_initializations(catalog: &Catalog) -> Result<(), CLIError> {
-    let init_result = init_on_startup::run_startup_jobs(catalog)
-        .await
-        .map_err(CLIError::failure);
+async fn run_startup_initializations(
+    catalog: &Catalog,
+    skip_jobs: HashSet<&'static str>,
+) -> Result<(), CLIError> {
+    let init_result = init_on_startup::run_startup_jobs_ex(
+        catalog,
+        RunStartupJobsOptions::builder()
+            .skip_completed_jobs(skip_jobs)
+            .build(),
+    )
+    .await
+    .map_err(CLIError::failure);
 
     if let Err(e) = init_result {
         tracing::error!(

@@ -5933,11 +5933,13 @@ name = "init-on-startup"
 version = "0.241.1"
 dependencies = [
  "async-trait",
+ "bon",
  "database-common",
  "dill",
  "internal-error",
  "paste",
  "petgraph 0.7.1",
+ "pretty_assertions",
  "test-log",
  "thiserror 2.0.12",
  "tokio",
