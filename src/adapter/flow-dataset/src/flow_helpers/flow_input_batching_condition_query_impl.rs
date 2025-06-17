@@ -10,10 +10,13 @@
 use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_adapter_task_dataset::{
+    TaskResultDatasetHardCompact,
+    TaskResultDatasetReset,
+    TaskResultDatasetUpdate,
+};
 use kamu_datasets::DatasetIncrementQueryService;
 use {kamu_flow_system as fs, kamu_task_system as ts};
-
-use crate::{TaskResultDatasetHardCompact, TaskResultDatasetReset, TaskResultDatasetUpdate};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

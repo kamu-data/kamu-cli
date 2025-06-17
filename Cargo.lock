@@ -6725,6 +6725,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-flow-dataset"
+version = "0.242.1"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-adapter-task-dataset",
+ "kamu-datasets",
+ "kamu-flow-system",
+ "kamu-task-system",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-adapter-graphql"
 version = "0.242.1"
 dependencies = [
@@ -6752,6 +6772,7 @@ dependencies = [
  "kamu-accounts-inmem",
  "kamu-accounts-services",
  "kamu-adapter-auth-oso-rebac",
+ "kamu-adapter-flow-dataset",
  "kamu-adapter-graphql",
  "kamu-adapter-task-dataset",
  "kamu-auth-rebac",
@@ -7199,6 +7220,7 @@ dependencies = [
  "kamu-adapter-auth-oso-rebac",
  "kamu-adapter-auth-web3",
  "kamu-adapter-flight-sql",
+ "kamu-adapter-flow-dataset",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-adapter-oauth",
@@ -7733,6 +7755,7 @@ dependencies = [
  "init-on-startup",
  "internal-error",
  "kamu-accounts",
+ "kamu-adapter-flow-dataset",
  "kamu-adapter-task-dataset",
  "kamu-core",
  "kamu-datasets",

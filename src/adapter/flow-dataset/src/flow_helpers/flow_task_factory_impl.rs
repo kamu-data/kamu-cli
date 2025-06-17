@@ -8,10 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_task_system::LogicalPlanProbe;
+use kamu_adapter_task_dataset::{
+    LogicalPlanDatasetHardCompact,
+    LogicalPlanDatasetReset,
+    LogicalPlanDatasetUpdate,
+};
 use {kamu_flow_system as fs, kamu_task_system as ts};
-
-use crate::{LogicalPlanDatasetHardCompact, LogicalPlanDatasetReset, LogicalPlanDatasetUpdate};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,7 +88,7 @@ impl fs::FlowTaskFactory for FlowTaskFactoryImpl {
             fs::FlowKey::System(flow_key) => {
                 match flow_key.flow_type {
                     // TODO: replace on correct logical plan
-                    fs::SystemFlowType::GC => Ok(LogicalPlanProbe {
+                    fs::SystemFlowType::GC => Ok(ts::LogicalPlanProbe {
                         dataset_id: None,
                         busy_time: Some(std::time::Duration::from_secs(20)),
                         end_with_outcome: Some(ts::TaskOutcome::Success(ts::TaskResult::empty())),

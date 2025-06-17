@@ -13,7 +13,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_adapter_task_dataset::{FlowBatchingConditionQueryImpl, FlowTaskFactoryImpl};
+use kamu_adapter_flow_dataset::{FlowBatchingConditionQueryImpl, FlowTaskFactoryImpl};
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetEntry,
