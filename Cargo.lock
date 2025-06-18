@@ -6732,6 +6732,7 @@ dependencies = [
  "database-common",
  "database-common-macros",
  "dill",
+ "futures",
  "internal-error",
  "kamu-adapter-task-dataset",
  "kamu-datasets",

@@ -8,21 +8,20 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_flow_system::{FlowBinding, FlowConfigurationRule, FlowDispatcher, FlowScope};
+use kamu_flow_system::*;
 use kamu_task_system as ts;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn FlowDispatcher)]
+#[dill::meta(FlowDispatcherMeta {
+    flow_dispatcher_type: "dev.kamu.flow.dispatcher.system.gc",
+})]
 pub struct FlowDispatcherSystemGC {}
 
 #[async_trait::async_trait]
 impl FlowDispatcher for FlowDispatcherSystemGC {
-    fn flow_type(&self) -> &'static str {
-        "dev.kamu.flow.dispatcher.system.gc"
-    }
-
     async fn build_task_logical_plan(
         &self,
         flow_binding: &FlowBinding,
@@ -39,6 +38,16 @@ impl FlowDispatcher for FlowDispatcherSystemGC {
             end_with_outcome: Some(ts::TaskOutcome::Success(ts::TaskResult::empty())),
         }
         .into_logical_plan())
+    }
+
+    async fn propagate_success(
+        &self,
+        _flow_binding: &FlowBinding,
+        _trigger_instance: FlowTriggerInstance,
+        _maybe_config_snapshot: Option<FlowConfigurationRule>,
+    ) -> Result<(), InternalError> {
+        // No propagation needed for system GC dispatcher
+        Ok(())
     }
 }
 

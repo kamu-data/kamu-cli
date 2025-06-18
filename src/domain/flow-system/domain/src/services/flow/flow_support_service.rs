@@ -10,8 +10,6 @@
 use internal_error::InternalError;
 use kamu_task_system as ts;
 
-use crate::{DatasetFlowType, FlowConfigurationRule};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -21,14 +19,6 @@ pub trait FlowSupportService: Send + Sync {
         dataset_id: &odf::DatasetID,
         input_result: &ts::TaskResult,
     ) -> Result<FlowInputResultInterpretation, InternalError>;
-
-    fn classify_dependent_trigger_type(
-        &self,
-        dataset_flow_type: DatasetFlowType,
-        maybe_config_snapshot: Option<&FlowConfigurationRule>,
-    ) -> Result<DownstreamDependencyTriggerType, InternalError>;
-
-    fn make_resursive_compaction_config(&self) -> FlowConfigurationRule;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -249,12 +249,12 @@ impl FlowQueryService for FlowQueryServiceImpl {
         skip_all,
         fields(?flow_key, %initiator_account_id)
     )]
-    async fn trigger_manual_flow(
+    async fn trigger_flow_manualy(
         &self,
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: odf::AccountID,
-        config_snapshot_maybe: Option<FlowConfigurationRule>,
+        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError> {
         let activation_time = self.agent_config.round_time(trigger_time)?;
 
@@ -267,7 +267,28 @@ impl FlowQueryService for FlowQueryServiceImpl {
                     trigger_time: activation_time,
                     initiator_account_id,
                 }),
-                config_snapshot_maybe,
+                maybe_flow_config_snapshot,
+            )
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Triggers the specified flow with custom trigger instance,
+    /// unless it's already waiting
+    async fn trigger_flow(
+        &self,
+        flow_key: FlowKey,
+        trigger_instance: FlowTriggerInstance,
+        maybe_flow_trigger_rule: Option<FlowTriggerRule>,
+        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
+    ) -> Result<FlowState, RequestFlowError> {
+        let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
+        scheduling_helper
+            .trigger_flow_common(
+                &flow_key,
+                maybe_flow_trigger_rule,
+                trigger_instance,
+                maybe_flow_config_snapshot,
             )
             .await
             .map_err(Into::into)
