@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use bytes::Bytes;
+use file_utils::MediaType;
 use http_common::{ApiError, IntoApiError, ResultIntoApiError};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_core::MediaType;
 use kamu_core::services::upload_service::{
     MakeUploadContextError,
     SaveUploadError,

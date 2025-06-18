@@ -15,6 +15,7 @@ mod delete_dataset_use_case_impl;
 mod get_dataset_downstream_dependencies_use_case_impl;
 mod get_dataset_upstream_dependencies_use_case_impl;
 mod rename_dataset_use_case_impl;
+mod update_version_file_use_case_impl;
 
 pub use append_dataset_metadata_batch_use_case_impl::*;
 pub use commit_dataset_event_use_case_impl::*;
@@ -24,3 +25,4 @@ pub use delete_dataset_use_case_impl::*;
 pub use get_dataset_downstream_dependencies_use_case_impl::*;
 pub use get_dataset_upstream_dependencies_use_case_impl::*;
 pub use rename_dataset_use_case_impl::*;
+pub use update_version_file_use_case_impl::*;

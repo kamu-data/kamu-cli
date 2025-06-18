@@ -4813,6 +4813,9 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 [[package]]
 name = "file-utils"
 version = "0.241.1"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "filetime"
@@ -6813,6 +6816,7 @@ dependencies = [
  "dill",
  "ed25519-dalek",
  "email-utils",
+ "file-utils",
  "flate2",
  "fs_extra",
  "futures",
@@ -7446,18 +7450,22 @@ dependencies = [
  "chrono",
  "crypto-utils",
  "database-common",
+ "file-utils",
  "futures",
  "internal-error",
  "merge",
  "messaging-outbox",
  "mockall",
+ "nutype",
  "opendatafabric",
  "secrecy",
  "serde",
+ "serde_json",
  "serde_with",
  "sqlx",
  "strum 0.26.3",
  "thiserror 2.0.12",
+ "tokio",
  "tokio-stream",
  "uuid",
 ]
@@ -7534,7 +7542,9 @@ dependencies = [
  "common-macros",
  "database-common",
  "database-common-macros",
+ "datafusion",
  "dill",
+ "file-utils",
  "futures",
  "indoc 2.0.6",
  "init-on-startup",

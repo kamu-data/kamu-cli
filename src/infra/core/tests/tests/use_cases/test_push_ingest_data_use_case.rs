@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
+use file_utils::MediaType;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
 use kamu::*;
 use kamu_core::*;

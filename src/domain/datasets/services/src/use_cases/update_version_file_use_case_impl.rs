@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
+use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::{
     ContentInfo,
@@ -18,7 +19,6 @@ use kamu_core::{
     FileUploadLimitConfig,
     FileVersion,
     GetDataOptions,
-    MediaType,
     PushIngestDataUseCase,
     QueryService,
     UpdateVersionFileResult,
@@ -27,6 +27,7 @@ use kamu_core::{
     UploadTooLargeError,
     VersionedFileEntity,
 };
+use serde_json::Value;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,7 +86,7 @@ impl UpdateVersionFileUseCaseImpl {
         let records = df.collect_json_aos().await.int_err()?;
 
         assert_eq!(records.len(), 1);
-        let serde_json::Value::Object(mut record) = records.into_iter().next().unwrap() else {
+        let Value::Object(mut record) = records.into_iter().next().unwrap() else {
             unreachable!()
         };
 
@@ -119,8 +120,7 @@ impl UpdateVersionFileUseCaseImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
-    // ToDo Add fields
-    #[tracing::instrument(level = "info", name = UpdateVersionFileUseCaseImpl_execute, skip_all)]
+    #[tracing::instrument(level = "info", name = UpdateVersionFileUseCaseImpl_execute, skip_all, fields(%dataset_handle.id))]
     async fn execute(
         &self,
         dataset_handle: &odf::DatasetHandle,
@@ -189,7 +189,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
                     source_name: None,
                     source_event_time: None,
                     is_ingest_from_upload: false,
-                    media_type: Some(kamu_core::MediaType::NDJSON.to_owned()),
+                    media_type: Some(MediaType::NDJSON.to_owned()),
                     expected_head,
                 },
                 None,

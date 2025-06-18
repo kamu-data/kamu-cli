@@ -31,6 +31,7 @@ common-macros = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
+file-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }

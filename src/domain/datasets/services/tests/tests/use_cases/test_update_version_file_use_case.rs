@@ -23,7 +23,6 @@ use kamu::{
     PushIngestExecutorImpl,
     PushIngestPlannerImpl,
     QueryServiceImpl,
-    UpdateVersionFileUseCaseImpl,
 };
 use kamu_core::{
     ContentInfo,
@@ -34,6 +33,7 @@ use kamu_core::{
     UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
 };
+use kamu_datasets_services::UpdateVersionFileUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{MetadataChainExt, TryStreamExtExt};

@@ -8,12 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use file_utils::MediaType;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use odf::dataset::RefCASError;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 
-use crate::{ExtraDataFields, FileVersion, PushIngestDataError, PushIngestError};
+use crate::{ExtraDataFields, FileVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -99,15 +99,15 @@ impl From<odf::DatasetRefUnresolvedError> for UpdateVersionFileUseCaseError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<PushIngestDataError> for UpdateVersionFileUseCaseError {
-    fn from(value: PushIngestDataError) -> Self {
-        match value {
-            PushIngestDataError::Execution(PushIngestError::CommitError(
-                odf::dataset::CommitError::MetadataAppendError(
-                    odf::dataset::AppendError::RefCASFailed(e),
-                ),
-            )) => Self::RefCASFailed(e),
-            err => Self::Internal(err.int_err()),
-        }
-    }
-}
+// impl From<PushIngestDataError> for UpdateVersionFileUseCaseError {
+//     fn from(value: PushIngestDataError) -> Self {
+//         match value {
+//             PushIngestDataError::Execution(PushIngestError::CommitError(
+//                 odf::dataset::CommitError::MetadataAppendError(
+//                     odf::dataset::AppendError::RefCASFailed(e),
+//                 ),
+//             )) => Self::RefCASFailed(e),
+//             err => Self::Internal(err.int_err()),
+//         }
+//     }
+// }

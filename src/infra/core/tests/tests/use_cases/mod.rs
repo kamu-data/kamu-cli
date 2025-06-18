@@ -13,5 +13,4 @@ mod test_push_dataset_use_case;
 mod test_push_ingest_data_use_case;
 mod test_reset_dataset_use_case;
 mod test_set_watermark_use_case;
-mod test_update_version_file_use_case;
 mod test_verify_dataset_use_case;

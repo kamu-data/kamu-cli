@@ -10,13 +10,13 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use file_utils::MediaType;
 use internal_error::InternalError;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 
 use crate::{
     DataSource,
-    MediaType,
     PushIngestError,
     PushIngestListener,
     PushIngestPlanningError,

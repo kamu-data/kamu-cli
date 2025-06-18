@@ -9,9 +9,10 @@
 
 use std::io::Cursor;
 
+use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{ContentInfo, MediaType, UpdateVersionFileUseCaseError};
+use kamu_core::{ContentInfo, UpdateVersionFileUseCaseError};
 use tokio::io::BufReader;
 
 use crate::prelude::*;
@@ -193,7 +194,7 @@ impl<'a> VersionedFileMut<'a> {
             .make_upload_context(
                 subject.account_id(),
                 uuid::Uuid::new_v4().to_string(),
-                content_type.map(domain::MediaType),
+                content_type.map(MediaType),
                 content_length,
             )
             .await

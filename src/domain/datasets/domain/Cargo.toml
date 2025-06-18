@@ -30,6 +30,7 @@ testing = ["dep:mockall"]
 [dependencies]
 crypto-utils = { workspace = true }
 database-common = { workspace = true }
+file-utils = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
@@ -39,11 +40,14 @@ bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
 merge = "0.1"
+nutype = { version = "0.6", default-features = false }
 secrecy = "0.10"
 serde = "1"
+serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
 strum = { version = "0.26", default-features = false, features = ["derive"] }
 thiserror = { version = "2", default-features = false }
+tokio = { version = "1", default-features = false }
 tokio-stream = "0.1"
 uuid = { version = "1", default-features = false, features = ["v4"] }
 
