@@ -12,21 +12,17 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
-use kamu_datasets::{
-    DatasetEntryService,
-    DatasetEntryServiceExt,
-    DatasetIncrementQueryService,
-    DependencyGraphService,
-};
+use kamu_datasets::DatasetIncrementQueryService;
 use kamu_flow_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
-use super::{DownstreamDependencyFlowPlan, FlowTriggerContext};
+use super::FlowTriggerContext;
 use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[component]
 pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
@@ -34,40 +30,11 @@ pub(crate) struct FlowSchedulingHelper {
     flow_support_service: Arc<dyn FlowSupportService>,
     outbox: Arc<dyn Outbox>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
 }
 
-#[component(pub)]
 impl FlowSchedulingHelper {
-    pub(crate) fn new(
-        flow_event_store: Arc<dyn FlowEventStore>,
-        flow_configuration_service: Arc<dyn FlowConfigurationService>,
-        flow_trigger_service: Arc<dyn FlowTriggerService>,
-        flow_support_service: Arc<dyn FlowSupportService>,
-        outbox: Arc<dyn Outbox>,
-        dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        dataset_entry_service: Arc<dyn DatasetEntryService>,
-        time_source: Arc<dyn SystemTimeSource>,
-        agent_config: Arc<FlowAgentConfig>,
-    ) -> Self {
-        Self {
-            flow_event_store,
-            flow_configuration_service,
-            flow_trigger_service,
-            flow_support_service,
-            outbox,
-            dataset_increment_query_service,
-            dependency_graph_service,
-            dataset_entry_service,
-            time_source,
-            agent_config,
-        }
-    }
-
     pub(crate) async fn activate_flow_trigger(
         &self,
         start_time: DateTime<Utc>,
@@ -135,127 +102,6 @@ impl FlowSchedulingHelper {
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(?dataset_id, ?trigger_type))]
-    pub(crate) async fn schedule_dependent_flows(
-        &self,
-        dataset_id: &odf::DatasetID,
-        flow_type: DatasetFlowType,
-        trigger_type: FlowTriggerInstance,
-        config_snapshot_maybe: Option<FlowConfigurationRule>,
-    ) -> Result<(), InternalError> {
-        let fk_dataset = FlowKeyDataset {
-            dataset_id: dataset_id.clone(),
-            flow_type,
-        };
-        let dependent_dataset_flow_plans = self
-            .make_downstream_dependencies_flow_plans(&fk_dataset, config_snapshot_maybe.as_ref())
-            .await?;
-        if dependent_dataset_flow_plans.is_empty() {
-            return Ok(());
-        }
-
-        // For each, trigger needed flow
-        for dependent_dataset_flow_plan in dependent_dataset_flow_plans {
-            // #ToDo handle dependencies flow
-            self.trigger_flow_common(
-                &dependent_dataset_flow_plan.flow_key,
-                dependent_dataset_flow_plan.flow_trigger_rule,
-                trigger_type.clone(),
-                dependent_dataset_flow_plan.maybe_config_snapshot,
-            )
-            .await?;
-        }
-
-        Ok(())
-    }
-
-    async fn make_downstream_dependencies_flow_plans(
-        &self,
-        fk_dataset: &FlowKeyDataset,
-        maybe_config_snapshot: Option<&FlowConfigurationRule>,
-    ) -> Result<Vec<DownstreamDependencyFlowPlan>, InternalError> {
-        // ToDo: extend dependency graph with possibility to fetch downstream
-        // dependencies by owner
-        use futures::StreamExt;
-        let dependent_dataset_ids: Vec<_> = self
-            .dependency_graph_service
-            .get_downstream_dependencies(&fk_dataset.dataset_id)
-            .await
-            .collect()
-            .await;
-
-        let mut plans: Vec<DownstreamDependencyFlowPlan> = vec![];
-        if dependent_dataset_ids.is_empty() {
-            return Ok(plans);
-        }
-
-        match self
-            .flow_support_service
-            .classify_dependent_trigger_type(fk_dataset.flow_type, maybe_config_snapshot)?
-        {
-            DownstreamDependencyTriggerType::TriggerAllEnabledExecuteTransform => {
-                for dataset_id in dependent_dataset_ids {
-                    if let Some(batching_rule) = self
-                        .flow_trigger_service
-                        .try_get_flow_batching_rule(
-                            dataset_id.clone(),
-                            DatasetFlowType::ExecuteTransform,
-                        )
-                        .await
-                        .int_err()?
-                    {
-                        plans.push(DownstreamDependencyFlowPlan {
-                            flow_key: FlowKeyDataset::new(
-                                dataset_id,
-                                DatasetFlowType::ExecuteTransform,
-                            )
-                            .into(),
-                            flow_trigger_rule: Some(FlowTriggerRule::Batching(batching_rule)),
-                            maybe_config_snapshot: None,
-                        });
-                    }
-                }
-            }
-
-            DownstreamDependencyTriggerType::TriggerOwnHardCompaction => {
-                let owner_account_id = self
-                    .dataset_entry_service
-                    .get_entry(&fk_dataset.dataset_id)
-                    .await
-                    .int_err()?
-                    .owner_id;
-
-                for dependent_dataset_id in dependent_dataset_ids {
-                    let owned = self
-                        .dataset_entry_service
-                        .is_dataset_owned_by(&dependent_dataset_id, &owner_account_id)
-                        .await
-                        .int_err()?;
-
-                    if owned {
-                        plans.push(DownstreamDependencyFlowPlan {
-                            flow_key: FlowKeyDataset::new(
-                                dependent_dataset_id,
-                                DatasetFlowType::HardCompaction,
-                            )
-                            .into(),
-                            flow_trigger_rule: None,
-                            // Currently we trigger Hard compaction recursively only in keep
-                            // metadata only mode
-                            maybe_config_snapshot: Some(
-                                self.flow_support_service.make_resursive_compaction_config(),
-                            ),
-                        });
-                    }
-                }
-            }
-
-            DownstreamDependencyTriggerType::Empty => {}
-        }
-
-        Ok(plans)
-    }
-
     pub(crate) async fn schedule_auto_polling_flow(
         &self,
         start_time: DateTime<Utc>,
@@ -297,7 +143,7 @@ impl FlowSchedulingHelper {
         flow_key: &FlowKey,
         trigger_rule_maybe: Option<FlowTriggerRule>,
         trigger_type: FlowTriggerInstance,
-        config_snapshot_maybe: Option<FlowConfigurationRule>,
+        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self.flow_event_store.get_flow_run_stats(flow_key).await?;
@@ -371,7 +217,7 @@ impl FlowSchedulingHelper {
                                 )?;
                             }
 
-                            if let Some(config_snapshot) = config_snapshot_maybe {
+                            if let Some(config_snapshot) = maybe_flow_config_snapshot {
                                 flow.modify_config_snapshot(trigger_time, config_snapshot)
                                     .int_err()?;
                             }
@@ -390,8 +236,8 @@ impl FlowSchedulingHelper {
             // Otherwise, initiate a new flow and schedule it for activation
             None => {
                 // Initiate new flow
-                let config_snapshot_maybe = if config_snapshot_maybe.is_some() {
-                    config_snapshot_maybe
+                let maybe_flow_config_snapshot = if maybe_flow_config_snapshot.is_some() {
+                    maybe_flow_config_snapshot
                 } else {
                     self.flow_configuration_service
                         .try_get_config_snapshot_by_key(flow_key.clone())
@@ -403,7 +249,7 @@ impl FlowSchedulingHelper {
                         self.flow_event_store.as_ref(),
                         flow_key.clone(),
                         &trigger_type,
-                        config_snapshot_maybe,
+                        maybe_flow_config_snapshot,
                     )
                     .await?;
 

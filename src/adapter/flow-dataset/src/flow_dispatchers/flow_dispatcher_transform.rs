@@ -7,33 +7,35 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use internal_error::InternalError;
+use kamu_datasets::DependencyGraphService;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
-use crate::FlowConfigRuleIngest;
+use crate::{FlowConfigRuleIngest, trigger_transform_flow_for_all_downstream_datasets};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn fs::FlowDispatcher)]
-pub struct FlowDispatcherTransform {}
+#[dill::meta(fs::FlowDispatcherMeta {
+    flow_dispatcher_type: "dev.kamu.flow.dispatcher.dataset.transform",
+})]
+pub struct FlowDispatcherTransform {
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
+    flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
+    flow_query_service: Arc<dyn fs::FlowQueryService>,
+}
 
 #[async_trait::async_trait]
 impl fs::FlowDispatcher for FlowDispatcherTransform {
-    fn flow_type(&self) -> &'static str {
-        "dev.kamu.flow.dispatcher.dataset.transform"
-    }
-
     async fn build_task_logical_plan(
         &self,
         flow_binding: &fs::FlowBinding,
         maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let fs::FlowScope::Dataset { dataset_id } = &flow_binding.scope else {
-            return InternalError::bail(
-                "Expecting dataset flow binding scope for transform dispatcher",
-            );
-        };
+        let dataset_id = flow_binding.dataset_id_or_die()?;
 
         let mut fetch_uncacheable = false;
         if let Some(config_snapshot) = maybe_config_snapshot
@@ -48,6 +50,22 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
             fetch_uncacheable,
         }
         .into_logical_plan())
+    }
+
+    async fn propagate_success(
+        &self,
+        flow_binding: &fs::FlowBinding,
+        trigger_instance: fs::FlowTriggerInstance,
+        _: Option<fs::FlowConfigurationRule>,
+    ) -> Result<(), InternalError> {
+        trigger_transform_flow_for_all_downstream_datasets(
+            self.dependency_graph_service.as_ref(),
+            self.flow_trigger_service.as_ref(),
+            self.flow_query_service.as_ref(),
+            flow_binding,
+            trigger_instance,
+        )
+        .await
     }
 }
 

@@ -89,7 +89,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         };
 
         let flow_state = flow_query_service
-            .trigger_manual_flow(
+            .trigger_flow_manualy(
                 Utc::now(),
                 fs::FlowKeyDataset::new(dataset_handle.id.clone(), dataset_flow_type.into()).into(),
                 logged_account.account_id,

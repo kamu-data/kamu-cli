@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
@@ -28,6 +30,13 @@ impl FlowBinding {
             flow_type: flow_type.to_string(),
             scope: FlowScope::System,
         }
+    }
+
+    pub fn dataset_id_or_die(&self) -> Result<odf::DatasetID, InternalError> {
+        let FlowScope::Dataset { dataset_id } = &self.scope else {
+            return InternalError::bail("Expecting dataset flow binding scope");
+        };
+        Ok(dataset_id.clone())
     }
 }
 

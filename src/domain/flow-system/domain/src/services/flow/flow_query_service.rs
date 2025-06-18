@@ -20,6 +20,8 @@ use crate::{
     FlowID,
     FlowKey,
     FlowState,
+    FlowTriggerInstance,
+    FlowTriggerRule,
     SystemFlowFilters,
 };
 
@@ -92,12 +94,22 @@ pub trait FlowQueryService: Sync + Send {
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
 
     /// Triggers the specified flow manually, unless it's already waiting
-    async fn trigger_manual_flow(
+    async fn trigger_flow_manualy(
         &self,
         trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: odf::AccountID,
-        flow_run_snapshot_maybe: Option<FlowConfigurationRule>,
+        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
+    ) -> Result<FlowState, RequestFlowError>;
+
+    /// Triggers the specified flow with custom trigger instance,
+    /// unless it's already waiting
+    async fn trigger_flow(
+        &self,
+        flow_key: FlowKey,
+        trigger_instance: FlowTriggerInstance,
+        maybe_flow_trigger_rule: Option<FlowTriggerRule>,
+        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError>;
 
     /// Attempts to cancel the tasks already scheduled for the given flow

@@ -63,30 +63,4 @@ pub enum AnyFlowType {
     System(SystemFlowType),
 }
 
-impl AnyFlowType {
-    /// What should be the reaction on flow success
-    pub fn success_followup_method(&self) -> FlowSuccessFollowupMethod {
-        match self {
-            AnyFlowType::Dataset(
-                DatasetFlowType::Ingest
-                | DatasetFlowType::ExecuteTransform
-                | DatasetFlowType::HardCompaction
-                | DatasetFlowType::Reset,
-            ) => FlowSuccessFollowupMethod::TriggerDependent,
-            _ => FlowSuccessFollowupMethod::Ignore,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum FlowSuccessFollowupMethod {
-    /// Nothing should happen if flow succeeds
-    Ignore,
-
-    /// If flow succeeds, it's dependent flows should trigger
-    TriggerDependent,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,19 +10,31 @@
 use internal_error::InternalError;
 use kamu_task_system as ts;
 
-use crate::{FlowBinding, FlowConfigurationRule};
+use crate::{FlowBinding, FlowConfigurationRule, FlowTriggerInstance};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait FlowDispatcher: Send + Sync {
-    fn flow_type(&self) -> &'static str;
-
     async fn build_task_logical_plan(
         &self,
         flow_binding: &FlowBinding,
         maybe_config_snapshot: Option<&FlowConfigurationRule>,
     ) -> Result<ts::LogicalPlan, InternalError>;
+
+    async fn propagate_success(
+        &self,
+        flow_binding: &FlowBinding,
+        trigger_instance: FlowTriggerInstance,
+        maybe_config_snapshot: Option<FlowConfigurationRule>,
+    ) -> Result<(), InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct FlowDispatcherMeta {
+    pub flow_dispatcher_type: &'static str,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -58,7 +58,7 @@ impl ManualFlowTriggerDriver {
         start_time: DateTime<Utc>,
     ) -> Result<(), RequestFlowError> {
         flow_query_service
-            .trigger_manual_flow(
+            .trigger_flow_manualy(
                 start_time + self.args.run_since_start,
                 self.args.flow_key.clone(),
                 self.args

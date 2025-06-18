@@ -9,8 +9,6 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -55,7 +53,6 @@ pub struct FlowAgentImpl {
     catalog: Catalog,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
-    flow_dispatchers_by_type: HashMap<String, Arc<dyn FlowDispatcher>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,40 +90,25 @@ impl FlowAgentImpl {
         agent_config: Arc<FlowAgentConfig>,
     ) -> Self {
         Self {
+            catalog,
             time_source,
             agent_config,
-            flow_dispatchers_by_type: Self::init_flow_dispatchers(&catalog),
-            catalog,
         }
-    }
-
-    fn init_flow_dispatchers(catalog: &Catalog) -> HashMap<String, Arc<dyn FlowDispatcher>> {
-        let mut flow_dispatchers_by_type: HashMap<String, Arc<dyn FlowDispatcher>> = HashMap::new();
-        for flow_dispatcher_builder in catalog.builders_for::<dyn FlowDispatcher>() {
-            let flow_dispatcher = flow_dispatcher_builder.get(catalog).unwrap();
-            let flow_type = flow_dispatcher.flow_type().to_string();
-            match flow_dispatchers_by_type.entry(flow_type) {
-                Entry::Vacant(entry) => {
-                    entry.insert(flow_dispatcher);
-                }
-                Entry::Occupied(_) => {
-                    panic!(
-                        "Flow dispatcher for type '{}' is already registered, skipping",
-                        flow_dispatcher.flow_type()
-                    );
-                }
-            }
-        }
-        flow_dispatchers_by_type
     }
 
     fn get_flow_dispatcher(
         &self,
+        target_catalog: &Catalog,
         flow_type: &str,
     ) -> Result<Arc<dyn FlowDispatcher>, InternalError> {
-        self.flow_dispatchers_by_type
-            .get(flow_type)
-            .cloned()
+        target_catalog
+            .builders_for_with_meta::<dyn FlowDispatcher, _>(|meta: &FlowDispatcherMeta| {
+                meta.flow_dispatcher_type == flow_type
+            })
+            .next()
+            .map(|builder| builder.get(target_catalog))
+            .transpose()
+            .int_err()?
             .ok_or_else(|| {
                 InternalError::new(format!("Flow dispatcher for type '{flow_type}' not found",))
             })
@@ -366,43 +348,9 @@ impl FlowAgentImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        // TODO: temporary mapping until FlowKey is fully replaced
-        fn map_flow_type(flow_key: &FlowKey) -> &'static str {
-            match flow_key {
-                FlowKey::Dataset(fk_dataset) => match fk_dataset.flow_type {
-                    DatasetFlowType::Ingest => "dev.kamu.flow.dispatcher.dataset.ingest",
-                    DatasetFlowType::HardCompaction => "dev.kamu.flow.dispatcher.dataset.compact",
-                    DatasetFlowType::ExecuteTransform => {
-                        "dev.kamu.flow.dispatcher.dataset.transform"
-                    }
-                    DatasetFlowType::Reset => "dev.kamu.flow.dispatcher.dataset.reset",
-                },
-                FlowKey::System(fk_system) => match fk_system.flow_type {
-                    SystemFlowType::GC => "dev.kamu.flow.dispatcher.system.gc",
-                },
-            }
-        }
-
-        // TODO: temporary mapping until FlowKey is fully replaced
-        fn map_flow_binding(flow_key: &FlowKey) -> FlowBinding {
-            let flow_type = map_flow_type(flow_key).to_string();
-            match flow_key {
-                FlowKey::Dataset(fk_dataset) => FlowBinding {
-                    flow_type,
-                    scope: FlowScope::Dataset {
-                        dataset_id: fk_dataset.dataset_id.clone(),
-                    },
-                },
-                FlowKey::System(_) => FlowBinding {
-                    flow_type,
-                    scope: FlowScope::System,
-                },
-            }
-        }
-
         // Find a dispatcher for this flow type
         let flow_dispatcher_type = map_flow_type(&flow.flow_key);
-        let flow_dispatcher = self.get_flow_dispatcher(flow_dispatcher_type).int_err()?;
+        let flow_dispatcher = self.get_flow_dispatcher(&target_catalog, flow_dispatcher_type)?;
 
         // Translate flow key to binding
         let flow_binding = map_flow_binding(&flow.flow_key);
@@ -583,31 +531,38 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         if let Some(task_result) = flow.try_task_result_as_ref()
                             && !task_result.is_empty()
                         {
-                            match flow.flow_key.get_type().success_followup_method() {
-                                FlowSuccessFollowupMethod::Ignore => {}
-                                FlowSuccessFollowupMethod::TriggerDependent => {
-                                    if let FlowKey::Dataset(fk_dataset) = &flow.flow_key {
-                                        let trigger_type = FlowTriggerInstance::InputDatasetFlow(
-                                            FlowTriggerInputDatasetFlow {
-                                                trigger_time: finish_time,
-                                                dataset_id: fk_dataset.dataset_id.clone(),
-                                                flow_type: fk_dataset.flow_type,
-                                                flow_id: flow.flow_id,
-                                                task_result: task_result.clone(),
-                                            },
-                                        );
+                            let flow_binding = map_flow_binding(&flow.flow_key);
+                            let flow_dispatcher =
+                                self.get_flow_dispatcher(target_catalog, &flow_binding.flow_type)?;
 
-                                        scheduling_helper
-                                            .schedule_dependent_flows(
-                                                &fk_dataset.dataset_id,
-                                                fk_dataset.flow_type,
-                                                trigger_type,
-                                                flow.config_snapshot.clone(),
-                                            )
-                                            .await?;
-                                    }
+                            let trigger_instance = match &flow.flow_key {
+                                FlowKey::Dataset(fk_dataset) => {
+                                    FlowTriggerInstance::InputDatasetFlow(
+                                        FlowTriggerInputDatasetFlow {
+                                            trigger_time: finish_time,
+                                            dataset_id: fk_dataset.dataset_id.clone(),
+                                            flow_type: fk_dataset.flow_type,
+                                            flow_id: flow.flow_id,
+                                            task_result: task_result.clone(),
+                                        },
+                                    )
                                 }
-                            }
+                                FlowKey::System(_) => {
+                                    // TODO: revise this, but there is no better trigger yet
+                                    FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
+                                        trigger_time: finish_time,
+                                    })
+                                }
+                            };
+
+                            flow_dispatcher
+                                .propagate_success(
+                                    &flow_binding,
+                                    trigger_instance,
+                                    flow.config_snapshot.clone(),
+                                )
+                                .await
+                                .int_err()?;
                         }
 
                         // In case of success:
@@ -778,7 +733,6 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received dataset externally changed message");
 
-        let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
         let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();
 
         let (trigger_type, dataset_id) = match message {
@@ -809,9 +763,23 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
                 &update_message.dataset_id,
             ),
         };
-        scheduling_helper
-            .schedule_dependent_flows(dataset_id, DatasetFlowType::Ingest, trigger_type, None)
-            .await?;
+
+        // TODO: we might need to place this queing elsewhere,
+        //  where it's known what is "ingest" flow
+
+        let flow_binding = FlowBinding::new_dataset(
+            dataset_id.clone(),
+            "dev.kamu.flow.dispatcher.dataset.ingest",
+        );
+
+        let flow_dispatcher = self
+            .get_flow_dispatcher(target_catalog, "dev.kamu.flow.dispatcher.dataset.ingest")
+            .int_err()?;
+
+        flow_dispatcher
+            .propagate_success(&flow_binding, trigger_type, None)
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -828,11 +796,38 @@ pub enum FlowTriggerContext {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct DownstreamDependencyFlowPlan {
-    pub flow_key: FlowKey,
-    pub flow_trigger_rule: Option<FlowTriggerRule>,
-    pub maybe_config_snapshot: Option<FlowConfigurationRule>,
+// TODO: temporary mapping until FlowKey is fully replaced
+fn map_flow_type(flow_key: &FlowKey) -> &'static str {
+    match flow_key {
+        FlowKey::Dataset(fk_dataset) => match fk_dataset.flow_type {
+            DatasetFlowType::Ingest => "dev.kamu.flow.dispatcher.dataset.ingest",
+            DatasetFlowType::HardCompaction => "dev.kamu.flow.dispatcher.dataset.compact",
+            DatasetFlowType::ExecuteTransform => "dev.kamu.flow.dispatcher.dataset.transform",
+            DatasetFlowType::Reset => "dev.kamu.flow.dispatcher.dataset.reset",
+        },
+        FlowKey::System(fk_system) => match fk_system.flow_type {
+            SystemFlowType::GC => "dev.kamu.flow.dispatcher.system.gc",
+        },
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: temporary mapping until FlowKey is fully replaced
+fn map_flow_binding(flow_key: &FlowKey) -> FlowBinding {
+    let flow_type = map_flow_type(flow_key).to_string();
+    match flow_key {
+        FlowKey::Dataset(fk_dataset) => FlowBinding {
+            flow_type,
+            scope: FlowScope::Dataset {
+                dataset_id: fk_dataset.dataset_id.clone(),
+            },
+        },
+        FlowKey::System(_) => FlowBinding {
+            flow_type,
+            scope: FlowScope::System,
+        },
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
