@@ -46,7 +46,7 @@ futures = { version = "0.3", default-features = false }
 jsonwebtoken = "9"
 merge = "0.1"
 mockall = { optional = true, version = "0.13" }
-nutype = { version = "0.6", default-features = false, features = ["new_unchecked"] }
+nutype = { version = "0.6", default-features = false, features = ["new_unchecked", "serde"] }
 rand = "0.8"
 reusable = "0.1"
 secrecy = "0.10"
