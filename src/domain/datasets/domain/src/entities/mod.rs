@@ -14,6 +14,7 @@ mod dataset_env_var;
 mod dataset_key_block;
 mod dataset_statistics;
 mod metadata_event_type;
+mod versioned_file;
 
 #[cfg(feature = "sqlx")]
 pub use dataset_dependency_entry::*;
@@ -22,3 +23,4 @@ pub use dataset_env_var::*;
 pub use dataset_key_block::*;
 pub use dataset_statistics::*;
 pub use metadata_event_type::*;
+pub use versioned_file::*;

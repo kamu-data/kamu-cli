@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use file_utils::MediaType;
 use kamu::domain::*;
 
 use super::{CLIError, Command};

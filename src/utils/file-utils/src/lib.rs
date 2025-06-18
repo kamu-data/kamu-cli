@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod media_type;
 mod owned_file;
 
+pub use media_type::*;
 pub use owned_file::*;

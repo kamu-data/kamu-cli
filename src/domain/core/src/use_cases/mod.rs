@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod compact_dataset_use_case;
-
 mod pull_dataset_use_case;
 mod push_dataset_use_case;
 mod push_ingest_data_use_case;

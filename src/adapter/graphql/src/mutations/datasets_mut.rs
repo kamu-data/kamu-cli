@@ -259,7 +259,7 @@ impl DatasetsMut {
             Err(Err(err)) => return Err(err),
         };
 
-        let snapshot = crate::queries::VersionedFile::dataset_shapshot(
+        let snapshot = crate::queries::VersionedFile::dataset_snapshot(
             dataset_alias.into(),
             extra_columns.unwrap_or_default(),
             extra_events_parsed,

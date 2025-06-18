@@ -25,6 +25,7 @@ Recommendation: for ease of reading, use the following order:
 - Configuration, predefined accounts: `password` field is now mandatory (#1277).
 - `kamu`: a start-up job by `PredefinedAccountsRegistrator` will be called earlier, right after creating
   `base_catalog` (#1277).
+- Refactor: move logic for versioned files from GQL level to use_case
 ### Fixed
 - `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`.
 - Renaming `provider_identity_key` field with account name for password accounts.
