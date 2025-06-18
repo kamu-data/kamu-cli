@@ -18,7 +18,6 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     LoggedAccount,
 };
-use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
 use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
 use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
@@ -3093,11 +3092,10 @@ impl FlowRunsHarness {
                     Duration::minutes(1),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>()
-                .add::<FlowTaskFactoryImpl>()
-                .add::<FlowSupportServiceImpl>();
+                .add::<InMemoryTaskEventStore>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
+            kamu_adapter_flow_dataset::register_dependencies(&mut b);
 
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,

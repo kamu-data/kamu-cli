@@ -13,21 +13,8 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_adapter_flow_dataset::{
-    FlowConfigRuleCompact,
-    FlowConfigRuleIngest,
-    FlowConfigRuleReset,
-    FlowSupportServiceImpl,
-    FlowTaskFactoryImpl,
-};
-use kamu_datasets::{
-    DatasetDependenciesMessage,
-    DatasetEntry,
-    DatasetIncrementQueryService,
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
+use kamu_adapter_flow_dataset::*;
+use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrementQueryService};
@@ -126,13 +113,12 @@ impl FlowHarness {
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<DatabaseTransactionRunner>()
-            .add::<FakeDatasetEntryService>()
-            .add::<FlowTaskFactoryImpl>()
-            .add::<FlowSupportServiceImpl>();
+            .add::<FakeDatasetEntryService>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             kamu_flow_system_services::register_dependencies(&mut b);
+            kamu_adapter_flow_dataset::register_dependencies(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,

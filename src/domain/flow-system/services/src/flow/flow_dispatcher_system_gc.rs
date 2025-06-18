@@ -23,10 +23,6 @@ impl FlowDispatcher for FlowDispatcherSystemGC {
         "dev.kamu.flow.dispatcher.system.gc"
     }
 
-    fn matches(&self, binding: &FlowBinding) -> bool {
-        binding.flow_type == self.flow_type() && matches!(binding.scope, FlowScope::System)
-    }
-
     async fn build_task_logical_plan(
         &self,
         flow_binding: &FlowBinding,
