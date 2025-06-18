@@ -112,7 +112,7 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetAccountLifecycleHandle
                 self.handle_account_lifecycle_deleted_message(message).await
             }
 
-            AccountLifecycleMessage::Created(_) => {
+            AccountLifecycleMessage::Created(_) | AccountLifecycleMessage::PasswordChanged(_) => {
                 // No action required
                 Ok(())
             }
