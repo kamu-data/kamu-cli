@@ -9,7 +9,7 @@
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetEntryServiceExt, DependencyGraphService};
-use kamu_flow_system::{self as fs, DatasetFlowType, FlowTriggerServiceExt};
+use kamu_flow_system::{self as fs, FlowTriggerServiceExt};
 
 use crate::FlowConfigRuleCompact;
 
@@ -27,11 +27,10 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
         fetch_downstream_dataset_ids(dependency_graph_service, &dataset_id).await;
 
     for downstream_dataset_id in downstream_dataset_ids {
+        let downstream_binding =
+            fs::FlowBinding::new_dataset(downstream_dataset_id.clone(), &flow_binding.flow_type);
         if let Some(batching_rule) = flow_trigger_service
-            .try_get_flow_batching_rule(
-                downstream_dataset_id.clone(),
-                DatasetFlowType::ExecuteTransform,
-            )
+            .try_get_flow_batching_rule(&downstream_binding)
             .await
             .int_err()?
         {
@@ -39,7 +38,7 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
                 .trigger_flow(
                     fs::FlowKeyDataset::new(
                         downstream_dataset_id,
-                        DatasetFlowType::ExecuteTransform,
+                        fs::DatasetFlowType::ExecuteTransform,
                     )
                     .into(),
                     input_trigger.clone(),
@@ -81,8 +80,11 @@ pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
             // Trigger hard compaction
             flow_query_service
                 .trigger_flow(
-                    fs::FlowKeyDataset::new(downstream_dataset_id, DatasetFlowType::HardCompaction)
-                        .into(),
+                    fs::FlowKeyDataset::new(
+                        downstream_dataset_id,
+                        fs::DatasetFlowType::HardCompaction,
+                    )
+                    .into(),
                     input_trigger.clone(),
                     None,
                     Some(

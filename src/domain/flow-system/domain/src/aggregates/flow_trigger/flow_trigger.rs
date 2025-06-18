@@ -19,13 +19,18 @@ pub struct FlowTrigger(Aggregate<FlowTriggerState, (dyn FlowTriggerEventStore + 
 
 impl FlowTrigger {
     /// Creates a flow trigger rule
-    pub fn new(now: DateTime<Utc>, flow_key: FlowKey, paused: bool, rule: FlowTriggerRule) -> Self {
+    pub fn new(
+        now: DateTime<Utc>,
+        flow_binding: FlowBinding,
+        paused: bool,
+        rule: FlowTriggerRule,
+    ) -> Self {
         Self(
             Aggregate::new(
-                flow_key.clone(),
+                flow_binding.clone(),
                 FlowTriggerEventCreated {
                     event_time: now,
-                    flow_key,
+                    flow_binding,
                     paused,
                     rule,
                 },
@@ -43,7 +48,7 @@ impl FlowTrigger {
     ) -> Result<(), ProjectionError<FlowTriggerState>> {
         let event = FlowTriggerEventModified {
             event_time: now,
-            flow_key: self.flow_key.clone(),
+            flow_binding: self.flow_binding.clone(),
             paused,
             rule: new_rule,
         };
@@ -55,7 +60,7 @@ impl FlowTrigger {
         if self.is_active() {
             let event = FlowTriggerEventModified {
                 event_time: now,
-                flow_key: self.flow_key.clone(),
+                flow_binding: self.flow_binding.clone(),
                 paused: true,
                 rule: self.rule.clone(),
             };
@@ -72,7 +77,7 @@ impl FlowTrigger {
         } else {
             let event = FlowTriggerEventModified {
                 event_time: now,
-                flow_key: self.flow_key.clone(),
+                flow_binding: self.flow_binding.clone(),
                 paused: false,
                 rule: self.rule.clone(),
             };
@@ -87,7 +92,7 @@ impl FlowTrigger {
     ) -> Result<(), ProjectionError<FlowTriggerState>> {
         let event = FlowTriggerEventDatasetRemoved {
             event_time: now,
-            flow_key: self.flow_key.clone(),
+            flow_binding: self.flow_binding.clone(),
         };
         self.apply(event)
     }

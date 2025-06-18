@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{FlowKeyDataset, FlowTriggerService};
+use kamu_flow_system::{FlowBinding, FlowTriggerService, map_dataset_flow_type};
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
@@ -35,15 +35,14 @@ impl<'a> DatasetFlowTriggers<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
     ) -> Result<Option<FlowTrigger>> {
+        let flow_binding = FlowBinding::new_dataset(
+            self.dataset_request_state.dataset_handle().id.clone(),
+            map_dataset_flow_type(dataset_flow_type.into()),
+        );
+
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         let maybe_flow_trigger = flow_trigger_service
-            .find_trigger(
-                FlowKeyDataset::new(
-                    self.dataset_request_state.dataset_handle().id.clone(),
-                    dataset_flow_type.into(),
-                )
-                .into(),
-            )
+            .find_trigger(&flow_binding)
             .await
             .int_err()?;
 

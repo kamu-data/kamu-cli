@@ -27,7 +27,7 @@ pub enum FlowTriggerEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerEventCreated {
     pub event_time: DateTime<Utc>,
-    pub flow_key: FlowKey,
+    pub flow_binding: FlowBinding,
     pub paused: bool,
     pub rule: FlowTriggerRule,
 }
@@ -37,7 +37,7 @@ pub struct FlowTriggerEventCreated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerEventModified {
     pub event_time: DateTime<Utc>,
-    pub flow_key: FlowKey,
+    pub flow_binding: FlowBinding,
     pub paused: bool,
     pub rule: FlowTriggerRule,
 }
@@ -47,7 +47,7 @@ pub struct FlowTriggerEventModified {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerEventDatasetRemoved {
     pub event_time: DateTime<Utc>,
-    pub flow_key: FlowKey,
+    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,11 +61,11 @@ impl FlowTriggerEvent {
         }
     }
 
-    pub fn flow_key(&self) -> &FlowKey {
+    pub fn flow_binding(&self) -> &FlowBinding {
         match self {
-            Self::Created(e) => &e.flow_key,
-            Self::Modified(e) => &e.flow_key,
-            Self::DatasetRemoved(e) => &e.flow_key,
+            Self::Created(e) => &e.flow_binding,
+            Self::Modified(e) => &e.flow_binding,
+            Self::DatasetRemoved(e) => &e.flow_binding,
         }
     }
 

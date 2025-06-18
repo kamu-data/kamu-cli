@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 mod flow_dispatcher_compact;
+mod flow_dispatcher_constants;
 mod flow_dispatcher_ingest;
 mod flow_dispatcher_reset;
 mod flow_dispatcher_shared_helpers;
 mod flow_dispatcher_transform;
 
 pub use flow_dispatcher_compact::*;
+pub use flow_dispatcher_constants::*;
 pub use flow_dispatcher_ingest::*;
 pub use flow_dispatcher_reset::*;
 pub(crate) use flow_dispatcher_shared_helpers::*;

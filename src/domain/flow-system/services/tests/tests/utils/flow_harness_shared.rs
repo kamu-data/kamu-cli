@@ -267,20 +267,14 @@ impl FlowHarness {
             .unwrap();
     }
 
-    pub async fn set_dataset_flow_trigger(
+    pub async fn set_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_binding: FlowBinding,
         trigger_rule: FlowTriggerRule,
     ) {
         self.flow_trigger_service
-            .set_trigger(
-                request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                trigger_rule,
-            )
+            .set_trigger(request_time, flow_binding, false, trigger_rule)
             .await
             .unwrap();
     }
@@ -330,42 +324,30 @@ impl FlowHarness {
             .unwrap();
     }
 
-    pub async fn pause_dataset_flow(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-    ) {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+    pub async fn pause_flow(&self, request_time: DateTime<Utc>, flow_binding: FlowBinding) {
         let current_trigger = self
             .flow_trigger_service
-            .find_trigger(flow_key.clone())
+            .find_trigger(&flow_binding)
             .await
             .unwrap()
             .unwrap();
 
         self.flow_trigger_service
-            .set_trigger(request_time, flow_key, true, current_trigger.rule)
+            .set_trigger(request_time, flow_binding, true, current_trigger.rule)
             .await
             .unwrap();
     }
 
-    pub async fn resume_dataset_flow(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-    ) {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+    pub async fn resume_flow(&self, request_time: DateTime<Utc>, flow_binding: FlowBinding) {
         let current_trigger = self
             .flow_trigger_service
-            .find_trigger(flow_key.clone())
+            .find_trigger(&flow_binding)
             .await
             .unwrap()
             .unwrap();
 
         self.flow_trigger_service
-            .set_trigger(request_time, flow_key, false, current_trigger.rule)
+            .set_trigger(request_time, flow_binding, false, current_trigger.rule)
             .await
             .unwrap();
     }

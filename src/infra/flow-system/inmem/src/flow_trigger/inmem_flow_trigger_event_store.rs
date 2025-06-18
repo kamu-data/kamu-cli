@@ -64,14 +64,18 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
-    fn get_events(&self, query: &FlowKey, opts: GetEventsOpts) -> EventStream<FlowTriggerEvent> {
+    fn get_events(
+        &self,
+        query: &FlowBinding,
+        opts: GetEventsOpts,
+    ) -> EventStream<FlowTriggerEvent> {
         self.inner.get_events(query, opts)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, num_events = events.len()))]
     async fn save_events(
         &self,
-        query: &FlowKey,
+        query: &FlowBinding,
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowTriggerEvent>,
     ) -> Result<EventID, SaveEventsError> {
@@ -79,10 +83,10 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
             return Err(SaveEventsError::NothingToSave);
         }
 
-        if let FlowKey::Dataset(flow_key) = query {
+        if let FlowScope::Dataset { dataset_id } = &query.scope {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
-            g.dataset_ids.push(flow_key.dataset_id.clone());
+            g.dataset_ids.push(dataset_id.clone());
         }
 
         self.inner
@@ -119,6 +123,87 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
+    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut seen_bindings = HashSet::new();
+        let mut active_bindings = Vec::new();
+
+        for event in g.events.iter().rev() {
+            let flow_binding = event.flow_binding();
+
+            // Only process the latest event per binding
+            if !seen_bindings.insert(flow_binding.clone()) {
+                continue;
+            }
+
+            let is_active = match event {
+                FlowTriggerEvent::Created(e) => !e.paused,
+                FlowTriggerEvent::Modified(e) => !e.paused,
+                FlowTriggerEvent::DatasetRemoved { .. } => false,
+            };
+
+            if is_active {
+                active_bindings.push(flow_binding.clone());
+            }
+        }
+
+        // Convert into stream
+        Box::pin(futures::stream::iter(active_bindings.into_iter().map(Ok)))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    async fn all_trigger_bindings_for_dataset_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut seen_flow_types = HashSet::new();
+        let mut bindings = Vec::new();
+
+        for event in g.events.iter().rev() {
+            if let FlowBinding {
+                scope: FlowScope::Dataset { dataset_id: id },
+                flow_type,
+            } = event.flow_binding()
+                && id == dataset_id
+                && seen_flow_types.insert(flow_type)
+            {
+                bindings.push(FlowBinding::new_dataset(id.clone(), flow_type));
+            }
+        }
+
+        Ok(bindings)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn all_trigger_bindings_for_system_flows(
+        &self,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut seen_flow_types = HashSet::new();
+        let mut bindings = Vec::new();
+
+        for event in g.events.iter().rev() {
+            if let FlowBinding {
+                scope: FlowScope::System,
+                flow_type,
+            } = event.flow_binding()
+                && seen_flow_types.insert(flow_type)
+            {
+                bindings.push(FlowBinding::new_system(flow_type));
+            }
+        }
+
+        Ok(bindings)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn has_active_triggers_for_datasets(
         &self,
         dataset_ids: &[odf::DatasetID],
@@ -131,17 +216,17 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         let g = state.lock().unwrap();
 
         let dataset_ids: HashSet<&odf::DatasetID> = dataset_ids.iter().collect();
-        let mut seen_keys = HashSet::new();
+        let mut seen_bindings = HashSet::new();
 
         for event in g.events.iter().rev() {
-            // Skip if we've already seen this key (we only want the latest event)
-            let key = event.flow_key();
-            if !seen_keys.insert(key) {
+            // Skip if we've already seen this binding (we only want the latest event)
+            let flow_binding = event.flow_binding();
+            if !seen_bindings.insert(flow_binding) {
                 continue;
             }
 
-            match key {
-                FlowKey::Dataset(fk_dataset) if dataset_ids.contains(&fk_dataset.dataset_id) => {
+            match &flow_binding.scope {
+                FlowScope::Dataset { dataset_id } if dataset_ids.contains(dataset_id) => {
                     match event {
                         FlowTriggerEvent::Created(e) => {
                             if !e.paused {

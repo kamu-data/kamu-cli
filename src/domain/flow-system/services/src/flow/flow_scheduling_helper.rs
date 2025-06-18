@@ -87,10 +87,11 @@ impl FlowSchedulingHelper {
         &self,
         start_time: DateTime<Utc>,
         flow_key: &FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
         let maybe_active_schedule = self
             .flow_trigger_service
-            .try_get_flow_schedule_rule(flow_key.clone())
+            .try_get_flow_schedule_rule(flow_binding)
             .await
             .int_err()?;
 

@@ -235,16 +235,11 @@ impl FlowAgentImpl {
             .chain(non_schedule_triggers.into_iter())
         {
             // Do not re-trigger the flow that has already triggered
-            let maybe_pending_flow_id = flow_event_store
-                .try_get_pending_flow(&enabled_trigger.flow_key)
-                .await?;
+            let flow_key: FlowKey = (&enabled_trigger.flow_binding).into();
+            let maybe_pending_flow_id = flow_event_store.try_get_pending_flow(&flow_key).await?;
             if maybe_pending_flow_id.is_none() {
                 scheduling_helper
-                    .activate_flow_trigger(
-                        start_time,
-                        enabled_trigger.flow_key,
-                        enabled_trigger.rule,
-                    )
+                    .activate_flow_trigger(start_time, flow_key, enabled_trigger.rule)
                     .await?;
             }
         }
@@ -353,7 +348,7 @@ impl FlowAgentImpl {
         let flow_dispatcher = self.get_flow_dispatcher(&target_catalog, flow_dispatcher_type)?;
 
         // Translate flow key to binding
-        let flow_binding = map_flow_binding(&flow.flow_key);
+        let flow_binding: FlowBinding = (&flow.flow_key).into();
 
         // Dispatcher should create a logical plan that corresponds to the flow type
         let logical_plan = flow_dispatcher
@@ -526,12 +521,13 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
 
                         let finish_time = self.agent_config.round_time(message.event_time)?;
 
+                        let flow_binding: FlowBinding = (&flow.flow_key).into();
+
                         // In case of success:
                         //  - execute follow-up method
                         if let Some(task_result) = flow.try_task_result_as_ref()
                             && !task_result.is_empty()
                         {
-                            let flow_binding = map_flow_binding(&flow.flow_key);
                             let flow_dispatcher =
                                 self.get_flow_dispatcher(target_catalog, &flow_binding.flow_type)?;
 
@@ -572,6 +568,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 .try_schedule_auto_polling_flow_if_enabled(
                                     finish_time,
                                     &flow.flow_key,
+                                    &flow_binding,
                                 )
                                 .await?;
                         }
@@ -582,7 +579,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                             let flow_trigger_service =
                                 target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
                             flow_trigger_service
-                                .pause_flow_trigger(finish_time, flow.flow_key.clone())
+                                .pause_flow_trigger(finish_time, &flow_binding)
                                 .await?;
                         }
 
@@ -634,12 +631,12 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow configuration message");
 
+        let flow_key = (&message.flow_binding).into();
+
         if message.paused {
             let maybe_pending_flow_id = {
                 let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-                flow_event_store
-                    .try_get_pending_flow(&message.flow_key)
-                    .await?
+                flow_event_store.try_get_pending_flow(&flow_key).await?
             };
 
             if let Some(flow_id) = maybe_pending_flow_id {
@@ -651,7 +648,7 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
             scheduling_helper
                 .activate_flow_trigger(
                     self.agent_config.round_time(message.event_time)?,
-                    message.flow_key.clone(),
+                    flow_key,
                     message.rule.clone(),
                 )
                 .await?;
@@ -767,13 +764,11 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
         // TODO: we might need to place this queing elsewhere,
         //  where it's known what is "ingest" flow
 
-        let flow_binding = FlowBinding::new_dataset(
-            dataset_id.clone(),
-            "dev.kamu.flow.dispatcher.dataset.ingest",
-        );
+        let flow_binding =
+            FlowBinding::new_dataset(dataset_id.clone(), "dev.kamu.flow.dataset.ingest");
 
         let flow_dispatcher = self
-            .get_flow_dispatcher(target_catalog, "dev.kamu.flow.dispatcher.dataset.ingest")
+            .get_flow_dispatcher(target_catalog, "dev.kamu.flow.dataset.ingest")
             .int_err()?;
 
         flow_dispatcher
@@ -792,42 +787,6 @@ pub enum FlowTriggerContext {
     Unconditional,
     Scheduled(Schedule),
     Batching(BatchingRule),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: temporary mapping until FlowKey is fully replaced
-fn map_flow_type(flow_key: &FlowKey) -> &'static str {
-    match flow_key {
-        FlowKey::Dataset(fk_dataset) => match fk_dataset.flow_type {
-            DatasetFlowType::Ingest => "dev.kamu.flow.dispatcher.dataset.ingest",
-            DatasetFlowType::HardCompaction => "dev.kamu.flow.dispatcher.dataset.compact",
-            DatasetFlowType::ExecuteTransform => "dev.kamu.flow.dispatcher.dataset.transform",
-            DatasetFlowType::Reset => "dev.kamu.flow.dispatcher.dataset.reset",
-        },
-        FlowKey::System(fk_system) => match fk_system.flow_type {
-            SystemFlowType::GC => "dev.kamu.flow.dispatcher.system.gc",
-        },
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: temporary mapping until FlowKey is fully replaced
-fn map_flow_binding(flow_key: &FlowKey) -> FlowBinding {
-    let flow_type = map_flow_type(flow_key).to_string();
-    match flow_key {
-        FlowKey::Dataset(fk_dataset) => FlowBinding {
-            flow_type,
-            scope: FlowScope::Dataset {
-                dataset_id: fk_dataset.dataset_id.clone(),
-            },
-        },
-        FlowKey::System(_) => FlowBinding {
-            flow_type,
-            scope: FlowScope::System,
-        },
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,7 +16,7 @@ use kamu_task_system as ts;
 #[dill::component]
 #[dill::interface(dyn FlowDispatcher)]
 #[dill::meta(FlowDispatcherMeta {
-    flow_dispatcher_type: "dev.kamu.flow.dispatcher.system.gc",
+    flow_dispatcher_type: FLOW_TYPE_SYSTEM_GC,
 })]
 pub struct FlowDispatcherSystemGC {}
 

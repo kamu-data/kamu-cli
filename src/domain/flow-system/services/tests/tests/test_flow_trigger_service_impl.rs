@@ -15,6 +15,7 @@ use chrono::{Duration, Utc};
 use database_common_macros::transactional_method1;
 use dill::*;
 use futures::TryStreamExt;
+use kamu_adapter_flow_dataset::{FLOW_TYPE_DATASET_COMPACT, FLOW_TYPE_DATASET_INGEST};
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -34,46 +35,38 @@ async fn test_visibility() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
+    let binding_foo_ingest = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_compaction =
+        FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
+    let binding_bar_ingest = FlowBinding::new_dataset(bar_id.clone(), FLOW_TYPE_DATASET_INGEST);
+
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
-        .set_dataset_flow_trigger(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_trigger.clone(),
-        )
+        .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
 
     let foo_compaction_trigger = FlowTriggerRule::Schedule(Duration::days(1).into());
     harness
-        .set_dataset_flow_trigger(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+        .set_flow_trigger(
+            binding_foo_compaction.clone(),
             foo_compaction_trigger.clone(),
         )
         .await;
 
     let bar_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
-        .set_dataset_flow_trigger(
-            bar_id.clone(),
-            DatasetFlowType::Ingest,
-            bar_ingest_trigger.clone(),
-        )
+        .set_flow_trigger(binding_bar_ingest.clone(), bar_ingest_trigger.clone())
         .await;
 
     let triggers = harness.list_enabled_triggers().await;
     assert_eq!(3, triggers.len());
 
-    for (dataset_id, dataset_flow_type, trigger) in [
-        (foo_id.clone(), DatasetFlowType::Ingest, &foo_ingest_trigger),
-        (
-            foo_id,
-            DatasetFlowType::HardCompaction,
-            &foo_compaction_trigger,
-        ),
-        (bar_id, DatasetFlowType::Ingest, &bar_ingest_trigger),
+    for (flow_binding, trigger) in [
+        (&binding_foo_ingest, &foo_ingest_trigger),
+        (&binding_foo_compaction, &foo_compaction_trigger),
+        (&binding_bar_ingest, &bar_ingest_trigger),
     ] {
-        harness.expect_dataset_flow_trigger(&triggers, dataset_id, dataset_flow_type, trigger);
+        harness.expect_flow_trigger(&triggers, flow_binding, trigger);
     }
 }
 
@@ -87,31 +80,21 @@ async fn test_pause_resume_individual_dataset_flows() {
 
     // Make a dataset and configure daily ingestion schedule
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let binding_foo_ingest = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
-        .set_dataset_flow_trigger(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_trigger.clone(),
-        )
+        .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
 
     // It should be visible in the list of enabled triggers and produced 1 trigger
     // event
     let triggers = harness.list_enabled_triggers().await;
     assert_eq!(1, triggers.len());
-    harness.expect_dataset_flow_trigger(
-        &triggers,
-        foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_trigger,
-    );
+    harness.expect_flow_trigger(&triggers, &binding_foo_ingest, &foo_ingest_trigger);
     assert_eq!(1, harness.trigger_events_count());
 
     // Now, pause this flow trigger
-    harness
-        .pause_dataset_flow(foo_id.clone(), DatasetFlowType::Ingest)
-        .await;
+    harness.pause_flow(&binding_foo_ingest).await;
 
     // It should disappear from the list of enabled triggers, and produce 1 more
     // event
@@ -121,7 +104,7 @@ async fn test_pause_resume_individual_dataset_flows() {
 
     // Still, we should see it's state as paused in the repository directly
     let flow_trigger_state = harness
-        .get_dataset_flow_trigger_from_store(foo_id.clone(), DatasetFlowType::Ingest)
+        .get_flow_trigger_from_store(binding_foo_ingest.clone())
         .await;
     assert_eq!(
         flow_trigger_state.status,
@@ -130,20 +113,13 @@ async fn test_pause_resume_individual_dataset_flows() {
     assert_eq!(flow_trigger_state.rule, foo_ingest_trigger.clone());
 
     // Now, resume the trigger
-    harness
-        .resume_dataset_flow(foo_id.clone(), DatasetFlowType::Ingest)
-        .await;
+    harness.resume_flow(&binding_foo_ingest).await;
 
     // It should be visible in the list of active triggers again, and produce
     // another event yet
     let triggers = harness.list_enabled_triggers().await;
     assert_eq!(1, triggers.len());
-    harness.expect_dataset_flow_trigger(
-        &triggers,
-        foo_id,
-        DatasetFlowType::Ingest,
-        &foo_ingest_trigger,
-    );
+    harness.expect_flow_trigger(&triggers, &binding_foo_ingest, &foo_ingest_trigger);
     assert_eq!(3, harness.trigger_events_count());
 }
 
@@ -157,19 +133,19 @@ async fn test_pause_resume_all_dataset_flows() {
 
     // Make a dataset and configure ingestion and compaction schedule
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
+    let binding_foo_ingest = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
     harness
-        .set_dataset_flow_trigger(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_trigger.clone(),
-        )
+        .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
+
     let foo_compaction_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
+    let binding_foo_compaction =
+        FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
     harness
-        .set_dataset_flow_trigger(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+        .set_flow_trigger(
+            binding_foo_compaction.clone(),
             foo_compaction_trigger.clone(),
         )
         .await;
@@ -177,18 +153,8 @@ async fn test_pause_resume_all_dataset_flows() {
     // Both should be visible in the list of enabled triggers, 2 events expected
     let triggers = harness.list_enabled_triggers().await;
     assert_eq!(2, triggers.len());
-    harness.expect_dataset_flow_trigger(
-        &triggers,
-        foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_trigger,
-    );
-    harness.expect_dataset_flow_trigger(
-        &triggers,
-        foo_id.clone(),
-        DatasetFlowType::HardCompaction,
-        &foo_compaction_trigger,
-    );
+    harness.expect_flow_trigger(&triggers, &binding_foo_ingest, &foo_ingest_trigger);
+    harness.expect_flow_trigger(&triggers, &binding_foo_compaction, &foo_compaction_trigger);
     assert_eq!(2, harness.trigger_events_count());
 
     // Now, pause all flows of this dataset
@@ -203,7 +169,7 @@ async fn test_pause_resume_all_dataset_flows() {
     // Still, we should see their state as paused in the repository directly
 
     let flow_trigger_ingest_state = harness
-        .get_dataset_flow_trigger_from_store(foo_id.clone(), DatasetFlowType::Ingest)
+        .get_flow_trigger_from_store(binding_foo_ingest.clone())
         .await;
     assert_eq!(
         flow_trigger_ingest_state.status,
@@ -212,7 +178,7 @@ async fn test_pause_resume_all_dataset_flows() {
     assert_eq!(flow_trigger_ingest_state.rule, foo_ingest_trigger.clone());
 
     let flow_trigger_compaction_state = harness
-        .get_dataset_flow_trigger_from_store(foo_id.clone(), DatasetFlowType::HardCompaction)
+        .get_flow_trigger_from_store(binding_foo_compaction.clone())
         .await;
     assert_eq!(
         flow_trigger_compaction_state.status,
@@ -230,18 +196,8 @@ async fn test_pause_resume_all_dataset_flows() {
     // should get 2 extra events
     let triggers = harness.list_enabled_triggers().await;
     assert_eq!(2, triggers.len());
-    harness.expect_dataset_flow_trigger(
-        &triggers,
-        foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_trigger,
-    );
-    harness.expect_dataset_flow_trigger(
-        &triggers,
-        foo_id.clone(),
-        DatasetFlowType::HardCompaction,
-        &foo_compaction_trigger,
-    );
+    harness.expect_flow_trigger(&triggers, &binding_foo_ingest, &foo_ingest_trigger);
+    harness.expect_flow_trigger(&triggers, &binding_foo_compaction, &foo_compaction_trigger);
     assert_eq!(6, harness.trigger_events_count());
 }
 
@@ -255,19 +211,20 @@ async fn test_pause_resume_individual_system_flows() {
 
     // Configure GC schedule
     let gc_schedule: Schedule = Duration::minutes(30).into();
+    let binding_gc = FlowBinding::new_system(FLOW_TYPE_SYSTEM_GC);
     harness
-        .set_system_flow_schedule(SystemFlowType::GC, gc_schedule.clone())
+        .set_system_flow_schedule(FLOW_TYPE_SYSTEM_GC, gc_schedule.clone())
         .await
         .unwrap();
 
     // It should be visible in the list of enabled triggers, and create 1 event
     let triggers = harness.list_enabled_triggers().await;
     assert_eq!(1, triggers.len());
-    harness.expect_system_flow_schedule(&triggers, SystemFlowType::GC, &gc_schedule);
+    harness.expect_system_flow_schedule(&triggers, FLOW_TYPE_SYSTEM_GC, &gc_schedule);
     assert_eq!(1, harness.trigger_events_count());
 
     // Now, pause this flow trigger
-    harness.pause_system_flow(SystemFlowType::GC).await;
+    harness.pause_flow(&binding_gc).await;
 
     // It should disappear from the list of enabled triggers, and create 1 more
     // event
@@ -277,7 +234,7 @@ async fn test_pause_resume_individual_system_flows() {
 
     // Still, we should see it's state as paused in the repository directly
     let flow_trigger_state = harness
-        .get_system_flow_trigger_from_store(SystemFlowType::GC)
+        .get_flow_trigger_from_store(binding_gc.clone())
         .await;
     assert_eq!(
         flow_trigger_state.status,
@@ -289,13 +246,13 @@ async fn test_pause_resume_individual_system_flows() {
     );
 
     // Now, resume the triggers
-    harness.resume_system_flow(SystemFlowType::GC).await;
+    harness.resume_flow(&binding_gc).await;
 
     // It should be visible in the list of active triggers again, and create
     // another event yet
     let triggers = harness.list_enabled_triggers().await;
     assert_eq!(1, triggers.len());
-    harness.expect_system_flow_schedule(&triggers, SystemFlowType::GC, &gc_schedule);
+    harness.expect_system_flow_schedule(&triggers, FLOW_TYPE_SYSTEM_GC, &gc_schedule);
     assert_eq!(3, harness.trigger_events_count());
 }
 
@@ -309,23 +266,15 @@ async fn test_dataset_deleted() {
     // Make a dataset and configure ingest trigger
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
+    let binding_foo_ingest = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
     harness
-        .set_dataset_flow_trigger(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_trigger.clone(),
-        )
+        .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
 
     // It should be visible in the list of triggers
     let configs = harness.list_enabled_triggers().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_trigger(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_trigger,
-    );
+    harness.expect_flow_trigger(&configs, &binding_foo_ingest, &foo_ingest_trigger);
 
     // Now, pretend the dataset was deleted
     harness.issue_dataset_deleted(&foo_id).await;
@@ -336,7 +285,7 @@ async fn test_dataset_deleted() {
 
     // Still, we should see it's state as permanently stopped in the repository
     let flow_config_state = harness
-        .get_dataset_flow_trigger_from_store(foo_id, DatasetFlowType::Ingest)
+        .get_flow_trigger_from_store(binding_foo_ingest)
         .await;
     assert_eq!(flow_config_state.rule, foo_ingest_trigger);
 }
@@ -389,7 +338,7 @@ impl FlowTriggerHarness {
         }
     }
 
-    async fn list_enabled_triggers(&self) -> HashMap<FlowKey, FlowTriggerState> {
+    async fn list_enabled_triggers(&self) -> HashMap<FlowBinding, FlowTriggerState> {
         let active_triggers: Vec<_> = self
             .flow_trigger_service
             .list_enabled_triggers()
@@ -399,7 +348,7 @@ impl FlowTriggerHarness {
 
         let mut res = HashMap::new();
         for active_trigger in active_triggers {
-            res.insert(active_trigger.flow_key.clone(), active_trigger);
+            res.insert(active_trigger.flow_binding.clone(), active_trigger);
         }
         res
     }
@@ -407,13 +356,13 @@ impl FlowTriggerHarness {
     #[transactional_method1(flow_trigger_service: Arc<dyn FlowTriggerService>)]
     async fn set_system_flow_schedule(
         &self,
-        system_flow_type: SystemFlowType,
+        system_flow_type: &str,
         schedule: Schedule,
     ) -> Result<(), SetFlowTriggerError> {
         flow_trigger_service
             .set_trigger(
                 Utc::now(),
-                system_flow_type.into(),
+                FlowBinding::new_system(system_flow_type),
                 false,
                 FlowTriggerRule::Schedule(schedule),
             )
@@ -421,32 +370,21 @@ impl FlowTriggerHarness {
         Ok(())
     }
 
-    async fn set_dataset_flow_trigger(
-        &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-        trigger_rule: FlowTriggerRule,
-    ) {
+    async fn set_flow_trigger(&self, flow_binding: FlowBinding, trigger_rule: FlowTriggerRule) {
         self.flow_trigger_service
-            .set_trigger(
-                Utc::now(),
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                trigger_rule,
-            )
+            .set_trigger(Utc::now(), flow_binding, false, trigger_rule)
             .await
             .unwrap();
     }
 
-    fn expect_dataset_flow_trigger(
+    fn expect_flow_trigger(
         &self,
-        triggers: &HashMap<FlowKey, FlowTriggerState>,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        triggers: &HashMap<FlowBinding, FlowTriggerState>,
+        flow_binding: &FlowBinding,
         expected_rule: &FlowTriggerRule,
     ) {
         assert_matches!(
-            triggers.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
+            triggers.get(flow_binding),
             Some(FlowTriggerState {
                 status: FlowTriggerStatus::Active,
                 rule: actual_rule,
@@ -457,12 +395,13 @@ impl FlowTriggerHarness {
 
     fn expect_system_flow_schedule(
         &self,
-        enabled_triggers: &HashMap<FlowKey, FlowTriggerState>,
-        system_flow_type: SystemFlowType,
+        enabled_triggers: &HashMap<FlowBinding, FlowTriggerState>,
+        system_flow_type: &str,
         expected_schedule: &Schedule,
     ) {
+        let flow_binding = FlowBinding::new_system(system_flow_type);
         assert_matches!(
-            enabled_triggers.get(&(system_flow_type.into())),
+            enabled_triggers.get(&flow_binding),
             Some(FlowTriggerState {
                 status: FlowTriggerStatus::Active,
                 rule: FlowTriggerRule::Schedule(actual_schedule),
@@ -471,36 +410,34 @@ impl FlowTriggerHarness {
         );
     }
 
-    async fn get_dataset_flow_trigger_from_store(
-        &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-    ) -> FlowTriggerState {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
-        let flow_trigger = FlowTrigger::load(flow_key, self.flow_trigger_event_store.as_ref())
+    async fn get_flow_trigger_from_store(&self, flow_binding: FlowBinding) -> FlowTriggerState {
+        let flow_trigger = FlowTrigger::load(flow_binding, self.flow_trigger_event_store.as_ref())
             .await
             .unwrap();
         flow_trigger.into()
     }
 
-    async fn get_system_flow_trigger_from_store(
-        &self,
-        system_flow_type: SystemFlowType,
-    ) -> FlowTriggerState {
-        let flow_key: FlowKey = FlowKey::System(FlowKeySystem::new(system_flow_type));
-        let flow_trigger = FlowTrigger::load(flow_key, self.flow_trigger_event_store.as_ref())
-            .await
-            .unwrap();
-        flow_trigger.into()
-    }
-
-    async fn pause_dataset_flow(
-        &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-    ) {
+    async fn pause_flow(&self, flow_binding: &FlowBinding) {
+        match &flow_binding.scope {
+            FlowScope::Dataset { dataset_id } => {
+                self.flow_trigger_service
+                    .pause_dataset_flows(Utc::now(), dataset_id, Some(&flow_binding.flow_type))
+                    .await
+                    .unwrap();
+            }
+            FlowScope::System => {
+                self.flow_trigger_service
+                    .pause_system_flows(Utc::now(), Some(&flow_binding.flow_type))
+                    .await
+                    .unwrap();
+            }
+        }
         self.flow_trigger_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
+            .pause_dataset_flows(
+                Utc::now(),
+                &flow_binding.dataset_id_or_die().unwrap(),
+                Some(&flow_binding.flow_type),
+            )
             .await
             .unwrap();
     }
@@ -512,34 +449,26 @@ impl FlowTriggerHarness {
             .unwrap();
     }
 
-    async fn pause_system_flow(&self, system_flow_type: SystemFlowType) {
-        self.flow_trigger_service
-            .pause_system_flows(Utc::now(), Some(system_flow_type))
-            .await
-            .unwrap();
-    }
-
-    async fn resume_dataset_flow(
-        &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-    ) {
-        self.flow_trigger_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, Some(dataset_flow_type))
-            .await
-            .unwrap();
+    async fn resume_flow(&self, flow_binding: &FlowBinding) {
+        match &flow_binding.scope {
+            FlowScope::Dataset { dataset_id } => {
+                self.flow_trigger_service
+                    .resume_dataset_flows(Utc::now(), dataset_id, Some(&flow_binding.flow_type))
+                    .await
+                    .unwrap();
+            }
+            FlowScope::System => {
+                self.flow_trigger_service
+                    .resume_system_flows(Utc::now(), Some(&flow_binding.flow_type))
+                    .await
+                    .unwrap();
+            }
+        }
     }
 
     async fn resume_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
         self.flow_trigger_service
             .resume_dataset_flows(Utc::now(), &dataset_id, None)
-            .await
-            .unwrap();
-    }
-
-    async fn resume_system_flow(&self, system_flow_type: SystemFlowType) {
-        self.flow_trigger_service
-            .resume_system_flows(Utc::now(), Some(system_flow_type))
             .await
             .unwrap();
     }
