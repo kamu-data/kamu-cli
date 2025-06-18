@@ -7404,7 +7404,6 @@ dependencies = [
  "internal-error",
  "kamu-datasets",
  "mockall",
- "nutype",
  "object_store",
  "opendatafabric",
  "oso",

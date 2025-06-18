@@ -24,15 +24,8 @@ use kamu::{
     PushIngestPlannerImpl,
     QueryServiceImpl,
 };
-use kamu_core::{
-    ContentInfo,
-    DatasetRegistry,
-    DidGenerator,
-    FileUploadLimitConfig,
-    MockDidGenerator,
-    UpdateVersionFileUseCase,
-    UpdateVersionFileUseCaseError,
-};
+use kamu_core::{DatasetRegistry, DidGenerator, FileUploadLimitConfig, MockDidGenerator};
+use kamu_datasets::{ContentArgs, UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
 use kamu_datasets_services::UpdateVersionFileUseCaseImpl;
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -54,24 +47,24 @@ async fn test_update_versioned_file_use_case() {
 
     let created_dataset_handle = harness.create_versioned_file(&alias_foo).await;
 
-    let content_info = UpdateVersionFileCaseHarness::combine_content_info(b"foo");
-    let content_hash = content_info.content_hash.clone();
+    let content_args = UpdateVersionFileCaseHarness::combine_content_args(b"foo");
+    let content_hash = content_args.content_hash.clone();
 
     // Upload first version
     let res = harness
         .use_case
-        .execute(&created_dataset_handle, Some(content_info), None, None)
+        .execute(&created_dataset_handle, Some(content_args), None, None)
         .await;
 
     assert_matches!(res, Ok(result) if result.new_version == 1 && result.content_hash == content_hash);
 
-    let content_info = UpdateVersionFileCaseHarness::combine_content_info(b"foo_new");
-    let content_hash = content_info.content_hash.clone();
+    let content_args = UpdateVersionFileCaseHarness::combine_content_args(b"foo_new");
+    let content_hash = content_args.content_hash.clone();
 
     // Upload second version
     let res = harness
         .use_case
-        .execute(&created_dataset_handle, Some(content_info), None, None)
+        .execute(&created_dataset_handle, Some(content_args), None, None)
         .await;
 
     assert_matches!(res, Ok(result) if result.new_version == 2 && result.content_hash == content_hash);
@@ -91,18 +84,18 @@ async fn test_update_versioned_file_use_case_errors() {
 
     let created_dataset_handle = harness.create_versioned_file(&alias_foo).await;
 
-    let content_info =
-        UpdateVersionFileCaseHarness::combine_content_info(b"very large content exceeds limit");
+    let content_args =
+        UpdateVersionFileCaseHarness::combine_content_args(b"very large content exceeds limit");
 
     // TooLarge error
     let res = harness
         .use_case
-        .execute(&created_dataset_handle, Some(content_info), None, None)
+        .execute(&created_dataset_handle, Some(content_args), None, None)
         .await;
 
     assert_matches!(res, Err(UpdateVersionFileUseCaseError::TooLarge(_)));
 
-    let content_info = UpdateVersionFileCaseHarness::combine_content_info(b"foo");
+    let content_args = UpdateVersionFileCaseHarness::combine_content_args(b"foo");
 
     let seed_bloch_hash = harness.get_seed_block_hash(&created_dataset_handle).await;
 
@@ -110,7 +103,7 @@ async fn test_update_versioned_file_use_case_errors() {
         .use_case
         .execute(
             &created_dataset_handle,
-            Some(content_info),
+            Some(content_args),
             Some(seed_bloch_hash),
             None,
         )
@@ -119,14 +112,14 @@ async fn test_update_versioned_file_use_case_errors() {
 
     assert_matches!(res, Ok(result) if result.new_version == 1);
 
-    let content_info = UpdateVersionFileCaseHarness::combine_content_info(b"bar");
+    let content_args = UpdateVersionFileCaseHarness::combine_content_args(b"bar");
 
     // RefCASFailed error
     let res = harness
         .use_case
         .execute(
             &created_dataset_handle,
-            Some(content_info),
+            Some(content_args),
             Some(old_head),
             None,
         )
@@ -253,11 +246,11 @@ impl UpdateVersionFileCaseHarness {
         seed_block.0
     }
 
-    fn combine_content_info(content: &[u8]) -> ContentInfo {
+    fn combine_content_args(content: &[u8]) -> ContentArgs {
         let content_hash = odf::Multihash::from_digest_sha3_256(content);
         let reader = BufReader::new(Cursor::new(content.to_vec()));
 
-        ContentInfo {
+        ContentArgs {
             content_stream: Some(Box::new(reader)),
             content_hash: content_hash.clone(),
             content_length: content.len(),

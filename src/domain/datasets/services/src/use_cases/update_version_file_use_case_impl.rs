@@ -11,16 +11,20 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use file_utils::MediaType;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::{
-    ContentInfo,
     DatasetRegistry,
-    ExtraDataFields,
     FileUploadLimitConfig,
-    FileVersion,
     GetDataOptions,
+    PushIngestDataError,
     PushIngestDataUseCase,
+    PushIngestError,
     QueryService,
+};
+use kamu_datasets::{
+    ContentArgs,
+    ExtraDataFields,
+    FileVersion,
     UpdateVersionFileResult,
     UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
@@ -68,10 +72,10 @@ impl UpdateVersionFileUseCaseImpl {
         Ok((last_version, query_res.block_hash))
     }
 
-    async fn get_content_info_from_latest_entry(
+    async fn get_content_args_from_latest_entry(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<ContentInfo>, InternalError> {
+    ) -> Result<Option<ContentArgs>, InternalError> {
         // TODO: Consider retractions / corrections
         let query_res = self
             .query_svc
@@ -106,7 +110,7 @@ impl UpdateVersionFileUseCaseImpl {
         )
         .unwrap();
 
-        Ok(Some(ContentInfo {
+        Ok(Some(ContentArgs {
             content_length,
             content_stream: None,
             content_hash,
@@ -124,7 +128,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
     async fn execute(
         &self,
         dataset_handle: &odf::DatasetHandle,
-        content_info_maybe: Option<ContentInfo>,
+        content_args_maybe: Option<ContentArgs>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,
     ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError> {
@@ -134,32 +138,32 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
             .await
             .clone();
 
-        let content_info = if let Some(ci) = content_info_maybe {
-            ci
+        let content_args = if let Some(args) = content_args_maybe {
+            args
         } else {
-            self.get_content_info_from_latest_entry(&dataset_handle.as_local_ref())
+            self.get_content_args_from_latest_entry(&dataset_handle.as_local_ref())
                 .await?
                 .unwrap()
         };
 
-        if content_info.content_length > self.upload_config.max_file_size_in_bytes() {
+        if content_args.content_length > self.upload_config.max_file_size_in_bytes() {
             return Err(UpdateVersionFileUseCaseError::TooLarge(
                 UploadTooLargeError::new(
-                    content_info.content_length,
+                    content_args.content_length,
                     self.upload_config.max_file_size_in_bytes(),
                 ),
             ));
         }
 
         // Upload data object
-        if let Some(content_stream) = content_info.content_stream {
+        if let Some(content_stream) = content_args.content_stream {
             let data_repo = resolved_dataset.as_data_repo();
             data_repo
                 .insert_stream(
                     content_stream,
                     odf::storage::InsertOpts {
-                        precomputed_hash: Some(&content_info.content_hash),
-                        size_hint: Some(content_info.content_length as u64),
+                        precomputed_hash: Some(&content_args.content_hash),
+                        size_hint: Some(content_args.content_length as u64),
                         ..Default::default()
                     },
                 )
@@ -174,9 +178,9 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
 
         let entity = VersionedFileEntity::new(
             new_version,
-            content_info.content_hash.clone(),
-            content_info.content_length,
-            content_info.content_type,
+            content_args.content_hash.clone(),
+            content_args.content_length,
+            content_args.content_type,
             extra_data,
         );
 
@@ -194,7 +198,15 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
                 },
                 None,
             )
-            .await?;
+            .await
+            .map_err(|err| match err {
+                PushIngestDataError::Execution(PushIngestError::CommitError(
+                    odf::dataset::CommitError::MetadataAppendError(
+                        odf::dataset::AppendError::RefCASFailed(e),
+                    ),
+                )) => UpdateVersionFileUseCaseError::RefCASFailed(e),
+                err => UpdateVersionFileUseCaseError::Internal(err.int_err()),
+            })?;
 
         match ingest_result {
             kamu_core::PushIngestResult::Updated {
@@ -205,7 +217,7 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
                 new_version,
                 old_head,
                 new_head,
-                content_hash: content_info.content_hash,
+                content_hash: content_args.content_hash,
             }),
             kamu_core::PushIngestResult::UpToDate => unreachable!(),
         }

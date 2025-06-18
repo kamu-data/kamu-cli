@@ -22,7 +22,7 @@ pub trait UpdateVersionFileUseCase: Send + Sync {
     async fn execute(
         &self,
         dataset_handle: &odf::DatasetHandle,
-        content_info_maybe: Option<ContentInfo>,
+        content_args_maybe: Option<ContentArgs>,
         expected_head: Option<odf::Multihash>,
         extra_data: Option<ExtraDataFields>,
     ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError>;
@@ -30,7 +30,7 @@ pub trait UpdateVersionFileUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ContentInfo {
+pub struct ContentArgs {
     pub content_length: usize,
     pub content_hash: odf::Multihash,
     pub content_stream: Option<Box<dyn AsyncRead + Send + Unpin>>,
@@ -98,16 +98,3 @@ impl From<odf::DatasetRefUnresolvedError> for UpdateVersionFileUseCaseError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// impl From<PushIngestDataError> for UpdateVersionFileUseCaseError {
-//     fn from(value: PushIngestDataError) -> Self {
-//         match value {
-//             PushIngestDataError::Execution(PushIngestError::CommitError(
-//                 odf::dataset::CommitError::MetadataAppendError(
-//                     odf::dataset::AppendError::RefCASFailed(e),
-//                 ),
-//             )) => Self::RefCASFailed(e),
-//             err => Self::Internal(err.int_err()),
-//         }
-//     }
-// }

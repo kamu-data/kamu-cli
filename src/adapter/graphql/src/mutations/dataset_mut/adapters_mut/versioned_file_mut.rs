@@ -12,7 +12,7 @@ use std::io::Cursor;
 use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{ContentInfo, UpdateVersionFileUseCaseError};
+use kamu_datasets::{ContentArgs, UpdateVersionFileUseCase, UpdateVersionFileUseCaseError};
 use tokio::io::BufReader;
 
 use crate::prelude::*;
@@ -26,12 +26,12 @@ pub struct VersionedFileMut<'a> {
 }
 
 impl<'a> VersionedFileMut<'a> {
-    async fn get_content_info(
+    async fn get_content_args(
         &'a self,
         ctx: &Context<'_>,
         content_source: ContentSource<'a>,
         content_type: Option<MediaType>,
-    ) -> Result<ContentInfo> {
+    ) -> Result<ContentArgs> {
         use sha3::Digest;
         use tokio::io::AsyncReadExt;
 
@@ -39,7 +39,7 @@ impl<'a> VersionedFileMut<'a> {
             ContentSource::Bytes(bytes) => {
                 let reader = BufReader::new(Cursor::new(bytes.to_owned()));
 
-                Ok(ContentInfo {
+                Ok(ContentArgs {
                     content_length: bytes.len(),
                     content_stream: Some(Box::new(reader)),
                     content_hash: odf::Multihash::from_digest_sha3_256(bytes),
@@ -85,7 +85,7 @@ impl<'a> VersionedFileMut<'a> {
                     .await
                     .int_err()?;
 
-                Ok(ContentInfo {
+                Ok(ContentArgs {
                     content_length: upload_token.0.content_length,
                     content_hash,
                     content_stream: Some(content_stream),
@@ -125,11 +125,10 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let update_version_file_use_case =
-            from_catalog_n!(ctx, dyn domain::use_cases::UpdateVersionFileUseCase);
+        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
-        let content_info = self
-            .get_content_info(
+        let content_args = self
+            .get_content_args(
                 ctx,
                 ContentSource::Bytes(&content),
                 content_type.map(Into::into),
@@ -139,7 +138,7 @@ impl<'a> VersionedFileMut<'a> {
         match update_version_file_use_case
             .execute(
                 self.dataset_request_state.dataset_handle(),
-                Some(content_info),
+                Some(content_args),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
             )
@@ -232,17 +231,16 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let update_version_file_use_case =
-            from_catalog_n!(ctx, dyn domain::use_cases::UpdateVersionFileUseCase);
+        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
-        let content_info = self
-            .get_content_info(ctx, ContentSource::Token(upload_token), None)
+        let content_args = self
+            .get_content_args(ctx, ContentSource::Token(upload_token), None)
             .await?;
 
         match update_version_file_use_case
             .execute(
                 self.dataset_request_state.dataset_handle(),
-                Some(content_info),
+                Some(content_args),
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
             )
@@ -285,8 +283,7 @@ impl<'a> VersionedFileMut<'a> {
         #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
-        let update_version_file_use_case =
-            from_catalog_n!(ctx, dyn domain::use_cases::UpdateVersionFileUseCase);
+        let update_version_file_use_case = from_catalog_n!(ctx, dyn UpdateVersionFileUseCase);
 
         match update_version_file_use_case
             .execute(
