@@ -7,16 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
+mod flow_dispatcher_compact;
+mod flow_dispatcher_ingest;
+mod flow_dispatcher_reset;
+mod flow_dispatcher_transform;
 
-mod dependencies;
-pub use dependencies::*;
-
-mod flow_config_rules;
-pub use flow_config_rules::*;
-
-mod flow_dispatchers;
-pub use flow_dispatchers::*;
-
-mod flow_helpers;
-pub use flow_helpers::*;
+pub use flow_dispatcher_compact::*;
+pub use flow_dispatcher_ingest::*;
+pub use flow_dispatcher_reset::*;
+pub use flow_dispatcher_transform::*;

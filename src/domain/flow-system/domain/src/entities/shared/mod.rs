@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 mod batching_rule;
+mod flow_binding;
 mod flow_key;
 mod flow_task_metadata;
 mod flow_type;
 mod schedule;
 
 pub use batching_rule::*;
+pub use flow_binding::*;
 pub use flow_key::*;
 pub use flow_task_metadata::*;
 pub use flow_type::*;

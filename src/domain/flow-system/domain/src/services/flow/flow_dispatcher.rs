@@ -7,20 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
+use internal_error::InternalError;
+use kamu_task_system as ts;
 
-use super::*;
+use crate::{FlowBinding, FlowConfigurationRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<FlowTaskFactoryImpl>();
-    catalog_builder.add::<FlowSupportServiceImpl>();
+#[async_trait::async_trait]
+pub trait FlowDispatcher: Send + Sync {
+    fn flow_type(&self) -> &'static str;
 
-    catalog_builder.add::<FlowDispatcherIngest>();
-    catalog_builder.add::<FlowDispatcherTransform>();
-    catalog_builder.add::<FlowDispatcherCompact>();
-    catalog_builder.add::<FlowDispatcherReset>();
+    fn matches(&self, binding: &FlowBinding) -> bool;
+
+    async fn build_task_logical_plan(
+        &self,
+        flow_binding: &FlowBinding,
+        maybe_config_snapshot: Option<&FlowConfigurationRule>,
+    ) -> Result<ts::LogicalPlan, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
