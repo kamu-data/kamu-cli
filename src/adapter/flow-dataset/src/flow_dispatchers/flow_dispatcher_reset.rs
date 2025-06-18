@@ -24,11 +24,6 @@ impl fs::FlowDispatcher for FlowDispatcherReset {
         "dev.kamu.flow.dispatcher.dataset.reset"
     }
 
-    fn matches(&self, binding: &fs::FlowBinding) -> bool {
-        binding.flow_type == self.flow_type()
-            && matches!(binding.scope, fs::FlowScope::Dataset { .. })
-    }
-
     async fn build_task_logical_plan(
         &self,
         flow_binding: &fs::FlowBinding,

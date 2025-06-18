@@ -18,8 +18,6 @@ use crate::{FlowBinding, FlowConfigurationRule};
 pub trait FlowDispatcher: Send + Sync {
     fn flow_type(&self) -> &'static str;
 
-    fn matches(&self, binding: &FlowBinding) -> bool;
-
     async fn build_task_logical_plan(
         &self,
         flow_binding: &FlowBinding,

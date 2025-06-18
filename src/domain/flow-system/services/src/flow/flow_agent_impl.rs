@@ -9,6 +9,8 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -49,7 +51,16 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
+pub struct FlowAgentImpl {
+    catalog: Catalog,
+    time_source: Arc<dyn SystemTimeSource>,
+    agent_config: Arc<FlowAgentConfig>,
+    flow_dispatchers_by_type: HashMap<String, Arc<dyn FlowDispatcher>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[component(pub)]
 #[interface(dyn FlowAgent)]
 #[interface(dyn FlowAgentTestDriver)]
 #[interface(dyn MessageConsumer)]
@@ -75,16 +86,52 @@ use crate::{
     requires_transaction: false,
 })]
 #[scope(Singleton)]
-pub struct FlowAgentImpl {
-    catalog: Catalog,
-    time_source: Arc<dyn SystemTimeSource>,
-    flow_task_factory: Arc<dyn FlowTaskFactory>,
-    agent_config: Arc<FlowAgentConfig>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl FlowAgentImpl {
+    pub fn new(
+        catalog: Catalog,
+        time_source: Arc<dyn SystemTimeSource>,
+        agent_config: Arc<FlowAgentConfig>,
+    ) -> Self {
+        Self {
+            time_source,
+            agent_config,
+            flow_dispatchers_by_type: Self::init_flow_dispatchers(&catalog),
+            catalog,
+        }
+    }
+
+    fn init_flow_dispatchers(catalog: &Catalog) -> HashMap<String, Arc<dyn FlowDispatcher>> {
+        let mut flow_dispatchers_by_type: HashMap<String, Arc<dyn FlowDispatcher>> = HashMap::new();
+        for flow_dispatcher_builder in catalog.builders_for::<dyn FlowDispatcher>() {
+            let flow_dispatcher = flow_dispatcher_builder.get(catalog).unwrap();
+            let flow_type = flow_dispatcher.flow_type().to_string();
+            match flow_dispatchers_by_type.entry(flow_type) {
+                Entry::Vacant(entry) => {
+                    entry.insert(flow_dispatcher);
+                }
+                Entry::Occupied(_) => {
+                    panic!(
+                        "Flow dispatcher for type '{}' is already registered, skipping",
+                        flow_dispatcher.flow_type()
+                    );
+                }
+            }
+        }
+        flow_dispatchers_by_type
+    }
+
+    fn get_flow_dispatcher(
+        &self,
+        flow_type: &str,
+    ) -> Result<Arc<dyn FlowDispatcher>, InternalError> {
+        self.flow_dispatchers_by_type
+            .get(flow_type)
+            .cloned()
+            .ok_or_else(|| {
+                InternalError::new(format!("Flow dispatcher for type '{flow_type}' not found",))
+            })
+    }
+
     #[transactional_method]
     #[tracing::instrument(level = "info", skip_all)]
     async fn recover_initial_flows_state(
@@ -319,10 +366,52 @@ impl FlowAgentImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        let logical_plan = self
-            .flow_task_factory
-            .build_task_logical_plan(&flow.flow_key, flow.config_snapshot.as_ref())
-            .await?;
+        // TODO: temporary mapping until FlowKey is fully replaced
+        fn map_flow_type(flow_key: &FlowKey) -> &'static str {
+            match flow_key {
+                FlowKey::Dataset(fk_dataset) => match fk_dataset.flow_type {
+                    DatasetFlowType::Ingest => "dev.kamu.flow.dispatcher.dataset.ingest",
+                    DatasetFlowType::HardCompaction => "dev.kamu.flow.dispatcher.dataset.compact",
+                    DatasetFlowType::ExecuteTransform => {
+                        "dev.kamu.flow.dispatcher.dataset.transform"
+                    }
+                    DatasetFlowType::Reset => "dev.kamu.flow.dispatcher.dataset.reset",
+                },
+                FlowKey::System(fk_system) => match fk_system.flow_type {
+                    SystemFlowType::GC => "dev.kamu.flow.dispatcher.system.gc",
+                },
+            }
+        }
+
+        // TODO: temporary mapping until FlowKey is fully replaced
+        fn map_flow_binding(flow_key: &FlowKey) -> FlowBinding {
+            let flow_type = map_flow_type(flow_key).to_string();
+            match flow_key {
+                FlowKey::Dataset(fk_dataset) => FlowBinding {
+                    flow_type,
+                    scope: FlowScope::Dataset {
+                        dataset_id: fk_dataset.dataset_id.clone(),
+                    },
+                },
+                FlowKey::System(_) => FlowBinding {
+                    flow_type,
+                    scope: FlowScope::System,
+                },
+            }
+        }
+
+        // Find a dispatcher for this flow type
+        let flow_dispatcher_type = map_flow_type(&flow.flow_key);
+        let flow_dispatcher = self.get_flow_dispatcher(flow_dispatcher_type).int_err()?;
+
+        // Translate flow key to binding
+        let flow_binding = map_flow_binding(&flow.flow_key);
+
+        // Dispatcher should create a logical plan that corresponds to the flow type
+        let logical_plan = flow_dispatcher
+            .build_task_logical_plan(&flow_binding, flow.config_snapshot.as_ref())
+            .await
+            .int_err()?;
 
         let task_scheduler = target_catalog.get_one::<dyn TaskScheduler>().unwrap();
         let task = task_scheduler

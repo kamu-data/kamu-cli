@@ -606,7 +606,6 @@ impl FlowTriggerHarness {
                 ))
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>()
-                .add::<FlowTaskFactoryImpl>()
                 .add::<FlowSupportServiceImpl>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
