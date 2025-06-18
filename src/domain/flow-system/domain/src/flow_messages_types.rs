@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{FlowConfigurationRule, FlowID, FlowKey, FlowOutcome, FlowTriggerRule};
+use crate::{FlowBinding, FlowConfigurationRule, FlowID, FlowKey, FlowOutcome, FlowTriggerRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,8 +49,8 @@ pub struct FlowTriggerUpdatedMessage {
     /// The time at which the event was recorded
     pub event_time: DateTime<Utc>,
 
-    /// The unique key identifying the flow
-    pub flow_key: FlowKey,
+    /// The unique binding identifying the flow
+    pub flow_binding: FlowBinding,
 
     /// Indicates whether the trigger is paused
     pub paused: bool,

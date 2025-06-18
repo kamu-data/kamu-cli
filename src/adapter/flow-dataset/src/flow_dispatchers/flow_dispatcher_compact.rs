@@ -14,6 +14,7 @@ use kamu_datasets::{DatasetEntryService, DependencyGraphService};
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
+    FLOW_TYPE_DATASET_COMPACT,
     FlowConfigRuleCompact,
     trigger_hard_compaction_flow_for_own_downstream_datasets,
     trigger_transform_flow_for_all_downstream_datasets,
@@ -24,7 +25,7 @@ use crate::{
 #[dill::component]
 #[dill::interface(dyn fs::FlowDispatcher)]
 #[dill::meta(fs::FlowDispatcherMeta {
-    flow_dispatcher_type: "dev.kamu.flow.dispatcher.dataset.compact",
+    flow_dispatcher_type: FLOW_TYPE_DATASET_COMPACT,
 })]
 pub struct FlowDispatcherCompact {
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,

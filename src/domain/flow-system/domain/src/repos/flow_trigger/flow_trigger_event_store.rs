@@ -22,6 +22,22 @@ pub trait FlowTriggerEventStore: EventStore<FlowTriggerState> {
         pagination: &PaginationOpts,
     ) -> Result<Vec<odf::DatasetID>, InternalError>;
 
+    /// Returns all existing flow bindings, where triggers are active
+    fn stream_all_active_flow_bindings(&self) -> FlowBindingStream;
+
+    /// Returns all bindings for a given dataset ID where triggers are defined
+    /// regardless of status
+    async fn all_trigger_bindings_for_dataset_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<FlowBinding>, InternalError>;
+
+    /// Returns all bindings of system flows where triggers are defined
+    /// regardless of status
+    async fn all_trigger_bindings_for_system_flows(
+        &self,
+    ) -> Result<Vec<FlowBinding>, InternalError>;
+
     async fn all_dataset_ids_count(&self) -> Result<usize, InternalError>;
 
     /// Checks if there are any active triggers for the given list of datasets
@@ -30,5 +46,11 @@ pub trait FlowTriggerEventStore: EventStore<FlowTriggerState> {
         dataset_ids: &[odf::DatasetID],
     ) -> Result<bool, InternalError>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type FlowBindingStream<'a> = std::pin::Pin<
+    Box<dyn tokio_stream::Stream<Item = Result<FlowBinding, InternalError>> + Send + 'a>,
+>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

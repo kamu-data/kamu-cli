@@ -11,14 +11,14 @@ use event_sourcing::{Projection, ProjectionError, ProjectionEvent};
 use serde::{Deserialize, Serialize};
 
 use super::{FlowTriggerEvent, FlowTriggerRule, FlowTriggerStatus};
-use crate::{BatchingRule, FlowKey, FlowTriggerEventCreated, FlowTriggerEventModified, Schedule};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowTriggerState {
-    /// Flow key
-    pub flow_key: FlowKey,
+    /// Flow binding
+    pub flow_binding: FlowBinding,
     /// Trigger rule
     pub rule: FlowTriggerRule,
     /// Trigger status
@@ -48,7 +48,7 @@ impl FlowTriggerState {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Projection for FlowTriggerState {
-    type Query = FlowKey;
+    type Query = FlowBinding;
     type Event = FlowTriggerEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
@@ -57,12 +57,12 @@ impl Projection for FlowTriggerState {
         match (state, event) {
             (None, event) => match event {
                 E::Created(FlowTriggerEventCreated {
-                    flow_key,
+                    flow_binding,
                     paused,
                     rule,
                     ..
                 }) => Ok(Self {
-                    flow_key,
+                    flow_binding,
                     status: if paused {
                         FlowTriggerStatus::PausedTemporarily
                     } else {
@@ -73,7 +73,7 @@ impl Projection for FlowTriggerState {
                 _ => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
-                assert_eq!(&s.flow_key, event.flow_key());
+                assert_eq!(&s.flow_binding, event.flow_binding());
 
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
@@ -93,7 +93,7 @@ impl Projection for FlowTriggerState {
                     }
 
                     E::DatasetRemoved(_) => {
-                        if let FlowKey::Dataset(_) = &s.flow_key {
+                        if let FlowScope::Dataset { .. } = &s.flow_binding.scope {
                             if s.status == FlowTriggerStatus::StoppedPermanently {
                                 Ok(s) // idempotent DELETE
                             } else {
@@ -114,9 +114,9 @@ impl Projection for FlowTriggerState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ProjectionEvent<FlowKey> for FlowTriggerEvent {
-    fn matches_query(&self, query: &FlowKey) -> bool {
-        self.flow_key() == query
+impl ProjectionEvent<FlowBinding> for FlowTriggerEvent {
+    fn matches_query(&self, query: &FlowBinding) -> bool {
+        self.flow_binding() == query
     }
 }
 
