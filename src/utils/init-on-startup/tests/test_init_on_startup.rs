@@ -14,6 +14,7 @@ use dill::*;
 use init_on_startup::{
     InitOnStartup,
     InitOnStartupMeta,
+    JobSelector,
     RunStartupJobsOptions,
     StartupJobsError,
     run_startup_jobs,
@@ -44,6 +45,10 @@ impl JobExecutions {
     pub fn job_names(&self) -> Vec<&'static str> {
         let inner = &*self.job_names.lock().unwrap();
         inner.clone()
+    }
+
+    pub fn reset(&self) {
+        self.job_names.lock().unwrap().clear();
     }
 }
 
@@ -118,7 +123,7 @@ async fn test_independent_jobs() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_independent_jobs_skip_completed() {
+async fn test_independent_jobs_with_job_selector() {
     test_startup_job!(A, &[]);
     test_startup_job!(B, &[]);
     test_startup_job!(C, &[]);
@@ -130,19 +135,34 @@ async fn test_independent_jobs_skip_completed() {
         .add::<TestJobC>()
         .build();
 
+    // 1-st run
     run_startup_jobs_ex(
         &catalog,
         RunStartupJobsOptions::builder()
-            .skip_completed_jobs(HashSet::from(["TestJobA"]))
+            .job_selector(JobSelector::AllOf(HashSet::from(["TestJobA"])))
             .build(),
     )
     .await
     .unwrap();
 
     let executions = catalog.get_one::<JobExecutions>().unwrap();
+    assert_eq!(["TestJobA"], *executions.job_names());
+
+    executions.reset();
+
+    // 2-nd run
+    run_startup_jobs_ex(
+        &catalog,
+        RunStartupJobsOptions::builder()
+            .job_selector(JobSelector::NoneOf(HashSet::from(["TestJobA"])))
+            .build(),
+    )
+    .await
+    .unwrap();
+
     assert_eq!(
-        ["TestJobB", "TestJobC"].into_iter().collect::<HashSet<_>>(),
-        executions.job_names().into_iter().collect(),
+        HashSet::from(["TestJobB", "TestJobC"]),
+        executions.job_names().into_iter().collect()
     );
 }
 
@@ -174,7 +194,7 @@ async fn test_linear_dependency() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_linear_dependency_skip_completed() {
+async fn test_linear_dependency_with_job_selector() {
     test_startup_job!(A, &[]);
     test_startup_job!(B, &["TestJobA"]);
     test_startup_job!(C, &["TestJobB"]);
@@ -186,10 +206,11 @@ async fn test_linear_dependency_skip_completed() {
         .add::<TestJobC>()
         .build();
 
+    // 1-st run
     run_startup_jobs_ex(
         &catalog,
         RunStartupJobsOptions::builder()
-            .skip_completed_jobs(HashSet::from(["TestJobB"]))
+            .job_selector(JobSelector::NoneOf(HashSet::from(["TestJobB"])))
             .build(),
     )
     .await
@@ -197,7 +218,19 @@ async fn test_linear_dependency_skip_completed() {
 
     // The order of executions must respect dependencies
     let executions = catalog.get_one::<JobExecutions>().unwrap();
-    assert_eq!(vec!["TestJobA", "TestJobC"], executions.job_names(),);
+    assert_eq!(["TestJobA", "TestJobC"], *executions.job_names());
+
+    executions.reset();
+
+    // 2-nd run
+    run_startup_jobs_ex(
+        &catalog,
+        RunStartupJobsOptions::builder()
+            .job_selector(JobSelector::AllOf(HashSet::from(["TestJobB"])))
+            .build(),
+    )
+    .await
+    .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
