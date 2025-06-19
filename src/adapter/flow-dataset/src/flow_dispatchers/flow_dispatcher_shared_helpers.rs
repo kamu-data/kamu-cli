@@ -11,7 +11,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetEntryServiceExt, DependencyGraphService};
 use kamu_flow_system::{self as fs, FlowTriggerServiceExt};
 
-use crate::FlowConfigRuleCompact;
+use crate::{FLOW_TYPE_DATASET_TRANSFORM, FlowConfigRuleCompact};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,8 +27,10 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
         fetch_downstream_dataset_ids(dependency_graph_service, &dataset_id).await;
 
     for downstream_dataset_id in downstream_dataset_ids {
-        let downstream_binding =
-            fs::FlowBinding::new_dataset(downstream_dataset_id.clone(), &flow_binding.flow_type);
+        let downstream_binding = fs::FlowBinding::new_dataset(
+            downstream_dataset_id.clone(),
+            FLOW_TYPE_DATASET_TRANSFORM,
+        );
         if let Some(batching_rule) = flow_trigger_service
             .try_get_flow_batching_rule(&downstream_binding)
             .await
