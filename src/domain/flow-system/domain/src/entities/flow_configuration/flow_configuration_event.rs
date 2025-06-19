@@ -27,7 +27,7 @@ pub enum FlowConfigurationEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowConfigurationEventCreated {
     pub event_time: DateTime<Utc>,
-    pub flow_key: FlowKey,
+    pub flow_binding: FlowBinding,
     pub rule: FlowConfigurationRule,
 }
 
@@ -36,7 +36,7 @@ pub struct FlowConfigurationEventCreated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowConfigurationEventModified {
     pub event_time: DateTime<Utc>,
-    pub flow_key: FlowKey,
+    pub flow_binding: FlowBinding,
     pub rule: FlowConfigurationRule,
 }
 
@@ -45,7 +45,7 @@ pub struct FlowConfigurationEventModified {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowConfigurationEventDatasetRemoved {
     pub event_time: DateTime<Utc>,
-    pub flow_key: FlowKey,
+    pub flow_binding: FlowBinding,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,11 +59,11 @@ impl FlowConfigurationEvent {
         }
     }
 
-    pub fn flow_key(&self) -> &FlowKey {
+    pub fn flow_binding(&self) -> &FlowBinding {
         match self {
-            FlowConfigurationEvent::Created(e) => &e.flow_key,
-            FlowConfigurationEvent::Modified(e) => &e.flow_key,
-            FlowConfigurationEvent::DatasetRemoved(e) => &e.flow_key,
+            FlowConfigurationEvent::Created(e) => &e.flow_binding,
+            FlowConfigurationEvent::Modified(e) => &e.flow_binding,
+            FlowConfigurationEvent::DatasetRemoved(e) => &e.flow_binding,
         }
     }
 

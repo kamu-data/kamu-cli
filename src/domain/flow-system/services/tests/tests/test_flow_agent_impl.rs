@@ -13,7 +13,9 @@ use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowConfigRuleCompact,
     FlowConfigRuleCompactFull,
@@ -60,8 +62,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
     harness
         .set_dataset_flow_ingest(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
             },
@@ -651,8 +652,7 @@ async fn test_ingest_trigger_with_ingest_config() {
 
     harness
         .set_dataset_flow_ingest(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST),
             FlowConfigRuleIngest {
                 fetch_uncacheable: true,
             },
@@ -1007,8 +1007,7 @@ async fn test_manual_trigger_reset() {
     harness.eager_initialization().await;
     harness
         .set_dataset_flow_reset_rule(
-            foo_id.clone(),
-            DatasetFlowType::Reset,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_RESET),
             FlowConfigRuleReset {
                 new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                 old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
@@ -1128,8 +1127,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
     harness
         .set_dataset_flow_reset_rule(
-            foo_id.clone(),
-            DatasetFlowType::Reset,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_RESET),
             FlowConfigRuleReset {
                 new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                 old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
@@ -1333,8 +1331,7 @@ async fn test_manual_trigger_compaction_with_config() {
     harness.eager_initialization().await;
     harness
         .set_dataset_flow_compaction_rule(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT),
             FlowConfigRuleCompact::Full(
                 FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records, false)
                     .unwrap(),
@@ -1450,8 +1447,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
     harness
         .set_dataset_flow_compaction_rule(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT),
             FlowConfigRuleCompact::Full(
                 FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records, true)
                     .unwrap(),
@@ -1679,8 +1675,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT),
             FlowConfigRuleCompact::MetadataOnly { recursive: true },
         )
         .await;
@@ -1908,8 +1903,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT),
             FlowConfigRuleCompact::MetadataOnly { recursive: false },
         )
         .await;
@@ -2041,8 +2035,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT),
             FlowConfigRuleCompact::MetadataOnly { recursive: true },
         )
         .await;
@@ -6285,8 +6278,7 @@ async fn test_disable_trigger_on_flow_fail() {
 
     harness
         .set_dataset_flow_ingest(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
+            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
             },

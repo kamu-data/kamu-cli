@@ -30,12 +30,10 @@ impl PostgresFlowConfigurationEventStore {
 
     fn get_system_events(
         &self,
-        fk_system: &FlowKeySystem,
+        system_flow_type: String,
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
-        let flow_type = fk_system.flow_type;
-
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr
@@ -46,12 +44,13 @@ impl PostgresFlowConfigurationEventStore {
                 r#"
                 SELECT event_id, event_payload
                 FROM flow_configuration_events
-                WHERE system_flow_type = ($1::text)::system_flow_type
+                WHERE flow_type = $1
+                    AND scope_data->>'type' = 'System'
                     AND (cast($2 as INT8) IS NULL or event_id > $2)
                     AND (cast($3 as INT8) IS NULL or event_id <= $3)
                 ORDER BY event_id ASC
                 "#,
-                flow_type as SystemFlowType,
+                system_flow_type,
                 maybe_from_id,
                 maybe_to_id,
             ).try_map(|event_row| {
@@ -71,12 +70,12 @@ impl PostgresFlowConfigurationEventStore {
 
     fn get_dataset_events(
         &self,
-        fk_dataset: &FlowKeyDataset,
+        dataset_id: &odf::DatasetID,
+        dataset_flow_type: String,
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
-        let dataset_id = fk_dataset.dataset_id.to_string();
-        let flow_type = fk_dataset.flow_type;
+        let dataset_id = dataset_id.to_string();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -88,14 +87,15 @@ impl PostgresFlowConfigurationEventStore {
                 r#"
                 SELECT event_id, event_payload
                 FROM flow_configuration_events
-                WHERE dataset_id = $1
-                    AND dataset_flow_type = ($2::text)::dataset_flow_type
+                WHERE flow_type = $1
+                    AND scope_data->>'dataset_id' = $2
+                    AND scope_data->>'type' = 'Dataset'
                     AND (cast($3 as INT8) IS NULL or event_id > $3)
                     AND (cast($4 as INT8) IS NULL or event_id <= $4)
                 ORDER BY event_id ASC
                 "#,
+                dataset_flow_type,
                 dataset_id,
-                flow_type as DatasetFlowType,
                 maybe_from_id,
                 maybe_to_id,
             ).try_map(|event_row| {
@@ -120,25 +120,28 @@ impl PostgresFlowConfigurationEventStore {
 impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore {
     fn get_events(
         &self,
-        flow_key: &FlowKey,
+        flow_binding: &FlowBinding,
         opts: GetEventsOpts,
     ) -> EventStream<FlowConfigurationEvent> {
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
-        match flow_key {
-            FlowKey::Dataset(fk_dataset) => {
-                self.get_dataset_events(fk_dataset, maybe_from_id, maybe_to_id)
-            }
-            FlowKey::System(fk_system) => {
-                self.get_system_events(fk_system, maybe_from_id, maybe_to_id)
+        match &flow_binding.scope {
+            FlowScope::Dataset { dataset_id } => self.get_dataset_events(
+                dataset_id,
+                flow_binding.flow_type.clone(),
+                maybe_from_id,
+                maybe_to_id,
+            ),
+            FlowScope::System => {
+                self.get_system_events(flow_binding.flow_type.clone(), maybe_from_id, maybe_to_id)
             }
         }
     }
 
     async fn save_events(
         &self,
-        flow_key: &FlowKey,
+        flow_binding: &FlowBinding,
         _prev_stored_event_id: Option<EventID>, // TODO: detecting concurrent modifications
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
@@ -149,41 +152,21 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = match flow_key {
-            FlowKey::Dataset(fk_dataset) => {
-                let mut query_builder = QueryBuilder::<Postgres>::new(
-                    r#"
-                    INSERT INTO flow_configuration_events (dataset_id, dataset_flow_type, event_type, event_time, event_payload)
-                    "#,
-                );
+        let mut query_builder = QueryBuilder::<Postgres>::new(
+            r#"
+            INSERT INTO flow_configuration_events (flow_type, scope_data, event_type, event_time, event_payload)
+            "#,
+        );
 
-                query_builder.push_values(events, |mut b, event| {
-                    b.push_bind(fk_dataset.dataset_id.to_string());
-                    b.push_bind(fk_dataset.flow_type);
-                    b.push_bind(event.typename());
-                    b.push_bind(event.event_time());
-                    b.push_bind(serde_json::to_value(event).unwrap());
-                });
+        let binding_scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
 
-                query_builder
-            }
-            FlowKey::System(fk_system) => {
-                let mut query_builder = QueryBuilder::<Postgres>::new(
-                    r#"
-                    INSERT INTO flow_configuration_events (system_flow_type, event_type, event_time, event_payload)
-                    "#,
-                );
-
-                query_builder.push_values(events, |mut b, event| {
-                    b.push_bind(fk_system.flow_type);
-                    b.push_bind(event.typename());
-                    b.push_bind(event.event_time());
-                    b.push_bind(serde_json::to_value(event).unwrap());
-                });
-
-                query_builder
-            }
-        };
+        query_builder.push_values(events, |mut b, event| {
+            b.push_bind(flow_binding.flow_type.as_str());
+            b.push_bind(&binding_scope_json);
+            b.push_bind(event.typename());
+            b.push_bind(event.event_time());
+            b.push_bind(serde_json::to_value(event).unwrap());
+        });
 
         query_builder.push("RETURNING event_id");
 
@@ -240,13 +223,13 @@ impl FlowConfigurationEventStore for PostgresFlowConfigurationEventStore {
 
         let dataset_ids = sqlx::query!(
             r#"
-                SELECT DISTINCT dataset_id
-                    FROM flow_configuration_events
-                    WHERE
-                        dataset_id IS NOT NULL AND
-                        event_type = 'FlowConfigurationEventCreated'
-                    ORDER BY dataset_id
-                    LIMIT $1 OFFSET $2
+            SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id
+                FROM flow_configuration_events
+                WHERE
+                    scope_data->>'dataset_id' IS NOT NULL AND
+                    event_type = 'FlowConfigurationEventCreated'
+                ORDER BY scope_data->>'dataset_id'
+                LIMIT $1 OFFSET $2
             "#,
             limit,
             offset,
@@ -271,11 +254,11 @@ impl FlowConfigurationEventStore for PostgresFlowConfigurationEventStore {
 
         let dataset_ids_count = sqlx::query_scalar!(
             r#"
-            SELECT COUNT(DISTINCT dataset_id)
+            SELECT COUNT(DISTINCT scope_data->>'dataset_id')
                 FROM flow_configuration_events
                 WHERE
-                    dataset_id IS NOT NULL AND
-                    event_type = 'FlowTriggerEventCreated'
+                    scope_data->>'dataset_id' IS NOT NULL AND
+                    event_type = 'FlowConfigurationEventCreated'
             "#,
         )
         .fetch_one(connection_mut)
@@ -283,6 +266,76 @@ impl FlowConfigurationEventStore for PostgresFlowConfigurationEventStore {
         .int_err()?;
 
         Ok(usize::try_from(dataset_ids_count.unwrap_or(0)).unwrap())
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                WITH latest_events AS (
+                    SELECT DISTINCT ON (flow_type, scope_data)
+                        flow_type,
+                        scope_data,
+                        event_type,
+                        event_payload
+                    FROM flow_configuration_events
+                    ORDER BY flow_type, scope_data, event_time DESC
+                )
+                SELECT flow_type, scope_data
+                FROM latest_events
+                WHERE event_type != 'FlowConfigurationEventDatasetRemoved'
+                "#,
+            )
+            .fetch(connection_mut)
+            .map_err(ErrorIntoInternal::int_err);
+
+            while let Some(row) = query_stream.try_next().await? {
+                let flow_binding = FlowBinding {
+                    flow_type: row.flow_type,
+                    scope: serde_json::from_value(row.scope_data).int_err()?,
+                };
+                yield Ok(flow_binding);
+            }
+        })
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    async fn all_bindings_for_dataset_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let dataset_id_str = dataset_id.to_string();
+
+        let flow_bindings = sqlx::query!(
+            r#"
+            SELECT DISTINCT flow_type, scope_data
+                FROM flow_configuration_events
+                WHERE scope_data->>'dataset_id' = $1
+                    AND event_type = 'FlowConfigurationEventCreated'
+            "#,
+            dataset_id_str,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(flow_bindings
+            .into_iter()
+            .map(|row| FlowBinding {
+                flow_type: row.flow_type,
+                scope: FlowScope::Dataset {
+                    dataset_id: dataset_id.clone(),
+                },
+            })
+            .collect())
     }
 }
 
