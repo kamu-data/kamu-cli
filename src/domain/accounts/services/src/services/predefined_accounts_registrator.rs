@@ -124,10 +124,27 @@ impl PredefinedAccountsRegistrator {
         };
 
         if account_config.provider == <&'static str>::from(AccountProvider::Password) {
-            self.account_service
-                .modify_account_password(&updated_account.account_name, &account_config.password)
+            use VerifyPasswordError as E;
+
+            let has_password_changed = match self
+                .account_service
+                .verify_account_password(&updated_account.account_name, &account_config.password)
                 .await
-                .int_err()?;
+            {
+                Ok(_) => Ok(false),
+                Err(E::IncorrectPassword(_)) => Ok(true),
+                Err(e @ (E::AccountNotFound(_) | E::Internal(_))) => Err(e.int_err()),
+            }?;
+
+            if has_password_changed {
+                self.account_service
+                    .modify_account_password(
+                        &updated_account.account_name,
+                        &account_config.password,
+                    )
+                    .await
+                    .int_err()?;
+            }
         }
 
         if account != updated_account {
