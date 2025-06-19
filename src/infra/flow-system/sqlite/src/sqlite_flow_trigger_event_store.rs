@@ -410,20 +410,26 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
             r#"
             SELECT EXISTS (
                 SELECT 1
-                FROM flow_trigger_events e
-                WHERE e.dataset_id IN ({})
-                AND e.event_time = (
-                    SELECT MAX(e2.event_time)
-                    FROM flow_trigger_events e2
-                    WHERE
-                        e2.dataset_id = e.dataset_id
-                        AND e2.dataset_flow_type = e.dataset_flow_type
-                )
-                AND e.event_type != 'FlowTriggerEventDatasetRemoved'
+                FROM (
+                    SELECT
+                        flow_type,
+                        scope_data,
+                        event_type,
+                        event_payload,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY flow_type, scope_data
+                            ORDER BY event_time DESC
+                        ) AS row_num
+                    FROM flow_trigger_events
+                ) AS latest_events
+                WHERE row_num = 1
+                AND json_extract(scope_data, '$.type') = 'Dataset'
+                AND json_extract(scope_data, '$.dataset_id') IN ({})
+                AND event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (
-                    (e.event_type = 'FlowTriggerEventCreated' AND json_extract(e.event_payload, '$.Created.paused') = 0)
+                    (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = 0)
                     OR
-                    (e.event_type = 'FlowTriggerEventModified' AND json_extract(e.event_payload, '$.Modified.paused') = 0)
+                    (event_type = 'FlowTriggerEventModified' AND json_extract(event_payload, '$.Modified.paused') = 0)
                 )
             )
             "#,
