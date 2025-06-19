@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `PredefinedAccountsRegistrator`: during account synchronization update password hash as well.
+
 ## [0.242.0] - 2025-06-17
 ### Added
 - `kamu system api-server gql-query`: support for authorization and, as a result, mutation requests (#1273).
