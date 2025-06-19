@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.242.1] - 2025-06-19
 ### Fixed
 - `PredefinedAccountsRegistrator`: during account synchronization update password hash as well.
 
