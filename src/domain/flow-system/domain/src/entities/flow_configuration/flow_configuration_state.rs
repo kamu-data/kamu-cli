@@ -15,8 +15,8 @@ use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationState {
-    /// Flow key
-    pub flow_key: FlowKey,
+    /// Flow binding
+    pub flow_binding: FlowBinding,
     /// Flow configuration rule
     pub rule: FlowConfigurationRule,
     /// Configuration status
@@ -32,7 +32,7 @@ impl FlowConfigurationState {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Projection for FlowConfigurationState {
-    type Query = FlowKey;
+    type Query = FlowBinding;
     type Event = FlowConfigurationEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
@@ -40,15 +40,17 @@ impl Projection for FlowConfigurationState {
 
         match (state, event) {
             (None, event) => match event {
-                E::Created(FlowConfigurationEventCreated { flow_key, rule, .. }) => Ok(Self {
-                    flow_key,
+                E::Created(FlowConfigurationEventCreated {
+                    flow_binding, rule, ..
+                }) => Ok(Self {
+                    flow_binding,
                     rule,
                     status: FlowConfigurationStatus::Active,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
-                assert_eq!(&s.flow_key, event.flow_key());
+                assert_eq!(&s.flow_binding, event.flow_binding());
 
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
@@ -63,7 +65,7 @@ impl Projection for FlowConfigurationState {
                     }
 
                     E::DatasetRemoved(_) => {
-                        if let FlowKey::Dataset(_) = &s.flow_key {
+                        if let FlowScope::Dataset { .. } = &s.flow_binding.scope {
                             if s.status == FlowConfigurationStatus::Deleted {
                                 Ok(s) // idempotent DELETE
                             } else {
@@ -84,9 +86,9 @@ impl Projection for FlowConfigurationState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ProjectionEvent<FlowKey> for FlowConfigurationEvent {
-    fn matches_query(&self, query: &FlowKey) -> bool {
-        self.flow_key() == query
+impl ProjectionEvent<FlowBinding> for FlowConfigurationEvent {
+    fn matches_query(&self, query: &FlowBinding) -> bool {
+        self.flow_binding() == query
     }
 }
 

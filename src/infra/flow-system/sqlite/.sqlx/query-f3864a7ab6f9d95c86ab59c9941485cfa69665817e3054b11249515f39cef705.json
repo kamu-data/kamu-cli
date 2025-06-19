@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                WITH latest_events AS (\n                    SELECT\n                        flow_type,\n                        scope_data,\n                        event_type,\n                        event_payload,\n                        ROW_NUMBER() OVER (\n                            PARTITION BY flow_type, scope_data\n                            ORDER BY event_time DESC\n                        ) AS row_num\n                    FROM flow_configuration_events\n                )\n                SELECT flow_type, scope_data as \"scope_data: String\"\n                FROM latest_events\n                WHERE row_num = 1\n                AND event_type != 'FlowConfigurationEventDatasetRemoved'\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "flow_type",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "scope_data: String",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f3864a7ab6f9d95c86ab59c9941485cfa69665817e3054b11249515f39cef705"
+}

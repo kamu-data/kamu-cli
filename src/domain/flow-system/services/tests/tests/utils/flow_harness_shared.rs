@@ -281,45 +281,33 @@ impl FlowHarness {
 
     pub async fn set_dataset_flow_ingest(
         &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_binding: FlowBinding,
         ingest_rule: FlowConfigRuleIngest,
     ) {
         self.flow_configuration_service
-            .set_configuration(
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                ingest_rule.into_flow_config(),
-            )
+            .set_configuration(flow_binding, ingest_rule.into_flow_config())
             .await
             .unwrap();
     }
 
     pub async fn set_dataset_flow_reset_rule(
         &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_binding: FlowBinding,
         reset_rule: FlowConfigRuleReset,
     ) {
         self.flow_configuration_service
-            .set_configuration(
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                reset_rule.into_flow_config(),
-            )
+            .set_configuration(flow_binding, reset_rule.into_flow_config())
             .await
             .unwrap();
     }
 
     pub async fn set_dataset_flow_compaction_rule(
         &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_binding: FlowBinding,
         compaction_rule: FlowConfigRuleCompact,
     ) {
         self.flow_configuration_service
-            .set_configuration(
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                compaction_rule.into_flow_config(),
-            )
+            .set_configuration(flow_binding, compaction_rule.into_flow_config())
             .await
             .unwrap();
     }

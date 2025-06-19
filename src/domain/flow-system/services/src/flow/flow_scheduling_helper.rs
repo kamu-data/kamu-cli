@@ -171,6 +171,8 @@ impl FlowSchedulingHelper {
             },
         };
 
+        let flow_binding = flow_key.into();
+
         // Is a pending flow present for this config?
         match self.find_pending_flow(flow_key).await? {
             // Already pending flow
@@ -241,7 +243,7 @@ impl FlowSchedulingHelper {
                     maybe_flow_config_snapshot
                 } else {
                     self.flow_configuration_service
-                        .try_get_config_snapshot_by_key(flow_key.clone())
+                        .try_get_config_snapshot_by_key(&flow_binding)
                         .await
                         .int_err()?
                 };

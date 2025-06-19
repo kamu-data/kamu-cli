@@ -20,19 +20,13 @@ pub trait FlowConfigurationService: Sync + Send {
     /// Find current configuration of a certain type
     async fn find_configuration(
         &self,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError>;
-
-    /// Find all configurations by dataset ids
-    async fn find_configurations_by_datasets(
-        &self,
-        dataset_ids: Vec<odf::DatasetID>,
-    ) -> FlowConfigurationStateStream;
 
     /// Set or modify flow configuration
     async fn set_configuration(
         &self,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError>;
 
@@ -46,7 +40,7 @@ pub trait FlowConfigurationService: Sync + Send {
 pub trait FlowConfigurationServiceExt {
     async fn try_get_config_snapshot_by_key(
         &self,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError>;
 }
 
@@ -54,9 +48,9 @@ pub trait FlowConfigurationServiceExt {
 impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
     async fn try_get_config_snapshot_by_key(
         &self,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError> {
-        let maybe_config = self.find_configuration(flow_key).await?;
+        let maybe_config = self.find_configuration(flow_binding).await?;
         Ok(maybe_config.map(|config| config.rule))
     }
 }
