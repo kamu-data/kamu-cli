@@ -432,14 +432,6 @@ impl FlowTriggerHarness {
                     .unwrap();
             }
         }
-        self.flow_trigger_service
-            .pause_dataset_flows(
-                Utc::now(),
-                &flow_binding.dataset_id_or_die().unwrap(),
-                Some(&flow_binding.flow_type),
-            )
-            .await
-            .unwrap();
     }
 
     async fn pause_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
