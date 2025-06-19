@@ -84,6 +84,7 @@ impl From<&FlowBinding> for FlowKey {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "PascalCase")]
 pub enum FlowScope {
     Dataset { dataset_id: odf::DatasetID },
     System,
