@@ -73,8 +73,10 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         // Extract account name and password
         let account_name =
             odf::AccountName::from_str(&password_login_credentials.login).int_err()?;
-        let password = Password::try_new(password_login_credentials.password)
-            .map_err(|_| ProviderLoginError::RejectedCredentials(RejectedCredentialsError {}))?;
+        let password = Password::try_new(password_login_credentials.password).map_err(|e| {
+            tracing::debug!(%account_name, %e, "Failed to instantiate a password");
+            ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
+        })?;
 
         self.account_service
             .verify_account_password(&account_name, &password)
@@ -82,7 +84,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             .map_err(|e| {
                 use VerifyPasswordError as E;
                 match e {
-                    E::AccountNotFound(_) | E::IncorrectPassword(_) => {
+                    e @ (E::AccountNotFound(_) | E::IncorrectPassword(_)) => {
+                        tracing::debug!(%account_name, %e, "Failed to verify a password");
                         ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
                     }
                     e @ E::Internal(_) => ProviderLoginError::Internal(e.int_err()),

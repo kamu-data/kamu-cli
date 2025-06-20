@@ -33,6 +33,7 @@ pub struct PredefinedAccountsRegistrator {
     default_account_properties: Arc<DefaultAccountProperties>,
     password_hash_repository: Arc<dyn PasswordHashRepository>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
+    account_service: Arc<dyn AccountService>,
 }
 
 #[component(pub)]
@@ -51,6 +52,7 @@ impl PredefinedAccountsRegistrator {
         default_account_properties: Arc<DefaultAccountProperties>,
         password_hash_repository: Arc<dyn PasswordHashRepository>,
         outbox: Arc<dyn messaging_outbox::Outbox>,
+        account_service: Arc<dyn AccountService>,
     ) -> Self {
         Self {
             predefined_accounts_config,
@@ -60,6 +62,7 @@ impl PredefinedAccountsRegistrator {
             default_account_properties,
             password_hash_repository,
             outbox,
+            account_service,
         }
     }
 
@@ -120,11 +123,33 @@ impl PredefinedAccountsRegistrator {
             ..account_config.into()
         };
 
+        if account_config.provider == <&'static str>::from(AccountProvider::Password) {
+            use VerifyPasswordError as E;
+
+            let has_password_changed = match self
+                .account_service
+                .verify_account_password(&updated_account.account_name, &account_config.password)
+                .await
+            {
+                Ok(_) => Ok(false),
+                Err(E::IncorrectPassword(_)) => Ok(true),
+                Err(e @ (E::AccountNotFound(_) | E::Internal(_))) => Err(e.int_err()),
+            }?;
+
+            if has_password_changed {
+                self.account_service
+                    .modify_account_password(
+                        &updated_account.account_name,
+                        &account_config.password,
+                    )
+                    .await
+                    .int_err()?;
+            }
+        }
+
         if account != updated_account {
             tracing::info!(
-                "Updating modified predefined account: old: {:?}, new: {:?}",
-                account,
-                updated_account
+                "Updating modified predefined account: old: {account:?}, new: {updated_account:?}",
             );
             let new_account_name = updated_account.account_name.clone();
 
