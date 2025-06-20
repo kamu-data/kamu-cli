@@ -19,8 +19,8 @@ use crate::*;
 pub struct FlowState {
     /// Unique flow identifier
     pub flow_id: FlowID,
-    /// Flow key
-    pub flow_key: FlowKey,
+    /// Flow binding
+    pub flow_binding: FlowBinding,
     /// Triggers
     pub triggers: Vec<FlowTriggerInstance>,
     /// Start condition (if defined)
@@ -88,12 +88,12 @@ impl Projection for FlowState {
                 E::Initiated(FlowEventInitiated {
                     event_time: _,
                     flow_id,
-                    flow_key,
+                    flow_binding,
                     trigger,
                     config_snapshot,
                 }) => Ok(Self {
                     flow_id,
-                    flow_key,
+                    flow_binding,
                     triggers: vec![trigger],
                     start_condition: None,
                     timing: FlowTimingRecords {

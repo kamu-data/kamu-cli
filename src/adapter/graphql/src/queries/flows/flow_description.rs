@@ -10,6 +10,12 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
+use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_TRANSFORM,
+};
 use kamu_adapter_task_dataset::{
     TaskResultDatasetHardCompact,
     TaskResultDatasetReset,
@@ -17,6 +23,7 @@ use kamu_adapter_task_dataset::{
 };
 use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
+use kamu_flow_system::FLOW_TYPE_SYSTEM_GC;
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::prelude::*;
@@ -333,8 +340,8 @@ impl FlowDescriptionBuilder {
         let dataset_ids = flow_states
             .iter()
             .filter_map(|flow_state| {
-                if let kamu_flow_system::FlowKey::Dataset(fk_dataset) = &flow_state.flow_key {
-                    Some(fk_dataset.dataset_id.clone())
+                if let fs::FlowScope::Dataset { dataset_id } = &flow_state.flow_binding.scope {
+                    Some(dataset_id.clone())
                 } else {
                     None
                 }
@@ -360,21 +367,29 @@ impl FlowDescriptionBuilder {
         ctx: &Context<'_>,
         flow_state: &fs::FlowState,
     ) -> Result<FlowDescription> {
-        Ok(match &flow_state.flow_key {
-            fs::FlowKey::Dataset(fk_dataset) => FlowDescription::Dataset(
-                self.dataset_flow_description(ctx, flow_state, fk_dataset)
+        let flow_type = flow_state.flow_binding.flow_type.as_str();
+        Ok(match &flow_state.flow_binding.scope {
+            fs::FlowScope::Dataset { dataset_id } => FlowDescription::Dataset(
+                self.dataset_flow_description(ctx, flow_state, flow_type, dataset_id)
                     .await?,
             ),
-            fs::FlowKey::System(fk_system) => {
-                FlowDescription::System(self.system_flow_description(fk_system))
+            fs::FlowScope::System => {
+                FlowDescription::System(self.system_flow_description(flow_type)?)
             }
         })
     }
 
-    fn system_flow_description(&self, system_key: &fs::FlowKeySystem) -> FlowDescriptionSystem {
-        match system_key.flow_type {
-            fs::SystemFlowType::GC => {
-                FlowDescriptionSystem::GC(FlowDescriptionSystemGC { dummy: true })
+    fn system_flow_description(&self, flow_type: &str) -> Result<FlowDescriptionSystem> {
+        match flow_type {
+            FLOW_TYPE_SYSTEM_GC => Ok(FlowDescriptionSystem::GC(FlowDescriptionSystemGC {
+                dummy: true,
+            })),
+
+            _ => {
+                tracing::error!("Unexpected system flow type: {}", flow_type,);
+                Err(GqlError::Internal(InternalError::new(format!(
+                    "Unexpected system flow type: {flow_type}",
+                ))))
             }
         }
     }
@@ -383,26 +398,24 @@ impl FlowDescriptionBuilder {
         &mut self,
         ctx: &Context<'_>,
         flow_state: &fs::FlowState,
-        dataset_key: &fs::FlowKeyDataset,
+        flow_type: &str,
+        dataset_id: &odf::DatasetID,
     ) -> Result<FlowDescriptionDataset> {
-        Ok(match dataset_key.flow_type {
-            fs::DatasetFlowType::Ingest => {
+        Ok(match flow_type {
+            FLOW_TYPE_DATASET_INGEST => {
                 let increment_query_service =
                     from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
                 let ingest_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                     flow_state.outcome.as_ref(),
-                    &dataset_key.dataset_id,
+                    dataset_id,
                     increment_query_service.as_ref(),
                 )
                 .await
                 .int_err()?;
 
-                if self
-                    .datasets_with_polling_sources
-                    .contains(&dataset_key.dataset_id)
-                {
+                if self.datasets_with_polling_sources.contains(dataset_id) {
                     FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
-                        dataset_id: dataset_key.dataset_id.clone().into(),
+                        dataset_id: dataset_id.clone().into(),
                         ingest_result,
                     })
                 } else {
@@ -412,7 +425,7 @@ impl FlowDescriptionBuilder {
                         .trigger_source_description()
                         .unwrap();
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
-                        dataset_id: dataset_key.dataset_id.clone().into(),
+                        dataset_id: dataset_id.clone().into(),
                         source_name,
                         input_records_count: 0, // TODO
                         ingest_result,
@@ -420,37 +433,45 @@ impl FlowDescriptionBuilder {
                     })
                 }
             }
-            fs::DatasetFlowType::ExecuteTransform => {
+
+            FLOW_TYPE_DATASET_TRANSFORM => {
                 let increment_query_service =
                     from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
 
                 FlowDescriptionDataset::ExecuteTransform(FlowDescriptionDatasetExecuteTransform {
-                    dataset_id: dataset_key.dataset_id.clone().into(),
+                    dataset_id: dataset_id.clone().into(),
                     transform_result: FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                         flow_state.outcome.as_ref(),
-                        &dataset_key.dataset_id,
+                        dataset_id,
                         increment_query_service.as_ref(),
                     )
                     .await
                     .int_err()?,
                 })
             }
-            fs::DatasetFlowType::HardCompaction => {
+
+            FLOW_TYPE_DATASET_COMPACT => {
                 FlowDescriptionDataset::HardCompaction(FlowDescriptionDatasetHardCompaction {
-                    dataset_id: dataset_key.dataset_id.clone().into(),
+                    dataset_id: dataset_id.clone().into(),
                     compaction_result:
                         FlowDescriptionDatasetHardCompactionResult::from_maybe_flow_outcome(
                             flow_state.outcome.as_ref(),
                         )?,
                 })
             }
-            fs::DatasetFlowType::Reset => {
-                FlowDescriptionDataset::Reset(FlowDescriptionDatasetReset {
-                    dataset_id: dataset_key.dataset_id.clone().into(),
-                    reset_result: FlowDescriptionResetResult::from_maybe_flow_outcome(
-                        flow_state.outcome.as_ref(),
-                    )?,
-                })
+
+            FLOW_TYPE_DATASET_RESET => FlowDescriptionDataset::Reset(FlowDescriptionDatasetReset {
+                dataset_id: dataset_id.clone().into(),
+                reset_result: FlowDescriptionResetResult::from_maybe_flow_outcome(
+                    flow_state.outcome.as_ref(),
+                )?,
+            }),
+
+            _ => {
+                tracing::error!("Unexpected flow type: {flow_type} for flow state: {flow_state:?}",);
+                return Err(GqlError::Internal(InternalError::new(format!(
+                    "Unexpected flow type: {flow_type} for flow state: {flow_state:?}",
+                ))));
             }
         })
     }

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService, map_dataset_flow_type};
+use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService};
 
 use super::{
     FlowIncompatibleDatasetKind,
@@ -74,7 +74,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
         let flow_binding = FlowBinding::new_dataset(
             dataset_handle.id.clone(),
-            map_dataset_flow_type(dataset_flow_type.into()),
+            map_dataset_flow_type(dataset_flow_type),
         );
 
         let res = flow_trigger_service
@@ -102,7 +102,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             .pause_dataset_flows(
                 Utc::now(),
                 &dataset_handle.id,
-                dataset_flow_type.map(|t| map_dataset_flow_type(t.into())),
+                dataset_flow_type.map(map_dataset_flow_type),
             )
             .await?;
 
@@ -124,7 +124,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             .resume_dataset_flows(
                 Utc::now(),
                 &dataset_handle.id,
-                dataset_flow_type.map(|t| map_dataset_flow_type(t.into())),
+                dataset_flow_type.map(map_dataset_flow_type),
             )
             .await?;
 

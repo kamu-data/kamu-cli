@@ -38,19 +38,21 @@ impl FlowSchedulingHelper {
     pub(crate) async fn activate_flow_trigger(
         &self,
         start_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         rule: FlowTriggerRule,
     ) -> Result<(), InternalError> {
-        tracing::trace!(flow_key = ?flow_key, rule = ?rule, "Activating flow trigger");
+        tracing::trace!(flow_key = ?flow_binding, rule = ?rule, "Activating flow trigger");
 
-        match &flow_key {
-            FlowKey::Dataset(_) => match &rule {
+        match &flow_binding.scope {
+            FlowScope::Dataset { .. } => match &rule {
                 FlowTriggerRule::Batching(batching_rule) => {
-                    let flow_run_stats =
-                        self.flow_event_store.get_flow_run_stats(&flow_key).await?;
+                    let flow_run_stats = self
+                        .flow_event_store
+                        .get_flow_run_stats(&flow_binding)
+                        .await?;
                     if flow_run_stats.last_success_time.is_some() {
                         self.trigger_flow_common(
-                            &flow_key,
+                            &flow_binding,
                             Some(FlowTriggerRule::Batching(*batching_rule)),
                             FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                                 trigger_time: start_time,
@@ -59,18 +61,18 @@ impl FlowSchedulingHelper {
                         )
                         .await?;
                     } else {
-                        self.schedule_auto_polling_flow_unconditionally(start_time, &flow_key)
+                        self.schedule_auto_polling_flow_unconditionally(start_time, &flow_binding)
                             .await?;
                     }
                 }
                 FlowTriggerRule::Schedule(schedule_rule) => {
-                    self.schedule_auto_polling_flow(start_time, &flow_key, schedule_rule)
+                    self.schedule_auto_polling_flow(start_time, &flow_binding, schedule_rule)
                         .await?;
                 }
             },
-            FlowKey::System(_) => {
+            FlowScope::System => {
                 if let FlowTriggerRule::Schedule(schedule) = &rule {
-                    self.schedule_auto_polling_flow(start_time, &flow_key, schedule)
+                    self.schedule_auto_polling_flow(start_time, &flow_binding, schedule)
                         .await?;
                 } else {
                     unimplemented!(
@@ -86,7 +88,6 @@ impl FlowSchedulingHelper {
     pub(crate) async fn try_schedule_auto_polling_flow_if_enabled(
         &self,
         start_time: DateTime<Utc>,
-        flow_key: &FlowKey,
         flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
         let maybe_active_schedule = self
@@ -96,7 +97,7 @@ impl FlowSchedulingHelper {
             .int_err()?;
 
         if let Some(active_schedule) = maybe_active_schedule {
-            self.schedule_auto_polling_flow(start_time, flow_key, &active_schedule)
+            self.schedule_auto_polling_flow(start_time, flow_binding, &active_schedule)
                 .await?;
         }
 
@@ -106,13 +107,13 @@ impl FlowSchedulingHelper {
     pub(crate) async fn schedule_auto_polling_flow(
         &self,
         start_time: DateTime<Utc>,
-        flow_key: &FlowKey,
+        flow_binding: &FlowBinding,
         schedule: &Schedule,
     ) -> Result<FlowState, InternalError> {
-        tracing::trace!(flow_key = ?flow_key, schedule = ?schedule, "Enqueuing scheduled flow");
+        tracing::trace!(flow_key = ?flow_binding, schedule = ?schedule, "Enqueuing scheduled flow");
 
         self.trigger_flow_common(
-            flow_key,
+            flow_binding,
             Some(FlowTriggerRule::Schedule(schedule.clone())),
             FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: start_time,
@@ -125,11 +126,11 @@ impl FlowSchedulingHelper {
     pub(crate) async fn schedule_auto_polling_flow_unconditionally(
         &self,
         start_time: DateTime<Utc>,
-        flow_key: &FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<FlowState, InternalError> {
         // Very similar to manual trigger, but automatic reasons
         self.trigger_flow_common(
-            flow_key,
+            flow_binding,
             None,
             FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: start_time,
@@ -141,13 +142,16 @@ impl FlowSchedulingHelper {
 
     pub(crate) async fn trigger_flow_common(
         &self,
-        flow_key: &FlowKey,
+        flow_binding: &FlowBinding,
         trigger_rule_maybe: Option<FlowTriggerRule>,
         trigger_type: FlowTriggerInstance,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
-        let flow_run_stats = self.flow_event_store.get_flow_run_stats(flow_key).await?;
+        let flow_run_stats = self
+            .flow_event_store
+            .get_flow_run_stats(flow_binding)
+            .await?;
 
         // Flows may not be attempted more frequent than mandatory throttling period.
         // If flow has never run before, let it go without restriction.
@@ -171,10 +175,8 @@ impl FlowSchedulingHelper {
             },
         };
 
-        let flow_binding = flow_key.into();
-
         // Is a pending flow present for this config?
-        match self.find_pending_flow(flow_key).await? {
+        match self.find_pending_flow(flow_binding).await? {
             // Already pending flow
             Some(flow_id) => {
                 // Load, merge triggers, update activation time
@@ -243,14 +245,14 @@ impl FlowSchedulingHelper {
                     maybe_flow_config_snapshot
                 } else {
                     self.flow_configuration_service
-                        .try_get_config_snapshot_by_key(&flow_binding)
+                        .try_get_config_snapshot_by_key(flow_binding)
                         .await
                         .int_err()?
                 };
                 let mut flow = self
                     .make_new_flow(
                         self.flow_event_store.as_ref(),
-                        flow_key.clone(),
+                        flow_binding.clone(),
                         &trigger_type,
                         maybe_flow_config_snapshot,
                     )
@@ -334,12 +336,12 @@ impl FlowSchedulingHelper {
         batching_rule: &BatchingRule,
         throttling_boundary_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        assert!(matches!(
+        /*assert!(matches!(
             flow.flow_key.get_type(),
             AnyFlowType::Dataset(
                 DatasetFlowType::ExecuteTransform | DatasetFlowType::HardCompaction
             )
-        ));
+        )); */
 
         // TODO: it's likely assumed the accumulation is per each input separately, but
         // for now count overall number
@@ -479,23 +481,28 @@ impl FlowSchedulingHelper {
         Ok(())
     }
 
-    async fn find_pending_flow(&self, flow_key: &FlowKey) -> Result<Option<FlowID>, InternalError> {
-        self.flow_event_store.try_get_pending_flow(flow_key).await
+    async fn find_pending_flow(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<Option<FlowID>, InternalError> {
+        self.flow_event_store
+            .try_get_pending_flow(flow_binding)
+            .await
     }
 
     async fn make_new_flow(
         &self,
         flow_event_store: &dyn FlowEventStore,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         trigger_type: &FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<Flow, InternalError> {
-        tracing::trace!(flow_key = ?flow_key, trigger = ?trigger_type, "Creating new flow");
+        tracing::trace!(flow_key = ?flow_binding, trigger = ?trigger_type, "Creating new flow");
 
         let flow = Flow::new(
             self.time_source.now(),
             flow_event_store.new_flow_id().await?,
-            flow_key,
+            flow_binding,
             trigger_type.clone(),
             config_snapshot,
         );

@@ -60,7 +60,7 @@ impl FlowEvent {
 pub struct FlowEventInitiated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub flow_key: FlowKey,
+    pub flow_binding: FlowBinding,
     pub trigger: FlowTriggerInstance,
     pub config_snapshot: Option<FlowConfigurationRule>,
 }

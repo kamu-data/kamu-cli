@@ -15,6 +15,11 @@ use chrono::{Duration, SubsecRound, Utc};
 use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
+use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_TRANSFORM,
+};
 use kamu_flow_system::*;
 use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
 
@@ -23,7 +28,7 @@ use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
 pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let always_happy_filters = DatasetFlowFilters::default();
+    let always_happy_filters = FlowFilters::default();
 
     let foo_cases = make_dataset_test_case(flow_event_store.clone()).await;
     let bar_cases = make_dataset_test_case(flow_event_store.clone()).await;
@@ -78,7 +83,7 @@ pub async fn test_dataset_flow_filter_by_status(catalog: &Catalog) {
 
     let cases = vec![
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
                 ..Default::default()
             },
@@ -88,7 +93,7 @@ pub async fn test_dataset_flow_filter_by_status(catalog: &Catalog) {
             ],
         ),
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Running),
                 ..Default::default()
             },
@@ -98,7 +103,7 @@ pub async fn test_dataset_flow_filter_by_status(catalog: &Catalog) {
             ],
         ),
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Finished),
                 ..Default::default()
             },
@@ -134,8 +139,8 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
 
     let cases = vec![
         (
-            DatasetFlowFilters {
-                by_flow_type: Some(DatasetFlowType::Ingest),
+            FlowFilters {
+                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
                 ..Default::default()
             },
             vec![
@@ -145,8 +150,8 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
             ],
         ),
         (
-            DatasetFlowFilters {
-                by_flow_type: Some(DatasetFlowType::HardCompaction),
+            FlowFilters {
+                by_flow_type: Some(FLOW_TYPE_DATASET_COMPACT.to_string()),
                 ..Default::default()
             },
             vec![
@@ -156,8 +161,8 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
             ],
         ),
         (
-            DatasetFlowFilters {
-                by_flow_type: Some(DatasetFlowType::ExecuteTransform),
+            FlowFilters {
+                by_flow_type: Some(FLOW_TYPE_DATASET_TRANSFORM.to_string()),
                 ..Default::default()
             },
             vec![],
@@ -192,7 +197,7 @@ pub async fn test_dataset_flow_filter_by_initiator(catalog: &Catalog) {
 
     let cases = vec![
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(wasya_filter)),
                 ..Default::default()
             },
@@ -202,7 +207,7 @@ pub async fn test_dataset_flow_filter_by_initiator(catalog: &Catalog) {
             ],
         ),
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(petya_filter)),
                 ..Default::default()
             },
@@ -212,7 +217,7 @@ pub async fn test_dataset_flow_filter_by_initiator(catalog: &Catalog) {
             ],
         ),
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::System),
                 ..Default::default()
             },
@@ -255,7 +260,7 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
 
     let cases = vec![
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(wasya_patya_filter)),
                 ..Default::default()
             },
@@ -268,7 +273,7 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
         ),
         // should return the same amount even if some non existing user was provided
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(wasya_patya_unrelated_filter)),
                 ..Default::default()
             },
@@ -307,25 +312,25 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
 
     let cases = vec![
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Finished),
-                by_flow_type: Some(DatasetFlowType::Ingest),
+                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
                 by_initiator: Some(InitiatorFilter::System),
             },
             vec![foo_cases.ingest_flow_ids.flow_id_finished],
         ),
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
-                by_flow_type: Some(DatasetFlowType::HardCompaction),
+                by_flow_type: Some(FLOW_TYPE_DATASET_COMPACT.to_string()),
                 by_initiator: Some(InitiatorFilter::Account(petya_filter)),
             },
             vec![foo_cases.compaction_flow_ids.flow_id_waiting],
         ),
         (
-            DatasetFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Running),
-                by_flow_type: Some(DatasetFlowType::Ingest),
+                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
                 by_initiator: Some(InitiatorFilter::System),
             },
             vec![],
@@ -393,7 +398,7 @@ pub async fn test_dataset_flow_filter_by_datasets(catalog: &Catalog) {
         assert_multiple_dataset_flow_expectations(
             flow_event_store.clone(),
             dataset_ids,
-            DatasetFlowFilters::default(),
+            FlowFilters::default(),
             PaginationOpts {
                 offset: 0,
                 limit: 100,
@@ -437,7 +442,7 @@ pub async fn test_dataset_flow_filter_by_datasets_and_status(catalog: &Catalog) 
         assert_multiple_dataset_flow_expectations(
             flow_event_store.clone(),
             dataset_ids,
-            DatasetFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
                 ..Default::default()
             },
@@ -516,7 +521,7 @@ pub async fn test_dataset_flow_filter_by_datasets_with_pagination(catalog: &Cata
         assert_multiple_dataset_flow_expectations(
             flow_event_store.clone(),
             dataset_ids,
-            DatasetFlowFilters::default(),
+            FlowFilters::default(),
             pagination,
             expected_flow_ids,
         )
@@ -605,8 +610,8 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
                 offset: 0,
                 limit: 2,
             },
-            DatasetFlowFilters {
-                by_flow_type: Some(DatasetFlowType::Ingest),
+            FlowFilters {
+                by_flow_type: Some(FLOW_TYPE_DATASET_INGEST.to_string()),
                 ..Default::default()
             },
             3,
@@ -620,7 +625,7 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
                 offset: 1,
                 limit: 2,
             },
-            DatasetFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
                 ..Default::default()
             },
@@ -632,7 +637,7 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
                 offset: 1,
                 limit: 2,
             },
-            DatasetFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::System),
                 ..Default::default()
             },
@@ -684,7 +689,7 @@ pub async fn test_unfiltered_system_flows(catalog: &Catalog) {
 
     assert_system_flow_expectations(
         flow_event_store.clone(),
-        SystemFlowFilters::default(),
+        FlowFilters::default(),
         PaginationOpts {
             offset: 0,
             limit: 100,
@@ -707,8 +712,8 @@ pub async fn test_system_flows_filtered_by_flow_type(catalog: &Catalog) {
     let system_case = make_system_test_case(flow_event_store.clone()).await;
 
     let cases = vec![(
-        SystemFlowFilters {
-            by_flow_type: Some(SystemFlowType::GC),
+        FlowFilters {
+            by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
             ..Default::default()
         },
         vec![
@@ -742,21 +747,21 @@ pub async fn test_system_flows_filtered_by_flow_status(catalog: &Catalog) {
 
     let cases = vec![
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
                 ..Default::default()
             },
             vec![system_case.gc_flow_ids.flow_id_waiting],
         ),
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Running),
                 ..Default::default()
             },
             vec![system_case.gc_flow_ids.flow_id_running],
         ),
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Finished),
                 ..Default::default()
             },
@@ -792,21 +797,21 @@ pub async fn test_system_flows_filtered_by_initiator(catalog: &Catalog) {
 
     let cases = vec![
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::System),
                 ..Default::default()
             },
             vec![system_case.gc_flow_ids.flow_id_finished],
         ),
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(wasya_filter)),
                 ..Default::default()
             },
             vec![system_case.gc_flow_ids.flow_id_running],
         ),
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(unrelated_user_filter)),
                 ..Default::default()
             },
@@ -839,15 +844,15 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
 
     let cases = vec![
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Finished),
                 by_initiator: Some(InitiatorFilter::System),
-                by_flow_type: Some(SystemFlowType::GC),
+                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
             },
             vec![system_case.gc_flow_ids.flow_id_finished],
         ),
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(petya_filter)),
                 by_flow_status: Some(FlowStatus::Waiting),
                 by_flow_type: None,
@@ -855,10 +860,10 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
             vec![system_case.gc_flow_ids.flow_id_waiting],
         ),
         (
-            SystemFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Running),
                 by_initiator: Some(InitiatorFilter::System),
-                by_flow_type: Some(SystemFlowType::GC),
+                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
             },
             vec![],
         ),
@@ -948,8 +953,8 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
                 offset: 0,
                 limit: 2,
             },
-            SystemFlowFilters {
-                by_flow_type: Some(SystemFlowType::GC),
+            FlowFilters {
+                by_flow_type: Some(FLOW_TYPE_SYSTEM_GC.to_string()),
                 ..Default::default()
             },
             3,
@@ -963,7 +968,7 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
                 offset: 0,
                 limit: 2,
             },
-            SystemFlowFilters {
+            FlowFilters {
                 by_flow_status: Some(FlowStatus::Waiting),
                 ..Default::default()
             },
@@ -975,7 +980,7 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
                 offset: 1,
                 limit: 2,
             },
-            SystemFlowFilters {
+            FlowFilters {
                 by_initiator: Some(InitiatorFilter::System),
                 ..Default::default()
             },
@@ -1007,7 +1012,7 @@ pub async fn test_all_flows_unpaged(catalog: &Catalog) {
 
     assert_all_flow_expectations(
         flow_event_store.clone(),
-        AllFlowFilters::default(),
+        FlowFilters::default(),
         PaginationOpts {
             offset: 0,
             limit: 100,
@@ -1086,7 +1091,7 @@ pub async fn test_all_flows_pagination(catalog: &Catalog) {
     for (pagination, expected_flow_ids) in cases {
         assert_all_flow_expectations(
             flow_event_store.clone(),
-            AllFlowFilters::default(),
+            FlowFilters::default(),
             pagination,
             9,
             expected_flow_ids,
@@ -1106,7 +1111,8 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
 
     assert_all_flow_expectations(
         flow_event_store.clone(),
-        AllFlowFilters {
+        FlowFilters {
+            by_flow_type: None,
             by_flow_status: Some(FlowStatus::Waiting),
             by_initiator: None,
         },
@@ -1125,7 +1131,8 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
 
     assert_all_flow_expectations(
         flow_event_store.clone(),
-        AllFlowFilters {
+        FlowFilters {
+            by_flow_type: None,
             by_flow_status: Some(FlowStatus::Running),
             by_initiator: None,
         },
@@ -1144,7 +1151,8 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
 
     assert_all_flow_expectations(
         flow_event_store.clone(),
-        AllFlowFilters {
+        FlowFilters {
+            by_flow_type: None,
             by_flow_status: Some(FlowStatus::Finished),
             by_initiator: None,
         },
@@ -1176,12 +1184,11 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
+    let binding_ingest = FlowBinding::new_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
+
     // No stats initially
     let stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
-            dataset_id: dataset_id.clone(),
-            flow_type: DatasetFlowType::Ingest,
-        }))
+        .get_flow_run_stats(&binding_ingest)
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1195,7 +1202,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     let flow_id = flow_generator
         .make_new_flow(
-            DatasetFlowType::Ingest,
+            FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1205,10 +1212,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
     // Stats hasn't changed
 
     let stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
-            dataset_id: dataset_id.clone(),
-            flow_type: DatasetFlowType::Ingest,
-        }))
+        .get_flow_run_stats(&binding_ingest)
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1218,10 +1222,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // still no change
     let stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
-            dataset_id: dataset_id.clone(),
-            flow_type: DatasetFlowType::Ingest,
-        }))
+        .get_flow_run_stats(&binding_ingest)
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1233,10 +1234,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Finally, stats got updated
     let stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
-            dataset_id: dataset_id.clone(),
-            flow_type: DatasetFlowType::Ingest,
-        }))
+        .get_flow_run_stats(&binding_ingest)
         .await
         .unwrap();
     assert_matches!(
@@ -1251,7 +1249,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     let flow_id = flow_generator
         .make_new_flow(
-            DatasetFlowType::Ingest,
+            FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1260,10 +1258,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Still storing old stats
     let new_stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
-            dataset_id: dataset_id.clone(),
-            flow_type: DatasetFlowType::Ingest,
-        }))
+        .get_flow_run_stats(&binding_ingest)
         .await
         .unwrap();
     assert_eq!(new_stats, stats);
@@ -1273,10 +1268,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Still storing old stats
     let new_stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
-            dataset_id: dataset_id.clone(),
-            flow_type: DatasetFlowType::Ingest,
-        }))
+        .get_flow_run_stats(&binding_ingest)
         .await
         .unwrap();
     assert_eq!(new_stats, stats);
@@ -1288,10 +1280,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     // Stats got updated: success stayed as previously, attempt refreshed
     let new_stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::Dataset(FlowKeyDataset {
-            dataset_id: dataset_id.clone(),
-            flow_type: DatasetFlowType::Ingest,
-        }))
+        .get_flow_run_stats(&binding_ingest)
         .await
         .unwrap();
     assert_matches!(
@@ -1308,11 +1297,11 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 pub async fn test_system_flow_run_stats(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
+    let binding_gc = FlowBinding::new_system(FLOW_TYPE_SYSTEM_GC);
+
     // No stats initially
     let stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
-            flow_type: SystemFlowType::GC,
-        }))
+        .get_flow_run_stats(&binding_gc)
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1326,7 +1315,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     let flow_id = flow_generator
         .make_new_flow(
-            SystemFlowType::GC,
+            FLOW_TYPE_SYSTEM_GC,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1336,9 +1325,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
     // Stats hasn't changed
 
     let stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
-            flow_type: SystemFlowType::GC,
-        }))
+        .get_flow_run_stats(&binding_gc)
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1348,9 +1335,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // still no change
     let stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
-            flow_type: SystemFlowType::GC,
-        }))
+        .get_flow_run_stats(&binding_gc)
         .await
         .unwrap();
     assert_eq!(stats, EMPTY_STATS);
@@ -1362,9 +1347,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Finally, stats got updated
     let stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
-            flow_type: SystemFlowType::GC,
-        }))
+        .get_flow_run_stats(&binding_gc)
         .await
         .unwrap();
     assert_matches!(
@@ -1379,7 +1362,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     let flow_id = flow_generator
         .make_new_flow(
-            SystemFlowType::GC,
+            FLOW_TYPE_SYSTEM_GC,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1388,9 +1371,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Still storing old stats
     let new_stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
-            flow_type: SystemFlowType::GC,
-        }))
+        .get_flow_run_stats(&binding_gc)
         .await
         .unwrap();
     assert_eq!(new_stats, stats);
@@ -1400,9 +1381,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Still storing old stats
     let new_stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
-            flow_type: SystemFlowType::GC,
-        }))
+        .get_flow_run_stats(&binding_gc)
         .await
         .unwrap();
     assert_eq!(new_stats, stats);
@@ -1414,9 +1393,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
 
     // Stats got updated: success stayed as previously, attempt refreshed
     let new_stats = flow_event_store
-        .get_flow_run_stats(&FlowKey::System(FlowKeySystem {
-            flow_type: SystemFlowType::GC,
-        }))
+        .get_flow_run_stats(&binding_gc)
         .await
         .unwrap();
     assert_matches!(
@@ -1435,11 +1412,11 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
-    let flow_key = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::Ingest);
+    let flow_binding = FlowBinding::new_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
     // No pending yet
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key)
+        .try_get_pending_flow(&flow_binding)
         .await
         .unwrap();
     assert!(res.is_none());
@@ -1452,7 +1429,7 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
 
     let flow_id = flow_generator
         .make_new_flow(
-            DatasetFlowType::Ingest,
+            FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1461,7 +1438,7 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
 
     // Got pending
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key)
+        .try_get_pending_flow(&flow_binding)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id));
@@ -1471,7 +1448,7 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
 
     // Got pending
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key)
+        .try_get_pending_flow(&flow_binding)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id));
@@ -1482,7 +1459,7 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
 
     // No more pending
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key)
+        .try_get_pending_flow(&flow_binding)
         .await
         .unwrap();
     assert!(res.is_none());
@@ -1495,17 +1472,19 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
-    let flow_key_ingest = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::Ingest);
-    let flow_key_compact = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::HardCompaction);
+    let flow_binding_ingest =
+        FlowBinding::new_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let flow_binding_compact =
+        FlowBinding::new_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     // No pending yet
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_ingest)
+        .try_get_pending_flow(&flow_binding_ingest)
         .await
         .unwrap();
     assert!(res.is_none());
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_compact)
+        .try_get_pending_flow(&flow_binding_compact)
         .await
         .unwrap();
     assert!(res.is_none());
@@ -1518,7 +1497,7 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 
     let flow_id_ingest = flow_generator
         .make_new_flow(
-            DatasetFlowType::Ingest,
+            FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1526,7 +1505,7 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
         .await;
     let flow_id_compact = flow_generator
         .make_new_flow(
-            DatasetFlowType::HardCompaction,
+            FLOW_TYPE_DATASET_COMPACT,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1534,12 +1513,12 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
         .await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_ingest)
+        .try_get_pending_flow(&flow_binding_ingest)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_ingest));
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_compact)
+        .try_get_pending_flow(&flow_binding_compact)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_compact));
@@ -1549,12 +1528,12 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
     flow_generator.start_running_flow(flow_id_compact).await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_ingest)
+        .try_get_pending_flow(&flow_binding_ingest)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_ingest));
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_compact)
+        .try_get_pending_flow(&flow_binding_compact)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_compact));
@@ -1565,12 +1544,12 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
         .await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_ingest)
+        .try_get_pending_flow(&flow_binding_ingest)
         .await
         .unwrap();
     assert!(res.is_none());
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_compact)
+        .try_get_pending_flow(&flow_binding_compact)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_compact));
@@ -1581,12 +1560,12 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
         .await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_ingest)
+        .try_get_pending_flow(&flow_binding_ingest)
         .await
         .unwrap();
     assert!(res.is_none());
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_compact)
+        .try_get_pending_flow(&flow_binding_compact)
         .await
         .unwrap();
     assert!(res.is_none());
@@ -1600,24 +1579,26 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
     let dataset_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let dataset_bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let flow_key_foo_ingest = FlowKey::dataset(dataset_foo_id.clone(), DatasetFlowType::Ingest);
-    let flow_key_bar_ingest = FlowKey::dataset(dataset_bar_id.clone(), DatasetFlowType::Ingest);
-    let flow_key_foo_compact =
-        FlowKey::dataset(dataset_foo_id.clone(), DatasetFlowType::HardCompaction);
+    let binding_foo_ingest =
+        FlowBinding::new_dataset(dataset_foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_bar_ingest =
+        FlowBinding::new_dataset(dataset_bar_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_compact =
+        FlowBinding::new_dataset(dataset_foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     // No pending yet
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_foo_ingest)
+        .try_get_pending_flow(&binding_foo_ingest)
         .await
         .unwrap();
     assert!(res.is_none());
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_bar_ingest)
+        .try_get_pending_flow(&binding_bar_ingest)
         .await
         .unwrap();
     assert!(res.is_none());
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_foo_compact)
+        .try_get_pending_flow(&binding_foo_compact)
         .await
         .unwrap();
     assert!(res.is_none());
@@ -1631,7 +1612,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
 
     let flow_id_foo_ingest = foo_flow_generator
         .make_new_flow(
-            DatasetFlowType::Ingest,
+            FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1639,7 +1620,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
         .await;
     let flow_id_bar_ingest = bar_flow_generator
         .make_new_flow(
-            DatasetFlowType::Ingest,
+            FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1647,7 +1628,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
         .await;
     let flow_id_foo_compacting = foo_flow_generator
         .make_new_flow(
-            DatasetFlowType::HardCompaction,
+            FLOW_TYPE_DATASET_COMPACT,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1655,17 +1636,17 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
         .await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_foo_ingest)
+        .try_get_pending_flow(&binding_foo_ingest)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_foo_ingest));
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_bar_ingest)
+        .try_get_pending_flow(&binding_bar_ingest)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_bar_ingest));
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_foo_compact)
+        .try_get_pending_flow(&binding_foo_compact)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_foo_compacting));
@@ -1691,17 +1672,17 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
         .await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_foo_ingest)
+        .try_get_pending_flow(&binding_foo_ingest)
         .await
         .unwrap();
     assert!(res.is_none());
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_bar_ingest)
+        .try_get_pending_flow(&binding_bar_ingest)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id_bar_ingest));
     let res = flow_event_store
-        .try_get_pending_flow(&flow_key_foo_compact)
+        .try_get_pending_flow(&binding_foo_compact)
         .await
         .unwrap();
     assert!(res.is_none());
@@ -1712,12 +1693,12 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
 pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let system_flow_key = FlowKey::system(SystemFlowType::GC);
+    let binding_gc = FlowBinding::new_system(FLOW_TYPE_SYSTEM_GC);
 
     // No pending yet
 
     let res = flow_event_store
-        .try_get_pending_flow(&system_flow_key)
+        .try_get_pending_flow(&binding_gc)
         .await
         .unwrap();
     assert!(res.is_none());
@@ -1731,7 +1712,7 @@ pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
 
     let flow_id = flow_generator
         .make_new_flow(
-            SystemFlowType::GC,
+            FLOW_TYPE_SYSTEM_GC,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
             None,
@@ -1739,7 +1720,7 @@ pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
         .await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&system_flow_key)
+        .try_get_pending_flow(&binding_gc)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id));
@@ -1748,7 +1729,7 @@ pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
     flow_generator.start_running_flow(flow_id).await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&system_flow_key)
+        .try_get_pending_flow(&binding_gc)
         .await
         .unwrap();
     assert_eq!(res, Some(flow_id));
@@ -1759,7 +1740,7 @@ pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
         .await;
 
     let res = flow_event_store
-        .try_get_pending_flow(&system_flow_key)
+        .try_get_pending_flow(&binding_gc)
         .await
         .unwrap();
     assert!(res.is_none());
@@ -1772,7 +1753,8 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
 
     let flow_id = event_store.new_flow_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_key = FlowKey::dataset(dataset_id.clone(), DatasetFlowType::Ingest);
+
+    let flow_binding = FlowBinding::new_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
     // Nothing stored yet, but prev stored event id sent => CM
     let res = event_store
@@ -1782,7 +1764,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: Utc::now(),
-                    flow_key: flow_key.clone(),
+                    flow_binding: flow_binding.clone(),
                     flow_id,
                     trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: Utc::now(),
@@ -1803,7 +1785,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: Utc::now(),
-                    flow_key,
+                    flow_binding,
                     flow_id,
                     trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: Utc::now(),
@@ -1874,7 +1856,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
 
     let flow_id = event_store.new_flow_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_key = FlowKey::dataset(dataset_id, DatasetFlowType::Ingest);
+    let flow_binding = FlowBinding::new_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
     let start_moment = Utc::now().trunc_subsecs(6);
     let activation_moment = start_moment + Duration::minutes(1);
@@ -1886,7 +1868,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_key,
+                    flow_binding,
                     flow_id,
                     trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: start_moment,
@@ -2034,7 +2016,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
 
     let flow_id = event_store.new_flow_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_key = FlowKey::dataset(dataset_id, DatasetFlowType::Ingest);
+    let flow_binding = FlowBinding::new_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
     let start_moment = Utc::now().trunc_subsecs(6);
     let activation_moment = start_moment + Duration::minutes(1);
@@ -2047,7 +2029,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_key,
+                    flow_binding,
                     flow_id,
                     trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: start_moment,
@@ -2124,9 +2106,12 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
     let flow_id_bar = event_store.new_flow_id().await.unwrap();
     let flow_id_baz = event_store.new_flow_id().await.unwrap();
 
-    let flow_key_foo = FlowKey::dataset(dataset_id_foo, DatasetFlowType::Ingest);
-    let flow_key_bar = FlowKey::dataset(dataset_id_bar, DatasetFlowType::Ingest);
-    let flow_key_baz = FlowKey::dataset(dataset_id_baz, DatasetFlowType::Ingest);
+    let flow_binding_foo =
+        FlowBinding::new_dataset(dataset_id_foo.clone(), FLOW_TYPE_DATASET_INGEST);
+    let flow_binding_bar =
+        FlowBinding::new_dataset(dataset_id_bar.clone(), FLOW_TYPE_DATASET_INGEST);
+    let flow_binding_baz =
+        FlowBinding::new_dataset(dataset_id_baz.clone(), FLOW_TYPE_DATASET_INGEST);
 
     let start_moment = Utc::now().trunc_subsecs(6);
     let activation_moment_1 = start_moment + Duration::minutes(1);
@@ -2139,7 +2124,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_key: flow_key_foo,
+                    flow_binding: flow_binding_foo,
                     flow_id: flow_id_foo,
                     trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: start_moment,
@@ -2174,7 +2159,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_key: flow_key_bar,
+                    flow_binding: flow_binding_bar,
                     flow_id: flow_id_bar,
                     trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: start_moment,
@@ -2209,7 +2194,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             vec![
                 FlowEventInitiated {
                     event_time: start_moment,
-                    flow_key: flow_key_baz,
+                    flow_binding: flow_binding_baz,
                     flow_id: flow_id_baz,
                     trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: start_moment,
@@ -2277,16 +2262,12 @@ async fn make_dataset_test_case(flow_event_store: Arc<dyn FlowEventStore>) -> Da
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let ingest_flow_ids = make_dataset_test_flows(
         &dataset_id,
-        DatasetFlowType::Ingest,
+        FLOW_TYPE_DATASET_INGEST,
         flow_event_store.clone(),
     )
     .await;
-    let compaction_flow_ids = make_dataset_test_flows(
-        &dataset_id,
-        DatasetFlowType::HardCompaction,
-        flow_event_store,
-    )
-    .await;
+    let compaction_flow_ids =
+        make_dataset_test_flows(&dataset_id, FLOW_TYPE_DATASET_COMPACT, flow_event_store).await;
 
     DatasetTestCase {
         dataset_id: dataset_id.clone(),
@@ -2297,13 +2278,13 @@ async fn make_dataset_test_case(flow_event_store: Arc<dyn FlowEventStore>) -> Da
 
 async fn make_system_test_case(flow_event_store: Arc<dyn FlowEventStore>) -> SystemTestCase {
     SystemTestCase {
-        gc_flow_ids: make_system_test_flows(SystemFlowType::GC, flow_event_store).await,
+        gc_flow_ids: make_system_test_flows(FLOW_TYPE_SYSTEM_GC, flow_event_store).await,
     }
 }
 
 async fn make_dataset_test_flows(
     dataset_id: &odf::DatasetID,
-    dataset_flow_type: DatasetFlowType,
+    flow_type: &str,
     flow_event_store: Arc<dyn FlowEventStore>,
 ) -> TestFlowIDs {
     let flow_generator = DatasetFlowGenerator::new(dataset_id, flow_event_store.clone());
@@ -2323,28 +2304,13 @@ async fn make_dataset_test_flows(
     });
 
     let flow_id_waiting = flow_generator
-        .make_new_flow(
-            dataset_flow_type,
-            FlowStatus::Waiting,
-            petya_manual_trigger,
-            None,
-        )
+        .make_new_flow(flow_type, FlowStatus::Waiting, petya_manual_trigger, None)
         .await;
     let flow_id_running = flow_generator
-        .make_new_flow(
-            dataset_flow_type,
-            FlowStatus::Running,
-            wasya_manual_trigger,
-            None,
-        )
+        .make_new_flow(flow_type, FlowStatus::Running, wasya_manual_trigger, None)
         .await;
     let flow_id_finished = flow_generator
-        .make_new_flow(
-            dataset_flow_type,
-            FlowStatus::Finished,
-            automatic_trigger,
-            None,
-        )
+        .make_new_flow(flow_type, FlowStatus::Finished, automatic_trigger, None)
         .await;
 
     TestFlowIDs {
@@ -2355,7 +2321,7 @@ async fn make_dataset_test_flows(
 }
 
 async fn make_system_test_flows(
-    system_flow_type: SystemFlowType,
+    flow_type: &str,
     flow_event_store: Arc<dyn FlowEventStore>,
 ) -> TestFlowIDs {
     let flow_generator = SystemFlowGenerator::new(flow_event_store.clone());
@@ -2375,28 +2341,13 @@ async fn make_system_test_flows(
     });
 
     let flow_id_waiting = flow_generator
-        .make_new_flow(
-            system_flow_type,
-            FlowStatus::Waiting,
-            petya_manual_trigger,
-            None,
-        )
+        .make_new_flow(flow_type, FlowStatus::Waiting, petya_manual_trigger, None)
         .await;
     let flow_id_running = flow_generator
-        .make_new_flow(
-            system_flow_type,
-            FlowStatus::Running,
-            wasya_manual_trigger,
-            None,
-        )
+        .make_new_flow(flow_type, FlowStatus::Running, wasya_manual_trigger, None)
         .await;
     let flow_id_finished = flow_generator
-        .make_new_flow(
-            system_flow_type,
-            FlowStatus::Finished,
-            automatic_trigger,
-            None,
-        )
+        .make_new_flow(flow_type, FlowStatus::Finished, automatic_trigger, None)
         .await;
 
     TestFlowIDs {
@@ -2409,7 +2360,7 @@ async fn make_system_test_flows(
 async fn assert_dataset_flow_expectations(
     flow_event_store: Arc<dyn FlowEventStore>,
     dataset_test_case: &DatasetTestCase,
-    filters: DatasetFlowFilters,
+    filters: FlowFilters,
     pagination: PaginationOpts,
     expected_total_count: usize,
     expected_flow_ids: Vec<FlowID>,
@@ -2431,7 +2382,7 @@ async fn assert_dataset_flow_expectations(
 async fn assert_multiple_dataset_flow_expectations(
     flow_event_store: Arc<dyn FlowEventStore>,
     dataset_ids: Vec<odf::DatasetID>,
-    filters: DatasetFlowFilters,
+    filters: FlowFilters,
     pagination: PaginationOpts,
     expected_flow_ids: Vec<FlowID>,
 ) {
@@ -2447,7 +2398,7 @@ async fn assert_multiple_dataset_flow_expectations(
 
 async fn assert_system_flow_expectations(
     flow_event_store: Arc<dyn FlowEventStore>,
-    filters: SystemFlowFilters,
+    filters: FlowFilters,
     pagination: PaginationOpts,
     expected_total_count: usize,
     expected_flow_ids: Vec<FlowID>,
@@ -2468,7 +2419,7 @@ async fn assert_system_flow_expectations(
 
 async fn assert_all_flow_expectations(
     flow_event_store: Arc<dyn FlowEventStore>,
-    filters: AllFlowFilters,
+    filters: FlowFilters,
     pagination: PaginationOpts,
     expected_total_count: usize,
     expected_flow_ids: Vec<FlowID>,
@@ -2504,7 +2455,7 @@ impl<'a> DatasetFlowGenerator<'a> {
 
     async fn make_new_flow(
         &self,
-        flow_type: DatasetFlowType,
+        flow_type: &str,
         expected_status: FlowStatus,
         initial_trigger: FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
@@ -2516,11 +2467,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         let mut flow = Flow::new(
             creation_moment,
             flow_id,
-            FlowKeyDataset {
-                dataset_id: self.dataset_id.clone(),
-                flow_type,
-            }
-            .into(),
+            FlowBinding::new_dataset(self.dataset_id.clone(), flow_type),
             initial_trigger,
             config_snapshot,
         );
@@ -2577,7 +2524,7 @@ impl SystemFlowGenerator {
 
     async fn make_new_flow(
         &self,
-        flow_type: SystemFlowType,
+        flow_type: &str,
         expected_status: FlowStatus,
         initial_trigger_type: FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
@@ -2589,7 +2536,7 @@ impl SystemFlowGenerator {
         let mut flow = Flow::new(
             creation_moment,
             flow_id,
-            FlowKey::System(FlowKeySystem { flow_type }),
+            FlowBinding::new_system(flow_type),
             initial_trigger_type,
             config_snapshot,
         );

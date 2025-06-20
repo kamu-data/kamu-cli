@@ -14,6 +14,12 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
+use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_TRANSFORM,
+};
 use kamu_flow_system::*;
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
@@ -36,7 +42,7 @@ pub(crate) struct FlowSystemTestListener {
     state: Arc<Mutex<FlowSystemTestListenerState>>,
 }
 
-type FlowSnapshot = (DateTime<Utc>, HashMap<FlowKey, Vec<FlowState>>);
+type FlowSnapshot = (DateTime<Utc>, HashMap<FlowBinding, Vec<FlowState>>);
 
 #[derive(Default)]
 struct FlowSystemTestListenerState {
@@ -82,10 +88,10 @@ impl FlowSystemTestListener {
             .await
             .unwrap();
 
-        let mut flow_states_map: HashMap<FlowKey, Vec<FlowState>> = HashMap::new();
+        let mut flow_states_map: HashMap<FlowBinding, Vec<FlowState>> = HashMap::new();
         for flow in flows {
             flow_states_map
-                .entry(flow.flow_key.clone())
+                .entry(flow.flow_binding.clone())
                 .and_modify(|flows| flows.push(flow.clone()))
                 .or_insert(vec![flow]);
         }
@@ -97,6 +103,17 @@ impl FlowSystemTestListener {
     pub(crate) fn define_dataset_display_name(&self, id: odf::DatasetID, display_name: String) {
         let mut state = self.state.lock().unwrap();
         state.dataset_display_names.insert(id, display_name);
+    }
+
+    fn display_flow_type(flow_type_label: &str) -> &'static str {
+        match flow_type_label {
+            FLOW_TYPE_DATASET_INGEST => "Ingest",
+            FLOW_TYPE_DATASET_TRANSFORM => "ExecuteTransform",
+            FLOW_TYPE_DATASET_COMPACT => "HardCompaction",
+            FLOW_TYPE_DATASET_RESET => "Reset",
+            FLOW_TYPE_SYSTEM_GC => "GC",
+            _ => "<unknown>",
+        }
     }
 }
 
@@ -115,21 +132,24 @@ impl std::fmt::Display for FlowSystemTestListener {
 
             let mut flow_headings = snapshots
                 .keys()
-                .map(|flow_key| {
+                .map(|flow_binding| {
                     (
-                        flow_key,
-                        match flow_key {
-                            FlowKey::Dataset(fk_dataset) => format!(
-                                "\"{}\" {:?}",
+                        flow_binding,
+                        match &flow_binding.scope {
+                            FlowScope::Dataset { dataset_id } => format!(
+                                "\"{}\" {}",
                                 state
                                     .dataset_display_names
-                                    .get(&fk_dataset.dataset_id)
+                                    .get(dataset_id)
                                     .cloned()
-                                    .unwrap_or_else(|| fk_dataset.dataset_id.to_string()),
-                                fk_dataset.flow_type
+                                    .unwrap_or_else(|| dataset_id.to_string()),
+                                Self::display_flow_type(flow_binding.flow_type.as_str())
                             ),
-                            FlowKey::System(fk_system) => {
-                                format!("System {:?}", fk_system.flow_type)
+                            FlowScope::System => {
+                                format!(
+                                    "System {}",
+                                    Self::display_flow_type(flow_binding.flow_type.as_str())
+                                )
                             }
                         },
                     )

@@ -23,7 +23,7 @@ impl Flow {
     pub fn new(
         now: DateTime<Utc>,
         flow_id: FlowID,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         trigger: FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
     ) -> Self {
@@ -33,7 +33,7 @@ impl Flow {
                 FlowEventInitiated {
                     event_time: now,
                     flow_id,
-                    flow_key,
+                    flow_binding,
                     trigger,
                     config_snapshot,
                 },

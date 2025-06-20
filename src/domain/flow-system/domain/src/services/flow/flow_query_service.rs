@@ -15,14 +15,13 @@ use tokio_stream::Stream;
 
 use crate::{
     AccountFlowFilters,
-    DatasetFlowFilters,
+    FlowBinding,
     FlowConfigurationRule,
+    FlowFilters,
     FlowID,
-    FlowKey,
     FlowState,
     FlowTriggerInstance,
     FlowTriggerRule,
-    SystemFlowFilters,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +34,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
@@ -70,7 +69,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_flows_by_dataset_ids(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
@@ -79,7 +78,7 @@ pub trait FlowQueryService: Sync + Send {
     /// Applies specified filters/pagination
     async fn list_all_system_flows(
         &self,
-        filters: SystemFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError>;
 
@@ -97,7 +96,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn trigger_flow_manualy(
         &self,
         trigger_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError>;
@@ -106,7 +105,7 @@ pub trait FlowQueryService: Sync + Send {
     /// unless it's already waiting
     async fn trigger_flow(
         &self,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         trigger_instance: FlowTriggerInstance,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,

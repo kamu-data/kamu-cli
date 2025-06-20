@@ -11,7 +11,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetEntryServiceExt, DependencyGraphService};
 use kamu_flow_system::{self as fs, FlowTriggerServiceExt};
 
-use crate::{FLOW_TYPE_DATASET_TRANSFORM, FlowConfigRuleCompact};
+use crate::{FLOW_TYPE_DATASET_COMPACT, FLOW_TYPE_DATASET_TRANSFORM, FlowConfigRuleCompact};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,11 +38,10 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
         {
             flow_query_service
                 .trigger_flow(
-                    fs::FlowKeyDataset::new(
+                    fs::FlowBinding::new_dataset(
                         downstream_dataset_id,
-                        fs::DatasetFlowType::ExecuteTransform,
-                    )
-                    .into(),
+                        FLOW_TYPE_DATASET_TRANSFORM,
+                    ),
                     input_trigger.clone(),
                     Some(fs::FlowTriggerRule::Batching(batching_rule)),
                     None,
@@ -82,11 +81,7 @@ pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
             // Trigger hard compaction
             flow_query_service
                 .trigger_flow(
-                    fs::FlowKeyDataset::new(
-                        downstream_dataset_id,
-                        fs::DatasetFlowType::HardCompaction,
-                    )
-                    .into(),
+                    fs::FlowBinding::new_dataset(downstream_dataset_id, FLOW_TYPE_DATASET_COMPACT),
                     input_trigger.clone(),
                     None,
                     Some(

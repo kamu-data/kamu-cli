@@ -22,14 +22,25 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Generates new unique flow identifier
     async fn new_flow_id(&self) -> Result<FlowID, InternalError>;
 
-    /// Attempts to access the pending (unfinished) flow ID for the given key
+    /// Attempts to access the pending (unfinished) flow ID for the given
+    /// binding
     async fn try_get_pending_flow(
         &self,
-        flow_key: &FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowID>, InternalError>;
 
+    /// Attempts to access all the pending (unfinished) flow ID for the given
+    /// dataset
+    async fn try_get_all_dataset_pending_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<FlowID>, InternalError>;
+
     /// Returns last run statistics for certain type
-    async fn get_flow_run_stats(&self, flow_key: &FlowKey) -> Result<FlowRunStats, InternalError>;
+    async fn get_flow_run_stats(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<FlowRunStats, InternalError>;
 
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError>;
@@ -46,7 +57,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     fn get_all_flow_ids_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: &DatasetFlowFilters,
+        filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream;
 
@@ -62,7 +73,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     async fn get_count_flows_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: &DatasetFlowFilters,
+        filters: &FlowFilters,
     ) -> Result<usize, InternalError>;
 
     /// Returns number of flows associated with the specified datasets and
@@ -70,7 +81,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     async fn get_count_flows_by_multiple_datasets(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: &DatasetFlowFilters,
+        filters: &FlowFilters,
     ) -> Result<usize, InternalError>;
 
     /// Returns IDs of the datasets who have any flows associated with them
@@ -85,7 +96,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     fn get_all_flow_ids_by_datasets(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: &DatasetFlowFilters,
+        filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream;
 
@@ -94,26 +105,23 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Applies filters/pagination, if specified
     fn get_all_system_flow_ids(
         &self,
-        filters: &SystemFlowFilters,
+        filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream;
 
     /// Returns number of system flows matching filters, if specified
-    async fn get_count_system_flows(
-        &self,
-        filters: &SystemFlowFilters,
-    ) -> Result<usize, InternalError>;
+    async fn get_count_system_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError>;
 
     /// Returns IDs of the flows of any type matching the given filters in
     /// reverse chronological order based on creation time
     fn get_all_flow_ids(
         &self,
-        filters: &AllFlowFilters,
+        filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_>;
 
     /// Returns number of all flows, matching filters
-    async fn get_count_all_flows(&self, filters: &AllFlowFilters) -> Result<usize, InternalError>;
+    async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError>;
 
     fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream;
 }
@@ -121,8 +129,8 @@ pub trait FlowEventStore: EventStore<FlowState> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default, Debug, Clone)]
-pub struct DatasetFlowFilters {
-    pub by_flow_type: Option<DatasetFlowType>,
+pub struct FlowFilters {
+    pub by_flow_type: Option<String>,
     pub by_flow_status: Option<FlowStatus>,
     pub by_initiator: Option<InitiatorFilter>,
 }
@@ -130,20 +138,7 @@ pub struct DatasetFlowFilters {
 #[derive(Default, Debug, Clone)]
 pub struct AccountFlowFilters {
     pub by_dataset_ids: HashSet<odf::DatasetID>,
-    pub by_flow_type: Option<DatasetFlowType>,
-    pub by_flow_status: Option<FlowStatus>,
-    pub by_initiator: Option<InitiatorFilter>,
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct SystemFlowFilters {
-    pub by_flow_type: Option<SystemFlowType>,
-    pub by_flow_status: Option<FlowStatus>,
-    pub by_initiator: Option<InitiatorFilter>,
-}
-
-#[derive(Default, Debug, Clone)]
-pub struct AllFlowFilters {
+    pub by_flow_type: Option<String>,
     pub by_flow_status: Option<FlowStatus>,
     pub by_initiator: Option<InitiatorFilter>,
 }

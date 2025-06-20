@@ -57,7 +57,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
         let total_count = self
@@ -120,7 +120,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
         let account_dataset_id_refs = filtered_dataset_ids.iter().collect::<Vec<_>>();
 
-        let dataset_flow_filters = DatasetFlowFilters {
+        let dataset_flow_filters = FlowFilters {
             by_flow_status: filters.by_flow_status,
             by_flow_type: filters.by_flow_type,
             by_initiator: filters.by_initiator,
@@ -137,7 +137,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn list_all_flows_by_dataset_ids(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
         let total_count = self
@@ -187,7 +187,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?filters, ?pagination))]
     async fn list_all_system_flows(
         &self,
-        filters: SystemFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError> {
         let total_count = self
@@ -217,7 +217,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         &self,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsError> {
-        let empty_filters = AllFlowFilters::default();
+        let empty_filters = FlowFilters::default();
         let total_count = self
             .flow_event_store
             .get_count_all_flows(&empty_filters)
@@ -247,12 +247,12 @@ impl FlowQueryService for FlowQueryServiceImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        fields(?flow_key, %initiator_account_id)
+        fields(?flow_binding, %initiator_account_id)
     )]
     async fn trigger_flow_manualy(
         &self,
         trigger_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError> {
@@ -261,7 +261,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
         scheduling_helper
             .trigger_flow_common(
-                &flow_key,
+                &flow_binding,
                 None,
                 FlowTriggerInstance::Manual(FlowTriggerManual {
                     trigger_time: activation_time,
@@ -277,7 +277,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     /// unless it's already waiting
     async fn trigger_flow(
         &self,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         trigger_instance: FlowTriggerInstance,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
@@ -285,7 +285,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
         scheduling_helper
             .trigger_flow_common(
-                &flow_key,
+                &flow_binding,
                 maybe_flow_trigger_rule,
                 trigger_instance,
                 maybe_flow_config_snapshot,
