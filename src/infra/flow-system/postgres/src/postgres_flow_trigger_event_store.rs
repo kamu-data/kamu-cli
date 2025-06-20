@@ -158,11 +158,11 @@ impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
             "#,
         );
 
-        let binding_scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
 
         query_builder.push_values(events, |mut b, event| {
             b.push_bind(flow_binding.flow_type.as_str());
-            b.push_bind(&binding_scope_json);
+            b.push_bind(&scope_data_json);
             b.push_bind(event.typename());
             b.push_bind(event.event_time());
             b.push_bind(serde_json::to_value(event).unwrap());

@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT success.last_event_time AS \"last_event_time: _\"\n            FROM (\n                SELECT e.event_id as event_id, e.event_time AS last_event_time\n                FROM flow_events e\n                INNER JOIN flows f ON f.flow_id = e.flow_id\n                WHERE\n                    e.event_type = 'FlowEventTaskFinished' AND\n                    e.event_payload ->> '$.TaskFinished.task_outcome.Success' IS NOT NULL AND\n                    f.flow_type = $1 AND\n                    f.scope_data = $2\n                ORDER BY e.event_id DESC\n                LIMIT 1\n            ) AS success\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "last_event_time: _",
+        "ordinal": 0,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b969597cf38dfb3d9ffdc273ae7a383a888b0063469b3f2c61192f28074123b1"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT attempt.last_event_time AS last_attempt_time\n            FROM (\n                SELECT e.event_id AS event_id, e.event_time AS last_event_time\n                FROM flow_events e\n                INNER JOIN flows f ON f.flow_id = e.flow_id\n                WHERE\n                    e.event_type = 'FlowEventTaskFinished' AND\n                    f.flow_type = $1 AND\n                    f.scope_data = $2\n                ORDER BY e.event_id DESC\n                LIMIT 1\n            ) AS attempt\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_attempt_time",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d64b33cbb8098749eb78c2f2f99ecd0d5a1472191dba4852041571ce5121839b"
+}

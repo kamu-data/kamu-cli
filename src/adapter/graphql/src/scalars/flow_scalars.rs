@@ -8,7 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_flow_system as fs;
+use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_TRANSFORM,
+};
+use kamu_flow_system::{self as fs, FLOW_TYPE_SYSTEM_GC};
 
 use crate::prelude::*;
 
@@ -24,11 +30,25 @@ pub enum FlowKey {
     System(FlowKeySystem),
 }
 
-impl From<fs::FlowKey> for FlowKey {
-    fn from(value: fs::FlowKey) -> Self {
-        match value {
-            fs::FlowKey::Dataset(fk_dataset) => Self::Dataset(fk_dataset.into()),
-            fs::FlowKey::System(fk_system) => Self::System(fk_system.into()),
+impl From<fs::FlowBinding> for FlowKey {
+    fn from(value: fs::FlowBinding) -> Self {
+        match value.scope {
+            fs::FlowScope::Dataset { dataset_id } => Self::Dataset(FlowKeyDataset {
+                dataset_id: dataset_id.into(),
+                flow_type: match value.flow_type.as_str() {
+                    FLOW_TYPE_DATASET_INGEST => DatasetFlowType::Ingest,
+                    FLOW_TYPE_DATASET_TRANSFORM => DatasetFlowType::ExecuteTransform,
+                    FLOW_TYPE_DATASET_COMPACT => DatasetFlowType::HardCompaction,
+                    FLOW_TYPE_DATASET_RESET => DatasetFlowType::Reset,
+                    _ => panic!("Unexpected dataset flow type: {:?}", value.flow_type),
+                },
+            }),
+            fs::FlowScope::System => Self::System(FlowKeySystem {
+                flow_type: match value.flow_type.as_str() {
+                    FLOW_TYPE_SYSTEM_GC => SystemFlowType::GC,
+                    _ => panic!("Unexpected system flow type: {:?}", value.flow_type),
+                },
+            }),
         }
     }
 }
@@ -39,26 +59,9 @@ pub struct FlowKeyDataset {
     pub flow_type: DatasetFlowType,
 }
 
-impl From<fs::FlowKeyDataset> for FlowKeyDataset {
-    fn from(value: fs::FlowKeyDataset) -> Self {
-        Self {
-            dataset_id: value.dataset_id.into(),
-            flow_type: value.flow_type.into(),
-        }
-    }
-}
-
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowKeySystem {
     pub flow_type: SystemFlowType,
-}
-
-impl From<fs::FlowKeySystem> for FlowKeySystem {
-    fn from(value: fs::FlowKeySystem) -> Self {
-        Self {
-            flow_type: value.flow_type.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,7 +102,6 @@ pub enum FlowStatus {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
-#[graphql(remote = "kamu_flow_system::DatasetFlowType")]
 pub enum DatasetFlowType {
     Ingest,
     ExecuteTransform,
@@ -110,9 +112,19 @@ pub enum DatasetFlowType {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-#[graphql(remote = "kamu_flow_system::SystemFlowType")]
 pub enum SystemFlowType {
     GC,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn map_dataset_flow_type(dataset_flow_type: DatasetFlowType) -> &'static str {
+    match dataset_flow_type {
+        DatasetFlowType::Ingest => FLOW_TYPE_DATASET_INGEST,
+        DatasetFlowType::ExecuteTransform => FLOW_TYPE_DATASET_TRANSFORM,
+        DatasetFlowType::HardCompaction => FLOW_TYPE_DATASET_COMPACT,
+        DatasetFlowType::Reset => FLOW_TYPE_DATASET_RESET,
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_TRANSFORM,
+};
 use kamu_core::DatasetRegistry;
 use kamu_flow_system as fs;
 
@@ -50,7 +56,19 @@ impl FlowTriggerInstance {
                     .expect("Account must exist");
                 Self::InputDatasetFlow(FlowTriggerInputDatasetFlow::new(
                     Dataset::new_access_checked(account, hdl),
-                    input.flow_type.into(),
+                    match input.flow_type.as_str() {
+                        FLOW_TYPE_DATASET_INGEST => DatasetFlowType::Ingest,
+                        FLOW_TYPE_DATASET_RESET => DatasetFlowType::Reset,
+                        FLOW_TYPE_DATASET_TRANSFORM => DatasetFlowType::ExecuteTransform,
+                        FLOW_TYPE_DATASET_COMPACT => DatasetFlowType::HardCompaction,
+
+                        _ => {
+                            return InternalError::bail(format!(
+                                "Unexpected flow type '{}' for input dataset flow trigger",
+                                input.flow_type.as_str()
+                            ));
+                        }
+                    },
                     input.flow_id.into(),
                 ))
             }

@@ -12,12 +12,7 @@ use kamu_adapter_flow_dataset::{
     FlowConfigRuleCompactFull,
     FlowConfigRuleIngest,
 };
-use kamu_flow_system::{
-    FlowBinding,
-    FlowConfigurationRule,
-    FlowConfigurationService,
-    map_dataset_flow_type,
-};
+use kamu_flow_system::{FlowBinding, FlowConfigurationRule, FlowConfigurationService};
 
 use super::{
     FlowIncompatibleDatasetKind,
@@ -85,7 +80,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
         let flow_binding = FlowBinding::new_dataset(
             self.dataset_request_state.dataset_id().clone(),
-            map_dataset_flow_type(dataset_flow_type.into()),
+            map_dataset_flow_type(dataset_flow_type),
         );
 
         let res = flow_config_service

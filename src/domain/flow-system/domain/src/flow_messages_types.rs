@@ -11,13 +11,13 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{FlowBinding, FlowConfigurationRule, FlowID, FlowKey, FlowOutcome, FlowTriggerRule};
+use crate::{FlowBinding, FlowConfigurationRule, FlowID, FlowOutcome, FlowTriggerRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const FLOW_AGENT_UPDATE_OUTBOX_VERSION: u32 = 1;
-const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 1;
-const FLOW_TRIGGER_UPDATE_OUTBOX_VERSION: u32 = 1;
+const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 2;
+const FLOW_TRIGGER_UPDATE_OUTBOX_VERSION: u32 = 2;
 const FLOW_PROGRESS_OUTBOX_VERSION: u32 = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +29,7 @@ pub struct FlowConfigurationUpdatedMessage {
     pub event_time: DateTime<Utc>,
 
     /// The unique key identifying the flow
-    pub flow_key: FlowKey,
+    pub flow_binding: FlowBinding,
 
     /// The updated configuration rule for the flow
     pub rule: FlowConfigurationRule,

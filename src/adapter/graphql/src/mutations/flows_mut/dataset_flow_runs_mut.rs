@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_flow_system::{self as fs, FlowBinding};
+use kamu_flow_system::{self as fs};
 
 use super::{
     FlowInDatasetError,
@@ -91,7 +91,10 @@ impl<'a> DatasetFlowRunsMut<'a> {
         let flow_state = flow_query_service
             .trigger_flow_manualy(
                 Utc::now(),
-                fs::FlowKeyDataset::new(dataset_handle.id.clone(), dataset_flow_type.into()).into(),
+                fs::FlowBinding::new_dataset(
+                    dataset_handle.id.clone(),
+                    map_dataset_flow_type(dataset_flow_type),
+                ),
                 logged_account.account_id,
                 flow_run_snapshot,
             )
@@ -133,13 +136,11 @@ impl<'a> DatasetFlowRunsMut<'a> {
                 fs::CancelScheduledTasksError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        let flow_binding: FlowBinding = (&flow_state.flow_key).into();
-
         // Pause flow triggers regardless of current state.
         // Duplicate requests are auto-ignored.
         let flow_trigger_service = from_catalog_n!(ctx, dyn fs::FlowTriggerService);
         flow_trigger_service
-            .pause_flow_trigger(Utc::now(), &flow_binding)
+            .pause_flow_trigger(Utc::now(), &flow_state.flow_binding)
             .await?;
 
         Ok(CancelScheduledTasksResult::Success(

@@ -158,7 +158,7 @@ pub struct DatasetPushSmtpSyncResult {
 pub struct FlowTriggerInputDatasetFlow {
     pub trigger_time: DateTime<Utc>,
     pub dataset_id: odf::DatasetID,
-    pub flow_type: DatasetFlowType,
+    pub flow_type: String,
     pub flow_id: FlowID,
     pub task_result: ts::TaskResult,
 }
@@ -207,7 +207,7 @@ mod tests {
         FlowTriggerInstance::InputDatasetFlow(FlowTriggerInputDatasetFlow {
             trigger_time: Utc::now(),
             dataset_id: TEST_DATASET_ID.clone(),
-            flow_type: DatasetFlowType::Ingest,
+            flow_type: "SOME.FLOW.TYPE".to_string(),
             flow_id: FlowID::new(5),
             task_result: ts::TaskResult::empty(),
         })
@@ -284,7 +284,7 @@ mod tests {
                 FlowTriggerInputDatasetFlow {
                     trigger_time: Utc::now(),
                     dataset_id: TEST_DATASET_ID.clone(),
-                    flow_type: DatasetFlowType::HardCompaction, // unrelated
+                    flow_type: "SOME.OTHER.FLOW_TYPE".to_string(), // unrelated
                     flow_id: FlowID::new(7),
                     task_result: ts::TaskResult::empty()
                 }
@@ -297,7 +297,7 @@ mod tests {
                 FlowTriggerInputDatasetFlow {
                     trigger_time: Utc::now(),
                     dataset_id: odf::DatasetID::new_seeded_ed25519(b"different"),
-                    flow_type: DatasetFlowType::Ingest,
+                    flow_type: "SOME.FLOW.TYPE".to_string(),
                     flow_id: FlowID::new(7),
                     task_result: ts::TaskResult::empty()
                 }

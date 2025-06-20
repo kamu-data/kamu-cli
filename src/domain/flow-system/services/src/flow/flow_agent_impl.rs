@@ -156,7 +156,8 @@ impl FlowAgentImpl {
         let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
 
         // How many waiting flows do we have?
-        let waiting_filters = AllFlowFilters {
+        let waiting_filters = FlowFilters {
+            by_flow_type: None,
             by_flow_status: Some(FlowStatus::Waiting),
             by_initiator: None,
         };
@@ -188,7 +189,7 @@ impl FlowAgentImpl {
                 if let Some(FlowStartCondition::Batching(b)) = &flow.start_condition {
                     scheduling_helper
                         .trigger_flow_common(
-                            &flow.flow_key,
+                            &flow.flow_binding,
                             Some(FlowTriggerRule::Batching(b.active_batching_rule)),
                             FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                                 trigger_time: start_time,
@@ -235,11 +236,16 @@ impl FlowAgentImpl {
             .chain(non_schedule_triggers.into_iter())
         {
             // Do not re-trigger the flow that has already triggered
-            let flow_key: FlowKey = (&enabled_trigger.flow_binding).into();
-            let maybe_pending_flow_id = flow_event_store.try_get_pending_flow(&flow_key).await?;
+            let maybe_pending_flow_id = flow_event_store
+                .try_get_pending_flow(&enabled_trigger.flow_binding)
+                .await?;
             if maybe_pending_flow_id.is_none() {
                 scheduling_helper
-                    .activate_flow_trigger(start_time, flow_key, enabled_trigger.rule)
+                    .activate_flow_trigger(
+                        start_time,
+                        enabled_trigger.flow_binding,
+                        enabled_trigger.rule,
+                    )
                     .await?;
             }
         }
@@ -344,15 +350,12 @@ impl FlowAgentImpl {
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
         // Find a dispatcher for this flow type
-        let flow_dispatcher_type = map_flow_type(&flow.flow_key);
-        let flow_dispatcher = self.get_flow_dispatcher(&target_catalog, flow_dispatcher_type)?;
-
-        // Translate flow key to binding
-        let flow_binding: FlowBinding = (&flow.flow_key).into();
+        let flow_dispatcher =
+            self.get_flow_dispatcher(&target_catalog, &flow.flow_binding.flow_type)?;
 
         // Dispatcher should create a logical plan that corresponds to the flow type
         let logical_plan = flow_dispatcher
-            .build_task_logical_plan(&flow_binding, flow.config_snapshot.as_ref())
+            .build_task_logical_plan(&flow.flow_binding, flow.config_snapshot.as_ref())
             .await
             .int_err()?;
 
@@ -521,29 +524,29 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
 
                         let finish_time = self.agent_config.round_time(message.event_time)?;
 
-                        let flow_binding: FlowBinding = (&flow.flow_key).into();
-
                         // In case of success:
                         //  - execute follow-up method
                         if let Some(task_result) = flow.try_task_result_as_ref()
                             && !task_result.is_empty()
                         {
-                            let flow_dispatcher =
-                                self.get_flow_dispatcher(target_catalog, &flow_binding.flow_type)?;
+                            let flow_dispatcher = self.get_flow_dispatcher(
+                                target_catalog,
+                                &flow.flow_binding.flow_type,
+                            )?;
 
-                            let trigger_instance = match &flow.flow_key {
-                                FlowKey::Dataset(fk_dataset) => {
+                            let trigger_instance = match &flow.flow_binding.scope {
+                                FlowScope::Dataset { dataset_id } => {
                                     FlowTriggerInstance::InputDatasetFlow(
                                         FlowTriggerInputDatasetFlow {
                                             trigger_time: finish_time,
-                                            dataset_id: fk_dataset.dataset_id.clone(),
-                                            flow_type: fk_dataset.flow_type,
+                                            dataset_id: dataset_id.clone(),
+                                            flow_type: flow.flow_binding.flow_type.clone(),
                                             flow_id: flow.flow_id,
                                             task_result: task_result.clone(),
                                         },
                                     )
                                 }
-                                FlowKey::System(_) => {
+                                FlowScope::System => {
                                     // TODO: revise this, but there is no better trigger yet
                                     FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                                         trigger_time: finish_time,
@@ -553,7 +556,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
 
                             flow_dispatcher
                                 .propagate_success(
-                                    &flow_binding,
+                                    &flow.flow_binding,
                                     trigger_instance,
                                     flow.config_snapshot.clone(),
                                 )
@@ -567,8 +570,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                             scheduling_helper
                                 .try_schedule_auto_polling_flow_if_enabled(
                                     finish_time,
-                                    &flow.flow_key,
-                                    &flow_binding,
+                                    &flow.flow_binding,
                                 )
                                 .await?;
                         }
@@ -579,7 +581,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                             let flow_trigger_service =
                                 target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
                             flow_trigger_service
-                                .pause_flow_trigger(finish_time, &flow_binding)
+                                .pause_flow_trigger(finish_time, &flow.flow_binding)
                                 .await?;
                         }
 
@@ -631,12 +633,12 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow configuration message");
 
-        let flow_key = (&message.flow_binding).into();
-
         if message.paused {
             let maybe_pending_flow_id = {
                 let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-                flow_event_store.try_get_pending_flow(&flow_key).await?
+                flow_event_store
+                    .try_get_pending_flow(&message.flow_binding)
+                    .await?
             };
 
             if let Some(flow_id) = maybe_pending_flow_id {
@@ -648,7 +650,7 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
             scheduling_helper
                 .activate_flow_trigger(
                     self.agent_config.round_time(message.event_time)?,
-                    flow_key,
+                    message.flow_binding.clone(),
                     message.rule.clone(),
                 )
                 .await?;
@@ -682,20 +684,9 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
                     // For every possible dataset flow:
                     //  - drop queued activations
                     //  - collect ID of aborted flow
-                    let mut flow_ids_2_abort: Vec<_> =
-                        Vec::with_capacity(DatasetFlowType::all().len());
-                    for flow_type in DatasetFlowType::all() {
-                        if let Some(flow_id) = flow_event_store
-                            .try_get_pending_flow(&FlowKey::dataset(
-                                message.dataset_id.clone(),
-                                *flow_type,
-                            ))
-                            .await?
-                        {
-                            flow_ids_2_abort.push(flow_id);
-                        }
-                    }
-                    flow_ids_2_abort
+                    flow_event_store
+                        .try_get_all_dataset_pending_flows(&message.dataset_id)
+                        .await?
                 };
 
                 // Abort matched flows

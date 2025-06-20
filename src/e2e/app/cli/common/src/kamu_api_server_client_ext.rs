@@ -12,7 +12,6 @@ use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
@@ -28,7 +27,7 @@ use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::platform::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_auth_rebac::AccountToDatasetRelation;
-use kamu_flow_system::{DatasetFlowType, FlowID};
+use kamu_flow_system::FlowID;
 use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use thiserror::Error;
@@ -1533,7 +1532,7 @@ impl FlowApi<'_> {
     pub async fn trigger(
         &self,
         dataset_id: &odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_type: &str,
     ) -> FlowTriggerResponse {
         let response = self
             .client
@@ -1545,7 +1544,7 @@ impl FlowApi<'_> {
                         byId(datasetId: "<dataset_id>") {
                           flows {
                             runs {
-                              triggerFlow(datasetFlowType: <dataset_flow_type>) {
+                              triggerFlow(datasetFlowType: <flow_type>) {
                                 message
                                 ... on TriggerFlowSuccess {
                                   flow {
@@ -1561,10 +1560,7 @@ impl FlowApi<'_> {
                     "#
                 )
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
-                .replace(
-                    "<dataset_flow_type>",
-                    &format!("{dataset_flow_type:?}").to_case(Case::UpperSnake),
-                )
+                .replace("<flow_type>", flow_type)
                 .as_str(),
                 None,
             )

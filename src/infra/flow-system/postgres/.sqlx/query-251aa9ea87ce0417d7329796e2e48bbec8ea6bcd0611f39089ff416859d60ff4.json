@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT COUNT(flow_id) AS flows_count\n            FROM flows\n                WHERE\n                    (cast($1 as flow_status_type) IS NULL or flow_status = $1)\n                    AND (cast($2 as TEXT[]) IS NULL OR initiator = ANY($2))\n            ",
+  "query": "\n            SELECT COUNT(flow_id) AS flows_count\n            FROM flows\n            WHERE\n                scope_data->>'type' = 'System'\n                AND ($1::text IS NULL OR flow_type = $1)\n                AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)\n                AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))\n            ",
   "describe": {
     "columns": [
       {
@@ -11,6 +11,7 @@
     ],
     "parameters": {
       "Left": [
+        "Text",
         {
           "Custom": {
             "name": "flow_status_type",
@@ -30,5 +31,5 @@
       null
     ]
   },
-  "hash": "9cb16215957bf11d3c321b6356fcf04807c7359421f7ffaaa4184ae298faf835"
+  "hash": "251aa9ea87ce0417d7329796e2e48bbec8ea6bcd0611f39089ff416859d60ff4"
 }

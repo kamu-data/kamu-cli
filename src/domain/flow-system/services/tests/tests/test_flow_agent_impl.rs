@@ -183,7 +183,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
             account_name: None,
         })
         .await;
-    let foo_flow_key = FlowKey::dataset(foo_id.clone(), DatasetFlowType::Ingest);
+
     let foo_ingest_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
     // Remember start time
@@ -223,7 +223,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                 FlowEventInitiated {
                     event_time: start_time,
                     flow_id,
-                    flow_key: foo_flow_key.clone(),
+                    flow_binding: foo_ingest_binding.clone(),
                     trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                         trigger_time: start_time,
                     }),
@@ -442,18 +442,18 @@ async fn test_manual_trigger() {
         })
         .await;
 
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let bar_flow_binding = FlowBinding::new_dataset(bar_id.clone(), FLOW_TYPE_DATASET_INGEST);
+
     // Note: only "foo" has auto-schedule, "bar" hasn't
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST),
+            foo_flow_binding.clone(),
             FlowTriggerRule::Schedule(Duration::milliseconds(90).into()),
         )
         .await;
     harness.eager_initialization().await;
-
-    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
-    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -510,7 +510,7 @@ async fn test_manual_trigger() {
 
                 // Manual trigger for "foo" at 40ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: foo_flow_key,
+                    flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
                     flow_configuration_snapshot_maybe: None,
@@ -519,7 +519,7 @@ async fn test_manual_trigger() {
 
                 // Manual trigger for "bar" at 80ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: bar_flow_key,
+                  flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
                     flow_configuration_snapshot_maybe: Some(FlowConfigRuleIngest {
@@ -650,9 +650,12 @@ async fn test_ingest_trigger_with_ingest_config() {
         })
         .await;
 
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let bar_flow_binding = FlowBinding::new_dataset(bar_id.clone(), FLOW_TYPE_DATASET_INGEST);
+
     harness
         .set_dataset_flow_ingest(
-            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST),
+            foo_flow_binding.clone(),
             FlowConfigRuleIngest {
                 fetch_uncacheable: true,
             },
@@ -661,14 +664,11 @@ async fn test_ingest_trigger_with_ingest_config() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST),
+            foo_flow_binding.clone(),
             FlowTriggerRule::Schedule(Duration::milliseconds(90).into()),
         )
         .await;
     harness.eager_initialization().await;
-
-    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
-    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -725,7 +725,7 @@ async fn test_ingest_trigger_with_ingest_config() {
 
                 // Manual trigger for "foo" at 40ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: foo_flow_key,
+                    flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
                     flow_configuration_snapshot_maybe: None,
@@ -734,7 +734,7 @@ async fn test_ingest_trigger_with_ingest_config() {
 
                 // Manual trigger for "bar" at 80ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: bar_flow_key,
+                    flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
                     flow_configuration_snapshot_maybe: None,
@@ -866,10 +866,8 @@ async fn test_manual_trigger_compaction() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
-    let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
+    let bar_flow_binding = FlowBinding::new_dataset(bar_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -915,7 +913,7 @@ async fn test_manual_trigger_compaction() {
 
                 // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: foo_flow_key,
+                    flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
                     flow_configuration_snapshot_maybe: None,
@@ -924,7 +922,7 @@ async fn test_manual_trigger_compaction() {
 
                 // Manual trigger for "bar" at 50ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: bar_flow_key,
+                    flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: None,
                     flow_configuration_snapshot_maybe: None,
@@ -1016,7 +1014,7 @@ async fn test_manual_trigger_reset() {
         )
         .await;
 
-    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Reset).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_RESET);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1051,7 +1049,7 @@ async fn test_manual_trigger_reset() {
 
                 // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: foo_flow_key,
+                    flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
                     flow_configuration_snapshot_maybe: None,
@@ -1138,7 +1136,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Reset).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_RESET);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1153,7 +1151,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
       // Run simulation script and task drivers
       _ = async {
           let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-              flow_key: foo_flow_key,
+              flow_binding: foo_flow_binding,
               run_since_start: Duration::milliseconds(10),
               initiator_id: None,
               flow_configuration_snapshot_maybe: None,
@@ -1339,8 +1337,7 @@ async fn test_manual_trigger_compaction_with_config() {
         )
         .await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1369,7 +1366,7 @@ async fn test_manual_trigger_compaction_with_config() {
                 let task0_handle = task0_driver.run();
 
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: foo_flow_key,
+                    flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
                     flow_configuration_snapshot_maybe: None,
@@ -1457,8 +1454,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1473,7 +1469,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
         // Run simulation script and task drivers
         _ = async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                flow_key: foo_flow_key,
+                flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
                 flow_configuration_snapshot_maybe: None,
@@ -1682,8 +1678,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1699,7 +1694,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
         // Run simulation script and task drivers
         _ = async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                flow_key: foo_flow_key,
+                flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
                 flow_configuration_snapshot_maybe: None,
@@ -1910,8 +1905,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1927,7 +1921,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
         // Run simulation script and task drivers
         _ = async {
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                flow_key: foo_flow_key,
+                flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
                 flow_configuration_snapshot_maybe: None,
@@ -2042,8 +2036,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -2085,7 +2078,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
             let task0_handle = task0_driver.run();
 
             let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                flow_key: foo_flow_key,
+                flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
                 flow_configuration_snapshot_maybe: None,
@@ -3275,7 +3268,7 @@ async fn test_throttling_manual_triggers() {
             account_name: None,
         })
         .await;
-    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
     // Enforce dependency graph initialization
     harness.eager_initialization().await;
@@ -3299,7 +3292,7 @@ async fn test_throttling_manual_triggers() {
       _ = async {
         // Manual trigger for "foo" at 20ms
         let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-            flow_key: foo_flow_key.clone(),
+            flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
             flow_configuration_snapshot_maybe: None,
@@ -3308,7 +3301,7 @@ async fn test_throttling_manual_triggers() {
 
         // Manual trigger for "foo" at 30ms
         let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-            flow_key: foo_flow_key.clone(),
+            flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
             flow_configuration_snapshot_maybe: None,
@@ -3317,7 +3310,7 @@ async fn test_throttling_manual_triggers() {
 
         // Manual trigger for "foo" at 70ms
         let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-          flow_key: foo_flow_key,
+          flow_binding: foo_flow_binding,
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
           flow_configuration_snapshot_maybe: None,
@@ -5402,10 +5395,8 @@ async fn test_list_all_flow_initiators() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
-    let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
+    let bar_flow_binding = FlowBinding::new_dataset(bar_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -5451,7 +5442,7 @@ async fn test_list_all_flow_initiators() {
 
                 // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: foo_flow_key,
+                    flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
                     flow_configuration_snapshot_maybe: None,
@@ -5460,7 +5451,7 @@ async fn test_list_all_flow_initiators() {
 
                 // Manual trigger for "bar" at 50ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: bar_flow_key,
+                    flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
                     flow_configuration_snapshot_maybe: None,
@@ -5550,10 +5541,8 @@ async fn test_list_all_datasets_with_flow() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_key: FlowKey =
-        FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::HardCompaction).into();
-    let bar_flow_key: FlowKey =
-        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::HardCompaction).into();
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
+    let bar_flow_binding = FlowBinding::new_dataset(bar_id.clone(), FLOW_TYPE_DATASET_COMPACT);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -5599,7 +5588,7 @@ async fn test_list_all_datasets_with_flow() {
 
                 // Manual trigger for "foo" at 10ms
                 let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: foo_flow_key,
+                    flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
                     flow_configuration_snapshot_maybe: None,
@@ -5608,7 +5597,7 @@ async fn test_list_all_datasets_with_flow() {
 
                 // Manual trigger for "bar" at 50ms
                 let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-                    flow_key: bar_flow_key,
+                    flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
                     flow_configuration_snapshot_maybe: None,
@@ -6420,7 +6409,8 @@ async fn test_trigger_enable_during_flow_throttling() {
             account_name: None,
         })
         .await;
-    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+
+    let foo_flow_binding = FlowBinding::new_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
     // Enforce dependency graph initialization
     harness.eager_initialization().await;
@@ -6444,7 +6434,7 @@ async fn test_trigger_enable_during_flow_throttling() {
       _ = async {
         // Manual trigger for "foo" at 20ms
         let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-            flow_key: foo_flow_key.clone(),
+            flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
             flow_configuration_snapshot_maybe: None,
@@ -6453,7 +6443,7 @@ async fn test_trigger_enable_during_flow_throttling() {
 
         // Manual trigger for "foo" at 30ms
         let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-            flow_key: foo_flow_key.clone(),
+            flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
             flow_configuration_snapshot_maybe: None,
@@ -6462,7 +6452,7 @@ async fn test_trigger_enable_during_flow_throttling() {
 
         // Manual trigger for "foo" at 70ms
         let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
-          flow_key: foo_flow_key,
+          flow_binding: foo_flow_binding,
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
           flow_configuration_snapshot_maybe: None,
