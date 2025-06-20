@@ -35,6 +35,8 @@ internal-error = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-adapter-flow-dataset = { workspace = true }
+kamu-adapter-task-dataset = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-auth-web3 = { workspace = true }
 kamu-core = { workspace = true }
@@ -92,7 +94,7 @@ kamu-adapter-graphql = { workspace = true, features = ["testing"] }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
-kamu-datasets-services = { workspace = true }
+kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }

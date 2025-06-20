@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id\n                FROM flow_trigger_events\n                WHERE\n                    scope_data->>'dataset_id' IS NOT NULL AND\n                    event_type = 'FlowTriggerEventCreated'\n                ORDER BY scope_data->>'dataset_id'\n                LIMIT $1 OFFSET $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "dataset_id",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "266f7b2dc65a01a6fc78c28e6a625c69a0272831788148e7ee3299f774911d70"
+}

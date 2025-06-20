@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO flows (flow_id, flow_type, scope_data, initiator, flow_status, last_event_id)\n                VALUES ($1, $2, $3, $4, 'waiting'::flow_status_type, NULL)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar",
+        "Jsonb",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a7e735beef4f4f8fd763f1d34803eb4a5245ce2d5e43b22a5e03675d43270e0b"
+}

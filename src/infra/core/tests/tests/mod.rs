@@ -10,7 +10,6 @@
 mod engine;
 mod ingest;
 mod test_compaction_services_impl;
-mod test_dataset_changes_service_impl;
 mod test_datasets_filtering;
 mod test_metadata_chain_comparator;
 mod test_object_store_s3;

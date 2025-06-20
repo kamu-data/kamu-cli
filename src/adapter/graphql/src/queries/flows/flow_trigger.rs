@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_TRANSFORM,
+};
 use kamu_core::DatasetRegistry;
 use kamu_flow_system as fs;
 
@@ -16,29 +22,29 @@ use crate::queries::{Account, Dataset};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union)]
-pub(crate) enum FlowTriggerType {
+pub(crate) enum FlowTriggerInstance {
     Manual(FlowTriggerManual),
     AutoPolling(FlowTriggerAutoPolling),
     Push(FlowTriggerPush),
     InputDatasetFlow(FlowTriggerInputDatasetFlow),
 }
 
-impl FlowTriggerType {
+impl FlowTriggerInstance {
     pub async fn build(
-        trigger: &fs::FlowTriggerType,
+        trigger: &fs::FlowTriggerInstance,
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(match &trigger {
-            fs::FlowTriggerType::Manual(manual) => {
+            fs::FlowTriggerInstance::Manual(manual) => {
                 let initiator =
                     Account::from_account_id(ctx, manual.initiator_account_id.clone()).await?;
                 Self::Manual(FlowTriggerManual { initiator })
             }
-            fs::FlowTriggerType::AutoPolling(auto_polling) => {
+            fs::FlowTriggerInstance::AutoPolling(auto_polling) => {
                 Self::AutoPolling(auto_polling.clone().into())
             }
-            fs::FlowTriggerType::Push(push) => Self::Push(push.clone().into()),
-            fs::FlowTriggerType::InputDatasetFlow(input) => {
+            fs::FlowTriggerInstance::Push(push) => Self::Push(push.clone().into()),
+            fs::FlowTriggerInstance::InputDatasetFlow(input) => {
                 let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
 
                 let hdl = dataset_registry
@@ -50,7 +56,19 @@ impl FlowTriggerType {
                     .expect("Account must exist");
                 Self::InputDatasetFlow(FlowTriggerInputDatasetFlow::new(
                     Dataset::new_access_checked(account, hdl),
-                    input.flow_type.into(),
+                    match input.flow_type.as_str() {
+                        FLOW_TYPE_DATASET_INGEST => DatasetFlowType::Ingest,
+                        FLOW_TYPE_DATASET_RESET => DatasetFlowType::Reset,
+                        FLOW_TYPE_DATASET_TRANSFORM => DatasetFlowType::ExecuteTransform,
+                        FLOW_TYPE_DATASET_COMPACT => DatasetFlowType::HardCompaction,
+
+                        _ => {
+                            return InternalError::bail(format!(
+                                "Unexpected flow type '{}' for input dataset flow trigger",
+                                input.flow_type.as_str()
+                            ));
+                        }
+                    },
                     input.flow_id.into(),
                 ))
             }

@@ -79,8 +79,10 @@ impl<'a> DatasetFlowRuns<'a> {
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         let filters = match filters {
-            Some(filters) => Some(kamu_flow_system::DatasetFlowFilters {
-                by_flow_type: filters.by_flow_type.map(Into::into),
+            Some(filters) => Some(kamu_flow_system::FlowFilters {
+                by_flow_type: filters
+                    .by_flow_type
+                    .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
                 by_flow_status: filters.by_status.map(Into::into),
                 by_initiator: match filters.by_initiator {
                     Some(initiator_filter) => match initiator_filter {
@@ -114,14 +116,14 @@ impl<'a> DatasetFlowRuns<'a> {
             .int_err()?;
 
         let matched_flow_states: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
-        let total_count = flows_state_listing.total_count;
+
         let matched_flows = Flow::build_batch(matched_flow_states, ctx).await?;
 
         Ok(FlowConnection::new(
             matched_flows,
             page,
             per_page,
-            total_count,
+            flows_state_listing.total_count,
         ))
     }
 

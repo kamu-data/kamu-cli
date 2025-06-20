@@ -21,14 +21,14 @@ pub trait FlowTriggerService: Sync + Send {
     /// Find current trigger of a certain type
     async fn find_trigger(
         &self,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowTriggerState>, FindFlowTriggerError>;
 
     /// Set or modify flow configuration
     async fn set_trigger(
         &self,
         request_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         paused: bool,
         rule: FlowTriggerRule,
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
@@ -40,14 +40,14 @@ pub trait FlowTriggerService: Sync + Send {
     async fn pause_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<(), InternalError>;
 
     /// Resumes particular flow configuration
     async fn resume_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        fflow_binding: &FlowBinding,
     ) -> Result<(), InternalError>;
 
     /// Pauses dataset flows of given type for given dataset.
@@ -56,7 +56,7 @@ pub trait FlowTriggerService: Sync + Send {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<DatasetFlowType>,
+        maybe_dataset_flow_type: Option<&str>,
     ) -> Result<(), InternalError>;
 
     /// Pauses system flows of given type.
@@ -64,7 +64,7 @@ pub trait FlowTriggerService: Sync + Send {
     async fn pause_system_flows(
         &self,
         request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<SystemFlowType>,
+        maybe_system_flow_type: Option<&str>,
     ) -> Result<(), InternalError>;
 
     /// Resumes dataset flows of given type for given dataset.
@@ -73,7 +73,7 @@ pub trait FlowTriggerService: Sync + Send {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<DatasetFlowType>,
+        maybe_dataset_flow_type: Option<&str>,
     ) -> Result<(), InternalError>;
 
     /// Resumes system flows of given type.
@@ -82,7 +82,7 @@ pub trait FlowTriggerService: Sync + Send {
     async fn resume_system_flows(
         &self,
         request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<SystemFlowType>,
+        maybe_system_flow_type: Option<&str>,
     ) -> Result<(), InternalError>;
 
     /// Checks if there are any active triggers for the given list of datasets
@@ -98,13 +98,12 @@ pub trait FlowTriggerService: Sync + Send {
 pub trait FlowTriggerServiceExt {
     async fn try_get_flow_schedule_rule(
         &self,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<Schedule>, FindFlowTriggerError>;
 
     async fn try_get_flow_batching_rule(
         &self,
-        dataset_id: odf::DatasetID,
-        flow_type: DatasetFlowType,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<BatchingRule>, FindFlowTriggerError>;
 }
 
@@ -112,9 +111,9 @@ pub trait FlowTriggerServiceExt {
 impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
     async fn try_get_flow_schedule_rule(
         &self,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<Schedule>, FindFlowTriggerError> {
-        let maybe_trigger = self.find_trigger(flow_key).await?;
+        let maybe_trigger = self.find_trigger(flow_binding).await?;
         Ok(
             if let Some(trigger) = maybe_trigger
                 && trigger.is_active()
@@ -128,12 +127,9 @@ impl<T: FlowTriggerService + ?Sized> FlowTriggerServiceExt for T {
 
     async fn try_get_flow_batching_rule(
         &self,
-        dataset_id: odf::DatasetID,
-        flow_type: DatasetFlowType,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<BatchingRule>, FindFlowTriggerError> {
-        let maybe_trigger = self
-            .find_trigger(FlowKey::dataset(dataset_id, flow_type))
-            .await?;
+        let maybe_trigger = self.find_trigger(flow_binding).await?;
         Ok(
             if let Some(trigger) = maybe_trigger
                 && trigger.is_active()

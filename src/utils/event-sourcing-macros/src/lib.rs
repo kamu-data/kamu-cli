@@ -90,6 +90,15 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
 
             #[inline]
+            pub async fn load_multi_simple(
+                queries: Vec<<#proj_type as ::event_sourcing::Projection>::Query>,
+                event_store: &#store_type,
+            ) -> Result<Vec<Self>, GetEventsError> {
+                let aggs = ::event_sourcing::Aggregate::load_multi_simple(queries, event_store).await?;
+                Ok(aggs.into_iter().map(Self).collect())
+            }
+
+            #[inline]
             pub async fn try_load(
                 query: <#proj_type as ::event_sourcing::Projection>::Query,
                 event_store: &#store_type,

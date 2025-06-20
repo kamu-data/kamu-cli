@@ -15,12 +15,13 @@ use tokio_stream::Stream;
 
 use crate::{
     AccountFlowFilters,
-    DatasetFlowFilters,
+    FlowBinding,
     FlowConfigurationRule,
+    FlowFilters,
     FlowID,
-    FlowKey,
     FlowState,
-    SystemFlowFilters,
+    FlowTriggerInstance,
+    FlowTriggerRule,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +34,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
@@ -68,7 +69,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_flows_by_dataset_ids(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
@@ -77,7 +78,7 @@ pub trait FlowQueryService: Sync + Send {
     /// Applies specified filters/pagination
     async fn list_all_system_flows(
         &self,
-        filters: SystemFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError>;
 
@@ -92,12 +93,22 @@ pub trait FlowQueryService: Sync + Send {
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
 
     /// Triggers the specified flow manually, unless it's already waiting
-    async fn trigger_manual_flow(
+    async fn trigger_flow_manualy(
         &self,
         trigger_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         initiator_account_id: odf::AccountID,
-        flow_run_snapshot_maybe: Option<FlowConfigurationRule>,
+        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
+    ) -> Result<FlowState, RequestFlowError>;
+
+    /// Triggers the specified flow with custom trigger instance,
+    /// unless it's already waiting
+    async fn trigger_flow(
+        &self,
+        flow_binding: FlowBinding,
+        trigger_instance: FlowTriggerInstance,
+        maybe_flow_trigger_rule: Option<FlowTriggerRule>,
+        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError>;
 
     /// Attempts to cancel the tasks already scheduled for the given flow

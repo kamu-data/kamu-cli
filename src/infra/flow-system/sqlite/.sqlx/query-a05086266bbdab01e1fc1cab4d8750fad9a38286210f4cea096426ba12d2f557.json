@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT flow_id FROM flows\n                WHERE\n                    scope_data->>'type' = 'Dataset' AND\n                    scope_data->>'dataset_id' = $1 AND\n                    flow_status != 'finished'\n                ORDER BY flow_id DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "flow_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a05086266bbdab01e1fc1cab4d8750fad9a38286210f4cea096426ba12d2f557"
+}

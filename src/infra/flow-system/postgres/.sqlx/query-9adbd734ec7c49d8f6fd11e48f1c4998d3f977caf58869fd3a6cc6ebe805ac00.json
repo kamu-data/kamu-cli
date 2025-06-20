@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(DISTINCT scope_data->>'dataset_id')\n                FROM flow_configuration_events\n                WHERE\n                    scope_data->>'dataset_id' IS NOT NULL AND\n                    event_type = 'FlowConfigurationEventCreated'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9adbd734ec7c49d8f6fd11e48f1c4998d3f977caf58869fd3a6cc6ebe805ac00"
+}

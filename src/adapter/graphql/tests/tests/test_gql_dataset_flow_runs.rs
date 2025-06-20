@@ -12,22 +12,16 @@ use chrono::{DateTime, Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
-use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::{
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME_STR,
     LoggedAccount,
 };
-use kamu_core::{
-    CompactionResult,
-    DatasetChangesService,
-    DatasetIntervalIncrement,
-    PullResult,
-    ResetResult,
-    TenancyConfig,
-};
-use kamu_datasets::*;
+use kamu_adapter_task_dataset::*;
+use kamu_core::{CompactionResult, PullResult, ResetResult, TenancyConfig};
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement, *};
+use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::{
@@ -52,7 +46,7 @@ use crate::utils::{
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 12,
@@ -314,14 +308,15 @@ async fn test_trigger_ingest_root_dataset() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
-                ts::TaskUpdateDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetUpdate {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -404,7 +399,7 @@ async fn test_trigger_ingest_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_root_dataset_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::default()),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -475,13 +470,14 @@ async fn test_trigger_reset_root_dataset_flow() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::ResetDatasetResult(
-                ts::TaskResetDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetReset {
                     reset_result: ResetResult {
                         new_head: root_dataset_blocks[1].0.clone(),
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -568,7 +564,7 @@ async fn test_trigger_reset_root_dataset_flow() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::default()),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -663,7 +659,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_execute_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 5,
@@ -791,14 +787,15 @@ async fn test_trigger_execute_transform_derived_dataset() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
-                ts::TaskUpdateDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetUpdate {
                     pull_result: PullResult::Updated {
                         old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -881,7 +878,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 12,
@@ -1145,16 +1142,17 @@ async fn test_trigger_compaction_root_dataset() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
-                ts::TaskCompactionDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetHardCompact {
                     compaction_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -2413,7 +2411,7 @@ async fn test_cancel_already_succeeded_flow() {
             flow_task_id,
             flow_task_metadata,
             Utc::now(),
-            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+            ts::TaskOutcome::Success(ts::TaskResult::empty()),
         )
         .await;
 
@@ -2485,7 +2483,7 @@ async fn test_history_of_completed_flow() {
     harness
         .mimic_flow_secondary_trigger(
             flow_id,
-            FlowTriggerType::AutoPolling(FlowTriggerAutoPolling {
+            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                 trigger_time: Utc::now(),
             }),
         )
@@ -2500,7 +2498,7 @@ async fn test_history_of_completed_flow() {
             flow_task_id,
             flow_task_metadata,
             Utc::now(),
-            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+            ts::TaskOutcome::Success(ts::TaskResult::empty()),
         )
         .await;
 
@@ -2593,7 +2591,7 @@ async fn test_history_of_completed_flow() {
 #[test_log::test(tokio::test)]
 async fn test_execute_transfrom_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 12,
@@ -2662,16 +2660,17 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::CompactionDatasetResult(
-                ts::TaskCompactionDatasetResult {
+            ts::TaskOutcome::Success(
+                TaskResultDatasetHardCompact {
                     compaction_result: CompactionResult::Success {
                         old_head: odf::Multihash::from_digest_sha3_256(b"old-slice"),
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
                     },
-                },
-            )),
+                }
+                .into_task_result(),
+            ),
         )
         .await;
 
@@ -2807,11 +2806,12 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
             flow_task_id,
             flow_task_metadata,
             complete_time,
-            ts::TaskOutcome::Failed(ts::TaskError::UpdateDatasetError(
-                ts::UpdateDatasetTaskError::InputDatasetCompacted(ts::InputDatasetCompactedError {
+            ts::TaskOutcome::Failed(
+                TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
                     dataset_id: create_root_result.dataset_handle.id.clone(),
-                }),
-            )),
+                })
+                .into_task_error(),
+            ),
         )
         .await;
 
@@ -2933,7 +2933,7 @@ async fn test_anonymous_operation_fails() {
 #[test_log::test(tokio::test)]
 async fn test_config_snapshot_returned_correctly() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 12,
@@ -3067,7 +3067,7 @@ struct FlowRunsHarness {
 
 #[derive(Default)]
 struct FlowRunsHarnessOverrides {
-    dataset_changes_mock: Option<MockDatasetChangesService>,
+    dataset_changes_mock: Option<MockDatasetIncrementQueryService>,
 }
 
 impl FlowRunsHarness {
@@ -3083,7 +3083,7 @@ impl FlowRunsHarness {
 
             b.add::<MetadataQueryServiceImpl>()
                 .add_value(dataset_changes_mock)
-                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+                .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowEventStore>()
@@ -3095,6 +3095,7 @@ impl FlowRunsHarness {
                 .add::<InMemoryTaskEventStore>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
+            kamu_adapter_flow_dataset::register_dependencies(&mut b);
 
             register_message_dispatcher::<ts::TaskProgressMessage>(
                 &mut b,
@@ -3233,7 +3234,7 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn mimic_flow_secondary_trigger(&self, flow_id: &str, flow_trigger: FlowTriggerType) {
+    async fn mimic_flow_secondary_trigger(&self, flow_id: &str, flow_trigger: FlowTriggerInstance) {
         let flow_event_store = self
             .catalog_authorized
             .get_one::<dyn FlowEventStore>()
