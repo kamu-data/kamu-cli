@@ -963,7 +963,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 SELECT flow_id FROM flows
                 WHERE
                     ($1::text IS NULL OR flow_type = $1)
-                    (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                    AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                     AND ($3 = 0 OR initiator IN ({}))
                 ORDER BY flow_id DESC
                 LIMIT $4 OFFSET $5
@@ -1018,7 +1018,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             FROM flows
             WHERE
                 ($1::text IS NULL OR flow_type = $1)
-                (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                 AND ($3 = 0 OR initiator IN ({}))
             "#,
             maybe_initiators

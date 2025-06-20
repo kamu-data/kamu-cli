@@ -12,6 +12,7 @@ use std::sync::LazyLock;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
@@ -1544,7 +1545,7 @@ impl FlowApi<'_> {
                         byId(datasetId: "<dataset_id>") {
                           flows {
                             runs {
-                              triggerFlow(datasetFlowType: <flow_type>) {
+                              triggerFlow(datasetFlowType: <dataset_flow_type>) {
                                 message
                                 ... on TriggerFlowSuccess {
                                   flow {
@@ -1560,7 +1561,10 @@ impl FlowApi<'_> {
                     "#
                 )
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
-                .replace("<flow_type>", flow_type)
+                .replace(
+                    "<dataset_flow_type>",
+                    &format!("{flow_type:?}").to_case(Case::UpperSnake),
+                )
                 .as_str(),
                 None,
             )

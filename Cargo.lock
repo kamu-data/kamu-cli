@@ -6741,6 +6741,7 @@ dependencies = [
  "opendatafabric",
  "serde",
  "serde_json",
+ "thiserror 1.0.69",
  "tracing",
  "uuid",
 ]
@@ -7397,7 +7398,6 @@ dependencies = [
  "indoc 2.0.6",
  "kamu",
  "kamu-accounts",
- "kamu-adapter-flow-dataset",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-auth-rebac",
