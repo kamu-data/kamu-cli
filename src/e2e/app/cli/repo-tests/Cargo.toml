@@ -30,7 +30,6 @@ database-common = { workspace = true, default-features = false }
 http-common = { workspace = true }
 kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
-kamu-adapter-flow-dataset = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
 kamu-auth-rebac = { workspace = true }
