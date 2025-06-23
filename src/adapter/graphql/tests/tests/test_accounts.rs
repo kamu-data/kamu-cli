@@ -1103,6 +1103,7 @@ impl GraphQLAccountsHarness {
             .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
             .add::<kamu_accounts_services::ModifyAccountPasswordUseCaseImpl>()
             .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
+            .add::<kamu_accounts_services::UpdateAccountEmailUseCaseImpl>()
             .add::<kamu_accounts_services::RenameAccountUseCaseImpl>()
             .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
             .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()

@@ -37,9 +37,17 @@ impl UpdateAccountEmailUseCase for UpdateAccountEmailUseCaseImpl {
         account: &Account,
         new_email: Email,
     ) -> Result<(), UpdateAccountEmailError> {
-        self.account_authorization_helper
+        if !self
+            .account_authorization_helper
             .can_modify_account(&account.account_name)
-            .await?;
+            .await?
+        {
+            return Err(UpdateAccountEmailError::Access(
+                odf::AccessError::Unauthorized(
+                    format!("Cannot update email in account {}", account.account_name).into(),
+                ),
+            ));
+        }
 
         self.account_repo
             .update_account_email(&account.id, new_email.clone())
