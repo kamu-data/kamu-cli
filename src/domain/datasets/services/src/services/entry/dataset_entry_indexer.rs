@@ -14,7 +14,7 @@ use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
-    AccountRepository,
+    AccountService,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
     GetAccountByNameError,
@@ -35,7 +35,7 @@ pub struct DatasetEntryIndexer {
     time_source: Arc<dyn SystemTimeSource>,
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>, /* Note: potentially we will have
                                                              * multiple */
-    account_repository: Arc<dyn AccountRepository>,
+    account_service: Arc<dyn AccountService>,
 }
 
 #[component(pub)]
@@ -53,13 +53,13 @@ impl DatasetEntryIndexer {
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         time_source: Arc<dyn SystemTimeSource>,
         dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-        account_repository: Arc<dyn AccountRepository>,
+        account_service: Arc<dyn AccountService>,
     ) -> Self {
         Self {
             dataset_entry_repo,
             time_source,
             dataset_storage_unit,
-            account_repository,
+            account_service,
         }
     }
 
@@ -211,7 +211,7 @@ impl DatasetEntryIndexer {
         match &maybe_owner_name {
             Some(account_name) => {
                 let account = self
-                    .account_repository
+                    .account_service
                     .get_account_by_name(account_name)
                     .await?;
 

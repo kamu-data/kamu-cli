@@ -34,7 +34,7 @@ pub struct AuthenticationServiceImpl {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
     authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
-    account_repository: Arc<dyn AccountRepository>,
+    account_service: Arc<dyn AccountService>,
     access_token_svc: Arc<dyn AccessTokenService>,
     outbox: Arc<dyn Outbox>,
     maybe_dummy_token_account: Option<Account>,
@@ -50,7 +50,7 @@ impl AuthenticationServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
-        account_repository: Arc<dyn AccountRepository>,
+        account_service: Arc<dyn AccountService>,
         access_token_svc: Arc<dyn AccessTokenService>,
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
@@ -76,7 +76,7 @@ impl AuthenticationServiceImpl {
             encoding_key: EncodingKey::from_secret(config.jwt_secret.as_bytes()),
             decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes()),
             authentication_providers_by_method,
-            account_repository,
+            account_service,
             access_token_svc,
             outbox,
             oauth_device_code_service,
@@ -151,11 +151,13 @@ impl AuthenticationServiceImpl {
                 DummyOdfAccessTokenError {},
             )));
         }
+
         if access_token.len() > 2 && &access_token[..2] == ACCESS_TOKEN_PREFIX {
             return KamuAccessToken::decode(access_token)
                 .map_err(|err| AccessTokenError::Invalid(Box::new(err)))
                 .map(AccessTokenType::KamuAccessToken);
         }
+
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
         validation.set_issuer(&[KAMU_JWT_ISSUER]);
 
@@ -179,7 +181,7 @@ impl AuthenticationServiceImpl {
             AccessTokenType::JWTToken(token_data) => {
                 let account_id = odf::AccountID::from_did_str(&token_data.claims.sub).int_err()?;
 
-                match self.account_repository.get_account_by_id(&account_id).await {
+                match self.account_service.get_account_by_id(&account_id).await {
                     Ok(account) => Ok(account),
                     Err(GetAccountByIdError::NotFound(_)) => {
                         Err(GetAccountInfoError::AccountUnresolved)
@@ -247,7 +249,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
         // Try to resolve an existing account via the provider's identity key
         let maybe_account_id = self
-            .account_repository
+            .account_service
             .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)
             .await?;
 
@@ -270,8 +272,8 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     provider_identity_key: provider_response.provider_identity_key,
                 };
 
-                // Register an account in the repository
-                self.account_repository
+                // Register an account
+                self.account_service
                     .save_account(&new_account)
                     .await
                     .map_err(|e| match e {

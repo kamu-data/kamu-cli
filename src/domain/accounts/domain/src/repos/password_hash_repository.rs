@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use super::AccountNotFoundByNameError;
+use super::AccountNotFoundByIdError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,13 +19,12 @@ pub trait PasswordHashRepository: Send + Sync {
     async fn save_password_hash(
         &self,
         account_id: &odf::AccountID,
-        account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError>;
 
     async fn modify_password_hash(
         &self,
-        account_name: &odf::AccountName,
+        account_id: &odf::AccountID,
         password_hash: String,
     ) -> Result<(), ModifyPasswordHashError>;
 
@@ -33,12 +32,6 @@ pub trait PasswordHashRepository: Send + Sync {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<Option<String>, FindPasswordHashError>;
-
-    async fn on_account_renamed(
-        &self,
-        old_account_name: &odf::AccountName,
-        new_account_name: &odf::AccountName,
-    ) -> Result<(), PasswordAccountRenamedError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +49,7 @@ pub enum ModifyPasswordHashError {
     #[error(transparent)]
     Internal(#[from] InternalError),
     #[error(transparent)]
-    AccountNotFound(#[from] AccountNotFoundByNameError),
+    AccountNotFound(#[from] AccountNotFoundByIdError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,17 +58,6 @@ pub enum ModifyPasswordHashError {
 pub enum FindPasswordHashError {
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum PasswordAccountRenamedError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-
-    #[error(transparent)]
-    AccountNotFound(#[from] AccountNotFoundByNameError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -62,23 +62,23 @@ impl AccountMut {
         ctx: &Context<'_>,
         new_email: Email<'_>,
     ) -> Result<UpdateEmailResult> {
-        // TODO: encapsulate in a service or a use case, don't use repository in GQL!
-        // If decided to have a new use case, the security check should be moved there
-        utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
+        let update_account_email_use_case = from_catalog_n!(ctx, dyn UpdateAccountEmailUseCase);
 
-        let account_repo = from_catalog_n!(ctx, dyn AccountRepository);
-        match account_repo
-            .update_account_email(&self.account.id, new_email.clone().into())
+        match update_account_email_use_case
+            .execute(&self.account, new_email.clone().into())
             .await
         {
             Ok(_) => Ok(UpdateEmailResult::Success(UpdateEmailSuccess {
                 new_email: new_email.as_ref().to_string(),
             })),
-            Err(UpdateAccountError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
+            Err(UpdateAccountEmailError::Duplicate(_)) => Ok(UpdateEmailResult::NonUniqueEmail(
                 UpdateEmailNonUnique::default(),
             )),
-            Err(e @ (UpdateAccountError::NotFound(_) | UpdateAccountError::Internal(_))) => {
-                Err(e.int_err().into())
+            Err(UpdateAccountEmailError::Internal(e)) => Err(e.int_err().into()),
+            Err(UpdateAccountEmailError::Access(_)) => {
+                Err(GqlError::gql_extended("Account access error", |eev| {
+                    eev.set("account_name", self.account.account_name.to_string());
+                }))
             }
         }
     }
