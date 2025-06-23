@@ -32,7 +32,6 @@ pub struct PredefinedAccountsRegistrator {
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
-    account_service: Arc<dyn AccountService>,
 }
 
 #[component(pub)]
@@ -50,7 +49,6 @@ impl PredefinedAccountsRegistrator {
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
         outbox: Arc<dyn messaging_outbox::Outbox>,
-        account_service: Arc<dyn AccountService>,
     ) -> Self {
         Self {
             predefined_accounts_config,
@@ -59,7 +57,6 @@ impl PredefinedAccountsRegistrator {
             rebac_service,
             default_account_properties,
             outbox,
-            account_service,
         }
     }
 
@@ -135,10 +132,7 @@ impl PredefinedAccountsRegistrator {
 
             if has_password_changed {
                 self.account_service
-                    .modify_account_password(
-                        &updated_account.account_name,
-                        &account_config.password,
-                    )
+                    .modify_account_password(&updated_account.id, &account_config.password)
                     .await
                     .int_err()?;
             }
