@@ -51,7 +51,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError> {
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_binding.clone(), self.event_store.as_ref()).await?;
+            FlowConfiguration::try_load(flow_binding, self.event_store.as_ref()).await?;
         Ok(maybe_flow_configuration.map(Into::into))
     }
 
@@ -69,7 +69,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         );
 
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_binding.clone(), self.event_store.as_ref()).await?;
+            FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref()).await?;
 
         let mut flow_configuration = match maybe_flow_configuration {
             // Modification
@@ -99,7 +99,7 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
             use futures::stream::TryStreamExt;
             let mut stream_flow_bindings = self.event_store.stream_all_existing_flow_bindings();
             while let Some(flow_binding) = stream_flow_bindings.try_next().await? {
-                let maybe_flow_configuration = FlowConfiguration::try_load(flow_binding, self.event_store.as_ref()).await.int_err()?;
+                let maybe_flow_configuration = FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref()).await.int_err()?;
 
                 if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                     yield flow_configuration.into();
@@ -138,7 +138,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl 
 
                 for flow_binding in flow_bindings {
                     let maybe_flow_configuration =
-                        FlowConfiguration::try_load(flow_binding, self.event_store.as_ref())
+                        FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
                             .await
                             .int_err()?;
 

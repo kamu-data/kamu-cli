@@ -56,7 +56,7 @@ impl WebhookDeliveryWorkerImpl {
             .int_err()?;
 
         let subscription = WebhookSubscription::load(
-            webhook_subscription_id,
+            &webhook_subscription_id,
             webhook_subscription_event_store.as_ref(),
         )
         .await

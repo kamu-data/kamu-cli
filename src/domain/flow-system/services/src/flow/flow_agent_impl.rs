@@ -244,7 +244,7 @@ impl FlowAgentImpl {
                 scheduling_helper
                     .activate_flow_trigger(
                         start_time,
-                        enabled_trigger.flow_binding,
+                        &enabled_trigger.flow_binding,
                         enabled_trigger.rule,
                     )
                     .await?;
@@ -651,7 +651,7 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
             scheduling_helper
                 .activate_flow_trigger(
                     self.agent_config.round_time(message.event_time)?,
-                    message.flow_binding.clone(),
+                    &message.flow_binding,
                     message.rule.clone(),
                 )
                 .await?;

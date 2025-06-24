@@ -88,13 +88,15 @@ impl<'a> DatasetFlowRunsMut<'a> {
             Err(e) => return Ok(TriggerFlowResult::InvalidRunConfigurations(e)),
         };
 
+        let flow_binding = fs::FlowBinding::for_dataset(
+            dataset_handle.id.clone(),
+            map_dataset_flow_type(dataset_flow_type),
+        );
+
         let flow_state = flow_query_service
             .trigger_flow_manualy(
                 Utc::now(),
-                fs::FlowBinding::for_dataset(
-                    dataset_handle.id.clone(),
-                    map_dataset_flow_type(dataset_flow_type),
-                ),
+                &flow_binding,
                 logged_account.account_id,
                 flow_run_snapshot,
             )

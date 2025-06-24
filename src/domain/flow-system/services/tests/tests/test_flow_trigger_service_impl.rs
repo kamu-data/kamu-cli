@@ -104,7 +104,7 @@ async fn test_pause_resume_individual_dataset_flows() {
 
     // Still, we should see it's state as paused in the repository directly
     let flow_trigger_state = harness
-        .get_flow_trigger_from_store(binding_foo_ingest.clone())
+        .get_flow_trigger_from_store(&binding_foo_ingest)
         .await;
     assert_eq!(
         flow_trigger_state.status,
@@ -169,7 +169,7 @@ async fn test_pause_resume_all_dataset_flows() {
     // Still, we should see their state as paused in the repository directly
 
     let flow_trigger_ingest_state = harness
-        .get_flow_trigger_from_store(binding_foo_ingest.clone())
+        .get_flow_trigger_from_store(&binding_foo_ingest)
         .await;
     assert_eq!(
         flow_trigger_ingest_state.status,
@@ -178,7 +178,7 @@ async fn test_pause_resume_all_dataset_flows() {
     assert_eq!(flow_trigger_ingest_state.rule, foo_ingest_trigger.clone());
 
     let flow_trigger_compaction_state = harness
-        .get_flow_trigger_from_store(binding_foo_compaction.clone())
+        .get_flow_trigger_from_store(&binding_foo_compaction)
         .await;
     assert_eq!(
         flow_trigger_compaction_state.status,
@@ -233,9 +233,7 @@ async fn test_pause_resume_individual_system_flows() {
     assert_eq!(2, harness.trigger_events_count());
 
     // Still, we should see it's state as paused in the repository directly
-    let flow_trigger_state = harness
-        .get_flow_trigger_from_store(binding_gc.clone())
-        .await;
+    let flow_trigger_state = harness.get_flow_trigger_from_store(&binding_gc).await;
     assert_eq!(
         flow_trigger_state.status,
         FlowTriggerStatus::PausedTemporarily
@@ -285,7 +283,7 @@ async fn test_dataset_deleted() {
 
     // Still, we should see it's state as permanently stopped in the repository
     let flow_config_state = harness
-        .get_flow_trigger_from_store(binding_foo_ingest)
+        .get_flow_trigger_from_store(&binding_foo_ingest)
         .await;
     assert_eq!(flow_config_state.rule, foo_ingest_trigger);
 }
@@ -410,7 +408,7 @@ impl FlowTriggerHarness {
         );
     }
 
-    async fn get_flow_trigger_from_store(&self, flow_binding: FlowBinding) -> FlowTriggerState {
+    async fn get_flow_trigger_from_store(&self, flow_binding: &FlowBinding) -> FlowTriggerState {
         let flow_trigger = FlowTrigger::load(flow_binding, self.flow_trigger_event_store.as_ref())
             .await
             .unwrap();

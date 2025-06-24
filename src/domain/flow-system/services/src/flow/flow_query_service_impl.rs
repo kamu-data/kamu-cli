@@ -252,7 +252,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn trigger_flow_manualy(
         &self,
         trigger_time: DateTime<Utc>,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError> {
@@ -261,7 +261,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
         scheduling_helper
             .trigger_flow_common(
-                &flow_binding,
+                flow_binding,
                 None,
                 FlowTriggerInstance::Manual(FlowTriggerManual {
                     trigger_time: activation_time,
@@ -277,7 +277,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     /// unless it's already waiting
     async fn trigger_flow(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         trigger_instance: FlowTriggerInstance,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
@@ -285,7 +285,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
         scheduling_helper
             .trigger_flow_common(
-                &flow_binding,
+                flow_binding,
                 maybe_flow_trigger_rule,
                 trigger_instance,
                 maybe_flow_config_snapshot,

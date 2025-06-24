@@ -38,7 +38,7 @@ impl FlowSchedulingHelper {
     pub(crate) async fn activate_flow_trigger(
         &self,
         start_time: DateTime<Utc>,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         rule: FlowTriggerRule,
     ) -> Result<(), InternalError> {
         tracing::trace!(flow_key = ?flow_binding, rule = ?rule, "Activating flow trigger");
@@ -48,11 +48,11 @@ impl FlowSchedulingHelper {
                 FlowTriggerRule::Batching(batching_rule) => {
                     let flow_run_stats = self
                         .flow_event_store
-                        .get_flow_run_stats(&flow_binding)
+                        .get_flow_run_stats(flow_binding)
                         .await?;
                     if flow_run_stats.last_success_time.is_some() {
                         self.trigger_flow_common(
-                            &flow_binding,
+                            flow_binding,
                             Some(FlowTriggerRule::Batching(*batching_rule)),
                             FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                                 trigger_time: start_time,
@@ -61,18 +61,18 @@ impl FlowSchedulingHelper {
                         )
                         .await?;
                     } else {
-                        self.schedule_auto_polling_flow_unconditionally(start_time, &flow_binding)
+                        self.schedule_auto_polling_flow_unconditionally(start_time, flow_binding)
                             .await?;
                     }
                 }
                 FlowTriggerRule::Schedule(schedule_rule) => {
-                    self.schedule_auto_polling_flow(start_time, &flow_binding, schedule_rule)
+                    self.schedule_auto_polling_flow(start_time, flow_binding, schedule_rule)
                         .await?;
                 }
             },
             FlowScope::System => {
                 if let FlowTriggerRule::Schedule(schedule) = &rule {
-                    self.schedule_auto_polling_flow(start_time, &flow_binding, schedule)
+                    self.schedule_auto_polling_flow(start_time, flow_binding, schedule)
                         .await?;
                 } else {
                     unimplemented!(

@@ -120,7 +120,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowTriggerState>, FindFlowTriggerError> {
         let maybe_flow_trigger =
-            FlowTrigger::try_load(flow_binding.clone(), self.event_store.as_ref()).await?;
+            FlowTrigger::try_load(flow_binding, self.event_store.as_ref()).await?;
         Ok(maybe_flow_trigger.map(Into::into))
     }
 
@@ -139,7 +139,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         );
 
         let maybe_flow_trigger =
-            FlowTrigger::try_load(flow_binding.clone(), self.event_store.as_ref()).await?;
+            FlowTrigger::try_load(&flow_binding, self.event_store.as_ref()).await?;
 
         let mut flow_trigger = match maybe_flow_trigger {
             // Modification
@@ -171,7 +171,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             use futures::stream::TryStreamExt;
             let mut stream_flow_bindings = self.event_store.stream_all_active_flow_bindings();
             while let Some(flow_binding) = stream_flow_bindings.try_next().await? {
-                let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref()).await.int_err()?;
+                let maybe_flow_trigger = FlowTrigger::try_load(&flow_binding, self.event_store.as_ref()).await.int_err()?;
                 if let Some(flow_trigger) = maybe_flow_trigger {
                     yield flow_trigger.into();
                 }
@@ -185,10 +185,9 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
-        let maybe_flow_trigger =
-            FlowTrigger::try_load(flow_binding.clone(), self.event_store.as_ref())
-                .await
-                .int_err()?;
+        let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
+            .await
+            .int_err()?;
 
         if let Some(mut flow_trigger) = maybe_flow_trigger {
             flow_trigger.pause(request_time).int_err()?;
@@ -210,10 +209,9 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         request_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
-        let maybe_flow_trigger =
-            FlowTrigger::try_load(flow_binding.clone(), self.event_store.as_ref())
-                .await
-                .int_err()?;
+        let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
+            .await
+            .int_err()?;
 
         if let Some(mut flow_trigger) = maybe_flow_trigger {
             flow_trigger.resume(request_time).int_err()?;
@@ -347,7 +345,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowTriggerServiceImpl {
 
                 for flow_binding in flow_bindings {
                     let maybe_flow_trigger =
-                        FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
+                        FlowTrigger::try_load(&flow_binding, self.event_store.as_ref())
                             .await
                             .int_err()?;
 

@@ -96,7 +96,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn trigger_flow_manualy(
         &self,
         trigger_time: DateTime<Utc>,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RequestFlowError>;
@@ -105,7 +105,7 @@ pub trait FlowQueryService: Sync + Send {
     /// unless it's already waiting
     async fn trigger_flow(
         &self,
-        flow_binding: FlowBinding,
+        flow_binding: &FlowBinding,
         trigger_instance: FlowTriggerInstance,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_flow_config_snapshot: Option<FlowConfigurationRule>,

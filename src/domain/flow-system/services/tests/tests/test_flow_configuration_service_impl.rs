@@ -270,12 +270,10 @@ impl FlowConfigurationHarness {
         &self,
         flow_binding: &FlowBinding,
     ) -> FlowConfigurationState {
-        let flow_configuration = FlowConfiguration::load(
-            flow_binding.clone(),
-            self.flow_configuration_event_store.as_ref(),
-        )
-        .await
-        .unwrap();
+        let flow_configuration =
+            FlowConfiguration::load(flow_binding, self.flow_configuration_event_store.as_ref())
+                .await
+                .unwrap();
         flow_configuration.into()
     }
 
