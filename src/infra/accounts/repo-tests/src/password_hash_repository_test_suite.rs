@@ -11,7 +11,6 @@ use std::assert_matches::assert_matches;
 
 use dill::Catalog;
 use kamu_accounts::{
-    Account,
     AccountProvider,
     AccountRepository,
     ModifyPasswordHashError,
@@ -65,20 +64,12 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     let hash_petya = make_password_hash(PASSWORD_PETYA, &salt_petya);
 
     password_hash_repo
-        .save_password_hash(
-            &account_wasya.id,
-            &account_wasya.account_name,
-            hash_wasya.to_string(),
-        )
+        .save_password_hash(&account_wasya.id, hash_wasya.to_string())
         .await
         .unwrap();
 
     password_hash_repo
-        .save_password_hash(
-            &account_petya.id,
-            &account_petya.account_name,
-            hash_petya.to_string(),
-        )
+        .save_password_hash(&account_petya.id, hash_petya.to_string())
         .await
         .unwrap();
 
@@ -121,11 +112,7 @@ pub async fn test_modify_password(catalog: &Catalog) {
     let hash_petya = make_password_hash(password_petya, &salt);
 
     password_hash_repo
-        .save_password_hash(
-            &account_petya.id,
-            &account_petya.account_name,
-            hash_petya.to_string(),
-        )
+        .save_password_hash(&account_petya.id, hash_petya.to_string())
         .await
         .unwrap();
 
@@ -143,7 +130,7 @@ pub async fn test_modify_password(catalog: &Catalog) {
     let hash_petya = make_password_hash(password_petya, &salt);
 
     password_hash_repo
-        .modify_password_hash(&account_petya.account_name, hash_petya.to_string())
+        .modify_password_hash(&account_petya.id, hash_petya.to_string())
         .await
         .unwrap();
 
@@ -165,92 +152,11 @@ pub async fn test_modify_password_non_existing(catalog: &Catalog) {
     assert_matches!(
         password_hash_repo
             .modify_password_hash(
-                &odf::AccountName::new_unchecked("foo"),
+                &odf::AccountID::new_seeded_ed25519(b"foo"),
                 "password_hash".to_string(),
             )
             .await,
         Err(ModifyPasswordHashError::AccountNotFound(_))
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_rename_account(catalog: &Catalog) {
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-    let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
-
-    let account_petya = make_test_account(
-        "petya",
-        "petya@example.com",
-        AccountProvider::Password.into(),
-        "petya",
-    );
-
-    account_repo.save_account(&account_petya).await.unwrap();
-
-    let password_petya = "password_petya";
-    let salt = generate_salt();
-    let hash_petya = make_password_hash(password_petya, &salt);
-
-    password_hash_repo
-        .save_password_hash(
-            &account_petya.id,
-            &account_petya.account_name,
-            hash_petya.to_string(),
-        )
-        .await
-        .unwrap();
-
-    let new_petya_name = odf::AccountName::new_unchecked("petya_renamed");
-    account_repo
-        .update_account(Account {
-            account_name: new_petya_name.clone(),
-            ..account_petya.clone()
-        })
-        .await
-        .unwrap();
-
-    let result = password_hash_repo
-        .on_account_renamed(&account_petya.account_name, &new_petya_name)
-        .await;
-    assert!(result.is_ok());
-
-    let result = password_hash_repo
-        .find_password_hash_by_account_name(&new_petya_name)
-        .await
-        .unwrap();
-    assert!(result.is_some_and(|hash| {
-        assert_eq!(hash, hash_petya.to_string());
-        true
-    }));
-
-    let result = password_hash_repo
-        .find_password_hash_by_account_name(&account_petya.account_name)
-        .await
-        .unwrap();
-    assert!(
-        result.is_none(),
-        "Old account name should not have a password hash"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_rename_account_non_existing(catalog: &Catalog) {
-    let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
-
-    let result = password_hash_repo
-        .on_account_renamed(
-            &odf::AccountName::new_unchecked("foo"),
-            &odf::AccountName::new_unchecked("bar"),
-        )
-        .await;
-
-    assert_matches!(
-        result,
-        Err(kamu_accounts::PasswordAccountRenamedError::AccountNotFound(
-            _
-        ))
     );
 }
 

@@ -67,7 +67,7 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
             .await?;
 
         self.account_service
-            .modify_account_password(&account.account_name, &password)
+            .modify_account_password(&account.id, &password)
             .await?;
 
         self.notify_password_changed(account).await?;
@@ -90,7 +90,7 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
             .await?;
 
         self.account_service
-            .modify_account_password(&account.account_name, &new_password)
+            .modify_account_password(&account.id, &new_password)
             .await?;
 
         self.notify_password_changed(account).await?;

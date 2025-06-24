@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE accounts_passwords set password_hash = ?\n                WHERE account_id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "9ecec78ccb41313d7642fe649df2e75b2384ff4292ffd400d0d444d41beb40a6"
+}

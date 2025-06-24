@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT password_hash\n              FROM accounts_passwords\n              WHERE account_name = ?\n            ",
+  "query": "\n            SELECT password_hash\n              FROM accounts_passwords\n              JOIN accounts ON accounts_passwords.account_id = accounts.id\n              WHERE account_name = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -20,5 +20,5 @@
       false
     ]
   },
-  "hash": "2c7b9baf739d4bfc260a166186d8e07478357ebc4ceb157dd4e73911fe49d258"
+  "hash": "fc1332aa08fab99d6c0281144d610582b31641be83711fec0f9ba7a4073fda09"
 }
