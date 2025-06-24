@@ -669,7 +669,7 @@ pub async fn test_owner_of_entries_renamed(catalog: &Catalog) {
 
     let new_account_name = odf::AccountName::new_unchecked("user1-renamed");
     account_repo
-        .update_account(Account {
+        .update_account(&Account {
             account_name: new_account_name.clone(),
             ..account_1.clone()
         })

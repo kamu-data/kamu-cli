@@ -215,7 +215,7 @@ impl AccountService for AccountServiceImpl {
             updated_account.provider_identity_key = updated_account.account_name.to_string();
         }
 
-        match self.account_repo.update_account(updated_account).await {
+        match self.account_repo.update_account(&updated_account).await {
             Ok(_) => Ok(()),
             Err(UpdateAccountError::Duplicate(e)) => Err(RenameAccountError::Duplicate(e)),
             Err(UpdateAccountError::NotFound(e)) => Err(RenameAccountError::Internal(e.int_err())),
@@ -247,7 +247,7 @@ impl AccountService for AccountServiceImpl {
                 .int_err()?;
 
         self.password_hash_repository
-            .save_password_hash(&account.id, &account.account_name, password_hash)
+            .save_password_hash(&account.id, password_hash)
             .await
             .int_err()
     }
@@ -293,7 +293,7 @@ impl AccountService for AccountServiceImpl {
 
     async fn modify_account_password(
         &self,
-        account_name: &odf::AccountName,
+        account_id: &odf::AccountID,
         new_password: &Password,
     ) -> Result<(), ModifyAccountPasswordError> {
         let password_hash =
@@ -302,11 +302,28 @@ impl AccountService for AccountServiceImpl {
                 .int_err()?;
 
         self.password_hash_repository
-            .modify_password_hash(account_name, password_hash)
+            .modify_password_hash(account_id, password_hash)
             .await
             .int_err()?;
 
         Ok(())
+    }
+
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError> {
+        self.account_repo.save_account(account).await
+    }
+
+    async fn update_account(&self, account: &Account) -> Result<(), UpdateAccountError> {
+        self.account_repo.update_account(account).await
+    }
+
+    async fn find_account_id_by_provider_identity_key(
+        &self,
+        provider_identity_key: &str,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
+        self.account_repo
+            .find_account_id_by_provider_identity_key(provider_identity_key)
+            .await
     }
 }
 

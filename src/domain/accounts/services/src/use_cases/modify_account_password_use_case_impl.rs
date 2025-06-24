@@ -9,14 +9,18 @@
 
 use std::sync::Arc;
 
+use internal_error::InternalError;
 use kamu_accounts::{
     Account,
+    AccountLifecycleMessage,
     AccountService,
+    MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ModifyAccountPasswordError,
     ModifyAccountPasswordUseCase,
     ModifyAccountPasswordWithConfirmationError,
     Password,
 };
+use messaging_outbox::Outbox;
 
 use crate::utils;
 
@@ -27,6 +31,26 @@ use crate::utils;
 pub struct ModifyAccountPasswordUseCaseImpl {
     account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
+    outbox: Arc<dyn Outbox>,
+}
+
+impl ModifyAccountPasswordUseCaseImpl {
+    async fn notify_password_changed(&self, account: &Account) -> Result<(), InternalError> {
+        use messaging_outbox::OutboxExt;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+                AccountLifecycleMessage::password_changed(
+                    account.id.clone(),
+                    account.email.clone(),
+                    account.display_name.clone(),
+                ),
+            )
+            .await?;
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,8 +67,10 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
             .await?;
 
         self.account_service
-            .modify_account_password(&account.account_name, &password)
+            .modify_account_password(&account.id, &password)
             .await?;
+
+        self.notify_password_changed(account).await?;
 
         Ok(())
     }
@@ -64,8 +90,10 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
             .await?;
 
         self.account_service
-            .modify_account_password(&account.account_name, &new_password)
+            .modify_account_password(&account.id, &new_password)
             .await?;
+
+        self.notify_password_changed(account).await?;
 
         Ok(())
     }

@@ -14,10 +14,12 @@ use kamu_accounts::*;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
+    AccountServiceImpl,
     AuthenticationServiceImpl,
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
@@ -116,8 +118,11 @@ fn make_catalog(mock_outbox: MockOutbox) -> dill::Catalog {
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .add::<InMemoryAccountRepository>()
+        .add::<AccountServiceImpl>()
+        .add::<InMemoryDidSecretKeyRepository>()
         .add::<AccessTokenServiceImpl>()
         .add::<InMemoryAccessTokenRepository>()
+        .add_value(DidSecretEncryptionConfig::default())
         .add_value(PredefinedAccountsConfig::single_tenant())
         .add_value(SystemTimeSourceStub::new())
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()

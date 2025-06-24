@@ -37,6 +37,6 @@ tracing = "0.1"
 
 [dev-dependencies]
 paste = "1"
-pretty_assertions = { version = "1", default-features = false, features = ["unstable"] }
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

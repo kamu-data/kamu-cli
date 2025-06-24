@@ -28,6 +28,10 @@ pub enum AccountLifecycleMessage {
     /// Message indicating that an account has been renamed
     Renamed(AccountLifecycleMessageRenamed),
 
+    /// Message indicating that the account password has been changed.
+    /// Only for the password account provider.
+    PasswordChanged(AccountLifecycleMessagePasswordChanged),
+
     /// Message indicating that an account has been deleted
     Deleted(AccountLifecycleMessageDeleted),
 }
@@ -57,6 +61,18 @@ impl AccountLifecycleMessage {
             email,
             old_account_name,
             new_account_name,
+            display_name,
+        })
+    }
+
+    pub fn password_changed(
+        account_id: odf::AccountID,
+        email: Email,
+        display_name: AccountDisplayName,
+    ) -> Self {
+        Self::PasswordChanged(AccountLifecycleMessagePasswordChanged {
+            account_id,
+            email,
             display_name,
         })
     }
@@ -112,6 +128,20 @@ pub struct AccountLifecycleMessageRenamed {
 
     /// The new name of the account
     pub new_account_name: odf::AccountName,
+
+    /// The display name of the account
+    pub display_name: AccountDisplayName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountLifecycleMessagePasswordChanged {
+    /// The unique identifier of the account
+    pub account_id: odf::AccountID,
+
+    /// The email address associated with the account
+    pub email: Email,
 
     /// The display name of the account
     pub display_name: AccountDisplayName,

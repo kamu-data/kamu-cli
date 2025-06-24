@@ -650,10 +650,7 @@ pub async fn test_update_account_success(catalog: &Catalog) {
         ..account.clone()
     };
 
-    account_repo
-        .update_account(updated_account.clone())
-        .await
-        .unwrap();
+    account_repo.update_account(&updated_account).await.unwrap();
 
     let result_account = account_repo.get_account_by_id(&account.id).await.unwrap();
     assert_eq!(result_account, updated_account);
@@ -708,7 +705,7 @@ pub async fn test_update_account_not_found(catalog: &Catalog) {
 
     assert_matches!(
         account_repo
-            .update_account(Account {
+            .update_account(&Account {
                 id: odf::AccountID::new_seeded_ed25519(b"wrong"),
                 ..account.clone()
             })
@@ -740,7 +737,7 @@ pub async fn test_update_account_duplicate_email(catalog: &Catalog) {
 
     assert_matches!(
         account_repo
-            .update_account(Account {
+            .update_account(&Account {
                 email: account_2.email.clone(),
                 ..account_1.clone()
             })
@@ -774,7 +771,7 @@ pub async fn test_update_account_duplicate_name(catalog: &Catalog) {
 
     assert_matches!(
         account_repo
-            .update_account(Account {
+            .update_account(&Account {
                 account_name: account_2.account_name.clone(),
                 ..account_1.clone()
             })
@@ -808,7 +805,7 @@ pub async fn test_update_account_duplicate_provider_identity(catalog: &Catalog) 
 
     assert_matches!(
         account_repo
-            .update_account(Account {
+            .update_account(&Account {
                 provider_identity_key: account_2.provider_identity_key.clone(),
                 ..account_1.clone()
             })

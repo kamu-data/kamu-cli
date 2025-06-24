@@ -12,10 +12,12 @@ use std::sync::Arc;
 use database_common::NoOpDatabasePlugin;
 use kamu_accounts::{
     Account,
+    AccountLifecycleMessage,
     AccountService,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
     DidSecretEncryptionConfig,
+    MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ModifyAccountPasswordError,
     ModifyAccountPasswordUseCase,
     ModifyAccountPasswordWithConfirmationError,
@@ -30,16 +32,21 @@ use kamu_accounts_services::{
     CreateAccountUseCaseImpl,
     ModifyAccountPasswordUseCaseImpl,
 };
-use messaging_outbox::DummyOutboxImpl;
+use messaging_outbox::{MockOutbox, Outbox};
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_modify_account_password_success() {
-    let harness =
-        ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::allowing())
-            .await;
+    let mut outbox = MockOutbox::new();
+    ModifyAccountPasswordUseCaseImplHarness::expect_outbox_account_messages(&mut outbox);
+
+    let harness = ModifyAccountPasswordUseCaseImplHarness::new(
+        MockAccountAuthorizationHelper::allowing(),
+        outbox,
+    )
+    .await;
 
     let initial_password = TEST_PASSWORD.clone();
     let account = harness.create_account(initial_password.clone()).await;
@@ -82,9 +89,14 @@ async fn test_modify_account_password_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_modify_account_password_not_admin() {
-    let harness =
-        ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::disallowing())
-            .await;
+    let mut outbox = MockOutbox::new();
+    ModifyAccountPasswordUseCaseImplHarness::expect_outbox_account_messages(&mut outbox);
+
+    let harness = ModifyAccountPasswordUseCaseImplHarness::new(
+        MockAccountAuthorizationHelper::disallowing(),
+        outbox,
+    )
+    .await;
 
     let account = harness.create_account(TEST_PASSWORD.clone()).await;
     let new_password = Password::try_new("new_password_1").unwrap();
@@ -110,9 +122,14 @@ async fn test_modify_account_password_not_admin() {
 
 #[test_log::test(tokio::test)]
 async fn test_modify_account_password_with_confirmation_success() {
-    let harness =
-        ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::allowing())
-            .await;
+    let mut outbox = MockOutbox::new();
+    ModifyAccountPasswordUseCaseImplHarness::expect_outbox_account_messages(&mut outbox);
+
+    let harness = ModifyAccountPasswordUseCaseImplHarness::new(
+        MockAccountAuthorizationHelper::allowing(),
+        outbox,
+    )
+    .await;
 
     let initial_password = TEST_PASSWORD.clone();
     let account = harness.create_account(initial_password.clone()).await;
@@ -146,9 +163,14 @@ async fn test_modify_account_password_with_confirmation_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_modify_account_password_with_confirmation_incorrect_old_password() {
-    let harness =
-        ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::allowing())
-            .await;
+    let mut outbox = MockOutbox::new();
+    ModifyAccountPasswordUseCaseImplHarness::expect_outbox_account_messages(&mut outbox);
+
+    let harness = ModifyAccountPasswordUseCaseImplHarness::new(
+        MockAccountAuthorizationHelper::allowing(),
+        outbox,
+    )
+    .await;
 
     let initial_password = TEST_PASSWORD.clone();
     let account = harness.create_account(initial_password).await;
@@ -169,9 +191,14 @@ async fn test_modify_account_password_with_confirmation_incorrect_old_password()
 
 #[test_log::test(tokio::test)]
 async fn test_modify_account_password_with_confirmation_incorrect_not_enough_permissions() {
-    let harness =
-        ModifyAccountPasswordUseCaseImplHarness::new(MockAccountAuthorizationHelper::disallowing())
-            .await;
+    let mut outbox = MockOutbox::new();
+    ModifyAccountPasswordUseCaseImplHarness::expect_outbox_account_messages(&mut outbox);
+
+    let harness = ModifyAccountPasswordUseCaseImplHarness::new(
+        MockAccountAuthorizationHelper::disallowing(),
+        outbox,
+    )
+    .await;
 
     let initial_password = TEST_PASSWORD.clone();
     let account = harness.create_account(initial_password.clone()).await;
@@ -196,12 +223,15 @@ struct ModifyAccountPasswordUseCaseImplHarness {
 }
 
 impl ModifyAccountPasswordUseCaseImplHarness {
-    async fn new(mock_account_authorization_helper: MockAccountAuthorizationHelper) -> Self {
+    async fn new(
+        mock_account_authorization_helper: MockAccountAuthorizationHelper,
+        mock_outbox: MockOutbox,
+    ) -> Self {
         let mut b = dill::CatalogBuilder::new();
 
         b.add::<CreateAccountUseCaseImpl>();
         b.add::<AccountServiceImpl>();
-        b.add::<DummyOutboxImpl>();
+        b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
         b.add::<InMemoryAccountRepository>();
         b.add_value(DidSecretEncryptionConfig::sample());
         b.add::<InMemoryDidSecretKeyRepository>();
@@ -238,6 +268,31 @@ impl ModifyAccountPasswordUseCaseImplHarness {
             )
             .await
             .unwrap()
+    }
+
+    fn expect_outbox_account_messages(mock_outbox: &mut MockOutbox) {
+        use mockall::predicate::{eq, function};
+
+        mock_outbox
+            .expect_post_message_as_json()
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE),
+                function(|message_as_json: &serde_json::Value| {
+                    match serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone())
+                        .unwrap()
+                    {
+                        AccountLifecycleMessage::Created(_) => true,
+                        AccountLifecycleMessage::PasswordChanged(m) => {
+                            m.display_name == "new-account"
+                                && m.email == "kamu+new-account@example.com".parse().unwrap()
+                        }
+                        AccountLifecycleMessage::Renamed(_)
+                        | AccountLifecycleMessage::Deleted(_) => false,
+                    }
+                }),
+                eq(1),
+            )
+            .returning(|_, _, _| Ok(()));
     }
 }
 

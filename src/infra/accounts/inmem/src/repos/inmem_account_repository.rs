@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use database_common::PaginationOpts;
 use dill::*;
 use email_utils::Email;
+use internal_error::ErrorIntoInternal;
 
 use crate::domain::*;
 
@@ -29,7 +30,7 @@ struct State {
     accounts_by_id: HashMap<odf::AccountID, Account>,
     accounts_by_name: HashMap<odf::AccountName, Account>,
     account_id_by_provider_identity_key: HashMap<String, odf::AccountID>,
-    password_hash_by_account_name: HashMap<odf::AccountName, String>,
+    password_hash_by_account_id: HashMap<odf::AccountID, String>,
 }
 
 impl State {
@@ -38,7 +39,7 @@ impl State {
             accounts_by_id: HashMap::new(),
             accounts_by_name: HashMap::new(),
             account_id_by_provider_identity_key: HashMap::new(),
-            password_hash_by_account_name: HashMap::new(),
+            password_hash_by_account_id: HashMap::new(),
         }
     }
 
@@ -138,7 +139,7 @@ impl AccountRepository for InMemoryAccountRepository {
         Ok(())
     }
 
-    async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError> {
+    async fn update_account(&self, updated_account: &Account) -> Result<(), UpdateAccountError> {
         let mut guard = self.state.lock().unwrap();
         let Some(account) = guard.accounts_by_id.get(&updated_account.id).cloned() else {
             return Err(UpdateAccountError::NotFound(AccountNotFoundByIdError {
@@ -146,7 +147,7 @@ impl AccountRepository for InMemoryAccountRepository {
             }));
         };
 
-        if account == updated_account {
+        if &account == updated_account {
             return Ok(());
         }
 
@@ -371,7 +372,9 @@ impl AccountRepository for InMemoryAccountRepository {
             guard
                 .account_id_by_provider_identity_key
                 .remove(&deleted_account.provider_identity_key);
-            guard.password_hash_by_account_name.remove(account_name);
+            guard
+                .password_hash_by_account_id
+                .remove(&deleted_account.id);
 
             Ok(())
         } else {
@@ -420,32 +423,31 @@ impl ExpensiveAccountRepository for InMemoryAccountRepository {
 impl PasswordHashRepository for InMemoryAccountRepository {
     async fn save_password_hash(
         &self,
-        _account_id: &odf::AccountID,
-        account_name: &odf::AccountName,
+        account_id: &odf::AccountID,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
         let mut guard = self.state.lock().unwrap();
         guard
-            .password_hash_by_account_name
-            .insert(account_name.clone(), password_hash);
+            .password_hash_by_account_id
+            .insert(account_id.clone(), password_hash);
         Ok(())
     }
 
     async fn modify_password_hash(
         &self,
-        account_name: &odf::AccountName,
+        account_id: &odf::AccountID,
         password_hash: String,
     ) -> Result<(), ModifyPasswordHashError> {
         let mut writable_state = self.state.lock().unwrap();
 
         let maybe_existing_password = writable_state
-            .password_hash_by_account_name
-            .get_mut(account_name);
+            .password_hash_by_account_id
+            .get_mut(account_id);
 
         let Some(existing_password) = maybe_existing_password else {
             return Err(ModifyPasswordHashError::AccountNotFound(
-                AccountNotFoundByNameError {
-                    account_name: account_name.clone(),
+                AccountNotFoundByIdError {
+                    account_id: account_id.clone(),
                 },
             ));
         };
@@ -458,38 +460,22 @@ impl PasswordHashRepository for InMemoryAccountRepository {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<Option<String>, FindPasswordHashError> {
+        let existing_account = match self.get_account_by_name(account_name).await {
+            Ok(account) => account,
+            Err(GetAccountByNameError::NotFound(_)) => {
+                return Ok(None);
+            }
+            Err(e) => {
+                return Err(FindPasswordHashError::Internal(e.int_err()));
+            }
+        };
+
         let guard = self.state.lock().unwrap();
         let maybe_hash_as_string = guard
-            .password_hash_by_account_name
-            .get(account_name)
+            .password_hash_by_account_id
+            .get(&existing_account.id)
             .cloned();
         Ok(maybe_hash_as_string)
-    }
-
-    async fn on_account_renamed(
-        &self,
-        old_account_name: &odf::AccountName,
-        new_account_name: &odf::AccountName,
-    ) -> Result<(), PasswordAccountRenamedError> {
-        let mut writable_state = self.state.lock().unwrap();
-
-        let maybe_password_hash = writable_state
-            .password_hash_by_account_name
-            .remove(old_account_name);
-
-        if let Some(password_hash) = maybe_password_hash {
-            writable_state
-                .password_hash_by_account_name
-                .insert(new_account_name.clone(), password_hash);
-        } else {
-            return Err(PasswordAccountRenamedError::AccountNotFound(
-                AccountNotFoundByNameError {
-                    account_name: old_account_name.clone(),
-                },
-            ));
-        }
-
-        Ok(())
     }
 }
 

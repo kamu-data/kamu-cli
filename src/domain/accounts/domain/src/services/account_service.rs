@@ -17,12 +17,14 @@ use crate::{
     AccountNotFoundByNameError,
     AccountPageStream,
     CreateAccountError,
+    FindAccountIdByProviderIdentityKeyError,
     GetAccountByIdError,
     GetAccountByNameError,
     ModifyAccountPasswordError,
     Password,
     RenameAccountError,
     SearchAccountsByNamePatternFilters,
+    UpdateAccountError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,9 +107,18 @@ pub trait AccountService: Sync + Send {
 
     async fn modify_account_password(
         &self,
-        account_name: &odf::AccountName,
+        account_id: &odf::AccountID,
         new_password: &Password,
     ) -> Result<(), ModifyAccountPasswordError>;
+
+    async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError>;
+
+    async fn update_account(&self, updated_account: &Account) -> Result<(), UpdateAccountError>;
+
+    async fn find_account_id_by_provider_identity_key(
+        &self,
+        provider_identity_key: &str,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -17,12 +17,12 @@ use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use crypto_utils::AesGcmEncryptor;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
-use init_on_startup::RunStartupJobsOptions;
+use init_on_startup::{JobSelector, RunStartupJobsOptions};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
-use kamu_accounts_services::{PasswordPolicyConfig, PredefinedAccountsRegistrator};
+use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_flow_system_inmem::domain::{
@@ -198,9 +198,16 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             }
         };
 
-        let startup_jobs_to_skip = post_build_base_catalog_actions(&base_catalog)
-            .instrument(tracing::debug_span!("app::post_build_base_catalog_actions"))
-            .await?;
+        run_startup_initializations(
+            &base_catalog,
+            JobSelector::AllOf(HashSet::from([
+                JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
+            ])),
+        )
+        .instrument(tracing::debug_span!(
+            "app::run_startup_initializations(base_catalog)"
+        ))
+        .await?;
 
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
             let server_catalog = configure_server_catalog(&base_catalog, tenancy_config).build();
@@ -247,9 +254,17 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         }?;
 
         if cli_commands::command_needs_startup_jobs(&args) {
-            run_startup_initializations(&cli_catalog, startup_jobs_to_skip)
-                .instrument(tracing::debug_span!("app::run_startup_initializations"))
-                .await?;
+            run_startup_initializations(
+                &cli_catalog,
+                // Registrator was already called on base_catalog
+                JobSelector::NoneOf(HashSet::from([
+                    JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
+                ])),
+            )
+            .instrument(tracing::debug_span!(
+                "app::run_startup_initializations(cli_catalog)"
+            ))
+            .await?;
         }
 
         let is_transactional = maybe_db_connection_settings.is_some()
@@ -570,27 +585,6 @@ pub fn configure_base_catalog(
     b
 }
 
-// NOTE: We need to perform some initialization jobs before creating cli_catalog
-async fn post_build_base_catalog_actions(
-    base_catalog: &Catalog,
-) -> Result<HashSet<&'static str>, InternalError> {
-    DatabaseTransactionRunner::new(base_catalog.clone())
-        .transactional_with(
-            |account_registrator: Arc<PredefinedAccountsRegistrator>| async move {
-                use init_on_startup::InitOnStartup;
-
-                account_registrator.run_initialization().await.int_err()?;
-
-                Ok(())
-            },
-        )
-        .await?;
-
-    let completed_jobs = HashSet::from([JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR]);
-
-    Ok(completed_jobs)
-}
-
 // Public only for tests
 pub fn configure_cli_catalog(
     base_catalog: &Catalog,
@@ -678,12 +672,12 @@ pub fn configure_server_catalog(
 
 async fn run_startup_initializations(
     catalog: &Catalog,
-    skip_jobs: HashSet<&'static str>,
+    job_selector: JobSelector,
 ) -> Result<(), CLIError> {
     let init_result = init_on_startup::run_startup_jobs_ex(
         catalog,
         RunStartupJobsOptions::builder()
-            .skip_completed_jobs(skip_jobs)
+            .job_selector(job_selector)
             .build(),
     )
     .await
