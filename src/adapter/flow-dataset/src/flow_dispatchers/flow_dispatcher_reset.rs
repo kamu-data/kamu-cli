@@ -24,7 +24,7 @@ use crate::{
 #[dill::component]
 #[dill::interface(dyn fs::FlowDispatcher)]
 #[dill::meta(fs::FlowDispatcherMeta {
-    flow_dispatcher_type: FLOW_TYPE_DATASET_RESET,
+    flow_type: FLOW_TYPE_DATASET_RESET,
 })]
 pub struct FlowDispatcherReset {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
@@ -39,7 +39,7 @@ impl fs::FlowDispatcher for FlowDispatcherReset {
         flow_binding: &fs::FlowBinding,
         maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = flow_binding.dataset_id_or_die()?;
+        let dataset_id = flow_binding.get_dataset_id_or_die()?;
 
         if let Some(config_snapshot) = maybe_config_snapshot
             && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
@@ -63,7 +63,7 @@ impl fs::FlowDispatcher for FlowDispatcherReset {
         trigger_instance: fs::FlowTriggerInstance,
         maybe_config_snapshot: Option<fs::FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
-        let dataset_id = flow_binding.dataset_id_or_die()?;
+        let dataset_id = flow_binding.get_dataset_id_or_die()?;
 
         if let Some(config_snapshot) = &maybe_config_snapshot
             && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID

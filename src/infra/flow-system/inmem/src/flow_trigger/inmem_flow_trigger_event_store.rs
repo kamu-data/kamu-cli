@@ -172,7 +172,7 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
                 && id == dataset_id
                 && seen_flow_types.insert(flow_type)
             {
-                bindings.push(FlowBinding::new_dataset(id.clone(), flow_type));
+                bindings.push(FlowBinding::for_dataset(id.clone(), flow_type));
             }
         }
 
@@ -196,7 +196,7 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
             } = event.flow_binding()
                 && seen_flow_types.insert(flow_type)
             {
-                bindings.push(FlowBinding::new_system(flow_type));
+                bindings.push(FlowBinding::for_system(flow_type));
             }
         }
 

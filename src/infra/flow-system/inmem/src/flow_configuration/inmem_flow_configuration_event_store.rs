@@ -164,7 +164,7 @@ impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
                 && id == dataset_id
                 && seen_flow_types.insert(flow_type)
             {
-                bindings.push(FlowBinding::new_dataset(id.clone(), flow_type));
+                bindings.push(FlowBinding::for_dataset(id.clone(), flow_type));
             }
         }
 

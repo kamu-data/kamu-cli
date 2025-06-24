@@ -101,9 +101,10 @@ impl FlowAgentImpl {
         target_catalog: &Catalog,
         flow_type: &str,
     ) -> Result<Arc<dyn FlowDispatcher>, InternalError> {
+        // Find a dispatcher for this flow type in dependency catalog
         target_catalog
             .builders_for_with_meta::<dyn FlowDispatcher, _>(|meta: &FlowDispatcherMeta| {
-                meta.flow_dispatcher_type == flow_type
+                meta.flow_type == flow_type
             })
             .next()
             .map(|builder| builder.get(target_catalog))
@@ -754,12 +755,13 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
 
         // TODO: we might need to place this queing elsewhere,
         //  where it's known what is "ingest" flow
+        // Also, who said it's ingest and not transform?
 
         let flow_binding =
-            FlowBinding::new_dataset(dataset_id.clone(), "dev.kamu.flow.dataset.ingest");
+            FlowBinding::for_dataset(dataset_id.clone(), "dev.kamu.flow.dataset.ingest");
 
         let flow_dispatcher = self
-            .get_flow_dispatcher(target_catalog, "dev.kamu.flow.dataset.ingest")
+            .get_flow_dispatcher(target_catalog, flow_binding.flow_type.as_str())
             .int_err()?;
 
         flow_dispatcher

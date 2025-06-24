@@ -85,7 +85,7 @@ impl FlowTriggerServiceImpl {
         maybe_dataset_flow_type: Option<&str>,
     ) -> Result<Vec<FlowBinding>, InternalError> {
         if let Some(dataset_flow_type) = maybe_dataset_flow_type {
-            Ok(vec![FlowBinding::new_dataset(
+            Ok(vec![FlowBinding::for_dataset(
                 dataset_id.clone(),
                 dataset_flow_type,
             )])
@@ -101,7 +101,7 @@ impl FlowTriggerServiceImpl {
         maybe_system_flow_type: Option<&str>,
     ) -> Result<Vec<FlowBinding>, InternalError> {
         if let Some(system_flow_type) = maybe_system_flow_type {
-            Ok(vec![FlowBinding::new_system(system_flow_type)])
+            Ok(vec![FlowBinding::for_system(system_flow_type)])
         } else {
             self.event_store
                 .all_trigger_bindings_for_system_flows()

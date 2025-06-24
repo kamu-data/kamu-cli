@@ -22,12 +22,12 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
     flow_binding: &fs::FlowBinding,
     input_trigger: fs::FlowTriggerInstance,
 ) -> Result<(), InternalError> {
-    let dataset_id = flow_binding.dataset_id_or_die()?;
+    let dataset_id = flow_binding.get_dataset_id_or_die()?;
     let downstream_dataset_ids =
         fetch_downstream_dataset_ids(dependency_graph_service, &dataset_id).await;
 
     for downstream_dataset_id in downstream_dataset_ids {
-        let downstream_binding = fs::FlowBinding::new_dataset(
+        let downstream_binding = fs::FlowBinding::for_dataset(
             downstream_dataset_id.clone(),
             FLOW_TYPE_DATASET_TRANSFORM,
         );
@@ -38,7 +38,7 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
         {
             flow_query_service
                 .trigger_flow(
-                    fs::FlowBinding::new_dataset(
+                    fs::FlowBinding::for_dataset(
                         downstream_dataset_id,
                         FLOW_TYPE_DATASET_TRANSFORM,
                     ),
@@ -81,7 +81,7 @@ pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
             // Trigger hard compaction
             flow_query_service
                 .trigger_flow(
-                    fs::FlowBinding::new_dataset(downstream_dataset_id, FLOW_TYPE_DATASET_COMPACT),
+                    fs::FlowBinding::for_dataset(downstream_dataset_id, FLOW_TYPE_DATASET_COMPACT),
                     input_trigger.clone(),
                     None,
                     Some(

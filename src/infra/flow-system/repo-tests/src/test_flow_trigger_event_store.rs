@@ -35,7 +35,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     assert_eq!(0, num_events);
 
-    let flow_binding = FlowBinding::new_dataset(
+    let flow_binding = FlowBinding::for_dataset(
         odf::DatasetID::new_seeded_ed25519(b"foo"),
         afs::FLOW_TYPE_DATASET_INGEST,
     );
@@ -65,7 +65,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
     let flow_binding_1 =
-        FlowBinding::new_dataset(dataset_id_1.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(dataset_id_1.clone(), afs::FLOW_TYPE_DATASET_INGEST);
 
     let event_1_1 = FlowTriggerEventCreated {
         event_time: Utc::now(),
@@ -95,7 +95,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
     let flow_binding_2 =
-        FlowBinding::new_dataset(dataset_id_2.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(dataset_id_2.clone(), afs::FLOW_TYPE_DATASET_INGEST);
 
     let event_2 = FlowTriggerEventCreated {
         event_time: Utc::now(),
@@ -113,7 +113,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(3, num_events);
 
-    let flow_binding_3 = FlowBinding::new_system(FLOW_TYPE_SYSTEM_GC);
+    let flow_binding_3 = FlowBinding::for_system(FLOW_TYPE_SYSTEM_GC);
     let event_3 = FlowTriggerEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),
@@ -179,7 +179,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
 
-    let flow_binding = FlowBinding::new_dataset(
+    let flow_binding = FlowBinding::for_dataset(
         odf::DatasetID::new_seeded_ed25519(b"foo"),
         afs::FLOW_TYPE_DATASET_INGEST,
     );
@@ -284,7 +284,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
 
     // Active trigger
     let flow_active =
-        FlowBinding::new_dataset(dataset_id_active.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(dataset_id_active.clone(), afs::FLOW_TYPE_DATASET_INGEST);
     event_store
         .save_events(
             &flow_active,
@@ -304,7 +304,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
 
     // Paused trigger
     let flow_paused =
-        FlowBinding::new_dataset(dataset_id_paused.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(dataset_id_paused.clone(), afs::FLOW_TYPE_DATASET_INGEST);
     event_store
         .save_events(
             &flow_paused,
@@ -323,7 +323,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     // Modified trigger: first active, then paused
-    let flow_modified_paused = FlowBinding::new_dataset(
+    let flow_modified_paused = FlowBinding::for_dataset(
         dataset_id_modified_paused.clone(),
         afs::FLOW_TYPE_DATASET_INGEST,
     );
@@ -352,7 +352,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     // Modified trigger: first paused, then active
-    let flow_modified_active = FlowBinding::new_dataset(
+    let flow_modified_active = FlowBinding::for_dataset(
         dataset_id_modified_active.clone(),
         afs::FLOW_TYPE_DATASET_INGEST,
     );
@@ -382,7 +382,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
 
     // Removed trigger
     let flow_removed =
-        FlowBinding::new_dataset(dataset_id_removed.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(dataset_id_removed.clone(), afs::FLOW_TYPE_DATASET_INGEST);
     event_store
         .save_events(
             &flow_removed,
@@ -406,7 +406,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     // System trigger (should be ignored)
-    let flow_system = FlowBinding::new_system(FLOW_TYPE_SYSTEM_GC);
+    let flow_system = FlowBinding::for_system(FLOW_TYPE_SYSTEM_GC);
     event_store
         .save_events(
             &flow_system,

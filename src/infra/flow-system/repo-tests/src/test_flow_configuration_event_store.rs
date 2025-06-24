@@ -26,7 +26,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     assert_eq!(0, num_events);
 
-    let flow_binding = FlowBinding::new_dataset(
+    let flow_binding = FlowBinding::for_dataset(
         odf::DatasetID::new_seeded_ed25519(b"foo"),
         afs::FLOW_TYPE_DATASET_INGEST,
     );
@@ -58,7 +58,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
     let flow_binding_1 =
-        FlowBinding::new_dataset(dataset_id_1.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(dataset_id_1.clone(), afs::FLOW_TYPE_DATASET_INGEST);
 
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
@@ -86,7 +86,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
     let flow_binding_2 =
-        FlowBinding::new_dataset(dataset_id_2.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(dataset_id_2.clone(), afs::FLOW_TYPE_DATASET_INGEST);
 
     let event_2 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
@@ -103,7 +103,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(3, num_events);
 
-    let flow_binding_3 = FlowBinding::new_system(FLOW_TYPE_SYSTEM_GC);
+    let flow_binding_3 = FlowBinding::for_system(FLOW_TYPE_SYSTEM_GC);
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),
@@ -170,7 +170,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         .get_one::<dyn FlowConfigurationEventStore>()
         .unwrap();
 
-    let flow_binding = FlowBinding::new_dataset(
+    let flow_binding = FlowBinding::for_dataset(
         odf::DatasetID::new_seeded_ed25519(b"foo"),
         afs::FLOW_TYPE_DATASET_INGEST,
     );

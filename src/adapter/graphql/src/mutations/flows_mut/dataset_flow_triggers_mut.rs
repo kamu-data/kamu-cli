@@ -72,7 +72,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        let flow_binding = FlowBinding::new_dataset(
+        let flow_binding = FlowBinding::for_dataset(
             dataset_handle.id.clone(),
             map_dataset_flow_type(dataset_flow_type),
         );

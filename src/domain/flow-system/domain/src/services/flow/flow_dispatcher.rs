@@ -34,7 +34,7 @@ pub trait FlowDispatcher: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct FlowDispatcherMeta {
-    pub flow_dispatcher_type: &'static str,
+    pub flow_type: &'static str,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

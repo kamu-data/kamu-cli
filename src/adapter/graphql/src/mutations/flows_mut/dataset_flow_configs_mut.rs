@@ -78,7 +78,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
 
-        let flow_binding = FlowBinding::new_dataset(
+        let flow_binding = FlowBinding::for_dataset(
             self.dataset_request_state.dataset_id().clone(),
             map_dataset_flow_type(dataset_flow_type),
         );

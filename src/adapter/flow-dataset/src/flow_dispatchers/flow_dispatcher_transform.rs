@@ -24,7 +24,7 @@ use crate::{
 #[dill::component]
 #[dill::interface(dyn fs::FlowDispatcher)]
 #[dill::meta(fs::FlowDispatcherMeta {
-    flow_dispatcher_type: FLOW_TYPE_DATASET_TRANSFORM,
+    flow_type: FLOW_TYPE_DATASET_TRANSFORM,
 })]
 pub struct FlowDispatcherTransform {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -39,7 +39,7 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
         flow_binding: &fs::FlowBinding,
         maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = flow_binding.dataset_id_or_die()?;
+        let dataset_id = flow_binding.get_dataset_id_or_die()?;
 
         let mut fetch_uncacheable = false;
         if let Some(config_snapshot) = maybe_config_snapshot

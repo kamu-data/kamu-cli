@@ -38,7 +38,7 @@ pub trait FlowConfigurationService: Sync + Send {
 
 #[async_trait::async_trait]
 pub trait FlowConfigurationServiceExt {
-    async fn try_get_config_snapshot_by_key(
+    async fn try_get_config_snapshot_by_binding(
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError>;
@@ -46,7 +46,7 @@ pub trait FlowConfigurationServiceExt {
 
 #[async_trait::async_trait]
 impl<T: FlowConfigurationService + ?Sized> FlowConfigurationServiceExt for T {
-    async fn try_get_config_snapshot_by_key(
+    async fn try_get_config_snapshot_by_binding(
         &self,
         flow_binding: &FlowBinding,
     ) -> Result<Option<FlowConfigurationRule>, FindFlowConfigurationError> {

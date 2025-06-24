@@ -35,7 +35,7 @@ impl<'a> DatasetFlowTriggers<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
     ) -> Result<Option<FlowTrigger>> {
-        let flow_binding = FlowBinding::new_dataset(
+        let flow_binding = FlowBinding::for_dataset(
             self.dataset_request_state.dataset_handle().id.clone(),
             map_dataset_flow_type(dataset_flow_type),
         );

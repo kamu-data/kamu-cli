@@ -245,7 +245,7 @@ impl FlowSchedulingHelper {
                     maybe_flow_config_snapshot
                 } else {
                     self.flow_configuration_service
-                        .try_get_config_snapshot_by_key(flow_binding)
+                        .try_get_config_snapshot_by_binding(flow_binding)
                         .await
                         .int_err()?
                 };

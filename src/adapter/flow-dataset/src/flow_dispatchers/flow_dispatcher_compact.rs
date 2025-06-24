@@ -25,7 +25,7 @@ use crate::{
 #[dill::component]
 #[dill::interface(dyn fs::FlowDispatcher)]
 #[dill::meta(fs::FlowDispatcherMeta {
-    flow_dispatcher_type: FLOW_TYPE_DATASET_COMPACT,
+    flow_type: FLOW_TYPE_DATASET_COMPACT,
 })]
 pub struct FlowDispatcherCompact {
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
@@ -41,7 +41,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
         flow_binding: &fs::FlowBinding,
         maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = flow_binding.dataset_id_or_die()?;
+        let dataset_id = flow_binding.get_dataset_id_or_die()?;
 
         let mut max_slice_size: Option<u64> = None;
         let mut max_slice_records: Option<u64> = None;
@@ -72,7 +72,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
         trigger_instance: fs::FlowTriggerInstance,
         maybe_config_snapshot: Option<fs::FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
-        let dataset_id = flow_binding.dataset_id_or_die()?;
+        let dataset_id = flow_binding.get_dataset_id_or_die()?;
 
         if let Some(config_snapshot) = &maybe_config_snapshot
             && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID

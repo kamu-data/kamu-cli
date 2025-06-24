@@ -39,7 +39,7 @@ async fn test_visibility() {
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
     let foo_ingest_binding =
-        FlowBinding::new_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
     let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: false,
     }
@@ -50,7 +50,7 @@ async fn test_visibility() {
         .await;
 
     let foo_compaction_binding =
-        FlowBinding::new_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
     let foo_compaction_config =
         FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3, false).unwrap())
             .into_flow_config();
@@ -63,7 +63,7 @@ async fn test_visibility() {
         .await;
 
     let bar_compaction_binding =
-        FlowBinding::new_dataset(bar_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
+        FlowBinding::for_dataset(bar_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
     let bar_compaction_config =
         FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(3, 4, false).unwrap())
             .into_flow_config();
@@ -98,7 +98,7 @@ async fn test_modify() {
     // Make a dataset and configure compaction config
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_compaction_binding =
-        FlowBinding::new_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
     let foo_compaction_config =
         FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(1, 2, false).unwrap())
             .into_flow_config();
@@ -143,7 +143,7 @@ async fn test_dataset_deleted() {
     // Make a dataset and configure ingest rule
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_binding =
-        FlowBinding::new_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
     let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: true,
     }

@@ -18,21 +18,21 @@ pub struct FlowBinding {
 }
 
 impl FlowBinding {
-    pub fn new_dataset(dataset_id: odf::DatasetID, flow_type: &str) -> Self {
+    pub fn for_dataset(dataset_id: odf::DatasetID, flow_type: &str) -> Self {
         Self {
             flow_type: flow_type.to_string(),
             scope: FlowScope::Dataset { dataset_id },
         }
     }
 
-    pub fn new_system(flow_type: &str) -> Self {
+    pub fn for_system(flow_type: &str) -> Self {
         Self {
             flow_type: flow_type.to_string(),
             scope: FlowScope::System,
         }
     }
 
-    pub fn dataset_id_or_die(&self) -> Result<odf::DatasetID, InternalError> {
+    pub fn get_dataset_id_or_die(&self) -> Result<odf::DatasetID, InternalError> {
         let FlowScope::Dataset { dataset_id } = &self.scope else {
             return InternalError::bail("Expecting dataset flow binding scope");
         };

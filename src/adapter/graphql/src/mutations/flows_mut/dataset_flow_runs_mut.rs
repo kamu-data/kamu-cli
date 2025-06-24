@@ -91,7 +91,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         let flow_state = flow_query_service
             .trigger_flow_manualy(
                 Utc::now(),
-                fs::FlowBinding::new_dataset(
+                fs::FlowBinding::for_dataset(
                     dataset_handle.id.clone(),
                     map_dataset_flow_type(dataset_flow_type),
                 ),
