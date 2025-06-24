@@ -578,11 +578,11 @@ impl PasswordHashRepository for MySqlAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts_passwords (password_hash, account_id)
+            INSERT INTO accounts_passwords (account_id, password_hash)
             VALUES (?, ?)
             "#,
-            password_hash,
-            account_id.as_str()
+            account_id.as_str(),
+            password_hash
         )
         .execute(connection_mut)
         .await
@@ -600,13 +600,16 @@ impl PasswordHashRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
+        use odf::metadata::AsStackString;
+        let account_id_stack = account_id.as_stack_string();
+
         let update_result = sqlx::query!(
             r#"
             UPDATE accounts_passwords set password_hash = ?
                 WHERE account_id = ?
             "#,
             password_hash,
-            account_id.to_string()
+            account_id_stack.as_str()
         )
         .execute(connection_mut)
         .await
@@ -635,7 +638,7 @@ impl PasswordHashRepository for MySqlAccountRepository {
             r#"
             SELECT password_hash
               FROM accounts_passwords
-              LEFT JOIN accounts ON accounts_passwords.account_id = accounts.id
+              JOIN accounts ON accounts_passwords.account_id = accounts.id
               WHERE account_name = ?
             "#,
             account_name.to_string(),

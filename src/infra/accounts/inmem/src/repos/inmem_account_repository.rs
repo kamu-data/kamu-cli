@@ -30,8 +30,6 @@ struct State {
     accounts_by_id: HashMap<odf::AccountID, Account>,
     accounts_by_name: HashMap<odf::AccountName, Account>,
     account_id_by_provider_identity_key: HashMap<String, odf::AccountID>,
-    // ToDo1269: Remove
-    password_hash_by_account_name: HashMap<odf::AccountName, String>,
     password_hash_by_account_id: HashMap<odf::AccountID, String>,
 }
 
@@ -41,7 +39,6 @@ impl State {
             accounts_by_id: HashMap::new(),
             accounts_by_name: HashMap::new(),
             account_id_by_provider_identity_key: HashMap::new(),
-            password_hash_by_account_name: HashMap::new(),
             password_hash_by_account_id: HashMap::new(),
         }
     }
@@ -375,7 +372,9 @@ impl AccountRepository for InMemoryAccountRepository {
             guard
                 .account_id_by_provider_identity_key
                 .remove(&deleted_account.provider_identity_key);
-            guard.password_hash_by_account_name.remove(account_name);
+            guard
+                .password_hash_by_account_id
+                .remove(&deleted_account.id);
 
             Ok(())
         } else {

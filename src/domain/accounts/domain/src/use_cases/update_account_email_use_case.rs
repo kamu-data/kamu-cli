@@ -31,7 +31,11 @@ pub trait UpdateAccountEmailUseCase: Send + Sync {
 #[derive(Debug, Error)]
 pub enum UpdateAccountEmailError {
     #[error(transparent)]
-    Duplicate(AccountErrorDuplicate),
+    Duplicate(
+        #[from]
+        #[backtrace]
+        AccountErrorDuplicate,
+    ),
 
     #[error(transparent)]
     Access(

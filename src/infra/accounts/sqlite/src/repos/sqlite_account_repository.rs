@@ -602,11 +602,11 @@ impl PasswordHashRepository for SqliteAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts_passwords (password_hash, account_id)
+            INSERT INTO accounts_passwords (account_id, password_hash)
             VALUES ($1, $2)
             "#,
-            password_hash,
-            account_id
+            account_id,
+            password_hash
         )
         .execute(connection_mut)
         .await
@@ -661,7 +661,7 @@ impl PasswordHashRepository for SqliteAccountRepository {
             r#"
             SELECT password_hash
               FROM accounts_passwords
-              LEFT JOIN accounts ON accounts_passwords.account_id = accounts.id
+              JOIN accounts ON accounts_passwords.account_id = accounts.id
               WHERE lower(account_name) = lower($1)
             "#,
             account_name,

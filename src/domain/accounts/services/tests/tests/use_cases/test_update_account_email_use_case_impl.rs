@@ -67,7 +67,7 @@ async fn test_update_account_email_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_update_account_email_duplicate() {
+async fn test_update_account_email_duplicate_error() {
     let mut mock_outbox = MockOutbox::new();
     UpdateAccountEmailUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox);
 
@@ -90,6 +90,33 @@ async fn test_update_account_email_duplicate() {
             .execute(&created_account_foo, created_account_bar.email.clone())
             .await,
         Err(UpdateAccountEmailError::Duplicate(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_update_account_email_access_error() {
+    let mut mock_outbox = MockOutbox::new();
+    UpdateAccountEmailUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox);
+
+    let harness = UpdateAccountEmailUseCaseImplHarness::new(
+        MockAccountAuthorizationHelper::disallowing(),
+        mock_outbox,
+    )
+    .await;
+
+    let account_name_foo = odf::AccountName::new_unchecked("foo");
+    let created_account_foo = harness.create_account(&account_name_foo).await;
+
+    let new_email = email_utils::Email::parse("foo@example.com").unwrap();
+
+    assert_matches!(
+        harness
+            .update_email_use_case
+            .execute(&created_account_foo, new_email)
+            .await,
+        Err(UpdateAccountEmailError::Access(_))
     );
 }
 
