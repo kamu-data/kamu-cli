@@ -20,6 +20,9 @@ use crate::{LogicalPlanDatasetHardCompact, TaskDefinitionDatasetHardCompact};
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskDefinitionPlanner)]
+#[dill::meta(TaskDefinitionPlannerMeta {
+    logic_plan_type: LogicalPlanDatasetHardCompact::TYPE_ID,
+})]
 pub struct HardCompactDatasetTaskPlanner {
     catalog: dill::Catalog,
 }
@@ -60,10 +63,6 @@ impl HardCompactDatasetTaskPlanner {
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
-    fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanDatasetHardCompact::TYPE_ID
-    }
-
     async fn prepare_task_definition(
         &self,
         _task_id: TaskID,

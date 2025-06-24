@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -21,17 +20,6 @@ use tracing::Instrument as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TaskAgentImpl {
-    catalog: Catalog,
-    // TODO: think of dill::Bulder here
-    task_planners_by_type: HashMap<String, Arc<dyn TaskDefinitionPlanner>>,
-    task_runners_by_type: HashMap<String, Arc<dyn TaskRunner>>,
-    time_source: Arc<dyn SystemTimeSource>,
-    agent_config: Arc<TaskAgentConfig>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[component(pub)]
 #[interface(dyn TaskAgent)]
 #[interface(dyn InitOnStartup)]
@@ -41,62 +29,53 @@ pub struct TaskAgentImpl {
     requires_transaction: false,
 })]
 #[scope(Singleton)]
+pub struct TaskAgentImpl {
+    catalog: Catalog,
+    time_source: Arc<dyn SystemTimeSource>,
+    agent_config: Arc<TaskAgentConfig>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl TaskAgentImpl {
-    pub fn new(
-        catalog: Catalog,
-        task_planners: Vec<Arc<dyn TaskDefinitionPlanner>>,
-        task_runners: Vec<Arc<dyn TaskRunner>>,
-        time_source: Arc<dyn SystemTimeSource>,
-        agent_config: Arc<TaskAgentConfig>,
-    ) -> Self {
-        let task_planners_by_type = task_planners.into_iter().fold(
-            HashMap::new(),
-            |mut acc: HashMap<String, Arc<dyn TaskDefinitionPlanner>>, planner| {
-                let logic_plan_type = planner.supported_logic_plan_type().to_string();
-                assert!(
-                    !acc.contains_key(&logic_plan_type),
-                    "Task planner for logic plan type '{logic_plan_type}' already exists",
-                );
-                acc.insert(logic_plan_type, planner.clone());
-                acc
-            },
-        );
-
-        let task_runners_by_type = task_runners.into_iter().fold(
-            HashMap::new(),
-            |mut acc: HashMap<String, Arc<dyn TaskRunner + 'static>>, runner| {
-                let task_type = runner.supported_task_type().to_string();
-                assert!(
-                    !acc.contains_key(&task_type),
-                    "Task runner for type '{task_type}' already exists",
-                );
-                acc.insert(task_type, runner.clone());
-                acc
-            },
-        );
-
-        Self {
-            catalog,
-            task_planners_by_type,
-            task_runners_by_type,
-            time_source,
-            agent_config,
-        }
+    fn get_task_planner_for(
+        &self,
+        plan: &LogicalPlan,
+    ) -> Result<Arc<dyn TaskDefinitionPlanner>, InternalError> {
+        self.catalog
+            .builders_for_with_meta::<dyn TaskDefinitionPlanner, _>(
+                |meta: &TaskDefinitionPlannerMeta| meta.logic_plan_type == plan.plan_type.as_str(),
+            )
+            .next()
+            .map(|builder| builder.get(&self.catalog))
+            .transpose()
+            .int_err()?
+            .ok_or_else(|| {
+                InternalError::new(format!(
+                    "Task definition planner for type '{}' not found",
+                    plan.plan_type
+                ))
+            })
     }
 
-    fn get_task_planner_for(&self, plan: &LogicalPlan) -> Arc<dyn TaskDefinitionPlanner> {
-        self.task_planners_by_type
-            .get(&plan.plan_type)
-            .cloned()
-            .unwrap_or_else(|| panic!("No task definition planner found for {}", plan.plan_type))
-    }
-
-    fn get_task_runner_for(&self, task_definition: &TaskDefinition) -> Arc<dyn TaskRunner> {
-        let task_type = task_definition.task_type();
-        self.task_runners_by_type
-            .get(task_type)
-            .cloned()
-            .unwrap_or_else(|| panic!("No task runner found for {task_type}",))
+    fn get_task_runner_for(
+        &self,
+        task_definition: &TaskDefinition,
+    ) -> Result<Arc<dyn TaskRunner>, InternalError> {
+        self.catalog
+            .builders_for_with_meta::<dyn TaskRunner, _>(|meta: &TaskRunnerMeta| {
+                meta.task_type == task_definition.task_type()
+            })
+            .next()
+            .map(|builder| builder.get(&self.catalog))
+            .transpose()
+            .int_err()?
+            .ok_or_else(|| {
+                InternalError::new(format!(
+                    "Task runner for type '{}' not found",
+                    task_definition.task_type()
+                ))
+            })
     }
 
     async fn run_task_iteration(&self) -> Result<(), InternalError> {
@@ -199,7 +178,7 @@ impl TaskAgentImpl {
         );
 
         // Find a planner and build a task definition
-        let task_planner = self.get_task_planner_for(&task.logical_plan);
+        let task_planner = self.get_task_planner_for(&task.logical_plan)?;
         let task_definition = match task_planner
             .prepare_task_definition(task.task_id, &task.logical_plan)
             .await
@@ -217,7 +196,7 @@ impl TaskAgentImpl {
         };
 
         // Find a runner and run task via definition
-        let task_runner = self.get_task_runner_for(&task_definition);
+        let task_runner = self.get_task_runner_for(&task_definition)?;
         let task_run_result = task_runner.run_task(task_definition).await;
 
         // Deal with errors: we should not interrupt the main loop if task fails

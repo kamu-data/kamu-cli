@@ -19,6 +19,9 @@ use crate::TaskDefinitionWebhookDeliver;
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskRunner)]
+#[dill::meta(TaskRunnerMeta {
+    task_type: TaskDefinitionWebhookDeliver::TASK_TYPE,
+})]
 pub struct DeliverWebhookTaskRunner {
     webhook_delivery_worker: Arc<dyn WebhookDeliveryWorker>,
 }
@@ -51,10 +54,6 @@ impl DeliverWebhookTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for DeliverWebhookTaskRunner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionWebhookDeliver::TASK_TYPE
-    }
-
     async fn run_task(
         &self,
         task_definition: kamu_task_system::TaskDefinition,

@@ -20,6 +20,9 @@ use crate::{TaskDefinitionDatasetHardCompact, TaskResultDatasetHardCompact};
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskRunner)]
+#[dill::meta(TaskRunnerMeta {
+    task_type: TaskDefinitionDatasetHardCompact::TASK_TYPE,
+})]
 pub struct HardCompactDatasetTaskRunner {
     catalog: dill::Catalog,
     compaction_executor: Arc<dyn CompactionExecutor>,
@@ -106,10 +109,6 @@ impl HardCompactDatasetTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for HardCompactDatasetTaskRunner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionDatasetHardCompact::TASK_TYPE
-    }
-
     async fn run_task(
         &self,
         task_definition: kamu_task_system::TaskDefinition,

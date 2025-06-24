@@ -14,6 +14,9 @@ use kamu_task_system::*;
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskDefinitionPlanner)]
+#[dill::meta(TaskDefinitionPlannerMeta {
+    logic_plan_type: LogicalPlanProbe::TYPE_ID,
+})]
 pub struct ProbeTaskPlanner {}
 
 impl ProbeTaskPlanner {
@@ -32,10 +35,6 @@ impl ProbeTaskPlanner {
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for ProbeTaskPlanner {
-    fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanProbe::TYPE_ID
-    }
-
     async fn prepare_task_definition(
         &self,
         _task_id: TaskID,

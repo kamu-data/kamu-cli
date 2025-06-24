@@ -14,6 +14,9 @@ use kamu_task_system::*;
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskRunner)]
+#[dill::meta(TaskRunnerMeta {
+    task_type: TaskDefinitionProbe::TASK_TYPE,
+})]
 pub struct ProbeTaskRunner {}
 
 impl ProbeTaskRunner {
@@ -37,10 +40,6 @@ impl ProbeTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for ProbeTaskRunner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionProbe::TASK_TYPE
-    }
-
     async fn run_task(
         &self,
         task_definition: kamu_task_system::TaskDefinition,

@@ -20,6 +20,9 @@ use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDataset
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskRunner)]
+#[dill::meta(TaskRunnerMeta {
+    task_type: TaskDefinitionDatasetReset::TASK_TYPE,
+})]
 pub struct ResetDatasetTaskRunner {
     catalog: dill::Catalog,
     reset_executor: Arc<dyn ResetExecutor>,
@@ -69,10 +72,6 @@ impl ResetDatasetTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for ResetDatasetTaskRunner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionDatasetReset::TASK_TYPE
-    }
-
     async fn run_task(
         &self,
         task_definition: kamu_task_system::TaskDefinition,

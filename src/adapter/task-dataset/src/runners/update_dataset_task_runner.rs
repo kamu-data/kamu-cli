@@ -25,6 +25,9 @@ use crate::{
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskRunner)]
+#[dill::meta(TaskRunnerMeta {
+    task_type: TaskDefinitionDatasetUpdate::TASK_TYPE,
+})]
 pub struct UpdateDatasetTaskRunner {
     catalog: dill::Catalog,
     polling_ingest_service: Arc<dyn PollingIngestService>,
@@ -220,10 +223,6 @@ impl UpdateDatasetTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for UpdateDatasetTaskRunner {
-    fn supported_task_type(&self) -> &str {
-        TaskDefinitionDatasetUpdate::TASK_TYPE
-    }
-
     async fn run_task(
         &self,
         task_definition: TaskDefinition,

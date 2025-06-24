@@ -15,10 +15,15 @@ use crate::{TaskDefinition, TaskOutcome};
 
 #[async_trait::async_trait]
 pub trait TaskRunner: Send + Sync {
-    fn supported_task_type(&self) -> &str;
-
     async fn run_task(&self, task_definition: TaskDefinition)
     -> Result<TaskOutcome, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct TaskRunnerMeta {
+    pub task_type: &'static str,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

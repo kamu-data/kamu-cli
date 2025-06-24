@@ -20,6 +20,9 @@ use crate::{LogicalPlanDatasetReset, TaskDefinitionDatasetReset};
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskDefinitionPlanner)]
+#[dill::meta(TaskDefinitionPlannerMeta {
+    logic_plan_type: LogicalPlanDatasetReset::TYPE_ID,
+})]
 pub struct ResetDatasetTaskPlanner {
     catalog: dill::Catalog,
 }
@@ -58,10 +61,6 @@ impl ResetDatasetTaskPlanner {
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
-    fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanDatasetReset::TYPE_ID
-    }
-
     async fn prepare_task_definition(
         &self,
         _task_id: TaskID,

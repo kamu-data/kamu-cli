@@ -28,6 +28,9 @@ use crate::{LogicalPlanDatasetUpdate, TaskDefinitionDatasetUpdate};
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskDefinitionPlanner)]
+#[dill::meta(TaskDefinitionPlannerMeta {
+    logic_plan_type: LogicalPlanDatasetUpdate::TYPE_ID,
+})]
 pub struct UpdateDatasetTaskPlanner {
     catalog: dill::Catalog,
     tenancy_config: Arc<TenancyConfig>,
@@ -95,10 +98,6 @@ impl UpdateDatasetTaskPlanner {
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for UpdateDatasetTaskPlanner {
-    fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanDatasetUpdate::TYPE_ID
-    }
-
     async fn prepare_task_definition(
         &self,
         _task_id: TaskID,

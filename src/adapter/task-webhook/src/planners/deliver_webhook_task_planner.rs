@@ -16,6 +16,9 @@ use crate::{LogicalPlanWebhookDeliver, TaskDefinitionWebhookDeliver};
 
 #[dill::component(pub)]
 #[dill::interface(dyn TaskDefinitionPlanner)]
+#[dill::meta(TaskDefinitionPlannerMeta {
+    logic_plan_type: LogicalPlanWebhookDeliver::TYPE_ID,
+})]
 pub struct DeliverWebhookTaskPlanner {}
 
 impl DeliverWebhookTaskPlanner {}
@@ -24,10 +27,6 @@ impl DeliverWebhookTaskPlanner {}
 
 #[async_trait::async_trait]
 impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
-    fn supported_logic_plan_type(&self) -> &str {
-        LogicalPlanWebhookDeliver::TYPE_ID
-    }
-
     async fn prepare_task_definition(
         &self,
         task_id: TaskID,

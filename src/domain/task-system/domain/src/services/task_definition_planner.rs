@@ -15,13 +15,18 @@ use crate::{LogicalPlan, TaskDefinition, TaskID};
 
 #[async_trait::async_trait]
 pub trait TaskDefinitionPlanner: Send + Sync {
-    fn supported_logic_plan_type(&self) -> &str;
-
     async fn prepare_task_definition(
         &self,
         task_id: TaskID,
         logical_plan: &LogicalPlan,
     ) -> Result<TaskDefinition, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct TaskDefinitionPlannerMeta {
+    pub logic_plan_type: &'static str,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

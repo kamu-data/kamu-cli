@@ -32,12 +32,8 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_pre_run_requeues_running_tasks() {
-    let mut mock_task_planner = MockTaskDefinitionPlanner::new();
-    let mut mock_task_runner = MockTaskRunner::new();
-    TaskAgentHarness::add_supported_task_types_expectations(
-        &mut mock_task_planner,
-        &mut mock_task_runner,
-    );
+    let mock_task_planner = MockTaskDefinitionPlanner::new();
+    let mock_task_runner = MockTaskRunner::new();
 
     let harness = TaskAgentHarness::new(MockOutbox::new(), mock_task_planner, mock_task_runner);
 
@@ -91,10 +87,6 @@ async fn test_run_single_task() {
     // Expect logical plan runner to run probe
     let mut mock_task_planner = MockTaskDefinitionPlanner::new();
     let mut mock_task_runner = MockTaskRunner::new();
-    TaskAgentHarness::add_supported_task_types_expectations(
-        &mut mock_task_planner,
-        &mut mock_task_runner,
-    );
     TaskAgentHarness::add_plan_probe_plan_expectations(
         &mut mock_task_planner,
         LogicalPlanProbe::default(),
@@ -134,10 +126,6 @@ async fn test_run_two_of_three_tasks() {
     // Expect logical plan runner to run probe twice
     let mut mock_task_planner = MockTaskDefinitionPlanner::new();
     let mut mock_task_runner = MockTaskRunner::new();
-    TaskAgentHarness::add_supported_task_types_expectations(
-        &mut mock_task_planner,
-        &mut mock_task_runner,
-    );
     TaskAgentHarness::add_plan_probe_plan_expectations(
         &mut mock_task_planner,
         LogicalPlanProbe::default(),
@@ -242,6 +230,8 @@ impl TaskAgentHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_value(TaskAgentConfig::new(chrono::Duration::seconds(1)))
+            .add::<ProbeTaskPlanner>()
+            .add::<ProbeTaskRunner>()
             .add_value(DatasetEnvVarsConfig::sample());
 
         NoOpDatabasePlugin::init_database_components(&mut b);
@@ -314,20 +304,6 @@ impl TaskAgentHarness {
             .times(1)
             .returning(|_, _, _| Ok(()));
     }
-
-    fn add_supported_task_types_expectations(
-        mock_task_planner: &mut MockTaskDefinitionPlanner,
-        mock_task_runner: &mut MockTaskRunner,
-    ) {
-        mock_task_planner
-            .expect_supported_logic_plan_type()
-            .return_const(LogicalPlanProbe::TYPE_ID);
-
-        mock_task_runner
-            .expect_supported_task_type()
-            .return_const(TaskDefinitionProbe::TASK_TYPE);
-    }
-
     fn add_plan_probe_plan_expectations(
         mock_task_planner: &mut MockTaskDefinitionPlanner,
         probe: LogicalPlanProbe,
@@ -379,8 +355,6 @@ mockall::mock! {
 
     #[async_trait::async_trait]
     impl TaskRunner for TaskRunner {
-        fn supported_task_type(&self) -> &'static str;
-
         async fn run_task(&self, task_definition: TaskDefinition) -> Result<TaskOutcome, InternalError>;
     }
 }
@@ -392,8 +366,6 @@ mockall::mock! {
 
     #[async_trait::async_trait]
     impl TaskDefinitionPlanner for TaskDefinitionPlanner {
-        fn supported_logic_plan_type(&self) -> &'static str;
-
         async fn prepare_task_definition(
             &self,
             task_id: TaskID,
