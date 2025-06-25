@@ -26,16 +26,15 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     assert_eq!(0, num_events);
 
-    let flow_binding = FlowBinding::for_dataset(
-        odf::DatasetID::new_seeded_ed25519(b"foo"),
-        afs::FLOW_TYPE_DATASET_INGEST,
-    );
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let flow_binding = FlowBinding::for_dataset(dataset_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+
     let events: Vec<_> = event_store
         .get_events(&flow_binding, GetEventsOpts::default())
         .try_collect()
         .await
         .unwrap();
-
     assert_eq!(events, []);
 
     let dataset_ids: Vec<_> = event_store
@@ -45,8 +44,26 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
         })
         .await
         .unwrap();
-
     assert_eq!(dataset_ids, []);
+
+    let dataset_bindings = event_store
+        .all_bindings_for_dataset_flows(&dataset_id)
+        .await
+        .unwrap();
+    assert!(
+        dataset_bindings.is_empty(),
+        "Expected no bindings, found: {dataset_bindings:?}"
+    );
+
+    let all_bindings = event_store
+        .stream_all_existing_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert!(
+        all_bindings.is_empty(),
+        "Expected no bindings, found: {all_bindings:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,14 +170,42 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         })
         .await
         .unwrap();
-
     dataset_ids.sort();
 
-    let mut expected_dataset_ids = vec![dataset_id_1, dataset_id_2];
-
+    let mut expected_dataset_ids = vec![dataset_id_1.clone(), dataset_id_2.clone()];
     expected_dataset_ids.sort();
 
     assert_eq!(expected_dataset_ids, dataset_ids);
+
+    let dataset_bindings = event_store
+        .all_bindings_for_dataset_flows(&dataset_id_1)
+        .await
+        .unwrap();
+    assert_eq!(
+        dataset_bindings,
+        vec![flow_binding_1.clone()],
+        "Expected only one binding for dataset 1, found: {dataset_bindings:?}"
+    );
+
+    let dataset_bindings = event_store
+        .all_bindings_for_dataset_flows(&dataset_id_2)
+        .await
+        .unwrap();
+    assert_eq!(
+        dataset_bindings,
+        vec![flow_binding_2.clone()],
+        "Expected only one binding for dataset 2, found: {dataset_bindings:?}"
+    );
+
+    let all_bindings = event_store
+        .stream_all_existing_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!(all_bindings.len(), 3);
+    assert!(all_bindings.contains(&flow_binding_1));
+    assert!(all_bindings.contains(&flow_binding_2));
+    assert!(all_bindings.contains(&flow_binding_3));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -35,16 +35,14 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     assert_eq!(0, num_events);
 
-    let flow_binding = FlowBinding::for_dataset(
-        odf::DatasetID::new_seeded_ed25519(b"foo"),
-        afs::FLOW_TYPE_DATASET_INGEST,
-    );
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let flow_binding = FlowBinding::for_dataset(dataset_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
     let events: Vec<_> = event_store
         .get_events(&flow_binding, GetEventsOpts::default())
         .try_collect()
         .await
         .unwrap();
-
     assert_eq!(events, []);
 
     let dataset_ids: Vec<_> = event_store
@@ -54,8 +52,26 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
         })
         .await
         .unwrap();
-
     assert_eq!(dataset_ids, []);
+
+    let bindings = event_store
+        .all_trigger_bindings_for_dataset_flows(&dataset_id)
+        .await
+        .unwrap();
+    assert_eq!(bindings, []);
+
+    let system_bindings = event_store
+        .all_trigger_bindings_for_system_flows()
+        .await
+        .unwrap();
+    assert_eq!(system_bindings, []);
+
+    let all_active_bindings = event_store
+        .stream_all_active_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!(all_active_bindings, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -127,7 +143,6 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .unwrap();
 
     let num_events = event_store.len().await.unwrap();
-
     assert_eq!(4, num_events);
 
     let events: Vec<_> = event_store
@@ -136,7 +151,6 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .try_collect()
         .await
         .unwrap();
-
     assert_eq!(&events[..], [event_1_1.into(), event_1_2.into()]);
 
     let events: Vec<_> = event_store
@@ -145,7 +159,6 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .try_collect()
         .await
         .unwrap();
-
     assert_eq!(&events[..], [event_2.into()]);
 
     let events: Vec<_> = event_store
@@ -154,7 +167,6 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .try_collect()
         .await
         .unwrap();
-
     assert_eq!(&events[..], [event_3.into()]);
 
     let mut dataset_ids: Vec<_> = event_store
@@ -167,11 +179,37 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     dataset_ids.sort();
 
-    let mut expected_dataset_ids = vec![dataset_id_1, dataset_id_2];
-
+    let mut expected_dataset_ids = vec![dataset_id_1.clone(), dataset_id_2.clone()];
     expected_dataset_ids.sort();
 
     assert_eq!(expected_dataset_ids, dataset_ids);
+
+    let bindings = event_store
+        .all_trigger_bindings_for_dataset_flows(&dataset_id_1)
+        .await
+        .unwrap();
+    assert_eq!(bindings, vec![flow_binding_1.clone()]);
+
+    let bindings = event_store
+        .all_trigger_bindings_for_dataset_flows(&dataset_id_2)
+        .await
+        .unwrap();
+    assert_eq!(bindings, vec![flow_binding_2.clone()]);
+
+    let bindings = event_store
+        .all_trigger_bindings_for_system_flows()
+        .await
+        .unwrap();
+    assert_eq!(bindings, vec![flow_binding_3.clone()]);
+
+    let all_active_bindings = event_store
+        .stream_all_active_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!(all_active_bindings.len(), 2);
+    assert!(all_active_bindings.contains(&flow_binding_2));
+    assert!(all_active_bindings.contains(&flow_binding_3));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

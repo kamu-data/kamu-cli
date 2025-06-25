@@ -18,6 +18,7 @@ use futures::TryStreamExt;
 use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
 };
 use kamu_flow_system::*;
@@ -2238,6 +2239,67 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
             .unwrap(),
         vec![flow_id_baz]
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    // Create a dataset and schedule multiple flows
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
+
+    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
+        trigger_time: Utc::now(),
+    });
+
+    // Schedule two flows for the dataset
+
+    let flow_id_1 = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_INGEST,
+            FlowStatus::Waiting,
+            automatic_trigger.clone(),
+            None,
+        )
+        .await;
+
+    let flow_id_2 = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_COMPACT,
+            FlowStatus::Waiting,
+            automatic_trigger.clone(),
+            None,
+        )
+        .await;
+
+    let flow_id_3 = flow_generator
+        .make_new_flow(
+            FLOW_TYPE_DATASET_RESET,
+            FlowStatus::Waiting,
+            automatic_trigger.clone(),
+            None,
+        )
+        .await;
+
+    // Start running both flows
+    flow_generator.start_running_flow(flow_id_1).await;
+    flow_generator.start_running_flow(flow_id_2).await;
+
+    // Finish the compaction flow (no longer pending)
+    flow_generator
+        .finish_running_flow(flow_id_2, TaskOutcome::Success(TaskResult::empty()))
+        .await;
+
+    // Call the method under test
+    let pending_flows = flow_event_store
+        .try_get_all_dataset_pending_flows(&dataset_id)
+        .await
+        .unwrap();
+
+    // Expect no flow_id_2, which finished
+    assert_eq!(pending_flows, vec![flow_id_3, flow_id_1]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

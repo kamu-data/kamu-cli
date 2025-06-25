@@ -284,6 +284,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
     fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
+
             let connection_mut = tr.connection_mut().await?;
 
             let mut rows = sqlx::query(
@@ -305,9 +306,9 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                 WHERE row_num = 1
                 AND event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (
-                    (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = 'false')
+                    (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = false)
                     OR
-                    (event_type = 'FlowTriggerEventModified' AND json_extract(event_payload, '$.Modified.paused') = 'false')
+                    (event_type = 'FlowTriggerEventModified' AND json_extract(event_payload, '$.Modified.paused') = false)
                 )
                 "#
             )
@@ -427,9 +428,9 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                 AND json_extract(scope_data, '$.dataset_id') IN ({})
                 AND event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (
-                    (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = 0)
+                    (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = false)
                     OR
-                    (event_type = 'FlowTriggerEventModified' AND json_extract(event_payload, '$.Modified.paused') = 0)
+                    (event_type = 'FlowTriggerEventModified' AND json_extract(event_payload, '$.Modified.paused') = false)
                 )
             )
             "#,
