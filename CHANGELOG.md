@@ -11,6 +11,25 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Major refactoring of flow & task systems:
+  - Fully unplugged the flow and task systems from `kamu-core` and removed all domain-specific couplings.
+  - Flow/task adapters moved into separate crates and adapters split by target domain for improved modularity.
+  - Task runners and planners isolated from the main task system; extracted and decoupled services for clearer interfaces.
+  - Decoupled `FlowOutcome` from direct error details; error details now accessed from associated tasks.
+  - Removed duplicate `FlowResult` hierarchy, standardized on propagating `TaskResult`.
+  - Refactored `TaskResult` and `TaskError` types for improved clarity and maintainability.
+  - Introduced flow-type specific dispatchers responsible for creating logical plans of tasks and propagating dependent flows.
+  - Replaced flow keys with flow bindings without hard-coded flow types for triggers, configs, and flows
+  - External data changes are now handled by an ingest dispatcher instead of the flow agent.
+  - Reduced boilerplate in `LogicalPlan`, `TaskDefinition`, `TaskResult`, and `TaskError` using macros.
+  - Extracted `FlowRunService` from `FlowQueryService` for clearer separation of responsibilities.
+- Improvements in event sourcing aggregates:
+  - Optimized event sourcing aggregate loading by supporting loading via reference.
+  - Simplified aggregate multi-load functions for improved efficiency.
+
+
 ## [0.242.1] - 2025-06-19
 ### Fixed
 - `PredefinedAccountsRegistrator`: during account synchronization, update password hash as well.
