@@ -228,6 +228,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                         trigger_time: start_time,
                     }),
                     config_snapshot: None,
+                    retry_policy: RetryPolicy::default(),
                 }
                 .into(),
                 FlowEventStartConditionUpdated {

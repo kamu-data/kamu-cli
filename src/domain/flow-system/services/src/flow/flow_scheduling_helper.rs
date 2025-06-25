@@ -505,6 +505,7 @@ impl FlowSchedulingHelper {
             flow_binding,
             trigger_type.clone(),
             config_snapshot,
+            RetryPolicy::default(), // TODO: configuration
         );
 
         Ok(flow)

@@ -26,6 +26,7 @@ impl Flow {
         flow_binding: FlowBinding,
         trigger: FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
+        retry_policy: RetryPolicy,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -36,6 +37,7 @@ impl Flow {
                     flow_binding,
                     trigger,
                     config_snapshot,
+                    retry_policy,
                 },
             )
             .unwrap(),
@@ -144,11 +146,20 @@ impl Flow {
         task_id: TaskID,
         task_outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<FlowState>> {
+        // Compute if there will be a next attempt and when
+        let next_attempt_at = if task_outcome.is_failed() {
+            self.retry_policy
+                .next_attempt_at(u32::try_from(self.task_ids.len()).unwrap(), now)
+        } else {
+            None
+        };
+
         let event = FlowEventTaskFinished {
             event_time: now,
             flow_id: self.flow_id,
             task_id,
             task_outcome,
+            next_attempt_at,
         };
         self.apply(event)
     }

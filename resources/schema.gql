@@ -2223,6 +2223,7 @@ type FlowStartConditionThrottling {
 enum FlowStatus {
 	WAITING
 	RUNNING
+	RETRYING
 	FINISHED
 }
 
