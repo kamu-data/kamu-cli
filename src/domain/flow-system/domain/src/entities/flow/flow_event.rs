@@ -63,6 +63,8 @@ pub struct FlowEventInitiated {
     pub flow_binding: FlowBinding,
     pub trigger: FlowTriggerInstance,
     pub config_snapshot: Option<FlowConfigurationRule>,
+    #[serde(default)]
+    pub retry_policy: RetryPolicy,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,6 +130,8 @@ pub struct FlowEventTaskFinished {
     pub flow_id: FlowID,
     pub task_id: TaskID,
     pub task_outcome: TaskOutcome,
+    #[serde(default)]
+    pub next_attempt_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,7 +182,14 @@ impl FlowEvent {
             | FlowEvent::ScheduledForActivation(_)
             | FlowEvent::TaskScheduled(_) => None,
             FlowEvent::TaskRunning(_) => Some(FlowStatus::Running),
-            FlowEvent::TaskFinished(_) | FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
+            FlowEvent::TaskFinished(e) => {
+                if e.next_attempt_at.is_some() {
+                    Some(FlowStatus::Retrying)
+                } else {
+                    Some(FlowStatus::Finished)
+                }
+            }
+            FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
         }
     }
 }
