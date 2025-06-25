@@ -72,7 +72,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         // TODO: for some datasets launching manually might not be an option:
         //   i.e., root datasets with push sources require input data to arrive
 
-        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
+        let flow_run_service = from_catalog_n!(ctx, dyn fs::FlowRunService);
         let logged_account = utils::get_logged_account(ctx);
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
@@ -93,8 +93,8 @@ impl<'a> DatasetFlowRunsMut<'a> {
             map_dataset_flow_type(dataset_flow_type),
         );
 
-        let flow_state = flow_query_service
-            .trigger_flow_manualy(
+        let flow_state = flow_run_service
+            .run_flow_manually(
                 Utc::now(),
                 &flow_binding,
                 logged_account.account_id,
@@ -129,8 +129,8 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }
 
         // Attempt cancelling scheduled tasks
-        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
-        let flow_state = flow_query_service
+        let flow_run_service = from_catalog_n!(ctx, dyn fs::FlowRunService);
+        let flow_state = flow_run_service
             .cancel_scheduled_tasks(flow_id.into())
             .await
             .map_err(|e| match e {

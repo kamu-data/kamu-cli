@@ -29,7 +29,7 @@ use crate::{
 })]
 pub struct FlowDispatcherCompact {
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
-    flow_query_service: Arc<dyn fs::FlowQueryService>,
+    flow_run_service: Arc<dyn fs::FlowRunService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
@@ -82,7 +82,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
                 trigger_hard_compaction_flow_for_own_downstream_datasets(
                     self.dataset_entry_service.as_ref(),
                     self.dependency_graph_service.as_ref(),
-                    self.flow_query_service.as_ref(),
+                    self.flow_run_service.as_ref(),
                     &dataset_id,
                     trigger_instance,
                 )
@@ -97,7 +97,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
             trigger_transform_flow_for_all_downstream_datasets(
                 self.dependency_graph_service.as_ref(),
                 self.flow_trigger_service.as_ref(),
-                self.flow_query_service.as_ref(),
+                self.flow_run_service.as_ref(),
                 flow_binding,
                 trigger_instance,
             )

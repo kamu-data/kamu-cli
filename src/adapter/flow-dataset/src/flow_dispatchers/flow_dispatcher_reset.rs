@@ -29,7 +29,7 @@ use crate::{
 pub struct FlowDispatcherReset {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    flow_query_service: Arc<dyn fs::FlowQueryService>,
+    flow_run_service: Arc<dyn fs::FlowRunService>,
 }
 
 #[async_trait::async_trait]
@@ -73,7 +73,7 @@ impl fs::FlowDispatcher for FlowDispatcherReset {
                 return trigger_hard_compaction_flow_for_own_downstream_datasets(
                     self.dataset_entry_service.as_ref(),
                     self.dependency_graph_service.as_ref(),
-                    self.flow_query_service.as_ref(),
+                    self.flow_run_service.as_ref(),
                     &dataset_id,
                     trigger_instance,
                 )

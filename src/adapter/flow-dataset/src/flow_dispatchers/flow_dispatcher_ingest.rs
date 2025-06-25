@@ -28,7 +28,7 @@ use crate::{
 })]
 pub struct FlowDispatcherIngest {
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
-    flow_query_service: Arc<dyn fs::FlowQueryService>,
+    flow_run_service: Arc<dyn fs::FlowRunService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
@@ -65,7 +65,7 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
         trigger_transform_flow_for_all_downstream_datasets(
             self.dependency_graph_service.as_ref(),
             self.flow_trigger_service.as_ref(),
-            self.flow_query_service.as_ref(),
+            self.flow_run_service.as_ref(),
             flow_binding,
             trigger_instance,
         )

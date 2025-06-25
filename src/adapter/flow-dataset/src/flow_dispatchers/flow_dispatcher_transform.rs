@@ -29,7 +29,7 @@ use crate::{
 pub struct FlowDispatcherTransform {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
-    flow_query_service: Arc<dyn fs::FlowQueryService>,
+    flow_run_service: Arc<dyn fs::FlowRunService>,
 }
 
 #[async_trait::async_trait]
@@ -65,7 +65,7 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
         trigger_transform_flow_for_all_downstream_datasets(
             self.dependency_graph_service.as_ref(),
             self.flow_trigger_service.as_ref(),
-            self.flow_query_service.as_ref(),
+            self.flow_run_service.as_ref(),
             flow_binding,
             trigger_instance,
         )

@@ -9,41 +9,20 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
-use dill::{Catalog, component, interface};
+use dill::{component, interface};
 use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::*;
 
-use crate::{FlowAbortHelper, FlowSchedulingHelper};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct FlowQueryServiceImpl {
-    catalog: Catalog,
-    flow_event_store: Arc<dyn FlowEventStore>,
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
-    agent_config: Arc<FlowAgentConfig>,
-}
 
 #[component(pub)]
 #[interface(dyn FlowQueryService)]
-impl FlowQueryServiceImpl {
-    pub fn new(
-        catalog: Catalog,
-        flow_event_store: Arc<dyn FlowEventStore>,
-        dataset_entry_service: Arc<dyn DatasetEntryService>,
-        agent_config: Arc<FlowAgentConfig>,
-    ) -> Self {
-        Self {
-            catalog,
-            flow_event_store,
-            dataset_entry_service,
-            agent_config,
-        }
-    }
+pub struct FlowQueryServiceImpl {
+    flow_event_store: Arc<dyn FlowEventStore>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -241,72 +220,6 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
         Ok(flow.into())
-    }
-
-    /// Triggers the specified flow manually, unless it's already waiting
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        fields(?flow_binding, %initiator_account_id)
-    )]
-    async fn trigger_flow_manualy(
-        &self,
-        trigger_time: DateTime<Utc>,
-        flow_binding: &FlowBinding,
-        initiator_account_id: odf::AccountID,
-        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
-    ) -> Result<FlowState, RequestFlowError> {
-        let activation_time = self.agent_config.round_time(trigger_time)?;
-
-        let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
-        scheduling_helper
-            .trigger_flow_common(
-                flow_binding,
-                None,
-                FlowTriggerInstance::Manual(FlowTriggerManual {
-                    trigger_time: activation_time,
-                    initiator_account_id,
-                }),
-                maybe_flow_config_snapshot,
-            )
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Triggers the specified flow with custom trigger instance,
-    /// unless it's already waiting
-    async fn trigger_flow(
-        &self,
-        flow_binding: &FlowBinding,
-        trigger_instance: FlowTriggerInstance,
-        maybe_flow_trigger_rule: Option<FlowTriggerRule>,
-        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
-    ) -> Result<FlowState, RequestFlowError> {
-        let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
-        scheduling_helper
-            .trigger_flow_common(
-                flow_binding,
-                maybe_flow_trigger_rule,
-                trigger_instance,
-                maybe_flow_config_snapshot,
-            )
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Attempts to cancel the tasks already scheduled for the given flow
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        fields(%flow_id)
-    )]
-    async fn cancel_scheduled_tasks(
-        &self,
-        flow_id: FlowID,
-    ) -> Result<FlowState, CancelScheduledTasksError> {
-        // Abort current flow and it's scheduled tasks
-        let abort_helper = self.catalog.get_one::<FlowAbortHelper>().unwrap();
-        abort_helper.abort_flow(flow_id).await.map_err(Into::into)
     }
 }
 

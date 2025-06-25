@@ -18,7 +18,7 @@ use crate::{FLOW_TYPE_DATASET_COMPACT, FLOW_TYPE_DATASET_TRANSFORM, FlowConfigRu
 pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
     dependency_graph_service: &dyn DependencyGraphService,
     flow_trigger_service: &dyn fs::FlowTriggerService,
-    flow_query_service: &dyn fs::FlowQueryService,
+    flow_run_service: &dyn fs::FlowRunService,
     flow_binding: &fs::FlowBinding,
     input_trigger: fs::FlowTriggerInstance,
 ) -> Result<(), InternalError> {
@@ -36,8 +36,8 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
             .await
             .int_err()?
         {
-            flow_query_service
-                .trigger_flow(
+            flow_run_service
+                .run_flow_with_trigger(
                     &downstream_binding,
                     input_trigger.clone(),
                     Some(fs::FlowTriggerRule::Batching(batching_rule)),
@@ -56,7 +56,7 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
 pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
     dataset_entry_service: &dyn kamu_datasets::DatasetEntryService,
     dependency_graph_service: &dyn DependencyGraphService,
-    flow_query_service: &dyn fs::FlowQueryService,
+    flow_run_service: &dyn fs::FlowRunService,
     dataset_id: &odf::DatasetID,
     input_trigger: fs::FlowTriggerInstance,
 ) -> Result<(), InternalError> {
@@ -78,8 +78,8 @@ pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
             let downstream_binding =
                 fs::FlowBinding::for_dataset(downstream_dataset_id, FLOW_TYPE_DATASET_COMPACT);
             // Trigger hard compaction
-            flow_query_service
-                .trigger_flow(
+            flow_run_service
+                .run_flow_with_trigger(
                     &downstream_binding,
                     input_trigger.clone(),
                     None,
