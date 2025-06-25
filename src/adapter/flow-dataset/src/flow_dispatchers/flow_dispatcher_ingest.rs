@@ -9,13 +9,20 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
-use kamu_datasets::DependencyGraphService;
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_datasets::{
+    DatasetExternallyChangedMessage,
+    DependencyGraphService,
+    MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+};
+use messaging_outbox::*;
+use time_source::SystemTimeSource;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
     FLOW_TYPE_DATASET_INGEST,
     FlowConfigRuleIngest,
+    MESSAGE_CONSUMER_KAMU_FLOW_DISPATCHER_INGEST,
     trigger_transform_flow_for_all_downstream_datasets,
 };
 
@@ -25,6 +32,16 @@ use crate::{
 #[dill::interface(dyn fs::FlowDispatcher)]
 #[dill::meta(fs::FlowDispatcherMeta {
     flow_type: FLOW_TYPE_DATASET_INGEST,
+})]
+#[dill::interface(dyn MessageConsumer)]
+#[dill::interface(dyn MessageConsumerT<DatasetExternallyChangedMessage>)]
+#[dill::meta(MessageConsumerMeta {
+    consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_DISPATCHER_INGEST,
+    feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+    ],
+    delivery: MessageDeliveryMechanism::Transactional,
+    initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct FlowDispatcherIngest {
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
@@ -70,6 +87,69 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
             trigger_instance,
         )
         .await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MessageConsumer for FlowDispatcherIngest {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "FlowDispatcherIngest[DatasetExternallyChangedMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        target_catalog: &dill::Catalog,
+        message: &DatasetExternallyChangedMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received dataset externally changed message");
+
+        let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();
+
+        let (trigger_type, dataset_id) = match message {
+            DatasetExternallyChangedMessage::HttpIngest(update_message) => (
+                fs::FlowTriggerInstance::Push(fs::FlowTriggerPush {
+                    trigger_time: time_source.now(),
+                    source_name: None,
+                    dataset_id: update_message.dataset_id.clone(),
+                    result: fs::DatasetPushResult::HttpIngest(fs::DatasetPushHttpIngestResult {
+                        old_head_maybe: update_message.maybe_prev_block_hash.clone(),
+                        new_head: update_message.new_block_hash.clone(),
+                    }),
+                }),
+                &update_message.dataset_id,
+            ),
+            DatasetExternallyChangedMessage::SmartTransferProtocolSync(update_message) => (
+                fs::FlowTriggerInstance::Push(fs::FlowTriggerPush {
+                    trigger_time: time_source.now(),
+                    source_name: None,
+                    dataset_id: update_message.dataset_id.clone(),
+                    result: fs::DatasetPushResult::SmtpSync(fs::DatasetPushSmtpSyncResult {
+                        old_head_maybe: update_message.maybe_prev_block_hash.clone(),
+                        new_head: update_message.new_block_hash.clone(),
+                        account_name_maybe: update_message.account_name.clone(),
+                        is_force: update_message.is_force,
+                    }),
+                }),
+                &update_message.dataset_id,
+            ),
+        };
+
+        let flow_binding =
+            fs::FlowBinding::for_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
+
+        use fs::FlowDispatcher;
+        self.propagate_success(&flow_binding, trigger_type, None)
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 }
 

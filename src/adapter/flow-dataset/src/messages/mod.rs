@@ -7,19 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
+mod flow_dataset_message_consumers;
 
-mod dependencies;
-pub use dependencies::*;
-
-mod flow_config_rules;
-pub use flow_config_rules::*;
-
-mod flow_dispatchers;
-pub use flow_dispatchers::*;
-
-mod flow_helpers;
-pub use flow_helpers::*;
-
-mod messages;
-pub use messages::*;
+pub use flow_dataset_message_consumers::*;

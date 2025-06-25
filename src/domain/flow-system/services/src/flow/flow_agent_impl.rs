@@ -19,7 +19,6 @@ use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_datasets::{
-    DatasetExternallyChangedMessage,
     DatasetLifecycleMessage,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
@@ -63,7 +62,6 @@ pub struct FlowAgentImpl {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
 #[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[interface(dyn MessageConsumerT<DatasetExternallyChangedMessage>)]
 #[interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
@@ -701,73 +699,6 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
                 // No action required
             }
         }
-
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowAgentImpl {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "FlowAgentImpl[DatasetExternallyChangedMessage]"
-    )]
-    async fn consume_message(
-        &self,
-        target_catalog: &Catalog,
-        message: &DatasetExternallyChangedMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset externally changed message");
-
-        let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();
-
-        let (trigger_type, dataset_id) = match message {
-            DatasetExternallyChangedMessage::HttpIngest(update_message) => (
-                FlowTriggerInstance::Push(FlowTriggerPush {
-                    trigger_time: time_source.now(),
-                    source_name: None,
-                    dataset_id: update_message.dataset_id.clone(),
-                    result: DatasetPushResult::HttpIngest(DatasetPushHttpIngestResult {
-                        old_head_maybe: update_message.maybe_prev_block_hash.clone(),
-                        new_head: update_message.new_block_hash.clone(),
-                    }),
-                }),
-                &update_message.dataset_id,
-            ),
-            DatasetExternallyChangedMessage::SmartTransferProtocolSync(update_message) => (
-                FlowTriggerInstance::Push(FlowTriggerPush {
-                    trigger_time: time_source.now(),
-                    source_name: None,
-                    dataset_id: update_message.dataset_id.clone(),
-                    result: DatasetPushResult::SmtpSync(DatasetPushSmtpSyncResult {
-                        old_head_maybe: update_message.maybe_prev_block_hash.clone(),
-                        new_head: update_message.new_block_hash.clone(),
-                        account_name_maybe: update_message.account_name.clone(),
-                        is_force: update_message.is_force,
-                    }),
-                }),
-                &update_message.dataset_id,
-            ),
-        };
-
-        // TODO: we might need to place this queing elsewhere,
-        //  where it's known what is "ingest" flow
-        // Also, who said it's ingest and not transform?
-
-        let flow_binding =
-            FlowBinding::for_dataset(dataset_id.clone(), "dev.kamu.flow.dataset.ingest");
-
-        let flow_dispatcher = self
-            .get_flow_dispatcher(target_catalog, flow_binding.flow_type.as_str())
-            .int_err()?;
-
-        flow_dispatcher
-            .propagate_success(&flow_binding, trigger_type, None)
-            .await
-            .int_err()?;
 
         Ok(())
     }

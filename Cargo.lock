@@ -6738,10 +6738,12 @@ dependencies = [
  "kamu-datasets",
  "kamu-flow-system",
  "kamu-task-system",
+ "messaging-outbox",
  "opendatafabric",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "time-source",
  "tracing",
  "uuid",
 ]

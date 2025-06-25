@@ -34,7 +34,9 @@ kamu-task-system ={ workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
 odf = { workspace = true }
+time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.14", default-features = false }
