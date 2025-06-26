@@ -2732,8 +2732,9 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         },
                                         "startCondition": null,
                                         "configSnapshot": {
-                                            "__typename": "FlowConfigurationCompactionRule",
-                                            "compactionRule": {
+                                            "__typename": "FlowConfigRuleCompaction",
+                                            "compactionMode": {
+                                                "__typename": "FlowConfigCompactionModeFull",
                                                 "maxSliceRecords": 10000,
                                                 "maxSliceSize": 1_000_000,
                                                 "recursive": false
@@ -3032,8 +3033,9 @@ async fn test_config_snapshot_returned_correctly() {
                                         },
                                         "startCondition": null,
                                         "configSnapshot": {
-                                            "__typename": "FlowConfigurationCompactionRule",
-                                            "compactionRule": {
+                                            "__typename": "FlowConfigRuleCompaction",
+                                            "compactionMode": {
+                                                "__typename": "FlowConfigCompactionModeFull",
                                                 "maxSliceRecords": 10000,
                                                 "maxSliceSize": 1_000_000,
                                                 "recursive": false
@@ -3464,30 +3466,31 @@ impl FlowRunsHarness {
                                             }
                                         }
                                         configSnapshot {
-                                            ... on FlowConfigurationIngest {
+                                            ... on FlowConfigRuleIngest {
                                                 fetchUncacheable
                                                 __typename
                                             }
-                                            ... on FlowConfigurationReset {
+                                            ... on FlowConfigRuleReset {
                                                 mode {
-                                                    ... on SnapshotConfigurationResetCustom {
+                                                    ... on FlowConfigResetPropagationModeCustom {
                                                         newHeadHash
                                                     }
-                                                    ... on SnapshotConfigurationResetToSeedDummy {
+                                                    ... on FlowConfigResetPropagationModeToSeed {
                                                         dummy
                                                     }
                                                 }
                                                 oldHeadHash
                                                 recursive
                                             }
-                                            ... on FlowConfigurationCompactionRule {
-                                                compactionRule {
-                                                    ... on CompactionFull {
+                                            ... on FlowConfigRuleCompaction {
+                                                compactionMode {
+                                                    __typename
+                                                    ... on FlowConfigCompactionModeFull {
                                                         maxSliceRecords
                                                         maxSliceSize
                                                         recursive
                                                     }
-                                                    ... on CompactionMetadataOnly {
+                                                    ... on FlowConfigCompactionModeMetadataOnly {
                                                         recursive
                                                     }
                                                 }

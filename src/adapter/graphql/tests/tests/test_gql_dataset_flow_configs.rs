@@ -40,11 +40,11 @@ async fn test_crud_ingest_root_dataset() {
                         configs {
                             byType (datasetFlowType: "INGEST") {
                                 __typename
-                                ingest {
-                                    fetchUncacheable
-                                }
-                                compaction {
+                                rule {
                                     __typename
+                                    ... on FlowConfigRuleIngest {
+                                        fetchUncacheable
+                                    }
                                 }
                             }
                         }
@@ -106,10 +106,10 @@ async fn test_crud_ingest_root_dataset() {
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "ingest": {
-                                        "fetchUncacheable": false,
+                                    "rule": {
+                                        "__typename": "FlowConfigRuleIngest",
+                                        "fetchUncacheable": false
                                     },
-                                    "compaction": null
                                 }
                             }
                         }
@@ -145,10 +145,10 @@ async fn test_crud_ingest_root_dataset() {
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "ingest": {
-                                        "fetchUncacheable": true,
+                                    "rule": {
+                                        "__typename": "FlowConfigRuleIngest",
+                                        "fetchUncacheable": true
                                     },
-                                    "compaction": null
                                 }
                             }
                         }
@@ -175,17 +175,20 @@ async fn test_crud_compaction_root_dataset() {
                         configs {
                             byType (datasetFlowType: "HARD_COMPACTION") {
                                 __typename
-                                ingest {
+                                rule {
                                     __typename
-                                }
-                                compaction {
-                                    __typename
-                                    ... on CompactionFull {
-                                        maxSliceSize
-                                        maxSliceRecords
-                                    }
-                                    ... on CompactionMetadataOnly {
-                                        recursive
+                                    ... on FlowConfigRuleCompaction {
+                                        compactionMode {
+                                            __typename
+                                            ... on FlowConfigCompactionModeFull {
+                                                maxSliceSize
+                                                maxSliceRecords
+                                                recursive
+                                            }
+                                            ... on FlowConfigCompactionModeMetadataOnly {
+                                                recursive
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -250,13 +253,15 @@ async fn test_crud_compaction_root_dataset() {
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "ingest": null,
-                                    "compaction": {
-                                        "__typename": "CompactionFull",
-                                        "maxSliceSize": 1_000_000,
-                                        "maxSliceRecords": 10000,
-                                        "recursive": false
-                                    }
+                                    "rule": {
+                                        "__typename": "FlowConfigRuleCompaction",
+                                        "compactionMode": {
+                                            "__typename": "FlowConfigCompactionModeFull",
+                                            "maxSliceSize": 1_000_000,
+                                            "maxSliceRecords": 10000,
+                                            "recursive": false
+                                        }
+                                    },
                                 }
                             }
                         }
@@ -444,11 +449,13 @@ async fn test_set_metadataonly_compaction_config_for_derivative() {
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "ingest": null,
-                                    "compaction": {
-                                        "__typename": "CompactionMetadataOnly",
-                                        "recursive": false
-                                    }
+                                    "rule": {
+                                        "__typename": "FlowConfigRuleCompaction",
+                                        "compactionMode": {
+                                            "__typename": "FlowConfigCompactionModeMetadataOnly",
+                                            "recursive": false
+                                        }
+                                    },
                                 }
                             }
                         }
@@ -652,11 +659,11 @@ impl FlowConfigHarness {
                                     ... on SetFlowConfigSuccess {
                                         config {
                                             __typename
-                                            ingest {
-                                                fetchUncacheable,
-                                            }
-                                            compaction {
+                                            rule {
                                                 __typename
+                                                ... on FlowConfigRuleIngest {
+                                                    fetchUncacheable
+                                                }
                                             }
                                         }
                                     }
@@ -710,18 +717,20 @@ impl FlowConfigHarness {
                                         ... on SetFlowConfigSuccess {
                                             config {
                                                 __typename
-                                                ingest {
+                                                rule {
                                                     __typename
-                                                }
-                                                compaction {
-                                                    __typename
-                                                    ... on CompactionFull {
-                                                        maxSliceSize
-                                                        maxSliceRecords
-                                                        recursive
-                                                    }
-                                                    ... on CompactionMetadataOnly {
-                                                        recursive
+                                                    ... on FlowConfigRuleCompaction {
+                                                        compactionMode {
+                                                            __typename
+                                                            ... on FlowConfigCompactionModeFull {
+                                                                maxSliceSize
+                                                                maxSliceRecords
+                                                                recursive
+                                                            }
+                                                            ... on FlowConfigCompactionModeMetadataOnly {
+                                                                recursive
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -772,18 +781,20 @@ impl FlowConfigHarness {
                                         ... on SetFlowConfigSuccess {
                                             config {
                                                 __typename
-                                                ingest {
+                                                rule {
                                                     __typename
-                                                }
-                                                compaction {
-                                                    __typename
-                                                    ... on CompactionFull {
-                                                        maxSliceSize
-                                                        maxSliceRecords
-                                                        recursive
-                                                    }
-                                                    ... on CompactionMetadataOnly {
-                                                        recursive
+                                                    ... on FlowConfigRuleCompaction {
+                                                        compactionMode {
+                                                            __typename
+                                                            ... on FlowConfigCompactionModeFull {
+                                                                maxSliceSize
+                                                                maxSliceRecords
+                                                                recursive
+                                                            }
+                                                            ... on FlowConfigCompactionModeMetadataOnly {
+                                                                recursive
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }

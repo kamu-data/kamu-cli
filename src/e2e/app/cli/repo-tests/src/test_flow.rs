@@ -439,12 +439,12 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     }
                   }
                   configSnapshot {
-                    ... on FlowConfigurationIngest {
+                    ... on FlowConfigRuleIngest {
                       fetchUncacheable
                       __typename
                     }
-                    ... on FlowConfigurationCompactionRule {
-                      compactionRule {
+                    ... on FlowConfigRuleCompaction {
+                      compactionMode {
                         __typename
                       }
                       __typename
@@ -1718,15 +1718,13 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
             }
           }
           configSnapshot {
-            ... on FlowConfigurationIngest {
+            ... on FlowConfigRuleIngest {
               fetchUncacheable
-              __typename
             }
-            ... on FlowConfigurationCompactionRule {
-              compactionRule {
-                __typename
+            ... on FlowConfigRuleCompaction {
+              compactionMode {
+                  __typename
               }
-              __typename
             }
             __typename
           }

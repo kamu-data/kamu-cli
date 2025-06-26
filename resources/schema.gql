@@ -664,31 +664,6 @@ type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 	message: String!
 }
 
-input CompactionConditionFull {
-	maxSliceSize: Int!
-	maxSliceRecords: Int!
-	recursive: Boolean!
-}
-
-input CompactionConditionInput @oneOf {
-	full: CompactionConditionFull
-	metadataOnly: CompactionConditionMetadataOnly
-}
-
-input CompactionConditionMetadataOnly {
-	recursive: Boolean!
-}
-
-type CompactionFull {
-	maxSliceSize: Int!
-	maxSliceRecords: Int!
-	recursive: Boolean!
-}
-
-type CompactionMetadataOnly {
-	recursive: Boolean!
-}
-
 union CompareChainsResult = CompareChainsResultStatus | CompareChainsResultError
 
 type CompareChainsResultError {
@@ -1124,7 +1099,7 @@ type DatasetFlowConfigs {
 }
 
 type DatasetFlowConfigsMut {
-	setConfig(datasetFlowType: DatasetFlowType!, configInput: FlowConfigurationInput!): SetFlowConfigResult!
+	setConfig(datasetFlowType: DatasetFlowType!, configInput: FlowConfigInput!): SetFlowConfigResult!
 }
 
 input DatasetFlowFilters {
@@ -1140,7 +1115,7 @@ type DatasetFlowRuns {
 }
 
 type DatasetFlowRunsMut {
-	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfiguration: FlowRunConfiguration): TriggerFlowResult!
+	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfiguration: FlowRunConfigInput): TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
@@ -1959,55 +1934,107 @@ type Flow {
 	"""
 	Flow config snapshot
 	"""
-	configSnapshot: FlowConfigurationSnapshot
+	configSnapshot: FlowConfigRule
 }
 
 type FlowAbortedResult {
 	message: String!
 }
 
-type FlowConfigSnapshotModified implements FlowEvent {
-	eventId: EventID!
-	eventTime: DateTime!
-	configSnapshot: FlowConfigurationSnapshot!
+union FlowConfigCompactionMode = FlowConfigCompactionModeFull | FlowConfigCompactionModeMetadataOnly
+
+type FlowConfigCompactionModeFull {
+	maxSliceSize: Int!
+	maxSliceRecords: Int!
+	recursive: Boolean!
 }
 
-type FlowConfiguration {
-	compaction: FlowConfigurationCompaction
-	ingest: FlowConfigurationIngest
-	reset: FlowConfigurationReset
+type FlowConfigCompactionModeMetadataOnly {
+	recursive: Boolean!
 }
 
-union FlowConfigurationCompaction = CompactionFull | CompactionMetadataOnly
-
-type FlowConfigurationCompactionRule {
-	compactionRule: FlowConfigurationCompaction!
+input FlowConfigInput @oneOf {
+	ingest: FlowConfigInputIngest
+	compaction: FlowConfigInputCompaction
 }
 
-type FlowConfigurationIngest {
+input FlowConfigInputCompaction @oneOf {
+	full: FlowConfigInputCompactionFull
+	metadataOnly: FlowConfigInputCompactionMetadataOnly
+}
+
+input FlowConfigInputCompactionFull {
+	maxSliceSize: Int!
+	maxSliceRecords: Int!
+	recursive: Boolean!
+}
+
+input FlowConfigInputCompactionMetadataOnly {
+	recursive: Boolean!
+}
+
+input FlowConfigInputIngest {
+	"""
+	Flag indicates to ignore cache during ingest step for API calls
+	"""
 	fetchUncacheable: Boolean!
 }
 
-input FlowConfigurationInput @oneOf {
-	ingest: IngestConditionInput
-	compaction: CompactionConditionInput
-}
-
-type FlowConfigurationReset {
-	mode: SnapshotPropagationMode!
+input FlowConfigInputReset {
+	mode: FlowConfigInputResetPropagationMode!
 	oldHeadHash: Multihash
 	recursive: Boolean!
 }
 
-input FlowConfigurationResetCustom {
+input FlowConfigInputResetPropagationMode @oneOf {
+	custom: FlowConfigInputResetPropagationModeCustom
+	toSeed: FlowConfigInputResetPropagationModeToSeed
+}
+
+input FlowConfigInputResetPropagationModeCustom {
 	newHeadHash: Multihash!
 }
 
-input FlowConfigurationResetToSeedDummy {
+input FlowConfigInputResetPropagationModeToSeed {
 	dummy: String
 }
 
-union FlowConfigurationSnapshot = FlowConfigurationCompactionRule | FlowConfigurationIngest | FlowConfigurationReset
+union FlowConfigResetPropagationMode = FlowConfigResetPropagationModeCustom | FlowConfigResetPropagationModeToSeed
+
+type FlowConfigResetPropagationModeCustom {
+	newHeadHash: Multihash!
+}
+
+type FlowConfigResetPropagationModeToSeed {
+	dummy: String
+}
+
+union FlowConfigRule = FlowConfigRuleIngest | FlowConfigRuleCompaction | FlowConfigRuleReset
+
+type FlowConfigRuleCompaction {
+	compactionMode: FlowConfigCompactionMode!
+}
+
+type FlowConfigRuleIngest {
+	fetchUncacheable: Boolean!
+}
+
+type FlowConfigRuleReset {
+	mode: FlowConfigResetPropagationMode!
+	oldHeadHash: Multihash
+	recursive: Boolean!
+}
+
+type FlowConfigSnapshotModified implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	configSnapshot: FlowConfigRule!
+}
+
+type FlowConfiguration {
+	rule: FlowConfigRule!
+	retryPolicy: FlowRetryPolicy
+}
 
 type FlowConnection {
 	"""
@@ -2191,10 +2218,23 @@ type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult 
 	message: String!
 }
 
-input FlowRunConfiguration @oneOf {
-	compaction: CompactionConditionInput
-	ingest: IngestConditionInput
-	reset: ResetConditionInput
+enum FlowRetryBackoffType {
+	FIXED
+	LINEAR
+	EXPONENTIAL
+	EXPONENTIAL_WITH_JITTER
+}
+
+type FlowRetryPolicy {
+	maxAttempts: Int!
+	minDelay: TimeDelta!
+	backoffType: FlowRetryBackoffType!
+}
+
+input FlowRunConfigInput @oneOf {
+	compaction: FlowConfigInputCompaction
+	ingest: FlowConfigInputIngest
+	reset: FlowConfigInputReset
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
@@ -2296,13 +2336,6 @@ interface GetFlowResult {
 type GetFlowSuccess implements GetFlowResult {
 	flow: Flow!
 	message: String!
-}
-
-input IngestConditionInput {
-	"""
-	Flag indicates to ignore cache during ingest step for API calls
-	"""
-	fetchUncacheable: Boolean!
 }
 
 input InitiatorFilterInput @oneOf {
@@ -2734,11 +2767,6 @@ input PrivateDatasetVisibilityInput {
 	dummy: String
 }
 
-input PropagationMode @oneOf {
-	custom: FlowConfigurationResetCustom
-	toSeed: FlowConfigurationResetToSeedDummy
-}
-
 type PublicDatasetVisibility {
 	anonymousAvailable: Boolean!
 }
@@ -3082,12 +3110,6 @@ type RequestHeader {
 	value: String!
 }
 
-input ResetConditionInput {
-	mode: PropagationMode!
-	oldHeadHash: Multihash
-	recursive: Boolean!
-}
-
 type RestProtocolDesc {
 	tailUrl: String!
 	queryUrl: String!
@@ -3395,16 +3417,6 @@ type SetWatermarkUpdated implements SetWatermarkResult {
 	newHead: Multihash!
 	message: String!
 }
-
-type SnapshotConfigurationResetCustom {
-	newHeadHash: Multihash!
-}
-
-type SnapshotConfigurationResetToSeedDummy {
-	dummy: String
-}
-
-union SnapshotPropagationMode = SnapshotConfigurationResetCustom | SnapshotConfigurationResetToSeedDummy
 
 """
 Defines how external data should be cached.

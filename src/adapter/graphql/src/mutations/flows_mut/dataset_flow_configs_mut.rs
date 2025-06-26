@@ -46,9 +46,9 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-        config_input: FlowConfigurationInput,
+        config_input: FlowConfigInput,
     ) -> Result<SetFlowConfigResult> {
-        let flow_run_config: FlowRunConfiguration = config_input.into();
+        let flow_run_config: FlowRunConfigInput = config_input.into();
         if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
             return Ok(SetFlowConfigResult::TypeIsNotSupported(err));
         }
@@ -148,17 +148,17 @@ impl FlowInvalidConfigInputError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl TryFrom<FlowConfigurationInput> for FlowConfigurationRule {
+impl TryFrom<FlowConfigInput> for FlowConfigurationRule {
     type Error = FlowInvalidConfigInputError;
 
-    fn try_from(value: FlowConfigurationInput) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: FlowConfigInput) -> std::result::Result<Self, Self::Error> {
         match value {
-            FlowConfigurationInput::Ingest(ingest_input) => {
+            FlowConfigInput::Ingest(ingest_input) => {
                 let ingest_rule: FlowConfigRuleIngest = ingest_input.into();
                 Ok(ingest_rule.into_flow_config())
             }
-            FlowConfigurationInput::Compaction(compaction_input) => match compaction_input {
-                CompactionConditionInput::Full(compaction_args) => {
+            FlowConfigInput::Compaction(compaction_input) => match compaction_input {
+                FlowConfigInputCompaction::Full(compaction_args) => {
                     FlowConfigRuleCompactFull::new_checked(
                         compaction_args.max_slice_size,
                         compaction_args.max_slice_records,
@@ -169,7 +169,7 @@ impl TryFrom<FlowConfigurationInput> for FlowConfigurationRule {
                     })
                     .map(|rule| FlowConfigRuleCompact::Full(rule).into_flow_config())
                 }
-                CompactionConditionInput::MetadataOnly(compaction_args) => {
+                FlowConfigInputCompaction::MetadataOnly(compaction_args) => {
                     let compaction_rule = FlowConfigRuleCompact::MetadataOnly {
                         recursive: compaction_args.recursive,
                     };
