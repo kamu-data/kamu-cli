@@ -76,7 +76,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         let logged_account = utils::get_logged_account(ctx);
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        let flow_run_snapshot = match FlowRunConfiguration::try_into_snapshot(
+        let maybe_forced_flow_config_rule = match FlowRunConfiguration::try_into_snapshot(
             ctx,
             &dataset_flow_type,
             dataset_handle,
@@ -98,7 +98,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
                 Utc::now(),
                 &flow_binding,
                 logged_account.account_id,
-                flow_run_snapshot,
+                maybe_forced_flow_config_rule,
             )
             .await
             .int_err()?;

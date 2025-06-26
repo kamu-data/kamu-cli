@@ -145,7 +145,7 @@ impl FlowSchedulingHelper {
         flow_binding: &FlowBinding,
         trigger_rule_maybe: Option<FlowTriggerRule>,
         trigger_type: FlowTriggerInstance,
-        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
+        maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self
@@ -222,7 +222,7 @@ impl FlowSchedulingHelper {
                                 )?;
                             }
 
-                            if let Some(config_snapshot) = maybe_flow_config_snapshot {
+                            if let Some(config_snapshot) = maybe_forced_flow_config_rule {
                                 flow.modify_config_snapshot(trigger_time, config_snapshot)
                                     .int_err()?;
                             }
@@ -240,21 +240,40 @@ impl FlowSchedulingHelper {
 
             // Otherwise, initiate a new flow and schedule it for activation
             None => {
+                // Do we have a defined configuration for this flow?
+                let maybe_flow_configuration = self
+                    .flow_configuration_service
+                    .find_configuration(flow_binding)
+                    .await
+                    .int_err()?;
+
+                // Decide on configuration rule snapshot:
+                //  - if forced, use it
+                //  - if not, use the latest configuration rule, if any
+                //  - if no configuration, use default rule
+                let maybe_flow_config_rule_snapshot =
+                    maybe_forced_flow_config_rule.map(Some).unwrap_or_else(|| {
+                        maybe_flow_configuration
+                            .as_ref()
+                            .map(|config| Some(config.rule.clone()))
+                            .unwrap_or_default()
+                    });
+
+                // Decide on retry policy:
+                // - if configuration defines it, use it
+                // - if not, use default retry policy
+                let retry_policy = maybe_flow_configuration
+                    .and_then(|config| config.retry_policy)
+                    .unwrap_or_else(RetryPolicy::default);
+
                 // Initiate new flow
-                let maybe_flow_config_snapshot = if maybe_flow_config_snapshot.is_some() {
-                    maybe_flow_config_snapshot
-                } else {
-                    self.flow_configuration_service
-                        .try_get_config_snapshot_by_binding(flow_binding)
-                        .await
-                        .int_err()?
-                };
                 let mut flow = self
                     .make_new_flow(
                         self.flow_event_store.as_ref(),
                         flow_binding.clone(),
                         &trigger_type,
-                        maybe_flow_config_snapshot,
+                        maybe_flow_config_rule_snapshot,
+                        retry_policy,
                     )
                     .await?;
 
@@ -495,7 +514,8 @@ impl FlowSchedulingHelper {
         flow_event_store: &dyn FlowEventStore,
         flow_binding: FlowBinding,
         trigger_type: &FlowTriggerInstance,
-        config_snapshot: Option<FlowConfigurationRule>,
+        maybe_config_rule_snapshot: Option<FlowConfigurationRule>,
+        retry_policy: RetryPolicy,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(flow_key = ?flow_binding, trigger = ?trigger_type, "Creating new flow");
 
@@ -504,8 +524,8 @@ impl FlowSchedulingHelper {
             flow_event_store.new_flow_id().await?,
             flow_binding,
             trigger_type.clone(),
-            config_snapshot,
-            RetryPolicy::default(), // TODO: configuration
+            maybe_config_rule_snapshot,
+            retry_policy,
         );
 
         Ok(flow)

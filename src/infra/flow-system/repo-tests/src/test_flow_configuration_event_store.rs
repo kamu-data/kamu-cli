@@ -81,11 +81,13 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_binding: flow_binding_1.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        retry_policy: None,
     };
     let event_1_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_binding: flow_binding_1.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        retry_policy: None,
     };
 
     event_store
@@ -109,6 +111,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_binding: flow_binding_2.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        retry_policy: None,
     };
 
     event_store
@@ -125,6 +128,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        retry_policy: None,
     };
 
     event_store
@@ -224,16 +228,19 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        retry_policy: None,
     };
     let event_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+        retry_policy: None,
     };
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
+        retry_policy: None,
     };
 
     let latest_event_id = event_store

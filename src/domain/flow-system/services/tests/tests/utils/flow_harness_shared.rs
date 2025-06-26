@@ -285,7 +285,7 @@ impl FlowHarness {
         ingest_rule: FlowConfigRuleIngest,
     ) {
         self.flow_configuration_service
-            .set_configuration(flow_binding, ingest_rule.into_flow_config())
+            .set_configuration(flow_binding, ingest_rule.into_flow_config(), None)
             .await
             .unwrap();
     }
@@ -296,7 +296,7 @@ impl FlowHarness {
         reset_rule: FlowConfigRuleReset,
     ) {
         self.flow_configuration_service
-            .set_configuration(flow_binding, reset_rule.into_flow_config())
+            .set_configuration(flow_binding, reset_rule.into_flow_config(), None)
             .await
             .unwrap();
     }
@@ -307,7 +307,7 @@ impl FlowHarness {
         compaction_rule: FlowConfigRuleCompact,
     ) {
         self.flow_configuration_service
-            .set_configuration(flow_binding, compaction_rule.into_flow_config())
+            .set_configuration(flow_binding, compaction_rule.into_flow_config(), None)
             .await
             .unwrap();
     }

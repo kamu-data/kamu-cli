@@ -514,7 +514,7 @@ async fn test_manual_trigger() {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -523,7 +523,7 @@ async fn test_manual_trigger() {
                   flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: Some(FlowConfigRuleIngest {
+                    maybe_forced_flow_config_rule: Some(FlowConfigRuleIngest {
                       fetch_uncacheable: true
                     }.into_flow_config()),
                 });
@@ -729,7 +729,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -738,7 +738,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -917,7 +917,7 @@ async fn test_manual_trigger_compaction() {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -926,7 +926,7 @@ async fn test_manual_trigger_compaction() {
                     flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -1053,7 +1053,7 @@ async fn test_manual_trigger_reset() {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -1155,7 +1155,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               flow_binding: foo_flow_binding,
               run_since_start: Duration::milliseconds(10),
               initiator_id: None,
-              flow_configuration_snapshot_maybe: None,
+              maybe_forced_flow_config_rule: None,
           });
           let trigger0_handle = trigger0_driver.run();
 
@@ -1370,7 +1370,7 @@ async fn test_manual_trigger_compaction_with_config() {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -1473,7 +1473,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
-                flow_configuration_snapshot_maybe: None,
+                maybe_forced_flow_config_rule: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -1698,7 +1698,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
-                flow_configuration_snapshot_maybe: None,
+                maybe_forced_flow_config_rule: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -1925,7 +1925,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
-                flow_configuration_snapshot_maybe: None,
+                maybe_forced_flow_config_rule: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -2082,7 +2082,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
-                flow_configuration_snapshot_maybe: None,
+                maybe_forced_flow_config_rule: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -3296,7 +3296,7 @@ async fn test_throttling_manual_triggers() {
             flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
-            flow_configuration_snapshot_maybe: None,
+            maybe_forced_flow_config_rule: None,
         });
         let trigger0_handle = trigger0_driver.run();
 
@@ -3305,7 +3305,7 @@ async fn test_throttling_manual_triggers() {
             flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
-            flow_configuration_snapshot_maybe: None,
+            maybe_forced_flow_config_rule: None,
         });
         let trigger1_handle = trigger1_driver.run();
 
@@ -3314,7 +3314,7 @@ async fn test_throttling_manual_triggers() {
           flow_binding: foo_flow_binding,
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
-          flow_configuration_snapshot_maybe: None,
+          maybe_forced_flow_config_rule: None,
         });
         let trigger2_handle = trigger2_driver.run();
 
@@ -5446,7 +5446,7 @@ async fn test_list_all_flow_initiators() {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -5455,7 +5455,7 @@ async fn test_list_all_flow_initiators() {
                     flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -5592,7 +5592,7 @@ async fn test_list_all_datasets_with_flow() {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -5601,7 +5601,7 @@ async fn test_list_all_datasets_with_flow() {
                     flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
-                    flow_configuration_snapshot_maybe: None,
+                    maybe_forced_flow_config_rule: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -6438,7 +6438,7 @@ async fn test_trigger_enable_during_flow_throttling() {
             flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
-            flow_configuration_snapshot_maybe: None,
+            maybe_forced_flow_config_rule: None,
         });
         let trigger0_handle = trigger0_driver.run();
 
@@ -6447,7 +6447,7 @@ async fn test_trigger_enable_during_flow_throttling() {
             flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
-            flow_configuration_snapshot_maybe: None,
+            maybe_forced_flow_config_rule: None,
         });
         let trigger1_handle = trigger1_driver.run();
 
@@ -6456,7 +6456,7 @@ async fn test_trigger_enable_during_flow_throttling() {
           flow_binding: foo_flow_binding,
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
-          flow_configuration_snapshot_maybe: None,
+          maybe_forced_flow_config_rule: None,
         });
         let trigger2_handle = trigger2_driver.run();
 
