@@ -19,6 +19,8 @@ pub struct FlowConfigurationState {
     pub flow_binding: FlowBinding,
     /// Flow configuration rule
     pub rule: FlowConfigurationRule,
+    /// Retry policy
+    pub retry_policy: Option<RetryPolicy>,
     /// Configuration status
     pub status: FlowConfigurationStatus,
 }
@@ -41,11 +43,15 @@ impl Projection for FlowConfigurationState {
         match (state, event) {
             (None, event) => match event {
                 E::Created(FlowConfigurationEventCreated {
-                    flow_binding, rule, ..
+                    flow_binding,
+                    rule,
+                    retry_policy,
+                    ..
                 }) => Ok(Self {
                     flow_binding,
                     rule,
                     status: FlowConfigurationStatus::Active,
+                    retry_policy,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },

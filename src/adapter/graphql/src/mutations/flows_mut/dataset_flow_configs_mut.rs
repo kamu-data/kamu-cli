@@ -84,7 +84,11 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         );
 
         let res = flow_config_service
-            .set_configuration(flow_binding, configuration_rule)
+            .set_configuration(
+                flow_binding,
+                configuration_rule,
+                None, /* TODO: retry policy */
+            )
             .await
             .int_err()?;
 

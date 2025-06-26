@@ -40,7 +40,7 @@ impl FlowRunService for FlowRunServiceImpl {
         trigger_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
-        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
+        maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError> {
         let activation_time = self.agent_config.round_time(trigger_time)?;
 
@@ -52,7 +52,7 @@ impl FlowRunService for FlowRunServiceImpl {
                     trigger_time: activation_time,
                     initiator_account_id,
                 }),
-                maybe_flow_config_snapshot,
+                maybe_forced_flow_config_rule,
             )
             .await
             .map_err(Into::into)
@@ -65,14 +65,14 @@ impl FlowRunService for FlowRunServiceImpl {
         flow_binding: &FlowBinding,
         trigger_instance: FlowTriggerInstance,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
-        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
+        maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError> {
         self.flow_scheduling_helper
             .trigger_flow_common(
                 flow_binding,
                 maybe_flow_trigger_rule,
                 trigger_instance,
-                maybe_flow_config_snapshot,
+                maybe_forced_flow_config_rule,
             )
             .await
             .map_err(Into::into)

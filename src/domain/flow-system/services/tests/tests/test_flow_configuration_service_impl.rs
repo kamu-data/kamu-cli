@@ -245,7 +245,7 @@ impl FlowConfigurationHarness {
         configuration_rule: FlowConfigurationRule,
     ) {
         self.flow_configuration_service
-            .set_configuration(flow_binding, configuration_rule)
+            .set_configuration(flow_binding, configuration_rule, None)
             .await
             .unwrap();
     }
