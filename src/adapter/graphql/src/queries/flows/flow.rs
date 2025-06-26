@@ -12,13 +12,7 @@ use std::collections::HashMap;
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
-use super::{
-    FlowConfigurationSnapshot,
-    FlowEvent,
-    FlowOutcome,
-    FlowStartCondition,
-    FlowTriggerInstance,
-};
+use super::{FlowEvent, FlowOutcome, FlowStartCondition, FlowTriggerInstance};
 use crate::prelude::*;
 use crate::queries::{Account, Task};
 use crate::utils;
@@ -200,7 +194,7 @@ impl Flow {
     }
 
     /// Flow config snapshot
-    async fn config_snapshot(&self) -> Option<FlowConfigurationSnapshot> {
+    async fn config_snapshot(&self) -> Option<FlowConfigRule> {
         self.flow_state.config_snapshot.clone().map(Into::into)
     }
 }

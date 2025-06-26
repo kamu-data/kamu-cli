@@ -7,14 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_adapter_flow_dataset::{
-    FlowConfigRuleCompact,
-    FlowConfigRuleCompactFull,
-    FlowConfigRuleIngest,
-    FlowConfigRuleReset,
-};
-use kamu_flow_system::FlowConfigurationRule;
 use odf::dataset::MetadataChainExt as _;
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use crate::mutations::{FlowInvalidRunConfigurations, FlowTypeIsNotSupported};
 use crate::prelude::*;
@@ -23,63 +17,74 @@ use crate::prelude::*;
 
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfiguration {
-    pub compaction: Option<FlowConfigurationCompaction>,
-    pub ingest: Option<FlowConfigurationIngest>,
-    pub reset: Option<FlowConfigurationReset>,
+    pub rule: FlowConfigRule,
+    pub retry_policy: Option<FlowRetryPolicy>,
 }
 
 impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
-        let (compaction, ingest, reset) = match value.rule.rule_type.as_str() {
-            FlowConfigRuleCompact::TYPE_ID => {
-                let compaction_rule = FlowConfigRuleCompact::from_flow_config(&value.rule).unwrap();
-                match compaction_rule {
-                    FlowConfigRuleCompact::Full(full_rule) => (
-                        Some(FlowConfigurationCompaction::Full(full_rule.into())),
-                        None,
-                        None,
-                    ),
-                    FlowConfigRuleCompact::MetadataOnly { recursive } => (
-                        Some(FlowConfigurationCompaction::MetadataOnly(
-                            CompactionMetadataOnly { recursive },
-                        )),
-                        None,
-                        None,
-                    ),
-                }
-            }
-
-            FlowConfigRuleIngest::TYPE_ID => {
-                let ingest_rule = FlowConfigRuleIngest::from_flow_config(&value.rule).unwrap();
-                (None, Some(ingest_rule.into()), None)
-            }
-
-            FlowConfigRuleReset::TYPE_ID => {
-                let reset_rule = FlowConfigRuleReset::from_flow_config(&value.rule).unwrap();
-                (None, None, Some(reset_rule.into()))
-            }
-
-            _ => panic!(
-                "Unsupported flow configuration rule type: {}",
-                value.rule.rule_type
-            ),
-        };
-
         Self {
-            compaction,
-            ingest,
-            reset,
+            rule: FlowConfigRule::from(value.rule),
+            retry_policy: value.retry_policy.map(FlowRetryPolicy::from),
         }
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Eq, PartialEq)]
+pub enum FlowConfigRule {
+    Ingest(FlowConfigRuleIngest),
+    Compaction(FlowConfigRuleCompaction),
+    Reset(FlowConfigRuleReset),
+}
+
+impl From<fs::FlowConfigurationRule> for FlowConfigRule {
+    fn from(value: fs::FlowConfigurationRule) -> Self {
+        match value.rule_type.as_str() {
+            afs::FlowConfigRuleIngest::TYPE_ID => {
+                let ingest_rule = afs::FlowConfigRuleIngest::from_flow_config(&value).unwrap();
+                Self::Ingest(ingest_rule.into())
+            }
+
+            afs::FlowConfigRuleReset::TYPE_ID => {
+                let reset_rule = afs::FlowConfigRuleReset::from_flow_config(&value).unwrap();
+                Self::Reset(reset_rule.into())
+            }
+
+            afs::FlowConfigRuleCompact::TYPE_ID => {
+                let compaction_rule = afs::FlowConfigRuleCompact::from_flow_config(&value).unwrap();
+                Self::Compaction(match compaction_rule {
+                    afs::FlowConfigRuleCompact::Full(full_rule) => FlowConfigRuleCompaction {
+                        compaction_mode: FlowConfigCompactionMode::Full(full_rule.into()),
+                    },
+                    afs::FlowConfigRuleCompact::MetadataOnly { recursive } => {
+                        FlowConfigRuleCompaction {
+                            compaction_mode: FlowConfigCompactionMode::MetadataOnly(
+                                FlowConfigCompactionModeMetadataOnly { recursive },
+                            ),
+                        }
+                    }
+                })
+            }
+
+            _ => panic!(
+                "Unsupported flow configuration rule type: {}",
+                value.rule_type
+            ),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowConfigurationIngest {
+pub struct FlowConfigRuleIngest {
     pub fetch_uncacheable: bool,
 }
 
-impl From<FlowConfigRuleIngest> for FlowConfigurationIngest {
-    fn from(value: FlowConfigRuleIngest) -> Self {
+impl From<afs::FlowConfigRuleIngest> for FlowConfigRuleIngest {
+    fn from(value: afs::FlowConfigRuleIngest) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
         }
@@ -88,37 +93,72 @@ impl From<FlowConfigRuleIngest> for FlowConfigurationIngest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(SimpleObject, Eq, PartialEq)]
+pub struct FlowConfigRuleCompaction {
+    compaction_mode: FlowConfigCompactionMode,
+}
+
+#[derive(Union, PartialEq, Eq)]
+pub enum FlowConfigCompactionMode {
+    Full(FlowConfigCompactionModeFull),
+    MetadataOnly(FlowConfigCompactionModeMetadataOnly),
+}
+
 #[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowConfigurationReset {
-    pub mode: SnapshotPropagationMode,
+pub struct FlowConfigCompactionModeFull {
+    pub max_slice_size: u64,
+    pub max_slice_records: u64,
+    pub recursive: bool,
+}
+
+impl From<afs::FlowConfigRuleCompactFull> for FlowConfigCompactionModeFull {
+    fn from(value: afs::FlowConfigRuleCompactFull) -> Self {
+        Self {
+            max_slice_records: value.max_slice_records(),
+            max_slice_size: value.max_slice_size(),
+            recursive: value.recursive(),
+        }
+    }
+}
+
+#[derive(SimpleObject, PartialEq, Eq)]
+pub struct FlowConfigCompactionModeMetadataOnly {
+    pub recursive: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, PartialEq, Eq)]
+pub struct FlowConfigRuleReset {
+    pub mode: FlowConfigResetPropagationMode,
     pub old_head_hash: Option<Multihash<'static>>,
     pub recursive: bool,
 }
 
 #[derive(Union, PartialEq, Eq)]
-pub enum SnapshotPropagationMode {
-    Custom(SnapshotConfigurationResetCustom),
-    ToSeed(SnapshotConfigurationResetToSeedDummy),
+pub enum FlowConfigResetPropagationMode {
+    Custom(FlowConfigResetPropagationModeCustom),
+    ToSeed(FlowConfigResetPropagationModeToSeed),
 }
 
 #[derive(SimpleObject, PartialEq, Eq)]
-pub struct SnapshotConfigurationResetCustom {
+pub struct FlowConfigResetPropagationModeCustom {
     pub new_head_hash: Multihash<'static>,
 }
 
 #[derive(SimpleObject, PartialEq, Eq, Default)]
-pub struct SnapshotConfigurationResetToSeedDummy {
+pub struct FlowConfigResetPropagationModeToSeed {
     _dummy: Option<String>,
 }
 
-impl From<FlowConfigRuleReset> for FlowConfigurationReset {
-    fn from(value: FlowConfigRuleReset) -> Self {
+impl From<afs::FlowConfigRuleReset> for FlowConfigRuleReset {
+    fn from(value: afs::FlowConfigRuleReset) -> Self {
         let propagation_mode = if let Some(new_head_hash) = value.new_head_hash {
-            SnapshotPropagationMode::Custom(SnapshotConfigurationResetCustom {
+            FlowConfigResetPropagationMode::Custom(FlowConfigResetPropagationModeCustom {
                 new_head_hash: new_head_hash.into(),
             })
         } else {
-            SnapshotPropagationMode::ToSeed(SnapshotConfigurationResetToSeedDummy::default())
+            FlowConfigResetPropagationMode::ToSeed(FlowConfigResetPropagationModeToSeed::default())
         };
         Self {
             mode: propagation_mode,
@@ -130,159 +170,123 @@ impl From<FlowConfigRuleReset> for FlowConfigurationReset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, PartialEq, Eq)]
-pub enum FlowConfigurationCompaction {
-    Full(CompactionFull),
-    MetadataOnly(CompactionMetadataOnly),
+#[derive(OneofObject, Copy, Clone)]
+pub enum FlowConfigInput {
+    Ingest(FlowConfigInputIngest),
+    Compaction(FlowConfigInputCompaction),
 }
 
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct CompactionFull {
-    pub max_slice_size: u64,
-    pub max_slice_records: u64,
-    pub recursive: bool,
-}
-
-impl From<FlowConfigRuleCompactFull> for CompactionFull {
-    fn from(value: FlowConfigRuleCompactFull) -> Self {
-        Self {
-            max_slice_records: value.max_slice_records(),
-            max_slice_size: value.max_slice_size(),
-            recursive: value.recursive(),
+impl From<FlowConfigInput> for FlowRunConfigInput {
+    fn from(value: FlowConfigInput) -> Self {
+        match value {
+            FlowConfigInput::Ingest(ingest_input) => Self::Ingest(ingest_input),
+            FlowConfigInput::Compaction(compaction_input) => Self::Compaction(compaction_input),
         }
     }
-}
-
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct CompactionMetadataOnly {
-    pub recursive: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(OneofObject)]
-pub enum FlowRunConfiguration {
-    Compaction(CompactionConditionInput),
-    Ingest(IngestConditionInput),
-    Reset(ResetConditionInput),
+pub enum FlowRunConfigInput {
+    Compaction(FlowConfigInputCompaction),
+    Ingest(FlowConfigInputIngest),
+    Reset(FlowConfigInputReset),
 }
 
-#[derive(OneofObject)]
-pub enum PropagationMode {
-    Custom(FlowConfigurationResetCustom),
-    ToSeed(FlowConfigurationResetToSeedDummy),
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]
-pub struct FlowConfigurationResetCustom {
-    pub new_head_hash: Multihash<'static>,
-}
-
-#[derive(InputObject)]
-pub struct FlowConfigurationResetToSeedDummy {
-    _dummy: Option<String>,
-}
-
-#[derive(InputObject)]
-pub struct ResetConditionInput {
-    pub mode: PropagationMode,
+pub struct FlowConfigInputReset {
+    pub mode: FlowConfigInputResetPropagationMode,
     pub old_head_hash: Option<Multihash<'static>>,
     pub recursive: bool,
 }
 
-impl ResetConditionInput {
+#[derive(OneofObject)]
+pub enum FlowConfigInputResetPropagationMode {
+    Custom(FlowConfigInputResetPropagationModeCustom),
+    ToSeed(FlowConfigInputResetPropagationModeToSeed),
+}
+
+#[derive(InputObject)]
+pub struct FlowConfigInputResetPropagationModeCustom {
+    pub new_head_hash: Multihash<'static>,
+}
+
+#[derive(InputObject)]
+pub struct FlowConfigInputResetPropagationModeToSeed {
+    _dummy: Option<String>,
+}
+
+impl FlowConfigInputReset {
     pub fn new_head_hash(&self) -> Option<Multihash> {
         match &self.mode {
-            PropagationMode::Custom(custom_args) => Some(custom_args.new_head_hash.clone()),
-            PropagationMode::ToSeed(_) => None,
+            FlowConfigInputResetPropagationMode::Custom(custom_args) => {
+                Some(custom_args.new_head_hash.clone())
+            }
+            FlowConfigInputResetPropagationMode::ToSeed(_) => None,
         }
     }
 }
 
-impl From<ResetConditionInput> for FlowRunConfiguration {
-    fn from(value: ResetConditionInput) -> Self {
-        Self::Reset(value)
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(OneofObject, Copy, Clone)]
-pub enum CompactionConditionInput {
-    Full(CompactionConditionFull),
-    MetadataOnly(CompactionConditionMetadataOnly),
+pub enum FlowConfigInputCompaction {
+    Full(FlowConfigInputCompactionFull),
+    MetadataOnly(FlowConfigInputCompactionMetadataOnly),
 }
 
 #[derive(InputObject, Copy, Clone)]
-pub struct CompactionConditionFull {
+pub struct FlowConfigInputCompactionFull {
     pub max_slice_size: u64,
     pub max_slice_records: u64,
     pub recursive: bool,
 }
 
 #[derive(InputObject, Copy, Clone)]
-pub struct CompactionConditionMetadataOnly {
+pub struct FlowConfigInputCompactionMetadataOnly {
     pub recursive: bool,
 }
 
-impl From<CompactionConditionInput> for FlowRunConfiguration {
-    fn from(value: CompactionConditionInput) -> Self {
+impl From<FlowConfigInputCompaction> for FlowRunConfigInput {
+    fn from(value: FlowConfigInputCompaction) -> Self {
         Self::Compaction(value)
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(InputObject, Copy, Clone)]
-pub struct IngestConditionInput {
+pub struct FlowConfigInputIngest {
     /// Flag indicates to ignore cache during ingest step for API calls
     pub fetch_uncacheable: bool,
 }
 
-impl From<IngestConditionInput> for FlowConfigRuleIngest {
-    fn from(value: IngestConditionInput) -> Self {
+impl From<FlowConfigInputIngest> for afs::FlowConfigRuleIngest {
+    fn from(value: FlowConfigInputIngest) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
         }
     }
 }
 
-impl From<IngestConditionInput> for FlowRunConfiguration {
-    fn from(value: IngestConditionInput) -> Self {
-        Self::Ingest(value)
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject, Copy, Clone)]
-pub enum FlowConfigurationInput {
-    Ingest(IngestConditionInput),
-    Compaction(CompactionConditionInput),
-}
-
-impl From<FlowConfigurationInput> for FlowRunConfiguration {
-    fn from(value: FlowConfigurationInput) -> Self {
-        match value {
-            FlowConfigurationInput::Ingest(ingest_input) => Self::Ingest(ingest_input),
-            FlowConfigurationInput::Compaction(compaction_input) => {
-                Self::Compaction(compaction_input)
-            }
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl FlowRunConfiguration {
+impl FlowRunConfigInput {
     pub async fn try_into_snapshot(
         ctx: &Context<'_>,
         dataset_flow_type: &DatasetFlowType,
         dataset_handle: &odf::DatasetHandle,
-        flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
-    ) -> Result<Option<FlowConfigurationRule>, FlowInvalidRunConfigurations> {
+        flow_run_configuration_maybe: Option<&FlowRunConfigInput>,
+    ) -> Result<Option<fs::FlowConfigurationRule>, FlowInvalidRunConfigurations> {
         match dataset_flow_type {
             DatasetFlowType::Ingest => {
                 if let Some(flow_run_configuration) = flow_run_configuration_maybe {
                     if let Self::Ingest(ingest_input) = flow_run_configuration {
                         return Ok(Some(
-                            FlowConfigRuleIngest {
+                            afs::FlowConfigRuleIngest {
                                 fetch_uncacheable: ingest_input.fetch_uncacheable,
                             }
                             .into_flow_config(),
@@ -300,9 +304,9 @@ impl FlowRunConfiguration {
                     if let Self::Compaction(compaction_input) = flow_run_configuration {
                         return Ok(Some(
                             match compaction_input {
-                                CompactionConditionInput::Full(compaction_input) => {
-                                    FlowConfigRuleCompact::Full(
-                                        FlowConfigRuleCompactFull::new_checked(
+                                FlowConfigInputCompaction::Full(compaction_input) => {
+                                    afs::FlowConfigRuleCompact::Full(
+                                        afs::FlowConfigRuleCompactFull::new_checked(
                                             compaction_input.max_slice_size,
                                             compaction_input.max_slice_records,
                                             compaction_input.recursive,
@@ -315,8 +319,8 @@ impl FlowRunConfiguration {
                                         })?,
                                     )
                                 }
-                                CompactionConditionInput::MetadataOnly(compaction_input) => {
-                                    FlowConfigRuleCompact::MetadataOnly {
+                                FlowConfigInputCompaction::MetadataOnly(compaction_input) => {
+                                    afs::FlowConfigRuleCompact::MetadataOnly {
                                         recursive: compaction_input.recursive,
                                     }
                                 }
@@ -351,7 +355,7 @@ impl FlowRunConfiguration {
                             current_head_hash
                         };
                         return Ok(Some(
-                            FlowConfigRuleReset {
+                            afs::FlowConfigRuleReset {
                                 new_head_hash: reset_input.new_head_hash().map(Into::into),
                                 old_head_hash,
                                 recursive: reset_input.recursive,
@@ -365,7 +369,7 @@ impl FlowRunConfiguration {
                     });
                 }
                 return Ok(Some(
-                    FlowConfigRuleReset {
+                    afs::FlowConfigRuleReset {
                         new_head_hash: None,
                         old_head_hash: current_head_hash,
                         recursive: false,
@@ -400,6 +404,38 @@ impl FlowRunConfiguration {
         }
         Err(FlowTypeIsNotSupported)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, PartialEq, Eq)]
+pub struct FlowRetryPolicy {
+    pub max_attempts: u32,
+    pub min_delay: TimeDelta,
+    pub backoff_type: FlowRetryBackoffType,
+}
+
+impl From<kamu_flow_system::RetryPolicy> for FlowRetryPolicy {
+    fn from(value: kamu_flow_system::RetryPolicy) -> Self {
+        let min_delay_duration = chrono::Duration::seconds(i64::from(value.min_delay_seconds));
+
+        Self {
+            max_attempts: value.max_attempts,
+            min_delay: min_delay_duration.into(),
+            backoff_type: value.backoff_type.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
+#[graphql(remote = "kamu_flow_system::RetryBackoffType")]
+pub enum FlowRetryBackoffType {
+    Fixed,
+    Linear,
+    Exponential,
+    ExponentialWithJitter,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

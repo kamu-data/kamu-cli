@@ -45,7 +45,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-        flow_run_configuration: Option<FlowRunConfiguration>,
+        flow_run_configuration: Option<FlowRunConfigInput>,
     ) -> Result<TriggerFlowResult> {
         if let Some(e) = ensure_expected_dataset_kind(
             ctx,
@@ -76,7 +76,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         let logged_account = utils::get_logged_account(ctx);
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        let maybe_forced_flow_config_rule = match FlowRunConfiguration::try_into_snapshot(
+        let maybe_forced_flow_config_rule = match FlowRunConfigInput::try_into_snapshot(
             ctx,
             &dataset_flow_type,
             dataset_handle,
