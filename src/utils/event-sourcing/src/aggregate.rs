@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::*;
 
@@ -96,17 +96,23 @@ where
 
     /// Initializes an aggregate from event history
     #[inline]
-    pub async fn load(query: Proj::Query, event_store: &Store) -> Result<Self, LoadError<Proj>> {
+    pub async fn load<Q>(query: Q, event_store: &Store) -> Result<Self, LoadError<Proj>>
+    where
+        Q: std::borrow::Borrow<Proj::Query> + std::fmt::Debug,
+    {
         Self::load_ext(query, event_store, LoadOpts::default()).await
     }
 
     /// Attempt initializing an aggregate from event history, but allow the not
     /// found case
     #[inline]
-    pub async fn try_load(
-        query: Proj::Query,
+    pub async fn try_load<Q>(
+        query: Q,
         event_store: &Store,
-    ) -> Result<Option<Self>, TryLoadError<Proj>> {
+    ) -> Result<Option<Self>, TryLoadError<Proj>>
+    where
+        Q: std::borrow::Borrow<Proj::Query> + std::fmt::Debug,
+    {
         match Self::load_ext(query, event_store, LoadOpts::default()).await {
             Ok(a) => Ok(Some(a)),
             Err(e) => match e {
@@ -182,6 +188,20 @@ where
         Ok(result)
     }
 
+    /// Same as `load_multi()` but returns a vector of loaded states and single
+    /// error
+    pub async fn load_multi_simple(
+        queries: Vec<Proj::Query>,
+        event_store: &Store,
+    ) -> Result<Vec<Self>, InternalError> {
+        Self::load_multi(queries, event_store)
+            .await
+            .int_err()?
+            .into_iter()
+            .map(|res| res.map_err(ErrorIntoInternal::int_err))
+            .collect()
+    }
+
     /// Same as [`Aggregate::load()`] but with extra control knobs
     #[tracing::instrument(
         level = "debug",
@@ -189,18 +209,23 @@ where
         skip_all,
         fields(
             agg_type = %std::any::type_name::<Proj>(),
-            agg_query = ?query,
+            agg_query = ?query_ref,
         )
     )]
-    pub async fn load_ext(
-        query: Proj::Query,
+    pub async fn load_ext<Q>(
+        query_ref: Q,
         event_store: &Store,
         opts: LoadOpts,
-    ) -> Result<Self, LoadError<Proj>> {
+    ) -> Result<Self, LoadError<Proj>>
+    where
+        Q: std::borrow::Borrow<Proj::Query> + std::fmt::Debug,
+    {
         use tokio_stream::StreamExt;
 
+        let query = query_ref.borrow();
+
         let mut event_stream = event_store.get_events(
-            &query,
+            query,
             GetEventsOpts {
                 from: None,
                 to: opts.as_of_event,
@@ -210,7 +235,7 @@ where
         let (event_id, event) = match event_stream.next().await {
             Some(Ok(v)) => v,
             Some(Err(GetEventsError::Internal(err))) => return Err(err.into()),
-            None => return Err(AggregateNotFoundError::new(query).into()),
+            None => return Err(AggregateNotFoundError::new(query.clone()).into()),
         };
 
         let mut agg = Self::from_stored_event(query.clone(), event_id, event)?;

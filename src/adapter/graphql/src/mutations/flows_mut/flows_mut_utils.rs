@@ -41,13 +41,15 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
     let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
     match flow_query_service.get_flow(flow_id.into()).await {
-        Ok(flow_state) => match flow_state.flow_key {
-            fs::FlowKey::Dataset(fk_dataset) => {
-                if fk_dataset.dataset_id != *dataset_id {
+        Ok(flow_state) => match flow_state.flow_binding.scope {
+            fs::FlowScope::Dataset {
+                dataset_id: flow_dataset_id,
+            } => {
+                if flow_dataset_id != *dataset_id {
                     return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }
             }
-            fs::FlowKey::System(_) => {
+            fs::FlowScope::System => {
                 return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
             }
         },
@@ -77,8 +79,14 @@ pub(crate) async fn ensure_expected_dataset_kind(
     {
         return Ok(None);
     }
-    let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
-    match dataset_flow_type.dataset_kind_restriction() {
+
+    let maybe_expected_kind = match dataset_flow_type {
+        DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => Some(odf::DatasetKind::Root),
+        DatasetFlowType::ExecuteTransform => Some(odf::DatasetKind::Derivative),
+        DatasetFlowType::Reset => None,
+    };
+
+    match maybe_expected_kind {
         Some(expected_kind) => {
             let resolved_dataset = dataset_request_state.resolved_dataset(ctx).await?;
             let dataset_kind = resolved_dataset.get_kind();

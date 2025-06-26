@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_flow_system as fs;
+use kamu_flow_system::{self as fs};
 
 use super::{
     FlowInDatasetError,
@@ -72,7 +72,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         // TODO: for some datasets launching manually might not be an option:
         //   i.e., root datasets with push sources require input data to arrive
 
-        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
+        let flow_run_service = from_catalog_n!(ctx, dyn fs::FlowRunService);
         let logged_account = utils::get_logged_account(ctx);
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
@@ -88,10 +88,15 @@ impl<'a> DatasetFlowRunsMut<'a> {
             Err(e) => return Ok(TriggerFlowResult::InvalidRunConfigurations(e)),
         };
 
-        let flow_state = flow_query_service
-            .trigger_manual_flow(
+        let flow_binding = fs::FlowBinding::for_dataset(
+            dataset_handle.id.clone(),
+            map_dataset_flow_type(dataset_flow_type),
+        );
+
+        let flow_state = flow_run_service
+            .run_flow_manually(
                 Utc::now(),
-                fs::FlowKeyDataset::new(dataset_handle.id.clone(), dataset_flow_type.into()).into(),
+                &flow_binding,
                 logged_account.account_id,
                 flow_run_snapshot,
             )
@@ -124,8 +129,8 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }
 
         // Attempt cancelling scheduled tasks
-        let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
-        let flow_state = flow_query_service
+        let flow_run_service = from_catalog_n!(ctx, dyn fs::FlowRunService);
+        let flow_state = flow_run_service
             .cancel_scheduled_tasks(flow_id.into())
             .await
             .map_err(|e| match e {
@@ -137,7 +142,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         // Duplicate requests are auto-ignored.
         let flow_trigger_service = from_catalog_n!(ctx, dyn fs::FlowTriggerService);
         flow_trigger_service
-            .pause_flow_trigger(Utc::now(), flow_state.flow_key.clone())
+            .pause_flow_trigger(Utc::now(), &flow_state.flow_binding)
             .await?;
 
         Ok(CancelScheduledTasksResult::Success(

@@ -22,7 +22,6 @@ use kamu_cli_e2e_common::{
     RequestBody,
 };
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_flow_system::DatasetFlowType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -822,7 +821,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .trigger(&root_dataset_id, "Ingest")
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -866,7 +865,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .trigger(&root_dataset_id, "Ingest")
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -923,7 +922,7 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .trigger(&root_dataset_id, "Ingest")
             .await,
         FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetPollingSource event defined'"
@@ -955,7 +954,7 @@ pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: Kam
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
+            .trigger(&derivative_dataset_id, "ExecuteTransform")
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1010,7 +1009,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
+            .trigger(&derivative_dataset_id, "ExecuteTransform")
             .await,
         FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetTransform event defined'"
@@ -1086,7 +1085,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::HardCompaction)
+            .trigger(&root_dataset_id, "HardCompaction")
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1166,7 +1165,7 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::Reset)
+            .trigger(&root_dataset_id, "Reset")
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1249,7 +1248,7 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&dataset_id, DatasetFlowType::Ingest)
+            .trigger(&dataset_id, "Ingest")
             .await,
         FlowTriggerResponse::Success(_)
     );

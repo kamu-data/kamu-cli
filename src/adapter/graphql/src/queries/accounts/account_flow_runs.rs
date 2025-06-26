@@ -54,7 +54,9 @@ impl<'a> AccountFlowRuns<'a> {
         }
 
         let maybe_filters = filters.map(|filters| kamu_flow_system::AccountFlowFilters {
-            by_flow_type: filters.by_flow_type.map(Into::into),
+            by_flow_type: filters
+                .by_flow_type
+                .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
             by_flow_status: filters.by_status.map(Into::into),
             by_dataset_ids: filters
                 .by_dataset_ids
@@ -104,7 +106,7 @@ impl<'a> AccountFlowRuns<'a> {
         let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
 
         let dataset_flow_filters = maybe_filters
-            .map(|fs| kamu_flow_system::DatasetFlowFilters {
+            .map(|fs| kamu_flow_system::FlowFilters {
                 by_flow_type: fs.by_flow_type,
                 by_flow_status: fs.by_flow_status,
                 by_initiator: fs.by_initiator,

@@ -9,41 +9,20 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
-use dill::{Catalog, component, interface};
+use dill::{component, interface};
 use futures::TryStreamExt;
 use internal_error::ResultIntoInternal;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::*;
 
-use crate::{FlowAbortHelper, FlowSchedulingHelper};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct FlowQueryServiceImpl {
-    catalog: Catalog,
-    flow_event_store: Arc<dyn FlowEventStore>,
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
-    agent_config: Arc<FlowAgentConfig>,
-}
 
 #[component(pub)]
 #[interface(dyn FlowQueryService)]
-impl FlowQueryServiceImpl {
-    pub fn new(
-        catalog: Catalog,
-        flow_event_store: Arc<dyn FlowEventStore>,
-        dataset_entry_service: Arc<dyn DatasetEntryService>,
-        agent_config: Arc<FlowAgentConfig>,
-    ) -> Self {
-        Self {
-            catalog,
-            flow_event_store,
-            dataset_entry_service,
-            agent_config,
-        }
-    }
+pub struct FlowQueryServiceImpl {
+    flow_event_store: Arc<dyn FlowEventStore>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +36,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
         let total_count = self
@@ -120,7 +99,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
         let account_dataset_id_refs = filtered_dataset_ids.iter().collect::<Vec<_>>();
 
-        let dataset_flow_filters = DatasetFlowFilters {
+        let dataset_flow_filters = FlowFilters {
             by_flow_status: filters.by_flow_status,
             by_flow_type: filters.by_flow_type,
             by_initiator: filters.by_initiator,
@@ -137,7 +116,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn list_all_flows_by_dataset_ids(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
         let total_count = self
@@ -187,7 +166,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?filters, ?pagination))]
     async fn list_all_system_flows(
         &self,
-        filters: SystemFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError> {
         let total_count = self
@@ -217,7 +196,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         &self,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsError> {
-        let empty_filters = AllFlowFilters::default();
+        let empty_filters = FlowFilters::default();
         let total_count = self
             .flow_event_store
             .get_count_all_flows(&empty_filters)
@@ -241,51 +220,6 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
         Ok(flow.into())
-    }
-
-    /// Triggers the specified flow manually, unless it's already waiting
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        fields(?flow_key, %initiator_account_id)
-    )]
-    async fn trigger_manual_flow(
-        &self,
-        trigger_time: DateTime<Utc>,
-        flow_key: FlowKey,
-        initiator_account_id: odf::AccountID,
-        config_snapshot_maybe: Option<FlowConfigurationRule>,
-    ) -> Result<FlowState, RequestFlowError> {
-        let activation_time = self.agent_config.round_time(trigger_time)?;
-
-        let scheduling_helper = self.catalog.get_one::<FlowSchedulingHelper>().unwrap();
-        scheduling_helper
-            .trigger_flow_common(
-                &flow_key,
-                None,
-                FlowTriggerType::Manual(FlowTriggerManual {
-                    trigger_time: activation_time,
-                    initiator_account_id,
-                }),
-                config_snapshot_maybe,
-            )
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Attempts to cancel the tasks already scheduled for the given flow
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        fields(%flow_id)
-    )]
-    async fn cancel_scheduled_tasks(
-        &self,
-        flow_id: FlowID,
-    ) -> Result<FlowState, CancelScheduledTasksError> {
-        // Abort current flow and it's scheduled tasks
-        let abort_helper = self.catalog.get_one::<FlowAbortHelper>().unwrap();
-        abort_helper.abort_flow(flow_id).await.map_err(Into::into)
     }
 }
 

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
@@ -64,7 +66,7 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
     fn get_events(
         &self,
-        query: &FlowKey,
+        query: &FlowBinding,
         opts: GetEventsOpts,
     ) -> EventStream<FlowConfigurationEvent> {
         self.inner.get_events(query, opts)
@@ -73,7 +75,7 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, num_events = events.len()))]
     async fn save_events(
         &self,
-        query: &FlowKey,
+        query: &FlowBinding,
         maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
@@ -81,10 +83,10 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
             return Err(SaveEventsError::NothingToSave);
         }
 
-        if let FlowKey::Dataset(flow_key) = query {
+        if let FlowScope::Dataset { dataset_id } = &query.scope {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
-            g.dataset_ids.push(flow_key.dataset_id.clone());
+            g.dataset_ids.push(dataset_id.clone());
         }
 
         self.inner
@@ -118,6 +120,55 @@ impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
         Ok(self.inner.as_state().lock().unwrap().dataset_ids.len())
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut seen_bindings = HashSet::new();
+        let mut active_bindings = Vec::new();
+
+        for event in g.events.iter().rev() {
+            let flow_binding = event.flow_binding();
+
+            // Only process the latest event per binding
+            if !seen_bindings.insert(flow_binding.clone()) {
+                continue;
+            }
+
+            active_bindings.push(flow_binding.clone());
+        }
+
+        // Convert into stream
+        Box::pin(futures::stream::iter(active_bindings.into_iter().map(Ok)))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    async fn all_bindings_for_dataset_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut seen_flow_types = HashSet::new();
+        let mut bindings = Vec::new();
+
+        for event in g.events.iter().rev() {
+            if let FlowBinding {
+                scope: FlowScope::Dataset { dataset_id: id },
+                flow_type,
+            } = event.flow_binding()
+                && id == dataset_id
+                && seen_flow_types.insert(flow_type)
+            {
+                bindings.push(FlowBinding::for_dataset(id.clone(), flow_type));
+            }
+        }
+
+        Ok(bindings)
     }
 }
 

@@ -8,8 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::{DatasetChangesService, DatasetIntervalIncrement};
-use kamu_flow_system::{self as fs};
+use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
+use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
+use kamu_flow_system as fs;
 
 use crate::prelude::*;
 
@@ -26,7 +27,7 @@ pub(crate) enum FlowStartCondition {
 impl FlowStartCondition {
     pub async fn create_from_raw_flow_data(
         start_condition: &fs::FlowStartCondition,
-        matching_triggers: &[fs::FlowTriggerType],
+        matching_triggers: &[fs::FlowTriggerInstance],
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(match start_condition {
@@ -35,7 +36,8 @@ impl FlowStartCondition {
             }),
             fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
             fs::FlowStartCondition::Batching(b) => {
-                let dataset_changes_service = from_catalog_n!(ctx, dyn DatasetChangesService);
+                let increment_query_service =
+                    from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
 
                 // Start from zero increment
                 let mut total_increment = DatasetIntervalIncrement::default();
@@ -45,16 +47,16 @@ impl FlowStartCondition {
 
                 // For each dataset trigger, add accumulated changes since trigger first fired
                 for trigger in matching_triggers {
-                    if let fs::FlowTriggerType::InputDatasetFlow(dataset_trigger) = trigger
-                        && let fs::FlowResult::DatasetUpdate(dataset_update) =
-                            &dataset_trigger.flow_result
-                        && let fs::FlowResultDatasetUpdate::Changed(update_result) = dataset_update
+                    if let fs::FlowTriggerInstance::InputDatasetFlow(dataset_trigger) = trigger
+                        && dataset_trigger.task_result.result_type
+                            == TaskResultDatasetUpdate::TYPE_ID
+                        && let dataset_update =
+                            TaskResultDatasetUpdate::from_task_result(&dataset_trigger.task_result)
+                                .int_err()?
+                        && let Some((old_head, _)) = dataset_update.try_as_increment()
                     {
-                        total_increment += dataset_changes_service
-                            .get_increment_since(
-                                &dataset_trigger.dataset_id,
-                                update_result.old_head.as_ref(),
-                            )
+                        total_increment += increment_query_service
+                            .get_increment_since(&dataset_trigger.dataset_id, old_head)
                             .await
                             .int_err()?;
                     }

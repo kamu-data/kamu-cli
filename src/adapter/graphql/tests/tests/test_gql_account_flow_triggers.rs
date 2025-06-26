@@ -13,10 +13,11 @@ use async_graphql::value;
 use chrono::Duration;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
-use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_adapter_flow_dataset::*;
 use kamu_core::*;
 use kamu_datasets::*;
+use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::FlowAgentConfig;
 use kamu_flow_system_inmem::{
     InMemoryFlowConfigurationEventStore,
@@ -594,8 +595,8 @@ impl FlowTriggerHarness {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
             b.add::<MetadataQueryServiceImpl>()
-                .add_value(MockDatasetChangesService::default())
-                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+                .add_value(MockDatasetIncrementQueryService::default())
+                .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowEventStore>()
@@ -604,7 +605,8 @@ impl FlowTriggerHarness {
                     Duration::minutes(1),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>();
+                .add::<InMemoryTaskEventStore>()
+                .add::<FlowSupportServiceImpl>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 

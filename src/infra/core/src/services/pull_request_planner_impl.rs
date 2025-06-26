@@ -15,6 +15,7 @@ use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
+use kamu_datasets::DependencyGraphService;
 use url::Url;
 
 use crate::SyncRequestBuilder;

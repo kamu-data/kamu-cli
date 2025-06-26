@@ -11,6 +11,8 @@ use chrono::Utc;
 use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
+use kamu_adapter_flow_dataset as afs;
+use kamu_adapter_flow_dataset::FlowConfigRuleCompact;
 use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,16 +26,15 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     assert_eq!(0, num_events);
 
-    let flow_key = FlowKey::dataset(
-        odf::DatasetID::new_seeded_ed25519(b"foo"),
-        DatasetFlowType::Ingest,
-    );
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let flow_binding = FlowBinding::for_dataset(dataset_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+
     let events: Vec<_> = event_store
-        .get_events(&flow_key, GetEventsOpts::default())
+        .get_events(&flow_binding, GetEventsOpts::default())
         .try_collect()
         .await
         .unwrap();
-
     assert_eq!(events, []);
 
     let dataset_ids: Vec<_> = event_store
@@ -43,8 +44,26 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
         })
         .await
         .unwrap();
-
     assert_eq!(dataset_ids, []);
+
+    let dataset_bindings = event_store
+        .all_bindings_for_dataset_flows(&dataset_id)
+        .await
+        .unwrap();
+    assert!(
+        dataset_bindings.is_empty(),
+        "Expected no bindings, found: {dataset_bindings:?}"
+    );
+
+    let all_bindings = event_store
+        .stream_all_existing_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert!(
+        all_bindings.is_empty(),
+        "Expected no bindings, found: {all_bindings:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,26 +74,23 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .unwrap();
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_key_1 = FlowKey::dataset(dataset_id_1.clone(), DatasetFlowType::Ingest);
+    let flow_binding_1 =
+        FlowBinding::for_dataset(dataset_id_1.clone(), afs::FLOW_TYPE_DATASET_INGEST);
 
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
-        flow_key: flow_key_1.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: false },
-        )),
+        flow_binding: flow_binding_1.clone(),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
     };
     let event_1_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
-        flow_key: flow_key_1.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: true },
-        )),
+        flow_binding: flow_binding_1.clone(),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
     };
 
     event_store
         .save_events(
-            &flow_key_1,
+            &flow_binding_1,
             None,
             vec![event_1_1.clone().into(), event_1_2.clone().into()],
         )
@@ -86,18 +102,17 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(2, num_events);
 
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
-    let flow_key_2 = FlowKey::dataset(dataset_id_2.clone(), DatasetFlowType::Ingest);
+    let flow_binding_2 =
+        FlowBinding::for_dataset(dataset_id_2.clone(), afs::FLOW_TYPE_DATASET_INGEST);
 
     let event_2 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
-        flow_key: flow_key_2.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: false },
-        )),
+        flow_binding: flow_binding_2.clone(),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
     };
 
     event_store
-        .save_events(&flow_key_2, None, vec![event_2.clone().into()])
+        .save_events(&flow_binding_2, None, vec![event_2.clone().into()])
         .await
         .unwrap();
 
@@ -105,17 +120,15 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(3, num_events);
 
-    let flow_key_3 = FlowKey::system(SystemFlowType::GC);
+    let flow_binding_3 = FlowBinding::for_system(FLOW_TYPE_SYSTEM_GC);
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
-        flow_key: flow_key_3.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: true },
-        )),
+        flow_binding: flow_binding_3.clone(),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
     };
 
     event_store
-        .save_events(&flow_key_3, None, vec![event_3.clone().into()])
+        .save_events(&flow_binding_3, None, vec![event_3.clone().into()])
         .await
         .unwrap();
 
@@ -124,7 +137,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(4, num_events);
 
     let events: Vec<_> = event_store
-        .get_events(&flow_key_1, GetEventsOpts::default())
+        .get_events(&flow_binding_1, GetEventsOpts::default())
         .map_ok(|(_, event)| event)
         .try_collect()
         .await
@@ -133,7 +146,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(&events[..], [event_1_1.into(), event_1_2.into()]);
 
     let events: Vec<_> = event_store
-        .get_events(&flow_key_2, GetEventsOpts::default())
+        .get_events(&flow_binding_2, GetEventsOpts::default())
         .map_ok(|(_, event)| event)
         .try_collect()
         .await
@@ -142,7 +155,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(&events[..], [event_2.into()]);
 
     let events: Vec<_> = event_store
-        .get_events(&flow_key_3, GetEventsOpts::default())
+        .get_events(&flow_binding_3, GetEventsOpts::default())
         .map_ok(|(_, event)| event)
         .try_collect()
         .await
@@ -157,14 +170,42 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         })
         .await
         .unwrap();
-
     dataset_ids.sort();
 
-    let mut expected_dataset_ids = vec![dataset_id_1, dataset_id_2];
-
+    let mut expected_dataset_ids = vec![dataset_id_1.clone(), dataset_id_2.clone()];
     expected_dataset_ids.sort();
 
     assert_eq!(expected_dataset_ids, dataset_ids);
+
+    let dataset_bindings = event_store
+        .all_bindings_for_dataset_flows(&dataset_id_1)
+        .await
+        .unwrap();
+    assert_eq!(
+        dataset_bindings,
+        vec![flow_binding_1.clone()],
+        "Expected only one binding for dataset 1, found: {dataset_bindings:?}"
+    );
+
+    let dataset_bindings = event_store
+        .all_bindings_for_dataset_flows(&dataset_id_2)
+        .await
+        .unwrap();
+    assert_eq!(
+        dataset_bindings,
+        vec![flow_binding_2.clone()],
+        "Expected only one binding for dataset 2, found: {dataset_bindings:?}"
+    );
+
+    let all_bindings = event_store
+        .stream_all_existing_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!(all_bindings.len(), 3);
+    assert!(all_bindings.contains(&flow_binding_1));
+    assert!(all_bindings.contains(&flow_binding_2));
+    assert!(all_bindings.contains(&flow_binding_3));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,36 +215,30 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         .get_one::<dyn FlowConfigurationEventStore>()
         .unwrap();
 
-    let flow_key = FlowKey::dataset(
+    let flow_binding = FlowBinding::for_dataset(
         odf::DatasetID::new_seeded_ed25519(b"foo"),
-        DatasetFlowType::Ingest,
+        afs::FLOW_TYPE_DATASET_INGEST,
     );
 
     let event_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
-        flow_key: flow_key.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: false },
-        )),
+        flow_binding: flow_binding.clone(),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
     };
     let event_2 = FlowConfigurationEventModified {
         event_time: Utc::now(),
-        flow_key: flow_key.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: true },
-        )),
+        flow_binding: flow_binding.clone(),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
     };
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
-        flow_key: flow_key.clone(),
-        rule: FlowConfigurationRule::CompactionRule(CompactionRule::MetadataOnly(
-            CompactionRuleMetadataOnly { recursive: false },
-        )),
+        flow_binding: flow_binding.clone(),
+        rule: FlowConfigRuleCompact::MetadataOnly { recursive: false }.into_flow_config(),
     };
 
     let latest_event_id = event_store
         .save_events(
-            &flow_key,
+            &flow_binding,
             None,
             vec![
                 event_1.clone().into(),
@@ -217,7 +252,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     // Use "from" only
     let events: Vec<_> = event_store
         .get_events(
-            &flow_key,
+            &flow_binding,
             GetEventsOpts {
                 from: Some(EventID::new(
                     latest_event_id.into_inner() - 2, /* last 2 events */
@@ -235,7 +270,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     // Use "to" only
     let events: Vec<_> = event_store
         .get_events(
-            &flow_key,
+            &flow_binding,
             GetEventsOpts {
                 from: None,
                 to: Some(EventID::new(
@@ -253,7 +288,7 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     // Use both "from" and "to"
     let events: Vec<_> = event_store
         .get_events(
-            &flow_key,
+            &flow_binding,
             GetEventsOpts {
                 // From 1 to 2, middle event only
                 from: Some(EventID::new(latest_event_id.into_inner() - 2)),

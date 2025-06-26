@@ -28,7 +28,7 @@ use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::platform::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_auth_rebac::AccountToDatasetRelation;
-use kamu_flow_system::{DatasetFlowType, FlowID};
+use kamu_flow_system::FlowID;
 use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use thiserror::Error;
@@ -1533,7 +1533,7 @@ impl FlowApi<'_> {
     pub async fn trigger(
         &self,
         dataset_id: &odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_type: &str,
     ) -> FlowTriggerResponse {
         let response = self
             .client
@@ -1563,7 +1563,7 @@ impl FlowApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .replace(
                     "<dataset_flow_type>",
-                    &format!("{dataset_flow_type:?}").to_case(Case::UpperSnake),
+                    &format!("{flow_type:?}").to_case(Case::UpperSnake),
                 )
                 .as_str(),
                 None,

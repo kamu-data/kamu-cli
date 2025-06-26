@@ -13,6 +13,12 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
+use kamu_adapter_flow_dataset as afs;
+use kamu_adapter_flow_dataset::{
+    FlowConfigRuleCompact,
+    FlowConfigRuleCompactFull,
+    FlowConfigRuleIngest,
+};
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -32,35 +38,39 @@ async fn test_visibility() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let foo_ingest_config = FlowConfigurationRule::IngestRule(IngestRule {
+    let foo_ingest_binding =
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: false,
-    });
+    }
+    .into_flow_config();
+
     harness
-        .set_dataset_flow_config(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_config.clone(),
-        )
+        .set_dataset_flow_config(foo_ingest_binding.clone(), foo_ingest_config.clone())
         .await;
 
-    let foo_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
-        CompactionRuleFull::new_checked(2, 3, false).unwrap(),
-    ));
+    let foo_compaction_binding =
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
+    let foo_compaction_config =
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3, false).unwrap())
+            .into_flow_config();
+
     harness
         .set_dataset_flow_config(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+            foo_compaction_binding.clone(),
             foo_compaction_config.clone(),
         )
         .await;
 
-    let bar_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
-        CompactionRuleFull::new_checked(3, 4, false).unwrap(),
-    ));
+    let bar_compaction_binding =
+        FlowBinding::for_dataset(bar_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
+    let bar_compaction_config =
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(3, 4, false).unwrap())
+            .into_flow_config();
+
     harness
         .set_dataset_flow_config(
-            bar_id.clone(),
-            DatasetFlowType::HardCompaction,
+            bar_compaction_binding.clone(),
             bar_compaction_config.clone(),
         )
         .await;
@@ -68,20 +78,12 @@ async fn test_visibility() {
     let configs = harness.list_active_configurations().await;
     assert_eq!(3, configs.len());
 
-    for (dataset_id, dataset_flow_type, config) in [
-        (foo_id.clone(), DatasetFlowType::Ingest, &foo_ingest_config),
-        (
-            foo_id,
-            DatasetFlowType::HardCompaction,
-            &foo_compaction_config,
-        ),
-        (
-            bar_id,
-            DatasetFlowType::HardCompaction,
-            &bar_compaction_config,
-        ),
+    for (flow_binding, config) in [
+        (&foo_ingest_binding, &foo_ingest_config),
+        (&foo_compaction_binding, &foo_compaction_config),
+        (&bar_compaction_binding, &bar_compaction_config),
     ] {
-        harness.expect_dataset_flow_config(&configs, dataset_id, dataset_flow_type, config);
+        harness.expect_dataset_flow_config(&configs, flow_binding, config);
     }
 }
 
@@ -95,13 +97,15 @@ async fn test_modify() {
 
     // Make a dataset and configure compaction config
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let foo_compaction_config = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
-        CompactionRuleFull::new_checked(1, 2, false).unwrap(),
-    ));
+    let foo_compaction_binding =
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
+    let foo_compaction_config =
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(1, 2, false).unwrap())
+            .into_flow_config();
+
     harness
         .set_dataset_flow_config(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+            foo_compaction_binding.clone(),
             foo_compaction_config.clone(),
         )
         .await;
@@ -109,21 +113,16 @@ async fn test_modify() {
     // It should be visible in the list of configs
     let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_config(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::HardCompaction,
-        &foo_compaction_config,
-    );
+    harness.expect_dataset_flow_config(&configs, &foo_compaction_binding, &foo_compaction_config);
 
     // Now make the config with different parameters
-    let foo_compaction_config_2 = FlowConfigurationRule::CompactionRule(CompactionRule::Full(
-        CompactionRuleFull::new_checked(2, 3, false).unwrap(),
-    ));
+    let foo_compaction_config_2 =
+        FlowConfigRuleCompact::Full(FlowConfigRuleCompactFull::new_checked(2, 3, false).unwrap())
+            .into_flow_config();
+
     harness
         .set_dataset_flow_config(
-            foo_id.clone(),
-            DatasetFlowType::HardCompaction,
+            foo_compaction_binding.clone(),
             foo_compaction_config_2.clone(),
         )
         .await;
@@ -131,12 +130,7 @@ async fn test_modify() {
     // Observe the updated config
     let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_config(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::HardCompaction,
-        &foo_compaction_config_2,
-    );
+    harness.expect_dataset_flow_config(&configs, &foo_compaction_binding, &foo_compaction_config_2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,26 +142,21 @@ async fn test_dataset_deleted() {
 
     // Make a dataset and configure ingest rule
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let foo_ingest_config = FlowConfigurationRule::IngestRule(IngestRule {
+    let foo_ingest_binding =
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let foo_ingest_config = FlowConfigRuleIngest {
         fetch_uncacheable: true,
-    });
+    }
+    .into_flow_config();
+
     harness
-        .set_dataset_flow_config(
-            foo_id.clone(),
-            DatasetFlowType::Ingest,
-            foo_ingest_config.clone(),
-        )
+        .set_dataset_flow_config(foo_ingest_binding.clone(), foo_ingest_config.clone())
         .await;
 
     // It should be visible in the list of configs
     let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_config(
-        &configs,
-        foo_id.clone(),
-        DatasetFlowType::Ingest,
-        &foo_ingest_config,
-    );
+    harness.expect_dataset_flow_config(&configs, &foo_ingest_binding, &foo_ingest_config);
 
     // Now, pretend dataset was deleted
     harness.issue_dataset_deleted(&foo_id).await;
@@ -178,13 +167,14 @@ async fn test_dataset_deleted() {
 
     // Still, we should see it's state as permanently stopped in the repository
     let flow_config_state = harness
-        .get_dataset_flow_config_from_store(foo_id, DatasetFlowType::Ingest)
+        .get_dataset_flow_config_from_store(&foo_ingest_binding)
         .await;
     assert_eq!(
         flow_config_state.rule,
-        FlowConfigurationRule::IngestRule(IngestRule {
-            fetch_uncacheable: true,
-        })
+        FlowConfigRuleIngest {
+            fetch_uncacheable: true
+        }
+        .into_flow_config()
     );
 }
 
@@ -234,7 +224,7 @@ impl FlowConfigurationHarness {
         }
     }
 
-    async fn list_active_configurations(&self) -> HashMap<FlowKey, FlowConfigurationState> {
+    async fn list_active_configurations(&self) -> HashMap<FlowBinding, FlowConfigurationState> {
         let active_configs: Vec<_> = self
             .flow_configuration_service
             .list_active_configurations()
@@ -244,35 +234,30 @@ impl FlowConfigurationHarness {
 
         let mut res = HashMap::new();
         for active_config in active_configs {
-            res.insert(active_config.flow_key.clone(), active_config);
+            res.insert(active_config.flow_binding.clone(), active_config);
         }
         res
     }
 
     async fn set_dataset_flow_config(
         &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_binding: FlowBinding,
         configuration_rule: FlowConfigurationRule,
     ) {
         self.flow_configuration_service
-            .set_configuration(
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                configuration_rule,
-            )
+            .set_configuration(flow_binding, configuration_rule)
             .await
             .unwrap();
     }
 
     fn expect_dataset_flow_config(
         &self,
-        configurations: &HashMap<FlowKey, FlowConfigurationState>,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        configurations: &HashMap<FlowBinding, FlowConfigurationState>,
+        flow_binding: &FlowBinding,
         expected_rule: &FlowConfigurationRule,
     ) {
         assert_matches!(
-            configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
+            configurations.get(flow_binding),
             Some(FlowConfigurationState {
                 status: FlowConfigurationStatus::Active,
                 rule: actual_rule,
@@ -283,12 +268,10 @@ impl FlowConfigurationHarness {
 
     async fn get_dataset_flow_config_from_store(
         &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_binding: &FlowBinding,
     ) -> FlowConfigurationState {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
         let flow_configuration =
-            FlowConfiguration::load(flow_key, self.flow_configuration_event_store.as_ref())
+            FlowConfiguration::load(flow_binding, self.flow_configuration_event_store.as_ref())
                 .await
                 .unwrap();
         flow_configuration.into()

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT flow_type, scope_data\n                FROM flow_trigger_events\n                WHERE scope_data->>'dataset_id' = $1\n                    AND event_type = 'FlowTriggerEventCreated'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "scope_data",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "028fbf6d546e338164181fee0d214e82937cf04d3b728c19b50cf979ffac1afd"
+}

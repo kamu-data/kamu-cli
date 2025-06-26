@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT event_id, event_payload as \"event_payload: _\"\n                FROM flow_trigger_events\n                WHERE flow_type = $1\n                    AND json_extract(scope_data, '$.dataset_id') = $2\n                    AND json_extract(scope_data, '$.type') = 'Dataset'\n                    AND (cast($3 as INT8) IS NULL or event_id > $3)\n                    AND (cast($4 as INT8) IS NULL or event_id <= $4)\n                ORDER BY event_id ASC\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "event_payload: _",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "d5c6568738f899730af1f8cd85f3680ad8e9e25fcbeb90ec92f346ad7a912095"
+}

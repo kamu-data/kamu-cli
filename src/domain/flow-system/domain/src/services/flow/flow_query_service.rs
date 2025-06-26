@@ -7,21 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
 
-use crate::{
-    AccountFlowFilters,
-    DatasetFlowFilters,
-    FlowConfigurationRule,
-    FlowID,
-    FlowKey,
-    FlowState,
-    SystemFlowFilters,
-};
+use crate::{AccountFlowFilters, FlowFilters, FlowID, FlowState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +24,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
@@ -68,7 +59,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_flows_by_dataset_ids(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: DatasetFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
@@ -77,7 +68,7 @@ pub trait FlowQueryService: Sync + Send {
     /// Applies specified filters/pagination
     async fn list_all_system_flows(
         &self,
-        filters: SystemFlowFilters,
+        filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError>;
 
@@ -90,21 +81,6 @@ pub trait FlowQueryService: Sync + Send {
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
-
-    /// Triggers the specified flow manually, unless it's already waiting
-    async fn trigger_manual_flow(
-        &self,
-        trigger_time: DateTime<Utc>,
-        flow_key: FlowKey,
-        initiator_account_id: odf::AccountID,
-        flow_run_snapshot_maybe: Option<FlowConfigurationRule>,
-    ) -> Result<FlowState, RequestFlowError>;
-
-    /// Attempts to cancel the tasks already scheduled for the given flow
-    async fn cancel_scheduled_tasks(
-        &self,
-        flow_id: FlowID,
-    ) -> Result<FlowState, CancelScheduledTasksError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -166,20 +142,6 @@ pub enum GetFlowError {
     Internal(#[from] InternalError),
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum RequestFlowError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum CancelScheduledTasksError {
-    #[error(transparent)]
-    NotFound(#[from] FlowNotFoundError),
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
@@ -191,18 +153,6 @@ pub struct FlowNotFoundError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<LoadError<FlowState>> for GetFlowError {
-    fn from(value: LoadError<FlowState>) -> Self {
-        match value {
-            LoadError::NotFound(err) => Self::NotFound(FlowNotFoundError { flow_id: err.query }),
-            LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
-            LoadError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<LoadError<FlowState>> for CancelScheduledTasksError {
     fn from(value: LoadError<FlowState>) -> Self {
         match value {
             LoadError::NotFound(err) => Self::NotFound(FlowNotFoundError { flow_id: err.query }),
