@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::auth;
+use kamu_core::{ResolvedDataset, auth};
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
@@ -68,13 +68,31 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn ensure_flow_applied_to_expected_dataset_kind(
+    resolved_dataset: &ResolvedDataset,
+    expected_dataset_kind: odf::DatasetKind,
+) -> std::result::Result<(), FlowIncompatibleDatasetKind> {
+    let actual_dataset_kind = resolved_dataset.get_kind();
+
+    if actual_dataset_kind != expected_dataset_kind {
+        Err(FlowIncompatibleDatasetKind {
+            expected_dataset_kind: expected_dataset_kind.into(),
+            actual_dataset_kind: actual_dataset_kind.into(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
     dataset_flow_type: DatasetFlowType,
     flow_run_configuration_maybe: Option<&FlowRunConfigInput>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
-    if let Some(FlowRunConfigInput::Compaction(FlowConfigInputCompaction::MetadataOnly(_))) =
+    if let Some(FlowRunConfigInput::Compaction(FlowConfigCompactionInput::MetadataOnly(_))) =
         flow_run_configuration_maybe
     {
         return Ok(None);
