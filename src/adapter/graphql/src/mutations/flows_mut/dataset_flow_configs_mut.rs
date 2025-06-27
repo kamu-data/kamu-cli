@@ -7,12 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_adapter_flow_dataset::{
-    FlowConfigRuleCompact,
-    FlowConfigRuleCompactFull,
-    FlowConfigRuleIngest,
-};
-use kamu_flow_system::{FlowBinding, FlowConfigurationRule, FlowConfigurationService};
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::{
     FlowIncompatibleDatasetKind,
@@ -47,6 +42,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         config_input: FlowConfigInput,
+        retry_policy_input: Option<FlowRetryPolicyInput>,
     ) -> Result<SetFlowConfigResult> {
         let flow_run_config: FlowRunConfigInput = config_input.into();
         if let Err(err) = flow_run_config.check_type_compatible(dataset_flow_type) {
@@ -64,7 +60,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
             return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
         }
 
-        let configuration_rule: FlowConfigurationRule = match config_input.try_into() {
+        let configuration_rule: fs::FlowConfigurationRule = match config_input.try_into() {
             Ok(rule) => rule,
             Err(e) => return Ok(SetFlowConfigResult::FlowInvalidConfigInput(e)),
         };
@@ -76,19 +72,25 @@ impl<'a> DatasetFlowConfigsMut<'a> {
             return Ok(SetFlowConfigResult::PreconditionsNotMet(e));
         }
 
-        let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
+        let retry_policy: Option<fs::RetryPolicy> = retry_policy_input.map(Into::into);
+        if retry_policy.is_some() && !config_input.is_retryable() {
+            return Ok(SetFlowConfigResult::FlowInvalidConfigInput(
+                FlowInvalidConfigInputError {
+                    reason: "Retry policy is set, but the configuration rule is not retryable"
+                        .to_string(),
+                },
+            ));
+        }
 
-        let flow_binding = FlowBinding::for_dataset(
+        let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
+
+        let flow_binding = fs::FlowBinding::for_dataset(
             self.dataset_request_state.dataset_id().clone(),
             map_dataset_flow_type(dataset_flow_type),
         );
 
         let res = flow_config_service
-            .set_configuration(
-                flow_binding,
-                configuration_rule,
-                None, /* TODO: retry policy */
-            )
+            .set_configuration(flow_binding, configuration_rule, retry_policy)
             .await
             .int_err()?;
 
@@ -148,18 +150,18 @@ impl FlowInvalidConfigInputError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl TryFrom<FlowConfigInput> for FlowConfigurationRule {
+impl TryFrom<FlowConfigInput> for fs::FlowConfigurationRule {
     type Error = FlowInvalidConfigInputError;
 
     fn try_from(value: FlowConfigInput) -> std::result::Result<Self, Self::Error> {
         match value {
             FlowConfigInput::Ingest(ingest_input) => {
-                let ingest_rule: FlowConfigRuleIngest = ingest_input.into();
+                let ingest_rule: afs::FlowConfigRuleIngest = ingest_input.into();
                 Ok(ingest_rule.into_flow_config())
             }
             FlowConfigInput::Compaction(compaction_input) => match compaction_input {
                 FlowConfigInputCompaction::Full(compaction_args) => {
-                    FlowConfigRuleCompactFull::new_checked(
+                    afs::FlowConfigRuleCompactFull::new_checked(
                         compaction_args.max_slice_size,
                         compaction_args.max_slice_records,
                         compaction_args.recursive,
@@ -167,10 +169,10 @@ impl TryFrom<FlowConfigInput> for FlowConfigurationRule {
                     .map_err(|err| Self::Error {
                         reason: err.to_string(),
                     })
-                    .map(|rule| FlowConfigRuleCompact::Full(rule).into_flow_config())
+                    .map(|rule| afs::FlowConfigRuleCompact::Full(rule).into_flow_config())
                 }
                 FlowConfigInputCompaction::MetadataOnly(compaction_args) => {
-                    let compaction_rule = FlowConfigRuleCompact::MetadataOnly {
+                    let compaction_rule = afs::FlowConfigRuleCompact::MetadataOnly {
                         recursive: compaction_args.recursive,
                     };
                     Ok(compaction_rule.into_flow_config())
@@ -179,3 +181,5 @@ impl TryFrom<FlowConfigInput> for FlowConfigurationRule {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
