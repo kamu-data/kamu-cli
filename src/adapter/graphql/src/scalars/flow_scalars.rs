@@ -68,6 +68,9 @@ pub struct FlowKeySystem {
 
 #[derive(SimpleObject, Debug)]
 pub struct FlowTimingRecords {
+    /// Planned scheduling time
+    scheduled_at: Option<DateTime<Utc>>,
+
     /// Recorded time of last task scheduling
     awaiting_executor_since: Option<DateTime<Utc>>,
 
@@ -82,6 +85,7 @@ pub struct FlowTimingRecords {
 impl From<fs::FlowTimingRecords> for FlowTimingRecords {
     fn from(value: fs::FlowTimingRecords) -> Self {
         Self {
+            scheduled_at: value.scheduled_for_activation_at,
             awaiting_executor_since: value.awaiting_executor_since,
             running_since: value.running_since,
             finished_at: value.finished_at,
