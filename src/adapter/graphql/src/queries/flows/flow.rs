@@ -197,6 +197,11 @@ impl Flow {
     async fn config_snapshot(&self) -> Option<FlowConfigRule> {
         self.flow_state.config_snapshot.clone().map(Into::into)
     }
+
+    /// Flow retry policy
+    async fn retry_policy(&self) -> Option<FlowRetryPolicy> {
+        self.flow_state.retry_policy.map(Into::into)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

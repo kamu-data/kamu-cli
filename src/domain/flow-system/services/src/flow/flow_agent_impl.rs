@@ -598,8 +598,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 ),
                             )
                             .await?;
-
-                        // TODO: retry logic in case of failed outcome
                     } else {
                         tracing::info!(
                             flow_id = %flow.flow_id,

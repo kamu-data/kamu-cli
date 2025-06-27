@@ -262,9 +262,7 @@ impl FlowSchedulingHelper {
                 // Decide on retry policy:
                 // - if configuration defines it, use it
                 // - if not, use default retry policy
-                let retry_policy = maybe_flow_configuration
-                    .and_then(|config| config.retry_policy)
-                    .unwrap_or_else(RetryPolicy::default);
+                let retry_policy = maybe_flow_configuration.and_then(|config| config.retry_policy);
 
                 // Initiate new flow
                 let mut flow = self
@@ -515,7 +513,7 @@ impl FlowSchedulingHelper {
         flow_binding: FlowBinding,
         trigger_type: &FlowTriggerInstance,
         maybe_config_rule_snapshot: Option<FlowConfigurationRule>,
-        retry_policy: RetryPolicy,
+        retry_policy: Option<RetryPolicy>,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(flow_key = ?flow_binding, trigger = ?trigger_type, "Creating new flow");
 

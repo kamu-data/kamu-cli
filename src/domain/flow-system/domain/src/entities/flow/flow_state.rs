@@ -34,7 +34,7 @@ pub struct FlowState {
     /// Flow config snapshot on the moment when flow was initiated
     pub config_snapshot: Option<FlowConfigurationRule>,
     /// Retry policy used
-    pub retry_policy: RetryPolicy,
+    pub retry_policy: Option<RetryPolicy>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

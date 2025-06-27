@@ -1771,7 +1771,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                         trigger_time: Utc::now(),
                     }),
                     config_snapshot: None,
-                    retry_policy: RetryPolicy::default(),
+                    retry_policy: None,
                 }
                 .into(),
             ],
@@ -1793,7 +1793,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                         trigger_time: Utc::now(),
                     }),
                     config_snapshot: None,
-                    retry_policy: RetryPolicy::default(),
+                    retry_policy: None,
                 }
                 .into(),
             ],
@@ -1877,7 +1877,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
                         trigger_time: start_moment,
                     }),
                     config_snapshot: None,
-                    retry_policy: RetryPolicy::default(),
+                    retry_policy: None,
                 }
                 .into(),
             ],
@@ -2040,7 +2040,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                         trigger_time: start_moment,
                     }),
                     config_snapshot: None,
-                    retry_policy: RetryPolicy::default(),
+                    retry_policy: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
@@ -2136,7 +2136,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                         trigger_time: start_moment,
                     }),
                     config_snapshot: None,
-                    retry_policy: RetryPolicy::default(),
+                    retry_policy: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
@@ -2172,7 +2172,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                         trigger_time: start_moment,
                     }),
                     config_snapshot: None,
-                    retry_policy: RetryPolicy::default(),
+                    retry_policy: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
@@ -2208,7 +2208,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                         trigger_time: start_moment,
                     }),
                     config_snapshot: None,
-                    retry_policy: RetryPolicy::default(),
+                    retry_policy: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
@@ -2613,7 +2613,7 @@ impl<'a> DatasetFlowGenerator<'a> {
             FlowBinding::for_dataset(self.dataset_id.clone(), flow_type),
             initial_trigger,
             config_snapshot,
-            RetryPolicy::default(),
+            None,
         );
 
         drive_flow_to_status(&mut flow, expected_status);
@@ -2683,7 +2683,7 @@ impl SystemFlowGenerator {
             FlowBinding::for_system(flow_type),
             initial_trigger_type,
             config_snapshot,
-            RetryPolicy::default(),
+            None,
         );
 
         drive_flow_to_status(&mut flow, expected_status);

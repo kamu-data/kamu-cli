@@ -1935,6 +1935,10 @@ type Flow {
 	Flow config snapshot
 	"""
 	configSnapshot: FlowConfigRule
+	"""
+	Flow retry policy
+	"""
+	retryPolicy: FlowRetryPolicy
 }
 
 type FlowAbortedResult {
