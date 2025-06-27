@@ -176,6 +176,15 @@ pub enum FlowConfigInput {
     Compaction(FlowConfigInputCompaction),
 }
 
+impl FlowConfigInput {
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            FlowConfigInput::Ingest(_) => true,
+            FlowConfigInput::Compaction(_) => false,
+        }
+    }
+}
+
 impl From<FlowConfigInput> for FlowRunConfigInput {
     fn from(value: FlowConfigInput) -> Self {
         match value {
@@ -404,38 +413,6 @@ impl FlowRunConfigInput {
         }
         Err(FlowTypeIsNotSupported)
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowRetryPolicy {
-    pub max_attempts: u32,
-    pub min_delay: TimeDelta,
-    pub backoff_type: FlowRetryBackoffType,
-}
-
-impl From<kamu_flow_system::RetryPolicy> for FlowRetryPolicy {
-    fn from(value: kamu_flow_system::RetryPolicy) -> Self {
-        let min_delay_duration = chrono::Duration::seconds(i64::from(value.min_delay_seconds));
-
-        Self {
-            max_attempts: value.max_attempts,
-            min_delay: min_delay_duration.into(),
-            backoff_type: value.backoff_type.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
-#[graphql(remote = "kamu_flow_system::RetryBackoffType")]
-pub enum FlowRetryBackoffType {
-    Fixed,
-    Linear,
-    Exponential,
-    ExponentialWithJitter,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

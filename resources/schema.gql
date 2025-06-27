@@ -1099,7 +1099,7 @@ type DatasetFlowConfigs {
 }
 
 type DatasetFlowConfigsMut {
-	setConfig(datasetFlowType: DatasetFlowType!, configInput: FlowConfigInput!): SetFlowConfigResult!
+	setConfig(datasetFlowType: DatasetFlowType!, configInput: FlowConfigInput!, retryPolicyInput: FlowRetryPolicyInput): SetFlowConfigResult!
 }
 
 input DatasetFlowFilters {
@@ -2232,6 +2232,12 @@ enum FlowRetryBackoffType {
 type FlowRetryPolicy {
 	maxAttempts: Int!
 	minDelay: TimeDelta!
+	backoffType: FlowRetryBackoffType!
+}
+
+input FlowRetryPolicyInput {
+	maxAttempts: Int!
+	minDelay: TimeDeltaInput!
 	backoffType: FlowRetryBackoffType!
 }
 
