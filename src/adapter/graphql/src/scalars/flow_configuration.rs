@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use odf::dataset::MetadataChainExt as _;
 use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
-use crate::mutations::FlowInvalidRunConfigurations;
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,15 +168,6 @@ impl From<afs::FlowConfigRuleReset> for FlowConfigRuleReset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject)]
-pub enum FlowRunConfigInput {
-    Compaction(FlowConfigCompactionInput),
-    Ingest(FlowConfigIngestInput),
-    Reset(FlowConfigResetInput),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(InputObject)]
 pub struct FlowConfigResetInput {
     pub mode: FlowConfigInputResetPropagationMode,
@@ -233,12 +222,6 @@ pub struct FlowConfigInputCompactionMetadataOnly {
     pub recursive: bool,
 }
 
-impl From<FlowConfigCompactionInput> for FlowRunConfigInput {
-    fn from(value: FlowConfigCompactionInput) -> Self {
-        Self::Compaction(value)
-    }
-}
-
 impl TryFrom<FlowConfigCompactionInput> for afs::FlowConfigRuleCompact {
     type Error = String;
 
@@ -274,116 +257,6 @@ impl From<FlowConfigIngestInput> for afs::FlowConfigRuleIngest {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl FlowRunConfigInput {
-    pub async fn try_into_snapshot(
-        ctx: &Context<'_>,
-        dataset_flow_type: &DatasetFlowType,
-        dataset_handle: &odf::DatasetHandle,
-        flow_run_configuration_maybe: Option<&FlowRunConfigInput>,
-    ) -> Result<Option<fs::FlowConfigurationRule>, FlowInvalidRunConfigurations> {
-        match dataset_flow_type {
-            DatasetFlowType::Ingest => {
-                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
-                    if let Self::Ingest(ingest_input) = flow_run_configuration {
-                        return Ok(Some(
-                            afs::FlowConfigRuleIngest {
-                                fetch_uncacheable: ingest_input.fetch_uncacheable,
-                            }
-                            .into_flow_config(),
-                        ));
-                    }
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
-                }
-            }
-            DatasetFlowType::ExecuteTransform => return Ok(None),
-            DatasetFlowType::HardCompaction => {
-                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
-                    if let Self::Compaction(compaction_input) = flow_run_configuration {
-                        return Ok(Some(
-                            match compaction_input {
-                                FlowConfigCompactionInput::Full(compaction_input) => {
-                                    afs::FlowConfigRuleCompact::Full(
-                                        afs::FlowConfigRuleCompactFull::new_checked(
-                                            compaction_input.max_slice_size,
-                                            compaction_input.max_slice_records,
-                                            compaction_input.recursive,
-                                        )
-                                        .map_err(|_| {
-                                            FlowInvalidRunConfigurations {
-                                                error: "Invalid compaction flow run configuration"
-                                                    .to_string(),
-                                            }
-                                        })?,
-                                    )
-                                }
-                                FlowConfigCompactionInput::MetadataOnly(compaction_input) => {
-                                    afs::FlowConfigRuleCompact::MetadataOnly {
-                                        recursive: compaction_input.recursive,
-                                    }
-                                }
-                            }
-                            .into_flow_config(),
-                        ));
-                    }
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
-                }
-            }
-            DatasetFlowType::Reset => {
-                let dataset_registry = from_catalog_n!(ctx, dyn kamu_core::DatasetRegistry);
-                let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
-
-                // Assume unwrap safe such as we have checked this existence during
-                // validation step
-                let current_head_hash = resolved_dataset
-                    .as_metadata_chain()
-                    .try_get_ref(&odf::BlockRef::Head)
-                    .await
-                    .map_err(|_| FlowInvalidRunConfigurations {
-                        error: "Cannot fetch default value".to_string(),
-                    })?;
-                if let Some(flow_run_configuration) = flow_run_configuration_maybe {
-                    if let Self::Reset(reset_input) = flow_run_configuration {
-                        let old_head_hash = if reset_input.old_head_hash.is_some() {
-                            reset_input.old_head_hash.clone().map(Into::into)
-                        } else {
-                            current_head_hash
-                        };
-                        return Ok(Some(
-                            afs::FlowConfigRuleReset {
-                                new_head_hash: reset_input.new_head_hash().map(Into::into),
-                                old_head_hash,
-                                recursive: reset_input.recursive,
-                            }
-                            .into_flow_config(),
-                        ));
-                    }
-                    return Err(FlowInvalidRunConfigurations {
-                        error: "Incompatible flow run configuration and dataset flow type"
-                            .to_string(),
-                    });
-                }
-                return Ok(Some(
-                    afs::FlowConfigRuleReset {
-                        new_head_hash: None,
-                        old_head_hash: current_head_hash,
-                        recursive: false,
-                    }
-                    .into_flow_config(),
-                ));
-            }
-        }
-        Ok(None)
     }
 }
 

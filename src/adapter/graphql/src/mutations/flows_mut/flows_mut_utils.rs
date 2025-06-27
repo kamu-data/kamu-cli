@@ -90,14 +90,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
     dataset_flow_type: DatasetFlowType,
-    flow_run_configuration_maybe: Option<&FlowRunConfigInput>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
-    if let Some(FlowRunConfigInput::Compaction(FlowConfigCompactionInput::MetadataOnly(_))) =
-        flow_run_configuration_maybe
-    {
-        return Ok(None);
-    }
-
     let maybe_expected_kind = match dataset_flow_type {
         DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => Some(odf::DatasetKind::Root),
         DatasetFlowType::ExecuteTransform => Some(odf::DatasetKind::Derivative),
@@ -129,7 +122,7 @@ pub(crate) async fn ensure_flow_preconditions(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
     dataset_flow_type: DatasetFlowType,
-    flow_run_configuration: Option<&FlowRunConfigInput>,
+    reset_configuration: Option<&FlowConfigResetInput>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
     let resolved_dataset = dataset_request_state.resolved_dataset(ctx).await?;
 
@@ -190,9 +183,7 @@ pub(crate) async fn ensure_flow_preconditions(
         }
         DatasetFlowType::HardCompaction => (),
         DatasetFlowType::Reset => {
-            if let Some(flow_configuration) = flow_run_configuration
-                && let FlowRunConfigInput::Reset(reset_configuration) = flow_configuration
-            {
+            if let Some(reset_configuration) = reset_configuration {
                 use odf::dataset::MetadataChainExt as _;
                 if let Some(new_head_hash) = &reset_configuration.new_head_hash() {
                     let metadata_chain = resolved_dataset.as_metadata_chain();

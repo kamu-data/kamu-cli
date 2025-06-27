@@ -1116,7 +1116,10 @@ type DatasetFlowRuns {
 }
 
 type DatasetFlowRunsMut {
-	triggerFlow(datasetFlowType: DatasetFlowType!, flowRunConfiguration: FlowRunConfigInput): TriggerFlowResult!
+	triggerIngestFlow(ingestConfigInput: FlowConfigIngestInput): TriggerFlowResult!
+	triggerTransformFlow: TriggerFlowResult!
+	triggerCompactionFlow(compactionConfigInput: FlowConfigCompactionInput): TriggerFlowResult!
+	triggerResetFlow(resetConfigInput: FlowConfigResetInput): TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
@@ -2235,12 +2238,6 @@ input FlowRetryPolicyInput {
 	maxAttempts: Int!
 	minDelay: TimeDeltaInput!
 	backoffType: FlowRetryBackoffType!
-}
-
-input FlowRunConfigInput @oneOf {
-	compaction: FlowConfigCompactionInput
-	ingest: FlowConfigIngestInput
-	reset: FlowConfigResetInput
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
