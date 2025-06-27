@@ -1099,7 +1099,8 @@ type DatasetFlowConfigs {
 }
 
 type DatasetFlowConfigsMut {
-	setConfig(datasetFlowType: DatasetFlowType!, configInput: FlowConfigInput!, retryPolicyInput: FlowRetryPolicyInput): SetFlowConfigResult!
+	setIngestConfig(ingestConfigInput: FlowConfigIngestInput!, retryPolicyInput: FlowRetryPolicyInput): SetFlowConfigResult!
+	setCompactionConfig(compactionConfigInput: FlowConfigCompactionInput!): SetFlowConfigResult!
 }
 
 input DatasetFlowFilters {
@@ -1945,6 +1946,11 @@ type FlowAbortedResult {
 	message: String!
 }
 
+input FlowConfigCompactionInput @oneOf {
+	full: FlowConfigInputCompactionFull
+	metadataOnly: FlowConfigInputCompactionMetadataOnly
+}
+
 union FlowConfigCompactionMode = FlowConfigCompactionModeFull | FlowConfigCompactionModeMetadataOnly
 
 type FlowConfigCompactionModeFull {
@@ -1957,14 +1963,11 @@ type FlowConfigCompactionModeMetadataOnly {
 	recursive: Boolean!
 }
 
-input FlowConfigInput @oneOf {
-	ingest: FlowConfigInputIngest
-	compaction: FlowConfigInputCompaction
-}
-
-input FlowConfigInputCompaction @oneOf {
-	full: FlowConfigInputCompactionFull
-	metadataOnly: FlowConfigInputCompactionMetadataOnly
+input FlowConfigIngestInput {
+	"""
+	Flag indicates to ignore cache during ingest step for API calls
+	"""
+	fetchUncacheable: Boolean!
 }
 
 input FlowConfigInputCompactionFull {
@@ -1974,19 +1977,6 @@ input FlowConfigInputCompactionFull {
 }
 
 input FlowConfigInputCompactionMetadataOnly {
-	recursive: Boolean!
-}
-
-input FlowConfigInputIngest {
-	"""
-	Flag indicates to ignore cache during ingest step for API calls
-	"""
-	fetchUncacheable: Boolean!
-}
-
-input FlowConfigInputReset {
-	mode: FlowConfigInputResetPropagationMode!
-	oldHeadHash: Multihash
 	recursive: Boolean!
 }
 
@@ -2001,6 +1991,12 @@ input FlowConfigInputResetPropagationModeCustom {
 
 input FlowConfigInputResetPropagationModeToSeed {
 	dummy: String
+}
+
+input FlowConfigResetInput {
+	mode: FlowConfigInputResetPropagationMode!
+	oldHeadHash: Multihash
+	recursive: Boolean!
 }
 
 union FlowConfigResetPropagationMode = FlowConfigResetPropagationModeCustom | FlowConfigResetPropagationModeToSeed
@@ -2242,9 +2238,9 @@ input FlowRetryPolicyInput {
 }
 
 input FlowRunConfigInput @oneOf {
-	compaction: FlowConfigInputCompaction
-	ingest: FlowConfigInputIngest
-	reset: FlowConfigInputReset
+	compaction: FlowConfigCompactionInput
+	ingest: FlowConfigIngestInput
+	reset: FlowConfigResetInput
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
@@ -2335,7 +2331,7 @@ type FlowTriggerPush {
 
 union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression
 
-type FlowTypeIsNotSupported implements SetFlowConfigResult & SetFlowTriggerResult {
+type FlowTypeIsNotSupported implements SetFlowTriggerResult {
 	message: String!
 }
 
