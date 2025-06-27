@@ -2276,6 +2276,10 @@ type FlowSuccessResult {
 
 type FlowTimingRecords {
 	"""
+	Planned scheduling time
+	"""
+	scheduledAt: DateTime
+	"""
 	Recorded time of last task scheduling
 	"""
 	awaitingExecutorSince: DateTime
