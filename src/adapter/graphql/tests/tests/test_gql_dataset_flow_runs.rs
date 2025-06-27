@@ -59,7 +59,7 @@ async fn test_trigger_ingest_root_dataset() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -77,7 +77,7 @@ async fn test_trigger_ingest_root_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerIngestFlow": {
                                 "__typename": "TriggerFlowSuccess",
                                 "message": "Success",
                                 "flow": {
@@ -419,7 +419,6 @@ async fn test_trigger_reset_root_dataset_flow() {
         &root_dataset_blocks[1].0,
         &root_dataset_blocks[0].0,
         false,
-        "RESET",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -438,7 +437,7 @@ async fn test_trigger_reset_root_dataset_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerResetFlow": {
                                 "__typename": "TriggerFlowSuccess",
                                 "message": "Success",
                                 "flow": {
@@ -578,7 +577,6 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         &new_invalid_head,
         &old_invalid_head,
         false,
-        "RESET",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -597,7 +595,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerResetFlow": {
                                 "__typename": "FlowPreconditionsNotMet",
                                 "message": "Flow didn't met preconditions: 'New head hash not found'"
                             }
@@ -623,7 +621,6 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
         &root_dataset_blocks[0].0,
         &root_dataset_blocks[1].0,
         false,
-        "RESET",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -642,7 +639,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerResetFlow": {
                                 "__typename": "FlowPreconditionsNotMet",
                                 "message": "Flow didn't met preconditions: 'Provided head hash is already a head block'"
                             }
@@ -672,10 +669,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
-    let mutation_code = FlowRunsHarness::trigger_flow_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-    );
+    let mutation_code =
+        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -693,7 +688,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerTransformFlow": {
                                 "__typename": "TriggerFlowSuccess",
                                 "message": "Success",
                                 "flow": {
@@ -891,7 +886,7 @@ async fn test_trigger_compaction_root_dataset() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
+        FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -909,7 +904,7 @@ async fn test_trigger_compaction_root_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerCompactionFlow": {
                                 "__typename": "TriggerFlowSuccess",
                                 "message": "Success",
                                 "flow": {
@@ -1241,9 +1236,9 @@ async fn test_list_flows_with_filters_and_pagination() {
     let create_result = harness.create_root_dataset().await;
 
     let ingest_mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
     let compaction_mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
+        FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -1643,9 +1638,9 @@ async fn test_list_flow_initiators() {
     let create_result = harness.create_root_dataset().await;
 
     let ingest_mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
     let compaction_mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
+        FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -1736,7 +1731,7 @@ async fn test_conditions_not_met_for_flows() {
     ////
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_root_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -1755,7 +1750,7 @@ async fn test_conditions_not_met_for_flows() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerIngestFlow": {
                                 "__typename": "FlowPreconditionsNotMet",
                                 "message": "Flow didn't met preconditions: 'No SetPollingSource event defined'",
                             }
@@ -1768,10 +1763,8 @@ async fn test_conditions_not_met_for_flows() {
 
     ////
 
-    let mutation_code = FlowRunsHarness::trigger_flow_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-    );
+    let mutation_code =
+        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -1790,7 +1783,7 @@ async fn test_conditions_not_met_for_flows() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerTransformFlow": {
                                 "__typename": "FlowPreconditionsNotMet",
                                 "message": "Flow didn't met preconditions: 'No SetTransform event defined'",
                             }
@@ -1816,10 +1809,8 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowRunsHarness::trigger_flow_mutation(
-        &create_root_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-    );
+    let mutation_code =
+        FlowRunsHarness::trigger_transform_flow_mutation(&create_root_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -1838,7 +1829,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerTransformFlow": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Derivative dataset, but a Root dataset was provided",
                             }
@@ -1852,7 +1843,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
     ////
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_derived_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_derived_result.dataset_handle.id);
 
     let response = schema
         .execute(
@@ -1869,7 +1860,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerIngestFlow": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
                             }
@@ -1882,10 +1873,8 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowRunsHarness::trigger_flow_mutation(
-        &create_derived_result.dataset_handle.id,
-        "HARD_COMPACTION",
-    );
+    let mutation_code =
+        FlowRunsHarness::trigger_compaction_flow_mutation(&create_derived_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -1904,7 +1893,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerCompactionFlow": {
                                 "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
                             }
@@ -1927,7 +1916,7 @@ async fn test_cancel_ingest_root_dataset() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -1939,7 +1928,8 @@ async fn test_cancel_ingest_root_dataset() {
 
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_id =
+        FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -1996,10 +1986,8 @@ async fn test_cancel_running_transform_derived_dataset() {
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
-    let mutation_code = FlowRunsHarness::trigger_flow_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-    );
+    let mutation_code =
+        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2011,7 +1999,10 @@ async fn test_cancel_running_transform_derived_dataset() {
 
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(
+        &response_json,
+        "triggerTransformFlow",
+    );
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -2070,7 +2061,7 @@ async fn test_cancel_hard_compaction_root_dataset() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "HARD_COMPACTION");
+        FlowRunsHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2082,7 +2073,10 @@ async fn test_cancel_hard_compaction_root_dataset() {
 
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(
+        &response_json,
+        "triggerCompactionFlow",
+    );
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -2181,7 +2175,7 @@ async fn test_cancel_foreign_flow_fails() {
     let create_derived_result = harness.create_derived_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_root_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2193,7 +2187,8 @@ async fn test_cancel_foreign_flow_fails() {
 
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_id =
+        FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
 
     let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
         &create_derived_result.dataset_handle.id,
@@ -2238,7 +2233,7 @@ async fn test_cancel_waiting_flow() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2250,7 +2245,8 @@ async fn test_cancel_waiting_flow() {
 
     assert!(response.is_ok(), "{response:?}");
     let res_json = response.data.into_json().unwrap();
-    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerIngestFlow"]["flow"]
+        ["flowId"]
         .as_str()
         .unwrap();
 
@@ -2305,7 +2301,7 @@ async fn test_cancel_already_aborted_flow() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2317,7 +2313,8 @@ async fn test_cancel_already_aborted_flow() {
 
     assert!(response.is_ok(), "{response:?}");
     let res_json = response.data.into_json().unwrap();
-    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerIngestFlow"]["flow"]
+        ["flowId"]
         .as_str()
         .unwrap();
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
@@ -2387,7 +2384,7 @@ async fn test_cancel_already_succeeded_flow() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2399,7 +2396,8 @@ async fn test_cancel_already_succeeded_flow() {
 
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_id =
+        FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
@@ -2465,7 +2463,7 @@ async fn test_history_of_completed_flow() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -2477,7 +2475,8 @@ async fn test_history_of_completed_flow() {
 
     assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
-    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    let flow_id =
+        FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json, "triggerIngestFlow");
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     harness
@@ -2606,7 +2605,6 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
 
     let mutation_code = FlowRunsHarness::trigger_flow_with_compaction_config_mutation(
         &create_root_result.dataset_handle.id,
-        "HARD_COMPACTION",
         10000,
         1_000_000,
         false,
@@ -2628,7 +2626,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerCompactionFlow": {
                                 "__typename": "TriggerFlowSuccess",
                                 "message": "Success",
                                 "flow": {
@@ -2756,10 +2754,8 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
         })
     );
 
-    let mutation_code = FlowRunsHarness::trigger_flow_mutation(
-        &create_derived_result.dataset_handle.id,
-        "EXECUTE_TRANSFORM",
-    );
+    let mutation_code =
+        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id);
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
         .execute(
@@ -2776,7 +2772,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerTransformFlow": {
                                 "__typename": "TriggerFlowSuccess",
                                 "message": "Success",
                                 "flow": {
@@ -2905,11 +2901,8 @@ async fn test_anonymous_operation_fails() {
     let create_derived_result = harness.create_derived_dataset().await;
 
     let mutation_codes = [
-        FlowRunsHarness::trigger_flow_mutation(&create_root_result.dataset_handle.id, "INGEST"),
-        FlowRunsHarness::trigger_flow_mutation(
-            &create_derived_result.dataset_handle.id,
-            "EXECUTE_TRANSFORM",
-        ),
+        FlowRunsHarness::trigger_ingest_flow_mutation(&create_root_result.dataset_handle.id),
+        FlowRunsHarness::trigger_transform_flow_mutation(&create_derived_result.dataset_handle.id),
         FlowRunsHarness::cancel_scheduled_tasks_mutation(
             &create_root_result.dataset_handle.id,
             "0",
@@ -2948,7 +2941,6 @@ async fn test_config_snapshot_returned_correctly() {
 
     let mutation_code = FlowRunsHarness::trigger_flow_with_compaction_config_mutation(
         &create_result.dataset_handle.id,
-        "HARD_COMPACTION",
         10000,
         1_000_000,
         false,
@@ -2970,7 +2962,7 @@ async fn test_config_snapshot_returned_correctly() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "triggerFlow": {
+                            "triggerCompactionFlow": {
                                 "__typename": "TriggerFlowSuccess",
                                 "message": "Success",
                                 "flow": {
@@ -3309,8 +3301,11 @@ impl FlowRunsHarness {
             .unwrap();
     }
 
-    fn extract_flow_id_from_trigger_response(response_json: &serde_json::Value) -> &str {
-        response_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+    fn extract_flow_id_from_trigger_response<'a>(
+        response_json: &'a serde_json::Value,
+        trigger_method: &'static str,
+    ) -> &'a str {
+        response_json["datasets"]["byId"]["flows"]["runs"][trigger_method]["flow"]["flowId"]
             .as_str()
             .unwrap()
     }
@@ -3569,7 +3564,7 @@ impl FlowRunsHarness {
         .replace("<flowId>", flow_id)
     }
 
-    fn trigger_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
+    fn trigger_ingest_flow_mutation(id: &odf::DatasetID) -> String {
         indoc!(
             r#"
             mutation {
@@ -3577,9 +3572,51 @@ impl FlowRunsHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             runs {
-                                triggerFlow (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                ) {
+                                triggerIngestFlow {
+                                    __typename,
+                                    message
+                                    ... on TriggerFlowSuccess {
+                                        flow {
+                                            __typename
+                                            flowId
+                                            status
+                                            outcome {
+                                                ...on FlowSuccessResult {
+                                                    message
+                                                }
+                                                ...on FlowAbortedResult {
+                                                    message
+                                                }
+                                                ...on FlowFailedError {
+                                                    reason {
+                                                        ...on FlowFailureReasonGeneral {
+                                                            message
+                                                        }
+                                                    }
+                                               }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+    }
+
+    fn trigger_transform_flow_mutation(id: &odf::DatasetID) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            runs {
+                                triggerTransformFlow {
                                     __typename,
                                     message
                                     ... on TriggerFlowSuccess {
@@ -3619,7 +3656,6 @@ impl FlowRunsHarness {
             "#
         )
         .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
     fn trigger_reset_flow_mutation(
@@ -3627,7 +3663,6 @@ impl FlowRunsHarness {
         new_head_hash: &odf::Multihash,
         old_head_hash: &odf::Multihash,
         recursive: bool,
-        dataset_flow_type: &str,
     ) -> String {
         indoc!(
             r#"
@@ -3636,16 +3671,123 @@ impl FlowRunsHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             runs {
-                                triggerFlow (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    flowRunConfiguration: {
-                                        reset: {
-                                            mode: {
-                                                custom: {
-                                                    newHeadHash: "<new_head_hash>"
+                                triggerResetFlow (
+                                    resetConfigInput: {
+                                        mode: {
+                                            custom: {
+                                                newHeadHash: "<new_head_hash>"
+                                            }
+                                        },
+                                        oldHeadHash: "<old_head_hash>",
+                                        recursive: <recursive>
+                                    }
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on TriggerFlowSuccess {
+                                        flow {
+                                            __typename
+                                            flowId
+                                            status
+                                            outcome {
+                                                ...on FlowSuccessResult {
+                                                    message
                                                 }
-                                            },
-                                            oldHeadHash: "<old_head_hash>",
+                                                ...on FlowAbortedResult {
+                                                    message
+                                                }
+                                                ...on FlowFailedError {
+                                                    reason {
+                                                        ...on FlowFailureReasonGeneral {
+                                                            message
+                                                        }
+                                                        ...on FlowFailureReasonInputDatasetCompacted {
+                                                            message
+                                                            inputDataset {
+                                                                id
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<new_head_hash>", &new_head_hash.to_string())
+        .replace("<old_head_hash>", &old_head_hash.to_string())
+        .replace("<recursive>", if recursive { "true" } else { "false" })
+    }
+
+    fn trigger_compaction_flow_mutation(id: &odf::DatasetID) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            runs {
+                                triggerCompactionFlow {
+                                    __typename,
+                                    message
+                                    ... on TriggerFlowSuccess {
+                                        flow {
+                                            __typename
+                                            flowId
+                                            status
+                                            outcome {
+                                                ...on FlowSuccessResult {
+                                                    message
+                                                }
+                                                ...on FlowAbortedResult {
+                                                    message
+                                                }
+                                                ...on FlowFailedError {
+                                                    reason {
+                                                        ...on FlowFailureReasonGeneral {
+                                                            message
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+    }
+
+    fn trigger_flow_with_compaction_config_mutation(
+        id: &odf::DatasetID,
+        max_slice_records: u64,
+        max_slice_size: u64,
+        recursive: bool,
+    ) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            runs {
+                                triggerCompactionFlow (
+                                    compactionConfigInput: {
+                                        full: {
+                                            maxSliceRecords: <max_slice_records>,
+                                            maxSliceSize: <max_slice_size>,
                                             recursive: <recursive>
                                         }
                                     }
@@ -3669,12 +3811,6 @@ impl FlowRunsHarness {
                                                         ...on FlowFailureReasonGeneral {
                                                             message
                                                         }
-                                                        ...on FlowFailureReasonInputDatasetCompacted {
-                                                            message
-                                                            inputDataset {
-                                                                id
-                                                            }
-                                                        }
                                                     }
                                                 }
                                             }
@@ -3689,78 +3825,6 @@ impl FlowRunsHarness {
             "#
         )
         .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
-        .replace("<new_head_hash>", &new_head_hash.to_string())
-        .replace("<old_head_hash>", &old_head_hash.to_string())
-        .replace("<recursive>", if recursive { "true" } else { "false" })
-    }
-
-    fn trigger_flow_with_compaction_config_mutation(
-        id: &odf::DatasetID,
-        dataset_flow_type: &str,
-        max_slice_records: u64,
-        max_slice_size: u64,
-        recursive: bool,
-    ) -> String {
-        indoc!(
-            r#"
-            mutation {
-                datasets {
-                    byId (datasetId: "<id>") {
-                        flows {
-                            runs {
-                                triggerFlow (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    flowRunConfiguration: {
-                                        compaction: {
-                                            full: {
-                                                maxSliceRecords: <max_slice_records>,
-                                                maxSliceSize: <max_slice_size>,
-                                                recursive: <recursive>
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    __typename,
-                                    message
-                                    ... on TriggerFlowSuccess {
-                                        flow {
-                                            __typename
-                                            flowId
-                                            status
-                                            outcome {
-                                                ...on FlowSuccessResult {
-                                                    message
-                                                }
-                                                ...on FlowAbortedResult {
-                                                    message
-                                                }
-                                                ...on FlowFailedError {
-                                                    reason {
-                                                        ...on FlowFailureReasonGeneral {
-                                                            message
-                                                        }
-                                                        ...on FlowFailureReasonInputDatasetCompacted {
-                                                            message
-                                                            inputDataset {
-                                                                id
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        )
-        .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
         .replace("<recursive>", if recursive { "true" } else { "false" })

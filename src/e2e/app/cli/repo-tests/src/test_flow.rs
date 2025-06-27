@@ -265,10 +265,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     byId(datasetId: $datasetId) {
                       flows {
                         runs {
-                          triggerFlow(
-                            datasetFlowType: $datasetFlowType
-                            flowRunConfiguration: $flowRunConfiguration
-                          ) {
+                          triggerTransformFlow {
                             ... on TriggerFlowSuccess {
                               flow {
                                 ...FlowSummaryData
@@ -523,12 +520,10 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     "$accountId",
                     "\"did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f\"",
                 )
-                .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
                 .replace(
                     "$datasetId",
                     &format!("\"{derivative_dataset_id}\""),
                 )
-                .replace("$flowRunConfiguration", "null")
                 .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -541,7 +536,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                         "__typename": "DatasetFlowsMut",
                         "runs": {
                           "__typename": "DatasetFlowRunsMut",
-                          "triggerFlow": {
+                          "triggerTransformFlow": {
                             "__typename": "TriggerFlowSuccess",
                             "flow": {
                               "__typename": "Flow",
@@ -821,7 +816,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, "Ingest")
+            .trigger_ingest(&root_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -865,7 +860,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, "Ingest")
+            .trigger_ingest(&root_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -922,7 +917,7 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, "Ingest")
+            .trigger_ingest(&root_dataset_id)
             .await,
         FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetPollingSource event defined'"
@@ -954,7 +949,7 @@ pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: Kam
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&derivative_dataset_id, "ExecuteTransform")
+            .trigger_transform(&derivative_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1009,7 +1004,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&derivative_dataset_id, "ExecuteTransform")
+            .trigger_transform(&derivative_dataset_id)
             .await,
         FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetTransform event defined'"
@@ -1085,7 +1080,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, "HardCompaction")
+            .trigger_compaction(&root_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1165,7 +1160,7 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, "Reset")
+            .trigger_reset(&root_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1248,7 +1243,7 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&dataset_id, "Ingest")
+            .trigger_ingest(&dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
