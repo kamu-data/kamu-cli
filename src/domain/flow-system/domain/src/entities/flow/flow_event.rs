@@ -63,8 +63,7 @@ pub struct FlowEventInitiated {
     pub flow_binding: FlowBinding,
     pub trigger: FlowTriggerInstance,
     pub config_snapshot: Option<FlowConfigurationRule>,
-    #[serde(default)]
-    pub retry_policy: RetryPolicy,
+    pub retry_policy: Option<RetryPolicy>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

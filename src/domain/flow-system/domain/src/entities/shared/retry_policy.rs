@@ -31,6 +31,7 @@ pub enum RetryBackoffType {
 
 impl RetryPolicy {
     pub fn new(max_attempts: u32, min_delay_seconds: u32, backoff_type: RetryBackoffType) -> Self {
+        // Validation?
         Self {
             max_attempts,
             min_delay_seconds,
@@ -63,16 +64,6 @@ impl RetryPolicy {
         };
 
         Some(last_attempt_at + Duration::seconds(i64::from(delay_seconds)))
-    }
-}
-
-impl Default for RetryPolicy {
-    fn default() -> Self {
-        Self {
-            max_attempts: 0,
-            min_delay_seconds: 0,
-            backoff_type: RetryBackoffType::Fixed,
-        }
     }
 }
 
