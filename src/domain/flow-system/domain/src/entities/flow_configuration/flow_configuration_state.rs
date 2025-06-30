@@ -61,11 +61,14 @@ impl Projection for FlowConfigurationState {
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(FlowConfigurationEventModified { rule, .. }) => {
+                    E::Modified(FlowConfigurationEventModified {
+                        rule, retry_policy, ..
+                    }) => {
                         // Note: when deleted dataset is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowConfigurationState {
                             rule: rule.clone(),
+                            retry_policy: retry_policy.clone(),
                             ..s
                         })
                     }
