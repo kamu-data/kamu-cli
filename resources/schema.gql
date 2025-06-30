@@ -229,6 +229,9 @@ type AccountsMut {
 	Create a new account
 	"""
 	createAccount(accountName: AccountName!, email: Email): CreateAccountResult!
+	"""
+	Create wallet accounts
+	"""
 	createWalletAccounts(walletAddresses: [DidPkh!]!): CreateWalletAccountsResult!
 }
 
