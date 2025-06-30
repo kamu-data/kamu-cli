@@ -68,7 +68,7 @@ impl Projection for FlowConfigurationState {
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowConfigurationState {
                             rule: rule.clone(),
-                            retry_policy: retry_policy.clone(),
+                            retry_policy: *retry_policy,
                             ..s
                         })
                     }

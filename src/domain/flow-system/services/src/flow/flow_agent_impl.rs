@@ -584,20 +584,19 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 .await?;
                         }
 
-                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                        outbox
-                            .post_message(
-                                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                FlowProgressMessage::finished(
-                                    message.event_time,
-                                    flow_id,
-                                    flow.outcome
-                                        .as_ref()
-                                        .expect("Outcome must be attached by now")
-                                        .clone(),
-                                ),
-                            )
-                            .await?;
+                        if let Some(flow_outcome) = flow.outcome.as_ref() {
+                            let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+                            outbox
+                                .post_message(
+                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                                    FlowProgressMessage::finished(
+                                        message.event_time,
+                                        flow_id,
+                                        flow_outcome.clone(),
+                                    ),
+                                )
+                                .await?;
+                        }
                     } else {
                         tracing::info!(
                             flow_id = %flow.flow_id,
