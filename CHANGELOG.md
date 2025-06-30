@@ -12,6 +12,8 @@ Recommendation: for ease of reading, use the following order:
 -->
 
 ## [Unreleased]
+### Added
+- GQL: `AccountsMut::create_wallet_accounts()`: to create wallet accounts.
 ### Changed
 - Major refactoring of flow & task systems:
   - Fully unplugged the flow and task systems from `kamu-core` and removed all domain-specific couplings.
@@ -28,7 +30,6 @@ Recommendation: for ease of reading, use the following order:
 - Improvements in event sourcing aggregates:
   - Optimized event sourcing aggregate loading by supporting loading via reference.
   - Simplified aggregate multi-load functions for improved efficiency.
-
 
 ## [0.242.1] - 2025-06-19
 ### Fixed
