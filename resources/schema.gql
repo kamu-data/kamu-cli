@@ -229,6 +229,7 @@ type AccountsMut {
 	Create a new account
 	"""
 	createAccount(accountName: AccountName!, email: Email): CreateAccountResult!
+	createWalletAccounts(walletAddresses: [DidPkh!]!): CreateWalletAccountsResult!
 }
 
 """
@@ -301,6 +302,14 @@ type AddPushSource {
 
 type Admin {
 	selfTest: String!
+}
+
+interface ApplyRolesMatrixResult {
+	message: String!
+}
+
+type ApplyRolesMatrixResultSuccess implements ApplyRolesMatrixResult {
+	message: String!
 }
 
 """
@@ -417,6 +426,13 @@ type Checkpoint {
 type CliProtocolDesc {
 	pullCommand: String!
 	pushCommand: String!
+}
+
+type CollaborationMut {
+	"""
+	Matrix application of dataset roles to specified accounts.
+	"""
+	applyRolesMatrix(accountIds: [AccountID!]!, datasetsWithMaybeRoles: [DatasetWithMaybeRole!]!): ApplyRolesMatrixResult!
 }
 
 type Collection {
@@ -742,6 +758,15 @@ interface CreateTokenResult {
 	message: String!
 }
 
+interface CreateWalletAccountsResult {
+	message: String!
+}
+
+type CreateWalletAccountsSuccess implements CreateWalletAccountsResult {
+	accounts: [Account!]!
+	message: String!
+}
+
 interface CreateWebhookSubscriptionResult {
 	message: String!
 }
@@ -897,7 +922,7 @@ type Dataset {
 	"""
 	visibility: DatasetVisibilityOutput!
 	"""
-	Quck access to `head` block hash
+	Quick access to `head` block hash
 	"""
 	head: Multihash!
 	"""
@@ -1362,6 +1387,11 @@ type DatasetWebhooksPermissions {
 	canUpdate: Boolean!
 }
 
+input DatasetWithMaybeRole {
+	datasetId: DatasetID!
+	maybeRole: DatasetAccessRole
+}
+
 type Datasets {
 	"""
 	Returns dataset by its ID
@@ -1509,6 +1539,13 @@ type DependencyDatasetResultNotAccessible implements DependencyDatasetResult {
 }
 
 scalar DeviceCode
+
+"""
+Wallet address in did:pkh format.
+
+Example: did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a
+"""
+scalar DidPkh
 
 """
 Disables the previously defined polling source.
@@ -2532,6 +2569,12 @@ type Mutation {
 	system. This groups deals with their identities and permissions.
 	"""
 	accounts: AccountsMut!
+	"""
+	Collaboration-related functionality group
+	
+	Allows setting permissions for multiple datasets in batch mode
+	"""
+	collaboration: CollaborationMut!
 }
 
 union NameLookupResult = Account

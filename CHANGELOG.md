@@ -13,7 +13,8 @@ Recommendation: for ease of reading, use the following order:
 
 ## [Unreleased]
 ### Added
-- GQL: `AccountsMut::create_wallet_accounts()`: to create wallet accounts.
+- GQL: `AccountsMut::create_wallet_accounts()` (#1287).
+- GQL: `CollaborationMut::apply_roles_matrix()` (#1287).
 ### Changed
 - Major refactoring of flow & task systems:
   - Fully unplugged the flow and task systems from `kamu-core` and removed all domain-specific couplings.

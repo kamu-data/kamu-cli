@@ -102,6 +102,7 @@ impl AccountsMut {
         }
     }
 
+    /// Create wallet accounts
     #[tracing::instrument(level = "info", name = AccountsMut_create_wallet_accounts, skip_all)]
     #[graphql(guard = "LoggedInGuard.and(CanProvisionAccountsGuard)")]
     async fn create_wallet_accounts(

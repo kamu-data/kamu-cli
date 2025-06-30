@@ -39,7 +39,12 @@ tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
+kamu = { workspace = true, default-features = false, features = ["testing"] }
 kamu-auth-rebac-inmem = { workspace = true }
 
+indoc = { version = "2" }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "unstable",
+] }
 serde_json = "1"
 test-log = { version = "0.2", features = ["trace"] }

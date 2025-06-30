@@ -12,6 +12,8 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::*;
+use kamu_core::auth;
+use kamu_core::auth::{DatasetAction, DatasetActionUnauthorizedError};
 use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,6 +35,7 @@ pub struct RebacServiceImpl {
     rebac_repo: Arc<dyn RebacRepository>,
     default_account_properties: Arc<DefaultAccountProperties>,
     default_dataset_properties: Arc<DefaultDatasetProperties>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
 }
 
 #[dill::component(pub)]
@@ -42,12 +45,14 @@ impl RebacServiceImpl {
         rebac_repo: Arc<dyn RebacRepository>,
         default_account_properties: Arc<DefaultAccountProperties>,
         default_dataset_properties: Arc<DefaultDatasetProperties>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     ) -> Self {
         Self {
             cache_state: Arc::new(RwLock::new(AccountPropertiesCacheState::default())),
             rebac_repo,
             default_account_properties,
             default_dataset_properties,
+            dataset_action_authorizer,
         }
     }
 }
@@ -331,6 +336,66 @@ impl RebacService for RebacServiceImpl {
                 }
             },
         }
+    }
+
+    async fn apply_roles_matrix(
+        &self,
+        account_ids: &[&odf::AccountID],
+        datasets_with_maybe_roles: &[(odf::DatasetID, Option<AccountToDatasetRelation>)],
+    ) -> Result<(), ApplyRelationMatrixError> {
+        {
+            // Access check
+            const EXPECTED_ACCESS: DatasetAction = DatasetAction::Maintain;
+
+            let datasets_ids = datasets_with_maybe_roles
+                .iter()
+                .map(|(dataset_id, _)| dataset_id.clone())
+                .collect::<Vec<_>>();
+            let unauthorized_ids_with_errors = self
+                .dataset_action_authorizer
+                .classify_dataset_ids_by_allowance(datasets_ids, EXPECTED_ACCESS)
+                .await?
+                .unauthorized_ids_with_errors;
+
+            if !unauthorized_ids_with_errors.is_empty() {
+                let mut unauthorized_dataset_refs =
+                    Vec::with_capacity(unauthorized_ids_with_errors.len());
+                for (dataset_id, e) in unauthorized_ids_with_errors {
+                    match e {
+                        DatasetActionUnauthorizedError::Access(_) => {
+                            unauthorized_dataset_refs.push(dataset_id.as_local_ref());
+                        }
+                        e @ DatasetActionUnauthorizedError::Internal(_) => {
+                            return Err(ApplyRelationMatrixError::Internal(e.int_err()));
+                        }
+                    }
+                }
+
+                return Err(ApplyRelationMatrixError::not_enough_permissions(
+                    unauthorized_dataset_refs,
+                    EXPECTED_ACCESS,
+                ));
+            }
+        }
+
+        for (dataset_id, maybe_role) in datasets_with_maybe_roles {
+            for account_id in account_ids {
+                if let Some(role) = maybe_role {
+                    self.set_account_dataset_relation(account_id, *role, dataset_id)
+                        .await
+                        .int_err()?;
+                } else {
+                    self.unset_accounts_dataset_relations(account_ids, dataset_id)
+                        .await
+                        .int_err()?;
+                    // For unset, we can apply it for all accounts at once, so we stop iterating
+                    // further.
+                    break;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     async fn get_account_dataset_relations(
