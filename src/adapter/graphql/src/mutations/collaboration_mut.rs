@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_auth_rebac::{AccountToDatasetRelation, RebacApplyRolesMatrixUseCase};
+use std::borrow::Cow;
+
+use kamu_auth_rebac::RebacApplyRolesMatrixUseCase;
 
 use crate::prelude::*;
 
@@ -26,7 +28,7 @@ impl CollaborationMut {
         &self,
         ctx: &Context<'_>,
         account_ids: Vec<AccountID<'_>>,
-        datasets_with_maybe_roles: Vec<DatasetWithMaybeRole>,
+        datasets_with_role_operations: Vec<DatasetWithRoleOperation>,
     ) -> Result<ApplyRolesMatrixResult> {
         let use_case = from_catalog_n!(ctx, dyn RebacApplyRolesMatrixUseCase);
 
@@ -34,26 +36,23 @@ impl CollaborationMut {
             .iter()
             .map(AsRef::as_ref)
             .collect::<Vec<&odf::AccountID>>();
-        let datasets_with_maybe_roles = datasets_with_maybe_roles
-            .into_iter()
-            .map(|tuple| (tuple.dataset_id.into(), tuple.maybe_role.map(Into::into)))
-            .collect::<Vec<(odf::DatasetID, Option<AccountToDatasetRelation>)>>();
+        let datasets_with_role_operations = datasets_with_role_operations
+            .iter()
+            .map(
+                |DatasetWithRoleOperation {
+                     dataset_id,
+                     operation,
+                 }| { (Cow::Borrowed(dataset_id.as_ref()), (*operation).into()) },
+            )
+            .collect::<Vec<_>>();
 
         use_case
-            .execute(&account_ids[..], &datasets_with_maybe_roles[..])
+            .execute(&account_ids[..], &datasets_with_role_operations)
             .await
             .int_err()?;
 
         Ok(ApplyRolesMatrixResult::default())
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(InputObject)]
-pub struct DatasetWithMaybeRole {
-    pub dataset_id: DatasetID<'static>,
-    pub maybe_role: Option<DatasetAccessRole>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

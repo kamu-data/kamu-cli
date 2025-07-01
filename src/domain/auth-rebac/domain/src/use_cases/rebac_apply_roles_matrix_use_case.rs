@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use internal_error::InternalError;
 use kamu_core::auth::{DatasetAction, DatasetsActionNotEnoughPermissionsError};
 
@@ -19,8 +21,16 @@ pub trait RebacApplyRolesMatrixUseCase: Send + Sync {
     async fn execute(
         &self,
         account_ids: &[&odf::AccountID],
-        datasets_with_maybe_roles: &[(odf::DatasetID, Option<AccountToDatasetRelation>)],
+        datasets_with_role_operations: &[(Cow<odf::DatasetID>, DatasetRoleOperation)],
     ) -> Result<(), ApplyRelationMatrixError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub enum DatasetRoleOperation {
+    Set(AccountToDatasetRelation),
+    Unset,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

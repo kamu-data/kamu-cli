@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -15,6 +16,7 @@ use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_auth_rebac::{
     AccountToDatasetRelation as Role,
     ApplyRelationMatrixError,
+    DatasetRoleOperation,
     RebacApplyRolesMatrixUseCase,
     RebacService,
 };
@@ -30,9 +32,9 @@ use pretty_assertions::{assert_eq, assert_matches};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const NO_ROLE: Option<Role> = None;
-const READER: Option<Role> = Some(Role::Reader);
-const MAINTAINER: Option<Role> = Some(Role::Maintainer);
+const UNSET_ROLE_OPERATION: DatasetRoleOperation = DatasetRoleOperation::Unset;
+const SET_READER_OPERATION: DatasetRoleOperation = DatasetRoleOperation::Set(Role::Reader);
+const SET_MAINTAINER_OPERATION: DatasetRoleOperation = DatasetRoleOperation::Set(Role::Maintainer);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,9 +66,9 @@ async fn test_apply_roles_matrix_success() {
             .execute(
                 &[&account_id_1],
                 &[
-                    (dataset_id_1.clone(), MAINTAINER),
-                    (dataset_id_2.clone(), MAINTAINER),
-                    (dataset_id_3.clone(), MAINTAINER),
+                    (Cow::Borrowed(&dataset_id_1), SET_MAINTAINER_OPERATION),
+                    (Cow::Borrowed(&dataset_id_2), SET_MAINTAINER_OPERATION),
+                    (Cow::Borrowed(&dataset_id_3), SET_MAINTAINER_OPERATION),
                 ],
             )
             .await,
@@ -98,9 +100,9 @@ async fn test_apply_roles_matrix_success() {
             .execute(
                 &[&account_id_2, &account_id_3],
                 &[
-                    (dataset_id_1.clone(), READER),
-                    (dataset_id_2.clone(), READER),
-                    (dataset_id_3.clone(), READER),
+                    (Cow::Borrowed(&dataset_id_1), SET_READER_OPERATION),
+                    (Cow::Borrowed(&dataset_id_2), SET_READER_OPERATION),
+                    (Cow::Borrowed(&dataset_id_3), SET_READER_OPERATION),
                 ],
             )
             .await,
@@ -138,9 +140,9 @@ async fn test_apply_roles_matrix_success() {
             .execute(
                 &[&account_id_2, &account_id_3],
                 &[
-                    (dataset_id_1.clone(), READER),
-                    (dataset_id_2.clone(), READER),
-                    (dataset_id_3.clone(), READER),
+                    (Cow::Borrowed(&dataset_id_1), SET_READER_OPERATION),
+                    (Cow::Borrowed(&dataset_id_2), SET_READER_OPERATION),
+                    (Cow::Borrowed(&dataset_id_3), SET_READER_OPERATION),
                 ],
             )
             .await,
@@ -177,7 +179,7 @@ async fn test_apply_roles_matrix_success() {
             .use_case
             .execute(
                 &[&account_id_1, &account_id_2, &account_id_3],
-                &[(dataset_id_1.clone(), NO_ROLE)],
+                &[(Cow::Borrowed(&dataset_id_1), UNSET_ROLE_OPERATION)],
             )
             .await,
         Ok(_)
@@ -211,8 +213,8 @@ async fn test_apply_roles_matrix_success() {
             .execute(
                 &[&account_id_1, &account_id_2, &account_id_3],
                 &[
-                    (dataset_id_2.clone(), NO_ROLE),
-                    (dataset_id_3.clone(), NO_ROLE),
+                    (Cow::Borrowed(&dataset_id_2), UNSET_ROLE_OPERATION),
+                    (Cow::Borrowed(&dataset_id_3), UNSET_ROLE_OPERATION),
                 ],
             )
             .await,
@@ -241,9 +243,9 @@ async fn test_apply_roles_matrix_success() {
             .execute(
                 &[&account_id_1, &account_id_2, &account_id_3],
                 &[
-                    (dataset_id_1.clone(), NO_ROLE),
-                    (dataset_id_2.clone(), NO_ROLE),
-                    (dataset_id_3.clone(), NO_ROLE),
+                    (Cow::Borrowed(&dataset_id_1), UNSET_ROLE_OPERATION),
+                    (Cow::Borrowed(&dataset_id_2), UNSET_ROLE_OPERATION),
+                    (Cow::Borrowed(&dataset_id_3), UNSET_ROLE_OPERATION),
                 ],
             )
             .await,
@@ -291,9 +293,9 @@ async fn test_apply_roles_matrix_not_authorized() {
             .execute(
                 &[&account_id_1, &account_id_2, &account_id_3],
                 &[
-                    (dataset_id_1.clone(), MAINTAINER),
-                    (dataset_id_2.clone(), MAINTAINER),
-                    (dataset_id_3.clone(), MAINTAINER),
+                    (Cow::Borrowed(&dataset_id_1), SET_MAINTAINER_OPERATION),
+                    (Cow::Borrowed(&dataset_id_2), SET_MAINTAINER_OPERATION),
+                    (Cow::Borrowed(&dataset_id_3), SET_MAINTAINER_OPERATION),
                 ],
             )
             .await,

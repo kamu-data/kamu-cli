@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{
-    AccountToDatasetRelation,
     ApplyRelationMatrixError,
+    DatasetRoleOperation,
     RebacApplyRolesMatrixUseCase,
     RebacService,
 };
@@ -70,31 +70,34 @@ impl RebacApplyRolesMatrixUseCase for RebacApplyRolesMatrixUseCaseImpl {
     async fn execute(
         &self,
         account_ids: &[&odf::AccountID],
-        datasets_with_maybe_roles: &[(odf::DatasetID, Option<AccountToDatasetRelation>)],
+        datasets_with_role_operations: &[(Cow<odf::DatasetID>, DatasetRoleOperation)],
     ) -> Result<(), ApplyRelationMatrixError> {
         {
-            let datasets_ids = datasets_with_maybe_roles
+            let datasets_ids = datasets_with_role_operations
                 .iter()
-                .map(|(id, _)| Cow::Borrowed(id))
+                .map(|(dataset_id, _)| Cow::Borrowed(dataset_id.as_ref()))
                 .collect::<Vec<_>>();
             self.access_check(&datasets_ids).await?;
         }
 
-        for (dataset_id, maybe_role) in datasets_with_maybe_roles {
+        for (dataset_id, role_operation) in datasets_with_role_operations {
             for account_id in account_ids {
-                if let Some(role) = maybe_role {
-                    self.rebac_service
-                        .set_account_dataset_relation(account_id, *role, dataset_id)
-                        .await
-                        .int_err()?;
-                } else {
-                    self.rebac_service
-                        .unset_accounts_dataset_relations(account_ids, dataset_id)
-                        .await
-                        .int_err()?;
-                    // For unset, we can apply it for all accounts at once, so we stop iterating
-                    // further.
-                    break;
+                match role_operation {
+                    DatasetRoleOperation::Set(role) => {
+                        self.rebac_service
+                            .set_account_dataset_relation(account_id, *role, dataset_id)
+                            .await
+                            .int_err()?;
+                    }
+                    DatasetRoleOperation::Unset => {
+                        self.rebac_service
+                            .unset_accounts_dataset_relations(account_ids, dataset_id)
+                            .await
+                            .int_err()?;
+                        // For unset, we can apply it for all accounts at once, so we stop iterating
+                        // further.
+                        break;
+                    }
                 }
             }
         }
