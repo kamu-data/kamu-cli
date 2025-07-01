@@ -117,24 +117,24 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
         })
     }
 
-    async fn classify_dataset_ids_by_allowance(
-        &self,
-        dataset_ids: Vec<odf::DatasetID>,
+    async fn classify_dataset_ids_by_allowance<'a>(
+        &'a self,
+        dataset_ids: &[&'a odf::DatasetID],
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         let mut allowed = Vec::new();
         let mut not_allowed = Vec::new();
 
         for dataset_id in dataset_ids {
-            if self.owns_dataset_by_id(&dataset_id).await? {
-                allowed.push(dataset_id);
+            if self.owns_dataset_by_id(dataset_id).await? {
+                allowed.push((*dataset_id).clone());
             } else {
                 let error = DatasetActionUnauthorizedError::not_enough_permissions(
                     dataset_id.as_local_ref(),
                     action,
                 );
 
-                not_allowed.push((dataset_id, error));
+                not_allowed.push(((*dataset_id).clone(), error));
             }
         }
 

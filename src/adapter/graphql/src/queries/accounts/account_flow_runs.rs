@@ -147,9 +147,10 @@ impl<'a> AccountFlowRuns<'a> {
             .list_all_datasets_with_flow_by_account(&self.account.id)
             .await
             .int_err()?;
+        let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
 
         let dataset_handles_resolution = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(dataset_ids)
+            .resolve_multiple_dataset_handles_by_ids(&dataset_id_refs)
             .await
             .int_err()?;
 

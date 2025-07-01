@@ -34,7 +34,7 @@ pub trait DatasetEntryService: Sync + Send {
 
     async fn get_multiple_entries(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        dataset_ids: &[&odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError>;
 }
 

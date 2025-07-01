@@ -60,15 +60,17 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
         let mut downstream_dependencies = Vec::with_capacity(downstream_dependency_ids.len());
 
         // Cut off datasets that we don't have access to
+        let downstream_dependency_id_refs = downstream_dependency_ids.iter().collect::<Vec<_>>();
         let authorized_ids = self
             .dataset_action_authorizer
-            .classify_dataset_ids_by_allowance(downstream_dependency_ids, DatasetAction::Read)
+            .classify_dataset_ids_by_allowance(&downstream_dependency_id_refs, DatasetAction::Read)
             .await?
             .authorized_ids;
 
+        let authorized_id_refs = authorized_ids.iter().collect::<Vec<_>>();
         let dataset_entries_resolution = self
             .dataset_entry_service
-            .get_multiple_entries(&authorized_ids)
+            .get_multiple_entries(&authorized_id_refs)
             .await
             .int_err()?;
 

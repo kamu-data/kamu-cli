@@ -292,7 +292,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 
     async fn get_multiple_entries(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        dataset_ids: &[&odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let mut cached_entries = Vec::with_capacity(dataset_ids.len());
         let mut missing_ids = Vec::with_capacity(dataset_ids.len());
@@ -305,7 +305,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
                 if let Some(entry) = readable_cache.datasets.entries_by_id.get(dataset_id) {
                     cached_entries.push(entry.clone());
                 } else {
-                    missing_ids.push(dataset_id.clone());
+                    missing_ids.push(*dataset_id);
                 }
             }
         }
@@ -477,11 +477,11 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]
-    async fn resolve_multiple_dataset_handles_by_ids(
+    async fn resolve_multiple_dataset_handles_by_ids<'a>(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[&'a odf::DatasetID],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
-        let entries_resolution = self.get_multiple_entries(&dataset_ids).await.int_err()?;
+        let entries_resolution = self.get_multiple_entries(dataset_ids).await.int_err()?;
 
         let resolved_handles = self.entries_as_handles(&entries_resolution.resolved_entries);
 

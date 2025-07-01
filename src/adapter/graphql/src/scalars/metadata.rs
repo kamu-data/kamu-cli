@@ -113,14 +113,14 @@ impl SetTransform {
         ctx: &Context<'_>,
         v: odf::metadata::SetTransform,
     ) -> Result<odf::metadata::SetTransform, InternalError> {
-        let input_ids_list: Vec<odf::DatasetID> = v
+        let input_id_refs = v
             .inputs
             .iter()
-            .map(|input| input.dataset_ref.id().unwrap().clone())
-            .collect();
+            .map(|input| input.dataset_ref.id().unwrap())
+            .collect::<Vec<_>>();
         let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
         let dataset_infos = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(input_ids_list)
+            .resolve_multiple_dataset_handles_by_ids(&input_id_refs)
             .await
             .int_err()?;
 

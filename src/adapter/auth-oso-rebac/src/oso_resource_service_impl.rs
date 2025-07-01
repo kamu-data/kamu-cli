@@ -85,7 +85,7 @@ impl OsoResourceServiceImpl {
 
     pub async fn get_multiple_dataset_resources(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        dataset_ids: &[&odf::DatasetID],
     ) -> Result<DatasetResourcesResolution, GetMultipleDatasetResourcesError> {
         let DatasetEntriesResolution {
             resolved_entries,

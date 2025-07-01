@@ -28,9 +28,9 @@ pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
         owner_id: &odf::AccountID,
     ) -> odf::dataset::DatasetHandleStream<'_>;
 
-    async fn resolve_multiple_dataset_handles_by_ids(
+    async fn resolve_multiple_dataset_handles_by_ids<'a>(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[&'a odf::DatasetID],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError>;
 
     async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;

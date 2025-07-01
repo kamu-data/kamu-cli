@@ -158,9 +158,9 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         }
     }
 
-    async fn get_multiple_dataset_entries(
-        &self,
-        dataset_ids: &[odf::DatasetID],
+    async fn get_multiple_dataset_entries<'a>(
+        &'a self,
+        dataset_ids: &[&'a odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let mut tr = self.transaction.lock().await;
 
@@ -200,7 +200,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         let unresolved_entries = dataset_ids
             .iter()
             .filter(|id| !resolved_dataset_ids.contains(id))
-            .cloned()
+            .map(|id| (*id).clone())
             .collect();
 
         Ok(DatasetEntriesResolution {

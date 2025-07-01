@@ -91,12 +91,12 @@ impl VerifyCommand {
                 .get_recursive_upstream_dependencies(input_dataset_ids)
                 .await
                 .int_err()?
-                .collect()
+                .collect::<Vec<_>>()
                 .await;
-
+            let all_dataset_id_refs = all_dataset_ids.iter().collect::<Vec<_>>();
             let resolution_results = self
                 .dataset_registry
-                .resolve_multiple_dataset_handles_by_ids(all_dataset_ids)
+                .resolve_multiple_dataset_handles_by_ids(&all_dataset_id_refs)
                 .await
                 .int_err()?;
 

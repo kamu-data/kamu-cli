@@ -102,7 +102,7 @@ impl DatasetEntryService for FakeDatasetEntryService {
 
     async fn get_multiple_entries(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        dataset_ids: &[&odf::DatasetID],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let guard = self.state.lock().unwrap();
 
@@ -112,7 +112,7 @@ impl DatasetEntryService for FakeDatasetEntryService {
                 if let Some(dataset_entry) = guard.all_entries_by_id.get(dataset_id) {
                     acc.resolved_entries.push(dataset_entry.clone());
                 } else {
-                    acc.unresolved_entries.push(dataset_id.clone());
+                    acc.unresolved_entries.push((*dataset_id).clone());
                 }
 
                 acc

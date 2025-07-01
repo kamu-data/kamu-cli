@@ -207,9 +207,9 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
         })
     }
 
-    async fn resolve_multiple_dataset_handles_by_ids(
+    async fn resolve_multiple_dataset_handles_by_ids<'a>(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[&'a odf::DatasetID],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
         use odf::dataset::DatasetHandleResolver;
 
@@ -220,7 +220,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
             let resolve_res = self.resolve_dataset_handle_by_ref(&dataset_ref).await;
             match resolve_res {
                 Ok(hdl) => res.resolved_handles.push(hdl),
-                Err(e) => res.unresolved_datasets.push((dataset_id, e)),
+                Err(e) => res.unresolved_datasets.push(((*dataset_id).clone(), e)),
             }
         }
 

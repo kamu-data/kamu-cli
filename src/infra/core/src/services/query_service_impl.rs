@@ -110,12 +110,10 @@ impl QueryServiceImpl {
         // Otherwise, we infer the datasets from the query itself.
         if let Some(input_dataset_opts) = options.input_datasets {
             // Vectorized access check
+            let dataset_id_refs = input_dataset_opts.keys().collect::<Vec<_>>();
             let by_access = self
                 .dataset_action_authorizer
-                .classify_dataset_ids_by_allowance(
-                    input_dataset_opts.keys().cloned().collect(),
-                    DatasetAction::Read,
-                )
+                .classify_dataset_ids_by_allowance(&dataset_id_refs, DatasetAction::Read)
                 .await?;
 
             for (id, _) in by_access.unauthorized_ids_with_errors {

@@ -58,22 +58,23 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
         }
 
         let mut upstream_dependencies = Vec::with_capacity(upstream_dependency_ids.len());
-
+        let upstream_dependency_id_refs = upstream_dependency_ids.iter().collect::<Vec<_>>();
         let ClassifyByAllowanceIdsResponse {
             authorized_ids,
             unauthorized_ids_with_errors,
         } = self
             .dataset_action_authorizer
-            .classify_dataset_ids_by_allowance(upstream_dependency_ids, DatasetAction::Read)
+            .classify_dataset_ids_by_allowance(&upstream_dependency_id_refs, DatasetAction::Read)
             .await?;
 
         upstream_dependencies.extend(unauthorized_ids_with_errors.into_iter().map(
             |(unauthorized_dataset_id, _)| DatasetDependency::Unresolved(unauthorized_dataset_id),
         ));
 
+        let authorized_id_refs = authorized_ids.iter().collect::<Vec<_>>();
         let dataset_entries_resolution = self
             .dataset_entry_service
-            .get_multiple_entries(&authorized_ids)
+            .get_multiple_entries(&authorized_id_refs)
             .await
             .int_err()?;
 

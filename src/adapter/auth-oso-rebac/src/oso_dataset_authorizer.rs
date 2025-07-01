@@ -106,13 +106,13 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         let user_actor = self.user_actor().await?;
         let mut matched_dataset_handles = Vec::with_capacity(dataset_handles.len());
 
-        let dataset_ids = dataset_handles
+        let dataset_id_refs = dataset_handles
             .iter()
-            .map(|hdl| hdl.id.clone())
+            .map(|hdl| &hdl.id)
             .collect::<Vec<_>>();
         let dataset_resources_resolution = self
             .oso_resource_service
-            .get_multiple_dataset_resources(&dataset_ids)
+            .get_multiple_dataset_resources(&dataset_id_refs)
             .await
             .int_err()?;
         let dataset_handle_id_mapping =
@@ -157,7 +157,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
         let dataset_ids = dataset_handles
             .iter()
-            .map(|hdl| hdl.id.clone())
+            .map(|hdl| &hdl.id)
             .collect::<Vec<_>>();
         let dataset_resources_resolution = self
             .oso_resource_service
@@ -203,9 +203,9 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, %action))]
-    async fn classify_dataset_ids_by_allowance(
-        &self,
-        dataset_ids: Vec<odf::DatasetID>,
+    async fn classify_dataset_ids_by_allowance<'a>(
+        &'a self,
+        dataset_ids: &[&'a odf::DatasetID],
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         let user_actor = self.user_actor().await?;
@@ -214,7 +214,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
         let dataset_resources_resolution = self
             .oso_resource_service
-            .get_multiple_dataset_resources(&dataset_ids)
+            .get_multiple_dataset_resources(dataset_ids)
             .await
             .int_err()?;
 

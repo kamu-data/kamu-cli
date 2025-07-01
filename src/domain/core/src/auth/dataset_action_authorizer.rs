@@ -40,9 +40,9 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
-    async fn classify_dataset_ids_by_allowance(
-        &self,
-        dataset_ids: Vec<odf::DatasetID>,
+    async fn classify_dataset_ids_by_allowance<'a>(
+        &'a self,
+        dataset_ids: &[&'a odf::DatasetID],
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
 }
@@ -448,13 +448,13 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
         })
     }
 
-    async fn classify_dataset_ids_by_allowance(
-        &self,
-        dataset_ids: Vec<odf::DatasetID>,
+    async fn classify_dataset_ids_by_allowance<'a>(
+        &'a self,
+        dataset_ids: &[&'a odf::DatasetID],
         _action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         Ok(ClassifyByAllowanceIdsResponse {
-            authorized_ids: dataset_ids,
+            authorized_ids: dataset_ids.iter().map(|d| (*d).clone()).collect(),
             unauthorized_ids_with_errors: vec![],
         })
     }
