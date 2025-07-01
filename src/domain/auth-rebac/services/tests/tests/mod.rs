@@ -8,4 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_rebac_dataset_lifecycle_message_consumer;
-mod test_rebac_service_impl;
+mod use_cases;

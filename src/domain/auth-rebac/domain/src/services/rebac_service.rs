@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 
 use internal_error::InternalError;
-use kamu_core::auth::{DatasetAction, DatasetsActionNotEnoughPermissionsError};
 use thiserror::Error;
 
 use crate::{
@@ -95,12 +94,6 @@ pub trait RebacService: Send + Sync {
         account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
     ) -> Result<(), UnsetRelationError>;
-
-    async fn apply_roles_matrix(
-        &self,
-        account_ids: &[&odf::AccountID],
-        datasets_with_maybe_roles: &[(odf::DatasetID, Option<AccountToDatasetRelation>)],
-    ) -> Result<(), ApplyRelationMatrixError>;
 
     async fn get_account_dataset_relations(
         &self,
@@ -254,36 +247,6 @@ pub enum SetRelationError {
 pub enum UnsetRelationError {
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum ApplyRelationMatrixError {
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        odf::AccessError,
-    ),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl ApplyRelationMatrixError {
-    pub fn not_enough_permissions(
-        dataset_refs: Vec<odf::DatasetRef>,
-        action: DatasetAction,
-    ) -> Self {
-        Self::Access(odf::AccessError::Unauthorized(
-            DatasetsActionNotEnoughPermissionsError {
-                action,
-                dataset_refs,
-            }
-            .into(),
-        ))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

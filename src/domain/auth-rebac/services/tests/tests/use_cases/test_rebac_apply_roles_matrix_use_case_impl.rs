@@ -12,11 +12,17 @@ use std::sync::Arc;
 
 use dill::CatalogBuilder;
 use kamu::testing::MockDatasetActionAuthorizer;
-use kamu_auth_rebac::{AccountToDatasetRelation as Role, ApplyRelationMatrixError, RebacService};
+use kamu_auth_rebac::{
+    AccountToDatasetRelation as Role,
+    ApplyRelationMatrixError,
+    RebacApplyRolesMatrixUseCase,
+    RebacService,
+};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,
     DefaultDatasetProperties,
+    RebacApplyRolesMatrixUseCaseImpl,
     RebacServiceImpl,
 };
 use kamu_core::auth::DatasetActionAuthorizer;
@@ -30,7 +36,7 @@ const MAINTAINER: Option<Role> = Some(Role::Maintainer);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type Harness = RebacServiceImplHarness;
+type Harness = RebacApplyRolesMatrixUseCaseImplHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,8 +60,8 @@ async fn test_apply_roles_matrix_success() {
     // Round 1: Setting Maintainer role for Account1
     assert_matches!(
         harness
-            .service
-            .apply_roles_matrix(
+            .use_case
+            .execute(
                 &[&account_id_1],
                 &[
                     (dataset_id_1.clone(), MAINTAINER),
@@ -88,8 +94,8 @@ async fn test_apply_roles_matrix_success() {
     // Round 2: Setting READER role for Account2, Account3
     assert_matches!(
         harness
-            .service
-            .apply_roles_matrix(
+            .use_case
+            .execute(
                 &[&account_id_2, &account_id_3],
                 &[
                     (dataset_id_1.clone(), READER),
@@ -128,8 +134,8 @@ async fn test_apply_roles_matrix_success() {
     // Round 3: Setting READER role for Account2, Account3 again (idempotence)
     assert_matches!(
         harness
-            .service
-            .apply_roles_matrix(
+            .use_case
+            .execute(
                 &[&account_id_2, &account_id_3],
                 &[
                     (dataset_id_1.clone(), READER),
@@ -168,8 +174,8 @@ async fn test_apply_roles_matrix_success() {
     // Round 4: Removing all granted roles for Dataset1
     assert_matches!(
         harness
-            .service
-            .apply_roles_matrix(
+            .use_case
+            .execute(
                 &[&account_id_1, &account_id_2, &account_id_3],
                 &[(dataset_id_1.clone(), NO_ROLE)],
             )
@@ -201,8 +207,8 @@ async fn test_apply_roles_matrix_success() {
     // Round 5: Removing all granted roles for Dataset2, Dataset3
     assert_matches!(
         harness
-            .service
-            .apply_roles_matrix(
+            .use_case
+            .execute(
                 &[&account_id_1, &account_id_2, &account_id_3],
                 &[
                     (dataset_id_2.clone(), NO_ROLE),
@@ -231,8 +237,8 @@ async fn test_apply_roles_matrix_success() {
     // Round 6: Removing all granted roles (idempotence)
     assert_matches!(
         harness
-            .service
-            .apply_roles_matrix(
+            .use_case
+            .execute(
                 &[&account_id_1, &account_id_2, &account_id_3],
                 &[
                     (dataset_id_1.clone(), NO_ROLE),
@@ -281,8 +287,8 @@ async fn test_apply_roles_matrix_not_authorized() {
 
     assert_matches!(
         harness
-            .service
-            .apply_roles_matrix(
+            .use_case
+            .execute(
                 &[&account_id_1, &account_id_2, &account_id_3],
                 &[
                     (dataset_id_1.clone(), MAINTAINER),
@@ -302,17 +308,19 @@ async fn test_apply_roles_matrix_not_authorized() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct RebacServiceImplHarness {
+struct RebacApplyRolesMatrixUseCaseImplHarness {
+    use_case: Arc<dyn RebacApplyRolesMatrixUseCase>,
     service: Arc<dyn RebacService>,
     account_name_pseudonyms: HashMap<odf::AccountID, String>,
     dataset_name_pseudonyms: HashMap<odf::DatasetID, String>,
 }
 
-impl RebacServiceImplHarness {
+impl RebacApplyRolesMatrixUseCaseImplHarness {
     pub fn new(mock_dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
+            b.add::<RebacApplyRolesMatrixUseCaseImpl>();
             b.add::<RebacServiceImpl>();
             b.add_value(DefaultAccountProperties::default());
             b.add_value(DefaultDatasetProperties::default());
@@ -324,6 +332,7 @@ impl RebacServiceImplHarness {
         };
 
         Self {
+            use_case: catalog.get_one().unwrap(),
             service: catalog.get_one().unwrap(),
             account_name_pseudonyms: Default::default(),
             dataset_name_pseudonyms: Default::default(),

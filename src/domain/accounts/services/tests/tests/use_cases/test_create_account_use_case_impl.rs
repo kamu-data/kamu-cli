@@ -59,11 +59,6 @@ async fn test_create_account() {
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_account_created_once(
         &mut mock_outbox,
-        AccountDisplayName::from(WASYA),
-        format!("{WASYA}@example.com").parse().unwrap(),
-    );
-    expect_outbox_account_created_once(
-        &mut mock_outbox,
         AccountDisplayName::from(new_account_name_with_email.as_str()),
         new_account_email.clone(),
     );

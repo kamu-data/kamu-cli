@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_auth_rebac::{AccountToDatasetRelation, RebacService};
+use kamu_auth_rebac::{AccountToDatasetRelation, RebacApplyRolesMatrixUseCase};
 
 use crate::prelude::*;
 
@@ -28,7 +28,7 @@ impl CollaborationMut {
         account_ids: Vec<AccountID<'_>>,
         datasets_with_maybe_roles: Vec<DatasetWithMaybeRole>,
     ) -> Result<ApplyRolesMatrixResult> {
-        let rebac_service = from_catalog_n!(ctx, dyn RebacService);
+        let use_case = from_catalog_n!(ctx, dyn RebacApplyRolesMatrixUseCase);
 
         let account_ids = account_ids
             .iter()
@@ -39,8 +39,8 @@ impl CollaborationMut {
             .map(|tuple| (tuple.dataset_id.into(), tuple.maybe_role.map(Into::into)))
             .collect::<Vec<(odf::DatasetID, Option<AccountToDatasetRelation>)>>();
 
-        rebac_service
-            .apply_roles_matrix(&account_ids[..], &datasets_with_maybe_roles[..])
+        use_case
+            .execute(&account_ids[..], &datasets_with_maybe_roles[..])
             .await
             .int_err()?;
 
