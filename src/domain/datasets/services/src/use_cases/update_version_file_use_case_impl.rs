@@ -29,9 +29,9 @@ use kamu_datasets::{
     UpdateVersionFileUseCase,
     UpdateVersionFileUseCaseError,
     UploadTooLargeError,
+    VERSION_COLUMN_NAME,
     VersionedFileEntity,
 };
-use serde_json::Value;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,7 +61,7 @@ impl UpdateVersionFileUseCaseImpl {
         };
 
         let last_version = df
-            .select_columns(&["version"])
+            .select_columns(&[VERSION_COLUMN_NAME])
             .int_err()?
             .collect_scalar::<datafusion::arrow::datatypes::Int32Type>()
             .await
@@ -72,10 +72,10 @@ impl UpdateVersionFileUseCaseImpl {
         Ok((last_version, query_res.block_hash))
     }
 
-    async fn get_content_args_from_latest_entry(
+    async fn get_versioned_file_entity_from_latest_entry(
         &self,
         dataset_ref: &odf::DatasetRef,
-    ) -> Result<Option<ContentArgs>, InternalError> {
+    ) -> Result<Option<VersionedFileEntity>, InternalError> {
         // TODO: Consider retractions / corrections
         let query_res = self
             .query_svc
@@ -90,32 +90,10 @@ impl UpdateVersionFileUseCaseImpl {
         let records = df.collect_json_aos().await.int_err()?;
 
         assert_eq!(records.len(), 1);
-        let Value::Object(mut record) = records.into_iter().next().unwrap() else {
-            unreachable!()
-        };
 
-        // TODO: Restrict after migration
-        let content_length = usize::try_from(
-            record
-                .remove("content_length")
-                .unwrap_or_default()
-                .as_u64()
-                .unwrap_or_default(),
-        )
-        .unwrap();
-        let content_type =
-            MediaType::from(record.remove("content_type").unwrap().as_str().unwrap());
-        let content_hash = odf::Multihash::from_multibase(
-            record.remove("content_hash").unwrap().as_str().unwrap(),
-        )
-        .unwrap();
-
-        Ok(Some(ContentArgs {
-            content_length,
-            content_stream: None,
-            content_hash,
-            content_type: Some(content_type),
-        }))
+        Ok(Some(VersionedFileEntity::from_last_record(
+            records.into_iter().next().unwrap(),
+        )))
     }
 }
 
@@ -138,51 +116,60 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
             .await
             .clone();
 
-        let content_args = if let Some(args) = content_args_maybe {
-            args
+        let entity = if let Some(args) = content_args_maybe {
+            let (latest_version, _) = self
+                .get_latest_version(&resolved_dataset.get_handle().as_local_ref())
+                .await?;
+            let new_version = latest_version + 1;
+
+            let result = VersionedFileEntity::new(
+                new_version,
+                args.content_hash.clone(),
+                args.content_length,
+                args.content_type,
+                extra_data,
+            );
+
+            // Upload data object in case when content is present
+            if let Some(content_stream) = args.content_stream {
+                let data_repo = resolved_dataset.as_data_repo();
+                data_repo
+                    .insert_stream(
+                        content_stream,
+                        odf::storage::InsertOpts {
+                            precomputed_hash: Some(&result.content_hash),
+                            size_hint: Some(result.content_length as u64),
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .int_err()?;
+            };
+
+            result
         } else {
-            self.get_content_args_from_latest_entry(&dataset_handle.as_local_ref())
+            let mut last_entity = self
+                .get_versioned_file_entity_from_latest_entry(&dataset_handle.as_local_ref())
                 .await?
-                .unwrap()
+                .unwrap();
+
+            // Increment version to match next record value
+            last_entity.version = last_entity.version + 1;
+
+            last_entity
         };
 
-        if content_args.content_length > self.upload_config.max_file_size_in_bytes() {
+        if entity.content_length > self.upload_config.max_file_size_in_bytes() {
             return Err(UpdateVersionFileUseCaseError::TooLarge(
                 UploadTooLargeError::new(
-                    content_args.content_length,
+                    entity.content_length,
                     self.upload_config.max_file_size_in_bytes(),
                 ),
             ));
         }
 
-        // Upload data object
-        if let Some(content_stream) = content_args.content_stream {
-            let data_repo = resolved_dataset.as_data_repo();
-            data_repo
-                .insert_stream(
-                    content_stream,
-                    odf::storage::InsertOpts {
-                        precomputed_hash: Some(&content_args.content_hash),
-                        size_hint: Some(content_args.content_length as u64),
-                        ..Default::default()
-                    },
-                )
-                .await
-                .int_err()?;
-        }
-
-        let (latest_version, _) = self
-            .get_latest_version(&resolved_dataset.get_handle().as_local_ref())
-            .await?;
-        let new_version = latest_version + 1;
-
-        let entity = VersionedFileEntity::new(
-            new_version,
-            content_args.content_hash.clone(),
-            content_args.content_length,
-            content_args.content_type,
-            extra_data,
-        );
+        let content_hash = entity.content_hash.clone();
+        let version = entity.version;
 
         let ingest_result = self
             .push_ingest_data_use_case
@@ -214,10 +201,10 @@ impl UpdateVersionFileUseCase for UpdateVersionFileUseCaseImpl {
                 new_head,
                 num_blocks: _,
             } => Ok(UpdateVersionFileResult {
-                new_version,
+                new_version: version,
                 old_head,
                 new_head,
-                content_hash: content_args.content_hash,
+                content_hash,
             }),
             kamu_core::PushIngestResult::UpToDate => unreachable!(),
         }

@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::ResolvedDataset;
+use kamu_datasets::VersionedFileEntity;
 
 use crate::prelude::*;
 
@@ -75,38 +76,16 @@ impl VersionedFileEntry {
         .unwrap()
         .into();
 
-        // Parse core columns
-        let version =
-            FileVersion::try_from(record.remove("version").unwrap().as_i64().unwrap()).unwrap();
-        // TODO: Restrict after migration
-        let content_length = usize::try_from(
-            record
-                .remove("content_length")
-                .unwrap_or_default()
-                .as_u64()
-                .unwrap_or_default(),
-        )
-        .unwrap();
-        let content_type = record
-            .remove("content_type")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .into();
-        let content_hash = odf::Multihash::from_multibase(
-            record.remove("content_hash").unwrap().as_str().unwrap(),
-        )
-        .unwrap()
-        .into();
+        let versioned_file_entity = VersionedFileEntity::from_last_record(record.clone().into());
 
         Self {
             dataset,
             system_time,
             event_time,
-            version,
-            content_length,
-            content_type,
-            content_hash,
+            version: versioned_file_entity.version,
+            content_length: versioned_file_entity.content_length,
+            content_type: versioned_file_entity.content_type,
+            content_hash: versioned_file_entity.content_hash.into(),
             extra_data: ExtraData::new(record.into()),
         }
     }

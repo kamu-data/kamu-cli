@@ -72,9 +72,9 @@ impl<'a> VersionedFileMut<'a> {
                     digest.update(&buf[..read]);
                 }
 
-                let digest = digest.finalize();
                 let content_hash =
-                    odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest).unwrap();
+                    odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &digest.finalize())
+                        .unwrap();
 
                 // Get the stream again and copy data from uploads to storage using computed
                 // hash

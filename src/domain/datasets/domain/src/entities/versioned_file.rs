@@ -14,8 +14,25 @@ pub type FileVersion = u32;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype::nutype(derive(AsRef, Clone, Debug, Into))]
+pub const VERSION_COLUMN_NAME: &str = "version";
+pub const CONTENT_TYPE_COLUMN_NAME: &str = "content_type";
+pub const CONTENT_LENGTH_COLUMN_NAME: &str = "content_length";
+pub const CONTENT_HASH_COLUMN_NAME: &str = "content_hash";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
 pub struct ExtraDataFields(serde_json::Value);
+
+impl ExtraDataFields {
+    pub fn new(value: serde_json::Value) -> Self {
+        Self(value)
+    }
+
+    pub fn into_inner(self) -> serde_json::Value {
+        self.0
+    }
+}
 
 impl Default for ExtraDataFields {
     fn default() -> Self {
@@ -68,16 +85,65 @@ impl VersionedFileEntity {
     }
 
     pub fn to_record_data(self) -> serde_json::Value {
-        let mut record: serde_json::Value = self.extra_data.into();
-        record["version"] = self.version.into();
-        record["content_hash"] = self.content_hash.to_string().into();
-        record["content_length"] = self.content_length.into();
-        record["content_type"] = self.content_type.clone().into();
+        let mut record = self.extra_data.into_inner();
+        record[VERSION_COLUMN_NAME] = self.version.into();
+        record[CONTENT_HASH_COLUMN_NAME] = self.content_hash.to_string().into();
+        record[CONTENT_LENGTH_COLUMN_NAME] = self.content_length.into();
+        record[CONTENT_TYPE_COLUMN_NAME] = self.content_type.clone().into();
         record
     }
 
     pub fn to_bytes(self) -> bytes::Bytes {
         let buf = self.to_record_data().to_string().into_bytes();
         bytes::Bytes::from_owner(buf)
+    }
+
+    pub fn from_last_record(record: serde_json::Value) -> Self {
+        let serde_json::Value::Object(mut record) = record else {
+            unreachable!()
+        };
+
+        // Parse core columns
+        let version = FileVersion::try_from(
+            record
+                .remove(VERSION_COLUMN_NAME)
+                .unwrap()
+                .as_i64()
+                .unwrap(),
+        )
+        .unwrap();
+
+        // TODO: Restrict after migration
+        let content_length = usize::try_from(
+            record
+                .remove(CONTENT_LENGTH_COLUMN_NAME)
+                .unwrap_or_default()
+                .as_u64()
+                .unwrap_or_default(),
+        )
+        .unwrap();
+        let content_type = record
+            .remove(CONTENT_TYPE_COLUMN_NAME)
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .into();
+        let content_hash = odf::Multihash::from_multibase(
+            record
+                .remove(CONTENT_HASH_COLUMN_NAME)
+                .unwrap()
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap()
+        .into();
+
+        Self {
+            version,
+            content_length,
+            content_type,
+            content_hash,
+            extra_data: ExtraDataFields::new(record.into()),
+        }
     }
 }
