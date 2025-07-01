@@ -121,6 +121,10 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             .get_accounts_by_ids(&account_ids)
             .await?;
 
+        if existing_accounts.len() == wallet_addresses.len() {
+            return Ok(existing_accounts);
+        }
+
         for existing_account in &existing_accounts {
             // SAFETY: input IDs are originally did:pkh
             let did_pkh = existing_account.id.as_did_pkh().unwrap();
