@@ -44,7 +44,7 @@ impl CollaborationMut {
             .await
             .int_err()?;
 
-        Ok(ApplyRolesMatrixResultSuccess::default().into())
+        Ok(ApplyRolesMatrixResult::default())
     }
 }
 
@@ -60,20 +60,12 @@ pub struct DatasetWithMaybeRole {
 // ApplyRolesMatrixResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-pub enum ApplyRolesMatrixResult {
-    Success(ApplyRolesMatrixResultSuccess),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject)]
-pub struct ApplyRolesMatrixResultSuccess {
+pub struct ApplyRolesMatrixResult {
     pub message: String,
 }
 
-impl Default for ApplyRolesMatrixResultSuccess {
+impl Default for ApplyRolesMatrixResult {
     fn default() -> Self {
         Self {
             message: "Roles applied".to_string(),
