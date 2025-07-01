@@ -509,6 +509,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                     let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
                         .await
                         .int_err()?;
+
                     if flow.status() != FlowStatus::Finished {
                         flow.on_task_finished(
                             message.event_time,
@@ -574,17 +575,20 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 .await?;
                         }
 
-                        // In case of failure:
-                        //  - disable trigger
-                        if message.outcome.is_failed() {
-                            let flow_trigger_service =
-                                target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
-                            flow_trigger_service
-                                .pause_flow_trigger(finish_time, &flow.flow_binding)
-                                .await?;
-                        }
-
+                        // The outcome might not be final in case of retrying flows.
+                        // If the flow is still retrying, await for the result of the next task
                         if let Some(flow_outcome) = flow.outcome.as_ref() {
+                            // In case of failure after retries:
+                            //  - disable trigger
+                            if message.outcome.is_failed() {
+                                let flow_trigger_service =
+                                    target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
+                                flow_trigger_service
+                                    .pause_flow_trigger(finish_time, &flow.flow_binding)
+                                    .await?;
+                            }
+
+                            // Notify about finished flow
                             let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
                             outbox
                                 .post_message(

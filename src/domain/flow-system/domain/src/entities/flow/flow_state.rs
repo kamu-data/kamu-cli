@@ -46,7 +46,7 @@ pub struct FlowTimingRecords {
     /// Started running at time
     pub running_since: Option<DateTime<Utc>>,
     /// Finish time (success or cancel/abort)
-    pub finished_at: Option<DateTime<Utc>>,
+    pub last_attempt_finished_at: Option<DateTime<Utc>>,
 }
 
 impl FlowState {
@@ -60,7 +60,7 @@ impl FlowState {
     pub fn status(&self) -> FlowStatus {
         if self.outcome.is_some() {
             FlowStatus::Finished
-        } else if self.timing.finished_at.is_some() {
+        } else if self.timing.last_attempt_finished_at.is_some() {
             FlowStatus::Retrying
         } else if self.timing.running_since.is_some() {
             FlowStatus::Running
@@ -76,7 +76,7 @@ impl FlowState {
     }
 
     pub fn can_schedule(&self) -> bool {
-        matches!(self.status(), FlowStatus::Waiting)
+        matches!(self.status(), FlowStatus::Waiting | FlowStatus::Retrying)
     }
 }
 
@@ -105,7 +105,7 @@ impl Projection for FlowState {
                         scheduled_for_activation_at: None,
                         awaiting_executor_since: None,
                         running_since: None,
-                        finished_at: None,
+                        last_attempt_finished_at: None,
                     },
                     task_ids: vec![],
                     config_snapshot,
@@ -165,7 +165,7 @@ impl Projection for FlowState {
                                     scheduled_for_activation_at: Some(scheduled_for_activation_at),
                                     awaiting_executor_since: None,
                                     running_since: None,
-                                    finished_at: None,
+                                    last_attempt_finished_at: None,
                                 },
                                 ..s
                             })
@@ -207,7 +207,7 @@ impl Projection for FlowState {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
                                     running_since: Some(event_time),
-                                    finished_at: None, // Reset for case of retry
+                                    last_attempt_finished_at: None, // Reset for case of retry
                                     ..s.timing
                                 },
                                 start_condition: None,
@@ -233,7 +233,7 @@ impl Projection for FlowState {
                             Ok(s)
                         } else {
                             let timing = FlowTimingRecords {
-                                finished_at: Some(event_time),
+                                last_attempt_finished_at: Some(event_time),
                                 ..s.timing
                             };
                             match task_outcome {
@@ -257,7 +257,8 @@ impl Projection for FlowState {
                                                 // No longer running
                                                 running_since: None,
                                                 // Keep finished time to distinguish Retrying status
-                                                finished_at: timing.finished_at,
+                                                last_attempt_finished_at: timing
+                                                    .last_attempt_finished_at,
                                                 // The scheduling time is defined via retry policy
                                                 scheduled_for_activation_at: Some(next_attempt_at),
                                             },
@@ -287,7 +288,7 @@ impl Projection for FlowState {
                             Ok(FlowState {
                                 outcome: Some(FlowOutcome::Aborted),
                                 timing: FlowTimingRecords {
-                                    finished_at: Some(event_time),
+                                    last_attempt_finished_at: Some(event_time),
                                     ..s.timing
                                 },
                                 start_condition: None,

@@ -2291,7 +2291,7 @@ type FlowTimingRecords {
 	Recorded time of finish (successful or failed after retry) or abortion
 	(Finished state seen at least once)
 	"""
-	finishedAt: DateTime
+	lastAttemptFinishedAt: DateTime
 }
 
 type FlowTrigger {

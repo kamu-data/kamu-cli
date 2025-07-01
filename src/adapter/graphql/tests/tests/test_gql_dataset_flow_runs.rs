@@ -124,7 +124,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [],
                                         "initiator": {
@@ -189,7 +189,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [
                                             {
@@ -264,7 +264,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [
                                             {
@@ -355,7 +355,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": complete_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
@@ -513,7 +513,7 @@ async fn test_trigger_reset_root_dataset_flow() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": complete_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
@@ -735,7 +735,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [],
                                         "initiator": {
@@ -829,7 +829,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": complete_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
@@ -951,7 +951,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [],
                                         "initiator": {
@@ -1016,7 +1016,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [
                                             {
@@ -1091,7 +1091,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [
                                             {
@@ -1186,7 +1186,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": complete_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
@@ -2708,7 +2708,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": complete_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
@@ -2849,7 +2849,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         "timing": {
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
-                                            "finishedAt": complete_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
@@ -3009,7 +3009,7 @@ async fn test_config_snapshot_returned_correctly() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [],
                                         "initiator": {
@@ -3409,7 +3409,7 @@ impl FlowRunsHarness {
                                         timing {
                                             awaitingExecutorSince
                                             runningSince
-                                            finishedAt
+                                            lastAttemptFinishedAt
                                         }
                                         tasks {
                                             taskId
