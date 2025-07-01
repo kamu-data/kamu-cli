@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use dill::*;
@@ -42,7 +43,7 @@ pub trait DatasetActionAuthorizer: Sync + Send {
 
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
-        dataset_ids: &[&'a odf::DatasetID],
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
 }
@@ -450,11 +451,11 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
 
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
-        dataset_ids: &[&'a odf::DatasetID],
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
         _action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         Ok(ClassifyByAllowanceIdsResponse {
-            authorized_ids: dataset_ids.iter().map(|d| (*d).clone()).collect(),
+            authorized_ids: dataset_ids.iter().map(|d| d.as_ref().clone()).collect(),
             unauthorized_ids_with_errors: vec![],
         })
     }

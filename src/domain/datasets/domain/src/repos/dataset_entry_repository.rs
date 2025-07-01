@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use database_common::PaginationOpts;
@@ -45,7 +46,7 @@ pub trait DatasetEntryRepository: Send + Sync {
 
     async fn get_multiple_dataset_entries<'a>(
         &'a self,
-        dataset_ids: &[&'a odf::DatasetID],
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError>;
 
     async fn get_dataset_entry_by_owner_and_name(

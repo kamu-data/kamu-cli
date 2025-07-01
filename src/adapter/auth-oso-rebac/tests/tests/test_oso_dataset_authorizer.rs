@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -348,9 +349,9 @@ async fn test_multi_datasets_matrix() {
                 acc
             });
 
-    let all_dataset_id_refs = all_dataset_handles
+    let all_dataset_ids = all_dataset_handles
         .iter()
-        .map(|h| &h.id)
+        .map(|h| Cow::Borrowed(&h.id))
         .collect::<Vec<_>>();
 
     let subjects_with_expected_results = [
@@ -619,7 +620,7 @@ async fn test_multi_datasets_matrix() {
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_authorizer
-                    .classify_dataset_ids_by_allowance(&all_dataset_id_refs, DatasetAction::Read)
+                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetAction::Read)
                     .await
                     .unwrap(),
                 &dataset_handle_map
@@ -630,7 +631,7 @@ async fn test_multi_datasets_matrix() {
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_authorizer
-                    .classify_dataset_ids_by_allowance(&all_dataset_id_refs, DatasetAction::Write)
+                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetAction::Write)
                     .await
                     .unwrap(),
                 &dataset_handle_map

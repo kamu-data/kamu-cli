@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use database_common::PaginationOpts;
@@ -143,14 +144,16 @@ impl<'a> AccountFlowRuns<'a> {
         let (flow_query_service, dataset_registry) =
             from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetRegistry);
 
-        let dataset_ids: Vec<_> = flow_query_service
+        let dataset_ids = flow_query_service
             .list_all_datasets_with_flow_by_account(&self.account.id)
             .await
-            .int_err()?;
-        let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
+            .int_err()?
+            .into_iter()
+            .map(Cow::Owned)
+            .collect::<Vec<_>>();
 
         let dataset_handles_resolution = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&dataset_id_refs)
+            .resolve_multiple_dataset_handles_by_ids(&dataset_ids)
             .await
             .int_err()?;
 

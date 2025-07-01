@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -292,7 +293,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 
     async fn get_multiple_entries(
         &self,
-        dataset_ids: &[&odf::DatasetID],
+        dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let mut cached_entries = Vec::with_capacity(dataset_ids.len());
         let mut missing_ids = Vec::with_capacity(dataset_ids.len());
@@ -305,7 +306,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
                 if let Some(entry) = readable_cache.datasets.entries_by_id.get(dataset_id) {
                     cached_entries.push(entry.clone());
                 } else {
-                    missing_ids.push(*dataset_id);
+                    missing_ids.push(dataset_id.clone());
                 }
             }
         }
@@ -477,9 +478,9 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]
-    async fn resolve_multiple_dataset_handles_by_ids<'a>(
+    async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: &[&'a odf::DatasetID],
+        dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
         let entries_resolution = self.get_multiple_entries(dataset_ids).await.int_err()?;
 

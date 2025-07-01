@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
@@ -91,12 +92,12 @@ impl VerifyCommand {
                 .get_recursive_upstream_dependencies(input_dataset_ids)
                 .await
                 .int_err()?
-                .collect::<Vec<_>>()
+                .map(Cow::Owned)
+                .collect::<Vec<Cow<'static, _>>>()
                 .await;
-            let all_dataset_id_refs = all_dataset_ids.iter().collect::<Vec<_>>();
             let resolution_results = self
                 .dataset_registry
-                .resolve_multiple_dataset_handles_by_ids(&all_dataset_id_refs)
+                .resolve_multiple_dataset_handles_by_ids(&all_dataset_ids)
                 .await
                 .int_err()?;
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use dill::{component, interface};
@@ -59,18 +60,25 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
 
         let mut downstream_dependencies = Vec::with_capacity(downstream_dependency_ids.len());
 
+        // NOTE: Borrow-checker can't digest the upfront transformation during stream
+        //       data collection. So we need to make an additional vector.
+        let downstream_dependency_ids = downstream_dependency_ids
+            .into_iter()
+            .map(Cow::Owned)
+            .collect::<Vec<_>>();
         // Cut off datasets that we don't have access to
-        let downstream_dependency_id_refs = downstream_dependency_ids.iter().collect::<Vec<_>>();
         let authorized_ids = self
             .dataset_action_authorizer
-            .classify_dataset_ids_by_allowance(&downstream_dependency_id_refs, DatasetAction::Read)
+            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetAction::Read)
             .await?
-            .authorized_ids;
+            .authorized_ids
+            .into_iter()
+            .map(Cow::Owned)
+            .collect::<Vec<_>>();
 
-        let authorized_id_refs = authorized_ids.iter().collect::<Vec<_>>();
         let dataset_entries_resolution = self
             .dataset_entry_service
-            .get_multiple_entries(&authorized_id_refs)
+            .get_multiple_entries(&authorized_ids)
             .await
             .int_err()?;
 

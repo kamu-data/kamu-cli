@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -102,7 +103,7 @@ impl DatasetEntryService for FakeDatasetEntryService {
 
     async fn get_multiple_entries(
         &self,
-        dataset_ids: &[&odf::DatasetID],
+        dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let guard = self.state.lock().unwrap();
 
@@ -112,7 +113,7 @@ impl DatasetEntryService for FakeDatasetEntryService {
                 if let Some(dataset_entry) = guard.all_entries_by_id.get(dataset_id) {
                     acc.resolved_entries.push(dataset_entry.clone());
                 } else {
-                    acc.unresolved_entries.push((*dataset_id).clone());
+                    acc.unresolved_entries.push(dataset_id.as_ref().clone());
                 }
 
                 acc

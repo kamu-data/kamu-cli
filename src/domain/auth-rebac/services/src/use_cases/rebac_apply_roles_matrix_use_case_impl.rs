@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -31,7 +32,7 @@ pub struct RebacApplyRolesMatrixUseCaseImpl {
 impl RebacApplyRolesMatrixUseCaseImpl {
     async fn access_check(
         &self,
-        dataset_ids: &[&odf::DatasetID],
+        dataset_ids: &[Cow<'_, odf::DatasetID>],
     ) -> Result<(), ApplyRelationMatrixError> {
         const EXPECTED_ACCESS: DatasetAction = DatasetAction::Maintain;
 
@@ -72,11 +73,11 @@ impl RebacApplyRolesMatrixUseCase for RebacApplyRolesMatrixUseCaseImpl {
         datasets_with_maybe_roles: &[(odf::DatasetID, Option<AccountToDatasetRelation>)],
     ) -> Result<(), ApplyRelationMatrixError> {
         {
-            let datasets_id_refs = datasets_with_maybe_roles
+            let datasets_ids = datasets_with_maybe_roles
                 .iter()
-                .map(|(dataset_id, _)| dataset_id)
+                .map(|(id, _)| Cow::Borrowed(id))
                 .collect::<Vec<_>>();
-            self.access_check(&datasets_id_refs).await?;
+            self.access_check(&datasets_ids).await?;
         }
 
         for (dataset_id, maybe_role) in datasets_with_maybe_roles {

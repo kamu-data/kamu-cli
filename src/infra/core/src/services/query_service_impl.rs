@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
@@ -110,7 +111,10 @@ impl QueryServiceImpl {
         // Otherwise, we infer the datasets from the query itself.
         if let Some(input_dataset_opts) = options.input_datasets {
             // Vectorized access check
-            let dataset_id_refs = input_dataset_opts.keys().collect::<Vec<_>>();
+            let dataset_id_refs = input_dataset_opts
+                .keys()
+                .map(Cow::Borrowed)
+                .collect::<Vec<_>>();
             let by_access = self
                 .dataset_action_authorizer
                 .classify_dataset_ids_by_allowance(&dataset_id_refs, DatasetAction::Read)

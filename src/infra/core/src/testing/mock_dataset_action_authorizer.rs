@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use internal_error::InternalError;
@@ -52,7 +53,7 @@ mockall::mock! {
 
         async fn classify_dataset_ids_by_allowance<'a>(
             &'a self,
-            dataset_ids: &[&'a odf::DatasetID],
+            dataset_ids: &[Cow<'a, odf::DatasetID>],
             action: DatasetAction,
         ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
     }
@@ -78,7 +79,7 @@ impl MockDatasetActionAuthorizer {
                         .iter()
                         .map(|id| {
                             (
-                                (*id).clone(),
+                                id.as_ref().clone(),
                                 DatasetActionUnauthorizedError::not_enough_permissions(
                                     id.as_local_ref(),
                                     action,
@@ -119,7 +120,7 @@ impl MockDatasetActionAuthorizer {
             .expect_classify_dataset_ids_by_allowance()
             .returning(|ids, _| {
                 Ok(ClassifyByAllowanceIdsResponse {
-                    authorized_ids: ids.iter().map(|id| (*id).clone()).collect(),
+                    authorized_ids: ids.iter().map(|id| id.as_ref().clone()).collect(),
                     unauthorized_ids_with_errors: Vec::new(),
                 })
             });
@@ -286,14 +287,14 @@ impl MockDatasetActionAuthorizer {
                     },
                     |mut acc, dataset_id| {
                         if authorized.contains(dataset_id) {
-                            acc.authorized_ids.push((*dataset_id).clone());
+                            acc.authorized_ids.push(dataset_id.as_ref().clone());
                         } else {
                             let error = DatasetActionUnauthorizedError::not_enough_permissions(
                                 dataset_id.as_local_ref(),
                                 action,
                             );
                             acc.unauthorized_ids_with_errors
-                                .push(((*dataset_id).clone(), error));
+                                .push((dataset_id.as_ref().clone(), error));
                         }
                         acc
                     },

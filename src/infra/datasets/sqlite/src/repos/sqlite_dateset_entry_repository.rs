@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -169,7 +170,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
     async fn get_multiple_dataset_entries<'a>(
         &'a self,
-        dataset_ids: &[&'a odf::DatasetID],
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let mut tr = self.transaction.lock().await;
 
@@ -223,7 +224,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let unresolved_entries = dataset_ids
             .iter()
             .filter(|id| !resolved_dataset_ids.contains(id))
-            .map(|id| (*id).clone())
+            .map(|id| id.as_ref().clone())
             .collect();
 
         Ok(DatasetEntriesResolution {

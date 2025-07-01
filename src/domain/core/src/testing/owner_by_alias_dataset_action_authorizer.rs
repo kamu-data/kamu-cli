@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -119,7 +120,7 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
 
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
-        dataset_ids: &[&'a odf::DatasetID],
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         let mut allowed = Vec::new();
@@ -127,14 +128,14 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
 
         for dataset_id in dataset_ids {
             if self.owns_dataset_by_id(dataset_id).await? {
-                allowed.push((*dataset_id).clone());
+                allowed.push(dataset_id.as_ref().clone());
             } else {
                 let error = DatasetActionUnauthorizedError::not_enough_permissions(
                     dataset_id.as_local_ref(),
                     action,
                 );
 
-                not_allowed.push(((*dataset_id).clone(), error));
+                not_allowed.push((dataset_id.as_ref().clone(), error));
             }
         }
 
