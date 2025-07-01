@@ -59,13 +59,11 @@ pub(crate) enum FlowDescriptionDataset {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPollingIngest {
-    dataset_id: DatasetID<'static>,
     ingest_result: Option<FlowDescriptionUpdateResult>,
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPushIngest {
-    dataset_id: DatasetID<'static>,
     source_name: Option<String>,
     input_records_count: u64,
     ingest_result: Option<FlowDescriptionUpdateResult>,
@@ -74,19 +72,16 @@ pub(crate) struct FlowDescriptionDatasetPushIngest {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetExecuteTransform {
-    dataset_id: DatasetID<'static>,
     transform_result: Option<FlowDescriptionUpdateResult>,
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetHardCompaction {
-    dataset_id: DatasetID<'static>,
     compaction_result: Option<FlowDescriptionDatasetHardCompactionResult>,
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetReset {
-    dataset_id: DatasetID<'static>,
     reset_result: Option<FlowDescriptionResetResult>,
 }
 
@@ -415,7 +410,6 @@ impl FlowDescriptionBuilder {
 
                 if self.datasets_with_polling_sources.contains(dataset_id) {
                     FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
-                        dataset_id: dataset_id.clone().into(),
                         ingest_result,
                     })
                 } else {
@@ -425,7 +419,6 @@ impl FlowDescriptionBuilder {
                         .trigger_source_description()
                         .unwrap();
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
-                        dataset_id: dataset_id.clone().into(),
                         source_name,
                         input_records_count: 0, // TODO
                         ingest_result,
@@ -439,7 +432,6 @@ impl FlowDescriptionBuilder {
                     from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
 
                 FlowDescriptionDataset::ExecuteTransform(FlowDescriptionDatasetExecuteTransform {
-                    dataset_id: dataset_id.clone().into(),
                     transform_result: FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                         flow_state.outcome.as_ref(),
                         dataset_id,
@@ -452,7 +444,6 @@ impl FlowDescriptionBuilder {
 
             FLOW_TYPE_DATASET_COMPACT => {
                 FlowDescriptionDataset::HardCompaction(FlowDescriptionDatasetHardCompaction {
-                    dataset_id: dataset_id.clone().into(),
                     compaction_result:
                         FlowDescriptionDatasetHardCompactionResult::from_maybe_flow_outcome(
                             flow_state.outcome.as_ref(),
@@ -461,7 +452,6 @@ impl FlowDescriptionBuilder {
             }
 
             FLOW_TYPE_DATASET_RESET => FlowDescriptionDataset::Reset(FlowDescriptionDatasetReset {
-                dataset_id: dataset_id.clone().into(),
                 reset_result: FlowDescriptionResetResult::from_maybe_flow_outcome(
                     flow_state.outcome.as_ref(),
                 )?,

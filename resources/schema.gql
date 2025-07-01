@@ -1886,6 +1886,10 @@ type Flow {
 	"""
 	flowId: FlowID!
 	"""
+	Associated dataset ID, if any
+	"""
+	datasetId: DatasetID
+	"""
 	Description of key flow parameters
 	"""
 	description: FlowDescription!
@@ -2044,24 +2048,20 @@ type FlowConnection {
 union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetExecuteTransform {
-	datasetId: DatasetID!
 	transformResult: FlowDescriptionUpdateResult
 }
 
 type FlowDescriptionDatasetHardCompaction {
-	datasetId: DatasetID!
 	compactionResult: FlowDescriptionDatasetHardCompactionResult
 }
 
 union FlowDescriptionDatasetHardCompactionResult = FlowDescriptionHardCompactionNothingToDo | FlowDescriptionHardCompactionSuccess
 
 type FlowDescriptionDatasetPollingIngest {
-	datasetId: DatasetID!
 	ingestResult: FlowDescriptionUpdateResult
 }
 
 type FlowDescriptionDatasetPushIngest {
-	datasetId: DatasetID!
 	sourceName: String
 	inputRecordsCount: Int!
 	ingestResult: FlowDescriptionUpdateResult
@@ -2069,7 +2069,6 @@ type FlowDescriptionDatasetPushIngest {
 }
 
 type FlowDescriptionDatasetReset {
-	datasetId: DatasetID!
 	resetResult: FlowDescriptionResetResult
 }
 
@@ -2261,6 +2260,10 @@ type FlowSuccessResult {
 }
 
 type FlowTimingRecords {
+	"""
+	Initiation time
+	"""
+	initiatedAt: DateTime!
 	"""
 	Planned scheduling time
 	"""

@@ -75,9 +75,9 @@ async fn test_list_account_flows() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "WAITING",
@@ -252,9 +252,9 @@ async fn test_pause_resume_account_flows() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": foo_create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": foo_create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "WAITING",
@@ -452,9 +452,9 @@ async fn test_account_triggers_all_paused() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": foo_create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": foo_create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "WAITING",
@@ -650,10 +650,10 @@ impl FlowTriggerHarness {
                               listFlows {
                                   nodes {
                                       flowId
+                                      datasetId
                                       description {
                                           __typename
                                           ... on FlowDescriptionDatasetHardCompaction {
-                                              datasetId
                                               compactionResult {
                                                   ... on FlowDescriptionHardCompactionSuccess {
                                                       originalBlocksCount
@@ -666,7 +666,6 @@ impl FlowTriggerHarness {
                                               }
                                           }
                                           ... on FlowDescriptionDatasetExecuteTransform {
-                                              datasetId
                                               transformResult {
                                                 __typename
                                                 ... on FlowDescriptionUpdateResultUpToDate {
@@ -679,7 +678,6 @@ impl FlowTriggerHarness {
                                               }
                                           }
                                           ... on FlowDescriptionDatasetPollingIngest {
-                                            datasetId
                                             ingestResult {
                                                 __typename
                                                 ... on FlowDescriptionUpdateResultUpToDate {
@@ -692,7 +690,6 @@ impl FlowTriggerHarness {
                                             }
                                           }
                                           ... on FlowDescriptionDatasetPushIngest {
-                                              datasetId
                                               sourceName
                                               inputRecordsCount
                                               ingestResult {

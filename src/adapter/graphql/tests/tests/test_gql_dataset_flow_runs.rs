@@ -114,9 +114,9 @@ async fn test_trigger_ingest_root_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "WAITING",
@@ -179,9 +179,9 @@ async fn test_trigger_ingest_root_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "WAITING",
@@ -254,9 +254,9 @@ async fn test_trigger_ingest_root_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "RUNNING",
@@ -339,9 +339,9 @@ async fn test_trigger_ingest_root_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": {
                                                 "__typename": "FlowDescriptionUpdateResultSuccess",
                                                 "numBlocks": 1,
@@ -499,9 +499,9 @@ async fn test_trigger_reset_root_dataset_flow() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_root_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetReset",
-                                            "datasetId": create_root_result.dataset_handle.id.to_string(),
                                             "resetResult": {
                                                 "newHead": &root_dataset_blocks[1].0,
                                             },
@@ -725,9 +725,9 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
-                                            "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                             "transformResult": null,
                                         },
                                         "status": "WAITING",
@@ -813,9 +813,9 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
-                                            "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                             "transformResult": {
                                                 "__typename": "FlowDescriptionUpdateResultSuccess",
                                                 "numBlocks": 1,
@@ -941,9 +941,9 @@ async fn test_trigger_compaction_root_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompaction",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactionResult": null,
                                         },
                                         "status": "WAITING",
@@ -1006,9 +1006,9 @@ async fn test_trigger_compaction_root_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompaction",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactionResult": null,
                                         },
                                         "status": "WAITING",
@@ -1081,9 +1081,9 @@ async fn test_trigger_compaction_root_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompaction",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactionResult": null,
                                         },
                                         "status": "RUNNING",
@@ -1170,9 +1170,9 @@ async fn test_trigger_compaction_root_dataset() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompaction",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactionResult": {
                                                 "originalBlocksCount": 5,
                                                 "resultingBlocksCount": 4,
@@ -2692,9 +2692,9 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_root_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompaction",
-                                            "datasetId": create_root_result.dataset_handle.id.to_string(),
                                             "compactionResult": {
                                                 "originalBlocksCount": 5,
                                                 "resultingBlocksCount": 4,
@@ -2832,9 +2832,9 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                 "nodes": [
                                     {
                                         "flowId": "1",
+                                        "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
-                                            "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                             "transformResult": null,
                                         },
                                         "status": "FINISHED",
@@ -2999,9 +2999,9 @@ async fn test_config_snapshot_returned_correctly() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetHardCompaction",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "compactionResult": null,
                                         },
                                         "status": "WAITING",
@@ -3321,10 +3321,10 @@ impl FlowRunsHarness {
                                 listFlows {
                                     nodes {
                                         flowId
+                                        datasetId
                                         description {
                                             __typename
                                             ... on FlowDescriptionDatasetHardCompaction {
-                                                datasetId
                                                 compactionResult {
                                                     ... on FlowDescriptionHardCompactionSuccess {
                                                         originalBlocksCount
@@ -3337,7 +3337,6 @@ impl FlowRunsHarness {
                                                 }
                                             }
                                             ... on FlowDescriptionDatasetExecuteTransform {
-                                                datasetId
                                                 transformResult {
                                                     __typename
                                                     ... on FlowDescriptionUpdateResultUpToDate {
@@ -3350,13 +3349,11 @@ impl FlowRunsHarness {
                                                 }
                                             }
                                             ... on FlowDescriptionDatasetReset {
-                                                datasetId
                                                 resetResult {
                                                     newHead
                                                 }
                                             }
                                             ... on FlowDescriptionDatasetPollingIngest {
-                                                datasetId
                                                 ingestResult {
                                                     __typename
                                                     ... on FlowDescriptionUpdateResultUpToDate {
@@ -3369,7 +3366,6 @@ impl FlowRunsHarness {
                                             }
                                             }
                                             ... on FlowDescriptionDatasetPushIngest {
-                                                datasetId
                                                 sourceName
                                                 inputRecordsCount
                                                 ingestResult {
