@@ -68,29 +68,21 @@ pub struct FlowKeySystem {
 
 #[derive(SimpleObject, Debug)]
 pub struct FlowTimingRecords {
+    /// Initiation time
+    pub initiated_at: DateTime<Utc>,
+
     /// Planned scheduling time
-    scheduled_at: Option<DateTime<Utc>>,
+    pub scheduled_at: Option<DateTime<Utc>>,
 
     /// Recorded time of last task scheduling
-    awaiting_executor_since: Option<DateTime<Utc>>,
+    pub awaiting_executor_since: Option<DateTime<Utc>>,
 
     /// Recorded start of running (Running state seen at least once)
-    running_since: Option<DateTime<Utc>>,
+    pub running_since: Option<DateTime<Utc>>,
 
     /// Recorded time of finish (successful or failed after retry) or abortion
     /// (Finished state seen at least once)
-    last_attempt_finished_at: Option<DateTime<Utc>>,
-}
-
-impl From<fs::FlowTimingRecords> for FlowTimingRecords {
-    fn from(value: fs::FlowTimingRecords) -> Self {
-        Self {
-            scheduled_at: value.scheduled_for_activation_at,
-            awaiting_executor_since: value.awaiting_executor_since,
-            running_since: value.running_since,
-            last_attempt_finished_at: value.last_attempt_finished_at,
-        }
-    }
+    pub last_attempt_finished_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
