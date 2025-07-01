@@ -401,7 +401,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                   timing {
                     awaitingExecutorSince
                     runningSince
-                    finishedAt
+                    lastAttemptFinishedAt
                     __typename
                   }
                   startCondition {
@@ -560,7 +560,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                               "timing": {
                                 "__typename": "FlowTimingRecords",
                                 "awaitingExecutorSince": null,
-                                "finishedAt": null,
+                                "lastAttemptFinishedAt": null,
                                 "runningSince": null
                               }
                             },
@@ -1414,7 +1414,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
     // - search FlowItemWidgetData.timing:
     //   - awaitingExecutorSince
     //   - runningSince
-    //   - finishedAt
+    //   - lastAttemptFinishedAt
     // - search FlowSummaryData (flowId)
 
     indoc::indoc!(
@@ -1802,7 +1802,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
           timing {
             # awaitingExecutorSince
             # runningSince
-            # finishedAt
+            # lastAttemptFinishedAt
             __typename
           }
           __typename

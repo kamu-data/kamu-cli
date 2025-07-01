@@ -79,7 +79,7 @@ pub struct FlowTimingRecords {
 
     /// Recorded time of finish (successful or failed after retry) or abortion
     /// (Finished state seen at least once)
-    finished_at: Option<DateTime<Utc>>,
+    last_attempt_finished_at: Option<DateTime<Utc>>,
 }
 
 impl From<fs::FlowTimingRecords> for FlowTimingRecords {
@@ -88,7 +88,7 @@ impl From<fs::FlowTimingRecords> for FlowTimingRecords {
             scheduled_at: value.scheduled_for_activation_at,
             awaiting_executor_since: value.awaiting_executor_since,
             running_since: value.running_since,
-            finished_at: value.finished_at,
+            last_attempt_finished_at: value.last_attempt_finished_at,
         }
     }
 }

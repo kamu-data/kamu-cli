@@ -85,7 +85,7 @@ async fn test_list_account_flows() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [],
                                         "primaryTrigger": {
@@ -262,7 +262,7 @@ async fn test_pause_resume_account_flows() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [],
                                         "primaryTrigger": {
@@ -462,7 +462,7 @@ async fn test_account_triggers_all_paused() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
                                         "tasks": [],
                                         "primaryTrigger": {
@@ -732,7 +732,7 @@ impl FlowTriggerHarness {
                                       timing {
                                           awaitingExecutorSince
                                           runningSince
-                                          finishedAt
+                                          lastAttemptFinishedAt
                                       }
                                       tasks {
                                           taskId
