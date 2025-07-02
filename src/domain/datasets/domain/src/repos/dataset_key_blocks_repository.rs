@@ -29,12 +29,12 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
         block_ref: &BlockRef,
     ) -> Result<Vec<DatasetKeyBlock>, DatasetKeyBlockQueryError>;
 
-    async fn filter_datasets_having_blocks(
+    async fn match_datasets_having_blocks(
         &self,
         dataset_ids: Vec<DatasetID>,
         block_ref: &BlockRef,
         event_type: MetadataEventType,
-    ) -> Result<Vec<DatasetID>, InternalError>;
+    ) -> Result<Vec<(DatasetID, DatasetKeyBlock)>, InternalError>;
 
     async fn save_blocks_batch(
         &self,

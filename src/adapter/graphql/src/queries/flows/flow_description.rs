@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use core::panic;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use kamu_adapter_flow_dataset::{
@@ -60,6 +61,7 @@ pub(crate) enum FlowDescriptionDataset {
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPollingIngest {
     ingest_result: Option<FlowDescriptionUpdateResult>,
+    polling_source: SetPollingSource,
 }
 
 #[derive(SimpleObject)]
@@ -311,7 +313,7 @@ impl FlowDescriptionResetResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowDescriptionBuilder {
-    datasets_with_polling_sources: HashSet<odf::DatasetID>,
+    polling_sources_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetPollingSource>,
 }
 
 impl FlowDescriptionBuilder {
@@ -320,7 +322,7 @@ impl FlowDescriptionBuilder {
         flow_states: &[fs::FlowState],
     ) -> Result<Self, InternalError> {
         Ok(Self {
-            datasets_with_polling_sources: HashSet::from_iter(
+            polling_sources_by_dataset_id: HashMap::from_iter(
                 FlowDescriptionBuilder::detect_datasets_with_polling_sources(ctx, flow_states)
                     .await?,
             ),
@@ -330,7 +332,7 @@ impl FlowDescriptionBuilder {
     async fn detect_datasets_with_polling_sources(
         ctx: &Context<'_>,
         flow_states: &[fs::FlowState],
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+    ) -> Result<Vec<(odf::DatasetID, odf::metadata::SetPollingSource)>, InternalError> {
         // Collect unique dataset IDs from flow states
         let dataset_ids = flow_states
             .iter()
@@ -348,13 +350,33 @@ impl FlowDescriptionBuilder {
         // Locate datasets with polling sources
         let key_blocks_repository =
             from_catalog_n!(ctx, dyn kamu_datasets::DatasetKeyBlockRepository);
-        key_blocks_repository
-            .filter_datasets_having_blocks(
+        let matches = key_blocks_repository
+            .match_datasets_having_blocks(
                 dataset_ids,
                 &odf::BlockRef::Head,
                 kamu_datasets::MetadataEventType::SetPollingSource,
             )
-            .await
+            .await?;
+
+        let mut results = Vec::new();
+        for (dataset_id, key_block) in matches {
+            let metadata_block = odf::storage::deserialize_metadata_block(
+                &key_block.block_hash,
+                &key_block.block_payload,
+            )
+            .int_err()?;
+
+            if let odf::MetadataEvent::SetPollingSource(set_polling_source) = metadata_block.event {
+                results.push((dataset_id, set_polling_source));
+            } else {
+                panic!(
+                    "Expected SetPollingSource event for dataset: {}, but found None",
+                    dataset_id
+                );
+            }
+        }
+
+        Ok(results)
     }
 
     pub async fn build(
@@ -408,9 +430,11 @@ impl FlowDescriptionBuilder {
                 .await
                 .int_err()?;
 
-                if self.datasets_with_polling_sources.contains(dataset_id) {
+                if let Some(polling_source) = self.polling_sources_by_dataset_id.remove(dataset_id)
+                {
                     FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
                         ingest_result,
+                        polling_source: polling_source.into(),
                     })
                 } else {
                     let source_name = flow_state.primary_trigger().push_source_name();

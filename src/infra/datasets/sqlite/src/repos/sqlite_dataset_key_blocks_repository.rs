@@ -117,24 +117,50 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             .collect())
     }
 
-    async fn filter_datasets_having_blocks(
+    async fn match_datasets_having_blocks(
         &self,
         dataset_ids: Vec<odf::DatasetID>,
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+    ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
         let dataset_ids: Vec<String> = dataset_ids.into_iter().map(|id| id.to_string()).collect();
 
+        use sqlx::Row;
+
         let query_str = format!(
             r#"
-            SELECT DISTINCT dataset_id
+            SELECT
+                dkb.dataset_id,
+                dkb.event_type as "event_type: _",
+                dkb.sequence_number,
+                dkb.block_hash,
+                dkb.block_payload
+            FROM dataset_key_blocks dkb
+            JOIN (
+                SELECT
+                    dataset_id,
+                    MAX(sequence_number) AS max_seq
                 FROM dataset_key_blocks
-                WHERE block_ref_name = $1 AND event_type = $2 AND dataset_id IN ({})
+                WHERE
+                    block_ref_name = $1 AND
+                    event_type = $2 AND
+                    dataset_id IN ({})
+                GROUP BY dataset_id
+            ) latest
+            ON
+                dkb.dataset_id = latest.dataset_id AND
+                dkb.sequence_number = latest.max_seq
+            WHERE
+                dkb.block_ref_name = $1 AND
+                dkb.event_type = $2 AND
+                dkb.dataset_id IN ({})
             "#,
-            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap())
+            // Generate same list twice to avoid duplicate binding
+            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap()),
+            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap()),
         );
 
         let mut query = sqlx::query(&query_str);
@@ -145,10 +171,23 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
 
         let raw_rows = query.fetch_all(conn).await.int_err()?;
 
-        use sqlx::Row;
         Ok(raw_rows
             .into_iter()
-            .map(|r| odf::DatasetID::from_did_str(r.get(0)).unwrap())
+            .map(|r| {
+                let dataset_id = odf::DatasetID::from_did_str(r.get::<&str, _>(0)).unwrap();
+                let event_type: String = r.get(1);
+                let sequence_number: i64 = r.get(2);
+                let block_hash: String = r.get(3);
+                let block_payload: Vec<u8> = r.get(4);
+
+                let key_block = DatasetKeyBlock {
+                    event_kind: MetadataEventType::from_str(&event_type).unwrap(),
+                    sequence_number: u64::try_from(sequence_number).unwrap(),
+                    block_hash: odf::Multihash::from_multibase(&block_hash).unwrap(),
+                    block_payload: bytes::Bytes::from(block_payload),
+                };
+                (dataset_id, key_block)
+            })
             .collect())
     }
 
