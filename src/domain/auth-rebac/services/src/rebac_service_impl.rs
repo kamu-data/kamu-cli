@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -289,9 +290,9 @@ impl RebacService for RebacServiceImpl {
 
         self.rebac_repo
             .upsert_entities_relations(&[UpsertEntitiesRelationOperation {
-                subject_entity: &account_entity,
+                subject_entity: Cow::Owned(account_entity),
                 relationship: Relation::AccountToDataset(relationship),
-                object_entity: &dataset_entity,
+                object_entity: Cow::Owned(dataset_entity),
             }])
             .await
             .int_err()?;
@@ -315,8 +316,8 @@ impl RebacService for RebacServiceImpl {
         let operations = account_entities
             .iter()
             .map(|account_entity| DeleteEntitiesRelationOperation {
-                subject_entity: account_entity,
-                object_entity: &dataset_entity,
+                subject_entity: Cow::Borrowed(account_entity),
+                object_entity: Cow::Borrowed(&dataset_entity),
             })
             .collect::<Vec<_>>();
 

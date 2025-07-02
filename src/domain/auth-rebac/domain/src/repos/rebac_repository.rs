@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
@@ -56,24 +58,10 @@ pub trait RebacRepository: Send + Sync {
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError>;
 
     // Relations
-
-    async fn insert_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Result<(), InsertEntitiesRelationError>;
-
     async fn upsert_entities_relations(
         &self,
         operations: &[UpsertEntitiesRelationOperation<'_>],
     ) -> Result<(), UpsertEntitiesRelationsError>;
-
-    async fn delete_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        object_entity: &Entity,
-    ) -> Result<(), DeleteEntitiesRelationError>;
 
     async fn get_subject_entity_relations(
         &self,
@@ -117,14 +105,14 @@ pub trait RebacRepository: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct UpsertEntitiesRelationOperation<'a> {
-    pub subject_entity: &'a Entity<'a>,
+    pub subject_entity: Cow<'a, Entity<'a>>,
     pub relationship: Relation,
-    pub object_entity: &'a Entity<'a>,
+    pub object_entity: Cow<'a, Entity<'a>>,
 }
 
 pub struct DeleteEntitiesRelationOperation<'a> {
-    pub subject_entity: &'a Entity<'a>,
-    pub object_entity: &'a Entity<'a>,
+    pub subject_entity: Cow<'a, Entity<'a>>,
+    pub object_entity: Cow<'a, Entity<'a>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

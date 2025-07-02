@@ -178,66 +178,11 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(entities_properties)
     }
 
-    async fn insert_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        relation: Relation,
-        object_entity: &Entity,
-    ) -> Result<(), InsertEntitiesRelationError> {
-        let mut writable_state = self.state.write().await;
-
-        for row in &writable_state.entities_relations_rows {
-            if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
-                return Err(InsertEntitiesRelationError::some_role_is_already_present(
-                    subject_entity,
-                    object_entity,
-                ));
-            }
-        }
-
-        let new_row = EntitiesWithRelation {
-            subject_entity: subject_entity.clone().into_owned(),
-            relation,
-            object_entity: object_entity.clone().into_owned(),
-        };
-
-        writable_state.entities_relations_rows.insert(new_row);
-
-        Ok(())
-    }
-
     async fn upsert_entities_relations(
         &self,
         _operations: &[UpsertEntitiesRelationOperation<'_>],
     ) -> Result<(), UpsertEntitiesRelationsError> {
         todo!()
-    }
-
-    async fn delete_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        object_entity: &Entity,
-    ) -> Result<(), DeleteEntitiesRelationError> {
-        let mut writable_state = self.state.write().await;
-
-        let maybe_row = writable_state
-            .entities_relations_rows
-            .iter()
-            .find(|row| {
-                row.subject_entity == *subject_entity && row.object_entity == *object_entity
-            })
-            .cloned();
-
-        if let Some(row) = maybe_row {
-            writable_state.entities_relations_rows.remove(&row);
-
-            Ok(())
-        } else {
-            Err(DeleteEntitiesRelationError::not_found(
-                subject_entity,
-                object_entity,
-            ))
-        }
     }
 
     async fn get_subject_entity_relations(
