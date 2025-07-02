@@ -12,23 +12,7 @@ use std::sync::Arc;
 use std::vec;
 
 use dill::Catalog;
-use kamu_auth_rebac::{
-    DatasetPropertyName,
-    DeleteEntitiesRelationError,
-    DeleteEntityPropertiesError,
-    DeleteEntityPropertyError,
-    DeleteSubjectEntitiesObjectEntityRelationsError,
-    EntitiesWithRelation,
-    Entity,
-    EntityType,
-    EntityWithRelation,
-    InsertEntitiesRelationError,
-    PropertyName,
-    RebacRepository,
-    RebacRepositoryExt,
-    Relation,
-    UpsertEntitiesRelationOperations,
-};
+use kamu_auth_rebac::*;
 use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -400,33 +384,35 @@ pub async fn test_upsert_entities_relations(catalog: &Catalog) {
     };
 
     {
-        rebac_repo
-            .upsert_entities_relations(&[
-                // Account1
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_1,
-                    relationship: reader,
-                    object_entity: &dataset_1,
-                },
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_1,
-                    relationship: reader,
-                    object_entity: &dataset_2,
-                },
-                // Account2
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_2,
-                    relationship: reader,
-                    object_entity: &dataset_1,
-                },
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_2,
-                    relationship: editor,
-                    object_entity: &dataset_3,
-                },
-            ])
-            .await
-            .unwrap();
+        assert_matches!(
+            rebac_repo
+                .upsert_entities_relations(&[
+                    // Account1
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: reader,
+                        object_entity: &dataset_1,
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: reader,
+                        object_entity: &dataset_2,
+                    },
+                    // Account2
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        relationship: reader,
+                        object_entity: &dataset_1,
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        relationship: editor,
+                        object_entity: &dataset_3,
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
 
         assert_get_relations("1.", &rebac_repo, &account_1_initial_state).await;
         assert_get_relations("2.", &rebac_repo, &account_2_initial_state).await;
@@ -434,33 +420,35 @@ pub async fn test_upsert_entities_relations(catalog: &Catalog) {
 
     // Same operations (idempotence)
     {
-        rebac_repo
-            .upsert_entities_relations(&[
-                // Account1
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_1,
-                    relationship: reader,
-                    object_entity: &dataset_1,
-                },
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_1,
-                    relationship: reader,
-                    object_entity: &dataset_2,
-                },
-                // Account2
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_2,
-                    relationship: reader,
-                    object_entity: &dataset_1,
-                },
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_2,
-                    relationship: editor,
-                    object_entity: &dataset_3,
-                },
-            ])
-            .await
-            .unwrap();
+        assert_matches!(
+            rebac_repo
+                .upsert_entities_relations(&[
+                    // Account1
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: reader,
+                        object_entity: &dataset_1,
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: reader,
+                        object_entity: &dataset_2,
+                    },
+                    // Account2
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        relationship: reader,
+                        object_entity: &dataset_1,
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        relationship: editor,
+                        object_entity: &dataset_3,
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
 
         assert_get_relations("3.", &rebac_repo, &account_1_initial_state).await;
         assert_get_relations("4.", &rebac_repo, &account_2_initial_state).await;
@@ -468,33 +456,35 @@ pub async fn test_upsert_entities_relations(catalog: &Catalog) {
 
     // Mix of adding and updating
     {
-        rebac_repo
-            .upsert_entities_relations(&[
-                // Account1
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_1,
-                    relationship: editor, // updating (from reader)
-                    object_entity: &dataset_1,
-                },
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_1,
-                    relationship: editor,
-                    object_entity: &dataset_3, // adding
-                },
-                // Account2
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_2,
-                    relationship: reader,
-                    object_entity: &dataset_2, // adding
-                },
-                UpsertEntitiesRelationOperations {
-                    subject_entity: &account_2,
-                    relationship: reader, // updating (from editor)
-                    object_entity: &dataset_3,
-                },
-            ])
-            .await
-            .unwrap();
+        assert_matches!(
+            rebac_repo
+                .upsert_entities_relations(&[
+                    // Account1
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: editor, // updating (from reader)
+                        object_entity: &dataset_1,
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: editor,
+                        object_entity: &dataset_3, // adding
+                    },
+                    // Account2
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        relationship: reader,
+                        object_entity: &dataset_2, // adding
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        relationship: reader, // updating (from editor)
+                        object_entity: &dataset_3,
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
 
         assert_get_relations(
             "5.",
@@ -567,6 +557,163 @@ pub async fn test_delete_entities_relation(catalog: &Catalog) {
             if e.subject_entity == account
                 && e.object_entity == dataset
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_delete_entities_relations(catalog: &Catalog) {
+    let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
+
+    let account_1 = Entity::new_account("account1");
+    let account_2 = Entity::new_account("account2");
+
+    let dataset_1 = Entity::new_dataset("dataset1");
+    let dataset_2 = Entity::new_dataset("dataset2");
+    let dataset_3 = Entity::new_dataset("dataset3");
+
+    let reader = Relation::account_is_a_dataset_reader();
+    let editor = Relation::account_is_a_dataset_editor();
+
+    // Initial
+    {
+        assert_matches!(
+            rebac_repo
+                .upsert_entities_relations(&[
+                    // Account1
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: reader,
+                        object_entity: &dataset_1,
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: reader,
+                        object_entity: &dataset_2,
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        relationship: editor,
+                        object_entity: &dataset_3,
+                    },
+                    // Account2
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        relationship: reader,
+                        object_entity: &dataset_1,
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        relationship: editor,
+                        object_entity: &dataset_3,
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations(
+            "1.",
+            &rebac_repo,
+            &CrossoverTestState {
+                account_id: "account1",
+                dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+                relation_map: HashMap::from([
+                    (
+                        Relation::account_is_a_dataset_reader(),
+                        ["dataset1", "dataset2"].into(),
+                    ),
+                    (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
+                ]),
+            },
+        )
+        .await;
+        assert_get_relations(
+            "2.",
+            &rebac_repo,
+            &CrossoverTestState {
+                account_id: "account2",
+                dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+                relation_map: HashMap::from([
+                    (Relation::account_is_a_dataset_reader(), ["dataset1"].into()),
+                    (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
+                ]),
+            },
+        )
+        .await;
+    }
+
+    // Partial deletion
+    let account_1_after_deletion_state = CrossoverTestState {
+        account_id: "account1",
+        dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+        relation_map: HashMap::from([(
+            Relation::account_is_a_dataset_editor(),
+            ["dataset3"].into(),
+        )]),
+    };
+    let account_2_after_deletion_state = CrossoverTestState {
+        account_id: "account2",
+        dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+        relation_map: HashMap::from([(
+            Relation::account_is_a_dataset_editor(),
+            ["dataset3"].into(),
+        )]),
+    };
+
+    {
+        assert_matches!(
+            rebac_repo
+                .delete_entities_relations(&[
+                    // Account1
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        object_entity: &dataset_1,
+                    },
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        object_entity: &dataset_2,
+                    },
+                    // Account2
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        object_entity: &dataset_1,
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations("3.", &rebac_repo, &account_1_after_deletion_state).await;
+        assert_get_relations("4.", &rebac_repo, &account_2_after_deletion_state).await;
+    }
+
+    // Same operations (idempotence)
+    {
+        assert_matches!(
+            rebac_repo
+                .delete_entities_relations(&[
+                    // Account1
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        object_entity: &dataset_1,
+                    },
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: &account_1,
+                        object_entity: &dataset_2,
+                    },
+                    // Account2
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: &account_2,
+                        object_entity: &dataset_1,
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations("5.", &rebac_repo, &account_1_after_deletion_state).await;
+        assert_get_relations("6.", &rebac_repo, &account_2_after_deletion_state).await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

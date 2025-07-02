@@ -79,7 +79,23 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_upsert_entities_relations,
+    harness = InMemoryRebacRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relation,
+    harness = InMemoryRebacRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relations,
     harness = InMemoryRebacRepositoryHarness
 );
 

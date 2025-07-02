@@ -66,8 +66,8 @@ pub trait RebacRepository: Send + Sync {
 
     async fn upsert_entities_relations(
         &self,
-        operations: &[UpsertEntitiesRelationOperations<'_>],
-    ) -> Result<(), InsertEntitiesRelationError>;
+        operations: &[UpsertEntitiesRelationOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError>;
 
     async fn delete_entities_relation(
         &self,
@@ -107,13 +107,23 @@ pub trait RebacRepository: Send + Sync {
         subject_entities: Vec<Entity<'static>>,
         object_entity: &Entity,
     ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError>;
+
+    async fn delete_entities_relations(
+        &self,
+        operations: &[DeleteEntitiesRelationOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct UpsertEntitiesRelationOperations<'a> {
+pub struct UpsertEntitiesRelationOperation<'a> {
     pub subject_entity: &'a Entity<'a>,
     pub relationship: Relation,
+    pub object_entity: &'a Entity<'a>,
+}
+
+pub struct DeleteEntitiesRelationOperation<'a> {
+    pub subject_entity: &'a Entity<'a>,
     pub object_entity: &'a Entity<'a>,
 }
 
@@ -261,6 +271,14 @@ pub struct InsertEntitiesRelationSomeRoleIsAlreadyPresentError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+pub enum UpsertEntitiesRelationsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 pub enum DeleteEntitiesRelationError {
     #[error(transparent)]
     NotFound(EntitiesRelationNotFoundError),
@@ -360,6 +378,14 @@ impl DeleteSubjectEntitiesObjectEntityRelationsError {
 pub struct SubjectEntitiesObjectEntityRelationsNotFoundError {
     pub subject_entities: Vec<Entity<'static>>,
     pub object_entity: Entity<'static>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteEntitiesRelationsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

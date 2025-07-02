@@ -271,8 +271,8 @@ impl RebacRepository for SqliteRebacRepository {
 
     async fn upsert_entities_relations(
         &self,
-        _operations: &[UpsertEntitiesRelationOperations<'_>],
-    ) -> Result<(), InsertEntitiesRelationError> {
+        _operations: &[UpsertEntitiesRelationOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError> {
         todo!()
     }
 

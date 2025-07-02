@@ -11,29 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::{Singleton, component, interface, scope};
-use kamu_auth_rebac::{
-    DeleteEntitiesRelationError,
-    DeleteEntityPropertiesError,
-    DeleteEntityPropertyError,
-    DeleteSubjectEntitiesObjectEntityRelationsError,
-    EntitiesWithRelation,
-    Entity,
-    EntityType,
-    EntityWithRelation,
-    GetEntityPropertiesError,
-    GetObjectEntityRelationsError,
-    GetRelationBetweenEntitiesError,
-    InsertEntitiesRelationError,
-    PropertiesCountError,
-    PropertyName,
-    PropertyValue,
-    RebacRepository,
-    Relation,
-    SetEntityPropertyError,
-    SubjectEntityRelationsByObjectTypeError,
-    SubjectEntityRelationsError,
-    UpsertEntitiesRelationOperations,
-};
+use kamu_auth_rebac::*;
 use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -230,8 +208,8 @@ impl RebacRepository for InMemoryRebacRepository {
 
     async fn upsert_entities_relations(
         &self,
-        _operations: &[UpsertEntitiesRelationOperations<'_>],
-    ) -> Result<(), InsertEntitiesRelationError> {
+        _operations: &[UpsertEntitiesRelationOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError> {
         todo!()
     }
 

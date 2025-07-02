@@ -97,6 +97,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relations,
+    harness = PostgresRebacRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = kamu_auth_rebac_repo_tests::test_get_relations_crossover_test,
     harness = PostgresRebacRepositoryHarness
 );
