@@ -119,14 +119,14 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
 
     async fn match_datasets_having_blocks(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
     ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
-        let dataset_ids: Vec<String> = dataset_ids.into_iter().map(|id| id.to_string()).collect();
+        let dataset_ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
 
         use sqlx::Row;
 

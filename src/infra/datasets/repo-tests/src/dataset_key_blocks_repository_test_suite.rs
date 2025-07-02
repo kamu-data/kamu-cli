@@ -250,7 +250,7 @@ pub async fn test_filter_datasets_having_blocks(catalog: &Catalog) {
 
     let matched_datasets = repo
         .match_datasets_having_blocks(
-            dataset_ids,
+            &dataset_ids,
             &odf::BlockRef::Head,
             kamu_datasets::MetadataEventType::SetLicense,
         )
