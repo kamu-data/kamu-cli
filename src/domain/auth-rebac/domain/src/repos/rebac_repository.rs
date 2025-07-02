@@ -104,12 +104,14 @@ pub trait RebacRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct UpsertEntitiesRelationOperation<'a> {
     pub subject_entity: Cow<'a, Entity<'a>>,
     pub relationship: Relation,
     pub object_entity: Cow<'a, Entity<'a>>,
 }
 
+#[derive(Debug)]
 pub struct DeleteEntitiesRelationOperation<'a> {
     pub subject_entity: Cow<'a, Entity<'a>>,
     pub object_entity: Cow<'a, Entity<'a>>,

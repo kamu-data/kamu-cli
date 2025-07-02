@@ -82,6 +82,12 @@ type AccountConnection {
 	edges: [AccountEdge!]!
 }
 
+input AccountDatasetRelationOperation {
+	accountId: AccountID!
+	operation: DatasetRoleOperation!
+	datasetId: DatasetID!
+}
+
 scalar AccountDisplayName
 
 type AccountEdge {
@@ -307,11 +313,7 @@ type Admin {
 	selfTest: String!
 }
 
-interface ApplyRolesMatrixResult {
-	message: String!
-}
-
-type ApplyRolesMatrixResultSuccess implements ApplyRolesMatrixResult {
+type ApplyRolesMatrixResult {
 	message: String!
 }
 
@@ -433,9 +435,9 @@ type CliProtocolDesc {
 
 type CollaborationMut {
 	"""
-	Matrix application of dataset roles to specified accounts.
+	Batch application of relations between accounts and datasets
 	"""
-	applyRolesMatrix(accountIds: [AccountID!]!, datasetsWithMaybeRoles: [DatasetWithMaybeRole!]!): ApplyRolesMatrixResult!
+	applyAccountDatasetRelations(operations: [AccountDatasetRelationOperation!]!): ApplyRolesMatrixResult!
 }
 
 type Collection {
@@ -1338,6 +1340,19 @@ scalar DatasetRef
 
 scalar DatasetRefRemote
 
+input DatasetRoleOperation @oneOf {
+	set: DatasetRoleSetOperation
+	unset: DatasetRoleUnsetOperation
+}
+
+input DatasetRoleSetOperation {
+	role: DatasetAccessRole!
+}
+
+input DatasetRoleUnsetOperation {
+	dummy: Boolean!
+}
+
 type DatasetState {
 	"""
 	Globally unique identity of the dataset
@@ -1388,11 +1403,6 @@ type DatasetWebhooksMut {
 type DatasetWebhooksPermissions {
 	canView: Boolean!
 	canUpdate: Boolean!
-}
-
-input DatasetWithMaybeRole {
-	datasetId: DatasetID!
-	maybeRole: DatasetAccessRole
 }
 
 type Datasets {

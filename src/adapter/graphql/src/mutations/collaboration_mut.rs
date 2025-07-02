@@ -19,7 +19,7 @@ pub struct CollaborationMut;
 #[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl CollaborationMut {
-    /// Batch application of relations between accounts and datasets.
+    /// Batch application of relations between accounts and datasets
     #[tracing::instrument(level = "info", name = CollaborationMut_apply_account_dataset_relations, skip_all)]
     #[graphql(guard = "LoggedInGuard.and(CanProvisionAccountsGuard)")]
     pub async fn apply_account_dataset_relations(

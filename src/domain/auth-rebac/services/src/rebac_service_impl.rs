@@ -308,7 +308,7 @@ impl RebacService for RebacServiceImpl {
             .iter()
             .map(|op| {
                 let account_entity = Entity::new_account(op.account_id.to_string());
-                let dataset_entity = Entity::new_account(op.dataset_id.to_string());
+                let dataset_entity = Entity::new_dataset(op.dataset_id.to_string());
 
                 UpsertEntitiesRelationOperation {
                     subject_entity: Cow::Owned(account_entity),
@@ -363,7 +363,7 @@ impl RebacService for RebacServiceImpl {
             .iter()
             .map(|op| DeleteEntitiesRelationOperation {
                 subject_entity: Cow::Owned(Entity::new_account(op.account_id.to_string())),
-                object_entity: Cow::Owned(Entity::new_account(op.dataset_id.to_string())),
+                object_entity: Cow::Owned(Entity::new_dataset(op.dataset_id.to_string())),
             })
             .collect::<Vec<_>>();
 

@@ -14,7 +14,7 @@ use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placehold
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::*;
-use sqlx::Row;
+use sqlx::{QueryBuilder, Row};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -232,9 +232,41 @@ impl RebacRepository for SqliteRebacRepository {
 
     async fn upsert_entities_relations(
         &self,
-        _operations: &[UpsertEntitiesRelationOperation<'_>],
+        operations: &[UpsertEntitiesRelationOperation<'_>],
     ) -> Result<(), UpsertEntitiesRelationsError> {
-        todo!()
+        if operations.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = QueryBuilder::new(
+            r#"
+            REPLACE INTO auth_rebac_relations (subject_entity_type,
+                                               subject_entity_id,
+                                               relationship,
+                                               object_entity_type,
+                                               object_entity_id)
+            "#,
+        );
+
+        query_builder.push_values(operations, |mut b, op| {
+            b.push_bind(op.subject_entity.entity_type);
+            b.push_bind(op.subject_entity.entity_id.as_ref());
+            b.push_bind(op.relationship.to_string());
+            b.push_bind(op.object_entity.entity_type);
+            b.push_bind(op.object_entity.entity_id.as_ref());
+        });
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 
     async fn get_subject_entity_relations(
@@ -488,9 +520,43 @@ impl RebacRepository for SqliteRebacRepository {
 
     async fn delete_entities_relations(
         &self,
-        _operations: &[DeleteEntitiesRelationOperation<'_>],
+        operations: &[DeleteEntitiesRelationOperation<'_>],
     ) -> Result<(), DeleteEntitiesRelationsError> {
-        todo!()
+        if operations.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = QueryBuilder::new(
+            r#"
+            DELETE
+            FROM auth_rebac_relations
+            WHERE (subject_entity_type,
+                   subject_entity_id,
+                   object_entity_type,
+                   object_entity_id) IN (
+            "#,
+        );
+
+        query_builder.push_values(operations, |mut b, op| {
+            b.push_bind(op.subject_entity.entity_type);
+            b.push_bind(op.subject_entity.entity_id.as_ref());
+            b.push_bind(op.object_entity.entity_type);
+            b.push_bind(op.object_entity.entity_id.as_ref());
+        });
+
+        query_builder.push(")");
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 }
 

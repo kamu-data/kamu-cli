@@ -180,9 +180,37 @@ impl RebacRepository for InMemoryRebacRepository {
 
     async fn upsert_entities_relations(
         &self,
-        _operations: &[UpsertEntitiesRelationOperation<'_>],
+        operations: &[UpsertEntitiesRelationOperation<'_>],
     ) -> Result<(), UpsertEntitiesRelationsError> {
-        todo!()
+        if operations.is_empty() {
+            return Ok(());
+        }
+
+        let mut writable_state = self.state.write().await;
+
+        for op in operations {
+            let maybe_existing_row = writable_state
+                .entities_relations_rows
+                .iter()
+                .find(|row| {
+                    row.subject_entity == *op.subject_entity
+                        && row.object_entity == *op.object_entity
+                })
+                .cloned();
+            if let Some(existing_row) = maybe_existing_row {
+                writable_state.entities_relations_rows.remove(&existing_row);
+            }
+
+            let new_row = EntitiesWithRelation {
+                subject_entity: op.subject_entity.as_ref().clone().into_owned(),
+                relation: op.relationship,
+                object_entity: op.object_entity.as_ref().clone().into_owned(),
+            };
+
+            writable_state.entities_relations_rows.insert(new_row);
+        }
+
+        Ok(())
     }
 
     async fn get_subject_entity_relations(
@@ -333,9 +361,30 @@ impl RebacRepository for InMemoryRebacRepository {
 
     async fn delete_entities_relations(
         &self,
-        _operations: &[DeleteEntitiesRelationOperation<'_>],
+        operations: &[DeleteEntitiesRelationOperation<'_>],
     ) -> Result<(), DeleteEntitiesRelationsError> {
-        todo!()
+        if operations.is_empty() {
+            return Ok(());
+        }
+
+        let mut writable_state = self.state.write().await;
+
+        for op in operations {
+            let maybe_existing_row = writable_state
+                .entities_relations_rows
+                .iter()
+                .find(|row| {
+                    row.subject_entity == *op.subject_entity
+                        && row.object_entity == *op.object_entity
+                })
+                .cloned();
+
+            if let Some(existing_row) = maybe_existing_row {
+                writable_state.entities_relations_rows.remove(&existing_row);
+            }
+        }
+
+        Ok(())
     }
 }
 
