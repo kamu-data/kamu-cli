@@ -2059,6 +2059,7 @@ union FlowDescriptionDatasetHardCompactionResult = FlowDescriptionHardCompaction
 
 type FlowDescriptionDatasetPollingIngest {
 	ingestResult: FlowDescriptionUpdateResult
+	pollingSource: SetPollingSource!
 }
 
 type FlowDescriptionDatasetPushIngest {

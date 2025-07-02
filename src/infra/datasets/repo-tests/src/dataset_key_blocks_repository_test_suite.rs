@@ -248,8 +248,8 @@ pub async fn test_filter_datasets_having_blocks(catalog: &Catalog) {
         dataset_id_3.clone(),
     ];
 
-    let filtered_datasets = repo
-        .filter_datasets_having_blocks(
+    let matched_datasets = repo
+        .match_datasets_having_blocks(
             dataset_ids,
             &odf::BlockRef::Head,
             kamu_datasets::MetadataEventType::SetLicense,
@@ -257,9 +257,9 @@ pub async fn test_filter_datasets_having_blocks(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert_eq!(filtered_datasets.len(), 2);
-    assert!(filtered_datasets.contains(&dataset_id_1));
-    assert!(filtered_datasets.contains(&dataset_id_3));
+    assert_eq!(matched_datasets.len(), 2);
+    assert!(matched_datasets.iter().any(|(id, _)| id == &dataset_id_1));
+    assert!(matched_datasets.iter().any(|(id, _)| id == &dataset_id_3));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
