@@ -17,15 +17,34 @@ use crate::AccountToDatasetRelation;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait RebacApplyRolesMatrixUseCase: Send + Sync {
+pub trait ApplyAccountDatasetRelationsUseCase: Send + Sync {
     async fn execute(
         &self,
-        account_ids: &[&odf::AccountID],
-        datasets_with_role_operations: &[(Cow<odf::DatasetID>, DatasetRoleOperation)],
+        operations: &[AccountDatasetRelationOperation],
     ) -> Result<(), ApplyRelationMatrixError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct AccountDatasetRelationOperation<'a> {
+    pub account_id: Cow<'a, odf::AccountID>,
+    pub operation: DatasetRoleOperation,
+    pub dataset_id: Cow<'a, odf::DatasetID>,
+}
+
+impl<'a> AccountDatasetRelationOperation<'a> {
+    pub fn new(
+        account_id: Cow<'a, odf::AccountID>,
+        operation: DatasetRoleOperation,
+        dataset_id: Cow<'a, odf::DatasetID>,
+    ) -> Self {
+        Self {
+            account_id,
+            operation,
+            dataset_id,
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 pub enum DatasetRoleOperation {

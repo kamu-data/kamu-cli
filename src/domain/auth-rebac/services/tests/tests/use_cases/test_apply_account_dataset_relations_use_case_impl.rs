@@ -14,17 +14,18 @@ use std::sync::Arc;
 use dill::CatalogBuilder;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu_auth_rebac::{
+    AccountDatasetRelationOperation,
     AccountToDatasetRelation as Role,
+    ApplyAccountDatasetRelationsUseCase,
     ApplyRelationMatrixError,
     DatasetRoleOperation,
-    RebacApplyRolesMatrixUseCase,
     RebacService,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
+    ApplyAccountDatasetRelationsUseCaseImpl,
     DefaultAccountProperties,
     DefaultDatasetProperties,
-    RebacApplyRolesMatrixUseCaseImpl,
     RebacServiceImpl,
 };
 use kamu_core::auth::DatasetActionAuthorizer;
@@ -38,7 +39,7 @@ const SET_MAINTAINER_OPERATION: DatasetRoleOperation = DatasetRoleOperation::Set
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type Harness = RebacApplyRolesMatrixUseCaseImplHarness;
+type Harness = ApplyAccountDatasetRelationsUseCaseImplHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,14 +64,23 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                &[&account_id_1],
-                &[
-                    (Cow::Borrowed(&dataset_id_1), SET_MAINTAINER_OPERATION),
-                    (Cow::Borrowed(&dataset_id_2), SET_MAINTAINER_OPERATION),
-                    (Cow::Borrowed(&dataset_id_3), SET_MAINTAINER_OPERATION),
-                ],
-            )
+            .execute(&[
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3),
+                ),
+            ],)
             .await,
         Ok(_)
     );
@@ -97,14 +107,40 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                &[&account_id_2, &account_id_3],
-                &[
-                    (Cow::Borrowed(&dataset_id_1), SET_READER_OPERATION),
-                    (Cow::Borrowed(&dataset_id_2), SET_READER_OPERATION),
-                    (Cow::Borrowed(&dataset_id_3), SET_READER_OPERATION),
-                ],
-            )
+            .execute(&[
+                // Account2
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account3
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+            ],)
             .await,
         Ok(_)
     );
@@ -137,14 +173,40 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                &[&account_id_2, &account_id_3],
-                &[
-                    (Cow::Borrowed(&dataset_id_1), SET_READER_OPERATION),
-                    (Cow::Borrowed(&dataset_id_2), SET_READER_OPERATION),
-                    (Cow::Borrowed(&dataset_id_3), SET_READER_OPERATION),
-                ],
-            )
+            .execute(&[
+                // Account2
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account3
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_READER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+            ],)
             .await,
         Ok(_)
     );
@@ -177,10 +239,23 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                &[&account_id_1, &account_id_2, &account_id_3],
-                &[(Cow::Borrowed(&dataset_id_1), UNSET_ROLE_OPERATION)],
-            )
+            .execute(&[
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+            ],)
             .await,
         Ok(_)
     );
@@ -210,13 +285,41 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                &[&account_id_1, &account_id_2, &account_id_3],
-                &[
-                    (Cow::Borrowed(&dataset_id_2), UNSET_ROLE_OPERATION),
-                    (Cow::Borrowed(&dataset_id_3), UNSET_ROLE_OPERATION),
-                ],
-            )
+            .execute(&[
+                // Account1
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account2
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account3
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+            ],)
             .await,
         Ok(_)
     );
@@ -240,14 +343,56 @@ async fn test_apply_roles_matrix_success() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                &[&account_id_1, &account_id_2, &account_id_3],
-                &[
-                    (Cow::Borrowed(&dataset_id_1), UNSET_ROLE_OPERATION),
-                    (Cow::Borrowed(&dataset_id_2), UNSET_ROLE_OPERATION),
-                    (Cow::Borrowed(&dataset_id_3), UNSET_ROLE_OPERATION),
-                ],
-            )
+            .execute(&[
+                // Account1
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account2
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account3
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    UNSET_ROLE_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+            ],)
             .await,
         Ok(_)
     );
@@ -290,14 +435,56 @@ async fn test_apply_roles_matrix_not_authorized() {
     assert_matches!(
         harness
             .use_case
-            .execute(
-                &[&account_id_1, &account_id_2, &account_id_3],
-                &[
-                    (Cow::Borrowed(&dataset_id_1), SET_MAINTAINER_OPERATION),
-                    (Cow::Borrowed(&dataset_id_2), SET_MAINTAINER_OPERATION),
-                    (Cow::Borrowed(&dataset_id_3), SET_MAINTAINER_OPERATION),
-                ],
-            )
+            .execute(&[
+                // Account1
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_1),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account2
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_2),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+                // Account3
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_1)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_2)
+                ),
+                AccountDatasetRelationOperation::new(
+                    Cow::Borrowed(&account_id_3),
+                    SET_MAINTAINER_OPERATION,
+                    Cow::Borrowed(&dataset_id_3)
+                ),
+            ],)
             .await,
         Err(ApplyRelationMatrixError::Access(odf::AccessError::Unauthorized(e))) if {
             let error_message = harness.replace_ids_with_pseudonyms(e.to_string());
@@ -310,19 +497,19 @@ async fn test_apply_roles_matrix_not_authorized() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct RebacApplyRolesMatrixUseCaseImplHarness {
-    use_case: Arc<dyn RebacApplyRolesMatrixUseCase>,
+struct ApplyAccountDatasetRelationsUseCaseImplHarness {
+    use_case: Arc<dyn ApplyAccountDatasetRelationsUseCase>,
     service: Arc<dyn RebacService>,
     account_name_pseudonyms: HashMap<odf::AccountID, String>,
     dataset_name_pseudonyms: HashMap<odf::DatasetID, String>,
 }
 
-impl RebacApplyRolesMatrixUseCaseImplHarness {
+impl ApplyAccountDatasetRelationsUseCaseImplHarness {
     pub fn new(mock_dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
-            b.add::<RebacApplyRolesMatrixUseCaseImpl>();
+            b.add::<ApplyAccountDatasetRelationsUseCaseImpl>();
             b.add::<RebacServiceImpl>();
             b.add_value(DefaultAccountProperties::default());
             b.add_value(DefaultDatasetProperties::default());

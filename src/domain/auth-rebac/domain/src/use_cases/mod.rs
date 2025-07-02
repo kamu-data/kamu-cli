@@ -7,6 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod rebac_apply_roles_matrix_use_case;
+mod apply_account_dataset_relations_use_case;
 
-pub use rebac_apply_roles_matrix_use_case::*;
+pub use apply_account_dataset_relations_use_case::*;

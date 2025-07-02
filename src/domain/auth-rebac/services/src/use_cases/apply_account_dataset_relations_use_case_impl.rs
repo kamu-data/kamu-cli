@@ -8,13 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{
+    AccountDatasetRelationOperation,
+    ApplyAccountDatasetRelationsUseCase,
     ApplyRelationMatrixError,
     DatasetRoleOperation,
-    RebacApplyRolesMatrixUseCase,
     RebacService,
 };
 use kamu_core::auth;
@@ -23,13 +25,13 @@ use kamu_core::auth::{DatasetAction, DatasetActionUnauthorizedError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn RebacApplyRolesMatrixUseCase)]
-pub struct RebacApplyRolesMatrixUseCaseImpl {
+#[dill::interface(dyn ApplyAccountDatasetRelationsUseCase)]
+pub struct ApplyAccountDatasetRelationsUseCaseImpl {
     rebac_service: Arc<dyn RebacService>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
 }
 
-impl RebacApplyRolesMatrixUseCaseImpl {
+impl ApplyAccountDatasetRelationsUseCaseImpl {
     async fn access_check(
         &self,
         dataset_ids: &[Cow<'_, odf::DatasetID>],
@@ -66,38 +68,41 @@ impl RebacApplyRolesMatrixUseCaseImpl {
 }
 
 #[async_trait::async_trait]
-impl RebacApplyRolesMatrixUseCase for RebacApplyRolesMatrixUseCaseImpl {
+impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCaseImpl {
     async fn execute(
         &self,
-        account_ids: &[&odf::AccountID],
-        datasets_with_role_operations: &[(Cow<odf::DatasetID>, DatasetRoleOperation)],
+        operations: &[AccountDatasetRelationOperation],
     ) -> Result<(), ApplyRelationMatrixError> {
         {
-            let datasets_ids = datasets_with_role_operations
+            let mut seen = HashSet::new();
+            let datasets_ids = operations
                 .iter()
-                .map(|(dataset_id, _)| Cow::Borrowed(dataset_id.as_ref()))
+                .filter(|op| seen.insert(op.dataset_id.as_ref()))
+                .map(|op| Cow::Borrowed(op.dataset_id.as_ref()))
                 .collect::<Vec<_>>();
+
             self.access_check(&datasets_ids).await?;
         }
 
-        for (dataset_id, role_operation) in datasets_with_role_operations {
-            for account_id in account_ids {
-                match role_operation {
-                    DatasetRoleOperation::Set(role) => {
-                        self.rebac_service
-                            .set_account_dataset_relation(account_id, *role, dataset_id)
-                            .await
-                            .int_err()?;
-                    }
-                    DatasetRoleOperation::Unset => {
-                        self.rebac_service
-                            .unset_accounts_dataset_relations(account_ids, dataset_id)
-                            .await
-                            .int_err()?;
-                        // For unset, we can apply it for all accounts at once, so we stop iterating
-                        // further.
-                        break;
-                    }
+        // TODO: batch operations
+        for AccountDatasetRelationOperation {
+            account_id,
+            operation,
+            dataset_id,
+        } in operations
+        {
+            match operation {
+                DatasetRoleOperation::Set(role) => {
+                    self.rebac_service
+                        .set_account_dataset_relation(account_id, *role, dataset_id)
+                        .await
+                        .int_err()?;
+                }
+                DatasetRoleOperation::Unset => {
+                    self.rebac_service
+                        .unset_accounts_dataset_relations(&[account_id], dataset_id)
+                        .await
+                        .int_err()?;
                 }
             }
         }

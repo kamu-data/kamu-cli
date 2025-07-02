@@ -7,16 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_auth_rebac::DatasetRoleOperation as DomainDatasetRoleOperation;
+use std::borrow::Cow;
+
+use kamu_auth_rebac::{
+    AccountDatasetRelationOperation as DomainAccountDatasetRelationOperation,
+    DatasetRoleOperation as DomainDatasetRoleOperation,
+};
 
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject)]
-pub struct DatasetWithRoleOperation {
-    pub dataset_id: DatasetID<'static>,
+pub struct AccountDatasetRelationOperation {
+    pub account_id: AccountID<'static>,
     pub operation: DatasetRoleOperation,
+    pub dataset_id: DatasetID<'static>,
 }
 
 #[derive(OneofObject, Copy, Clone)]
@@ -42,6 +48,16 @@ impl From<DatasetRoleOperation> for DomainDatasetRoleOperation {
         match v {
             DatasetRoleOperation::Set(op) => DomainDatasetRoleOperation::Set(op.role.into()),
             DatasetRoleOperation::Unset(_) => DomainDatasetRoleOperation::Unset,
+        }
+    }
+}
+
+impl<'a> From<&'a AccountDatasetRelationOperation> for DomainAccountDatasetRelationOperation<'a> {
+    fn from(v: &'a AccountDatasetRelationOperation) -> Self {
+        DomainAccountDatasetRelationOperation {
+            account_id: Cow::Borrowed(v.account_id.as_ref()),
+            operation: v.operation.into(),
+            dataset_id: Cow::Borrowed(v.dataset_id.as_ref()),
         }
     }
 }

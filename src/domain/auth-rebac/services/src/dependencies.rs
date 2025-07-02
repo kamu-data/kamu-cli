@@ -23,7 +23,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add_value(DefaultAccountProperties::default());
     b.add_value(DefaultDatasetProperties::default());
 
-    b.add::<RebacApplyRolesMatrixUseCaseImpl>();
+    b.add::<ApplyAccountDatasetRelationsUseCaseImpl>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
