@@ -2172,18 +2172,7 @@ type FlowEventTriggerAdded implements FlowEvent {
 }
 
 type FlowFailedError {
-	reason: FlowFailureReason!
-}
-
-union FlowFailureReason = FlowFailureReasonGeneral | FlowFailureReasonInputDatasetCompacted
-
-type FlowFailureReasonGeneral {
-	message: String!
-}
-
-type FlowFailureReasonInputDatasetCompacted {
-	inputDataset: Dataset!
-	message: String!
+	reason: TaskFailureReason!
 }
 
 scalar FlowID
@@ -3552,24 +3541,34 @@ type Task {
 	finishedAt: DateTime
 }
 
+union TaskFailureReason = TaskFailureReasonGeneral | TaskFailureReasonInputDatasetCompacted
+
+type TaskFailureReasonGeneral {
+	message: String!
+}
+
+type TaskFailureReasonInputDatasetCompacted {
+	inputDataset: Dataset!
+	message: String!
+}
+
 scalar TaskID
 
 """
 Describes a certain final outcome of the task
 """
-enum TaskOutcome {
-	"""
-	Task succeeded
-	"""
-	SUCCESS
-	"""
-	Task failed to complete
-	"""
-	FAILED
-	"""
-	Task was cancelled by a user
-	"""
-	CANCELLED
+union TaskOutcome = TaskOutcomeSuccess | TaskOutcomeFailed | TaskOutcomeCancelled
+
+type TaskOutcomeCancelled {
+	message: String!
+}
+
+type TaskOutcomeFailed {
+	reason: TaskFailureReason!
+}
+
+type TaskOutcomeSuccess {
+	message: String!
 }
 
 """

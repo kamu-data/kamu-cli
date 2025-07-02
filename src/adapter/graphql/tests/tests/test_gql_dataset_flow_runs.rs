@@ -361,7 +361,9 @@ async fn test_trigger_ingest_root_dataset() {
                                             {
                                                 "taskId": "0",
                                                 "status": "FINISHED",
-                                                "outcome": "SUCCESS"
+                                                "outcome": {
+                                                    "__typename": "TaskOutcomeSuccess",
+                                                }
                                             }
                                         ],
                                         "initiator": {
@@ -519,7 +521,9 @@ async fn test_trigger_reset_root_dataset_flow() {
                                             {
                                                 "taskId": "0",
                                                 "status": "FINISHED",
-                                                "outcome": "SUCCESS",
+                                                "outcome": {
+                                                    "__typename": "TaskOutcomeSuccess",
+                                                },
                                             }
                                         ],
                                         "initiator": {
@@ -835,7 +839,9 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             {
                                                 "taskId": "0",
                                                 "status": "FINISHED",
-                                                "outcome": "SUCCESS",
+                                                "outcome": {
+                                                    "__typename": "TaskOutcomeSuccess",
+                                                }
                                             }
                                         ],
                                         "initiator": {
@@ -1192,7 +1198,9 @@ async fn test_trigger_compaction_root_dataset() {
                                             {
                                                 "taskId": "0",
                                                 "status": "FINISHED",
-                                                "outcome": "SUCCESS",
+                                                "outcome": {
+                                                    "__typename": "TaskOutcomeSuccess",
+                                                },
                                             }
                                         ],
                                         "initiator": {
@@ -2717,7 +2725,9 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             {
                                                 "taskId": "0",
                                                 "status": "FINISHED",
-                                                "outcome": "SUCCESS",
+                                                "outcome": {
+                                                    "__typename": "TaskOutcomeSuccess",
+                                                },
                                             }
                                         ],
                                         "initiator": {
@@ -2858,7 +2868,9 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             {
                                                 "taskId": "1",
                                                 "status": "FINISHED",
-                                                "outcome": "FAILED",
+                                                "outcome": {
+                                                    "__typename": "TaskOutcomeFailed",
+                                                },
                                             }
                                         ],
                                         "initiator": {
@@ -3393,10 +3405,10 @@ impl FlowRunsHarness {
                                             }
                                             ...on FlowFailedError {
                                                 reason {
-                                                    ...on FlowFailureReasonGeneral {
+                                                    ...on TaskFailureReasonGeneral {
                                                         message
                                                     }
-                                                    ...on FlowFailureReasonInputDatasetCompacted {
+                                                    ...on TaskFailureReasonInputDatasetCompacted {
                                                         message
                                                         inputDataset {
                                                             id
@@ -3413,7 +3425,9 @@ impl FlowRunsHarness {
                                         tasks {
                                             taskId
                                             status
-                                            outcome
+                                            outcome {
+                                                __typename
+                                            }
                                         }
                                         initiator {
                                             id
@@ -3589,7 +3603,7 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailureReasonGeneral {
+                                                        ...on TaskFailureReasonGeneral {
                                                             message
                                                         }
                                                     }
@@ -3633,10 +3647,10 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailureReasonGeneral {
+                                                        ...on TaskFailureReasonGeneral {
                                                             message
                                                         }
-                                                        ...on FlowFailureReasonInputDatasetCompacted {
+                                                        ...on TaskFailureReasonInputDatasetCompacted {
                                                             message
                                                             inputDataset {
                                                                 id
@@ -3698,10 +3712,10 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailureReasonGeneral {
+                                                        ...on TaskFailureReasonGeneral {
                                                             message
                                                         }
-                                                        ...on FlowFailureReasonInputDatasetCompacted {
+                                                        ...on TaskFailureReasonInputDatasetCompacted {
                                                             message
                                                             inputDataset {
                                                                 id
@@ -3751,7 +3765,7 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailureReasonGeneral {
+                                                        ...on TaskFailureReasonGeneral {
                                                             message
                                                         }
                                                     }
@@ -3808,7 +3822,7 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailureReasonGeneral {
+                                                        ...on TaskFailureReasonGeneral {
                                                             message
                                                         }
                                                     }
@@ -3857,10 +3871,10 @@ impl FlowRunsHarness {
                                                 }
                                                 ...on FlowFailedError {
                                                     reason {
-                                                        ...on FlowFailureReasonGeneral {
+                                                        ...on TaskFailureReasonGeneral {
                                                             message
                                                         }
-                                                        ...on FlowFailureReasonInputDatasetCompacted {
+                                                        ...on TaskFailureReasonInputDatasetCompacted {
                                                             message
                                                             inputDataset {
                                                                 id
