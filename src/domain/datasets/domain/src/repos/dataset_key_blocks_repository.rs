@@ -31,7 +31,7 @@ pub trait DatasetKeyBlockRepository: Send + Sync {
 
     async fn match_datasets_having_blocks(
         &self,
-        dataset_ids: Vec<DatasetID>,
+        dataset_ids: &[odf::DatasetID],
         block_ref: &BlockRef,
         event_type: MetadataEventType,
     ) -> Result<Vec<(DatasetID, DatasetKeyBlock)>, InternalError>;

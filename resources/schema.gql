@@ -2063,6 +2063,7 @@ union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDat
 
 type FlowDescriptionDatasetExecuteTransform {
 	transformResult: FlowDescriptionUpdateResult
+	transform: SetTransform!
 }
 
 type FlowDescriptionDatasetHardCompaction {

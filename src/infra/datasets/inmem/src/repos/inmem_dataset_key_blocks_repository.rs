@@ -102,7 +102,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
 
     async fn match_datasets_having_blocks(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
     ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError> {
@@ -118,7 +118,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
                     .rev()
                     .find(|block| block.event_kind == event_type)
             {
-                result.push((dataset_id, block.clone()));
+                result.push((dataset_id.clone(), block.clone()));
             }
         }
 

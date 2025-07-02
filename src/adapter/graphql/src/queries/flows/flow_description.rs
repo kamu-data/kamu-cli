@@ -70,11 +70,13 @@ pub(crate) struct FlowDescriptionDatasetPushIngest {
     input_records_count: u64,
     ingest_result: Option<FlowDescriptionUpdateResult>,
     message: String,
+    // TODO: SetPushSource
 }
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetExecuteTransform {
     transform_result: Option<FlowDescriptionUpdateResult>,
+    transform: SetTransform,
 }
 
 #[derive(SimpleObject)]
@@ -314,6 +316,7 @@ impl FlowDescriptionResetResult {
 
 pub struct FlowDescriptionBuilder {
     polling_sources_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetPollingSource>,
+    transforms_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetTransform>,
 }
 
 impl FlowDescriptionBuilder {
@@ -321,20 +324,25 @@ impl FlowDescriptionBuilder {
         ctx: &Context<'_>,
         flow_states: &[fs::FlowState],
     ) -> Result<Self, InternalError> {
+        let unique_dataset_ids = FlowDescriptionBuilder::collect_unique_dataset_ids(flow_states);
+
         Ok(Self {
             polling_sources_by_dataset_id: HashMap::from_iter(
-                FlowDescriptionBuilder::detect_datasets_with_polling_sources(ctx, flow_states)
+                FlowDescriptionBuilder::detect_datasets_with_polling_sources(
+                    ctx,
+                    &unique_dataset_ids,
+                )
+                .await?,
+            ),
+            transforms_by_dataset_id: HashMap::from_iter(
+                FlowDescriptionBuilder::detect_datasets_with_transforms(ctx, &unique_dataset_ids)
                     .await?,
             ),
         })
     }
 
-    async fn detect_datasets_with_polling_sources(
-        ctx: &Context<'_>,
-        flow_states: &[fs::FlowState],
-    ) -> Result<Vec<(odf::DatasetID, odf::metadata::SetPollingSource)>, InternalError> {
-        // Collect unique dataset IDs from flow states
-        let dataset_ids = flow_states
+    fn collect_unique_dataset_ids(flow_states: &[fs::FlowState]) -> Vec<odf::DatasetID> {
+        flow_states
             .iter()
             .filter_map(|flow_state| {
                 if let fs::FlowScope::Dataset { dataset_id } = &flow_state.flow_binding.scope {
@@ -345,8 +353,13 @@ impl FlowDescriptionBuilder {
             })
             .collect::<HashSet<_>>()
             .into_iter()
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    }
 
+    async fn detect_datasets_with_polling_sources(
+        ctx: &Context<'_>,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<Vec<(odf::DatasetID, odf::metadata::SetPollingSource)>, InternalError> {
         // Locate datasets with polling sources
         let key_blocks_repository =
             from_catalog_n!(ctx, dyn kamu_datasets::DatasetKeyBlockRepository);
@@ -370,8 +383,44 @@ impl FlowDescriptionBuilder {
                 results.push((dataset_id, set_polling_source));
             } else {
                 panic!(
-                    "Expected SetPollingSource event for dataset: {}, but found None",
-                    dataset_id
+                    "Expected SetPollingSource event for dataset: {}, but found: {:?}",
+                    dataset_id, metadata_block.event
+                );
+            }
+        }
+
+        Ok(results)
+    }
+
+    async fn detect_datasets_with_transforms(
+        ctx: &Context<'_>,
+        dataset_ids: &[odf::DatasetID],
+    ) -> Result<Vec<(odf::DatasetID, odf::metadata::SetTransform)>, InternalError> {
+        // Locate datasets with transforms
+        let key_blocks_repository =
+            from_catalog_n!(ctx, dyn kamu_datasets::DatasetKeyBlockRepository);
+        let matches = key_blocks_repository
+            .match_datasets_having_blocks(
+                dataset_ids,
+                &odf::BlockRef::Head,
+                kamu_datasets::MetadataEventType::SetTransform,
+            )
+            .await?;
+
+        let mut results = Vec::new();
+        for (dataset_id, key_block) in matches {
+            let metadata_block = odf::storage::deserialize_metadata_block(
+                &key_block.block_hash,
+                &key_block.block_payload,
+            )
+            .int_err()?;
+
+            if let odf::MetadataEvent::SetTransform(set_transform) = metadata_block.event {
+                results.push((dataset_id, set_transform));
+            } else {
+                panic!(
+                    "Expected SetTransform event for dataset: {}, but found: {:?}",
+                    dataset_id, metadata_block.event
                 );
             }
         }
@@ -430,11 +479,10 @@ impl FlowDescriptionBuilder {
                 .await
                 .int_err()?;
 
-                if let Some(polling_source) = self.polling_sources_by_dataset_id.remove(dataset_id)
-                {
+                if let Some(polling_source) = self.polling_sources_by_dataset_id.get(dataset_id) {
                     FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
                         ingest_result,
-                        polling_source: polling_source.into(),
+                        polling_source: polling_source.clone().into(),
                     })
                 } else {
                     let source_name = flow_state.primary_trigger().push_source_name();
@@ -455,15 +503,27 @@ impl FlowDescriptionBuilder {
                 let increment_query_service =
                     from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
 
-                FlowDescriptionDataset::ExecuteTransform(FlowDescriptionDatasetExecuteTransform {
-                    transform_result: FlowDescriptionUpdateResult::from_maybe_flow_outcome(
+                if let Some(transform) = self.transforms_by_dataset_id.get(dataset_id) {
+                    let transform_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                         flow_state.outcome.as_ref(),
                         dataset_id,
                         increment_query_service.as_ref(),
                     )
                     .await
-                    .int_err()?,
-                })
+                    .int_err()?;
+
+                    FlowDescriptionDataset::ExecuteTransform(
+                        FlowDescriptionDatasetExecuteTransform {
+                            transform_result,
+                            transform: transform.clone().into(),
+                        },
+                    )
+                } else {
+                    panic!(
+                        "Expected SetTransform event for dataset: {}, but found None",
+                        dataset_id
+                    );
+                }
             }
 
             FLOW_TYPE_DATASET_COMPACT => {
