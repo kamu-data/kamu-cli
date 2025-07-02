@@ -1,0 +1,51 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE\n            FROM auth_rebac_relations\n            WHERE (subject_entity_type, subject_entity_id, object_entity_type, object_entity_id) IN\n                  (SELECT *\n                   FROM UNNEST($1::rebac_entity_type[],\n                               $2::TEXT[],\n                               $3::rebac_entity_type[],\n                               $4::TEXT[]));\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "rebac_entity_type[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "rebac_entity_type",
+                  "kind": {
+                    "Enum": [
+                      "account",
+                      "dataset"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray",
+        {
+          "Custom": {
+            "name": "rebac_entity_type[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "rebac_entity_type",
+                  "kind": {
+                    "Enum": [
+                      "account",
+                      "dataset"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "db20a7ddeedc938eec2892a34a0dd73b12845064f438c7de3a0c0e5541450546"
+}
