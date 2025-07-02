@@ -363,6 +363,10 @@ impl FlowDescriptionBuilder {
         // Locate datasets with polling sources
         let key_blocks_repository =
             from_catalog_n!(ctx, dyn kamu_datasets::DatasetKeyBlockRepository);
+
+        // TODO: to be more precise, we should query the key block within the sequence
+        // number range of the head at the flow launch moment,
+        // as metadata might have already evolved by now
         let matches = key_blocks_repository
             .match_datasets_having_blocks(
                 dataset_ids,
@@ -399,6 +403,10 @@ impl FlowDescriptionBuilder {
         // Locate datasets with transforms
         let key_blocks_repository =
             from_catalog_n!(ctx, dyn kamu_datasets::DatasetKeyBlockRepository);
+
+        // TODO: to be more precise, we should query the key block within the sequence
+        // number range of the head at the flow launch moment,
+        // as metadata might have already evolved by now
         let matches = key_blocks_repository
             .match_datasets_having_blocks(
                 dataset_ids,
