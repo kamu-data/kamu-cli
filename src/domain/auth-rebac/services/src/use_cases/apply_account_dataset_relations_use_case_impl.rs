@@ -18,6 +18,8 @@ use kamu_auth_rebac::{
     ApplyRelationMatrixError,
     DatasetRoleOperation,
     RebacService,
+    SetAccountDatasetRelationsOperation,
+    UnsetAccountDatasetRelationsOperation,
 };
 use kamu_core::auth;
 use kamu_core::auth::{DatasetAction, DatasetActionUnauthorizedError};
@@ -73,6 +75,10 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
         &self,
         operations: &[AccountDatasetRelationOperation],
     ) -> Result<(), ApplyRelationMatrixError> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+
         {
             let mut seen = HashSet::new();
             let datasets_ids = operations
@@ -84,7 +90,11 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
             self.access_check(&datasets_ids).await?;
         }
 
-        // TODO: batch operations
+        const BATCH_SIZE: usize = 1000;
+
+        let mut upsert_operations = Vec::with_capacity(operations.len() / 2);
+        let mut delete_operations = Vec::with_capacity(operations.len() / 2);
+
         for AccountDatasetRelationOperation {
             account_id,
             operation,
@@ -93,18 +103,33 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
         {
             match operation {
                 DatasetRoleOperation::Set(role) => {
-                    self.rebac_service
-                        .set_account_dataset_relation(account_id, *role, dataset_id)
-                        .await
-                        .int_err()?;
+                    upsert_operations.push(SetAccountDatasetRelationsOperation {
+                        account_id: Cow::Borrowed(account_id.as_ref()),
+                        relationship: *role,
+                        dataset_id: Cow::Borrowed(dataset_id.as_ref()),
+                    });
                 }
                 DatasetRoleOperation::Unset => {
-                    self.rebac_service
-                        .unset_accounts_dataset_relations(&[account_id], dataset_id)
-                        .await
-                        .int_err()?;
+                    delete_operations.push(UnsetAccountDatasetRelationsOperation {
+                        account_id: Cow::Borrowed(account_id.as_ref()),
+                        dataset_id: Cow::Borrowed(dataset_id.as_ref()),
+                    });
                 }
             }
+        }
+
+        for upsert_chunk in upsert_operations.chunks(BATCH_SIZE) {
+            self.rebac_service
+                .set_account_dataset_relations(upsert_chunk)
+                .await
+                .int_err()?;
+        }
+
+        for delete_chuck in delete_operations.chunks(BATCH_SIZE) {
+            self.rebac_service
+                .unset_account_dataset_relations(delete_chuck)
+                .await
+                .int_err()?;
         }
 
         Ok(())

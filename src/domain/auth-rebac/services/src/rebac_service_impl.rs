@@ -300,6 +300,32 @@ impl RebacService for RebacServiceImpl {
         Ok(())
     }
 
+    async fn set_account_dataset_relations(
+        &self,
+        operations: &[SetAccountDatasetRelationsOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError> {
+        let upsert_operations = operations
+            .iter()
+            .map(|op| {
+                let account_entity = Entity::new_account(op.account_id.to_string());
+                let dataset_entity = Entity::new_account(op.dataset_id.to_string());
+
+                UpsertEntitiesRelationOperation {
+                    subject_entity: Cow::Owned(account_entity),
+                    relationship: Relation::AccountToDataset(op.relationship),
+                    object_entity: Cow::Owned(dataset_entity),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        self.rebac_repo
+            .upsert_entities_relations(&upsert_operations)
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
     async fn unset_accounts_dataset_relations(
         &self,
         account_ids: &[&odf::AccountID],
@@ -323,6 +349,26 @@ impl RebacService for RebacServiceImpl {
 
         self.rebac_repo
             .delete_entities_relations(&operations)
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
+    async fn unset_account_dataset_relations(
+        &self,
+        operations: &[UnsetAccountDatasetRelationsOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError> {
+        let delete_operations = operations
+            .iter()
+            .map(|op| DeleteEntitiesRelationOperation {
+                subject_entity: Cow::Owned(Entity::new_account(op.account_id.to_string())),
+                object_entity: Cow::Owned(Entity::new_account(op.dataset_id.to_string())),
+            })
+            .collect::<Vec<_>>();
+
+        self.rebac_repo
+            .delete_entities_relations(&delete_operations)
             .await
             .int_err()?;
 
