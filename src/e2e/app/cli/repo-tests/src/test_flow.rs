@@ -463,11 +463,11 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                   }
                   ... on FlowFailedError {
                     reason {
-                      ... on FlowFailureReasonGeneral {
+                      ... on TaskFailureReasonGeneral {
                         message
                         __typename
                       }
-                      ... on FlowFailureReasonInputDatasetCompacted {
+                      ... on TaskFailureReasonInputDatasetCompacted {
                         message
                         inputDataset {
                           ...DatasetBasics
@@ -1291,7 +1291,7 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                   "outcome": {
                                     "__typename": "FlowFailedError",
                                     "reason": {
-                                      "__typename": "FlowFailureReasonGeneral",
+                                      "__typename": "TaskFailureReasonGeneral",
                                       "message": "FAILED"
                                     }
                                   },
@@ -1324,7 +1324,7 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                 "outcome": {
                                   "__typename": "FlowFailedError",
                                   "reason": {
-                                    "__typename": "FlowFailureReasonGeneral",
+                                    "__typename": "TaskFailureReasonGeneral",
                                     "message": "FAILED"
                                   }
                                 },
@@ -1356,7 +1356,7 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
                                 "outcome": {
                                   "__typename": "FlowFailedError",
                                   "reason": {
-                                    "__typename": "FlowFailureReasonGeneral",
+                                    "__typename": "TaskFailureReasonGeneral",
                                     "message": "FAILED"
                                   }
                                 },
@@ -1740,11 +1740,11 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
           }
           ... on FlowFailedError {
             reason {
-              ... on FlowFailureReasonGeneral {
+              ... on TaskFailureReasonGeneral {
                 message
                 __typename
               }
-              ... on FlowFailureReasonInputDatasetCompacted {
+              ... on TaskFailureReasonInputDatasetCompacted {
                 message
                 inputDataset {
                   ...DatasetBasics

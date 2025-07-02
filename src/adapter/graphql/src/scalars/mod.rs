@@ -37,7 +37,7 @@ mod odf_generated;
 mod os_path;
 mod pagination;
 mod task_id;
-mod task_status_outcome;
+mod task_status;
 mod webhook_scalars;
 
 pub use access_token::*;
@@ -70,7 +70,7 @@ pub use odf_generated::*;
 pub use os_path::*;
 pub use pagination::*;
 pub use task_id::*;
-pub use task_status_outcome::*;
+pub use task_status::*;
 pub use webhook_scalars::*;
 
 macro_rules! simple_scalar {

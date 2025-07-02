@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod task;
+mod task_outcome;
 
 pub(crate) use task::*;
+pub(crate) use task_outcome::*;

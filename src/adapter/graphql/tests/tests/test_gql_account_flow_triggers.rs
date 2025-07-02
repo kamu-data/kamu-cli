@@ -714,10 +714,10 @@ impl FlowTriggerHarness {
                                           }
                                           ...on FlowFailedError {
                                               reason {
-                                                  ...on FlowFailureReasonGeneral {
+                                                  ...on TaskFailureReasonGeneral {
                                                       message
                                                   }
-                                                  ...on FlowFailureReasonInputDatasetCompacted {
+                                                  ...on TaskFailureReasonInputDatasetCompacted {
                                                       message
                                                       inputDataset {
                                                           id
@@ -734,7 +734,9 @@ impl FlowTriggerHarness {
                                       tasks {
                                           taskId
                                           status
-                                          outcome
+                                          outcome {
+                                            __typename
+                                          }
                                       }
                                       primaryTrigger {
                                           __typename
@@ -816,10 +818,10 @@ impl FlowTriggerHarness {
                                               }
                                               ...on FlowFailedError {
                                                   reason {
-                                                    ...on FlowFailureReasonGeneral {
+                                                    ...on TaskFailureReasonGeneral {
                                                         message
                                                     }
-                                                    ...on FlowFailureReasonInputDatasetCompacted {
+                                                    ...on TaskFailureReasonInputDatasetCompacted {
                                                           message
                                                           inputDataset {
                                                               id
@@ -866,7 +868,7 @@ impl FlowTriggerHarness {
                                               }
                                               ...on FlowFailedError {
                                                   reason {
-                                                    ...on FlowFailureReasonGeneral {
+                                                    ...on TaskFailureReasonGeneral {
                                                         message
                                                     }
                                                   }
