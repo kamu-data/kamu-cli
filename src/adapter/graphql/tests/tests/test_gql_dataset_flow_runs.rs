@@ -2554,7 +2554,8 @@ async fn test_history_of_completed_flow() {
                                             "taskStatus": "QUEUED",
                                             "task": {
                                                 "taskId": "0",
-                                            }
+                                            },
+                                            "nextAttemptAt": null,
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
@@ -2563,7 +2564,8 @@ async fn test_history_of_completed_flow() {
                                             "taskStatus": "RUNNING",
                                             "task": {
                                                 "taskId": "0",
-                                            }
+                                            },
+                                            "nextAttemptAt": null,
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
@@ -2572,7 +2574,8 @@ async fn test_history_of_completed_flow() {
                                             "taskStatus": "FINISHED",
                                             "task": {
                                                 "taskId": "0",
-                                            }
+                                            },
+                                            "nextAttemptAt": null,
                                         }
                                     ]
                                 }
@@ -3544,6 +3547,7 @@ impl FlowRunsHarness {
                                                     task {
                                                         taskId
                                                     }
+                                                    nextAttemptAt
                                                 }
                                             }
                                         }
