@@ -269,6 +269,13 @@ impl RebacRepository for SqliteRebacRepository {
         Ok(())
     }
 
+    async fn upsert_entities_relations(
+        &self,
+        _operations: &[UpsertEntitiesRelationOperations<'_>],
+    ) -> Result<(), InsertEntitiesRelationError> {
+        todo!()
+    }
+
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,

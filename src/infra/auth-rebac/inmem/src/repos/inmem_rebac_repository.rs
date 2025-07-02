@@ -32,6 +32,7 @@ use kamu_auth_rebac::{
     SetEntityPropertyError,
     SubjectEntityRelationsByObjectTypeError,
     SubjectEntityRelationsError,
+    UpsertEntitiesRelationOperations,
 };
 use tokio::sync::RwLock;
 
@@ -225,6 +226,13 @@ impl RebacRepository for InMemoryRebacRepository {
         writable_state.entities_relations_rows.insert(new_row);
 
         Ok(())
+    }
+
+    async fn upsert_entities_relations(
+        &self,
+        _operations: &[UpsertEntitiesRelationOperations<'_>],
+    ) -> Result<(), InsertEntitiesRelationError> {
+        todo!()
     }
 
     async fn delete_entities_relation(

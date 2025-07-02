@@ -270,6 +270,64 @@ impl RebacRepository for PostgresRebacRepository {
         Ok(())
     }
 
+    async fn upsert_entities_relations(
+        &self,
+        operations: &[UpsertEntitiesRelationOperations<'_>],
+    ) -> Result<(), InsertEntitiesRelationError> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut subject_entity_types = Vec::with_capacity(operations.len());
+        let mut subject_entity_ids = Vec::with_capacity(operations.len());
+        let mut relationships = Vec::with_capacity(operations.len());
+        let mut object_entity_types = Vec::with_capacity(operations.len());
+        let mut object_entity_ids = Vec::with_capacity(operations.len());
+
+        for op in operations {
+            subject_entity_types.push(op.subject_entity.entity_type);
+            subject_entity_ids.push(op.subject_entity.entity_id.as_ref());
+            relationships.push(op.relationship.to_string());
+            object_entity_types.push(op.object_entity.entity_type);
+            object_entity_ids.push(op.object_entity.entity_id.as_ref());
+        }
+
+        sqlx::query!(
+            r#"
+            INSERT INTO auth_rebac_relations (subject_entity_type,
+                                              subject_entity_id,
+                                              relationship,
+                                              object_entity_type,
+                                              object_entity_id)
+            SELECT *
+            FROM UNNEST($1::rebac_entity_type[],
+                        $2::text[],
+                        $3::text[],
+                        $4::rebac_entity_type[],
+                        $5::text[])
+            ON CONFLICT(subject_entity_type,
+                        subject_entity_id,
+                        object_entity_type,
+                        object_entity_id)
+                DO UPDATE SET relationship = excluded.relationship
+            "#,
+            subject_entity_types as Vec<EntityType>,
+            subject_entity_ids.as_slice() as &[&str],
+            &relationships,
+            object_entity_types as Vec<EntityType>,
+            object_entity_ids.as_slice() as &[&str],
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,

@@ -64,6 +64,11 @@ pub trait RebacRepository: Send + Sync {
         object_entity: &Entity,
     ) -> Result<(), InsertEntitiesRelationError>;
 
+    async fn upsert_entities_relations(
+        &self,
+        operations: &[UpsertEntitiesRelationOperations<'_>],
+    ) -> Result<(), InsertEntitiesRelationError>;
+
     async fn delete_entities_relation(
         &self,
         subject_entity: &Entity,
@@ -102,6 +107,14 @@ pub trait RebacRepository: Send + Sync {
         subject_entities: Vec<Entity<'static>>,
         object_entity: &Entity,
     ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct UpsertEntitiesRelationOperations<'a> {
+    pub subject_entity: &'a Entity<'a>,
+    pub relationship: Relation,
+    pub object_entity: &'a Entity<'a>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

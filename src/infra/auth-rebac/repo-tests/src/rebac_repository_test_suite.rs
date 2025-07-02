@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::vec;
@@ -28,7 +27,9 @@ use kamu_auth_rebac::{
     RebacRepository,
     RebacRepositoryExt,
     Relation,
+    UpsertEntitiesRelationOperations,
 };
+use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -363,6 +364,168 @@ pub async fn test_try_insert_another_entities_relation(catalog: &Catalog) {
             if e.subject_entity == account
                 && e.object_entity == dataset
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_upsert_entities_relations(catalog: &Catalog) {
+    let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
+
+    let account_1 = Entity::new_account("account1");
+    let account_2 = Entity::new_account("account2");
+
+    let dataset_1 = Entity::new_dataset("dataset1");
+    let dataset_2 = Entity::new_dataset("dataset2");
+    let dataset_3 = Entity::new_dataset("dataset3");
+
+    let reader = Relation::account_is_a_dataset_reader();
+    let editor = Relation::account_is_a_dataset_editor();
+
+    // Initial
+    let account_1_initial_state = CrossoverTestState {
+        account_id: "account1",
+        dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+        relation_map: HashMap::from([(
+            Relation::account_is_a_dataset_reader(),
+            ["dataset1", "dataset2"].into(),
+        )]),
+    };
+    let account_2_initial_state = CrossoverTestState {
+        account_id: "account2",
+        dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+        relation_map: HashMap::from([
+            (Relation::account_is_a_dataset_reader(), ["dataset1"].into()),
+            (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
+        ]),
+    };
+
+    {
+        rebac_repo
+            .upsert_entities_relations(&[
+                // Account1
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_1,
+                    relationship: reader,
+                    object_entity: &dataset_1,
+                },
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_1,
+                    relationship: reader,
+                    object_entity: &dataset_2,
+                },
+                // Account2
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_2,
+                    relationship: reader,
+                    object_entity: &dataset_1,
+                },
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_2,
+                    relationship: editor,
+                    object_entity: &dataset_3,
+                },
+            ])
+            .await
+            .unwrap();
+
+        assert_get_relations("1.", &rebac_repo, &account_1_initial_state).await;
+        assert_get_relations("2.", &rebac_repo, &account_2_initial_state).await;
+    }
+
+    // Same operations (idempotence)
+    {
+        rebac_repo
+            .upsert_entities_relations(&[
+                // Account1
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_1,
+                    relationship: reader,
+                    object_entity: &dataset_1,
+                },
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_1,
+                    relationship: reader,
+                    object_entity: &dataset_2,
+                },
+                // Account2
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_2,
+                    relationship: reader,
+                    object_entity: &dataset_1,
+                },
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_2,
+                    relationship: editor,
+                    object_entity: &dataset_3,
+                },
+            ])
+            .await
+            .unwrap();
+
+        assert_get_relations("3.", &rebac_repo, &account_1_initial_state).await;
+        assert_get_relations("4.", &rebac_repo, &account_2_initial_state).await;
+    }
+
+    // Mix of adding and updating
+    {
+        rebac_repo
+            .upsert_entities_relations(&[
+                // Account1
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_1,
+                    relationship: editor, // updating (from reader)
+                    object_entity: &dataset_1,
+                },
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_1,
+                    relationship: editor,
+                    object_entity: &dataset_3, // adding
+                },
+                // Account2
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_2,
+                    relationship: reader,
+                    object_entity: &dataset_2, // adding
+                },
+                UpsertEntitiesRelationOperations {
+                    subject_entity: &account_2,
+                    relationship: reader, // updating (from editor)
+                    object_entity: &dataset_3,
+                },
+            ])
+            .await
+            .unwrap();
+
+        assert_get_relations(
+            "5.",
+            &rebac_repo,
+            &CrossoverTestState {
+                account_id: "account1",
+                dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+                relation_map: HashMap::from([
+                    (Relation::account_is_a_dataset_reader(), ["dataset2"].into()),
+                    (
+                        Relation::account_is_a_dataset_editor(),
+                        ["dataset1", "dataset3"].into(),
+                    ),
+                ]),
+            },
+        )
+        .await;
+        assert_get_relations(
+            "6.",
+            &rebac_repo,
+            &CrossoverTestState {
+                account_id: "account2",
+                dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+                relation_map: HashMap::from([(
+                    Relation::account_is_a_dataset_reader(),
+                    ["dataset1", "dataset2", "dataset3"].into(),
+                )]),
+            },
+        )
+        .await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
