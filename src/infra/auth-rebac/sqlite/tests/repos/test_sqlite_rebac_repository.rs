@@ -96,7 +96,7 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = postgres,
+    storage = sqlite,
     fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relations,
     harness = SqliteRebacRepositoryHarness
 );

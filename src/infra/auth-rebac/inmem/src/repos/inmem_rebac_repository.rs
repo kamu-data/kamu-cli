@@ -385,6 +385,13 @@ impl RebacRepository for InMemoryRebacRepository {
 
         Ok(())
     }
+
+    async fn delete_entities_relations(
+        &self,
+        _operations: &[DeleteEntitiesRelationOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError> {
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

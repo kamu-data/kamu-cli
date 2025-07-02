@@ -561,6 +561,13 @@ impl RebacRepository for SqliteRebacRepository {
 
         Ok(())
     }
+
+    async fn delete_entities_relations(
+        &self,
+        _operations: &[DeleteEntitiesRelationOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError> {
+        todo!()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

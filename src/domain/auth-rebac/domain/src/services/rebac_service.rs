@@ -16,6 +16,7 @@ use crate::{
     AccountPropertyName,
     AccountToDatasetRelation,
     DatasetPropertyName,
+    DeleteEntitiesRelationsError,
     EntityNotFoundError,
     EntityWithRelation,
     GetObjectEntityRelationsError,
@@ -24,6 +25,7 @@ use crate::{
     PropertyValue,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
+    UpsertEntitiesRelationsError,
     boolean_property_value,
 };
 
@@ -87,13 +89,13 @@ pub trait RebacService: Send + Sync {
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), SetRelationError>;
+    ) -> Result<(), UpsertEntitiesRelationsError>;
 
     async fn unset_accounts_dataset_relations(
         &self,
         account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), UnsetRelationError>;
+    ) -> Result<(), DeleteEntitiesRelationsError>;
 
     async fn get_account_dataset_relations(
         &self,
@@ -229,22 +231,6 @@ pub enum DeletePropertiesError {
 
 #[derive(Error, Debug)]
 pub enum GetPropertiesError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum SetRelationError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum UnsetRelationError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
