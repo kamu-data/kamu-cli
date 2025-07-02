@@ -81,18 +81,21 @@ impl FlowEvent {
                 e.event_time,
                 e.task_id,
                 TaskStatus::Queued,
+                None,
             )),
             fs::FlowEvent::TaskRunning(e) => Self::TaskChanged(FlowEventTaskChanged::new(
                 event_id,
                 e.event_time,
                 e.task_id,
                 TaskStatus::Running,
+                None,
             )),
             fs::FlowEvent::TaskFinished(e) => Self::TaskChanged(FlowEventTaskChanged::new(
                 event_id,
                 e.event_time,
                 e.task_id,
                 TaskStatus::Finished,
+                e.next_attempt_at,
             )),
             fs::FlowEvent::Aborted(e) => Self::Aborted(FlowEventAborted::new(event_id, &e)),
         })
@@ -222,6 +225,7 @@ pub struct FlowEventTaskChanged {
     event_time: DateTime<Utc>,
     task_id: TaskID,
     task_status: TaskStatus,
+    next_attempt_at: Option<DateTime<Utc>>,
 }
 
 #[ComplexObject]
@@ -232,12 +236,14 @@ impl FlowEventTaskChanged {
         event_time: DateTime<Utc>,
         task_id: ts::TaskID,
         task_status: TaskStatus,
+        next_attempt_at: Option<DateTime<Utc>>,
     ) -> Self {
         Self {
             event_id: event_id.into(),
             event_time,
             task_id: task_id.into(),
             task_status,
+            next_attempt_at,
         }
     }
 
