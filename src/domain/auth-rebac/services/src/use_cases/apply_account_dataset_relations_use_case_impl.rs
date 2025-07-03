@@ -92,8 +92,8 @@ impl ApplyAccountDatasetRelationsUseCase for ApplyAccountDatasetRelationsUseCase
 
         const BATCH_SIZE: usize = 1000;
 
-        let mut upsert_operations = Vec::with_capacity(operations.len() / 2);
-        let mut delete_operations = Vec::with_capacity(operations.len() / 2);
+        let mut upsert_operations = Vec::with_capacity(operations.len());
+        let mut delete_operations = Vec::with_capacity(operations.len());
 
         for AccountDatasetRelationOperation {
             account_id,
