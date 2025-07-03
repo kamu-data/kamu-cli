@@ -21,7 +21,7 @@ use kamu_accounts::{
     MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
 };
 use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryDidSecretKeyRepository};
-use kamu_accounts_services::AccessTokenServiceImpl;
+use kamu_accounts_services::{AccessTokenServiceImpl, AllowAnonymousAuthPolicyServiceImpl};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::SystemTimeSourceDefault;
 
@@ -359,6 +359,7 @@ impl AuthGQLHarness {
                 .add::<AccessTokenServiceImpl>()
                 .add::<InMemoryAccessTokenRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
+                .add::<AllowAnonymousAuthPolicyServiceImpl>()
                 .add_builder(
                     messaging_outbox::OutboxImmediateImpl::builder()
                         .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),

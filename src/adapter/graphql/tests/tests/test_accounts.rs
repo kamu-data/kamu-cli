@@ -1108,8 +1108,10 @@ impl GraphQLAccountsHarness {
             .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
             .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
             .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
+            .add::<kamu_accounts_services::AllowAnonymousAuthPolicyServiceImpl>()
             .add::<time_source::SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
+            .add_value(AuthConfig::sample())
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),

@@ -1,0 +1,60 @@
+    Blocking waiting for file lock on build directory
+   Compiling kamu-accounts v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/domain/accounts/domain)
+   Compiling kamu-auth-rebac-services v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/domain/auth-rebac/services)
+   Compiling kamu-datasets-services v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/domain/datasets/services)
+   Compiling kamu-accounts-inmem v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/accounts/inmem)
+   Compiling kamu-flow-system-services v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/domain/flow-system/services)
+   Compiling kamu-accounts-sqlite v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/accounts/sqlite)
+   Compiling kamu-accounts-postgres v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/accounts/postgres)
+   Compiling kamu-accounts-services v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/domain/accounts/services)
+   Compiling kamu v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/core)
+   Compiling kamu-adapter-auth-oso-rebac v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/adapter/auth-oso-rebac)
+   Compiling kamu-datasets-repo-tests v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/datasets/repo-tests)
+   Compiling kamu-accounts-repo-tests v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/accounts/repo-tests)
+   Compiling kamu-adapter-flight-sql v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/adapter/flight-sql)
+   Compiling kamu-adapter-auth-web3 v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/adapter/auth-web3)
+   Compiling kamu-accounts-mysql v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/accounts/mysql)
+   Compiling kamu-adapter-oauth v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/adapter/oauth)
+   Compiling kamu-webhooks-services v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/domain/webhooks/services)
+   Compiling kamu-datasets-sqlite v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/datasets/sqlite)
+   Compiling kamu-datasets-postgres v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/datasets/postgres)
+   Compiling kamu-datasets-inmem v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/infra/datasets/inmem)
+   Compiling kamu-flow-system v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/domain/flow-system/domain)
+   Compiling kamu-adapter-graphql v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/adapter/graphql)
+   Compiling kamu-adapter-http v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/adapter/http)
+   Compiling kamu-adapter-odata v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/adapter/odata)
+   Compiling kamu-task-system-services v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/domain/task-system/services)
+   Compiling kamu-cli-e2e-common v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/common)
+   Compiling kamu-cli v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/app/cli)
+   Compiling kamu-cli-e2e-repo-tests v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/repo-tests)
+   Compiling kamu-cli-e2e-mysql v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/mysql)
+   Compiling kamu-cli-e2e-postgres v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/postgres)
+   Compiling kamu-cli-e2e-sqlite v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/sqlite)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 32s
+    Starting 2 tests across 170 binaries (2084 skipped; run ID: bed44424-86ab-44d1-86a3-0ac00bf2befc, nextest profile: default)
+        FAIL [   0.033s] kamu-cli-e2e-postgres::mod tests::commands::test_delete_command::gb305::e2e::database::postgres::engine::ingest::datafusion::test_delete_warning
+
+--- STDOUT:              kamu-cli-e2e-postgres::mod tests::commands::test_delete_command::gb305::e2e::database::postgres::engine::ingest::datafusion::test_delete_warning ---
+
+running 1 test
+test tests::commands::test_delete_command::gb305::e2e::database::postgres::engine::ingest::datafusion::test_delete_warning ... FAILED
+
+failures:
+
+failures:
+    tests::commands::test_delete_command::gb305::e2e::database::postgres::engine::ingest::datafusion::test_delete_warning
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 192 filtered out; finished in 0.02s
+
+
+--- STDERR:              kamu-cli-e2e-postgres::mod tests::commands::test_delete_command::gb305::e2e::database::postgres::engine::ingest::datafusion::test_delete_warning ---
+
+thread 'tests::commands::test_delete_command::gb305::e2e::database::postgres::engine::ingest::datafusion::test_delete_warning' panicked at /home/roman-boiko/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sqlx-postgres-0.8.6/src/testing/mod.rs:96:44:
+DATABASE_URL must be set: EnvVar(NotPresent)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+   Canceling due to interrupt: 1 test still running
+     SIGKILL [   1.851s] kamu-cli-e2e-sqlite::mod tests::commands::test_delete_command::g1202::e2e::engine::ingest::datafusion::test_delete_warning
+------------
+     Summary [   2.015s] 2 tests run: 0 passed, 2 failed, 2084 skipped
+error: test run failed

@@ -10,19 +10,22 @@
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
+use crate::AuthPolicyLayer;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn root_router() -> OpenApiRouter {
     use crate::platform::handlers;
 
     OpenApiRouter::new()
+        .routes(routes!(handlers::file_upload_prepare_post_handler))
+        .routes(routes!(handlers::file_upload_post_handler))
+        .routes(routes!(handlers::file_upload_get_handler))
+        .layer(AuthPolicyLayer::new())
         .routes(routes!(handlers::login_handler))
         .routes(routes!(handlers::token_validate_handler))
         .routes(routes!(handlers::token_device_authorization_handler))
         .routes(routes!(handlers::token_device_handler))
-        .routes(routes!(handlers::file_upload_prepare_post_handler))
-        .routes(routes!(handlers::file_upload_post_handler))
-        .routes(routes!(handlers::file_upload_get_handler))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

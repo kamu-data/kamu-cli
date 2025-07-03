@@ -39,6 +39,7 @@ impl Query {
     ///
     /// Datasets are historical streams of events recorded under a certain
     /// schema.
+    #[graphql(guard = "AuthPolicyGuard")]
     async fn datasets(&self) -> Datasets {
         Datasets
     }
@@ -47,6 +48,7 @@ impl Query {
     ///
     /// Accounts can be individual users or organizations registered in the
     /// system. This groups deals with their identities and permissions.
+    #[graphql(guard = "AuthPolicyGuard")]
     async fn accounts(&self) -> Accounts {
         Accounts
     }
@@ -55,16 +57,19 @@ impl Query {
     ///
     /// Webhooks are used to send notifications about events happening in the
     /// system. This groups deals with their management and subscriptions.
+    #[graphql(guard = "AuthPolicyGuard")]
     async fn webhooks(&self) -> Webhooks {
         Webhooks
     }
 
     /// Search-related functionality group
+    #[graphql(guard = "AuthPolicyGuard")]
     async fn search(&self) -> Search {
         Search
     }
 
     /// Querying and data manipulations
+    #[graphql(guard = "AuthPolicyGuard")]
     async fn data(&self) -> DataQueries {
         DataQueries
     }
@@ -92,6 +97,7 @@ impl Mutation {
     ///
     /// Datasets are historical streams of events recorded under a certain
     /// schema.
+    #[graphql(guard = "AuthPolicyGuard")]
     async fn datasets(&self) -> DatasetsMut {
         DatasetsMut
     }
@@ -100,6 +106,7 @@ impl Mutation {
     ///
     /// Accounts can be individual users or organizations registered in the
     /// system. This groups deals with their identities and permissions.
+    #[graphql(guard = "AuthPolicyGuard")]
     async fn accounts(&self) -> AccountsMut {
         AccountsMut
     }

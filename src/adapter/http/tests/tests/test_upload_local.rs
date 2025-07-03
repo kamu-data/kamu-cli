@@ -23,6 +23,7 @@ use kamu::domain::upload_service::{
 use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
+    AuthConfig,
     DEFAULT_ACCOUNT_ID,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
@@ -38,6 +39,7 @@ use kamu_accounts_inmem::{
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AccountServiceImpl,
+    AllowAnonymousAuthPolicyServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
     OAuthDeviceCodeGeneratorDefault,
@@ -102,6 +104,7 @@ impl Harness {
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add_value(DidSecretEncryptionConfig::sample())
                 .add_value(JwtAuthenticationConfig::default())
+                .add_value(AuthConfig::sample())
                 .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add::<UploadServiceLocal>()
@@ -113,6 +116,7 @@ impl Harness {
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<OAuthDeviceCodeGeneratorDefault>()
+                .add::<AllowAnonymousAuthPolicyServiceImpl>()
                 .add::<InMemoryOAuthDeviceCodeRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
@@ -265,6 +269,7 @@ async fn test_attempt_upload_file_authorized() {
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
     let cache_dir = harness.cache_dir.clone();
+    println!("upload_prepare_url: {upload_prepare_url}");
 
     let client = async move {
         let client = reqwest::Client::new();

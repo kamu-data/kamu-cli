@@ -58,11 +58,12 @@ impl KamuCliPuppet {
                     kind: CLIConfig
                     version: 1
                     content:
-                      users:
-                        predefined:
-                          - accountName: e2e-user
-                            password: e2e-user
-                            email: e2e-user@example.com
+                      auth:
+                        users:
+                          predefined:
+                            - accountName: e2e-user
+                              password: e2e-user
+                              email: e2e-user@example.com
                     "#
                 )
                 .into(),

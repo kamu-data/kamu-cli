@@ -30,12 +30,12 @@ const FIXED_SECRET: &str = "6923bdb993ca8290d0705dd13a31956f2853a1de15860ba84182
 
 #[test_log::test(tokio::test)]
 async fn test_list_expected_event_types() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let res = schema
         .execute(
-            async_graphql::Request::new(WebhookSubscriptiuonsHarness::event_types_query())
+            async_graphql::Request::new(WebhookSubscriptionsHarness::event_types_query())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
@@ -57,25 +57,26 @@ async fn test_list_expected_event_types() {
 
 #[test_log::test(tokio::test)]
 async fn test_create_and_see_subscription() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": "https://example.com/webhook",
+                    "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                    "label": "My Webhook Subscription",
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "targetUrl": "https://example.com/webhook",
-                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
-                "label": "My Webhook Subscription",
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok(), "{res:?}");
 
@@ -104,18 +105,15 @@ async fn test_create_and_see_subscription() {
         })
     );
 
-    let res =
-        schema
-            .execute(
-                async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::dataset_subscriptions_query(),
-                )
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptionsHarness::dataset_subscriptions_query())
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
                 })))
                 .data(harness.catalog_authorized.clone()),
-            )
-            .await;
+        )
+        .await;
 
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -144,7 +142,7 @@ async fn test_create_and_see_subscription() {
 
     let res = schema
         .execute(
-            async_graphql::Request::new(WebhookSubscriptiuonsHarness::subscription_by_id_query())
+            async_graphql::Request::new(WebhookSubscriptionsHarness::subscription_by_id_query())
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
                     "subscriptionId": subscription_id.clone(),
@@ -180,7 +178,7 @@ async fn test_create_and_see_subscription() {
 
 #[test_log::test(tokio::test)]
 async fn test_completely_invalid_target_urls() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -191,7 +189,7 @@ async fn test_completely_invalid_target_urls() {
         let res = schema
             .execute(
                 async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
                 )
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
@@ -225,7 +223,7 @@ async fn test_completely_invalid_target_urls() {
 
 #[test_log::test(tokio::test)]
 async fn test_target_url_non_https_or_localhost() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -240,7 +238,7 @@ async fn test_target_url_non_https_or_localhost() {
         let res = schema
             .execute(
                 async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
                 )
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
@@ -275,25 +273,26 @@ async fn test_target_url_non_https_or_localhost() {
 
 #[test_log::test(tokio::test)]
 async fn test_bad_event_type() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": "https://example.com/webhook",
+                    "eventTypes": ["BAD.EVENT.TYPE"],
+                    "label": "My Webhook Subscription",
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "targetUrl": "https://example.com/webhook",
-                "eventTypes": ["BAD.EVENT.TYPE"],
-                "label": "My Webhook Subscription",
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_err(), "{res:?}");
 
@@ -316,25 +315,26 @@ async fn test_bad_event_type() {
 
 #[test_log::test(tokio::test)]
 async fn test_no_event_types() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": "https://example.com/webhook",
+                    "eventTypes": [],
+                    "label": "My Webhook Subscription",
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "targetUrl": "https://example.com/webhook",
-                "eventTypes": [],
-                "label": "My Webhook Subscription",
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -358,42 +358,44 @@ async fn test_no_event_types() {
 
 #[test_log::test(tokio::test)]
 async fn test_duplicate_labels() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": "https://example.com/webhook/1",
+                    "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                    "label": "My Webhook Subscription",
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "targetUrl": "https://example.com/webhook/1",
-                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
-                "label": "My Webhook Subscription",
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok(), "{res:?}");
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": "https://example.com/webhook/2",
+                    "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                    "label": "My Webhook Subscription",
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "targetUrl": "https://example.com/webhook/2",
-                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
-                "label": "My Webhook Subscription",
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok());
     assert_eq!(
@@ -417,25 +419,26 @@ async fn test_duplicate_labels() {
 
 #[test_log::test(tokio::test)]
 async fn test_empty_labels_arent_duplicates() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": "https://example.com/webhook/1",
+                    "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                    "label": "",
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "targetUrl": "https://example.com/webhook/1",
-                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
-                "label": "",
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok(), "{res:?}");
 
@@ -464,20 +467,21 @@ async fn test_empty_labels_arent_duplicates() {
         })
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "targetUrl": "https://example.com/webhook/2",
+                    "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                    "label": "",
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "targetUrl": "https://example.com/webhook/2",
-                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
-                "label": "",
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok());
 
@@ -511,7 +515,7 @@ async fn test_empty_labels_arent_duplicates() {
 
 #[test_log::test(tokio::test)]
 async fn test_label_length_validation() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -519,7 +523,7 @@ async fn test_label_length_validation() {
     let res = schema
         .execute(
             async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+                WebhookSubscriptionsHarness::create_subscription_mutation(),
             )
             .variables(async_graphql::Variables::from_json(json!({
                 "datasetId": create_result.dataset_handle.id.to_string(),
@@ -552,7 +556,7 @@ async fn test_label_length_validation() {
     let res = schema
         .execute(
             async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+                WebhookSubscriptionsHarness::create_subscription_mutation(),
             )
             .variables(async_graphql::Variables::from_json(json!({
                 "datasetId": create_result.dataset_handle.id.to_string(),
@@ -597,7 +601,7 @@ async fn test_label_length_validation() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_subscription() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -612,21 +616,22 @@ async fn test_update_subscription() {
         )
         .await;
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::update_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::update_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "subscriptionId": subscription_id.clone(),
+                    "targetUrl": "https://example.com/webhook/updated",
+                    "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
+                    "label": "Updated Webhook Subscription",
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "subscriptionId": subscription_id.clone(),
-                "targetUrl": "https://example.com/webhook/updated",
-                "eventTypes": [kamu_webhooks::WebhookEventTypeCatalog::DATASET_REF_UPDATED],
-                "label": "Updated Webhook Subscription",
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok());
     assert_eq!(
@@ -648,18 +653,15 @@ async fn test_update_subscription() {
         })
     );
 
-    let res =
-        schema
-            .execute(
-                async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::dataset_subscriptions_query(),
-                )
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptionsHarness::dataset_subscriptions_query())
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
                 })))
                 .data(harness.catalog_authorized.clone()),
-            )
-            .await;
+        )
+        .await;
 
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -691,7 +693,7 @@ async fn test_update_subscription() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_subscription_failure() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -715,20 +717,21 @@ async fn test_update_subscription_failure() {
     });
 
     // Wrong dataset ID
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::update_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::update_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json({
+                    let mut variables = base_variables_json.clone();
+                    variables["datasetId"] =
+                        json!(odf::DatasetID::new_seeded_ed25519(b"invalid").to_string());
+                    variables
+                }))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json({
-                let mut variables = base_variables_json.clone();
-                variables["datasetId"] =
-                    json!(odf::DatasetID::new_seeded_ed25519(b"invalid").to_string());
-                variables
-            }))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,
@@ -740,19 +743,20 @@ async fn test_update_subscription_failure() {
     );
 
     // Wrong subscription ID
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::update_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::update_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json({
+                    let mut variables = base_variables_json.clone();
+                    variables["subscriptionId"] = json!(uuid::Uuid::new_v4().to_string());
+                    variables
+                }))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json({
-                let mut variables = base_variables_json.clone();
-                variables["subscriptionId"] = json!(uuid::Uuid::new_v4().to_string());
-                variables
-            }))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,
@@ -768,19 +772,20 @@ async fn test_update_subscription_failure() {
     );
 
     // Wrong target URL
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::update_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::update_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json({
+                    let mut variables = base_variables_json.clone();
+                    variables["targetUrl"] = json!("http://example.com/"); // not https!
+                    variables
+                }))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json({
-                let mut variables = base_variables_json.clone();
-                variables["targetUrl"] = json!("http://example.com/"); // not https!
-                variables
-            }))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,
@@ -801,19 +806,20 @@ async fn test_update_subscription_failure() {
     );
 
     // No event types
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::update_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::update_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json({
+                    let mut variables = base_variables_json.clone();
+                    variables["eventTypes"] = json!([]); // no event types
+                    variables
+                }))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json({
-                let mut variables = base_variables_json.clone();
-                variables["eventTypes"] = json!([]); // no event types
-                variables
-            }))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,
@@ -834,19 +840,20 @@ async fn test_update_subscription_failure() {
     );
 
     // Duplicate label: modifying self is not an error
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::update_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::update_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json({
+                    let mut variables = base_variables_json.clone();
+                    variables["label"] = json!("My Webhook Subscription"); // same label
+                    variables
+                }))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json({
-                let mut variables = base_variables_json.clone();
-                variables["label"] = json!("My Webhook Subscription"); // same label
-                variables
-            }))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,
@@ -877,20 +884,21 @@ async fn test_update_subscription_failure() {
         .await;
 
     // Duplicate label: modifying other subscription with same label as first one
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::update_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::update_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json({
+                    let mut variables = base_variables_json.clone();
+                    variables["subscriptionId"] = json!(subscription_id_2);
+                    variables["label"] = json!("My Webhook Subscription"); // same label as 1st subscription
+                    variables
+                }))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json({
-                let mut variables = base_variables_json.clone();
-                variables["subscriptionId"] = json!(subscription_id_2);
-                variables["label"] = json!("My Webhook Subscription"); // same label as 1st subscription
-                variables
-            }))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,
@@ -915,7 +923,7 @@ async fn test_update_subscription_failure() {
 
 #[test_log::test(tokio::test)]
 async fn test_pause_resume_subscription() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -930,19 +938,16 @@ async fn test_pause_resume_subscription() {
         )
         .await;
 
-    let res =
-        schema
-            .execute(
-                async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::pause_subscription_mutation(),
-                )
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptionsHarness::pause_subscription_mutation())
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
                     "subscriptionId": subscription_id.clone(),
                 })))
                 .data(harness.catalog_authorized.clone()),
-            )
-            .await;
+        )
+        .await;
 
     assert!(res.is_ok());
     assert_eq!(
@@ -964,18 +969,15 @@ async fn test_pause_resume_subscription() {
         })
     );
 
-    let res =
-        schema
-            .execute(
-                async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::dataset_subscriptions_query(),
-                )
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptionsHarness::dataset_subscriptions_query())
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
                 })))
                 .data(harness.catalog_authorized.clone()),
-            )
-            .await;
+        )
+        .await;
 
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -1002,18 +1004,19 @@ async fn test_pause_resume_subscription() {
         })
     );
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::resume_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::resume_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "subscriptionId": subscription_id.clone(),
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "subscriptionId": subscription_id.clone(),
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok());
     assert_eq!(
@@ -1035,18 +1038,15 @@ async fn test_pause_resume_subscription() {
         })
     );
 
-    let res =
-        schema
-            .execute(
-                async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::dataset_subscriptions_query(),
-                )
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptionsHarness::dataset_subscriptions_query())
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
                 })))
                 .data(harness.catalog_authorized.clone()),
-            )
-            .await;
+        )
+        .await;
 
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -1078,7 +1078,7 @@ async fn test_pause_resume_subscription() {
 
 #[test_log::test(tokio::test)]
 async fn test_remove_subscription() {
-    let harness = WebhookSubscriptiuonsHarness::new().await;
+    let harness = WebhookSubscriptionsHarness::new().await;
     let create_result = harness.create_root_dataset("foo").await;
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -1093,18 +1093,19 @@ async fn test_remove_subscription() {
         )
         .await;
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                WebhookSubscriptiuonsHarness::remove_subscription_mutation(),
+    let res =
+        schema
+            .execute(
+                async_graphql::Request::new(
+                    WebhookSubscriptionsHarness::remove_subscription_mutation(),
+                )
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": create_result.dataset_handle.id.to_string(),
+                    "subscriptionId": subscription_id.clone(),
+                })))
+                .data(harness.catalog_authorized.clone()),
             )
-            .variables(async_graphql::Variables::from_json(json!({
-                "datasetId": create_result.dataset_handle.id.to_string(),
-                "subscriptionId": subscription_id.clone(),
-            })))
-            .data(harness.catalog_authorized.clone()),
-        )
-        .await;
+            .await;
 
     assert!(res.is_ok());
     assert_eq!(
@@ -1126,18 +1127,15 @@ async fn test_remove_subscription() {
         })
     );
 
-    let res =
-        schema
-            .execute(
-                async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::dataset_subscriptions_query(),
-                )
+    let res = schema
+        .execute(
+            async_graphql::Request::new(WebhookSubscriptionsHarness::dataset_subscriptions_query())
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": create_result.dataset_handle.id.to_string(),
                 })))
                 .data(harness.catalog_authorized.clone()),
-            )
-            .await;
+        )
+        .await;
 
     assert!(res.is_ok(), "{res:?}");
     assert_eq!(
@@ -1158,19 +1156,19 @@ async fn test_remove_subscription() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
-struct WebhookSubscriptiuonsHarness {
+struct WebhookSubscriptionsHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
 }
 
-impl WebhookSubscriptiuonsHarness {
+impl WebhookSubscriptionsHarness {
     async fn new() -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::MultiTenant)
             .build();
 
         let mock_secret_generator =
-            WebhookSubscriptiuonsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
+            WebhookSubscriptionsHarness::make_mock_secret_generator(FIXED_SECRET.to_string());
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
@@ -1238,7 +1236,7 @@ impl WebhookSubscriptiuonsHarness {
         let res = schema
             .execute(
                 async_graphql::Request::new(
-                    WebhookSubscriptiuonsHarness::create_subscription_mutation(),
+                    WebhookSubscriptionsHarness::create_subscription_mutation(),
                 )
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetId": dataset_id.to_string(),

@@ -9,6 +9,7 @@
 
 mod access_token_service_impl;
 mod account_service_impl;
+mod auth_policy_service;
 mod authentication_service_impl;
 mod did_secret_service;
 mod login_password_auth_provider;
@@ -19,6 +20,7 @@ mod predefined_oauth_device_code_generator;
 
 pub use access_token_service_impl::*;
 pub use account_service_impl::*;
+pub use auth_policy_service::*;
 pub use authentication_service_impl::*;
 pub use did_secret_service::*;
 pub use login_password_auth_provider::*;

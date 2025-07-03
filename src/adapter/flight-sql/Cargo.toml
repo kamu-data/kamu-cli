@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 kamu-accounts = { workspace = true }
+kamu-accounts-services = { workspace = true, features = ["testing"] }
 kamu-core = { workspace = true }
 database-common = { workspace = true }
 time-source = { workspace = true }

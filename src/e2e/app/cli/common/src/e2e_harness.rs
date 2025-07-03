@@ -23,12 +23,13 @@ pub const MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER: &str = indoc::indoc!(
     kind: CLIConfig
     version: 1
     content:
-      users:
-        predefined:
-          - accountName: kamu
-            password: kamu.dev
-            email: kamu@example.com
-            properties: [ admin ]
+      auth:
+        users:
+          predefined:
+            - accountName: kamu
+              password: kamu.dev
+              email: kamu@example.com
+              properties: [ admin ]
     "#
 );
 

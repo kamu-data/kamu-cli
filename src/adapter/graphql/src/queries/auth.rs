@@ -40,6 +40,7 @@ impl Auth {
         Ok(providers)
     }
 
+    #[graphql(guard = "AuthPolicyGuard")]
     #[tracing::instrument(level = "info", name = Auth_list_access_tokens, skip_all, fields(%account_id, ?page, ?per_page))]
     async fn list_access_tokens(
         &self,

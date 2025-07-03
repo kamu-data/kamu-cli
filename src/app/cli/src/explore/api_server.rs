@@ -132,21 +132,12 @@ impl APIServer {
             )
             .build(),
         )
-        .route(
-            "/ui-config",
-            axum::routing::get(ui_configuration_handler),
-        )
-        .route(
-            "/graphql",
-            axum::routing::post(graphql_handler),
-        )
         .merge(server_console::router(
             "Kamu API Server".to_string(),
             format!("v{} embedded", crate::VERSION),
         ).into())
         .merge(kamu_adapter_http::data::root_router())
         .merge(kamu_adapter_http::general::root_router())
-        .nest("/platform", kamu_adapter_http::platform::root_router())
         .nest(
             "/odata",
             match tenancy_config {
@@ -177,13 +168,18 @@ impl APIServer {
         }
 
         router = router
-            .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(
                 tower_http::cors::CorsLayer::new()
                     .allow_origin(tower_http::cors::Any)
                     .allow_methods(vec![http::Method::GET, http::Method::POST])
                     .allow_headers(tower_http::cors::Any),
             )
+            .layer(kamu_adapter_http::AuthPolicyLayer::new())
+            .nest("/platform", kamu_adapter_http::platform::root_router())
+            // GraphQL API have his own guard to handle auth policy check
+            .route("/graphql", axum::routing::post(graphql_handler))
+            .route("/ui-config", axum::routing::get(ui_configuration_handler))
+            .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(observability::axum::http_layer())
             .layer(CatchPanicLayer::custom(panic_handler))
             // Note: Healthcheck, metrics, and OpenAPI routes are placed before the tracing layer

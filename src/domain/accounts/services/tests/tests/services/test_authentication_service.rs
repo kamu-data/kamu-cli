@@ -132,6 +132,7 @@ fn make_catalog(mock_outbox: MockOutbox) -> dill::Catalog {
         .bind::<dyn Outbox, MockOutbox>()
         .add::<OAuthDeviceCodeServiceImpl>()
         .add::<OAuthDeviceCodeGeneratorDefault>()
+        .add_value(AuthConfig::sample())
         .add::<InMemoryOAuthDeviceCodeRepository>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
