@@ -7,14 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(error_generic_member_access)]
+mod apply_account_dataset_relations_use_case;
 
-mod entities;
-mod repos;
-mod services;
-mod use_cases;
-
-pub use entities::*;
-pub use repos::*;
-pub use services::*;
-pub use use_cases::*;
+pub use apply_account_dataset_relations_use_case::*;

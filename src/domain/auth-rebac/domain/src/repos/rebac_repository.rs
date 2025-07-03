@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
@@ -56,19 +58,10 @@ pub trait RebacRepository: Send + Sync {
     ) -> Result<Vec<(Entity, PropertyName, PropertyValue)>, GetEntityPropertiesError>;
 
     // Relations
-
-    async fn insert_entities_relation(
+    async fn upsert_entities_relations(
         &self,
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Result<(), InsertEntitiesRelationError>;
-
-    async fn delete_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        object_entity: &Entity,
-    ) -> Result<(), DeleteEntitiesRelationError>;
+        operations: &[UpsertEntitiesRelationOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError>;
 
     async fn get_subject_entity_relations(
         &self,
@@ -102,6 +95,26 @@ pub trait RebacRepository: Send + Sync {
         subject_entities: Vec<Entity<'static>>,
         object_entity: &Entity,
     ) -> Result<(), DeleteSubjectEntitiesObjectEntityRelationsError>;
+
+    async fn delete_entities_relations(
+        &self,
+        operations: &[DeleteEntitiesRelationOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct UpsertEntitiesRelationOperation<'a> {
+    pub subject_entity: Cow<'a, Entity<'a>>,
+    pub relationship: Relation,
+    pub object_entity: Cow<'a, Entity<'a>>,
+}
+
+#[derive(Debug)]
+pub struct DeleteEntitiesRelationOperation<'a> {
+    pub subject_entity: Cow<'a, Entity<'a>>,
+    pub object_entity: Cow<'a, Entity<'a>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -248,6 +261,14 @@ pub struct InsertEntitiesRelationSomeRoleIsAlreadyPresentError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+pub enum UpsertEntitiesRelationsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 pub enum DeleteEntitiesRelationError {
     #[error(transparent)]
     NotFound(EntitiesRelationNotFoundError),
@@ -347,6 +368,14 @@ impl DeleteSubjectEntitiesObjectEntityRelationsError {
 pub struct SubjectEntitiesObjectEntityRelationsNotFoundError {
     pub subject_entities: Vec<Entity<'static>>,
     pub object_entity: Entity<'static>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteEntitiesRelationsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

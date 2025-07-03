@@ -16,7 +16,7 @@ use database_common::{
     postgres_generate_placeholders_tuple_list_2,
 };
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::*;
 use sqlx::Row;
 
@@ -230,79 +230,60 @@ impl RebacRepository for PostgresRebacRepository {
         Ok(entity_properties)
     }
 
-    async fn insert_entities_relation(
+    async fn upsert_entities_relations(
         &self,
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Result<(), InsertEntitiesRelationError> {
+        operations: &[UpsertEntitiesRelationOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+
+        let mut subject_entity_types = Vec::with_capacity(operations.len());
+        let mut subject_entity_ids = Vec::with_capacity(operations.len());
+        let mut relationships = Vec::with_capacity(operations.len());
+        let mut object_entity_types = Vec::with_capacity(operations.len());
+        let mut object_entity_ids = Vec::with_capacity(operations.len());
+
+        for op in operations {
+            subject_entity_types.push(op.subject_entity.entity_type);
+            subject_entity_ids.push(op.subject_entity.entity_id.as_ref());
+            relationships.push(op.relationship.to_string());
+            object_entity_types.push(op.object_entity.entity_type);
+            object_entity_ids.push(op.object_entity.entity_id.as_ref());
+        }
 
         sqlx::query!(
             r#"
-            INSERT INTO auth_rebac_relations (
-                subject_entity_type, subject_entity_id, relationship, object_entity_type, object_entity_id
-            )
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO auth_rebac_relations (subject_entity_type,
+                                              subject_entity_id,
+                                              relationship,
+                                              object_entity_type,
+                                              object_entity_id)
+            SELECT *
+            FROM UNNEST($1::rebac_entity_type[],
+                        $2::TEXT[],
+                        $3::TEXT[],
+                        $4::rebac_entity_type[],
+                        $5::TEXT[])
+            ON CONFLICT(subject_entity_type,
+                        subject_entity_id,
+                        object_entity_type,
+                        object_entity_id)
+                DO UPDATE SET relationship = excluded.relationship
             "#,
-            subject_entity.entity_type as EntityType,
-            &subject_entity.entity_id,
-            relationship.to_string(),
-            object_entity.entity_type as EntityType,
-            &object_entity.entity_id,
+            subject_entity_types as Vec<EntityType>,
+            subject_entity_ids.as_slice() as &[&str],
+            &relationships,
+            object_entity_types as Vec<EntityType>,
+            object_entity_ids.as_slice() as &[&str],
         )
         .execute(connection_mut)
         .await
-        .map_err(|e| {
-            match e {
-                sqlx::Error::Database(e) if e.is_unique_violation() => {
-                    InsertEntitiesRelationError::some_role_is_already_present(
-                        subject_entity,
-                        object_entity,
-                    )
-                }
-                _ => InsertEntitiesRelationError::Internal(e.int_err()),
-            }
-        })?;
-
-        Ok(())
-    }
-
-    async fn delete_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        object_entity: &Entity,
-    ) -> Result<(), DeleteEntitiesRelationError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let delete_result = sqlx::query!(
-            r#"
-            DELETE
-            FROM auth_rebac_relations
-            WHERE subject_entity_type = $1
-              AND subject_entity_id = $2
-              AND object_entity_type = $3
-              AND object_entity_id = $4
-            "#,
-            subject_entity.entity_type as EntityType,
-            &subject_entity.entity_id,
-            object_entity.entity_type as EntityType,
-            &object_entity.entity_id,
-        )
-        .execute(&mut *connection_mut)
-        .await
         .int_err()?;
-
-        if delete_result.rows_affected() == 0 {
-            return Err(DeleteEntitiesRelationError::not_found(
-                subject_entity,
-                object_entity,
-            ));
-        }
 
         Ok(())
     }
@@ -552,6 +533,53 @@ impl RebacRepository for PostgresRebacRepository {
                 object_entity,
             ));
         }
+
+        Ok(())
+    }
+
+    async fn delete_entities_relations(
+        &self,
+        operations: &[DeleteEntitiesRelationOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut subject_entity_types = Vec::with_capacity(operations.len());
+        let mut subject_entity_ids = Vec::with_capacity(operations.len());
+        let mut object_entity_types = Vec::with_capacity(operations.len());
+        let mut object_entity_ids = Vec::with_capacity(operations.len());
+
+        for op in operations {
+            subject_entity_types.push(op.subject_entity.entity_type);
+            subject_entity_ids.push(op.subject_entity.entity_id.as_ref());
+            object_entity_types.push(op.object_entity.entity_type);
+            object_entity_ids.push(op.object_entity.entity_id.as_ref());
+        }
+
+        sqlx::query!(
+            r#"
+            DELETE
+            FROM auth_rebac_relations
+            WHERE (subject_entity_type, subject_entity_id, object_entity_type, object_entity_id) IN
+                  (SELECT *
+                   FROM UNNEST($1::rebac_entity_type[],
+                               $2::TEXT[],
+                               $3::rebac_entity_type[],
+                               $4::TEXT[]));
+            "#,
+            subject_entity_types as Vec<EntityType>,
+            subject_entity_ids.as_slice() as &[&str],
+            object_entity_types as Vec<EntityType>,
+            object_entity_ids.as_slice() as &[&str],
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
 
         Ok(())
     }

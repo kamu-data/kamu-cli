@@ -9,6 +9,8 @@
 
 mod account;
 mod dataset_access_role;
+mod dataset_with_role_operation;
 
 pub use account::*;
 pub use dataset_access_role::*;
+pub use dataset_with_role_operation::*;

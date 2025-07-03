@@ -38,7 +38,7 @@ kamu-auth-rebac = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true }
+odf = { workspace = true, default-features = false, features = ["did-pkh"] }
 random-strings = { workspace = true }
 time-source = { workspace = true }
 
@@ -70,5 +70,7 @@ kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 
 mockall = { version = "0.13", default-features = false }
-pretty_assertions = { version = "1", default-features = false, features = ["unstable"] }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "unstable",
+] }
 test-log = { version = "0.2", features = ["trace"] }

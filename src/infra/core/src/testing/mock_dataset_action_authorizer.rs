@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use internal_error::InternalError;
@@ -50,9 +51,9 @@ mockall::mock! {
             action: DatasetAction,
         ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
-        async fn classify_dataset_ids_by_allowance(
-            &self,
-            dataset_ids: Vec<odf::DatasetID>,
+        async fn classify_dataset_ids_by_allowance<'a>(
+            &'a self,
+            dataset_ids: &[Cow<'a, odf::DatasetID>],
             action: DatasetAction,
         ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
     }
@@ -75,10 +76,10 @@ impl MockDatasetActionAuthorizer {
                 Ok(ClassifyByAllowanceIdsResponse {
                     authorized_ids: Vec::new(),
                     unauthorized_ids_with_errors: ids
-                        .into_iter()
+                        .iter()
                         .map(|id| {
                             (
-                                id.clone(),
+                                id.as_ref().clone(),
                                 DatasetActionUnauthorizedError::not_enough_permissions(
                                     id.as_local_ref(),
                                     action,
@@ -119,7 +120,7 @@ impl MockDatasetActionAuthorizer {
             .expect_classify_dataset_ids_by_allowance()
             .returning(|ids, _| {
                 Ok(ClassifyByAllowanceIdsResponse {
-                    authorized_ids: ids,
+                    authorized_ids: ids.iter().map(|id| id.as_ref().clone()).collect(),
                     unauthorized_ids_with_errors: Vec::new(),
                 })
             });
@@ -279,20 +280,21 @@ impl MockDatasetActionAuthorizer {
             .with(always(), eq(action))
             .times(times)
             .returning(move |dataset_ids, action| {
-                let res = dataset_ids.into_iter().fold(
+                let res = dataset_ids.iter().fold(
                     ClassifyByAllowanceIdsResponse {
                         authorized_ids: Vec::new(),
                         unauthorized_ids_with_errors: Vec::new(),
                     },
                     |mut acc, dataset_id| {
-                        if authorized.contains(&dataset_id) {
-                            acc.authorized_ids.push(dataset_id);
+                        if authorized.contains(dataset_id) {
+                            acc.authorized_ids.push(dataset_id.as_ref().clone());
                         } else {
                             let error = DatasetActionUnauthorizedError::not_enough_permissions(
                                 dataset_id.as_local_ref(),
                                 action,
                             );
-                            acc.unauthorized_ids_with_errors.push((dataset_id, error));
+                            acc.unauthorized_ids_with_errors
+                                .push((dataset_id.as_ref().clone(), error));
                         }
                         acc
                     },

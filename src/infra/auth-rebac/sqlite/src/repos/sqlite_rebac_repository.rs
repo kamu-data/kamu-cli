@@ -12,9 +12,9 @@ use std::num::NonZeroUsize;
 
 use database_common::{TransactionRef, TransactionRefT, sqlite_generate_placeholders_tuple_list_2};
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::*;
-use sqlx::Row;
+use sqlx::{QueryBuilder, Row};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -230,78 +230,41 @@ impl RebacRepository for SqliteRebacRepository {
         Ok(entity_properties)
     }
 
-    async fn insert_entities_relation(
+    async fn upsert_entities_relations(
         &self,
-        subject_entity: &Entity,
-        relationship: Relation,
-        object_entity: &Entity,
-    ) -> Result<(), InsertEntitiesRelationError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let relation_as_str = relationship.to_string();
-
-        sqlx::query!(
-            r#"
-            INSERT INTO auth_rebac_relations (subject_entity_type, subject_entity_id, relationship, object_entity_type,
-                                              object_entity_id)
-            VALUES ($1, $2, $3, $4, $5)
-            "#,
-            subject_entity.entity_type,
-            subject_entity.entity_id,
-            relation_as_str,
-            object_entity.entity_type,
-            object_entity.entity_id,
-        )
-        .execute(connection_mut)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
-                InsertEntitiesRelationError::some_role_is_already_present(
-                    subject_entity,
-                    object_entity,
-                )
-            }
-            _ => InsertEntitiesRelationError::Internal(e.int_err()),
-        })?;
-
-        Ok(())
-    }
-
-    async fn delete_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        object_entity: &Entity,
-    ) -> Result<(), DeleteEntitiesRelationError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let delete_result = sqlx::query!(
-            r#"
-            DELETE
-            FROM auth_rebac_relations
-            WHERE subject_entity_type = $1
-              AND subject_entity_id = $2
-              AND object_entity_type = $3
-              AND object_entity_id = $4
-            "#,
-            subject_entity.entity_type,
-            subject_entity.entity_id,
-            object_entity.entity_type,
-            object_entity.entity_id,
-        )
-        .execute(&mut *connection_mut)
-        .await
-        .int_err()?;
-
-        if delete_result.rows_affected() == 0 {
-            return Err(DeleteEntitiesRelationError::not_found(
-                subject_entity,
-                object_entity,
-            ));
+        operations: &[UpsertEntitiesRelationOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError> {
+        if operations.is_empty() {
+            return Ok(());
         }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = QueryBuilder::new(
+            r#"
+            REPLACE INTO auth_rebac_relations (subject_entity_type,
+                                               subject_entity_id,
+                                               relationship,
+                                               object_entity_type,
+                                               object_entity_id)
+            "#,
+        );
+
+        query_builder.push_values(operations, |mut b, op| {
+            b.push_bind(op.subject_entity.entity_type);
+            b.push_bind(op.subject_entity.entity_id.as_ref());
+            b.push_bind(op.relationship.to_string());
+            b.push_bind(op.object_entity.entity_type);
+            b.push_bind(op.object_entity.entity_id.as_ref());
+        });
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -551,6 +514,47 @@ impl RebacRepository for SqliteRebacRepository {
                 object_entity,
             ));
         }
+
+        Ok(())
+    }
+
+    async fn delete_entities_relations(
+        &self,
+        operations: &[DeleteEntitiesRelationOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = QueryBuilder::new(
+            r#"
+            DELETE
+            FROM auth_rebac_relations
+            WHERE (subject_entity_type,
+                   subject_entity_id,
+                   object_entity_type,
+                   object_entity_id) IN (
+            "#,
+        );
+
+        query_builder.push_values(operations, |mut b, op| {
+            b.push_bind(op.subject_entity.entity_type);
+            b.push_bind(op.subject_entity.entity_id.as_ref());
+            b.push_bind(op.object_entity.entity_type);
+            b.push_bind(op.object_entity.entity_id.as_ref());
+        });
+
+        query_builder.push(")");
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
 
         Ok(())
     }
