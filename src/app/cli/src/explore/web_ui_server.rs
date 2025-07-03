@@ -78,6 +78,7 @@ impl WebUIServer {
         predefined_accounts_config: &PredefinedAccountsConfig,
         file_upload_limit_config: &FileUploadLimitConfig,
         enable_dataset_env_vars_management: bool,
+        allow_anonymous: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
         password_policy_config: &PasswordPolicyConfig,
@@ -127,6 +128,7 @@ impl WebUIServer {
                 // No way to configure scheduling of datasets
                 enable_scheduling: false,
                 enable_dataset_env_vars_management,
+                allow_anonymous,
                 enable_terms_of_service: true,
             },
         };

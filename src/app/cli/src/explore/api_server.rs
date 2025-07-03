@@ -53,6 +53,7 @@ impl APIServer {
         port: Option<u16>,
         file_upload_limit_config: &FileUploadLimitConfig,
         enable_dataset_env_vars_management: bool,
+        allow_anonymous: bool,
         external_address: Option<IpAddr>,
         e2e_output_data_path: Option<&PathBuf>,
         password_policy_config: &PasswordPolicyConfig,
@@ -106,6 +107,7 @@ impl APIServer {
                 enable_logout: true,
                 enable_scheduling: true,
                 enable_dataset_env_vars_management,
+                allow_anonymous,
                 enable_terms_of_service: true,
             },
         };
