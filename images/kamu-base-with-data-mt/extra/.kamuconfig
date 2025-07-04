@@ -1,84 +1,85 @@
 kind: CLIConfig
 version: 1
 content:
-  users:
-    predefined:
-      - accountName: kamu
-        password: kamu.dev
-        properties: [ admin ]
-        avatarUrl: https://avatars.githubusercontent.com/u/50896974?s=200&v=4
-        email: support+kamu@kamu.dev
-      - accountName: sh101-bowen
-        password: sh101-bowen
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
-        email: support+sh101-bowen@kamu.dev
-      - accountName: sh102-gambier
-        password: sh102-gambier
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
-        email: support+sh102-gambier@kamu.dev
-      - accountName: sh103-howe
-        password: sh103-howe
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
-        email: support+sh103-howe@kamu.dev
-      - accountName: sh104-granville
-        password: sh104-granville
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
-        email: support+sh104-granville@kamu.dev
-      - accountName: sh105-keats
-        password: sh105-keats
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
-        email: support+sh105-keats@kamu.dev
-      - accountName: sh106-seymour
-        password: sh106-seymour
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
-        email: support+sh106-seymour@kamu.dev
-      - accountName: moa.gov.nl
-        password: moa.gov.nl
-        accountType: Organization
-        displayName: moa.gov.nl
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
-        email: support+moa.gov.nl@kamu.dev
-      - accountName: mim.dk
-        password: kamu#mim.dk
-        accountType: Organization
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
-        email: support+mim.dk@kamu.dev
-      - accountName: ofb.gouv.fr
-        password: ofb.gouv.fr
-        accountType: Organization
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
-        email: support+ofb.gouv.fr@kamu.dev
-      - accountName: mmo.gov.uk
-        password: mmo.gov.uk
-        accountType: Organization
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
-        email: support+mmo.gov.uk@kamu.dev
-      - accountName: protectedseas.net
-        password: protectedseas.net
-        accountType: Organization
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
-        email: support+protectedseas.net@kamu.dev
-      - accountName: bmis-bycatch.org
-        password: bmis-bycatch.org
-        accountType: Organization
-        displayName: Bycatch Management Information System
-        avatarUrl: https://cdn-icons-png.flaticon.com/128/10197/10197245.png
-        email: support+bmis-bycatch.org@kamu.dev
-      - accountName: acme.fishing.co
-        password: acme.fishing.co
-        accountType: Organization
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/1090/1090630.png
-        email: support+acme.fishing.co@kamu.dev
-      - accountName: globalfishingwatch.org
-        password: globalfishingwatch.org
-        accountType: Organization
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/744/744480.png
-        email: support+globalfishingwatch.org@kamu.dev
-      - accountName: rijkswaterstaat.nl
-        password: rijkswaterstaat.nl
-        avatarUrl: https://www.shutterstock.com/image-vector/royal-exclusive-badge-logo-two-260nw-236025661.jpg
-        email: support+rijkswaterstaat.nl@kamu.dev
-      - accountName: deltares.nl
-        password: deltares.nl
-        avatarUrl: https://avatars.githubusercontent.com/u/6613768?s=200&v=4
-        email: support+deltares.nl@kamu.dev
+  auth:
+    users:
+      predefined:
+        - accountName: kamu
+          password: kamu.dev
+          properties: [ admin ]
+          avatarUrl: https://avatars.githubusercontent.com/u/50896974?s=200&v=4
+          email: support+kamu@kamu.dev
+        - accountName: sh101-bowen
+          password: sh101-bowen
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+          email: support+sh101-bowen@kamu.dev
+        - accountName: sh102-gambier
+          password: sh102-gambier
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+          email: support+sh102-gambier@kamu.dev
+        - accountName: sh103-howe
+          password: sh103-howe
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+          email: support+sh103-howe@kamu.dev
+        - accountName: sh104-granville
+          password: sh104-granville
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+          email: support+sh104-granville@kamu.dev
+        - accountName: sh105-keats
+          password: sh105-keats
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+          email: support+sh105-keats@kamu.dev
+        - accountName: sh106-seymour
+          password: sh106-seymour
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+          email: support+sh106-seymour@kamu.dev
+        - accountName: moa.gov.nl
+          password: moa.gov.nl
+          accountType: Organization
+          displayName: moa.gov.nl
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+          email: support+moa.gov.nl@kamu.dev
+        - accountName: mim.dk
+          password: kamu#mim.dk
+          accountType: Organization
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+          email: support+mim.dk@kamu.dev
+        - accountName: ofb.gouv.fr
+          password: ofb.gouv.fr
+          accountType: Organization
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+          email: support+ofb.gouv.fr@kamu.dev
+        - accountName: mmo.gov.uk
+          password: mmo.gov.uk
+          accountType: Organization
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+          email: support+mmo.gov.uk@kamu.dev
+        - accountName: protectedseas.net
+          password: protectedseas.net
+          accountType: Organization
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+          email: support+protectedseas.net@kamu.dev
+        - accountName: bmis-bycatch.org
+          password: bmis-bycatch.org
+          accountType: Organization
+          displayName: Bycatch Management Information System
+          avatarUrl: https://cdn-icons-png.flaticon.com/128/10197/10197245.png
+          email: support+bmis-bycatch.org@kamu.dev
+        - accountName: acme.fishing.co
+          password: acme.fishing.co
+          accountType: Organization
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/1090/1090630.png
+          email: support+acme.fishing.co@kamu.dev
+        - accountName: globalfishingwatch.org
+          password: globalfishingwatch.org
+          accountType: Organization
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/744/744480.png
+          email: support+globalfishingwatch.org@kamu.dev
+        - accountName: rijkswaterstaat.nl
+          password: rijkswaterstaat.nl
+          avatarUrl: https://www.shutterstock.com/image-vector/royal-exclusive-badge-logo-two-260nw-236025661.jpg
+          email: support+rijkswaterstaat.nl@kamu.dev
+        - accountName: deltares.nl
+          password: deltares.nl
+          avatarUrl: https://avatars.githubusercontent.com/u/6613768?s=200&v=4
+          email: support+deltares.nl@kamu.dev
