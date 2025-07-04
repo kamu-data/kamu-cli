@@ -87,7 +87,11 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_binding: flow_binding_1.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
-        retry_policy: None,
+        retry_policy: Some(RetryPolicy {
+            max_attempts: 3,
+            min_delay_seconds: 10,
+            backoff_type: RetryBackoffType::Linear,
+        }),
     };
 
     event_store
@@ -128,7 +132,11 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),
         rule: FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
-        retry_policy: None,
+        retry_policy: Some(RetryPolicy {
+            max_attempts: 5,
+            min_delay_seconds: 3600,
+            backoff_type: RetryBackoffType::Fixed,
+        }),
     };
 
     event_store
