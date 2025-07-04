@@ -575,6 +575,8 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 .await?;
                         }
 
+                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
                         if let Some(flow_outcome) = flow.outcome.as_ref() {
@@ -589,7 +591,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                             }
 
                             // Notify about finished flow
-                            let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
                             outbox
                                 .post_message(
                                     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
@@ -597,6 +598,20 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                         message.event_time,
                                         flow_id,
                                         flow_outcome.clone(),
+                                    ),
+                                )
+                                .await?;
+                        } else {
+                            // Notify about scheduled retry
+                            outbox
+                                .post_message(
+                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                                    FlowProgressMessage::retry_scheduled(
+                                        message.event_time,
+                                        flow_id,
+                                        flow.timing
+                                            .scheduled_for_activation_at
+                                            .expect("Flow must have scheduled activation time"),
                                     ),
                                 )
                                 .await?;
