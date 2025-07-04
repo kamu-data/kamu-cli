@@ -134,6 +134,9 @@ impl From<kamu_accounts::LoginError> for GqlError {
             kamu_accounts::LoginError::DuplicateCredentials => {
                 GqlError::Gql(Error::new(value.to_string()))
             }
+            kamu_accounts::LoginError::RestrictedLoginMethod => {
+                GqlError::Gql(Error::new(value.to_string()))
+            }
             kamu_accounts::LoginError::Internal(e) => GqlError::Internal(e),
         }
     }

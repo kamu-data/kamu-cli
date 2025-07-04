@@ -75,6 +75,9 @@ pub enum LoginError {
     #[error("Credentials are already used by an existing account")]
     DuplicateCredentials,
 
+    #[error("Login method is restricted")]
+    RestrictedLoginMethod,
+
     #[error(transparent)]
     Internal(
         #[from]

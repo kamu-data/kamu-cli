@@ -262,6 +262,10 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
             // Account does not exist and needs to be created
             None => {
+                if !self.auth_config.allow_anonymous.unwrap() {
+                    return Err(LoginError::RestrictedLoginMethod);
+                }
+
                 // Create a new account
                 let new_account = Account {
                     id: provider_response.account_id,
@@ -275,19 +279,17 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     provider_identity_key: provider_response.provider_identity_key,
                 };
 
-                if self.auth_config.allow_anonymous.unwrap() {
-                    // Register an account
-                    self.account_service
-                        .save_account(&new_account)
-                        .await
-                        .map_err(|e| match e {
-                            CreateAccountError::Duplicate(_) => LoginError::DuplicateCredentials,
-                            CreateAccountError::Internal(e) => LoginError::Internal(e),
-                        })?;
+                // Register an account
+                self.account_service
+                    .save_account(&new_account)
+                    .await
+                    .map_err(|e| match e {
+                        CreateAccountError::Duplicate(_) => LoginError::DuplicateCredentials,
+                        CreateAccountError::Internal(e) => LoginError::Internal(e),
+                    })?;
 
-                    // Notify interested parties
-                    self.notify_account_created(&new_account).await?;
-                }
+                // Notify interested parties
+                self.notify_account_created(&new_account).await?;
 
                 new_account.id
             }
