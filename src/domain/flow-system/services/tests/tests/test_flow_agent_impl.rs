@@ -66,6 +66,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
             },
+            None, // No retry policy
         )
         .await;
 
@@ -660,6 +661,7 @@ async fn test_ingest_trigger_with_ingest_config() {
             FlowConfigRuleIngest {
                 fetch_uncacheable: true,
             },
+            None, // No retry policy
         )
         .await;
     harness
@@ -6272,6 +6274,7 @@ async fn test_disable_trigger_on_flow_fail() {
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
             },
+            None, // No retry policy
         )
         .await;
 
@@ -6850,6 +6853,302 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 Flow ID = 4 Waiting AutoPolling Executor(task=4, since=200ms)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let foo_flow_binding = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    harness
+        .set_dataset_flow_ingest(
+            foo_flow_binding.clone(),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+            },
+            Some(RetryPolicy {
+                max_attempts: 2,
+                min_delay_seconds: 1,
+                backoff_type: RetryBackoffType::Fixed,
+            }),
+        )
+        .await;
+
+    harness.eager_initialization().await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_agent.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                // Manual trigger for "foo" at 20ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_binding: foo_flow_binding,
+                    run_since_start: Duration::milliseconds(20),
+                    initiator_id: None,
+                    maybe_forced_flow_config_rule: None,
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Task 0: "foo" start running at 30ms, fail at 40ms
+                let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::milliseconds(30),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
+                });
+                let task0_handle = task0_driver.run();
+
+                // Task 1: "foo" start running at 1040ms, fail at 1050ms
+                let task1_driver = harness.task_driver(TaskDriverArgs {
+                  task_id: TaskID::new(1),
+                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                  dataset_id: Some(foo_id.clone()),
+                  run_since_start: Duration::milliseconds(1040),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                  expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                  }.into_logical_plan(),
+                });
+                let task1_handle = task1_driver.run();
+
+                // Task 2: "foo" start running at 2050ms, success at 2070ms
+                let task2_driver = harness.task_driver(TaskDriverArgs {
+                  task_id: TaskID::new(2),
+                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                  dataset_id: Some(foo_id.clone()),
+                  run_since_start: Duration::milliseconds(2050),
+                  finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::empty()))),
+                  expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                  }.into_logical_plan(),
+                });
+                let task2_handle = task2_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    harness.advance_time(Duration::milliseconds(2100)).await;
+                };
+
+                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
+
+            #2: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +40ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms)
+
+            #4: +1040ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms) Executor(task=1, since=1040ms)
+
+            #5: +1040ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0,1)
+
+            #6: +1050ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=2050ms)
+
+            #7: +2050ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=2050ms) Executor(task=2, since=2050ms)
+
+            #8: +2050ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0,1,2)
+
+            #9: +2070ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let foo_flow_binding = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    harness
+        .set_dataset_flow_ingest(
+            foo_flow_binding.clone(),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+            },
+            Some(RetryPolicy {
+                max_attempts: 2,
+                min_delay_seconds: 1,
+                backoff_type: RetryBackoffType::Fixed,
+            }),
+        )
+        .await;
+
+    harness.eager_initialization().await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+        // Run API service
+        res = harness.flow_agent.run() => res.int_err(),
+
+        // Run simulation script and task drivers
+        _ = async {
+                // Manual trigger for "foo" at 20ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_binding: foo_flow_binding,
+                    run_since_start: Duration::milliseconds(20),
+                    initiator_id: None,
+                    maybe_forced_flow_config_rule: None,
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Task 0: "foo" start running at 30ms, fail at 40ms
+                let task0_driver = harness.task_driver(TaskDriverArgs {
+                    task_id: TaskID::new(0),
+                    task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::milliseconds(30),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                    expected_logical_plan: LogicalPlanDatasetUpdate {
+                      dataset_id: foo_id.clone(),
+                      fetch_uncacheable: false
+                    }.into_logical_plan(),
+                });
+                let task0_handle = task0_driver.run();
+
+                // Task 1: "foo" start running at 1040ms, fail at 1050ms
+                let task1_driver = harness.task_driver(TaskDriverArgs {
+                  task_id: TaskID::new(1),
+                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                  dataset_id: Some(foo_id.clone()),
+                  run_since_start: Duration::milliseconds(1040),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                  expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                  }.into_logical_plan(),
+                });
+                let task1_handle = task1_driver.run();
+
+                // Task 2: "foo" start running at 2050ms, fail at 2060ms
+                let task2_driver = harness.task_driver(TaskDriverArgs {
+                  task_id: TaskID::new(2),
+                  task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                  dataset_id: Some(foo_id.clone()),
+                  run_since_start: Duration::milliseconds(2050),
+                  finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(TaskError::empty()))),
+                  expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false
+                  }.into_logical_plan(),
+                });
+                let task2_handle = task2_driver.run();
+
+                // Main simulation script
+                let main_handle = async {
+                    harness.advance_time(Duration::milliseconds(2100)).await;
+                };
+
+                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, main_handle)
+            } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
+
+            #2: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +40ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms)
+
+            #4: +1040ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms) Executor(task=1, since=1040ms)
+
+            #5: +1040ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0,1)
+
+            #6: +1050ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=2050ms)
+
+            #7: +2050ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=2050ms) Executor(task=2, since=2050ms)
+
+            #8: +2050ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0,1,2)
+
+            #9: +2060ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Failed
 
             "#
         ),

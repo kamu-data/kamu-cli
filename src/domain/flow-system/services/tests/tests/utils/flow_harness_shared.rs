@@ -283,9 +283,10 @@ impl FlowHarness {
         &self,
         flow_binding: FlowBinding,
         ingest_rule: FlowConfigRuleIngest,
+        retry_policy: Option<RetryPolicy>,
     ) {
         self.flow_configuration_service
-            .set_configuration(flow_binding, ingest_rule.into_flow_config(), None)
+            .set_configuration(flow_binding, ingest_rule.into_flow_config(), retry_policy)
             .await
             .unwrap();
     }

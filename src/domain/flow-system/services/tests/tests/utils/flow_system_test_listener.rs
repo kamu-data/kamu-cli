@@ -176,6 +176,13 @@ impl std::fmt::Display for FlowSystemTestListener {
                                     .collect::<Vec<_>>()
                                     .join(",")
                             ),
+                            FlowStatus::Retrying => format!(
+                                "{:?}(scheduled_at={}ms)",
+                                flow_state.status(),
+                                (flow_state.timing.scheduled_for_activation_at.unwrap()
+                                    - initial_time)
+                                    .num_milliseconds()
+                            ),
                             _ => format!("{:?}", flow_state.status()),
                         }
                     )?;
@@ -281,6 +288,7 @@ impl MessageConsumerT<FlowProgressMessage> for FlowSystemTestListener {
     ) -> Result<(), InternalError> {
         match message {
             FlowProgressMessage::Running(e) => self.make_a_snapshot(e.event_time).await,
+            FlowProgressMessage::RetryScheduled(e) => self.make_a_snapshot(e.event_time).await,
             FlowProgressMessage::Finished(e) => self.make_a_snapshot(e.event_time).await,
             FlowProgressMessage::Cancelled(e) => self.make_a_snapshot(e.event_time).await,
             FlowProgressMessage::Scheduled(_) => {}
