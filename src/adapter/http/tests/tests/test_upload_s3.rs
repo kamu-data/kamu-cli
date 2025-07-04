@@ -15,6 +15,7 @@ use http::{HeaderMap, HeaderName, HeaderValue};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{FileUploadLimitConfig, ServerUrlConfig, TenancyConfig, UploadContext};
 use kamu_accounts::{
+    AuthConfig,
     DEFAULT_ACCOUNT_ID,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
@@ -30,6 +31,7 @@ use kamu_accounts_inmem::{
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AccountServiceImpl,
+    AllowAnonymousAuthPolicyServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
     OAuthDeviceCodeGeneratorDefault,
@@ -85,6 +87,7 @@ impl Harness {
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add_value(DidSecretEncryptionConfig::sample())
                 .add_value(JwtAuthenticationConfig::default())
+                .add_value(AuthConfig::sample())
                 .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add_builder(UploadServiceS3::builder(s3_upload_context.clone()))
@@ -96,6 +99,7 @@ impl Harness {
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<OAuthDeviceCodeGeneratorDefault>()
+                .add::<AllowAnonymousAuthPolicyServiceImpl>()
                 .add::<InMemoryOAuthDeviceCodeRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

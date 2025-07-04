@@ -68,9 +68,9 @@ pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
     pub source: Option<SourceConfig>,
 
-    /// Users configuration
+    /// Auth configuration
     #[merge(strategy = merge_recursive)]
-    pub users: Option<PredefinedAccountsConfig>,
+    pub auth: Option<AuthConfig>,
 
     /// Uploads configuration
     #[merge(strategy = merge_recursive)]
@@ -93,7 +93,7 @@ impl CLIConfig {
             protocol: None,
             search: None,
             source: None,
-            users: None,
+            auth: None,
             uploads: None,
             did_encryption: None,
         }
@@ -115,7 +115,7 @@ impl CLIConfig {
             protocol: Some(ProtocolConfig::sample()),
             search: Some(SearchConfig::sample()),
             source: Some(SourceConfig::sample()),
-            users: Some(PredefinedAccountsConfig::sample()),
+            auth: Some(AuthConfig::sample()),
             uploads: Some(UploadsConfig::sample()),
             did_encryption: Some(DidSecretEncryptionConfig::sample()),
         }
@@ -135,7 +135,7 @@ impl Default for CLIConfig {
             protocol: Some(ProtocolConfig::default()),
             search: Some(SearchConfig::default()),
             source: Some(SourceConfig::default()),
-            users: Some(PredefinedAccountsConfig::default()),
+            auth: Some(AuthConfig::default()),
             uploads: Some(UploadsConfig::default()),
             did_encryption: Some(DidSecretEncryptionConfig::default()),
         }

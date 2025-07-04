@@ -113,6 +113,7 @@ impl ServerSideS3Harness {
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DidGeneratorDefault>()
                 .add_value(RunInfoDir::new(run_info_dir))
+                .add_value(AuthConfig::sample())
                 .add_builder(
                     messaging_outbox::OutboxImmediateImpl::builder()
                         .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),

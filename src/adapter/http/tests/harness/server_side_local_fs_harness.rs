@@ -19,6 +19,7 @@ use kamu::*;
 use kamu_accounts::{
     Account,
     AccountConfig,
+    AuthConfig,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
     DidSecretEncryptionConfig,
@@ -136,6 +137,7 @@ impl ServerSideLocalFsHarness {
                 )
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add_value(time_source.clone())
+                .add_value(AuthConfig::sample())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DependencyGraphServiceImpl>()
                 .add::<InMemoryDatasetDependencyRepository>()

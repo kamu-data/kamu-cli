@@ -53,6 +53,7 @@ impl APIServer {
         port: Option<u16>,
         file_upload_limit_config: &FileUploadLimitConfig,
         enable_dataset_env_vars_management: bool,
+        allow_anonymous: bool,
         external_address: Option<IpAddr>,
         e2e_output_data_path: Option<&PathBuf>,
         password_policy_config: &PasswordPolicyConfig,
@@ -106,6 +107,7 @@ impl APIServer {
                 enable_logout: true,
                 enable_scheduling: true,
                 enable_dataset_env_vars_management,
+                allow_anonymous,
                 enable_terms_of_service: true,
             },
         };
@@ -132,21 +134,12 @@ impl APIServer {
             )
             .build(),
         )
-        .route(
-            "/ui-config",
-            axum::routing::get(ui_configuration_handler),
-        )
-        .route(
-            "/graphql",
-            axum::routing::post(graphql_handler),
-        )
         .merge(server_console::router(
             "Kamu API Server".to_string(),
             format!("v{} embedded", crate::VERSION),
         ).into())
         .merge(kamu_adapter_http::data::root_router())
         .merge(kamu_adapter_http::general::root_router())
-        .nest("/platform", kamu_adapter_http::platform::root_router())
         .nest(
             "/odata",
             match tenancy_config {
@@ -154,6 +147,9 @@ impl APIServer {
                 TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
             },
         )
+        .layer(kamu_adapter_http::AuthPolicyLayer::new())
+        // GraphQL API has its own guard to handle auth policy check
+        .route("/graphql", axum::routing::post(graphql_handler))
         .nest(
             match tenancy_config {
                 TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
@@ -161,12 +157,16 @@ impl APIServer {
             },
             kamu_adapter_http::add_dataset_resolver_layer(
                 OpenApiRouter::new()
-                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
                     .merge(kamu_adapter_http::data::dataset_router())
+                    .layer(kamu_adapter_http::AuthPolicyLayer::new())
+                    // ToDo: Should we close SMTP in restricted mode?
+                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
                     .layer(DatasetAuthorizationLayer::default()),
                 tenancy_config,
             )
-        );
+        )
+        .nest("/platform", kamu_adapter_http::platform::root_router())
+        .route("/ui-config", axum::routing::get(ui_configuration_handler));
 
         let is_e2e_testing = e2e_output_data_path.is_some();
 

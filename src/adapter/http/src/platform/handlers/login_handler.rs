@@ -67,6 +67,7 @@ pub async fn login_handler(
                 E::RejectedCredentials(e) => ApiError::new_unauthorized_from(e),
                 E::NoPrimaryEmail(e) => ApiError::new_unauthorized_from(e),
                 E::DuplicateCredentials => ApiError::bad_request(e),
+                E::RestrictedLogin => ApiError::new_unauthorized_from(e),
                 E::Internal(e) => e.api_err(),
             }
         })

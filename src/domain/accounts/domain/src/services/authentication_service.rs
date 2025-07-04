@@ -75,6 +75,9 @@ pub enum LoginError {
     #[error("Credentials are already used by an existing account")]
     DuplicateCredentials,
 
+    #[error("Your account is not whitelisted")]
+    RestrictedLogin,
+
     #[error(transparent)]
     Internal(
         #[from]

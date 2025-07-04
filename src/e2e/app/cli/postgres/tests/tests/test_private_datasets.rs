@@ -8,7 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use kamu_cli_e2e_common::prelude::*;
-use kamu_cli_e2e_repo_tests::private_datasets::PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG;
+use kamu_cli_e2e_repo_tests::private_datasets::{
+    PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG,
+    PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +24,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +38,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +52,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +66,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +80,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,7 +94,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,7 +108,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,7 +136,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,7 +165,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -205,7 +208,7 @@ kamu_cli_run_api_server_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
-        .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -81,6 +81,7 @@ impl Harness {
                 .add_value(predefined_accounts_config)
                 .add::<InMemoryAccountRepository>()
                 .add_value(SystemTimeSourceStub::new())
+                .add_value(AuthConfig::sample())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<LoginPasswordAuthProvider>()
                 .add::<AccountServiceImpl>()

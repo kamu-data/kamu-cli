@@ -18,7 +18,7 @@ use console::style as s;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
-use kamu_accounts::PredefinedAccountsConfig;
+use kamu_accounts::{AuthConfig, PredefinedAccountsConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_datasets::DatasetEnvVarsConfig;
 
@@ -34,6 +34,7 @@ pub struct UICommand {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
     dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
+    auth_config: Arc<AuthConfig>,
     output_config: Arc<OutputConfig>,
     password_policy_config: Arc<PasswordPolicyConfig>,
 
@@ -65,6 +66,7 @@ impl Command for UICommand {
             self.predefined_accounts_config.as_ref(),
             self.file_upload_limit_config.as_ref(),
             self.dataset_env_vars_config.is_enabled(),
+            self.auth_config.as_ref().allow_anonymous.unwrap(),
             self.address,
             self.port,
             self.password_policy_config.as_ref(),

@@ -9,6 +9,7 @@
 
 mod access_token;
 mod account;
+mod auth_config;
 mod current_account_subject;
 mod device_token;
 mod did_entity;
@@ -19,6 +20,7 @@ mod predefined_accounts_config;
 
 pub use access_token::*;
 pub use account::*;
+pub use auth_config::*;
 pub use current_account_subject::*;
 pub use device_token::*;
 pub use did_entity::*;

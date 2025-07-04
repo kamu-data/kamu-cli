@@ -484,6 +484,7 @@ impl DatasetApi<'_> {
         match response.status() {
             StatusCode::OK => Ok(response.json().await.int_err()?),
             StatusCode::NOT_FOUND => Err(DatasetByIdError::NotFound),
+            StatusCode::UNAUTHORIZED => Err(DatasetByIdError::Unauthorized),
             unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
                 .int_err()
                 .into()),
@@ -1453,6 +1454,8 @@ impl Eq for SetDatasetVisibilityError {}
 
 #[derive(Error, Debug)]
 pub enum DatasetByIdError {
+    #[error("Unauthorized")]
+    Unauthorized,
     #[error("Not found")]
     NotFound,
     #[error(transparent)]

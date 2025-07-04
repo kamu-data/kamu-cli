@@ -131,7 +131,8 @@ impl From<kamu_accounts::LoginError> for GqlError {
             kamu_accounts::LoginError::NoPrimaryEmail(e) => GqlError::Gql(
                 Error::new(e.to_string()).extend_with(|_, eev| eev.set("reason", e.to_string())),
             ),
-            kamu_accounts::LoginError::DuplicateCredentials => {
+            kamu_accounts::LoginError::DuplicateCredentials
+            | kamu_accounts::LoginError::RestrictedLogin => {
                 GqlError::Gql(Error::new(value.to_string()))
             }
             kamu_accounts::LoginError::Internal(e) => GqlError::Internal(e),
