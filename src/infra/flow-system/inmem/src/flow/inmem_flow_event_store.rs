@@ -359,6 +359,12 @@ impl FlowEventStore for InMemoryFlowEventStore {
             by_initiator: None,
         };
 
+        let retrying_filter = FlowFilters {
+            by_flow_type: None,
+            by_flow_status: Some(FlowStatus::Retrying),
+            by_initiator: None,
+        };
+
         let running_filter = FlowFilters {
             by_flow_type: None,
             by_flow_status: Some(FlowStatus::Running),
@@ -373,6 +379,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
                     .rev()
                     .filter(|flow_id| {
                         g.matches_flow(**flow_id, &waiting_filter)
+                            || g.matches_flow(**flow_id, &retrying_filter)
                             || g.matches_flow(**flow_id, &running_filter)
                     })
                     .copied()
