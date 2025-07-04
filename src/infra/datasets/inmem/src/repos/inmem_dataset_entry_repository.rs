@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -112,9 +113,9 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         Ok(dataset_entry.clone())
     }
 
-    async fn get_multiple_dataset_entries(
-        &self,
-        dataset_ids: &[odf::DatasetID],
+    async fn get_multiple_dataset_entries<'a>(
+        &'a self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let readable_state = self.state.read().await;
 
@@ -125,7 +126,9 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             if let Some(dataset_entry) = maybe_dataset_entry {
                 resolution.resolved_entries.push(dataset_entry.clone());
             } else {
-                resolution.unresolved_entries.push(dataset_id.clone());
+                resolution
+                    .unresolved_entries
+                    .push(dataset_id.as_ref().clone());
             }
         }
 

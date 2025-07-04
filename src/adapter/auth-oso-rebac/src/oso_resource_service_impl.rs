@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -85,7 +86,7 @@ impl OsoResourceServiceImpl {
 
     pub async fn get_multiple_dataset_resources(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        dataset_ids: &[Cow<'_, odf::DatasetID>],
     ) -> Result<DatasetResourcesResolution, GetMultipleDatasetResourcesError> {
         let DatasetEntriesResolution {
             resolved_entries,

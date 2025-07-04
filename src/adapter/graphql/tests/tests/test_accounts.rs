@@ -12,6 +12,8 @@ use dill::Component;
 use indoc::indoc;
 use kamu_accounts::*;
 use kamu_adapter_graphql::traits::ResponseExt;
+use pretty_assertions::assert_eq;
+use serde_json::json;
 
 use crate::utils::{PredefinedAccountOpts, authentication_catalogs};
 
@@ -362,7 +364,7 @@ async fn test_update_email_bad_email() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         ["Failed to parse \"Email\": wasya#example.com is not a valid email"],
         *res.error_messages(),
         "{res:?}"
@@ -409,7 +411,7 @@ async fn test_update_email_unauthorized() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(["Account access error"], *res.error_messages(), "{res:?}");
+    assert_eq!(["Account access error"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -427,7 +429,7 @@ async fn test_create_account() {
         .execute(create_account_request("foo").data(harness.catalog_authorized.clone()))
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "createAccount": {
@@ -449,7 +451,7 @@ async fn test_create_account() {
         .execute(create_account_request("foo").data(harness.catalog_authorized))
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "createAccount": {
@@ -473,7 +475,119 @@ async fn test_create_account_without_permissions() {
         .execute(create_account_request("foo").data(harness.catalog_authorized))
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
+        ["Account is not authorized to provision accounts"],
+        *res.error_messages(),
+        "{res:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_wallet_accounts() {
+    fn sort_accounts(response_root_json: &mut serde_json::Value) {
+        let accounts = response_root_json["accounts"]["createWalletAccounts"]["accounts"]
+            .as_array_mut()
+            .unwrap();
+        accounts.sort_by(|a, b| {
+            let a_name = a["accountName"].as_str().unwrap();
+            let b_name = b["accountName"].as_str().unwrap();
+            a_name.cmp(b_name)
+        });
+    }
+
+    // -----
+
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        is_admin: false,
+        can_provision_accounts: true,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let wallet_accounts = [
+        "did:pkh:eip155:1:0xbf9a00755BB7d2E904b5F569095220c54E742E07",
+        "did:pkh:eip155:1:0x3F41642f9813eb3be2DBc098dad815c25b9156E8",
+        "did:pkh:eip155:1:0xeCd666A695086c10D8d4AB146D2827842bd15Ef9",
+    ];
+    let expected_result = json!({
+        "accounts": {
+            "createWalletAccounts": {
+                "message": "Wallet accounts created",
+                "accounts": [
+                    {
+                        "accountName": "0x3F41642f9813eb3be2DBc098dad815c25b9156E8",
+                        "displayName": "0x3F41642f9813eb3be2DBc098dad815c25b9156E8",
+                        "accountProvider": "WEB3_WALLET",
+                    },
+                    {
+                        "accountName": "0xbf9a00755BB7d2E904b5F569095220c54E742E07",
+                        "displayName": "0xbf9a00755BB7d2E904b5F569095220c54E742E07",
+                        "accountProvider": "WEB3_WALLET",
+                    },
+                    {
+                        "accountName": "0xeCd666A695086c10D8d4AB146D2827842bd15Ef9",
+                        "displayName": "0xeCd666A695086c10D8d4AB146D2827842bd15Ef9",
+                        "accountProvider": "WEB3_WALLET",
+                    },
+                ]
+            }
+        }
+    });
+
+    {
+        let res = schema
+            .execute(
+                create_wallet_accounts_request(&wallet_accounts)
+                    .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+        assert!(res.is_ok(), "{res:?}");
+
+        let mut root_json = res.data.into_json().unwrap();
+        sort_accounts(&mut root_json);
+        assert_eq!(&expected_result, &root_json);
+    }
+    // Idempotence.
+    {
+        let res = schema
+            .execute(
+                create_wallet_accounts_request(&wallet_accounts)
+                    .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+
+        assert!(res.is_ok(), "{res:?}");
+
+        let mut root_json = res.data.into_json().unwrap();
+        sort_accounts(&mut root_json);
+        assert_eq!(&expected_result, &root_json);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_wallet_accounts_without_permissions() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
+        is_admin: false,
+        can_provision_accounts: false,
+    })
+    .await;
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let wallet_accounts = [
+        "did:pkh:eip155:1:0xbf9a00755BB7d2E904b5F569095220c54E742E07",
+        "did:pkh:eip155:1:0x3F41642f9813eb3be2DBc098dad815c25b9156E8",
+        "did:pkh:eip155:1:0xeCd666A695086c10D8d4AB146D2827842bd15Ef9",
+    ];
+
+    let res = schema
+        .execute(create_wallet_accounts_request(&wallet_accounts).data(harness.catalog_authorized))
+        .await;
+
+    assert_eq!(
         ["Account is not authorized to provision accounts"],
         *res.error_messages(),
         "{res:?}"
@@ -502,7 +616,7 @@ async fn test_modify_password() {
     let res = schema
         .execute(modify_password_request("foo", "p4s5w0rd").data(harness.catalog_authorized))
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "byName": {
@@ -562,7 +676,7 @@ async fn test_modify_password_errors() {
             )
             .await;
 
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             [format!(
                 "Failed to parse \"AccountPassword\": {expected_error_message}"
             )],
@@ -614,7 +728,7 @@ async fn test_modify_password_non_admin() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+    assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -636,7 +750,7 @@ async fn test_delete_own_account() {
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "byName": {
@@ -657,7 +771,7 @@ async fn test_delete_own_account() {
                 .data(harness.catalog_authorized),
         )
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &res.data,
         &value!({
             "accounts": {
@@ -695,7 +809,7 @@ async fn test_admin_delete_other_account() {
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "byName": {
@@ -713,7 +827,7 @@ async fn test_admin_delete_other_account() {
     let res = schema
         .execute(account_by_name_request(another_account_username).data(harness.catalog_authorized))
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &res.data,
         &value!({
             "accounts": {
@@ -739,7 +853,7 @@ async fn test_anonymous_try_to_delete_account() {
                 .data(harness.catalog_anonymous),
         )
         .await;
-    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+    assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -767,7 +881,7 @@ async fn test_non_admin_try_to_delete_other_account() {
         .execute(delete_account_request(another_account_username).data(harness.catalog_authorized))
         .await;
 
-    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+    assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -796,7 +910,7 @@ async fn test_rename_own_account() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "byName": {
@@ -817,7 +931,7 @@ async fn test_rename_own_account() {
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &res.data,
         &value!({
             "accounts": {
@@ -832,7 +946,7 @@ async fn test_rename_own_account() {
             account_by_name_request(RENAMED_ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized),
         )
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &res.data,
         &value!({
             "accounts": {
@@ -857,7 +971,7 @@ async fn test_rename_own_account() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "auth": {
                 "login": {
@@ -914,7 +1028,7 @@ async fn test_rename_own_account_taken_name() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "byName": {
@@ -940,7 +1054,7 @@ async fn test_rename_own_account_taken_name() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "byName": {
@@ -983,7 +1097,7 @@ async fn test_admin_renames_other_account() {
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &value!({
             "accounts": {
                 "byName": {
@@ -1003,7 +1117,7 @@ async fn test_admin_renames_other_account() {
             account_by_name_request(ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized.clone()),
         )
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &res.data,
         &value!({
             "accounts": {
@@ -1018,7 +1132,7 @@ async fn test_admin_renames_other_account() {
             account_by_name_request(RENAMED_ANOTHER_ACCOUNT_NAME).data(harness.catalog_authorized),
         )
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         &res.data,
         &value!({
             "accounts": {
@@ -1046,7 +1160,7 @@ async fn test_anonymous_try_to_rename_account() {
                 .data(harness.catalog_anonymous),
         )
         .await;
-    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+    assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1077,7 +1191,7 @@ async fn test_non_admin_try_to_rename_other_account() {
         )
         .await;
 
-    pretty_assertions::assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
+    assert_eq!(["Unauthenticated"], *res.error_messages(), "{res:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1157,6 +1271,32 @@ fn create_account_request(new_account_name: &str) -> async_graphql::Request {
     ))
     .variables(async_graphql::Variables::from_value(value!({
         "newAccountName": new_account_name,
+    })))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn create_wallet_accounts_request(wallet_accounts: &[&str]) -> async_graphql::Request {
+    async_graphql::Request::new(indoc!(
+        r#"
+        mutation ($newWalletAccounts: [DidPkh!]!) {
+          accounts {
+            createWalletAccounts(walletAddresses: $newWalletAccounts) {
+              ... on CreateWalletAccountsSuccess {
+                message
+                accounts {
+                  accountName
+                  displayName
+                  accountProvider
+                }
+              }
+            }
+          }
+        }
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(value!({
+        "newWalletAccounts": wallet_accounts,
     })))
 }
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use internal_error::InternalError;
@@ -16,6 +17,7 @@ use crate::{
     AccountPropertyName,
     AccountToDatasetRelation,
     DatasetPropertyName,
+    DeleteEntitiesRelationsError,
     EntityNotFoundError,
     EntityWithRelation,
     GetObjectEntityRelationsError,
@@ -24,6 +26,7 @@ use crate::{
     PropertyValue,
     SetEntityPropertyError,
     SubjectEntityRelationsError,
+    UpsertEntitiesRelationsError,
     boolean_property_value,
 };
 
@@ -87,13 +90,23 @@ pub trait RebacService: Send + Sync {
         account_id: &odf::AccountID,
         relationship: AccountToDatasetRelation,
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), SetRelationError>;
+    ) -> Result<(), UpsertEntitiesRelationsError>;
+
+    async fn set_account_dataset_relations(
+        &self,
+        operations: &[SetAccountDatasetRelationsOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError>;
 
     async fn unset_accounts_dataset_relations(
         &self,
         account_ids: &[&odf::AccountID],
         dataset_id: &odf::DatasetID,
-    ) -> Result<(), UnsetRelationError>;
+    ) -> Result<(), DeleteEntitiesRelationsError>;
+
+    async fn unset_account_dataset_relations(
+        &self,
+        operations: &[UnsetAccountDatasetRelationsOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError>;
 
     async fn get_account_dataset_relations(
         &self,
@@ -109,6 +122,19 @@ pub trait RebacService: Send + Sync {
         &self,
         dataset_ids: &[odf::DatasetID],
     ) -> Result<HashMap<odf::DatasetID, Vec<AuthorizedAccount>>, GetObjectEntityRelationsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SetAccountDatasetRelationsOperation<'a> {
+    pub account_id: Cow<'a, odf::AccountID>,
+    pub relationship: AccountToDatasetRelation,
+    pub dataset_id: Cow<'a, odf::DatasetID>,
+}
+
+pub struct UnsetAccountDatasetRelationsOperation<'a> {
+    pub account_id: Cow<'a, odf::AccountID>,
+    pub dataset_id: Cow<'a, odf::DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -229,22 +255,6 @@ pub enum DeletePropertiesError {
 
 #[derive(Error, Debug)]
 pub enum GetPropertiesError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum SetRelationError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum UnsetRelationError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

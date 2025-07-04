@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::borrow::Cow;
 
 use database_common::PaginationOpts;
 use dill::Catalog;
@@ -209,8 +210,8 @@ pub async fn test_get_multiple_entries(catalog: &Catalog) {
     {
         let mut get_multiple_res = dataset_entry_repo
             .get_multiple_dataset_entries(&[
-                dataset_entry_acc_1.id.clone(),
-                dataset_entry_acc_3.id.clone(),
+                Cow::Borrowed(&dataset_entry_acc_1.id),
+                Cow::Borrowed(&dataset_entry_acc_3.id),
             ])
             .await
             .unwrap();
@@ -235,7 +236,10 @@ pub async fn test_get_multiple_entries(catalog: &Catalog) {
     {
         let wrong_id = odf::DatasetID::new_seeded_ed25519(b"wrong_id");
         let get_multiple_res = dataset_entry_repo
-            .get_multiple_dataset_entries(&[dataset_entry_acc_2.id.clone(), wrong_id.clone()])
+            .get_multiple_dataset_entries(&[
+                Cow::Borrowed(&dataset_entry_acc_2.id),
+                Cow::Borrowed(&wrong_id),
+            ])
             .await
             .unwrap();
 
@@ -253,7 +257,7 @@ pub async fn test_get_multiple_entries(catalog: &Catalog) {
         let wrong_id_2 = odf::DatasetID::new_seeded_ed25519(b"wrong_id_2");
 
         let get_multiple_res = dataset_entry_repo
-            .get_multiple_dataset_entries(&[wrong_id_1.clone(), wrong_id_2.clone()])
+            .get_multiple_dataset_entries(&[Cow::Borrowed(&wrong_id_1), Cow::Borrowed(&wrong_id_2)])
             .await
             .unwrap();
 

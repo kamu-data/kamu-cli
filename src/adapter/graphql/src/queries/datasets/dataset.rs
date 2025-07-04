@@ -155,7 +155,7 @@ impl Dataset {
         Ok(visibility)
     }
 
-    /// Quck access to `head` block hash
+    /// Quick access to `head` block hash
     async fn head(&self, ctx: &Context<'_>) -> Result<Multihash<'static>> {
         let head = self
             .dataset_request_state

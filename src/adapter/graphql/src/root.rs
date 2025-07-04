@@ -110,6 +110,13 @@ impl Mutation {
     async fn accounts(&self) -> AccountsMut {
         AccountsMut
     }
+
+    /// Collaboration-related functionality group
+    ///
+    /// Allows setting permissions for multiple datasets in batch mode
+    async fn collaboration(&self) -> CollaborationMut {
+        CollaborationMut
+    }
 }
 
 pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;

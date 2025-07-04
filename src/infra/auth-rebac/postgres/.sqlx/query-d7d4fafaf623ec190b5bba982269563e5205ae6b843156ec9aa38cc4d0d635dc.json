@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO auth_rebac_relations (subject_entity_type,\n                                              subject_entity_id,\n                                              relationship,\n                                              object_entity_type,\n                                              object_entity_id)\n            SELECT *\n            FROM UNNEST($1::rebac_entity_type[],\n                        $2::TEXT[],\n                        $3::TEXT[],\n                        $4::rebac_entity_type[],\n                        $5::TEXT[])\n            ON CONFLICT(subject_entity_type,\n                        subject_entity_id,\n                        object_entity_type,\n                        object_entity_id)\n                DO UPDATE SET relationship = excluded.relationship\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "rebac_entity_type[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "rebac_entity_type",
+                  "kind": {
+                    "Enum": [
+                      "account",
+                      "dataset"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray",
+        "TextArray",
+        {
+          "Custom": {
+            "name": "rebac_entity_type[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "rebac_entity_type",
+                  "kind": {
+                    "Enum": [
+                      "account",
+                      "dataset"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d7d4fafaf623ec190b5bba982269563e5205ae6b843156ec9aa38cc4d0d635dc"
+}

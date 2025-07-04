@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use chrono::{DateTime, Utc};
 use kamu_core::DatasetRegistry;
 
@@ -113,14 +115,14 @@ impl SetTransform {
         ctx: &Context<'_>,
         v: odf::metadata::SetTransform,
     ) -> Result<odf::metadata::SetTransform, InternalError> {
-        let input_ids_list: Vec<odf::DatasetID> = v
+        let input_ids = v
             .inputs
             .iter()
-            .map(|input| input.dataset_ref.id().unwrap().clone())
-            .collect();
+            .map(|input| Cow::Borrowed(input.dataset_ref.id().unwrap()))
+            .collect::<Vec<_>>();
         let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
         let dataset_infos = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(input_ids_list)
+            .resolve_multiple_dataset_handles_by_ids(&input_ids)
             .await
             .int_err()?;
 

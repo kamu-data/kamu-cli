@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 use database_common::PaginationOpts;
 use internal_error::InternalError;
+use odf::metadata::DidPkh;
 
 use crate::{
     Account,
@@ -79,6 +80,8 @@ pub trait AccountService: Sync + Send {
         password: Password,
         email: email_utils::Email,
     ) -> Result<Account, CreateAccountError>;
+
+    async fn create_wallet_account(&self, did_pkh: &DidPkh) -> Result<Account, CreateAccountError>;
 
     async fn rename_account(
         &self,
