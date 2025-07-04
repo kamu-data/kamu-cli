@@ -76,6 +76,50 @@ pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      auth:
+        allowAnonymous: true
+        users:
+          predefined:
+            # Special:
+            - accountName: admin
+              password: test#admin
+              properties: [admin]
+              email: admin@example.com
+
+            # By names:
+            - accountName: alice
+              password: test#alice
+              email: alice@example.com
+            - accountName: bob
+              password: test#bob
+              email: bob@example.com
+
+            # By roles:
+            - accountName: owner
+              password: test#owner
+              email: owner@example.com
+            - accountName: not-owner
+              password: test#not-owner
+              email: not-owner@example.com
+            - accountName: reader
+              password: test#reader
+              email: reader@example.com
+            - accountName: editor
+              password: test#editor
+              email: editor@example.com
+            - accountName: maintainer
+              password: test#maintainer
+              email: maintainer@example.com
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_datasets_have_correct_visibility_after_creation(anonymous: KamuApiServerClient) {
     let [
         not_owner,

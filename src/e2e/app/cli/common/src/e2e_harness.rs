@@ -35,13 +35,13 @@ pub const MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER: &str = indoc::indoc!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MULTITENANT_KAMU_CONFIG_WITH_RESTRICTED_ANONYMOUS: &str = indoc::indoc!(
+pub const MULTITENANT_KAMU_CONFIG_WITH_ALLOWED_ANONYMOUS: &str = indoc::indoc!(
     r#"
     kind: CLIConfig
     version: 1
     content:
       auth:
-        allowAnonymous: false
+        allowAnonymous: true
         users:
           predefined:
             - accountName: kamu

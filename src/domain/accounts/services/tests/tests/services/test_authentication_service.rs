@@ -95,7 +95,7 @@ async fn test_account_not_created_in_restrict_anonymous_mode() {
         .login("method-A", "dummy".to_string(), None)
         .await;
 
-    assert_matches!(response_a, Err(LoginError::RestrictedLoginMethod));
+    assert_matches!(response_a, Err(LoginError::RestrictedLogin));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,7 +164,7 @@ fn make_catalog(catalog_opts: CatalogOpts) -> dill::Catalog {
 
     let auth_config = catalog_opts
         .auth_config_maybe
-        .unwrap_or_else(|| AuthConfig::sample());
+        .unwrap_or_else(AuthConfig::sample);
 
     b.add::<DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()

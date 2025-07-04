@@ -16,6 +16,6 @@ pub use kamu_cli_e2e_common_macros::{
 pub use crate::e2e_harness::{
     KamuCliApiServerHarness,
     KamuCliApiServerHarnessOptions as Options,
+    MULTITENANT_KAMU_CONFIG_WITH_ALLOWED_ANONYMOUS,
     MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER,
-    MULTITENANT_KAMU_CONFIG_WITH_RESTRICTED_ANONYMOUS,
 };

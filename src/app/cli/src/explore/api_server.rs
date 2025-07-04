@@ -147,6 +147,9 @@ impl APIServer {
                 TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
             },
         )
+        .layer(kamu_adapter_http::AuthPolicyLayer::new())
+        // GraphQL API has its own guard to handle auth policy check
+        .route("/graphql", axum::routing::post(graphql_handler))
         .nest(
             match tenancy_config {
                 TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
@@ -154,12 +157,16 @@ impl APIServer {
             },
             kamu_adapter_http::add_dataset_resolver_layer(
                 OpenApiRouter::new()
-                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
                     .merge(kamu_adapter_http::data::dataset_router())
+                    .layer(kamu_adapter_http::AuthPolicyLayer::new())
+                    // ToDo: Should we close SMTP in restricted mode?
+                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
                     .layer(DatasetAuthorizationLayer::default()),
                 tenancy_config,
             )
-        );
+        )
+        .nest("/platform", kamu_adapter_http::platform::root_router())
+        .route("/ui-config", axum::routing::get(ui_configuration_handler));
 
         let is_e2e_testing = e2e_output_data_path.is_some();
 
@@ -170,18 +177,13 @@ impl APIServer {
         }
 
         router = router
+            .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(
                 tower_http::cors::CorsLayer::new()
                     .allow_origin(tower_http::cors::Any)
                     .allow_methods(vec![http::Method::GET, http::Method::POST])
                     .allow_headers(tower_http::cors::Any),
             )
-            .layer(kamu_adapter_http::AuthPolicyLayer::new())
-            .nest("/platform", kamu_adapter_http::platform::root_router())
-            // GraphQL API have his own guard to handle auth policy check
-            .route("/graphql", axum::routing::post(graphql_handler))
-            .route("/ui-config", axum::routing::get(ui_configuration_handler))
-            .layer(kamu_adapter_http::AuthenticationLayer::new())
             .layer(observability::axum::http_layer())
             .layer(CatchPanicLayer::custom(panic_handler))
             // Note: Healthcheck, metrics, and OpenAPI routes are placed before the tracing layer

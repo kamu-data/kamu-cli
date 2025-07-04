@@ -269,7 +269,6 @@ async fn test_attempt_upload_file_authorized() {
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
     let cache_dir = harness.cache_dir.clone();
-    println!("upload_prepare_url: {upload_prepare_url}");
 
     let client = async move {
         let client = reqwest::Client::new();
