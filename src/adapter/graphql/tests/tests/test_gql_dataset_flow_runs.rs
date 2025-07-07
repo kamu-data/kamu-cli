@@ -124,6 +124,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -189,6 +190,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": null,
@@ -265,6 +267,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "RUNNING",
                                         "outcome": null,
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -357,6 +360,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "message": "SUCCESS",
                                         },
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -518,6 +522,7 @@ async fn test_trigger_reset_root_dataset_flow() {
                                             "message": "SUCCESS"
                                         },
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -745,6 +750,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -839,6 +845,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "message": "SUCCESS"
                                         },
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -966,6 +973,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -1031,6 +1039,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": null,
@@ -1107,6 +1116,7 @@ async fn test_trigger_compaction_root_dataset() {
                                         "status": "RUNNING",
                                         "outcome": null,
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -1203,6 +1213,7 @@ async fn test_trigger_compaction_root_dataset() {
                                             "message": "SUCCESS"
                                         },
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -2732,6 +2743,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "message": "SUCCESS"
                                         },
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -2876,6 +2888,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             }
                                         },
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
@@ -3041,6 +3054,7 @@ async fn test_config_snapshot_returned_correctly() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "initiatedAt": schedule_time.to_rfc3339(),
                                             "scheduledAt": schedule_time.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
@@ -3207,12 +3221,12 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
 
-    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let complete_time_0 = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
             flow_task_metadata.clone(),
-            complete_time,
+            complete_time_0,
             ts::TaskOutcome::Failed(TaskError::empty()),
         )
         .await;
@@ -3225,7 +3239,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
         )
         .await;
 
-    let next_scheduled_at = complete_time + Duration::minutes(1);
+    let next_scheduled_at_0 = complete_time_0 + Duration::minutes(1);
 
     assert!(response.is_ok(), "{response:?}");
     pretty_assertions::assert_eq!(
@@ -3247,10 +3261,11 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "status": "RETRYING",
                                         "outcome": null,
                                         "timing": {
-                                            "scheduledAt": next_scheduled_at.to_rfc3339(),
+                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "scheduledAt": next_scheduled_at_0.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time_0.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
@@ -3295,24 +3310,24 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 
     // Retry attempt 1 - failure again
 
-    let flow_task_id = harness.mimic_flow_scheduled("0", next_scheduled_at).await;
+    let flow_task_id = harness.mimic_flow_scheduled("0", next_scheduled_at_0).await;
 
     let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
 
-    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let complete_time_1 = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
             flow_task_metadata.clone(),
-            complete_time,
+            complete_time_1,
             ts::TaskOutcome::Failed(TaskError::empty()),
         )
         .await;
 
-    let next_scheduled_at = complete_time + Duration::minutes(1);
+    let next_scheduled_at_1 = complete_time_1 + Duration::minutes(1);
 
     let response = schema
         .execute(
@@ -3341,10 +3356,11 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "status": "RETRYING",
                                         "outcome": null,
                                         "timing": {
-                                            "scheduledAt": next_scheduled_at.to_rfc3339(),
+                                            "initiatedAt": schedule_time.to_rfc3339(),
+                                            "scheduledAt": next_scheduled_at_1.to_rfc3339(),
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "lastAttemptFinishedAt": complete_time.to_rfc3339(),
+                                            "lastAttemptFinishedAt": complete_time_1.to_rfc3339(),
                                         },
                                         "tasks": [
                                             {
@@ -3396,19 +3412,19 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 
     // Retry attempt 2 - success
 
-    let flow_task_id = harness.mimic_flow_scheduled("0", next_scheduled_at).await;
+    let flow_task_id = harness.mimic_flow_scheduled("0", next_scheduled_at_1).await;
 
     let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_running(flow_task_id, flow_task_metadata.clone(), running_time)
         .await;
 
-    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let complete_time_2 = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
             flow_task_metadata,
-            complete_time,
+            complete_time_2,
             ts::TaskOutcome::Success(
                 TaskResultDatasetUpdate {
                     pull_result: PullResult::Updated {
@@ -3420,6 +3436,163 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
             ),
         )
         .await;
+
+    // Now, let's see flow history with these retries
+    let query = FlowRunsHarness::flow_history_query(
+        &create_result.dataset_handle.id,
+        "0", /* flowId */
+    );
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(query.clone()).data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    pretty_assertions::assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "getFlow": {
+                                "__typename": "GetFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "history": [
+                                        {
+                                            "__typename": "FlowEventInitiated",
+                                            "eventId": "1",
+                                            "trigger": {
+                                                "__typename": "FlowTriggerManual",
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventScheduledForActivation",
+                                            "eventId": "2",
+                                        },
+                                        {
+                                            "__typename": "FlowEventStartConditionUpdated",
+                                            "eventId": "3",
+                                            "startCondition": {
+                                                "__typename": "FlowStartConditionExecutor",
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "4",
+                                            "taskId": "0",
+                                            "taskStatus": "QUEUED",
+                                            "task": {
+                                                "taskId": "0"
+                                            },
+                                            "nextAttemptAt": null
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "5",
+                                            "taskId": "0",
+                                            "taskStatus": "RUNNING",
+                                            "task": {
+                                                "taskId": "0"
+                                            },
+                                            "nextAttemptAt": null
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "6",
+                                            "taskId": "0",
+                                            "taskStatus": "FINISHED",
+                                            "task": {
+                                                "taskId": "0"
+                                            },
+                                            "nextAttemptAt": next_scheduled_at_0.to_rfc3339()
+                                        },
+                                        {
+                                            "__typename": "FlowEventStartConditionUpdated",
+                                            "eventId": "7",
+                                            "startCondition": {
+                                                "__typename": "FlowStartConditionExecutor",
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "8",
+                                            "taskId": "1",
+                                            "taskStatus": "QUEUED",
+                                            "task": {
+                                                "taskId": "1"
+                                            },
+                                            "nextAttemptAt": null
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "9",
+                                            "taskId": "1",
+                                            "taskStatus": "RUNNING",
+                                            "task": {
+                                                "taskId": "1"
+                                            },
+                                            "nextAttemptAt": null
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "10",
+                                            "taskId": "1",
+                                            "taskStatus": "FINISHED",
+                                            "task": {
+                                                "taskId": "1"
+                                            },
+                                            "nextAttemptAt": next_scheduled_at_1.to_rfc3339()
+                                        },
+                                        {
+                                            "__typename": "FlowEventStartConditionUpdated",
+                                            "eventId": "11",
+                                            "startCondition": {
+                                                "__typename": "FlowStartConditionExecutor",
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "12",
+                                            "taskId": "2",
+                                            "taskStatus": "QUEUED",
+                                            "task": {
+                                                "taskId": "2"
+                                            },
+                                            "nextAttemptAt": null
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "13",
+                                            "taskId": "2",
+                                            "taskStatus": "RUNNING",
+                                            "task": {
+                                                "taskId": "2"
+                                            },
+                                            "nextAttemptAt": null
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "14",
+                                            "taskId": "2",
+                                            "taskStatus": "FINISHED",
+                                            "task": {
+                                                "taskId": "2"
+                                            },
+                                            "nextAttemptAt": null
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3775,6 +3948,7 @@ impl FlowRunsHarness {
                                             }
                                         }
                                         timing {
+                                            initiatedAt
                                             scheduledAt
                                             awaitingExecutorSince
                                             runningSince
