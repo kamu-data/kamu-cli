@@ -2918,7 +2918,6 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
-                                            "transformResult": null,
                                             "transform": {
                                                 "inputs": [
                                                     {
@@ -2929,7 +2928,8 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                                     "__typename": "TransformSql",
                                                     "engine": "some_engine",
                                                 }
-                                            }
+                                            },
+                                            "transformResult": null,
                                         },
                                         "status": "FINISHED",
                                         "outcome": {
@@ -2953,6 +2953,9 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                                 "status": "FINISHED",
                                                 "outcome": {
                                                     "__typename": "TaskOutcomeFailed",
+                                                    "reason": {
+                                                        "__typename": "TaskFailureReasonInputDatasetCompacted",
+                                                    }
                                                 },
                                             }
                                         ],
@@ -3331,6 +3334,9 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                                 "status": "FINISHED",
                                                 "outcome": {
                                                     "__typename": "TaskOutcomeFailed",
+                                                    "reason": {
+                                                        "__typename": "TaskFailureReasonGeneral"
+                                                    }
                                                 }
                                             }
                                         ],
@@ -3431,6 +3437,9 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                                 "status": "FINISHED",
                                                 "outcome": {
                                                     "__typename": "TaskOutcomeFailed",
+                                                    "reason": {
+                                                        "__typename": "TaskFailureReasonGeneral"
+                                                    }
                                                 }
                                             },
                                             {
@@ -3438,6 +3447,9 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                                 "status": "FINISHED",
                                                 "outcome": {
                                                     "__typename": "TaskOutcomeFailed",
+                                                    "reason": {
+                                                        "__typename": "TaskFailureReasonGeneral"
+                                                    }
                                                 }
                                             },
                                         ],
@@ -4038,6 +4050,11 @@ impl FlowRunsHarness {
                                             status
                                             outcome {
                                                 __typename
+                                                ... on TaskOutcomeFailed {
+                                                    reason {
+                                                        __typename
+                                                    }
+                                                }
                                             }
                                         }
                                         initiator {
