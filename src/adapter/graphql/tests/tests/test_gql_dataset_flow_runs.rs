@@ -120,6 +120,11 @@ async fn test_trigger_ingest_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "ingestResult": null,
+                                            "pollingSource": {
+                                                "fetch": {
+                                                    "__typename": "FetchStepUrl"
+                                                }
+                                            }
                                         },
                                         "status": "WAITING",
                                         "outcome": null,
@@ -186,6 +191,11 @@ async fn test_trigger_ingest_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "ingestResult": null,
+                                            "pollingSource": {
+                                                "fetch": {
+                                                    "__typename": "FetchStepUrl"
+                                                }
+                                            }
                                         },
                                         "status": "WAITING",
                                         "outcome": null,
@@ -263,6 +273,11 @@ async fn test_trigger_ingest_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "ingestResult": null,
+                                            "pollingSource": {
+                                                "fetch": {
+                                                    "__typename": "FetchStepUrl"
+                                                }
+                                            }
                                         },
                                         "status": "RUNNING",
                                         "outcome": null,
@@ -354,6 +369,11 @@ async fn test_trigger_ingest_root_dataset() {
                                                 "numBlocks": 1,
                                                 "numRecords": 12,
                                             },
+                                            "pollingSource": {
+                                                "fetch": {
+                                                    "__typename": "FetchStepUrl"
+                                                }
+                                            }
                                         },
                                         "status": "FINISHED",
                                         "outcome": {
@@ -746,6 +766,17 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
                                             "transformResult": null,
+                                            "transform": {
+                                                "inputs": [
+                                                    {
+                                                        "alias": "foo"
+                                                    }
+                                                ],
+                                                "transform": {
+                                                    "__typename": "TransformSql",
+                                                    "engine": "some_engine"
+                                                }
+                                            }
                                         },
                                         "status": "WAITING",
                                         "outcome": null,
@@ -839,6 +870,17 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                                 "numBlocks": 1,
                                                 "numRecords": 5,
                                             },
+                                            "transform": {
+                                                "inputs": [
+                                                    {
+                                                        "alias": "foo"
+                                                    }
+                                                ],
+                                                "transform": {
+                                                    "__typename": "TransformSql",
+                                                    "engine": "some_engine"
+                                                }
+                                            }
                                         },
                                         "status": "FINISHED",
                                         "outcome": {
@@ -2877,6 +2919,17 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
                                             "transformResult": null,
+                                            "transform": {
+                                                "inputs": [
+                                                    {
+                                                        "alias": "foo"
+                                                    }
+                                                ],
+                                                "transform": {
+                                                    "__typename": "TransformSql",
+                                                    "engine": "some_engine",
+                                                }
+                                            }
                                         },
                                         "status": "FINISHED",
                                         "outcome": {
@@ -3257,6 +3310,11 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "ingestResult": null,
+                                            "pollingSource": {
+                                                "fetch": {
+                                                    "__typename": "FetchStepUrl"
+                                                }
+                                            }
                                         },
                                         "status": "RETRYING",
                                         "outcome": null,
@@ -3352,6 +3410,11 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "ingestResult": null,
+                                            "pollingSource": {
+                                                "fetch": {
+                                                    "__typename": "FetchStepUrl"
+                                                }
+                                            }
                                         },
                                         "status": "RETRYING",
                                         "outcome": null,
@@ -3882,6 +3945,17 @@ impl FlowRunsHarness {
                                                 }
                                             }
                                             ... on FlowDescriptionDatasetExecuteTransform {
+                                                transform {
+                                                    inputs {
+                                                        alias
+                                                    }
+                                                    transform {
+                                                        __typename
+                                                        ... on TransformSql {
+                                                            engine
+                                                        }
+                                                    }
+                                                }
                                                 transformResult {
                                                     __typename
                                                     ... on FlowDescriptionUpdateResultUpToDate {
@@ -3908,7 +3982,12 @@ impl FlowRunsHarness {
                                                         numBlocks
                                                         numRecords
                                                     }
-                                            }
+                                                }
+                                                pollingSource {
+                                                    fetch {
+                                                        __typename
+                                                    }
+                                                }
                                             }
                                             ... on FlowDescriptionDatasetPushIngest {
                                                 sourceName
