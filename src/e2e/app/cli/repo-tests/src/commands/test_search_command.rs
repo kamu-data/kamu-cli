@@ -147,7 +147,7 @@ async fn test_search_multi_user(
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────────┐
             │              Alias               │ Kind │ Description │ Blocks │ Records │   Size   │
             ├──────────────────────────────────┼──────┼─────────────┼────────┼─────────┼──────────┤
-            │ kamu-node/e2e-user/player-scores │ Root │ -           │      5 │       2 │ 2.31 KiB │
+            │ kamu-node/e2e-user/player-scores │ Root │ -           │      5 │       2 │ 2.42 KiB │
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
@@ -176,7 +176,7 @@ async fn test_search_multi_user(
             │                 Alias                 │    Kind    │ Description │ Blocks │ Records │   Size   │
             ├───────────────────────────────────────┼────────────┼─────────────┼────────┼─────────┼──────────┤
             │ kamu-node/e2e-user/player-leaderboard │ Derivative │ -           │      3 │       - │        - │
-            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 2.31 KiB │
+            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 2.42 KiB │
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
@@ -199,7 +199,7 @@ async fn test_search_multi_user(
             │                 Alias                 │    Kind    │ Description │ Blocks │ Records │   Size   │
             ├───────────────────────────────────────┼────────────┼─────────────┼────────┼─────────┼──────────┤
             │ kamu-node/e2e-user/player-leaderboard │ Derivative │ -           │      3 │       - │        - │
-            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 2.31 KiB │
+            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 2.42 KiB │
             │ kamu-node/kamu/player-scores          │    Root    │ -           │      3 │       - │        - │
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#

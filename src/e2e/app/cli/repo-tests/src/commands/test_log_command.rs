@@ -163,7 +163,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                 odf::metadata::OffsetInterval { start: 0, end: 1 },
                 actual_new_data.offset_interval
             );
-            pretty_assertions::assert_eq!(2369, actual_new_data.size);
+            pretty_assertions::assert_eq!(2481, actual_new_data.size);
 
             pretty_assertions::assert_eq!(None, actual_add_data.new_checkpoint);
             pretty_assertions::assert_eq!(
@@ -188,7 +188,7 @@ pub async fn test_log(kamu: KamuCliPuppet) {
                 odf::metadata::OffsetInterval { start: 2, end: 3 },
                 actual_new_data.offset_interval
             );
-            pretty_assertions::assert_eq!(2385, actual_new_data.size);
+            pretty_assertions::assert_eq!(2497, actual_new_data.size);
 
             pretty_assertions::assert_eq!(None, actual_add_data.new_checkpoint);
             pretty_assertions::assert_eq!(
