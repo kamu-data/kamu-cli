@@ -16,7 +16,7 @@ kamu_cli_run_api_server_e2e_test!(
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_datasets_by_id,
     options = Options::default()
         .with_multi_tenant()
-        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_ALLOWED_ANONYMOUS)
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER)
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +24,9 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = mysql,
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_datasets_endpoint_restricted_for_anonymous,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_RESTRICTED_ANONYMOUS)
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,18 +14,27 @@ use crate::AuthPolicyLayer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn root_router() -> OpenApiRouter {
+pub fn root_router(allow_anonymous: bool) -> OpenApiRouter {
     use crate::platform::handlers;
 
-    OpenApiRouter::new()
+    let mut router = OpenApiRouter::new();
+
+    router = router
         .routes(routes!(handlers::file_upload_prepare_post_handler))
         .routes(routes!(handlers::file_upload_post_handler))
-        .routes(routes!(handlers::file_upload_get_handler))
-        .layer(AuthPolicyLayer::new())
+        .routes(routes!(handlers::file_upload_get_handler));
+
+    if !allow_anonymous {
+        router = router.layer(AuthPolicyLayer::new()); // Mutate router without moving
+    }
+
+    router = router
         .routes(routes!(handlers::login_handler))
         .routes(routes!(handlers::token_validate_handler))
         .routes(routes!(handlers::token_device_authorization_handler))
-        .routes(routes!(handlers::token_device_handler))
+        .routes(routes!(handlers::token_device_handler));
+
+    router
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

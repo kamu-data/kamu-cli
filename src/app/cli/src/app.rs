@@ -913,13 +913,6 @@ pub fn register_config_in_catalog(
 
     // Authentication configuration
     catalog_builder.add_value(config.auth.clone().unwrap());
-    if let Some(auth_config) = config.auth.as_ref()
-        && auth_config.allow_anonymous.unwrap()
-    {
-        catalog_builder.add::<kamu_accounts_services::AllowAnonymousAuthPolicyServiceImpl>();
-    } else {
-        catalog_builder.add::<kamu_accounts_services::RestrictAnonymousAuthPolicyServiceImpl>();
-    }
     //
 
     // Outbox configuration

@@ -1,0 +1,10 @@
+    Blocking waiting for file lock on build directory
+   Compiling kamu-cli-e2e-repo-tests v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/repo-tests)
+   Compiling kamu-cli-e2e-mysql v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/mysql)
+   Compiling kamu-cli-e2e-postgres v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/postgres)
+   Compiling kamu-cli-e2e-sqlite v0.242.1 (/home/roman-boiko/projects/kamu-cli/src/e2e/app/cli/sqlite)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.95s
+    Starting 1 test across 170 binaries (2091 skipped; run ID: 792cd19b-17ee-4022-ac2f-84735dbfe5d5, nextest profile: default)
+        PASS [   1.037s] kamu-cli-e2e-sqlite::mod tests::rest_api::test_auth::g0ad8::e2e::test_kamu_access_token_middleware
+------------
+     Summary [   1.041s] 1 test run: 1 passed, 2091 skipped

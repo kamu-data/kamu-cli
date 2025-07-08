@@ -147,26 +147,31 @@ impl APIServer {
                 TenancyConfig::SingleTenant => kamu_adapter_odata::router_single_tenant(),
             },
         )
-        .layer(kamu_adapter_http::AuthPolicyLayer::new())
-        // GraphQL API has its own guard to handle auth policy check
         .route("/graphql", axum::routing::post(graphql_handler))
         .nest(
-            match tenancy_config {
-                TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
-                TenancyConfig::SingleTenant => "/{dataset_name}",
-            },
-            kamu_adapter_http::add_dataset_resolver_layer(
-                OpenApiRouter::new()
-                    .merge(kamu_adapter_http::data::dataset_router())
-                    .layer(kamu_adapter_http::AuthPolicyLayer::new())
-                    // ToDo: Should we close SMTP in restricted mode?
-                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
-                    .layer(DatasetAuthorizationLayer::default()),
-                tenancy_config,
+                match tenancy_config {
+                    TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
+                    TenancyConfig::SingleTenant => "/{dataset_name}",
+                },
+                kamu_adapter_http::add_dataset_resolver_layer(
+                    OpenApiRouter::new()
+                        .merge(kamu_adapter_http::data::dataset_router())
+                        .merge(kamu_adapter_http::smart_transfer_protocol_router())
+                        .layer(DatasetAuthorizationLayer::default()),
+                    tenancy_config,
+                ),
+            );
+
+        if !allow_anonymous {
+            router = router.layer(kamu_adapter_http::AuthPolicyLayer::new());
+        }
+
+        router = router
+            .nest(
+                "/platform",
+                kamu_adapter_http::platform::root_router(allow_anonymous),
             )
-        )
-        .nest("/platform", kamu_adapter_http::platform::root_router())
-        .route("/ui-config", axum::routing::get(ui_configuration_handler));
+            .route("/ui-config", axum::routing::get(ui_configuration_handler));
 
         let is_e2e_testing = e2e_output_data_path.is_some();
 

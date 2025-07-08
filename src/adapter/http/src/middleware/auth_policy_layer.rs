@@ -12,8 +12,10 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::Response;
-use http::StatusCode;
-use kamu_accounts_services::AuthPolicyService;
+use http::{Request, StatusCode};
+use http_body_util::BodyExt;
+use kamu_accounts::CurrentAccountSubject;
+use serde_json::Value;
 use tower::{Layer, Service};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,17 +46,43 @@ pub struct AuthPolicyMiddleware<Svc> {
 
 impl<Svc> AuthPolicyMiddleware<Svc> {
     fn check(base_catalog: &dill::Catalog) -> Result<(), Response> {
-        let auth_policy_service = base_catalog.get_one::<dyn AuthPolicyService>().unwrap();
+        let current_account_subject = base_catalog
+            .get_one::<kamu_accounts::CurrentAccountSubject>()
+            .expect("CurrentAccountSubject not found in HTTP server extensions");
 
-        if let Err(err) = auth_policy_service.check() {
-            tracing::warn!(error = ?err, "Auth policy check failed");
-            return Err(Response::builder()
+        match current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(_) => Ok(()),
+            CurrentAccountSubject::Anonymous(_) => Err(Response::builder()
                 .status(StatusCode::UNAUTHORIZED)
-                .body(err.to_string().into())
-                .unwrap());
+                .body("Anonymous account is restricted".into())
+                .unwrap()),
         }
+    }
 
-        Ok(())
+    pub async fn is_auth_graphql_operation_request(
+        request: Request<Body>,
+    ) -> (Request<Body>, bool) {
+        let (parts, body) = request.into_parts();
+
+        let body_bytes = match body.collect().await {
+            Ok(collected) => collected.to_bytes(),
+            Err(_) => return (Request::from_parts(parts, Body::empty()), false),
+        };
+
+        let json: Value = match serde_json::from_slice(&body_bytes) {
+            Ok(v) => v,
+            Err(_) => return (Request::from_parts(parts, Body::from(body_bytes)), false),
+        };
+
+        let Some(query_str) = json.get("query").and_then(|q| q.as_str()) else {
+            return (Request::from_parts(parts, Body::from(body_bytes)), false);
+        };
+
+        let lower = query_str.to_lowercase();
+        let is_auth =
+            (lower.contains("query") || lower.contains("mutation")) && lower.contains("auth");
+
+        (Request::from_parts(parts, Body::from(body_bytes)), is_auth)
     }
 }
 
@@ -78,10 +106,22 @@ where
         let mut inner = self.inner.clone();
 
         Box::pin(async move {
+            let path = request.uri().path();
+
+            let (request, skip_auth) = if path == "/graphql" {
+                Self::is_auth_graphql_operation_request(request).await
+            } else {
+                (request, false)
+            };
+
+            if skip_auth {
+                return inner.call(request).await;
+            }
+
             let base_catalog = request
                 .extensions()
                 .get::<dill::Catalog>()
-                .expect("Catalog not found in http server extensions");
+                .expect("Catalog not found in HTTP server extensions");
 
             if let Err(err_response) = Self::check(base_catalog) {
                 return Ok(err_response);

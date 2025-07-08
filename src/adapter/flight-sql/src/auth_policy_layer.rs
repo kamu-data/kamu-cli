@@ -10,7 +10,7 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use kamu_accounts_services::{AuthPolicyCheckError, AuthPolicyService};
+use kamu_accounts::CurrentAccountSubject;
 use tonic::Status;
 use tonic::body::BoxBody;
 use tower::{Layer, Service};
@@ -42,10 +42,17 @@ pub struct AuthPolicyMiddleware<Svc> {
 }
 
 impl<Svc> AuthPolicyMiddleware<Svc> {
-    fn check(base_catalog: &dill::Catalog) -> Result<(), AuthPolicyCheckError> {
-        let auth_policy_service = base_catalog.get_one::<dyn AuthPolicyService>().unwrap();
+    fn check(base_catalog: &dill::Catalog) -> Result<(), String> {
+        let current_account_subject = base_catalog
+            .get_one::<kamu_accounts::CurrentAccountSubject>()
+            .expect("CurrentAccountSubject not found in HTTP server extensions");
 
-        auth_policy_service.check()
+        match current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(_) => Ok(()),
+            CurrentAccountSubject::Anonymous(_) => {
+                Err("Anonymous account is restricted".to_string())
+            }
+        }
     }
 }
 

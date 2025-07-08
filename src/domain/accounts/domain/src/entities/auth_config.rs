@@ -37,7 +37,7 @@ impl AuthConfig {
 impl Default for AuthConfig {
     fn default() -> Self {
         Self {
-            allow_anonymous: Some(false),
+            allow_anonymous: Some(true),
             users: Some(PredefinedAccountsConfig::default()),
         }
     }

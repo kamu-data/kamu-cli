@@ -9,7 +9,6 @@
 
 use async_graphql::{Context, Guard, Result};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_accounts_services::AuthPolicyService;
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 
 use crate::prelude::*;
@@ -122,23 +121,3 @@ impl Guard for CanProvisionAccountsGuard {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct AuthPolicyGuard;
-
-impl AuthPolicyGuard {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Guard for AuthPolicyGuard {
-    async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let auth_policy_service = from_catalog_n!(ctx, dyn AuthPolicyService);
-
-        if let Err(err) = auth_policy_service.check() {
-            return Err(Error::new(err.to_string()));
-        }
-
-        Ok(())
-    }
-}

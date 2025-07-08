@@ -39,7 +39,6 @@ use kamu_accounts_inmem::{
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AccountServiceImpl,
-    AllowAnonymousAuthPolicyServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
     OAuthDeviceCodeGeneratorDefault,
@@ -116,7 +115,6 @@ impl Harness {
                 .add::<DummyOutboxImpl>()
                 .add::<OAuthDeviceCodeServiceImpl>()
                 .add::<OAuthDeviceCodeGeneratorDefault>()
-                .add::<AllowAnonymousAuthPolicyServiceImpl>()
                 .add::<InMemoryOAuthDeviceCodeRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);

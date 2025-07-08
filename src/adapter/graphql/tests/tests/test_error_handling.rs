@@ -11,7 +11,6 @@ use indoc::indoc;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::DatasetRegistrySoloUnitBridge;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_accounts_services::AllowAnonymousAuthPolicyServiceImpl;
 use kamu_auth_rebac::{
     ClassifyDatasetRefsByAllowanceResponse,
     RebacDatasetIdUnresolvedError,
@@ -42,11 +41,7 @@ async fn test_malformed_argument() {
                 }
                 "#
             ))
-            .data(
-                dill::CatalogBuilder::new()
-                    .add::<AllowAnonymousAuthPolicyServiceImpl>()
-                    .build(),
-            ),
+            .data(dill::CatalogBuilder::new().build()),
         )
         .await;
 
@@ -127,7 +122,6 @@ async fn test_internal_error() {
             tempdir.path().join("datasets"),
         ))
         .add::<DatasetRegistrySoloUnitBridge>()
-        .add::<AllowAnonymousAuthPolicyServiceImpl>()
         .add::<ErrorRebacDatasetRegistryFacadeImpl>()
         .add::<AlwaysHappyDatasetActionAuthorizer>()
         .build();
