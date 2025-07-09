@@ -1085,7 +1085,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             FROM flows
             WHERE
                 scope_data->>'type' = 'Dataset'
-                AND scope_data->>'dataset_id' = IN ({})
+                AND scope_data->>'dataset_id' IN ({})
                 AND ($1::text IS NULL OR flow_type = $1)
                 AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
                 AND ($3 = 0 OR initiator IN ({}))
@@ -1132,8 +1132,11 @@ impl FlowEventStore for SqliteFlowEventStore {
 
         let query_str = format!(
             r#"
-            SELECT DISTINCT(dataset_id) FROM flows
-                WHERE dataset_id IN ({})
+            SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id
+            FROM flows
+            WHERE
+                scope_data->>'type' = 'Dataset'
+                AND scope_data->>'dataset_id' IN ({})
             "#,
             sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(1).unwrap())
         );
