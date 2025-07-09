@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- New configuration property `allow_anonymous` which is true by default. And turnoff anonymous mode for API endpoints.
+
 ## [0.243.1] - 2025-07-09
 ### Fixed
 - SQLite-specific crashes on account flow listings
