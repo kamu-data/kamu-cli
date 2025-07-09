@@ -2359,13 +2359,10 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let mut result: Vec<_> = filtered_dataset_ids
-        .iter()
-        .map(|dataset_id| dataset_id)
-        .collect();
+    let mut result: Vec<&odf::DatasetID> = filtered_dataset_ids.iter().collect();
     result.sort();
 
-    assert_eq!(dataset_ids, result)
+    assert_eq!(dataset_ids, result);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
