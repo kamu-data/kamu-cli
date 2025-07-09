@@ -42,7 +42,7 @@ pub struct AuthPolicyMiddleware<Svc> {
 }
 
 impl<Svc> AuthPolicyMiddleware<Svc> {
-    fn check(base_catalog: &dill::Catalog) -> Result<(), String> {
+    fn check_tonic_subject(base_catalog: &dill::Catalog) -> Result<(), String> {
         let current_account_subject = base_catalog
             .get_one::<kamu_accounts::CurrentAccountSubject>()
             .expect("CurrentAccountSubject not found in HTTP server extensions");
@@ -83,7 +83,7 @@ where
                 .get::<dill::Catalog>()
                 .expect("Catalog not found in http server extensions");
 
-            if let Err(err_response) = Self::check(base_catalog) {
+            if let Err(err_response) = Self::check_tonic_subject(base_catalog) {
                 return Ok(Status::unauthenticated(err_response.to_string()).into_http());
             }
 

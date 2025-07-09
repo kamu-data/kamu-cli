@@ -1212,7 +1212,8 @@ async fn test_create_and_get_access_token() {
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
 
-    let created_token_id = json["accounts"]["byId"]["createAccessToken"]["token"]["id"].clone();
+    let created_token_id =
+        json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
 
     let query_request = get_access_tokens_request(&DEFAULT_ACCOUNT_ID.to_string());
     let res = schema
@@ -1224,12 +1225,14 @@ async fn test_create_and_get_access_token() {
         value!({
             "accounts": {
                 "byId": {
-                    "listAccessTokens": {
-                        "nodes": [{
-                            "id": created_token_id,
-                            "name": "foo",
-                            "revokedAt": null
-                        }]
+                    "accessTokens": {
+                        "listAccessTokens": {
+                            "nodes": [{
+                                "id": created_token_id,
+                                "name": "foo",
+                                "revokedAt": null
+                            }]
+                        }
                     }
                 }
             }
@@ -1247,9 +1250,11 @@ async fn test_create_and_get_access_token() {
         value!({
             "accounts": {
                 "byId": {
-                    "createAccessToken": {
-                        "__typename": "CreateAccessTokenResultDuplicate",
-                        "message": "Access token with foo name already exists"
+                    "accessTokens": {
+                        "createAccessToken": {
+                            "__typename": "CreateAccessTokenResultDuplicate",
+                            "message": "Access token with foo name already exists"
+                        }
                     }
                 }
             }
@@ -1275,7 +1280,8 @@ async fn test_revoke_access_token() {
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
 
-    let created_token_id = json["accounts"]["byId"]["createAccessToken"]["token"]["id"].clone();
+    let created_token_id =
+        json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
 
     let mutation_request = revoke_access_token_request(
         &DEFAULT_ACCOUNT_ID.to_string(),
@@ -1308,9 +1314,11 @@ async fn test_revoke_access_token() {
         value!({
             "accounts": {
                 "byId": {
-                    "revokeAccessToken": {
-                        "__typename": "RevokeResultSuccess",
-                        "message": "Access token revoked successfully"
+                    "accessTokens": {
+                        "revokeAccessToken": {
+                            "__typename": "RevokeResultSuccess",
+                            "message": "Access token revoked successfully"
+                        }
                     }
                 }
             }
@@ -1332,8 +1340,10 @@ async fn test_revoke_access_token() {
         value!({
             "accounts": {
                 "byId": {
-                    "revokeAccessToken": {
-                        "__typename": "RevokeResultAlreadyRevoked",
+                    "accessTokens": {
+                        "revokeAccessToken": {
+                            "__typename": "RevokeResultAlreadyRevoked",
+                        }
                     }
                 }
             }
@@ -1563,14 +1573,16 @@ fn create_access_token_request(account_id: &str, token_name: &str) -> async_grap
         mutation($accountId: String!, $tokenName: String!) {
             accounts {
                 byId(accountId: $accountId) {
-                    createAccessToken (tokenName: $tokenName) {
-                        __typename
-                        message
-                        ... on CreateAccessTokenResultSuccess {
-                            token {
-                                id,
-                                name,
-                                composed
+                    accessTokens {
+                        createAccessToken (tokenName: $tokenName) {
+                            __typename
+                            message
+                            ... on CreateAccessTokenResultSuccess {
+                                token {
+                                    id,
+                                    name,
+                                    composed
+                                }
                             }
                         }
                     }
@@ -1593,10 +1605,12 @@ fn revoke_access_token_request(account_id: &str, token_id: &str) -> async_graphq
         mutation {
             accounts {
                 byId(accountId: "<account_id>") {
-                    revokeAccessToken (tokenId: <token_id>) {
-                        __typename
-                        ... on RevokeResultSuccess {
-                            message
+                    accessTokens {
+                        revokeAccessToken (tokenId: <token_id>) {
+                            __typename
+                            ... on RevokeResultSuccess {
+                                message
+                            }
                         }
                     }
                 }
@@ -1618,11 +1632,13 @@ fn get_access_tokens_request(account_id: &str) -> async_graphql::Request {
         query($accountId: String!) {
             accounts {
                 byId(accountId: $accountId) {
-                    listAccessTokens (perPage: 10, page: 0) {
-                        nodes {
-                            id,
-                            name,
-                            revokedAt
+                    accessTokens {
+                        listAccessTokens (perPage: 10, page: 0) {
+                            nodes {
+                                id,
+                                name,
+                                revokedAt
+                            }
                         }
                     }
                 }

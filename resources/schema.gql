@@ -64,7 +64,19 @@ type Account {
 	Access to the flow configurations of this account
 	"""
 	flows: AccountFlows!
+	"""
+	Access to the flow configurations of this account
+	"""
+	accessTokens: AccountAccessTokens!
+}
+
+type AccountAccessTokens {
 	listAccessTokens(page: Int, perPage: Int): AccessTokenConnection!
+}
+
+type AccountAccessTokensMut {
+	createAccessToken(tokenName: String!): CreateTokenResult!
+	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
 }
 
 type AccountConnection {
@@ -170,8 +182,10 @@ type AccountMut {
 	Access to the mutable flow configurations of this account
 	"""
 	flows: AccountFlowsMut!
-	createAccessToken(tokenName: String!): CreateTokenResult!
-	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
+	"""
+	Access to the mutable flow configurations of this account
+	"""
+	accessTokens: AccountAccessTokensMut!
 }
 
 scalar AccountName

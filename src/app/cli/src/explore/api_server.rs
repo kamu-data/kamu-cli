@@ -166,6 +166,7 @@ impl APIServer {
             router = router.layer(kamu_adapter_http::AuthPolicyLayer::new());
         }
 
+        // All endpoints bellow AuthPolicyLayer are opened for anonymous access
         router = router
             .nest(
                 "/platform",
