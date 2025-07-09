@@ -2304,6 +2304,72 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
+    let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let foo_cases = make_dataset_test_case(flow_event_store.clone()).await;
+    let bar_cases = make_dataset_test_case(flow_event_store.clone()).await;
+    // Create a bit more flows to be sure we filter correctly
+    make_dataset_test_case(flow_event_store.clone()).await;
+
+    let mut dataset_ids = vec![&foo_cases.dataset_id, &bar_cases.dataset_id];
+    dataset_ids.sort();
+
+    let mut expected_flow_ids = [
+        foo_cases.ingest_flow_ids.as_vec(),
+        foo_cases.compaction_flow_ids.as_vec(),
+        bar_cases.ingest_flow_ids.as_vec(),
+        bar_cases.compaction_flow_ids.as_vec(),
+    ]
+    .concat();
+
+    let total_count = flow_event_store
+        .get_count_flows_by_multiple_datasets(dataset_ids.as_slice(), &FlowFilters::default())
+        .await
+        .unwrap();
+
+    assert_eq!(total_count, expected_flow_ids.len());
+
+    let mut total_flow_ids: Vec<_> = flow_event_store
+        .get_all_flow_ids_by_datasets(
+            dataset_ids.as_slice(),
+            &FlowFilters::default(),
+            PaginationOpts {
+                offset: 0,
+                limit: 100,
+            },
+        )
+        .try_collect()
+        .await
+        .unwrap();
+
+    expected_flow_ids.sort();
+    total_flow_ids.sort();
+
+    assert_eq!(total_flow_ids.len(), expected_flow_ids.len());
+    assert_eq!(total_flow_ids, expected_flow_ids);
+
+    // Test dataset having flows
+    let mut dataset_ids_with_empty = dataset_ids.clone();
+    let empty_dataset_id = odf::DatasetID::new_seeded_ed25519(b"empty");
+    dataset_ids_with_empty.push(&empty_dataset_id);
+
+    let filtered_dataset_ids = flow_event_store
+        .filter_datasets_having_flows(dataset_ids_with_empty.as_slice())
+        .await
+        .unwrap();
+
+    let mut result: Vec<_> = filtered_dataset_ids
+        .iter()
+        .map(|dataset_id| dataset_id)
+        .collect();
+    result.sort();
+
+    assert_eq!(dataset_ids, result)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DatasetTestCase {
     dataset_id: odf::DatasetID,
     ingest_flow_ids: TestFlowIDs,
@@ -2318,6 +2384,16 @@ struct TestFlowIDs {
     flow_id_waiting: FlowID,  // Initiator: petya
     flow_id_running: FlowID,  // Initiator: wasya
     flow_id_finished: FlowID, // Initiator: system
+}
+
+impl TestFlowIDs {
+    fn as_vec(&self) -> Vec<FlowID> {
+        vec![
+            self.flow_id_waiting,
+            self.flow_id_running,
+            self.flow_id_finished,
+        ]
+    }
 }
 
 async fn make_dataset_test_case(flow_event_store: Arc<dyn FlowEventStore>) -> DatasetTestCase {
