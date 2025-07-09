@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.243.1] - 2025-07-09
 ### Fixed
 - SQLite-specific crashes on account flow listings
 
