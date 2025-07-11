@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.244.0] - 2025-07-11
 ### Added
 - New configuration property `allow_anonymous` which is true by default. And turnoff anonymous mode for API endpoints.
 
