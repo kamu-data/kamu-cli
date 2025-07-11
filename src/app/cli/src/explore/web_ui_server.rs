@@ -133,10 +133,6 @@ impl WebUIServer {
             },
         };
 
-        let access_token = Self::acquire_access_token(server_catalog.clone(), &login_instructions)
-            .await
-            .expect("Token not retrieved");
-
         let web_ui_url = Url::parse(&web_ui_url).expect("URL failed to parse");
 
         let default_protocols = Protocols::default();
@@ -150,14 +146,13 @@ impl WebUIServer {
             }))
             .build();
 
+        let access_token = Self::acquire_access_token(web_ui_catalog.clone(), &login_instructions)
+            .await
+            .expect("Token not retrieved");
+
         let mut open_api_router = OpenApiRouter::with_openapi(
             kamu_adapter_http::openapi::spec_builder(crate::app::VERSION, "").build(),
         )
-        .route(
-            "/assets/runtime-config.json",
-            axum::routing::get(runtime_configuration_handler),
-        )
-        .route("/ui-config", axum::routing::get(ui_configuration_handler))
         .route("/graphql", axum::routing::post(graphql_handler))
         .nest(
             "/odata",
@@ -185,6 +180,11 @@ impl WebUIServer {
         }
 
         let (router, api) = open_api_router
+            .route(
+                "/assets/runtime-config.json",
+                axum::routing::get(runtime_configuration_handler),
+            )
+            .route("/ui-config", axum::routing::get(ui_configuration_handler))
             .nest(
                 "/platform",
                 kamu_adapter_http::platform::root_router(allow_anonymous),
