@@ -29,6 +29,7 @@ impl FlightSqlServiceFactory {
         &self,
         address: Option<IpAddr>,
         port: Option<u16>,
+        allow_anonymous: bool,
     ) -> Result<FlightSqlService, CLIError> {
         assert_matches!(
             self.catalog
@@ -57,7 +58,7 @@ impl FlightSqlServiceFactory {
                     Ok(req)
                 },
             ))
-            .layer(AuthPolicyLayer::new())
+            .layer(AuthPolicyLayer::new(allow_anonymous))
             .layer(AuthenticationLayer::new())
             .add_service(FlightServiceServer::new(
                 kamu_adapter_flight_sql::KamuFlightSqlServiceWrapper,
