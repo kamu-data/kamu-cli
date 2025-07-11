@@ -85,6 +85,7 @@ where
         let allow_anonymous = self.allow_anonymous;
 
         Box::pin(async move {
+            // ToDo: Modify to not use this value in runtime
             if !allow_anonymous {
                 let base_catalog = request
                     .extensions()
