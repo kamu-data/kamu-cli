@@ -1196,6 +1196,163 @@ async fn test_non_admin_try_to_rename_other_account() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_create_and_get_access_token() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+
+    let res = schema
+        .execute(mutation_request.data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(res.is_ok());
+
+    let json = serde_json::to_string(&res.data).unwrap();
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+
+    let created_token_id =
+        json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
+
+    let query_request = get_access_tokens_request(&DEFAULT_ACCOUNT_ID.to_string());
+    let res = schema
+        .execute(query_request.data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "accounts": {
+                "byId": {
+                    "accessTokens": {
+                        "listAccessTokens": {
+                            "nodes": [{
+                                "id": created_token_id,
+                                "name": "foo",
+                                "revokedAt": null
+                            }]
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+
+    let res = schema
+        .execute(mutation_request.data(harness.catalog_authorized))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "accounts": {
+                "byId": {
+                    "accessTokens": {
+                        "createAccessToken": {
+                            "__typename": "CreateAccessTokenResultDuplicate",
+                            "message": "Access token with foo name already exists"
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_revoke_access_token() {
+    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+
+    let res = schema
+        .execute(mutation_request.data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(res.is_ok());
+
+    let json = serde_json::to_string(&res.data).unwrap();
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+
+    let created_token_id =
+        json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
+
+    let mutation_request = revoke_access_token_request(
+        &DEFAULT_ACCOUNT_ID.to_string(),
+        &created_token_id.to_string(),
+    );
+
+    let res = schema
+        .execute(mutation_request.data(harness.catalog_anonymous))
+        .await;
+
+    assert!(res.is_err());
+    assert_eq!(res.errors.len(), 1);
+    assert_eq!(
+        res.errors[0].message,
+        "Access token access error".to_string()
+    );
+
+    let mutation_request = revoke_access_token_request(
+        &DEFAULT_ACCOUNT_ID.to_string(),
+        &created_token_id.to_string(),
+    );
+
+    let res = schema
+        .execute(mutation_request.data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.data,
+        value!({
+            "accounts": {
+                "byId": {
+                    "accessTokens": {
+                        "revokeAccessToken": {
+                            "__typename": "RevokeResultSuccess",
+                            "message": "Access token revoked successfully"
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let mutation_request = revoke_access_token_request(
+        &DEFAULT_ACCOUNT_ID.to_string(),
+        &created_token_id.to_string(),
+    );
+
+    let res = schema
+        .execute(mutation_request.data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(res.is_ok());
+    assert_eq!(
+        res.data,
+        value!({
+            "accounts": {
+                "byId": {
+                    "accessTokens": {
+                        "revokeAccessToken": {
+                            "__typename": "RevokeResultAlreadyRevoked",
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct GraphQLAccountsHarness {
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
@@ -1224,6 +1381,7 @@ impl GraphQLAccountsHarness {
             .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
             .add::<time_source::SystemTimeSourceDefault>()
             .add_value(JwtAuthenticationConfig::default())
+            .add_value(AuthConfig::sample())
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
@@ -1404,6 +1562,92 @@ fn login_via_password_request(account_name: &str, password: &str) -> async_graph
     ))
     .variables(async_graphql::Variables::from_value(value!({
         "credentials": credentials,
+    })))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn create_access_token_request(account_id: &str, token_name: &str) -> async_graphql::Request {
+    async_graphql::Request::new(indoc!(
+        r#"
+        mutation($accountId: String!, $tokenName: String!) {
+            accounts {
+                byId(accountId: $accountId) {
+                    accessTokens {
+                        createAccessToken (tokenName: $tokenName) {
+                            __typename
+                            message
+                            ... on CreateAccessTokenResultSuccess {
+                                token {
+                                    id,
+                                    name,
+                                    composed
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(value!({
+        "accountId": account_id,
+        "tokenName": token_name,
+    })))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn revoke_access_token_request(account_id: &str, token_id: &str) -> async_graphql::Request {
+    let query = indoc!(
+        r#"
+        mutation {
+            accounts {
+                byId(accountId: "<account_id>") {
+                    accessTokens {
+                        revokeAccessToken (tokenId: <token_id>) {
+                            __typename
+                            ... on RevokeResultSuccess {
+                                message
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<account_id>", account_id)
+    .replace("<token_id>", token_id);
+
+    async_graphql::Request::new(query)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn get_access_tokens_request(account_id: &str) -> async_graphql::Request {
+    async_graphql::Request::new(indoc!(
+        r#"
+        query($accountId: String!) {
+            accounts {
+                byId(accountId: $accountId) {
+                    accessTokens {
+                        listAccessTokens (perPage: 10, page: 0) {
+                            nodes {
+                                id,
+                                name,
+                                revokedAt
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#,
+    ))
+    .variables(async_graphql::Variables::from_value(value!({
+        "accountId": account_id,
     })))
 }
 

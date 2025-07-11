@@ -64,3 +64,29 @@ pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_datasets_endpoint_restricted_for_anonymous(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let (_, nonexistent_dataset_id) = odf::DatasetID::new_generated_ed25519();
+
+    assert_matches!(
+        kamu_api_server_client
+            .dataset()
+            .by_id(&nonexistent_dataset_id)
+            .await,
+        Err(DatasetByIdError::Unauthorized)
+    );
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .dataset()
+            .by_id(&nonexistent_dataset_id)
+            .await,
+        Err(DatasetByIdError::NotFound)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

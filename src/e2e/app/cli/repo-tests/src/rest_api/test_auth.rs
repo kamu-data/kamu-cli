@@ -218,15 +218,19 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
             indoc::indoc!(
                 r#"
             mutation {
-                auth {
-                    createAccessToken (accountId: "<account_id>", tokenName: "foo") {
-                        __typename
-                        message
-                        ... on CreateAccessTokenResultSuccess {
-                            token {
-                                id,
-                                name,
-                                composed
+                accounts {
+                    byId(accountId: "<account_id>") {
+                        accessTokens {
+                            createAccessToken (tokenName: "foo") {
+                                __typename
+                                message
+                                ... on CreateAccessTokenResultSuccess {
+                                    token {
+                                        id,
+                                        name,
+                                        composed
+                                    }
+                                }
                             }
                         }
                     }
@@ -240,7 +244,8 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
         )
         .await
         .data();
-    let kamu_token = create_token_response["auth"]["createAccessToken"]["token"]["composed"]
+    let kamu_token = create_token_response["accounts"]["byId"]["accessTokens"]["createAccessToken"]
+        ["token"]["composed"]
         .as_str()
         .map(ToOwned::to_owned)
         .unwrap();

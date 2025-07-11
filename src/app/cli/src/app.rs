@@ -834,11 +834,11 @@ pub fn register_config_in_catalog(
             }
 
             use merge::Merge;
-            let mut user_config = config.users.clone().unwrap();
+            let mut user_config = config.auth.as_ref().unwrap().users.clone().unwrap();
             user_config.merge(implicit_user_config);
             catalog_builder.add_value(user_config);
         } else {
-            if let Some(users) = &config.users {
+            if let Some(users) = &config.auth.as_ref().unwrap().users {
                 assert!(
                     users.predefined.is_empty(),
                     "There cannot be predefined users in a single-tenant workspace"
@@ -909,6 +909,10 @@ pub fn register_config_in_catalog(
     } else {
         warn!("Did secret keys will not be stored");
     }
+    //
+
+    // Authentication configuration
+    catalog_builder.add_value(config.auth.clone().unwrap());
     //
 
     // Outbox configuration

@@ -13,7 +13,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
-use kamu_adapter_flight_sql::AuthenticationLayer;
+use kamu_adapter_flight_sql::{AuthPolicyLayer, AuthenticationLayer};
 
 use crate::CLIError;
 
@@ -57,6 +57,7 @@ impl FlightSqlServiceFactory {
                     Ok(req)
                 },
             ))
+            .layer(AuthPolicyLayer::new())
             .layer(AuthenticationLayer::new())
             .add_service(FlightServiceServer::new(
                 kamu_adapter_flight_sql::KamuFlightSqlServiceWrapper,

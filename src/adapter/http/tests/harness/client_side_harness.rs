@@ -121,6 +121,7 @@ impl ClientSideHarness {
                 b.add_value(predefined_accounts_config);
             }
         }
+        b.add_value(AuthConfig::sample());
 
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 

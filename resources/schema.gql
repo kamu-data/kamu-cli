@@ -64,6 +64,19 @@ type Account {
 	Access to the flow configurations of this account
 	"""
 	flows: AccountFlows!
+	"""
+	Access to the flow configurations of this account
+	"""
+	accessTokens: AccountAccessTokens!
+}
+
+type AccountAccessTokens {
+	listAccessTokens(page: Int, perPage: Int): AccessTokenConnection!
+}
+
+type AccountAccessTokensMut {
+	createAccessToken(tokenName: String!): CreateTokenResult!
+	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
 }
 
 type AccountConnection {
@@ -169,6 +182,10 @@ type AccountMut {
 	Access to the mutable flow configurations of this account
 	"""
 	flows: AccountFlowsMut!
+	"""
+	Access to the mutable flow configurations of this account
+	"""
+	accessTokens: AccountAccessTokensMut!
 }
 
 scalar AccountName
@@ -354,7 +371,6 @@ type AttachmentsEmbedded {
 
 type Auth {
 	enabledProviders: [AccountProvider!]!
-	listAccessTokens(accountId: AccountID!, page: Int, perPage: Int): AccessTokenConnection!
 }
 
 type AuthMut {
@@ -364,8 +380,6 @@ type AuthMut {
 	web3: AuthWeb3Mut!
 	login(loginMethod: AccountProvider!, loginCredentialsJson: String!, deviceCode: DeviceCode): LoginResponse!
 	accountDetails(accessToken: String!): Account!
-	createAccessToken(accountId: AccountID!, tokenName: String!): CreateTokenResult!
-	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
 }
 
 type AuthWeb3Mut {

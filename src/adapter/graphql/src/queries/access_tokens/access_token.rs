@@ -7,107 +7,64 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-use kamu_accounts::{AccessToken as ViewKamuAccessToken, KamuAccessToken};
+use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::queries::Account;
+use crate::queries::ViewAccessToken;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ViewAccessToken {
-    token: ViewKamuAccessToken,
+pub struct AccountAccessTokens<'a> {
+    account_id: &'a AccountID<'a>,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
-impl ViewAccessToken {
+impl<'a> AccountAccessTokens<'a> {
+    const DEFAULT_PER_PAGE: usize = 15;
+
     #[graphql(skip)]
-    pub fn new(token: ViewKamuAccessToken) -> Self {
-        Self { token }
+    pub fn new(account_id: &'a AccountID) -> Self {
+        Self { account_id }
     }
 
-    /// Unique identifier of the access token
-    async fn id(&self) -> AccessTokenID {
-        (&self.token.id).into()
-    }
+    #[tracing::instrument(level = "info", name = AccountAccessTokens_list_access_tokens, skip_all)]
+    async fn list_access_tokens(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<AccessTokenConnection> {
+        let access_token_service = from_catalog_n!(ctx, dyn kamu_accounts::AccessTokenService);
 
-    /// Name of the access token
-    async fn name(&self) -> &String {
-        &self.token.token_name
-    }
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-    /// Date of token creation
-    async fn created_at(&self) -> DateTime<Utc> {
-        self.token.created_at
-    }
+        let access_token_listing = access_token_service
+            .get_access_tokens_by_account_id(
+                self.account_id,
+                &PaginationOpts::from_page(page, per_page),
+            )
+            .await
+            .int_err()?;
 
-    /// Date of token revocation
-    async fn revoked_at(&self) -> Option<DateTime<Utc>> {
-        self.token.revoked_at
-    }
+        let access_tokens: Vec<_> = access_token_listing
+            .list
+            .into_iter()
+            .map(ViewAccessToken::new)
+            .collect();
 
-    /// Access token account owner
-    async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
-        let account = Account::from_account_id(ctx, self.token.account_id.clone()).await?;
-
-        Ok(account)
+        Ok(AccessTokenConnection::new(
+            access_tokens,
+            page,
+            per_page,
+            access_token_listing.total_count,
+        ))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct CreatedAccessToken<'a> {
-    token: KamuAccessToken,
-    account_id: AccountID<'a>,
-    token_name: String,
-}
-
-#[Object]
-impl<'a> CreatedAccessToken<'a> {
-    #[graphql(skip)]
-    pub fn new(token: KamuAccessToken, account_id: AccountID<'a>, token_name: &str) -> Self {
-        Self {
-            token,
-            account_id,
-            token_name: token_name.to_string(),
-        }
-    }
-
-    /// Unique identifier of the access token
-    async fn id(&self) -> AccessTokenID {
-        self.token.id.into()
-    }
-
-    /// Name of the access token
-    async fn name(&self) -> &String {
-        &self.token_name
-    }
-
-    /// Composed original token
-    async fn composed(&self) -> &String {
-        &self.token.composed_token
-    }
-
-    /// Access token account owner
-    async fn account(&self, ctx: &Context<'_>) -> Result<Account> {
-        let account = Account::from_account_id(ctx, self.account_id.clone().into()).await?;
-
-        Ok(account)
-    }
-}
-
-#[derive(SimpleObject, Debug)]
-#[graphql(complex)]
-pub struct CreateAccessTokenResultSuccess<'a> {
-    pub token: CreatedAccessToken<'a>,
-}
-
-#[ComplexObject]
-impl CreateAccessTokenResultSuccess<'_> {
-    pub async fn message(&self) -> String {
-        "Success".to_string()
-    }
-}
+page_based_connection!(ViewAccessToken, AccessTokenConnection, AccessTokenEdge);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
