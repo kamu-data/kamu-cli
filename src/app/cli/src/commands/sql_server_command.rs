@@ -15,6 +15,7 @@ use console::style as s;
 use container_runtime::ContainerRuntime;
 use internal_error::*;
 use kamu::*;
+use kamu_accounts::AuthConfig;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command, SqlShellEngine};
@@ -31,6 +32,7 @@ pub struct SqlServerCommand {
     engine_prov_config: Arc<EngineProvisionerLocalConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
+    auth_config: Arc<AuthConfig>,
 
     #[dill::component(explicit)]
     address: Option<IpAddr>,
@@ -70,7 +72,11 @@ impl SqlServerCommand {
     async fn run_datafusion_flight_sql(&self) -> Result<(), CLIError> {
         let flight_sql_svc = self
             .flight_sql_service_factory
-            .start(self.address, self.port)
+            .start(
+                self.address,
+                self.port,
+                self.auth_config.allow_anonymous.unwrap(),
+            )
             .await?;
 
         eprintln!(
