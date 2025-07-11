@@ -526,10 +526,7 @@ impl FlowDescriptionBuilder {
                         },
                     )
                 } else {
-                    panic!(
-                        "Expected SetTransform event for dataset: {}, but found None",
-                        dataset_id
-                    );
+                    panic!("Expected SetTransform event for dataset: {dataset_id}, but found None",);
                 }
             }
 
