@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use kamu_task_system::TaskOutcome;
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
@@ -139,11 +140,17 @@ impl FlowProgressMessage {
         })
     }
 
-    pub fn finished(event_time: DateTime<Utc>, flow_id: FlowID, outcome: FlowOutcome) -> Self {
+    pub fn finished(
+        event_time: DateTime<Utc>,
+        flow_id: FlowID,
+        outcome: FlowOutcome,
+        task_outcome: TaskOutcome,
+    ) -> Self {
         Self::Finished(FlowProgressMessageFinished {
             event_time,
             flow_id,
             outcome,
+            task_outcome,
         })
     }
 
@@ -189,6 +196,9 @@ pub struct FlowProgressMessageFinished {
 
     /// The outcome of the flow execution
     pub outcome: FlowOutcome,
+
+    /// The outcome of the flow execution
+    pub task_outcome: TaskOutcome,
 }
 
 /// Contains details about a cancelled flow

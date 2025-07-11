@@ -585,6 +585,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         }
 
                         let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+
                         outbox
                             .post_message(
                                 MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
@@ -595,6 +596,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                         .as_ref()
                                         .expect("Outcome must be attached by now")
                                         .clone(),
+                                    message.outcome.clone(),
                                 ),
                             )
                             .await?;
