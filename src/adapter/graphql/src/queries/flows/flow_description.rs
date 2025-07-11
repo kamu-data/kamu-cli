@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use core::panic;
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
