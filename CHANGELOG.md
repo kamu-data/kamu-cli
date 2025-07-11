@@ -11,6 +11,18 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- Flow system extended with retry policy support:
+  - Retry policy model: includes number of attempts, base delay, and four delay growth functions
+  - Retry policies can be associated with flow configurations
+  - A retry policy snapshot is selected for each scheduled flow. If defined, it's used to relaunch a failing task after calculating the appropriate delay based on the configured policy
+  - GQL API extensions for retry policies, along with related task-level and flow-level attributes to populate the UI.
+### Changed
+- Optimized GQL API for flow listings by including already resolved `SetPollingSource` and `SetTransform` event copies into flow descriptions, eliminating the need for costly secondary queries from the UI.
+- Significantly reworked flow configuration and triggering GQL API for improved ease of use and maintainability
+
+
 ## [0.244.0] - 2025-07-11
 ### Added
 - New configuration property `allow_anonymous` which is true by default. And turnoff anonymous mode for API endpoints.

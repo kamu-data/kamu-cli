@@ -40,11 +40,11 @@ async fn test_crud_ingest_root_dataset() {
                         configs {
                             byType (datasetFlowType: "INGEST") {
                                 __typename
-                                ingest {
-                                    fetchUncacheable
-                                }
-                                compaction {
+                                rule {
                                     __typename
+                                    ... on FlowConfigRuleIngest {
+                                        fetchUncacheable
+                                    }
                                 }
                             }
                         }
@@ -80,11 +80,8 @@ async fn test_crud_ingest_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_ingest_config_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        false,
-    );
+    let mutation_code =
+        FlowConfigHarness::set_ingest_config_mutation(&create_result.dataset_handle.id, false);
 
     let res = schema
         .execute(
@@ -101,15 +98,15 @@ async fn test_crud_ingest_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfig": {
+                            "setIngestConfig": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "ingest": {
-                                        "fetchUncacheable": false,
+                                    "rule": {
+                                        "__typename": "FlowConfigRuleIngest",
+                                        "fetchUncacheable": false
                                     },
-                                    "compaction": null
                                 }
                             }
                         }
@@ -119,11 +116,8 @@ async fn test_crud_ingest_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_ingest_config_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        true,
-    );
+    let mutation_code =
+        FlowConfigHarness::set_ingest_config_mutation(&create_result.dataset_handle.id, true);
 
     let res = schema
         .execute(
@@ -140,15 +134,15 @@ async fn test_crud_ingest_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfig": {
+                            "setIngestConfig": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "ingest": {
-                                        "fetchUncacheable": true,
+                                    "rule": {
+                                        "__typename": "FlowConfigRuleIngest",
+                                        "fetchUncacheable": true
                                     },
-                                    "compaction": null
                                 }
                             }
                         }
@@ -175,17 +169,20 @@ async fn test_crud_compaction_root_dataset() {
                         configs {
                             byType (datasetFlowType: "HARD_COMPACTION") {
                                 __typename
-                                ingest {
+                                rule {
                                     __typename
-                                }
-                                compaction {
-                                    __typename
-                                    ... on CompactionFull {
-                                        maxSliceSize
-                                        maxSliceRecords
-                                    }
-                                    ... on CompactionMetadataOnly {
-                                        recursive
+                                    ... on FlowConfigRuleCompaction {
+                                        compactionMode {
+                                            __typename
+                                            ... on FlowConfigCompactionModeFull {
+                                                maxSliceSize
+                                                maxSliceRecords
+                                                recursive
+                                            }
+                                            ... on FlowConfigCompactionModeMetadataOnly {
+                                                recursive
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -224,7 +221,6 @@ async fn test_crud_compaction_root_dataset() {
 
     let mutation_code = FlowConfigHarness::set_config_compaction_full_mutation(
         &create_result.dataset_handle.id,
-        "HARD_COMPACTION",
         1_000_000,
         10000,
         false,
@@ -245,18 +241,20 @@ async fn test_crud_compaction_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfig": {
+                            "setCompactionConfig": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "ingest": null,
-                                    "compaction": {
-                                        "__typename": "CompactionFull",
-                                        "maxSliceSize": 1_000_000,
-                                        "maxSliceRecords": 10000,
-                                        "recursive": false
-                                    }
+                                    "rule": {
+                                        "__typename": "FlowConfigRuleCompaction",
+                                        "compactionMode": {
+                                            "__typename": "FlowConfigCompactionModeFull",
+                                            "maxSliceSize": 1_000_000,
+                                            "maxSliceRecords": 10000,
+                                            "recursive": false
+                                        }
+                                    },
                                 }
                             }
                         }
@@ -293,7 +291,6 @@ async fn test_compaction_config_validation() {
     ] {
         let mutation_code = FlowConfigHarness::set_config_compaction_full_mutation(
             &create_root_result.dataset_handle.id,
-            "HARD_COMPACTION",
             test_case.0,
             test_case.1,
             test_case.2,
@@ -313,7 +310,7 @@ async fn test_compaction_config_validation() {
                         "byId": {
                             "flows": {
                                 "configs": {
-                                    "setConfig": {
+                                    "setCompactionConfig": {
                                         "__typename": "FlowInvalidConfigInputError",
                                         "message": test_case.3,
                                     }
@@ -335,27 +332,12 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
-    let expected_error = value!({
-        "datasets": {
-            "byId": {
-                "flows": {
-                    "configs": {
-                        "setConfig": {
-                            "__typename": "FlowIncompatibleDatasetKind",
-                            "message": "Expected a Root dataset, but a Derivative dataset was provided",
-                        }
-                    }
-                }
-            }
-        }
-    });
     ////
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let mutation_code = FlowConfigHarness::set_ingest_config_mutation(
         &create_derived_result.dataset_handle.id,
-        "INGEST",
         false,
     );
 
@@ -367,31 +349,28 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(res.data, expected_error);
-
-    ////
-
-    let mutation_code = FlowConfigHarness::set_ingest_config_mutation(
-        &create_derived_result.dataset_handle.id,
-        "INGEST",
-        false,
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setIngestConfig": {
+                                "__typename": "FlowIncompatibleDatasetKind",
+                                "message": "Expected a Root dataset, but a Derivative dataset was provided",
+                            }
+                        }
+                    }
+                }
+            }
+        })
     );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(res.is_ok(), "{res:?}");
-    assert_eq!(res.data, expected_error);
 
     ////
 
     let mutation_code = FlowConfigHarness::set_config_compaction_full_mutation(
         &create_derived_result.dataset_handle.id,
-        "HARD_COMPACTION",
         1000,
         1000,
         false,
@@ -405,7 +384,23 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         .await;
 
     assert!(res.is_ok(), "{res:?}");
-    assert_eq!(res.data, expected_error);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setCompactionConfig": {
+                                "__typename": "FlowIncompatibleDatasetKind",
+                                "message": "Expected a Root dataset, but a Derivative dataset was provided",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -419,7 +414,6 @@ async fn test_set_metadataonly_compaction_config_for_derivative() {
 
     let mutation_code = FlowConfigHarness::set_config_compaction_metadata_only_mutation(
         &create_derived_result.dataset_handle.id,
-        "HARD_COMPACTION",
         false,
     );
 
@@ -439,16 +433,18 @@ async fn test_set_metadataonly_compaction_config_for_derivative() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfig": {
+                            "setCompactionConfig": {
                                 "__typename": "SetFlowConfigSuccess",
                                 "message": "Success",
                                 "config": {
                                     "__typename": "FlowConfiguration",
-                                    "ingest": null,
-                                    "compaction": {
-                                        "__typename": "CompactionMetadataOnly",
-                                        "recursive": false
-                                    }
+                                    "rule": {
+                                        "__typename": "FlowConfigRuleCompaction",
+                                        "compactionMode": {
+                                            "__typename": "FlowConfigCompactionModeMetadataOnly",
+                                            "recursive": false
+                                        }
+                                    },
                                 }
                             }
                         }
@@ -462,77 +458,12 @@ async fn test_set_metadataonly_compaction_config_for_derivative() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_set_config_for_hard_compaction_fails() {
-    let harness = FlowConfigHarness::make().await;
-    let create_root_result = harness.create_root_dataset().await;
-    let expected_error = value!({
-        "datasets": {
-            "byId": {
-                "flows": {
-                    "configs": {
-                        "setConfig": {
-                            "__typename": "FlowTypeIsNotSupported",
-                            "message": "Flow type is not supported",
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    ////
-
-    let mutation_code = FlowConfigHarness::set_ingest_config_mutation(
-        &create_root_result.dataset_handle.id,
-        "HARD_COMPACTION",
-        false,
-    );
-
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(response.data, expected_error);
-
-    ////
-
-    let mutation_code = FlowConfigHarness::set_config_compaction_full_mutation(
-        &create_root_result.dataset_handle.id,
-        "INGEST",
-        10,
-        20,
-        false,
-    );
-
-    let schema = kamu_adapter_graphql::schema_quiet();
-
-    let response = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(response.data, expected_error);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_anonymous_setters_fail() {
     let harness = FlowConfigHarness::make().await;
     let create_root_result = harness.create_root_dataset().await;
 
     let mutation_codes = [FlowConfigHarness::set_ingest_config_mutation(
         &create_root_result.dataset_handle.id,
-        "INGEST",
         false,
     )];
 
@@ -627,11 +558,7 @@ impl FlowConfigHarness {
             .unwrap()
     }
 
-    fn set_ingest_config_mutation(
-        id: &odf::DatasetID,
-        dataset_flow_type: &str,
-        fetch_uncacheable: bool,
-    ) -> String {
+    fn set_ingest_config_mutation(id: &odf::DatasetID, fetch_uncacheable: bool) -> String {
         indoc!(
             r#"
             mutation {
@@ -639,12 +566,9 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfig (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    configInput : {
-                                        ingest: {
-                                            fetchUncacheable: <fetch_uncacheable>,
-                                        }
+                                setIngestConfig (
+                                    ingestConfigInput : {
+                                        fetchUncacheable: <fetch_uncacheable>,
                                     }
                                 ) {
                                     __typename,
@@ -652,11 +576,11 @@ impl FlowConfigHarness {
                                     ... on SetFlowConfigSuccess {
                                         config {
                                             __typename
-                                            ingest {
-                                                fetchUncacheable,
-                                            }
-                                            compaction {
+                                            rule {
                                                 __typename
+                                                ... on FlowConfigRuleIngest {
+                                                    fetchUncacheable
+                                                }
                                             }
                                         }
                                     }
@@ -669,7 +593,6 @@ impl FlowConfigHarness {
             "#
         )
         .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
         .replace(
             "<fetch_uncacheable>",
             if fetch_uncacheable { "true" } else { "false" },
@@ -678,7 +601,6 @@ impl FlowConfigHarness {
 
     fn set_config_compaction_full_mutation(
         id: &odf::DatasetID,
-        dataset_flow_type: &str,
         max_slice_size: u64,
         max_slice_records: u64,
         recursive: bool,
@@ -690,15 +612,12 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfig (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    configInput: {
-                                        compaction: {
-                                            full: {
-                                                maxSliceSize: <max_slice_size>,
-                                                maxSliceRecords: <max_slice_records>,
-                                                recursive: <recursive>
-                                            }
+                                setCompactionConfig (
+                                    compactionConfigInput: {
+                                        full: {
+                                            maxSliceSize: <max_slice_size>,
+                                            maxSliceRecords: <max_slice_records>,
+                                            recursive: <recursive>
                                         }
                                     }
                                 ) {
@@ -710,18 +629,20 @@ impl FlowConfigHarness {
                                         ... on SetFlowConfigSuccess {
                                             config {
                                                 __typename
-                                                ingest {
+                                                rule {
                                                     __typename
-                                                }
-                                                compaction {
-                                                    __typename
-                                                    ... on CompactionFull {
-                                                        maxSliceSize
-                                                        maxSliceRecords
-                                                        recursive
-                                                    }
-                                                    ... on CompactionMetadataOnly {
-                                                        recursive
+                                                    ... on FlowConfigRuleCompaction {
+                                                        compactionMode {
+                                                            __typename
+                                                            ... on FlowConfigCompactionModeFull {
+                                                                maxSliceSize
+                                                                maxSliceRecords
+                                                                recursive
+                                                            }
+                                                            ... on FlowConfigCompactionModeMetadataOnly {
+                                                                recursive
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -736,7 +657,6 @@ impl FlowConfigHarness {
             "#
         )
         .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<max_slice_records>", &max_slice_records.to_string())
         .replace("<max_slice_size>", &max_slice_size.to_string())
         .replace("<recursive>", if recursive { "true" } else { "false" })
@@ -744,7 +664,6 @@ impl FlowConfigHarness {
 
     fn set_config_compaction_metadata_only_mutation(
         id: &odf::DatasetID,
-        dataset_flow_type: &str,
         recursive: bool,
     ) -> String {
         indoc!(
@@ -754,13 +673,10 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfig (
-                                    datasetFlowType: "<dataset_flow_type>",
-                                    configInput: {
-                                        compaction: {
-                                            metadataOnly: {
-                                                recursive: <recursive>
-                                            }
+                                setCompactionConfig (
+                                    compactionConfigInput: {
+                                        metadataOnly: {
+                                            recursive: <recursive>
                                         }
                                     }
                                 ) {
@@ -772,18 +688,20 @@ impl FlowConfigHarness {
                                         ... on SetFlowConfigSuccess {
                                             config {
                                                 __typename
-                                                ingest {
+                                                rule {
                                                     __typename
-                                                }
-                                                compaction {
-                                                    __typename
-                                                    ... on CompactionFull {
-                                                        maxSliceSize
-                                                        maxSliceRecords
-                                                        recursive
-                                                    }
-                                                    ... on CompactionMetadataOnly {
-                                                        recursive
+                                                    ... on FlowConfigRuleCompaction {
+                                                        compactionMode {
+                                                            __typename
+                                                            ... on FlowConfigCompactionModeFull {
+                                                                maxSliceSize
+                                                                maxSliceRecords
+                                                                recursive
+                                                            }
+                                                            ... on FlowConfigCompactionModeMetadataOnly {
+                                                                recursive
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -798,7 +716,6 @@ impl FlowConfigHarness {
             "#
         )
         .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<recursive>", if recursive { "true" } else { "false" })
     }
 }

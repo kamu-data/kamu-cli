@@ -28,6 +28,7 @@ pub trait FlowConfigurationService: Sync + Send {
         &self,
         flow_binding: FlowBinding,
         rule: FlowConfigurationRule,
+        retry_policy: Option<RetryPolicy>,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError>;
 
     /// Lists all active flow configurations

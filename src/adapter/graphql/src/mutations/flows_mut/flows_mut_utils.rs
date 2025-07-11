@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_core::auth;
+use kamu_core::{ResolvedDataset, auth};
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
@@ -68,18 +68,29 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn ensure_flow_applied_to_expected_dataset_kind(
+    resolved_dataset: &ResolvedDataset,
+    expected_dataset_kind: odf::DatasetKind,
+) -> std::result::Result<(), FlowIncompatibleDatasetKind> {
+    let actual_dataset_kind = resolved_dataset.get_kind();
+
+    if actual_dataset_kind != expected_dataset_kind {
+        Err(FlowIncompatibleDatasetKind {
+            expected_dataset_kind: expected_dataset_kind.into(),
+            actual_dataset_kind: actual_dataset_kind.into(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn ensure_expected_dataset_kind(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
     dataset_flow_type: DatasetFlowType,
-    flow_run_configuration_maybe: Option<&FlowRunConfiguration>,
 ) -> Result<Option<FlowIncompatibleDatasetKind>> {
-    if let Some(FlowRunConfiguration::Compaction(CompactionConditionInput::MetadataOnly(_))) =
-        flow_run_configuration_maybe
-    {
-        return Ok(None);
-    }
-
     let maybe_expected_kind = match dataset_flow_type {
         DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => Some(odf::DatasetKind::Root),
         DatasetFlowType::ExecuteTransform => Some(odf::DatasetKind::Derivative),
@@ -111,7 +122,7 @@ pub(crate) async fn ensure_flow_preconditions(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
     dataset_flow_type: DatasetFlowType,
-    flow_run_configuration: Option<&FlowRunConfiguration>,
+    reset_configuration: Option<&FlowConfigResetInput>,
 ) -> Result<Option<FlowPreconditionsNotMet>> {
     let resolved_dataset = dataset_request_state.resolved_dataset(ctx).await?;
 
@@ -172,9 +183,7 @@ pub(crate) async fn ensure_flow_preconditions(
         }
         DatasetFlowType::HardCompaction => (),
         DatasetFlowType::Reset => {
-            if let Some(flow_configuration) = flow_run_configuration
-                && let FlowRunConfiguration::Reset(reset_configuration) = flow_configuration
-            {
+            if let Some(reset_configuration) = reset_configuration {
                 use odf::dataset::MetadataChainExt as _;
                 if let Some(new_head_hash) = &reset_configuration.new_head_hash() {
                     let metadata_chain = resolved_dataset.as_metadata_chain();
