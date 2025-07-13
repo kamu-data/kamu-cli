@@ -147,7 +147,7 @@ impl CollectionProjection {
 
         assert_eq!(records.len(), 1);
         let record = records.into_iter().next().unwrap();
-        let entry = CollectionEntry::from_json(record);
+        let entry = CollectionEntry::from_json(record)?;
 
         Ok(Some(entry))
     }
@@ -223,7 +223,7 @@ impl CollectionProjection {
         let nodes = records
             .into_iter()
             .map(CollectionEntry::from_json)
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         Ok(CollectionEntryConnection::new(
             nodes,
@@ -283,7 +283,7 @@ impl CollectionProjection {
         let nodes = records
             .into_iter()
             .map(CollectionEntry::from_json)
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         Ok(nodes)
     }

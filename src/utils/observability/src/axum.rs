@@ -31,6 +31,7 @@ pub struct OnRequest;
 impl<B> tower_http::trace::OnRequest<B> for OnRequest {
     fn on_request(&mut self, request: &http::Request<B>, _: &tracing::Span) {
         tracing::info!(
+            method = %request.method(),
             uri = %request.uri(),
             version = ?request.version(),
             headers = ?request.headers(),

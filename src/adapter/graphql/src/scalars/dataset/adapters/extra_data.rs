@@ -30,32 +30,36 @@ static EXTRA_DATA_JSONSCHEMA_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLo
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[nutype::nutype(derive(AsRef, Clone, Debug, Into))]
-pub struct ExtraData(serde_json::Value);
+pub struct ExtraData(serde_json::Map<String, serde_json::Value>);
 
 impl Default for ExtraData {
     fn default() -> Self {
-        Self::new(serde_json::Value::Object(Default::default()))
+        Self::new(Default::default())
     }
 }
 
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ExtraData {
-    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let async_graphql::Value::Object(gql_extra_data) = &value else {
-            return Err(invalid_input_error(&value));
+    fn parse(gql_value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let async_graphql::Value::Object(gql_map) = &gql_value else {
+            return Err(invalid_input_error(&gql_value));
         };
 
-        let extra_data = serde_json::to_value(gql_extra_data)?;
+        let json_value = serde_json::to_value(gql_map)?;
 
-        if !EXTRA_DATA_JSONSCHEMA_VALIDATOR.is_valid(&extra_data) {
-            return Err(invalid_input_error(&value));
+        if !EXTRA_DATA_JSONSCHEMA_VALIDATOR.is_valid(&json_value) {
+            return Err(invalid_input_error(&gql_value));
         }
 
-        Ok(Self::new(extra_data))
+        let serde_json::Value::Object(json_map) = json_value else {
+            return Err(invalid_input_error(&gql_value));
+        };
+
+        Ok(Self::new(json_map))
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        match async_graphql::Value::from_json(self.as_ref().clone()) {
+        match async_graphql::Value::from_json(serde_json::Value::Object(self.as_ref().clone())) {
             Ok(v) => v,
             Err(e) => unreachable!("{e}"),
         }

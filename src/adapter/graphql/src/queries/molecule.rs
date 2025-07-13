@@ -588,32 +588,37 @@ impl MoleculeProject {
 
         let records = records
             .into_iter()
-            .filter_map(|record| {
+            .map(|record| {
                 let op = record[&vocab.operation_type_column].as_i64().unwrap();
                 let op = odf::metadata::OperationType::try_from(u8::try_from(op).unwrap()).unwrap();
+                (op, record)
+            })
+            .filter(|(op, _)| *op != odf::metadata::OperationType::CorrectFrom)
+            .map(|(op, record)| {
+                let entry = CollectionEntry::from_json(record)?;
 
-                let entry = CollectionEntry::from_json(record);
-
-                match op {
+                let event = match op {
                     odf::metadata::OperationType::Append => {
-                        Some(MoleculeProjectEvent::DataRoomEntryAdded(
+                        MoleculeProjectEvent::DataRoomEntryAdded(
                             MoleculeProjectEventDataRoomEntryAdded { entry },
-                        ))
+                        )
                     }
                     odf::metadata::OperationType::Retract => {
-                        Some(MoleculeProjectEvent::DataRoomEntryRemoved(
+                        MoleculeProjectEvent::DataRoomEntryRemoved(
                             MoleculeProjectEventDataRoomEntryRemoved { entry },
-                        ))
+                        )
                     }
-                    odf::metadata::OperationType::CorrectFrom => None,
+                    odf::metadata::OperationType::CorrectFrom => unreachable!(),
                     odf::metadata::OperationType::CorrectTo => {
-                        Some(MoleculeProjectEvent::DataRoomEntryUpdated(
+                        MoleculeProjectEvent::DataRoomEntryUpdated(
                             MoleculeProjectEventDataRoomEntryUpdated { new_entry: entry },
-                        ))
+                        )
                     }
-                }
+                };
+
+                Ok(event)
             })
-            .collect();
+            .collect::<Result<_, InternalError>>()?;
 
         Ok(records)
     }
@@ -689,19 +694,21 @@ impl MoleculeProject {
             let project_account = Account::from_account_id(ctx, self.account_id.clone()).await?;
 
             // TODO: Assuming every collection entry is a versioned file
-            events.extend(records.into_iter().map(|record| {
+            for record in records {
                 let dataset = Dataset::new_access_checked(
                     project_account.clone(),
                     resolved_dataset.get_handle().clone(),
                 );
 
-                let entry = VersionedFileEntry::from_json(resolved_dataset.clone(), record);
+                let entry = VersionedFileEntry::from_json(resolved_dataset.clone(), record)?;
 
-                MoleculeProjectEvent::FileUpdated(MoleculeProjectEventFileUpdated {
-                    dataset,
-                    new_entry: entry,
-                })
-            }));
+                events.push(MoleculeProjectEvent::FileUpdated(
+                    MoleculeProjectEventFileUpdated {
+                        dataset,
+                        new_entry: entry,
+                    },
+                ));
+            }
         }
 
         Ok(events)
