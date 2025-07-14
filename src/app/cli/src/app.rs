@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
@@ -942,6 +942,36 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(kamu_flow_system::FlowAgentConfig::new(
         Duration::seconds(flow_agent_config.awaiting_step_secs.unwrap()),
         Duration::seconds(flow_agent_config.mandatory_throttling_period_secs.unwrap()),
+        if let Some(retry_configs) = flow_agent_config.default_retry_policies.as_ref() {
+            retry_configs
+                .iter()
+                .map(|(flow_type, retry_policy_config)| {
+                    (
+                        flow_type.clone(),
+                        kamu_flow_system::RetryPolicy::new(
+                            retry_policy_config.max_attempts.unwrap_or(0),
+                            retry_policy_config.min_delay_secs.unwrap_or(0),
+                            match retry_policy_config.backoff_type {
+                                Some(config::RetryPolicyConfigBackoffType::Exponential) => {
+                                    kamu_flow_system::RetryBackoffType::Exponential
+                                }
+                                Some(config::RetryPolicyConfigBackoffType::Linear) => {
+                                    kamu_flow_system::RetryBackoffType::Linear
+                                }
+                                Some(
+                                    config::RetryPolicyConfigBackoffType::ExponentialWithJitter,
+                                ) => kamu_flow_system::RetryBackoffType::ExponentialWithJitter,
+                                Some(config::RetryPolicyConfigBackoffType::Fixed) | None => {
+                                    kamu_flow_system::RetryBackoffType::Fixed
+                                }
+                            },
+                        ),
+                    )
+                })
+                .collect()
+        } else {
+            HashMap::new()
+        },
     ));
 
     let task_agent_config = kamu_flow_system_config.task_agent.as_ref().unwrap();

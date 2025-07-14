@@ -9,6 +9,8 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use std::collections::HashMap;
+
 use async_graphql::value;
 use chrono::Duration;
 use indoc::indoc;
@@ -601,6 +603,7 @@ impl FlowTriggerHarness {
                 .add_value(FlowAgentConfig::new(
                     Duration::seconds(1),
                     Duration::minutes(1),
+                    HashMap::new(),
                 ))
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>()

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use futures::TryStreamExt;
@@ -3599,6 +3601,7 @@ impl FlowRunsHarness {
                 .add_value(FlowAgentConfig::new(
                     Duration::seconds(1),
                     Duration::minutes(1),
+                    HashMap::new(),
                 ))
                 .add::<TaskSchedulerImpl>()
                 .add::<InMemoryTaskEventStore>();

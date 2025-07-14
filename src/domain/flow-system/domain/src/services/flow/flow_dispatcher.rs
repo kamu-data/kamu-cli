@@ -10,7 +10,13 @@
 use internal_error::InternalError;
 use kamu_task_system as ts;
 
-use crate::{FlowBinding, FlowConfigurationRule, FlowRunArguments, FlowTriggerInstance};
+use crate::{
+    FlowBinding,
+    FlowConfigurationRule,
+    FlowRunArguments,
+    FlowTriggerInstance,
+    RetryPolicy,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,6 +35,10 @@ pub trait FlowDispatcher: Send + Sync {
         trigger_instance: FlowTriggerInstance,
         maybe_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<(), InternalError>;
+
+    fn default_retry_policy(&self) -> Option<RetryPolicy> {
+        None
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

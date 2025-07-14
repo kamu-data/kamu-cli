@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -100,6 +101,7 @@ impl FlowHarness {
             .add_value(FlowAgentConfig::new(
                 awaiting_step,
                 mandatory_throttling_period,
+                HashMap::new(),
             ))
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()

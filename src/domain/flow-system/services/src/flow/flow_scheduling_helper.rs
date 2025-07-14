@@ -269,8 +269,15 @@ impl FlowSchedulingHelper {
 
                 // Decide on retry policy:
                 // - if configuration defines it, use it
-                // - if not, use default retry policy
-                let retry_policy = maybe_flow_configuration.and_then(|config| config.retry_policy);
+                // - if not, use default retry policy for this flow type, if it's defined
+                let retry_policy = maybe_flow_configuration
+                    .and_then(|config| config.retry_policy)
+                    .or_else(|| {
+                        self.agent_config
+                            .default_retry_policy_by_flow_type
+                            .get(&flow_binding.flow_type)
+                            .copied()
+                    });
 
                 // Initiate new flow
                 let mut flow = self
