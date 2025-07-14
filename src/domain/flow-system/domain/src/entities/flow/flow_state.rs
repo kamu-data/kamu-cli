@@ -19,10 +19,10 @@ use crate::*;
 pub struct FlowState {
     /// Unique flow identifier
     pub flow_id: FlowID,
-    /// Flow key
-    pub flow_key: FlowKey,
+    /// Flow binding
+    pub flow_binding: FlowBinding,
     /// Triggers
-    pub triggers: Vec<FlowTriggerType>,
+    pub triggers: Vec<FlowTriggerInstance>,
     /// Start condition (if defined)
     pub start_condition: Option<FlowStartCondition>,
     /// Timing records
@@ -49,7 +49,7 @@ pub struct FlowTimingRecords {
 
 impl FlowState {
     /// Extract primary trigger
-    pub fn primary_trigger(&self) -> &FlowTriggerType {
+    pub fn primary_trigger(&self) -> &FlowTriggerInstance {
         // At least 1 trigger is initially defined for sure
         self.triggers.first().unwrap()
     }
@@ -65,10 +65,10 @@ impl FlowState {
         }
     }
 
-    pub fn try_result_as_ref(&self) -> Option<&FlowResult> {
+    pub fn try_task_result_as_ref(&self) -> Option<&ts::TaskResult> {
         self.outcome
             .as_ref()
-            .and_then(|outcome| outcome.try_result_as_ref())
+            .and_then(|outcome| outcome.try_task_result_as_ref())
     }
 
     pub fn can_schedule(&self) -> bool {
@@ -88,12 +88,12 @@ impl Projection for FlowState {
                 E::Initiated(FlowEventInitiated {
                     event_time: _,
                     flow_id,
-                    flow_key,
+                    flow_binding,
                     trigger,
                     config_snapshot,
                 }) => Ok(Self {
                     flow_id,
-                    flow_key,
+                    flow_binding,
                     triggers: vec![trigger],
                     start_condition: None,
                     timing: FlowTimingRecords {
@@ -220,7 +220,7 @@ impl Projection for FlowState {
                             };
                             match task_outcome {
                                 ts::TaskOutcome::Success(task_result) => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Success(task_result.clone().into())),
+                                    outcome: Some(FlowOutcome::Success(task_result.clone())),
                                     timing,
                                     ..s
                                 }),
@@ -230,8 +230,8 @@ impl Projection for FlowState {
                                     ..s
                                 }),
                                 // TODO: support retries
-                                ts::TaskOutcome::Failed(task_error) => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Failed(task_error.into())),
+                                ts::TaskOutcome::Failed(_) => Ok(FlowState {
+                                    outcome: Some(FlowOutcome::Failed),
                                     timing,
                                     ..s
                                 }),

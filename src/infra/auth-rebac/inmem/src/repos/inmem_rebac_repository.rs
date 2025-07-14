@@ -11,28 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::{Singleton, component, interface, scope};
-use kamu_auth_rebac::{
-    DeleteEntitiesRelationError,
-    DeleteEntityPropertiesError,
-    DeleteEntityPropertyError,
-    DeleteSubjectEntitiesObjectEntityRelationsError,
-    EntitiesWithRelation,
-    Entity,
-    EntityType,
-    EntityWithRelation,
-    GetEntityPropertiesError,
-    GetObjectEntityRelationsError,
-    GetRelationBetweenEntitiesError,
-    InsertEntitiesRelationError,
-    PropertiesCountError,
-    PropertyName,
-    PropertyValue,
-    RebacRepository,
-    Relation,
-    SetEntityPropertyError,
-    SubjectEntityRelationsByObjectTypeError,
-    SubjectEntityRelationsError,
-};
+use kamu_auth_rebac::*;
 use tokio::sync::RwLock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -199,59 +178,39 @@ impl RebacRepository for InMemoryRebacRepository {
         Ok(entities_properties)
     }
 
-    async fn insert_entities_relation(
+    async fn upsert_entities_relations(
         &self,
-        subject_entity: &Entity,
-        relation: Relation,
-        object_entity: &Entity,
-    ) -> Result<(), InsertEntitiesRelationError> {
-        let mut writable_state = self.state.write().await;
-
-        for row in &writable_state.entities_relations_rows {
-            if row.subject_entity == *subject_entity && row.object_entity == *object_entity {
-                return Err(InsertEntitiesRelationError::some_role_is_already_present(
-                    subject_entity,
-                    object_entity,
-                ));
-            }
+        operations: &[UpsertEntitiesRelationOperation<'_>],
+    ) -> Result<(), UpsertEntitiesRelationsError> {
+        if operations.is_empty() {
+            return Ok(());
         }
 
-        let new_row = EntitiesWithRelation {
-            subject_entity: subject_entity.clone().into_owned(),
-            relation,
-            object_entity: object_entity.clone().into_owned(),
-        };
+        let mut writable_state = self.state.write().await;
 
-        writable_state.entities_relations_rows.insert(new_row);
+        for op in operations {
+            let maybe_existing_row = writable_state
+                .entities_relations_rows
+                .iter()
+                .find(|row| {
+                    row.subject_entity == *op.subject_entity
+                        && row.object_entity == *op.object_entity
+                })
+                .cloned();
+            if let Some(existing_row) = maybe_existing_row {
+                writable_state.entities_relations_rows.remove(&existing_row);
+            }
+
+            let new_row = EntitiesWithRelation {
+                subject_entity: op.subject_entity.as_ref().clone().into_owned(),
+                relation: op.relationship,
+                object_entity: op.object_entity.as_ref().clone().into_owned(),
+            };
+
+            writable_state.entities_relations_rows.insert(new_row);
+        }
 
         Ok(())
-    }
-
-    async fn delete_entities_relation(
-        &self,
-        subject_entity: &Entity,
-        object_entity: &Entity,
-    ) -> Result<(), DeleteEntitiesRelationError> {
-        let mut writable_state = self.state.write().await;
-
-        let maybe_row = writable_state
-            .entities_relations_rows
-            .iter()
-            .find(|row| {
-                row.subject_entity == *subject_entity && row.object_entity == *object_entity
-            })
-            .cloned();
-
-        if let Some(row) = maybe_row {
-            writable_state.entities_relations_rows.remove(&row);
-
-            Ok(())
-        } else {
-            Err(DeleteEntitiesRelationError::not_found(
-                subject_entity,
-                object_entity,
-            ))
-        }
     }
 
     async fn get_subject_entity_relations(
@@ -395,6 +354,34 @@ impl RebacRepository for InMemoryRebacRepository {
                 subject_entities,
                 object_entity,
             ));
+        }
+
+        Ok(())
+    }
+
+    async fn delete_entities_relations(
+        &self,
+        operations: &[DeleteEntitiesRelationOperation<'_>],
+    ) -> Result<(), DeleteEntitiesRelationsError> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+
+        let mut writable_state = self.state.write().await;
+
+        for op in operations {
+            let maybe_existing_row = writable_state
+                .entities_relations_rows
+                .iter()
+                .find(|row| {
+                    row.subject_entity == *op.subject_entity
+                        && row.object_entity == *op.object_entity
+                })
+                .cloned();
+
+            if let Some(existing_row) = maybe_existing_row {
+                writable_state.entities_relations_rows.remove(&existing_row);
+            }
         }
 
         Ok(())

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO flows (flow_id, flow_type, scope_data, initiator, flow_status, last_event_id)\n                VALUES ($1, $2, $3, $4, 'waiting', NULL)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "2754942fe3baa3c3a7e4ce9045a073dad4358e4769a649f04a03b0cf550df8fe"
+}

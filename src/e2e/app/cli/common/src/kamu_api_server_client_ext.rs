@@ -16,6 +16,7 @@ use convert_case::{Case, Casing};
 use http_common::comma_separated::CommaSeparatedSet;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts_services::PREDEFINED_DEVICE_CODE_UUID;
+use kamu_accounts_services::domain::DEFAULT_PASSWORD_STR;
 use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_adapter_http::data::metadata_handler::{
     DatasetMetadataParams,
@@ -27,7 +28,7 @@ use kamu_adapter_http::data::verify_types::{VerifyRequest, VerifyResponse};
 use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, NodeInfoResponse};
 use kamu_adapter_http::platform::{LoginRequestBody, PlatformFileUploadQuery, UploadContext};
 use kamu_auth_rebac::AccountToDatasetRelation;
-use kamu_flow_system::{DatasetFlowType, FlowID};
+use kamu_flow_system::FlowID;
 use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use thiserror::Error;
@@ -232,7 +233,7 @@ pub struct AccountApi<'a> {
 }
 
 impl AccountApi<'_> {
-    pub async fn me(&mut self) -> Result<AccountResponse, AccountMeError> {
+    pub async fn me(&self) -> Result<AccountResponse, AccountMeError> {
         let response = self
             .client
             .rest_api_call(Method::GET, "/accounts/me", None)
@@ -286,7 +287,7 @@ impl AuthApi<'_> {
     }
 
     pub async fn login_as_kamu(&mut self) -> AccessToken {
-        self.login_with_password("kamu", "kamu").await
+        self.login_with_password("kamu", DEFAULT_PASSWORD_STR).await
     }
 
     pub async fn login_as_e2e_user(&mut self) -> AccessToken {
@@ -483,6 +484,7 @@ impl DatasetApi<'_> {
         match response.status() {
             StatusCode::OK => Ok(response.json().await.int_err()?),
             StatusCode::NOT_FOUND => Err(DatasetByIdError::NotFound),
+            StatusCode::UNAUTHORIZED => Err(DatasetByIdError::Unauthorized),
             unexpected_status => Err(format!("Unexpected status: {unexpected_status}")
                 .int_err()
                 .into()),
@@ -1452,6 +1454,8 @@ impl Eq for SetDatasetVisibilityError {}
 
 #[derive(Error, Debug)]
 pub enum DatasetByIdError {
+    #[error("Unauthorized")]
+    Unauthorized,
     #[error("Not found")]
     NotFound,
     #[error(transparent)]
@@ -1532,7 +1536,7 @@ impl FlowApi<'_> {
     pub async fn trigger(
         &self,
         dataset_id: &odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_type: &str,
     ) -> FlowTriggerResponse {
         let response = self
             .client
@@ -1562,7 +1566,7 @@ impl FlowApi<'_> {
                 .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
                 .replace(
                     "<dataset_flow_type>",
-                    &format!("{dataset_flow_type:?}").to_case(Case::UpperSnake),
+                    &format!("{flow_type:?}").to_case(Case::UpperSnake),
                 )
                 .as_str(),
                 None,

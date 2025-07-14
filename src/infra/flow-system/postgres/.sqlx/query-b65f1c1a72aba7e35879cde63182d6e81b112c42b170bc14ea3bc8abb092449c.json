@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                WITH latest_events AS (\n                    SELECT DISTINCT ON (flow_type, scope_data)\n                        flow_type,\n                        scope_data,\n                        event_type,\n                        event_payload\n                    FROM flow_trigger_events\n                    ORDER BY flow_type, scope_data, event_time DESC\n                )\n                SELECT flow_type, scope_data\n                FROM latest_events\n                WHERE event_type != 'FlowTriggerEventDatasetRemoved'\n                AND (\n                    (event_type = 'FlowTriggerEventCreated' AND (event_payload #>> '{Created,paused}') = 'false')\n                    OR\n                    (event_type = 'FlowTriggerEventModified' AND (event_payload #>> '{Modified,paused}') = 'false')\n                )\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "scope_data",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "b65f1c1a72aba7e35879cde63182d6e81b112c42b170bc14ea3bc8abb092449c"
+}

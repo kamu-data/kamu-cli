@@ -15,6 +15,7 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct UIConfiguration {
     pub(crate) ingest_upload_file_limit_mb: usize,
+    pub(crate) min_new_password_length: usize,
     pub(crate) feature_flags: UIFeatureFlags,
 }
 
@@ -27,6 +28,7 @@ pub(crate) struct UIFeatureFlags {
     pub(crate) enable_scheduling: bool,
     pub(crate) enable_dataset_env_vars_management: bool,
     pub(crate) enable_terms_of_service: bool,
+    pub(crate) allow_anonymous: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

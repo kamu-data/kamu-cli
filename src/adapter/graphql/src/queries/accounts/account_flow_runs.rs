@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use database_common::PaginationOpts;
@@ -54,7 +55,9 @@ impl<'a> AccountFlowRuns<'a> {
         }
 
         let maybe_filters = filters.map(|filters| kamu_flow_system::AccountFlowFilters {
-            by_flow_type: filters.by_flow_type.map(Into::into),
+            by_flow_type: filters
+                .by_flow_type
+                .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
             by_flow_status: filters.by_status.map(Into::into),
             by_dataset_ids: filters
                 .by_dataset_ids
@@ -104,7 +107,7 @@ impl<'a> AccountFlowRuns<'a> {
         let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
 
         let dataset_flow_filters = maybe_filters
-            .map(|fs| kamu_flow_system::DatasetFlowFilters {
+            .map(|fs| kamu_flow_system::FlowFilters {
                 by_flow_type: fs.by_flow_type,
                 by_flow_status: fs.by_flow_status,
                 by_initiator: fs.by_initiator,
@@ -141,13 +144,16 @@ impl<'a> AccountFlowRuns<'a> {
         let (flow_query_service, dataset_registry) =
             from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetRegistry);
 
-        let dataset_ids: Vec<_> = flow_query_service
+        let dataset_ids = flow_query_service
             .list_all_datasets_with_flow_by_account(&self.account.id)
             .await
-            .int_err()?;
+            .int_err()?
+            .into_iter()
+            .map(Cow::Owned)
+            .collect::<Vec<_>>();
 
         let dataset_handles_resolution = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(dataset_ids)
+            .resolve_multiple_dataset_handles_by_ids(&dataset_ids)
             .await
             .int_err()?;
 

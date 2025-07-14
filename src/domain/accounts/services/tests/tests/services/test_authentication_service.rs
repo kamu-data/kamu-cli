@@ -14,22 +14,30 @@ use kamu_accounts::*;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
+    AccountServiceImpl,
     AuthenticationServiceImpl,
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
 };
 use messaging_outbox::{MockOutbox, Outbox};
+use mockall::predicate::str;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_enabled_login_providers() {
-    let catalog = make_catalog(MockOutbox::new());
+    let catalog_opts = CatalogOpts {
+        mock_outbox: MockOutbox::new(),
+        auth_config_maybe: None,
+    };
+
+    let catalog = make_catalog(catalog_opts);
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let mut supported_login_methods = authentication_service.supported_login_methods();
@@ -43,8 +51,12 @@ async fn test_enabled_login_providers() {
 async fn test_login() {
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_account_created(&mut mock_outbox);
+    let catalog_opts = CatalogOpts {
+        mock_outbox,
+        auth_config_maybe: None,
+    };
 
-    let catalog = make_catalog(mock_outbox);
+    let catalog = make_catalog(catalog_opts);
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let response_a = authentication_service
@@ -67,11 +79,37 @@ async fn test_login() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_account_not_created_in_restrict_anonymous_mode() {
+    let catalog_opts = CatalogOpts {
+        mock_outbox: MockOutbox::new(),
+        auth_config_maybe: Some(AuthConfig {
+            allow_anonymous: Some(false),
+            ..AuthConfig::default()
+        }),
+    };
+
+    let catalog = make_catalog(catalog_opts);
+    let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
+
+    let response_a = authentication_service
+        .login("method-A", "dummy".to_string(), None)
+        .await;
+
+    assert_matches!(response_a, Err(LoginError::RestrictedLogin));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_use_good_access_token() {
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_account_created(&mut mock_outbox);
+    let catalog_opts = CatalogOpts {
+        mock_outbox,
+        auth_config_maybe: None,
+    };
 
-    let catalog = make_catalog(mock_outbox);
+    let catalog = make_catalog(catalog_opts);
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let login_response = authentication_service
@@ -94,7 +132,12 @@ async fn test_use_good_access_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_use_bad_access_token() {
-    let catalog = make_catalog(MockOutbox::new());
+    let catalog_opts = CatalogOpts {
+        mock_outbox: MockOutbox::new(),
+        auth_config_maybe: None,
+    };
+
+    let catalog = make_catalog(catalog_opts);
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     assert_matches!(
@@ -109,24 +152,39 @@ async fn test_use_bad_access_token() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_catalog(mock_outbox: MockOutbox) -> dill::Catalog {
+struct CatalogOpts {
+    mock_outbox: MockOutbox,
+    auth_config_maybe: Option<AuthConfig>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_catalog(catalog_opts: CatalogOpts) -> dill::Catalog {
     let mut b = dill::CatalogBuilder::new();
+
+    let auth_config = catalog_opts
+        .auth_config_maybe
+        .unwrap_or_else(AuthConfig::sample);
 
     b.add::<DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .add::<InMemoryAccountRepository>()
+        .add::<AccountServiceImpl>()
+        .add::<InMemoryDidSecretKeyRepository>()
         .add::<AccessTokenServiceImpl>()
         .add::<InMemoryAccessTokenRepository>()
+        .add_value(DidSecretEncryptionConfig::default())
         .add_value(PredefinedAccountsConfig::single_tenant())
         .add_value(SystemTimeSourceStub::new())
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .add_value(JwtAuthenticationConfig::default())
         .add::<DatabaseTransactionRunner>()
-        .add_value(mock_outbox)
+        .add_value(catalog_opts.mock_outbox)
         .bind::<dyn Outbox, MockOutbox>()
         .add::<OAuthDeviceCodeServiceImpl>()
         .add::<OAuthDeviceCodeGeneratorDefault>()
+        .add_value(auth_config)
         .add::<InMemoryOAuthDeviceCodeRepository>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);

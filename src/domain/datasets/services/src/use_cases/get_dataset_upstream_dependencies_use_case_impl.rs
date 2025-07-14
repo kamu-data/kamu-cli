@@ -7,15 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
+use kamu_core::TenancyConfig;
 use kamu_core::auth::{ClassifyByAllowanceIdsResponse, DatasetAction, DatasetActionAuthorizer};
-use kamu_core::{DependencyGraphService, TenancyConfig};
 use kamu_datasets::{
     DatasetDependency,
     DatasetEntryService,
+    DependencyGraphService,
     GetDatasetUpstreamDependenciesError,
     GetDatasetUpstreamDependenciesUseCase,
 };
@@ -56,20 +58,29 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
             return Ok(Vec::new());
         }
 
+        // NOTE: Borrow-checker can't digest the upfront transformation during stream
+        //       data collection. So we need to make an additional vector.
+        let upstream_dependency_ids = upstream_dependency_ids
+            .into_iter()
+            .map(Cow::Owned)
+            .collect::<Vec<_>>();
         let mut upstream_dependencies = Vec::with_capacity(upstream_dependency_ids.len());
-
         let ClassifyByAllowanceIdsResponse {
             authorized_ids,
             unauthorized_ids_with_errors,
         } = self
             .dataset_action_authorizer
-            .classify_dataset_ids_by_allowance(upstream_dependency_ids, DatasetAction::Read)
+            .classify_dataset_ids_by_allowance(&upstream_dependency_ids, DatasetAction::Read)
             .await?;
 
         upstream_dependencies.extend(unauthorized_ids_with_errors.into_iter().map(
             |(unauthorized_dataset_id, _)| DatasetDependency::Unresolved(unauthorized_dataset_id),
         ));
 
+        let authorized_ids = authorized_ids
+            .into_iter()
+            .map(Cow::Owned)
+            .collect::<Vec<_>>();
         let dataset_entries_resolution = self
             .dataset_entry_service
             .get_multiple_entries(&authorized_ids)

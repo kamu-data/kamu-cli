@@ -12,12 +12,13 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::{DatasetRegistry, DatasetRegistryExt, DependencyGraphService, ResolvedDataset};
+use kamu_core::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetDependencyRepository,
     DatasetReferenceMessage,
     DatasetReferenceMessageUpdated,
+    DependencyGraphService,
     MESSAGE_CONSUMER_KAMU_DATASET_DEPENDENCY_GRAPH_IMMEDIATE_LISTENER,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,

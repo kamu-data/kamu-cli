@@ -17,7 +17,17 @@ pub trait ResponseExt {
 
 impl ResponseExt for async_graphql::Response {
     fn into_json_data(self) -> serde_json::Value {
-        self.data.into_json().unwrap()
+        match self.data.into_json() {
+            Ok(json) => json,
+            Err(e) => panic!(
+                "Failed to JSON: {e}; server errors: {:?}",
+                self.errors
+                    .into_iter()
+                    .map(|e| e.message)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+        }
     }
 
     fn error_messages(&self) -> Vec<String> {

@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT password_hash\n              FROM accounts_passwords\n              JOIN accounts ON accounts_passwords.account_id = accounts.id\n              WHERE account_name = ?\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "password_hash",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "max_size": 400
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fc1332aa08fab99d6c0281144d610582b31641be83711fec0f9ba7a4073fda09"
+}

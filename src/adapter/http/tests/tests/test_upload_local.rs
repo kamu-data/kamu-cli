@@ -23,7 +23,9 @@ use kamu::domain::upload_service::{
 use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
+    AuthConfig,
     DEFAULT_ACCOUNT_ID,
+    DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
@@ -31,10 +33,12 @@ use kamu_accounts::{
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
     InMemoryAccountRepository,
+    InMemoryDidSecretKeyRepository,
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
+    AccountServiceImpl,
     AuthenticationServiceImpl,
     LoginPasswordAuthProvider,
     OAuthDeviceCodeGeneratorDefault,
@@ -95,7 +99,11 @@ impl Harness {
                 .add::<InMemoryAccessTokenRepository>()
                 .add::<SystemTimeSourceDefault>()
                 .add::<LoginPasswordAuthProvider>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
                 .add_value(JwtAuthenticationConfig::default())
+                .add_value(AuthConfig::sample())
                 .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add::<UploadServiceLocal>()

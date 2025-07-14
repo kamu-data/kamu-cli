@@ -21,11 +21,16 @@ use crate::{
     AccountType,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
+    DEFAULT_ACCOUNT_PASSWORD,
+    DEFAULT_PASSWORD_STR,
+    Password,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const DEFAULT_AVATAR_URL: &str = "https://avatars.githubusercontent.com/u/50896974?s=200&v=4";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
 #[derive(Default, Debug, Clone, Merge, Serialize, Deserialize)]
@@ -49,7 +54,7 @@ impl PredefinedAccountsConfig {
             predefined: vec![AccountConfig {
                 id: Some(DEFAULT_ACCOUNT_ID.clone()),
                 account_name: DEFAULT_ACCOUNT_NAME.clone(),
-                password: None,
+                password: DEFAULT_ACCOUNT_PASSWORD.clone(),
                 account_type: AccountType::User,
                 display_name: None,
                 avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
@@ -85,7 +90,7 @@ pub struct AccountConfig {
     // 'id' is auto-derived from `account_name` if omitted
     id: Option<odf::AccountID>,
     pub account_name: odf::AccountName,
-    pub password: Option<String>,
+    pub password: Password,
     pub email: Email,
     // 'display_name' is auto-derived from `account_name` if omitted
     display_name: Option<AccountDisplayName>,
@@ -106,10 +111,12 @@ impl AccountConfig {
     // #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_name(account_name: odf::AccountName) -> Self {
         let email = Email::parse(&format!("{account_name}@example.com")).unwrap();
+        let password = Self::generate_password(&account_name);
+
         Self {
             id: None,
             account_name,
-            password: None,
+            password,
             email,
             display_name: None,
             account_type: Self::default_account_type(),
@@ -125,10 +132,12 @@ impl AccountConfig {
     // #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
         let email = Email::parse(&format!("{}@example.com", subject.account_name)).unwrap();
+        let password = Self::generate_password(&subject.account_name);
+
         Self {
             id: Some(subject.account_id),
             account_name: subject.account_name,
-            password: None,
+            password,
             email,
             display_name: None,
             account_type: Self::default_account_type(),
@@ -140,8 +149,8 @@ impl AccountConfig {
         }
     }
 
-    pub fn set_password(mut self, password: String) -> Self {
-        self.password = Some(password);
+    pub fn set_password(mut self, password: Password) -> Self {
+        self.password = password;
         self
     }
 
@@ -163,15 +172,6 @@ impl AccountConfig {
         }
     }
 
-    pub fn get_password(&self) -> String {
-        if let Some(password) = &self.password {
-            password.clone()
-        } else {
-            // Use same password as login name by default
-            self.account_name.to_string()
-        }
-    }
-
     pub fn get_display_name(&self) -> AccountDisplayName {
         if let Some(display_name) = &self.display_name {
             display_name.clone()
@@ -190,6 +190,10 @@ impl AccountConfig {
 
     pub fn default_registered_at() -> DateTime<Utc> {
         Utc::now()
+    }
+
+    pub fn generate_password(account_name: &odf::AccountName) -> Password {
+        Password::try_new(format!("{DEFAULT_PASSWORD_STR}:{account_name}")).unwrap()
     }
 }
 

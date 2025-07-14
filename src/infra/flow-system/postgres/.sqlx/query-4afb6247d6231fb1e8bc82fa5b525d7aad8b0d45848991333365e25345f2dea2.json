@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT flow_id FROM flows\n                WHERE\n                    ($1::text IS NULL OR flow_type = $1)\n                    AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)\n                    AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))\n                ORDER BY flow_id DESC\n                LIMIT $4 OFFSET $5\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        {
+          "Custom": {
+            "name": "flow_status_type",
+            "kind": {
+              "Enum": [
+                "waiting",
+                "running",
+                "finished"
+              ]
+            }
+          }
+        },
+        "TextArray",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4afb6247d6231fb1e8bc82fa5b525d7aad8b0d45848991333365e25345f2dea2"
+}

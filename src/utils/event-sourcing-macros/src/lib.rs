@@ -64,10 +64,13 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
     quote::quote! {
         impl #type_name {
             #[inline]
-            pub async fn load(
-                query: <#proj_type as ::event_sourcing::Projection>::Query,
+            pub async fn load<Q>(
+                query: Q,
                 event_store: &#store_type,
-            ) -> Result<Self, LoadError<#proj_type>> {
+            ) -> Result<Self, LoadError<#proj_type>>
+            where
+                Q: std::borrow::Borrow<<#proj_type as ::event_sourcing::Projection>::Query> + std::fmt::Debug,
+            {
                 let agg = ::event_sourcing::Aggregate::load(query, event_store).await?;
                 Ok(Self(agg))
             }
@@ -90,20 +93,35 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
 
             #[inline]
-            pub async fn try_load(
-                query: <#proj_type as ::event_sourcing::Projection>::Query,
+            pub async fn load_multi_simple(
+                queries: Vec<<#proj_type as ::event_sourcing::Projection>::Query>,
                 event_store: &#store_type,
-            ) -> Result<Option<Self>, TryLoadError<#proj_type>> {
+            ) -> Result<Vec<Self>, GetEventsError> {
+                let aggs = ::event_sourcing::Aggregate::load_multi_simple(queries, event_store).await?;
+                Ok(aggs.into_iter().map(Self).collect())
+            }
+
+            #[inline]
+            pub async fn try_load<Q>(
+                query: Q,
+                event_store: &#store_type,
+            ) -> Result<Option<Self>, TryLoadError<#proj_type>>
+            where
+                Q: std::borrow::Borrow<<#proj_type as ::event_sourcing::Projection>::Query> + std::fmt::Debug,
+            {
                 let maybe_agg = ::event_sourcing::Aggregate::try_load(query, event_store).await?;
                 Ok(maybe_agg.map(|agg| Self(agg)))
             }
 
             #[inline]
-            pub async fn load_ext(
-                query: <#proj_type as ::event_sourcing::Projection>::Query,
+            pub async fn load_ext<Q>(
+                query: Q,
                 event_store: &#store_type,
                 opts: LoadOpts,
-            ) -> Result<Self, LoadError<#proj_type>> {
+            ) -> Result<Self, LoadError<#proj_type>>
+            where
+                Q: std::borrow::Borrow<<#proj_type as ::event_sourcing::Projection>::Query> + std::fmt::Debug,
+            {
                 let agg = ::event_sourcing::Aggregate::load_ext(query, event_store, opts).await?;
                 Ok(Self(agg))
             }

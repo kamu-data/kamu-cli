@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{DatasetReferenceMessage, MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE};
-use kamu_task_system::{LogicalPlan, LogicalPlanDeliverWebhook, TaskScheduler};
+use kamu_task_system::TaskScheduler;
 use kamu_webhooks::*;
 use messaging_outbox::*;
 
@@ -32,6 +32,7 @@ use messaging_outbox::*;
 pub struct WebhookDeliveryScheduler {
     task_scheduler: Arc<dyn TaskScheduler>,
     webhook_event_builder: Arc<dyn WebhookEventBuilder>,
+    webhook_task_factory: Arc<dyn WebhookTaskFactory>,
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
 }
 
@@ -88,10 +89,9 @@ impl WebhookDeliveryScheduler {
         let task = self
             .task_scheduler
             .create_task(
-                LogicalPlan::DeliverWebhook(LogicalPlanDeliverWebhook {
-                    webhook_subscription_id: subscription_id.into_inner(),
-                    webhook_event_id: event_id.into_inner(),
-                }),
+                self.webhook_task_factory
+                    .build_delivery_task_plan(subscription_id, event_id)
+                    .await?,
                 None,
             )
             .await

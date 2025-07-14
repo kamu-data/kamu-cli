@@ -91,7 +91,7 @@ impl AccountRepository for PostgresAccountRepository {
         Ok(())
     }
 
-    async fn update_account(&self, updated_account: Account) -> Result<(), UpdateAccountError> {
+    async fn update_account(&self, updated_account: &Account) -> Result<(), UpdateAccountError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -539,7 +539,6 @@ impl PasswordHashRepository for PostgresAccountRepository {
     async fn save_password_hash(
         &self,
         account_id: &odf::AccountID,
-        account_name: &odf::AccountName,
         password_hash: String,
     ) -> Result<(), SavePasswordHashError> {
         let mut tr = self.transaction.lock().await;
@@ -552,12 +551,11 @@ impl PasswordHashRepository for PostgresAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts_passwords (account_name, password_hash, account_id)
-            VALUES ($1, $2, $3)
+            INSERT INTO accounts_passwords (account_id, password_hash)
+            VALUES ($1, $2)
             "#,
-            account_name.as_str(),
-            password_hash,
-            account_id.as_str()
+            account_id.as_str(),
+            password_hash
         )
         .execute(connection_mut)
         .await
@@ -568,7 +566,7 @@ impl PasswordHashRepository for PostgresAccountRepository {
 
     async fn modify_password_hash(
         &self,
-        account_name: &odf::AccountName,
+        account_id: &odf::AccountID,
         password_hash: String,
     ) -> Result<(), ModifyPasswordHashError> {
         let mut tr = self.transaction.lock().await;
@@ -578,10 +576,10 @@ impl PasswordHashRepository for PostgresAccountRepository {
         let update_result = sqlx::query!(
             r#"
             UPDATE accounts_passwords set password_hash=$1
-                where account_name=$2
+                where account_id=$2
             "#,
             password_hash,
-            account_name.to_string()
+            account_id.to_string()
         )
         .execute(connection_mut)
         .await
@@ -589,8 +587,8 @@ impl PasswordHashRepository for PostgresAccountRepository {
 
         if update_result.rows_affected() == 0 {
             return Err(ModifyPasswordHashError::AccountNotFound(
-                AccountNotFoundByNameError {
-                    account_name: account_name.clone(),
+                AccountNotFoundByIdError {
+                    account_id: account_id.clone(),
                 },
             ));
         }
@@ -610,6 +608,7 @@ impl PasswordHashRepository for PostgresAccountRepository {
             r#"
             SELECT password_hash
               FROM accounts_passwords
+              JOIN accounts ON accounts_passwords.account_id = accounts.id
               WHERE lower(account_name) = lower($1)
             "#,
             account_name.to_string(),
@@ -619,39 +618,6 @@ impl PasswordHashRepository for PostgresAccountRepository {
         .int_err()?;
 
         Ok(maybe_password_row.map(|password_row| password_row.password_hash))
-    }
-
-    async fn on_account_renamed(
-        &self,
-        old_account_name: &odf::AccountName,
-        new_account_name: &odf::AccountName,
-    ) -> Result<(), PasswordAccountRenamedError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let update_result = sqlx::query!(
-            r#"
-            UPDATE accounts_passwords
-                SET account_name = $1
-                WHERE lower(account_name) = lower($2)
-            "#,
-            new_account_name.as_str(),
-            old_account_name.as_str(),
-        )
-        .execute(connection_mut)
-        .await
-        .int_err()?;
-
-        if update_result.rows_affected() == 0 {
-            return Err(PasswordAccountRenamedError::AccountNotFound(
-                AccountNotFoundByNameError {
-                    account_name: old_account_name.clone(),
-                },
-            ));
-        }
-
-        Ok(())
     }
 }
 

@@ -11,8 +11,13 @@ use std::sync::Arc;
 
 use dill::Component;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, MockDatasetActionAuthorizer};
-use kamu_accounts::{AccountConfig, DEFAULT_ACCOUNT_NAME_STR, PredefinedAccountsConfig};
-use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_accounts::{
+    AccountConfig,
+    DEFAULT_ACCOUNT_NAME_STR,
+    DidSecretEncryptionConfig,
+    PredefinedAccountsConfig,
+};
+use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
     LoginPasswordAuthProvider,
@@ -294,6 +299,8 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDatasetDependencyRepository>()
         .add::<AccountServiceImpl>()
+        .add::<InMemoryDidSecretKeyRepository>()
+        .add_value(DidSecretEncryptionConfig::sample())
         .add::<InMemoryAccountRepository>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(

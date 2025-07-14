@@ -45,7 +45,7 @@ impl PostgresTaskEventStore {
                 VALUES ($1, $2, 'queued'::task_status_type, NULL)
             "#,
             task_id,
-            maybe_dataset_id.map(ToString::to_string),
+            maybe_dataset_id.as_ref().map(ToString::to_string),
         )
         .execute(connection_mut)
         .await

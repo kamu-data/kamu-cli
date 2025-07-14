@@ -18,6 +18,64 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
 
+## [0.244.1] - 2025-07-11
+### Fixed
+- `AuthPolicyLayer` correctly works for FlightSQL
+
+## [0.244.0] - 2025-07-11
+### Added
+- New configuration property `allow_anonymous` which is true by default. And turnoff anonymous mode for API endpoints.
+
+## [0.243.1] - 2025-07-09
+### Fixed
+- SQLite-specific crashes on account flow listings
+
+## [0.243.0] - 2025-07-07
+### Added
+- GQL: `AccountsMut::create_wallet_accounts()` (#1287).
+- GQL: `CollaborationMut::apply_account_dataset_relations()` (#1287).
+### Changed
+- Major refactoring of flow & task systems:
+  - Fully unplugged the flow and task systems from `kamu-core` and removed all domain-specific couplings.
+  - Flow/task adapters moved into separate crates and adapters split by target domain for improved modularity.
+  - Task runners and planners isolated from the main task system; extracted and decoupled services for clearer interfaces.
+  - Decoupled `FlowOutcome` from direct error details; error details now accessed from associated tasks.
+  - Removed duplicate `FlowResult` hierarchy, standardized on propagating `TaskResult`.
+  - Refactored `TaskResult` and `TaskError` types for improved clarity and maintainability.
+  - Introduced flow-type specific dispatchers responsible for creating logical plans of tasks and propagating dependent flows.
+  - Replaced flow keys with flow bindings without hard-coded flow types for triggers, configs, and flows
+  - External data changes are now handled by an ingest dispatcher instead of the flow agent.
+  - Reduced boilerplate in `LogicalPlan`, `TaskDefinition`, `TaskResult`, and `TaskError` using macros.
+  - Extracted `FlowRunService` from `FlowQueryService` for clearer separation of responsibilities.
+- Improvements in event sourcing aggregates:
+  - Optimized event sourcing aggregate loading by supporting loading via reference.
+  - Simplified aggregate multi-load functions for improved efficiency.
+
+## [0.242.1] - 2025-06-19
+### Fixed
+- `PredefinedAccountsRegistrator`: during account synchronization, update password hash as well.
+
+## [0.242.0] - 2025-06-17
+### Added
+- `kamu system api-server gql-query`: support for authorization and, as a result, mutation requests (#1273).
+- GQL: `AccountMut::modifyPasswordWithConfirmation()`: for user's password change (#1277).
+- `UIConfiguration`: added `min_new_password_length` parameter (#1277).
+### Changed
+- Panic's now also logs a correct tracing message.
+- `kamu`: improved logging, especially in failure cases (#1273).
+- `kamu --account <NAME>`: added checks for account existence (multi-tenant mode) (#1273).
+- `kamu init`: flush database after successful command completion (#1273).
+- Upgraded to `datafusion v48`
+- Configuration, predefined accounts: `password` field is now mandatory (#1277).
+- `kamu`: a start-up job by `PredefinedAccountsRegistrator` will be called earlier, right after creating
+  `base_catalog` (#1277).
+### Fixed
+- `CreateAccountUseCaseImpl`: added sending `AccountLifecycleMessage`.
+- Renaming `provider_identity_key` field with account name for password accounts.
+- User in single-tenant mode now has administrator privileges (#1273).
+- `DeleteAccountUseCaseImpl`: complete deletion of datasets, not just database entries (#1273).
+- `kamu system api-server gql-query`: authorization based on the current subject (#1273).
+
 ## [0.241.1] - 2025-06-06
 ### Fixed
 - Account name in password hashes table should be updated as well during a rename

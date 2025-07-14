@@ -7,28 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::vec;
 
 use dill::Catalog;
-use kamu_auth_rebac::{
-    DatasetPropertyName,
-    DeleteEntitiesRelationError,
-    DeleteEntityPropertiesError,
-    DeleteEntityPropertyError,
-    DeleteSubjectEntitiesObjectEntityRelationsError,
-    EntitiesWithRelation,
-    Entity,
-    EntityType,
-    EntityWithRelation,
-    InsertEntitiesRelationError,
-    PropertyName,
-    RebacRepository,
-    RebacRepositoryExt,
-    Relation,
-};
+use kamu_auth_rebac::*;
+use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -314,96 +300,327 @@ pub async fn test_delete_entity_properties(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_try_insert_duplicate_entities_relation(catalog: &Catalog) {
+pub async fn test_upsert_entities_relations(catalog: &Catalog) {
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
-    let account = Entity::new_account("kamu");
-    let dataset = Entity::new_account("dataset");
+    let account_1 = Entity::new_account("account1");
+    let account_2 = Entity::new_account("account2");
+
+    let dataset_1 = Entity::new_dataset("dataset1");
+    let dataset_2 = Entity::new_dataset("dataset2");
+    let dataset_3 = Entity::new_dataset("dataset3");
+
     let reader = Relation::account_is_a_dataset_reader();
-
-    assert_matches!(
-        rebac_repo
-            .insert_entities_relation(&account, reader, &dataset)
-            .await,
-        Ok(())
-    );
-    assert_matches!(
-        rebac_repo
-            .insert_entities_relation(&account, reader, &dataset)
-            .await,
-        Err(InsertEntitiesRelationError::SomeRoleIsAlreadyPresent(e))
-            if e.subject_entity == account
-                && e.object_entity == dataset
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_try_insert_another_entities_relation(catalog: &Catalog) {
-    let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
-
-    let account = Entity::new_account("kamu");
-    let dataset = Entity::new_account("dataset");
-    let reader = Relation::account_is_a_dataset_reader();
-
-    assert_matches!(
-        rebac_repo
-            .insert_entities_relation(&account, reader, &dataset)
-            .await,
-        Ok(())
-    );
-
     let editor = Relation::account_is_a_dataset_editor();
 
-    assert_matches!(
-        rebac_repo
-            .insert_entities_relation(&account, editor, &dataset)
-            .await,
-        Err(InsertEntitiesRelationError::SomeRoleIsAlreadyPresent(e))
-            if e.subject_entity == account
-                && e.object_entity == dataset
-    );
+    // Initial
+    let account_1_initial_state = CrossoverTestState {
+        account_id: "account1",
+        dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+        relation_map: HashMap::from([(
+            Relation::account_is_a_dataset_reader(),
+            ["dataset1", "dataset2"].into(),
+        )]),
+    };
+    let account_2_initial_state = CrossoverTestState {
+        account_id: "account2",
+        dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+        relation_map: HashMap::from([
+            (Relation::account_is_a_dataset_reader(), ["dataset1"].into()),
+            (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
+        ]),
+    };
+
+    {
+        assert_matches!(
+            rebac_repo
+                .upsert_entities_relations(&[
+                    // Account1
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_2),
+                    },
+                    // Account2
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        relationship: editor,
+                        object_entity: Cow::Borrowed(&dataset_3),
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations("1.", &rebac_repo, &account_1_initial_state).await;
+        assert_get_relations("2.", &rebac_repo, &account_2_initial_state).await;
+    }
+
+    // Same operations (idempotence)
+    {
+        assert_matches!(
+            rebac_repo
+                .upsert_entities_relations(&[
+                    // Account1
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_2),
+                    },
+                    // Account2
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        relationship: editor,
+                        object_entity: Cow::Borrowed(&dataset_3),
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations("3.", &rebac_repo, &account_1_initial_state).await;
+        assert_get_relations("4.", &rebac_repo, &account_2_initial_state).await;
+    }
+
+    // Mix of adding and updating
+    {
+        assert_matches!(
+            rebac_repo
+                .upsert_entities_relations(&[
+                    // Account1
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: editor, // updating (from reader)
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: editor,
+                        object_entity: Cow::Borrowed(&dataset_3), // adding
+                    },
+                    // Account2
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_2), // adding
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        relationship: reader, // updating (from editor)
+                        object_entity: Cow::Borrowed(&dataset_3),
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations(
+            "5.",
+            &rebac_repo,
+            &CrossoverTestState {
+                account_id: "account1",
+                dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+                relation_map: HashMap::from([
+                    (Relation::account_is_a_dataset_reader(), ["dataset2"].into()),
+                    (
+                        Relation::account_is_a_dataset_editor(),
+                        ["dataset1", "dataset3"].into(),
+                    ),
+                ]),
+            },
+        )
+        .await;
+        assert_get_relations(
+            "6.",
+            &rebac_repo,
+            &CrossoverTestState {
+                account_id: "account2",
+                dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+                relation_map: HashMap::from([(
+                    Relation::account_is_a_dataset_reader(),
+                    ["dataset1", "dataset2", "dataset3"].into(),
+                )]),
+            },
+        )
+        .await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_delete_entities_relation(catalog: &Catalog) {
+pub async fn test_delete_entities_relations(catalog: &Catalog) {
     let rebac_repo = catalog.get_one::<dyn RebacRepository>().unwrap();
 
-    let account = Entity::new_account("kamu");
-    let dataset = Entity::new_dataset("dataset");
-    let relationship = Relation::account_is_a_dataset_reader();
+    let account_1 = Entity::new_account("account1");
+    let account_2 = Entity::new_account("account2");
 
-    assert_matches!(
-        rebac_repo
-            .delete_entities_relation(&account, &dataset)
-            .await,
-        Err(DeleteEntitiesRelationError::NotFound(e))
-            if e.subject_entity == account
-                && e.object_entity == dataset
-    );
+    let dataset_1 = Entity::new_dataset("dataset1");
+    let dataset_2 = Entity::new_dataset("dataset2");
+    let dataset_3 = Entity::new_dataset("dataset3");
 
-    assert_matches!(
-        rebac_repo
-            .insert_entities_relation(&account, relationship, &dataset)
-            .await,
-        Ok(())
-    );
+    let reader = Relation::account_is_a_dataset_reader();
+    let editor = Relation::account_is_a_dataset_editor();
 
-    assert_matches!(
-        rebac_repo
-            .delete_entities_relation(&account, &dataset)
-            .await,
-        Ok(())
-    );
-    assert_matches!(
-        rebac_repo
-            .delete_entities_relation(&account, &dataset)
-            .await,
-        Err(DeleteEntitiesRelationError::NotFound(e))
-            if e.subject_entity == account
-                && e.object_entity == dataset
-    );
+    // Initial
+    {
+        assert_matches!(
+            rebac_repo
+                .upsert_entities_relations(&[
+                    // Account1
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_2),
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        relationship: editor,
+                        object_entity: Cow::Borrowed(&dataset_3),
+                    },
+                    // Account2
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        relationship: reader,
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        relationship: editor,
+                        object_entity: Cow::Borrowed(&dataset_3),
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations(
+            "1.",
+            &rebac_repo,
+            &CrossoverTestState {
+                account_id: "account1",
+                dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+                relation_map: HashMap::from([
+                    (
+                        Relation::account_is_a_dataset_reader(),
+                        ["dataset1", "dataset2"].into(),
+                    ),
+                    (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
+                ]),
+            },
+        )
+        .await;
+        assert_get_relations(
+            "2.",
+            &rebac_repo,
+            &CrossoverTestState {
+                account_id: "account2",
+                dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+                relation_map: HashMap::from([
+                    (Relation::account_is_a_dataset_reader(), ["dataset1"].into()),
+                    (Relation::account_is_a_dataset_editor(), ["dataset3"].into()),
+                ]),
+            },
+        )
+        .await;
+    }
+
+    // Partial deletion
+    let account_1_after_deletion_state = CrossoverTestState {
+        account_id: "account1",
+        dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+        relation_map: HashMap::from([(
+            Relation::account_is_a_dataset_editor(),
+            ["dataset3"].into(),
+        )]),
+    };
+    let account_2_after_deletion_state = CrossoverTestState {
+        account_id: "account2",
+        dataset_ids_for_check: vec!["dataset1", "dataset2", "dataset3"],
+        relation_map: HashMap::from([(
+            Relation::account_is_a_dataset_editor(),
+            ["dataset3"].into(),
+        )]),
+    };
+
+    {
+        assert_matches!(
+            rebac_repo
+                .delete_entities_relations(&[
+                    // Account1
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        object_entity: Cow::Borrowed(&dataset_2),
+                    },
+                    // Account2
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations("3.", &rebac_repo, &account_1_after_deletion_state).await;
+        assert_get_relations("4.", &rebac_repo, &account_2_after_deletion_state).await;
+    }
+
+    // Same operations (idempotence)
+    {
+        assert_matches!(
+            rebac_repo
+                .delete_entities_relations(&[
+                    // Account1
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_1),
+                        object_entity: Cow::Borrowed(&dataset_2),
+                    },
+                    // Account2
+                    DeleteEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account_2),
+                        object_entity: Cow::Borrowed(&dataset_1),
+                    },
+                ])
+                .await,
+            Ok(_)
+        );
+
+        assert_get_relations("5.", &rebac_repo, &account_1_after_deletion_state).await;
+        assert_get_relations("6.", &rebac_repo, &account_2_after_deletion_state).await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -427,19 +644,25 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
     {
         let account = Entity::new_account(state.account_id);
+        let operations = state
+            .relation_map
+            .iter()
+            .flat_map(|(relation, dataset_ids)| {
+                dataset_ids.iter().map(|dataset_id| {
+                    let dataset = Entity::new_dataset(*dataset_id);
+                    UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(&account),
+                        relationship: *relation,
+                        object_entity: Cow::Owned(dataset),
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
 
-        for (relation, dataset_ids) in &state.relation_map {
-            for dataset_id in dataset_ids {
-                let dataset = Entity::new_dataset(*dataset_id);
-
-                assert_matches!(
-                    rebac_repo
-                        .insert_entities_relation(&account, *relation, &dataset)
-                        .await,
-                    Ok(_)
-                );
-            }
-        }
+        assert_matches!(
+            rebac_repo.upsert_entities_relations(&operations).await,
+            Ok(_)
+        );
     }
 
     // 2. Validate inserted
@@ -454,7 +677,10 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
         assert_matches!(
             rebac_repo
-                .delete_entities_relation(&account, &dataset1)
+                .delete_entities_relations(&[DeleteEntitiesRelationOperation {
+                    subject_entity: Cow::Owned(account),
+                    object_entity: Cow::Owned(dataset1)
+                }])
                 .await,
             Ok(())
         );
@@ -476,7 +702,10 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
         assert_matches!(
             rebac_repo
-                .delete_entities_relation(&account, &dataset2)
+                .delete_entities_relations(&[DeleteEntitiesRelationOperation {
+                    subject_entity: Cow::Owned(account),
+                    object_entity: Cow::Owned(dataset2)
+                }])
                 .await,
             Ok(())
         );
@@ -498,7 +727,10 @@ pub async fn test_get_relations_crossover_test(catalog: &Catalog) {
 
         assert_matches!(
             rebac_repo
-                .delete_entities_relation(&account, &dataset3)
+                .delete_entities_relations(&[DeleteEntitiesRelationOperation {
+                    subject_entity: Cow::Owned(account),
+                    object_entity: Cow::Owned(dataset3)
+                }])
                 .await,
             Ok(())
         );
@@ -538,7 +770,11 @@ pub async fn test_delete_subject_entities_object_entity_relations(catalog: &Cata
         ] {
             assert_matches!(
                 rebac_repo
-                    .insert_entities_relation(account, relationship, dataset)
+                    .upsert_entities_relations(&[UpsertEntitiesRelationOperation {
+                        subject_entity: Cow::Borrowed(account),
+                        relationship,
+                        object_entity: Cow::Borrowed(dataset),
+                    }])
                     .await,
                 Ok(())
             );
@@ -639,7 +875,11 @@ pub async fn test_get_object_entity_relations_matrix(catalog: &Catalog) {
     ] {
         assert_matches!(
             rebac_repo
-                .insert_entities_relation(account, relationship, dataset)
+                .upsert_entities_relations(&[UpsertEntitiesRelationOperation {
+                    subject_entity: Cow::Borrowed(account),
+                    relationship,
+                    object_entity: Cow::Borrowed(dataset),
+                }])
                 .await,
             Ok(())
         );

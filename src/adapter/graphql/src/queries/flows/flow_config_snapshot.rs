@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_adapter_flow_dataset::{FlowConfigRuleCompact, FlowConfigRuleIngest, FlowConfigRuleReset};
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
@@ -29,23 +30,37 @@ pub struct FlowConfigurationCompactionRule {
 
 impl From<fs::FlowConfigurationRule> for FlowConfigurationSnapshot {
     fn from(value: fs::FlowConfigurationRule) -> Self {
-        match value {
-            fs::FlowConfigurationRule::IngestRule(ingest_rule) => Self::Ingest(ingest_rule.into()),
-            fs::FlowConfigurationRule::ResetRule(reset_rule) => Self::Reset(reset_rule.into()),
-            fs::FlowConfigurationRule::CompactionRule(compaction_rule) => {
-                Self::Compaction(FlowConfigurationCompactionRule {
-                    compaction_rule: match compaction_rule {
-                        fs::CompactionRule::Full(compaction_full_rule) => {
-                            FlowConfigurationCompaction::Full(compaction_full_rule.into())
-                        }
-                        fs::CompactionRule::MetadataOnly(compaction_metadata_only_rule) => {
-                            FlowConfigurationCompaction::MetadataOnly(
-                                compaction_metadata_only_rule.into(),
-                            )
-                        }
+        match value.rule_type.as_str() {
+            FlowConfigRuleIngest::TYPE_ID => {
+                let ingest_rule = FlowConfigRuleIngest::from_flow_config(&value).unwrap();
+                Self::Ingest(ingest_rule.into())
+            }
+
+            FlowConfigRuleReset::TYPE_ID => {
+                let reset_rule = FlowConfigRuleReset::from_flow_config(&value).unwrap();
+                Self::Reset(reset_rule.into())
+            }
+
+            FlowConfigRuleCompact::TYPE_ID => {
+                let compaction_rule = FlowConfigRuleCompact::from_flow_config(&value).unwrap();
+                Self::Compaction(match compaction_rule {
+                    FlowConfigRuleCompact::Full(full_rule) => FlowConfigurationCompactionRule {
+                        compaction_rule: FlowConfigurationCompaction::Full(full_rule.into()),
                     },
+                    FlowConfigRuleCompact::MetadataOnly { recursive } => {
+                        FlowConfigurationCompactionRule {
+                            compaction_rule: FlowConfigurationCompaction::MetadataOnly(
+                                CompactionMetadataOnly { recursive },
+                            ),
+                        }
+                    }
                 })
             }
+
+            _ => panic!(
+                "Unsupported flow configuration rule type: {}",
+                value.rule_type
+            ),
         }
     }
 }

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -292,7 +293,7 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
 
     async fn get_multiple_entries(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
         let mut cached_entries = Vec::with_capacity(dataset_ids.len());
         let mut missing_ids = Vec::with_capacity(dataset_ids.len());
@@ -479,9 +480,9 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError> {
-        let entries_resolution = self.get_multiple_entries(&dataset_ids).await.int_err()?;
+        let entries_resolution = self.get_multiple_entries(dataset_ids).await.int_err()?;
 
         let resolved_handles = self.entries_as_handles(&entries_resolution.resolved_entries);
 

@@ -28,10 +28,9 @@ use crate::LoginPasswordAuthProvider;
 pub struct PredefinedAccountsRegistrator {
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
-    account_repository: Arc<dyn AccountRepository>,
+    account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<DefaultAccountProperties>,
-    password_hash_repository: Arc<dyn PasswordHashRepository>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
 }
 
@@ -46,19 +45,17 @@ impl PredefinedAccountsRegistrator {
     pub fn new(
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         login_password_auth_provider: Arc<LoginPasswordAuthProvider>,
-        account_repository: Arc<dyn AccountRepository>,
+        account_service: Arc<dyn AccountService>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<DefaultAccountProperties>,
-        password_hash_repository: Arc<dyn PasswordHashRepository>,
         outbox: Arc<dyn messaging_outbox::Outbox>,
     ) -> Self {
         Self {
             predefined_accounts_config,
             login_password_auth_provider,
-            account_repository,
+            account_service,
             rebac_service,
             default_account_properties,
-            password_hash_repository,
             outbox,
         }
     }
@@ -96,14 +93,14 @@ impl PredefinedAccountsRegistrator {
     ) -> Result<(), InternalError> {
         let account = account_config.into();
 
-        self.account_repository
+        self.account_service
             .save_account(&account)
             .await
             .int_err()?;
 
         if account_config.provider == <&'static str>::from(AccountProvider::Password) {
             self.login_password_auth_provider
-                .save_password(&account, account_config.get_password())
+                .save_password(&account, &account_config.password)
                 .await?;
         }
 
@@ -120,16 +117,35 @@ impl PredefinedAccountsRegistrator {
             ..account_config.into()
         };
 
+        if account_config.provider == <&'static str>::from(AccountProvider::Password) {
+            use VerifyPasswordError as E;
+
+            let has_password_changed = match self
+                .account_service
+                .verify_account_password(&updated_account.account_name, &account_config.password)
+                .await
+            {
+                Ok(_) => Ok(false),
+                Err(E::IncorrectPassword(_)) => Ok(true),
+                Err(e @ (E::AccountNotFound(_) | E::Internal(_))) => Err(e.int_err()),
+            }?;
+
+            if has_password_changed {
+                self.account_service
+                    .modify_account_password(&updated_account.id, &account_config.password)
+                    .await
+                    .int_err()?;
+            }
+        }
+
         if account != updated_account {
             tracing::info!(
-                "Updating modified predefined account: old: {:?}, new: {:?}",
-                account,
-                updated_account
+                "Updating modified predefined account: old: {account:?}, new: {updated_account:?}",
             );
             let new_account_name = updated_account.account_name.clone();
 
-            self.account_repository
-                .update_account(updated_account)
+            self.account_service
+                .update_account(&updated_account)
                 .await
                 .int_err()?;
 
@@ -140,12 +156,6 @@ impl PredefinedAccountsRegistrator {
                     account.account_name,
                     new_account_name
                 );
-
-                // Update account name in the password hash repository
-                self.password_hash_repository
-                    .on_account_renamed(&account.account_name, &new_account_name)
-                    .await
-                    .int_err()?;
 
                 self.outbox
                     .post_message(
@@ -197,7 +207,7 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
 
         for account_config in account_config_by_id.values() {
             let account_id = account_config.get_id();
-            match self.account_repository.get_account_by_id(&account_id).await {
+            match self.account_service.get_account_by_id(&account_id).await {
                 Ok(account) => {
                     self.compare_and_update_account(account, account_config)
                         .await?;

@@ -11,6 +11,7 @@ use dill::*;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 
+use crate::accounts::CurrentAccountIndication;
 use crate::cli::SystemApiServerSubCommand;
 use crate::commands::*;
 use crate::{WorkspaceService, accounts, cli, odf_server};
@@ -21,6 +22,7 @@ pub fn get_command(
     base_catalog: &Catalog,
     cli_catalog: &Catalog,
     args: cli::Cli,
+    current_account_indication: CurrentAccountIndication,
 ) -> Result<Box<dyn TypedBuilder<dyn Command>>, CLIError> {
     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
     let tenancy_config = if workspace_svc.is_multi_tenant_workspace() {
@@ -125,7 +127,7 @@ pub fn get_command(
 
         cli::Command::List(c) => Box::new(
             ListCommand::builder(
-                accounts::AccountService::current_account_indication(args.account, tenancy_config),
+                current_account_indication,
                 accounts::AccountService::related_account_indication(
                     c.target_account,
                     c.all_accounts,
@@ -363,7 +365,7 @@ pub fn get_command(
                     .cast(),
                 ),
                 Some(cli::SystemApiServerSubCommand::GqlQuery(ssc)) => Box::new(
-                    APIServerGqlQueryCommand::builder(base_catalog.clone(), ssc.query, ssc.full)
+                    APIServerGqlQueryCommand::builder(cli_catalog.clone(), ssc.query, ssc.full)
                         .cast(),
                 ),
                 Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => {
@@ -459,7 +461,12 @@ pub fn get_command(
 pub fn command_needs_transaction(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
-            cli::SystemSubCommand::ApiServer(_) => false,
+            cli::SystemSubCommand::ApiServer(sas) => {
+                matches!(
+                    &sas.subcommand,
+                    Some(SystemApiServerSubCommand::GqlQuery(_))
+                )
+            }
             _ => true,
         },
         cli::Command::Ui(_) | cli::Command::Login(_) => false,
@@ -527,14 +534,18 @@ pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
         return true;
     }
 
-    if let cli::Command::Complete(_) = &args.command {
-        return true;
+    match &args.command {
+        cli::Command::Complete(_) => true,
+        cli::Command::Init(c) if !c.pull_images => {
+            // NOTE: When initializing, we need to run initialization at least to create
+            //       user accounts.
+            true
+        }
+        _ => false,
     }
-
-    false
 }
 
-#[allow(clippy::match_like_matches_macro)]
+#[expect(clippy::match_like_matches_macro)]
 pub fn command_needs_server_components(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {

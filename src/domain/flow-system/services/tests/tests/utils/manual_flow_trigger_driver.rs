@@ -13,7 +13,7 @@ use chrono::{DateTime, Duration, Utc};
 use database_common_macros::transactional_method1;
 use dill::Catalog;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
-use kamu_flow_system::{FlowConfigurationRule, FlowKey, FlowQueryService, RequestFlowError};
+use kamu_flow_system::{FlowBinding, FlowConfigurationRule, FlowRunService, RunFlowError};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +25,7 @@ pub(crate) struct ManualFlowTriggerDriver {
 }
 
 pub(crate) struct ManualFlowTriggerArgs {
-    pub(crate) flow_key: FlowKey,
+    pub(crate) flow_binding: FlowBinding,
     pub(crate) run_since_start: Duration,
     pub(crate) initiator_id: Option<odf::AccountID>,
     pub(crate) flow_configuration_snapshot_maybe: Option<FlowConfigurationRule>,
@@ -52,15 +52,15 @@ impl ManualFlowTriggerDriver {
         self.send_trigger_manual_flow(start_time).await.unwrap();
     }
 
-    #[transactional_method1(flow_query_service: Arc<dyn FlowQueryService>)]
+    #[transactional_method1(flow_run_service: Arc<dyn FlowRunService>)]
     async fn send_trigger_manual_flow(
         &self,
         start_time: DateTime<Utc>,
-    ) -> Result<(), RequestFlowError> {
-        flow_query_service
-            .trigger_manual_flow(
+    ) -> Result<(), RunFlowError> {
+        flow_run_service
+            .run_flow_manually(
                 start_time + self.args.run_since_start,
-                self.args.flow_key.clone(),
+                &self.args.flow_binding,
                 self.args
                     .initiator_id
                     .clone()

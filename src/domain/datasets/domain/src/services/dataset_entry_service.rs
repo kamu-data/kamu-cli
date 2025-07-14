@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
@@ -34,7 +36,7 @@ pub trait DatasetEntryService: Sync + Send {
 
     async fn get_multiple_entries(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError>;
 }
 

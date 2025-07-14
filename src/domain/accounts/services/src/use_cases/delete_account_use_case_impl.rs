@@ -18,7 +18,7 @@ use crate::utils;
 #[dill::component]
 #[dill::interface(dyn DeleteAccountUseCase)]
 pub struct DeleteAccountUseCaseImpl {
-    account_authorization_helper: Arc<utils::AccountAuthorizationHelper>,
+    account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
 }

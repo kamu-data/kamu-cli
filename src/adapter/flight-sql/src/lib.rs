@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod auth_layer;
+mod auth_policy_layer;
 mod service;
 mod service_wrapper;
 mod session_auth;
@@ -20,6 +21,7 @@ pub mod sql_info;
 mod types;
 
 pub use auth_layer::*;
+pub use auth_policy_layer::*;
 pub use service::*;
 pub use service_wrapper::*;
 pub use session_auth::*;

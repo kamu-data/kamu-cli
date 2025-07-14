@@ -16,6 +16,7 @@ mod test_export_command;
 mod test_ingest_command;
 mod test_init_command;
 mod test_inspect_command;
+mod test_list_command;
 mod test_log_command;
 mod test_login_command;
 mod test_new_command;

@@ -18,7 +18,42 @@ use crate::{KamuApiServerClient, api_server_e2e_test};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default, PartialEq)]
+pub const MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      auth:
+        users:
+          predefined:
+            - accountName: kamu
+              password: kamu.dev
+              email: kamu@example.com
+              properties: [ admin ]
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const MULTITENANT_KAMU_CONFIG_WITH_RESTRICTED_ANONYMOUS: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      auth:
+        allowAnonymous: false
+        users:
+          predefined:
+            - accountName: kamu
+              password: kamu.dev
+              email: kamu@example.com
+              properties: [ admin ]
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default, PartialEq)]
 enum PotentialWorkspace {
     NoWorkspace,
     #[default]
@@ -28,7 +63,7 @@ enum PotentialWorkspace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct KamuCliApiServerHarnessOptions {
     potential_workspace: PotentialWorkspace,
     env_vars: Vec<(String, String)>,

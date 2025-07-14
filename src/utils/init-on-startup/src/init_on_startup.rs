@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use database_common::DatabaseTransactionRunner;
 use dill::{Builder, BuilderExt, Catalog, TypecastBuilder};
@@ -16,6 +16,10 @@ use petgraph::algo::toposort;
 use petgraph::graph::NodeIndex;
 use petgraph::stable_graph::StableDiGraph;
 use thiserror::Error;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type JobName = &'static str;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,8 +34,8 @@ pub trait InitOnStartup: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct InitOnStartupMeta {
-    pub job_name: &'static str,
-    pub depends_on: &'static [&'static str],
+    pub job_name: JobName,
+    pub depends_on: &'static [JobName],
     pub requires_transaction: bool,
 }
 
@@ -55,26 +59,56 @@ pub enum StartupJobsError {
 #[derive(Error, Debug)]
 #[error("Startup job name '{job_name}' is not unique")]
 pub struct StartupJobsNonUniqueNameError {
-    pub job_name: &'static str,
+    pub job_name: JobName,
 }
 
 #[derive(Error, Debug)]
 #[error("Startup job name '{job_name}' depends on unresolved job'{unresolved_depends_on}'")]
 pub struct StartupJobsDependsOnUnresolvedError {
-    pub job_name: &'static str,
-    pub unresolved_depends_on: &'static str,
+    pub job_name: JobName,
+    pub unresolved_depends_on: JobName,
 }
 
 #[derive(Error, Debug)]
 #[error("Startup job name '{job_name}' forms a dependency loop on itself")]
 pub struct StartupJobsDependsOnLoopError {
-    pub job_name: &'static str,
+    pub job_name: JobName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(bon::Builder, Default)]
+pub struct RunStartupJobsOptions {
+    pub job_selector: Option<JobSelector>,
+}
+
+#[derive(Debug)]
+pub enum JobSelector {
+    AllOf(HashSet<JobName>),
+    NoneOf(HashSet<JobName>),
+}
+
+impl JobSelector {
+    pub fn matches(&self, job_name: JobName) -> bool {
+        match self {
+            Self::AllOf(required) => required.contains(job_name),
+            Self::NoneOf(forbidden) => !forbidden.contains(job_name),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError> {
+    run_startup_jobs_ex(catalog, RunStartupJobsOptions::default()).await
+}
+
+#[tracing::instrument(level = "debug", skip_all)]
+pub async fn run_startup_jobs_ex(
+    catalog: &Catalog,
+    options: RunStartupJobsOptions,
+) -> Result<(), StartupJobsError> {
     let job_builders_by_name = {
         let mut job_builders_by_name = HashMap::new();
 
@@ -97,6 +131,17 @@ pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError>
     };
     tracing::debug!("Defined {} startup jobs", job_builders_by_name.len());
 
+    if let Some(job_selector) = &options.job_selector {
+        match job_selector {
+            JobSelector::AllOf(required) => {
+                tracing::debug!("Selecting startup jobs: {:?}", required);
+            }
+            JobSelector::NoneOf(forbidden) => {
+                tracing::debug!("Skipping startup jobs: {:?}", forbidden);
+            }
+        }
+    }
+
     check_startup_job_dependencies(&job_builders_by_name)?;
     tracing::debug!("Startup job dependencies checked");
 
@@ -104,6 +149,12 @@ pub async fn run_startup_jobs(catalog: &Catalog) -> Result<(), StartupJobsError>
     tracing::debug!("Topological order of startup jobs: {topological_order:?}");
 
     for job_name in topological_order {
+        if let Some(job_selector) = &options.job_selector {
+            if !job_selector.matches(job_name) {
+                continue;
+            }
+        }
+
         let (job_builder, job_metadata) = job_builders_by_name
             .get(job_name)
             .expect("Job builder must be present");

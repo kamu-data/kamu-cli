@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{FlowConfigurationService, FlowKeyDataset};
+use kamu_flow_system::{FlowBinding, FlowConfigurationService};
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
@@ -35,15 +35,14 @@ impl<'a> DatasetFlowConfigs<'a> {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
     ) -> Result<Option<FlowConfiguration>> {
+        let flow_binding = FlowBinding::for_dataset(
+            self.dataset_request_state.dataset_handle().id.clone(),
+            map_dataset_flow_type(dataset_flow_type),
+        );
+
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);
         let maybe_flow_config = flow_config_service
-            .find_configuration(
-                FlowKeyDataset::new(
-                    self.dataset_request_state.dataset_handle().id.clone(),
-                    dataset_flow_type.into(),
-                )
-                .into(),
-            )
+            .find_configuration(&flow_binding)
             .await
             .int_err()?;
 

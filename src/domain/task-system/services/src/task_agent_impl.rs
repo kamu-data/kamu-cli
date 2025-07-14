@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, PaginationOpts};
+use database_common::PaginationOpts;
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -17,15 +17,6 @@ use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct TaskAgentImpl {
-    catalog: Catalog,
-    task_runner: Arc<dyn TaskRunner>,
-    time_source: Arc<dyn SystemTimeSource>,
-    agent_config: Arc<TaskAgentConfig>,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,19 +29,53 @@ pub struct TaskAgentImpl {
     requires_transaction: false,
 })]
 #[scope(Singleton)]
+pub struct TaskAgentImpl {
+    catalog: Catalog,
+    time_source: Arc<dyn SystemTimeSource>,
+    agent_config: Arc<TaskAgentConfig>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl TaskAgentImpl {
-    pub fn new(
-        catalog: Catalog,
-        task_runner: Arc<dyn TaskRunner>,
-        time_source: Arc<dyn SystemTimeSource>,
-        agent_config: Arc<TaskAgentConfig>,
-    ) -> Self {
-        Self {
-            catalog,
-            task_runner,
-            time_source,
-            agent_config,
-        }
+    fn get_task_planner_for(
+        &self,
+        plan: &LogicalPlan,
+    ) -> Result<Arc<dyn TaskDefinitionPlanner>, InternalError> {
+        self.catalog
+            .builders_for_with_meta::<dyn TaskDefinitionPlanner, _>(
+                |meta: &TaskDefinitionPlannerMeta| meta.logic_plan_type == plan.plan_type.as_str(),
+            )
+            .next()
+            .map(|builder| builder.get(&self.catalog))
+            .transpose()
+            .int_err()?
+            .ok_or_else(|| {
+                InternalError::new(format!(
+                    "Task definition planner for type '{}' not found",
+                    plan.plan_type
+                ))
+            })
+    }
+
+    fn get_task_runner_for(
+        &self,
+        task_definition: &TaskDefinition,
+    ) -> Result<Arc<dyn TaskRunner>, InternalError> {
+        self.catalog
+            .builders_for_with_meta::<dyn TaskRunner, _>(|meta: &TaskRunnerMeta| {
+                meta.task_type == task_definition.task_type()
+            })
+            .next()
+            .map(|builder| builder.get(&self.catalog))
+            .transpose()
+            .int_err()?
+            .ok_or_else(|| {
+                InternalError::new(format!(
+                    "Task runner for type '{}' not found",
+                    task_definition.task_type()
+                ))
+            })
     }
 
     async fn run_task_iteration(&self) -> Result<(), InternalError> {
@@ -92,16 +117,14 @@ impl TaskAgentImpl {
                 .await?;
             let batch_size = running_task_ids.len();
 
-            let tasks = Task::load_multi(running_task_ids, task_event_store.as_ref())
+            let tasks = Task::load_multi_simple(running_task_ids, task_event_store.as_ref())
                 .await
                 .int_err()?;
 
-            for task in tasks {
-                let mut t = task.int_err()?;
-
+            for mut task in tasks {
                 // Requeue
-                t.requeue(self.time_source.now()).int_err()?;
-                t.save(task_event_store.as_ref()).await.int_err()?;
+                task.requeue(self.time_source.now()).int_err()?;
+                task.save(task_event_store.as_ref()).await.int_err()?;
             }
 
             processed_running_tasks += batch_size;
@@ -154,15 +177,10 @@ impl TaskAgentImpl {
             "Preparing task to run",
         );
 
-        // Prepare task definition (requires transaction)
-        let task_definition = match DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                |task_definition_planner: Arc<dyn TaskDefinitionPlanner>| async move {
-                    task_definition_planner
-                        .prepare_task_definition(task.task_id, &task.logical_plan)
-                        .await
-                },
-            )
+        // Find a planner and build a task definition
+        let task_planner = self.get_task_planner_for(&task.logical_plan)?;
+        let task_definition = match task_planner
+            .prepare_task_definition(task.task_id, &task.logical_plan)
             .await
         {
             Ok(task_definition) => task_definition,
@@ -173,12 +191,13 @@ impl TaskAgentImpl {
                     error_msg = %e,
                     "Task definition preparation failed"
                 );
-                return Ok(TaskOutcome::Failed(TaskError::Empty));
+                return Ok(TaskOutcome::Failed(TaskError::empty()));
             }
         };
 
-        // Run task via definition
-        let task_run_result = self.task_runner.run_task(task_definition).await;
+        // Find a runner and run task via definition
+        let task_runner = self.get_task_runner_for(&task_definition)?;
+        let task_run_result = task_runner.run_task(task_definition).await;
 
         // Deal with errors: we should not interrupt the main loop if task fails
         let task_outcome = match task_run_result {
@@ -191,7 +210,7 @@ impl TaskAgentImpl {
                     error_msg = %e,
                     "Task run failed"
                 );
-                TaskOutcome::Failed(TaskError::Empty)
+                TaskOutcome::Failed(TaskError::empty())
             }
         };
 

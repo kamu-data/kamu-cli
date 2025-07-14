@@ -7,12 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{CreateAccessTokenError, RevokeTokenError};
-
 use crate::mutations::AuthWeb3Mut;
 use crate::prelude::*;
-use crate::queries::{Account, CreateAccessTokenResultSuccess, CreatedAccessToken};
-use crate::utils::{check_access_token_valid, check_logged_account_id_match};
+use crate::queries::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,61 +54,6 @@ impl AuthMut {
             Err(e) => Err(e.into()),
         }
     }
-
-    #[tracing::instrument(level = "info", name = AuthMut_create_access_token, skip_all, fields(%account_id))]
-    async fn create_access_token(
-        &self,
-        ctx: &Context<'_>,
-        account_id: AccountID<'static>,
-        token_name: String,
-    ) -> Result<CreateTokenResult> {
-        check_logged_account_id_match(ctx, &account_id)?;
-
-        let access_token_service = from_catalog_n!(ctx, dyn kamu_accounts::AccessTokenService);
-
-        match access_token_service
-            .create_access_token(&token_name, &account_id)
-            .await
-        {
-            Ok(created_token) => Ok(CreateTokenResult::Success(Box::new(
-                CreateAccessTokenResultSuccess {
-                    token: CreatedAccessToken::new(created_token, account_id, &token_name),
-                },
-            ))),
-            Err(err) => match err {
-                CreateAccessTokenError::Duplicate(_) => Ok(CreateTokenResult::DuplicateName(
-                    CreateAccessTokenResultDuplicate { token_name },
-                )),
-                CreateAccessTokenError::Internal(internal_err) => {
-                    Err(GqlError::Internal(internal_err))
-                }
-            },
-        }
-    }
-
-    #[tracing::instrument(level = "info", name = AuthMut_revoke_access_token, skip_all)]
-    async fn revoke_access_token(
-        &self,
-        ctx: &Context<'_>,
-        token_id: AccessTokenID<'static>,
-    ) -> Result<RevokeResult> {
-        check_access_token_valid(ctx, &token_id).await?;
-
-        let access_token_service = from_catalog_n!(ctx, dyn kamu_accounts::AccessTokenService);
-
-        match access_token_service.revoke_access_token(&token_id).await {
-            Ok(_) => Ok(RevokeResult::Success(RevokeResultSuccess { token_id })),
-            Err(RevokeTokenError::AlreadyRevoked) => {
-                Ok(RevokeResult::AlreadyRevoked(RevokeResultAlreadyRevoked {
-                    token_id,
-                }))
-            }
-            Err(RevokeTokenError::NotFound(_)) => Err(GqlError::Gql(async_graphql::Error::new(
-                "Access token not found",
-            ))),
-            Err(RevokeTokenError::Internal(e)) => Err(e.into()),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,7 +73,8 @@ impl From<kamu_accounts::LoginError> for GqlError {
             kamu_accounts::LoginError::NoPrimaryEmail(e) => GqlError::Gql(
                 Error::new(e.to_string()).extend_with(|_, eev| eev.set("reason", e.to_string())),
             ),
-            kamu_accounts::LoginError::DuplicateCredentials => {
+            kamu_accounts::LoginError::DuplicateCredentials
+            | kamu_accounts::LoginError::RestrictedLogin => {
                 GqlError::Gql(Error::new(value.to_string()))
             }
             kamu_accounts::LoginError::Internal(e) => GqlError::Internal(e),
@@ -168,63 +111,6 @@ impl From<kamu_accounts::LoginResponse> for LoginResponse {
             access_token: value.access_token,
             account: Account::new(value.account_id.into(), value.account_name.into()),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
-pub enum RevokeResult<'a> {
-    Success(RevokeResultSuccess<'a>),
-    AlreadyRevoked(RevokeResultAlreadyRevoked<'a>),
-}
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub struct RevokeResultSuccess<'a> {
-    pub token_id: AccessTokenID<'a>,
-}
-
-#[ComplexObject]
-impl RevokeResultSuccess<'_> {
-    async fn message(&self) -> String {
-        "Access token revoked successfully".to_string()
-    }
-}
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub struct RevokeResultAlreadyRevoked<'a> {
-    pub token_id: AccessTokenID<'a>,
-}
-
-#[ComplexObject]
-impl RevokeResultAlreadyRevoked<'_> {
-    async fn message(&self) -> String {
-        format!("Access token with id {} already revoked", self.token_id)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
-pub enum CreateTokenResult<'a> {
-    Success(Box<CreateAccessTokenResultSuccess<'a>>),
-    DuplicateName(CreateAccessTokenResultDuplicate),
-}
-
-#[derive(SimpleObject, Debug)]
-#[graphql(complex)]
-pub struct CreateAccessTokenResultDuplicate {
-    pub token_name: String,
-}
-
-#[ComplexObject]
-impl CreateAccessTokenResultDuplicate {
-    pub async fn message(&self) -> String {
-        format!("Access token with {} name already exists", self.token_name)
     }
 }
 

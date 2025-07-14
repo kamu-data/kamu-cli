@@ -29,7 +29,7 @@ use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use odf::metadata::testing::MetadataFactory;
 
-use crate::utils::make_logged_clients;
+use crate::utils::{generate_password, make_logged_clients};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,30 +38,83 @@ pub const PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
     kind: CLIConfig
     version: 1
     content:
-      users:
-        predefined:
-          # Special:
-          - accountName: admin
-            properties: [admin]
-            email: admin@example.com
+      auth:
+        users:
+          predefined:
+            # Special:
+            - accountName: admin
+              password: test#admin
+              properties: [admin]
+              email: admin@example.com
 
-          # By names:
-          - accountName: alice
-            email: alice@example.com
-          - accountName: bob
-            email: bob@example.com
+            # By names:
+            - accountName: alice
+              password: test#alice
+              email: alice@example.com
+            - accountName: bob
+              password: test#bob
+              email: bob@example.com
 
-          # By roles:
-          - accountName: owner
-            email: owner@example.com
-          - accountName: not-owner
-            email: not-owner@example.com
-          - accountName: reader
-            email: reader@example.com
-          - accountName: editor
-            email: editor@example.com
-          - accountName: maintainer
-            email: maintainer@example.com
+            # By roles:
+            - accountName: owner
+              password: test#owner
+              email: owner@example.com
+            - accountName: not-owner
+              password: test#not-owner
+              email: not-owner@example.com
+            - accountName: reader
+              password: test#reader
+              email: reader@example.com
+            - accountName: editor
+              password: test#editor
+              email: editor@example.com
+            - accountName: maintainer
+              password: test#maintainer
+              email: maintainer@example.com
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub const PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      auth:
+        allowAnonymous: true
+        users:
+          predefined:
+            # Special:
+            - accountName: admin
+              password: test#admin
+              properties: [admin]
+              email: admin@example.com
+
+            # By names:
+            - accountName: alice
+              password: test#alice
+              email: alice@example.com
+            - accountName: bob
+              password: test#bob
+              email: bob@example.com
+
+            # By roles:
+            - accountName: owner
+              password: test#owner
+              email: owner@example.com
+            - accountName: not-owner
+              password: test#not-owner
+              email: not-owner@example.com
+            - accountName: reader
+              password: test#reader
+              email: reader@example.com
+            - accountName: editor
+              password: test#editor
+              email: editor@example.com
+            - accountName: maintainer
+              password: test#maintainer
+              email: maintainer@example.com
     "#
 );
 
@@ -1058,9 +1111,10 @@ pub async fn test_a_private_dataset_can_only_be_pulled_by_authorized_users(
             let workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
             if let Some(account_name) = maybe_account_name {
-                let password_same_as_account_name = account_name;
+                let password = generate_password(&account_name);
+
                 workspace
-                    .login_to_node(node_url, account_name, password_same_as_account_name)
+                    .login_to_node(node_url, account_name, &password)
                     .await;
             }
 
@@ -1201,9 +1255,10 @@ pub async fn test_a_public_derivative_dataset_that_has_a_private_dependency_can_
             let workspace = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
             if let Some(account_name) = maybe_account_name {
-                let password_same_as_account_name = account_name;
+                let password = generate_password(&account_name);
+
                 workspace
-                    .login_to_node(node_url, account_name, password_same_as_account_name)
+                    .login_to_node(node_url, account_name, &password)
                     .await;
             }
 

@@ -44,10 +44,10 @@ test-utils = { workspace = true }
 
 async-graphql = { version = "7", default-features = false }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "47", default-features = false, features = [] }
+datafusion = { version = "48", default-features = false, features = [] }
 indoc = "2"
 paste = { version = "1", default-features = false }
-pretty_assertions = { version = "1" }
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
 reqwest = { version = "0.12", default-features = false }
 serde_json = { version = "1", default-features = false }
 tempfile = { version = "3" }

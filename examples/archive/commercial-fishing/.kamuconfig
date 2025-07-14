@@ -1,17 +1,21 @@
 kind: CLIConfig
 version: 1
 content:
-  users:
-    predefined:
-      - accountName: kamu
-        properties: [admin]
-        avatarUrl: https://avatars.githubusercontent.com/u/50896974?s=200&v=4
-        email: support+kamu@kamu.dev
-      - accountName: acme.fishing.co
-        accountType: Organization
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/1090/1090630.png
-        email: support+acme.fishing.co@kamu.dev
-      - accountName: globalfishingwatch.org
-        accountType: Organization
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/744/744480.png
-        email: support+globalfishingwatch.org@kamu.dev
+  auth:
+    users:
+      predefined:
+        - accountName: kamu
+          password: kamu.dev
+          properties: [ admin ]
+          avatarUrl: https://avatars.githubusercontent.com/u/50896974?s=200&v=4
+          email: support+kamu@kamu.dev
+        - accountName: acme.fishing.co
+          password: acme.fishing.co
+          accountType: Organization
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/1090/1090630.png
+          email: support+acme.fishing.co@kamu.dev
+        - accountName: globalfishingwatch.org
+          password: globalfishingwatch.org
+          accountType: Organization
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/744/744480.png
+          email: support+globalfishingwatch.org@kamu.dev

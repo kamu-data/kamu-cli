@@ -24,7 +24,7 @@ use arrow::datatypes::SchemaRef;
 use arrow::json::{ArrayWriter, LineDelimitedWriter};
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches_with_options;
-use datafusion::common::format::DEFAULT_CLI_FORMAT_OPTIONS;
+use datafusion::config::FormatOptions;
 use datafusion::error::Result;
 
 use crate::print_options::MaxRows;
@@ -110,7 +110,10 @@ fn format_batches_with_maxrows<W: std::io::Write>(
     writer: &mut W,
     batches: &[RecordBatch],
     maxrows: MaxRows,
+    format_options: &FormatOptions,
 ) -> Result<()> {
+    let options: arrow::util::display::FormatOptions = format_options.try_into()?;
+
     match maxrows {
         MaxRows::Limited(maxrows) => {
             // Filter batches to meet the maxrows condition
@@ -131,20 +134,18 @@ fn format_batches_with_maxrows<W: std::io::Write>(
                 }
             }
 
-            let formatted =
-                pretty_format_batches_with_options(&filtered_batches, &DEFAULT_CLI_FORMAT_OPTIONS)?;
+            let formatted = pretty_format_batches_with_options(&filtered_batches, &options)?;
             if over_limit {
-                let mut formatted_str = format!("{}", formatted);
+                let mut formatted_str = format!("{formatted}");
                 formatted_str = keep_only_maxrows(&formatted_str, maxrows);
-                writeln!(writer, "{}", formatted_str)?;
+                writeln!(writer, "{formatted_str}")?;
             } else {
-                writeln!(writer, "{}", formatted)?;
+                writeln!(writer, "{formatted}")?;
             }
         }
         MaxRows::Unlimited => {
-            let formatted =
-                pretty_format_batches_with_options(batches, &DEFAULT_CLI_FORMAT_OPTIONS)?;
-            writeln!(writer, "{}", formatted)?;
+            let formatted = pretty_format_batches_with_options(batches, &options)?;
+            writeln!(writer, "{formatted}")?;
         }
     }
 
@@ -160,6 +161,7 @@ impl PrintFormat {
         batches: &[RecordBatch],
         maxrows: MaxRows,
         with_header: bool,
+        format_options: &FormatOptions,
     ) -> Result<()> {
         // filter out any empty batches
         let batches: Vec<_> = batches
@@ -168,7 +170,7 @@ impl PrintFormat {
             .cloned()
             .collect();
         if batches.is_empty() {
-            return self.print_empty(writer, schema);
+            return self.print_empty(writer, schema, format_options);
         }
 
         match self {
@@ -180,7 +182,7 @@ impl PrintFormat {
                 if maxrows == MaxRows::Limited(0) {
                     return Ok(());
                 }
-                format_batches_with_maxrows(writer, &batches, maxrows)
+                format_batches_with_maxrows(writer, &batches, maxrows, format_options)
             }
             Self::Json => batches_to_json!(ArrayWriter, writer, &batches),
             Self::NdJson => batches_to_json!(LineDelimitedWriter, writer, &batches),
@@ -188,16 +190,22 @@ impl PrintFormat {
     }
 
     /// Print when the result batches contain no rows
-    fn print_empty<W: std::io::Write>(&self, writer: &mut W, schema: SchemaRef) -> Result<()> {
+    fn print_empty<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+        schema: SchemaRef,
+        format_options: &FormatOptions,
+    ) -> Result<()> {
         match self {
             // Print column headers for Table format
             Self::Table if !schema.fields().is_empty() => {
+                let format_options: arrow::util::display::FormatOptions =
+                    format_options.try_into()?;
+
                 let empty_batch = RecordBatch::new_empty(schema);
-                let formatted = pretty_format_batches_with_options(
-                    &[empty_batch],
-                    &DEFAULT_CLI_FORMAT_OPTIONS,
-                )?;
-                writeln!(writer, "{}", formatted)?;
+                let formatted =
+                    pretty_format_batches_with_options(&[empty_batch], &format_options)?;
+                writeln!(writer, "{formatted}")?;
             }
             _ => {}
         }
@@ -638,6 +646,7 @@ mod tests {
                     &self.batches,
                     self.maxrows,
                     with_header,
+                    &FormatOptions::default(),
                 )
                 .unwrap();
             String::from_utf8(buffer).unwrap()

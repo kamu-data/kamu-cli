@@ -27,7 +27,7 @@ use kamu_accounts::{
     AuthenticationService,
     PredefinedAccountsConfig,
 };
-use kamu_accounts_services::PasswordLoginCredentials;
+use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use observability::axum::unknown_fallback_handler;
 use rust_embed::RustEmbed;
@@ -63,7 +63,7 @@ struct WebUILoginInstructions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WebUIServer {
-    server_future: Pin<Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Send>>,
+    server_future: Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send>>,
     local_addr: SocketAddr,
     access_token: String,
 }
@@ -75,11 +75,13 @@ impl WebUIServer {
         server_catalog: Catalog,
         tenancy_config: TenancyConfig,
         current_account_name: odf::AccountName,
-        predefined_accounts_config: Arc<PredefinedAccountsConfig>,
-        file_upload_limit_config: Arc<FileUploadLimitConfig>,
+        predefined_accounts_config: &PredefinedAccountsConfig,
+        file_upload_limit_config: &FileUploadLimitConfig,
         enable_dataset_env_vars_management: bool,
+        allow_anonymous: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
+        password_policy_config: &PasswordPolicyConfig,
     ) -> Result<Self, InternalError> {
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
@@ -99,7 +101,7 @@ impl WebUIServer {
 
         let login_credentials = PasswordLoginCredentials {
             login: current_account_name.to_string(),
-            password: account_config.get_password(),
+            password: account_config.password.into_inner(),
         };
 
         let gql_schema = kamu_adapter_graphql::schema();
@@ -119,19 +121,17 @@ impl WebUIServer {
 
         let ui_configuration = UIConfiguration {
             ingest_upload_file_limit_mb: file_upload_limit_config.max_file_size_in_mb(),
+            min_new_password_length: password_policy_config.min_new_password_length,
             feature_flags: UIFeatureFlags {
                 // No way to log out, always logging in a predefined user
                 enable_logout: false,
                 // No way to configure scheduling of datasets
                 enable_scheduling: false,
                 enable_dataset_env_vars_management,
+                allow_anonymous,
                 enable_terms_of_service: true,
             },
         };
-
-        let access_token = Self::acquire_access_token(server_catalog.clone(), &login_instructions)
-            .await
-            .expect("Token not retrieved");
 
         let web_ui_url = Url::parse(&web_ui_url).expect("URL failed to parse");
 
@@ -146,17 +146,14 @@ impl WebUIServer {
             }))
             .build();
 
-        let (router, api) = OpenApiRouter::with_openapi(
+        let access_token = Self::acquire_access_token(web_ui_catalog.clone(), &login_instructions)
+            .await
+            .expect("Token not retrieved");
+
+        let mut open_api_router = OpenApiRouter::with_openapi(
             kamu_adapter_http::openapi::spec_builder(crate::app::VERSION, "").build(),
         )
-        .route(
-            "/assets/runtime-config.json",
-            axum::routing::get(runtime_configuration_handler),
-        )
-        .route("/ui-config", axum::routing::get(ui_configuration_handler))
         .route("/graphql", axum::routing::post(graphql_handler))
-        .merge(kamu_adapter_http::data::root_router())
-        .nest("/platform", kamu_adapter_http::platform::root_router())
         .nest(
             "/odata",
             match tenancy_config {
@@ -176,37 +173,53 @@ impl WebUIServer {
                     .layer(DatasetAuthorizationLayer::default()),
                 tenancy_config,
             ),
-        )
-        .fallback(app_handler)
-        .layer(kamu_adapter_http::AuthenticationLayer::new())
-        .layer(
-            tower_http::cors::CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods(vec![http::Method::GET, http::Method::POST])
-                .allow_headers(tower_http::cors::Any),
-        )
-        .layer(observability::axum::http_layer())
-        // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
-        // execute bottom-up) to avoid spam in logs
-        .route(
-            "/system/health",
-            axum::routing::get(observability::health::health_handler),
-        )
-        .route(
-            "/system/metrics",
-            axum::routing::get(observability::metrics::metrics_handler),
-        )
-        .route(
-            "/system/info",
-            axum::routing::get(observability::build_info::build_info_handler),
-        )
-        .merge(kamu_adapter_http::openapi::router().into())
-        .layer(axum::extract::Extension(web_ui_catalog))
-        .layer(axum::extract::Extension(gql_schema))
-        .layer(axum::extract::Extension(web_ui_runtime_configuration))
-        .layer(axum::extract::Extension(ui_configuration))
-        .fallback(unknown_fallback_handler)
-        .split_for_parts();
+        );
+
+        if !allow_anonymous {
+            open_api_router = open_api_router.layer(kamu_adapter_http::AuthPolicyLayer::new());
+        }
+
+        let (router, api) = open_api_router
+            .route(
+                "/assets/runtime-config.json",
+                axum::routing::get(runtime_configuration_handler),
+            )
+            .route("/ui-config", axum::routing::get(ui_configuration_handler))
+            .nest(
+                "/platform",
+                kamu_adapter_http::platform::root_router(allow_anonymous),
+            )
+            .fallback(app_handler)
+            .merge(kamu_adapter_http::data::root_router())
+            .layer(kamu_adapter_http::AuthenticationLayer::new())
+            .layer(
+                tower_http::cors::CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods(vec![http::Method::GET, http::Method::POST])
+                    .allow_headers(tower_http::cors::Any),
+            )
+            .layer(observability::axum::http_layer())
+            // Note: Healthcheck and metrics routes are placed before the tracing layer (layers
+            // execute bottom-up) to avoid spam in logs
+            .route(
+                "/system/health",
+                axum::routing::get(observability::health::health_handler),
+            )
+            .route(
+                "/system/metrics",
+                axum::routing::get(observability::metrics::metrics_handler),
+            )
+            .route(
+                "/system/info",
+                axum::routing::get(observability::build_info::build_info_handler),
+            )
+            .merge(kamu_adapter_http::openapi::router().into())
+            .layer(axum::extract::Extension(web_ui_catalog))
+            .layer(axum::extract::Extension(gql_schema))
+            .layer(axum::extract::Extension(web_ui_runtime_configuration))
+            .layer(axum::extract::Extension(ui_configuration))
+            .fallback(unknown_fallback_handler)
+            .split_for_parts();
 
         let server_future = Box::pin(
             axum::serve(

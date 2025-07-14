@@ -90,6 +90,25 @@ async fn test_search_multi_user(
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
+    let e2e_access_token = kamu_node_api_client.auth().login_as_e2e_user().await;
+
+    kamu.assert_success_command_execution(
+        [
+            "login",
+            kamu_node_api_client.get_base_url().as_str(),
+            "--access-token",
+            &e2e_access_token,
+            "--skip-add-repo",
+        ],
+        None,
+        Some([format!(
+            "Login successful: {}",
+            kamu_node_api_client.get_base_url().as_str()
+        )
+        .as_str()]),
+    )
+    .await;
+
     kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
         Some(indoc::indoc!(
@@ -104,8 +123,6 @@ async fn test_search_multi_user(
         None::<Vec<&str>>,
     )
     .await;
-
-    kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
         .dataset()
@@ -147,7 +164,7 @@ async fn test_search_multi_user(
             ┌──────────────────────────────────┬──────┬─────────────┬────────┬─────────┬──────────┐
             │              Alias               │ Kind │ Description │ Blocks │ Records │   Size   │
             ├──────────────────────────────────┼──────┼─────────────┼────────┼─────────┼──────────┤
-            │ kamu-node/e2e-user/player-scores │ Root │ -           │      5 │       2 │ 2.31 KiB │
+            │ kamu-node/e2e-user/player-scores │ Root │ -           │      5 │       2 │ 2.42 KiB │
             └──────────────────────────────────┴──────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
@@ -176,7 +193,7 @@ async fn test_search_multi_user(
             │                 Alias                 │    Kind    │ Description │ Blocks │ Records │   Size   │
             ├───────────────────────────────────────┼────────────┼─────────────┼────────┼─────────┼──────────┤
             │ kamu-node/e2e-user/player-leaderboard │ Derivative │ -           │      3 │       - │        - │
-            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 2.31 KiB │
+            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 2.42 KiB │
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
         )),
@@ -184,12 +201,29 @@ async fn test_search_multi_user(
     )
     .await;
 
-    kamu_node_api_client.auth().login_as_kamu().await;
+    let kamu_access_token = kamu_node_api_client.auth().login_as_kamu().await;
 
     kamu_node_api_client
         .dataset()
         .create_player_scores_dataset()
         .await;
+
+    kamu.assert_success_command_execution(
+        [
+            "login",
+            kamu_node_api_client.get_base_url().as_str(),
+            "--access-token",
+            &kamu_access_token,
+            "--skip-add-repo",
+        ],
+        None,
+        Some([format!(
+            "Login successful: {}",
+            kamu_node_api_client.get_base_url().as_str()
+        )
+        .as_str()]),
+    )
+    .await;
 
     kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
@@ -199,7 +233,7 @@ async fn test_search_multi_user(
             │                 Alias                 │    Kind    │ Description │ Blocks │ Records │   Size   │
             ├───────────────────────────────────────┼────────────┼─────────────┼────────┼─────────┼──────────┤
             │ kamu-node/e2e-user/player-leaderboard │ Derivative │ -           │      3 │       - │        - │
-            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 2.31 KiB │
+            │ kamu-node/e2e-user/player-scores      │    Root    │ -           │      5 │       2 │ 2.42 KiB │
             │ kamu-node/kamu/player-scores          │    Root    │ -           │      3 │       - │        - │
             └───────────────────────────────────────┴────────────┴─────────────┴────────┴─────────┴──────────┘
             "#
@@ -219,7 +253,7 @@ async fn test_search_by_name(
 
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
 
-    kamu_node_api_client.auth().login_as_e2e_user().await;
+    let access_token = kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
         .dataset()
@@ -227,6 +261,23 @@ async fn test_search_by_name(
         .await;
 
     kamu_node_api_client.dataset().create_leaderboard().await;
+
+    kamu.assert_success_command_execution(
+        [
+            "login",
+            kamu_node_api_client.get_base_url().as_str(),
+            "--access-token",
+            &access_token,
+            "--skip-add-repo",
+        ],
+        None,
+        Some([format!(
+            "Login successful: {}",
+            kamu_node_api_client.get_base_url().as_str()
+        )
+        .as_str()]),
+    )
+    .await;
 
     kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
@@ -301,7 +352,7 @@ async fn test_search_by_repo(
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "kamu-node").await;
     add_repo_to_workspace(&kamu_node_api_client, &kamu, "acme-org-node").await;
 
-    kamu_node_api_client.auth().login_as_e2e_user().await;
+    let access_token = kamu_node_api_client.auth().login_as_e2e_user().await;
 
     kamu_node_api_client
         .dataset()
@@ -309,6 +360,23 @@ async fn test_search_by_repo(
         .await;
 
     kamu_node_api_client.dataset().create_leaderboard().await;
+
+    kamu.assert_success_command_execution(
+        [
+            "login",
+            kamu_node_api_client.get_base_url().as_str(),
+            "--access-token",
+            &access_token,
+            "--skip-add-repo",
+        ],
+        None,
+        Some([format!(
+            "Login successful: {}",
+            kamu_node_api_client.get_base_url().as_str()
+        )
+        .as_str()]),
+    )
+    .await;
 
     kamu.assert_success_command_execution(
         ["search", "player", "--output-format", "table"],
@@ -414,7 +482,7 @@ async fn test_search_private_dataset(
                     "kamu-node",
                     "password",
                     "alice",
-                    "alice",
+                    "test#alice",
                     kamu_node_url,
                 ],
                 None,
@@ -452,7 +520,7 @@ async fn test_search_private_dataset(
                     "kamu-node",
                     "password",
                     "bob",
-                    "bob",
+                    "test#bob",
                     kamu_node_url,
                 ],
                 None,

@@ -144,7 +144,9 @@ impl MessageConsumerT<AccountLifecycleMessage> for DatasetAliasUpdateHandler {
                 Ok(())
             }
 
-            AccountLifecycleMessage::Created(_) | AccountLifecycleMessage::Deleted(_) => {
+            AccountLifecycleMessage::Created(_)
+            | AccountLifecycleMessage::PasswordChanged(_)
+            | AccountLifecycleMessage::Deleted(_) => {
                 // No action required
                 Ok(())
             }

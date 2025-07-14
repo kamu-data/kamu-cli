@@ -1,14 +1,18 @@
 kind: CLIConfig
 version: 1
 content:
-  users:
-    predefined:
-      - accountName: admin
-        properties: [admin]
-        email: admin@private.datasets
-      - accountName: alice
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3665/3665909.png
-        email: alice@private.datasets
-      - accountName: bob
-        avatarUrl: https://cdn-icons-png.flaticon.com/512/3665/3665917.png
-        email: bob@private.datasets
+  auth:
+    users:
+      predefined:
+        - accountName: admin
+          password: kamu#admin
+          properties: [ admin ]
+          email: admin@private.datasets
+        - accountName: alice
+          password: kamu#alice
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3665/3665909.png
+          email: alice@private.datasets
+        - accountName: bob
+          password: kamu#bob
+          avatarUrl: https://cdn-icons-png.flaticon.com/512/3665/3665917.png
+          email: bob@private.datasets

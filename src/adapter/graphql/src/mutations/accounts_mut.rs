@@ -13,6 +13,7 @@ use kamu_accounts::{
     AccountServiceExt,
     CreateAccountError,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     CurrentAccountSubject,
 };
 
@@ -83,7 +84,9 @@ impl AccountsMut {
             .execute(
                 &logged_account,
                 account_name.as_ref(),
-                email.map(Into::into),
+                CreateAccountUseCaseOptions::builder()
+                    .maybe_email(email.map(Into::into))
+                    .build(),
             )
             .await
         {
@@ -97,6 +100,32 @@ impl AccountsMut {
             ),
             Err(e @ CreateAccountError::Internal(_)) => Err(e.int_err().into()),
         }
+    }
+
+    /// Create wallet accounts
+    #[tracing::instrument(level = "info", name = AccountsMut_create_wallet_accounts, skip_all)]
+    #[graphql(guard = "LoggedInGuard.and(CanProvisionAccountsGuard)")]
+    async fn create_wallet_accounts(
+        &self,
+        ctx: &Context<'_>,
+        wallet_addresses: Vec<DidPkh>,
+    ) -> Result<CreateWalletAccountsResult> {
+        let create_account_use_case = from_catalog_n!(ctx, dyn CreateAccountUseCase);
+        let wallet_addresses = wallet_addresses.into_iter().map(Into::into).collect();
+
+        let created_accounts = create_account_use_case
+            .execute_multi_wallet_accounts(wallet_addresses)
+            .await
+            .int_err()?;
+
+        Ok(CreateWalletAccountsResult::Success(
+            CreateWalletAccountsSuccess {
+                accounts: created_accounts
+                    .into_iter()
+                    .map(queries::Account::from_account)
+                    .collect(),
+            },
+        ))
     }
 }
 
@@ -138,6 +167,31 @@ pub struct AccountFieldNonUnique {
 impl AccountFieldNonUnique {
     pub async fn message(&self) -> String {
         format!("Non-unique account field '{}'", self.field)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// CreateWalletAccountsResult
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum CreateWalletAccountsResult {
+    Success(CreateWalletAccountsSuccess),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CreateWalletAccountsSuccess {
+    pub accounts: Vec<queries::Account>,
+}
+
+#[ComplexObject]
+impl CreateWalletAccountsSuccess {
+    pub async fn message(&self) -> String {
+        "Wallet accounts created".to_string()
     }
 }
 

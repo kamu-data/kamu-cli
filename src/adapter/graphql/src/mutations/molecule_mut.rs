@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain;
-use kamu_accounts::{AccountServiceExt as _, CurrentAccountSubject};
+use kamu_accounts::{AccountServiceExt as _, CreateAccountUseCaseOptions, CurrentAccountSubject};
 use kamu_core::DatasetRegistryExt;
 use kamu_core::auth::DatasetAction;
 
@@ -136,7 +136,10 @@ impl MoleculeMut {
                 .execute(
                     &molecule_account,
                     &project_account_name,
-                    Some(project_email),
+                    CreateAccountUseCaseOptions {
+                        email: Some(project_email),
+                        password: None,
+                    },
                 )
                 .await
                 .int_err()?

@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use http::Uri;
+use std::any::Any;
+
+use axum::body::Body;
+use http::{Response, StatusCode, Uri, header};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -164,4 +167,16 @@ pub async fn unknown_fallback_handler(
         "HTTP: fallback request",
     );
     (axum::http::StatusCode::NOT_FOUND, "Not Found")
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn panic_handler(_err: Box<dyn Any + Send + 'static>) -> Response<Body> {
+    let body = Body::from(r#"{"error":"Internal Server Error"}"#);
+    Response::builder()
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(body)
+        .unwrap()
 }

@@ -500,14 +500,14 @@ async fn test_data_query_handler_success() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620b3c7db78f8343423b488aa0431793243f8828d99d1a416eeefbdaf7cfe8f476c",
+                    "inputHash": "f1620915b49981013b71a52ce28ade79ed0eb3c3a020f4c403963237b0ebdb90d2fa1",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uX3T4s2bOOo0NKxHuE_DJc6oeRkZcmHnTVgJXuwTTKx1GkQ7AJs4njqw8FyYxsH1ANzUbSrA81NidYt35RDaFAA",
+                    "proofValue": "ulReG_0c_7hJF1cVjScJgdwF30-EseOSgPs-EBf_9sWvzBabcYZ_FiX6fPO8XfvrCIaOeVhEgmF99wh7Ha15HCQ",
                 }
             }),
             response
@@ -658,14 +658,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620ea04d37acc04446aa2e87daa09152e0eb42ea1545ef2992ffe97404d501584cd",
+                    "inputHash": "f162080423739210aa75bec32c3d31726e2d9c5244baf81c26b2c49afdc947a25b2e7",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uT1ZArQ-FjxZdhpU3SjvLXBB4kOJN0VdGsLJUYFOjJfX08yQhUI6q4rrW5Y2Mm3P2Z71G30eZ_9t14wfjIyBwAw",
+                    "proofValue": "u7eDhEsumYHz3IXKM7eu6eKNISId61T-NakbmccUJBQf1wfuAYbxoaN0ZQe6seFiXDSQgN0Fujy2EjkgVnuIKBw",
                 }
             }),
             response
@@ -916,7 +916,7 @@ async fn test_data_query_handler_error_sql_unparsable() {
         );
         pretty_assertions::assert_eq!(
             json!({
-                "message": "sql parser error: Expected end of statement, found: ?"
+                "message": "sql parser error: Expected: end of statement, found: ? at Line: 1, Column: 9"
             }),
             body
         );

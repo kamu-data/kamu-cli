@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT flow_id FROM flows\n                WHERE\n                    flow_type = $1 AND\n                    scope_data = $2 AND\n                    flow_status != 'finished'\n                ORDER BY flow_id DESC\n                LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "flow_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9f3983050ed27ae631fc99feabacdacf7b6fb0a9975375a6b2e1917b147bc2a1"
+}

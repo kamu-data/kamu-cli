@@ -34,18 +34,19 @@ email-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true }
+odf = { workspace = true, default-features = false, features = ["did-pkh"] }
 random-strings = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 base32 = { version = "0.5" }
+bon = { version = "3", default-features = false }
 chrono = { version = "0.4", default-features = false }
 crc32fast = { version = "1.4.2" }
 futures = { version = "0.3", default-features = false }
 jsonwebtoken = "9"
 merge = "0.1"
 mockall = { optional = true, version = "0.13" }
-nutype = { version = "0.6", default-features = false }
+nutype = { version = "0.6", default-features = false, features = ["new_unchecked", "serde"] }
 rand = "0.8"
 reusable = "0.1"
 secrecy = "0.10"
