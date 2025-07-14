@@ -131,6 +131,8 @@ impl SqliteFlowConfigurationEventStore {
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
+        let webhook_subscription_id = webhook_subscription_id.to_string();
+
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr

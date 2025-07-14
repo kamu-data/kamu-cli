@@ -2059,7 +2059,7 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionSystemGC | FlowDescriptionWebhookDeliver
 
 type FlowDescriptionDatasetExecuteTransform {
 	transformResult: FlowDescriptionUpdateResult
@@ -2124,6 +2124,12 @@ type FlowDescriptionUpdateResultUpToDate {
 	The value indicates whether the api cache was used
 	"""
 	uncacheable: Boolean!
+}
+
+type FlowDescriptionWebhookDeliver {
+	targetUrl: Url!
+	label: String!
+	eventType: String!
 }
 
 type FlowEdge {
@@ -3762,6 +3768,11 @@ type UpsertDatasetEnvVarResultUpdated implements UpsertDatasetEnvVarResult {
 type UpsertDatasetEnvVarUpToDate implements UpsertDatasetEnvVarResult {
 	message: String!
 }
+
+"""
+URL is a String implementing the [URL Standard](http://url.spec.whatwg.org/)
+"""
+scalar Url
 
 type VersionedFile {
 	"""

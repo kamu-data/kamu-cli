@@ -35,6 +35,7 @@ internal-error = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-adapter-flow-dataset = { workspace = true }
+kamu-adapter-flow-webhook = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-auth-web3 = { workspace = true }

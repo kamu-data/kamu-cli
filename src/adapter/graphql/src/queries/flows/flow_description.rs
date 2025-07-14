@@ -16,6 +16,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
 };
+use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowRunArgumentsWebhookDeliver};
 use kamu_adapter_task_dataset::{
     TaskResultDatasetHardCompact,
     TaskResultDatasetReset,
@@ -24,6 +25,7 @@ use kamu_adapter_task_dataset::{
 use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
 use kamu_flow_system::FLOW_TYPE_SYSTEM_GC;
+use kamu_webhooks::{WebhookEvent, WebhookEventID};
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::prelude::*;
@@ -36,6 +38,8 @@ pub(crate) enum FlowDescription {
     Dataset(FlowDescriptionDataset),
     #[graphql(flatten)]
     System(FlowDescriptionSystem),
+    #[graphql(flatten)]
+    Webhook(FlowDescriptionWebhook),
 }
 
 #[derive(Union)]
@@ -46,6 +50,18 @@ pub(crate) enum FlowDescriptionSystem {
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionSystemGC {
     dummy: bool,
+}
+
+#[derive(Union)]
+pub(crate) enum FlowDescriptionWebhook {
+    Deliver(FlowDescriptionWebhookDeliver),
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowDescriptionWebhookDeliver {
+    target_url: url::Url,
+    label: String,
+    event_type: String,
 }
 
 #[derive(Union)]
@@ -446,13 +462,83 @@ impl FlowDescriptionBuilder {
                 self.dataset_flow_description(ctx, flow_state, flow_type, dataset_id)
                     .await?,
             ),
-            fs::FlowScope::WebhookSubscription { .. } => {
-                unimplemented!("WebhookSubscription flow description is not implemented yet")
+            fs::FlowScope::WebhookSubscription {
+                subscription_id, ..
+            } => {
+                self.webhook_flow_description(
+                    ctx,
+                    flow_state,
+                    flow_type,
+                    kamu_webhooks::WebhookSubscriptionID::new(*subscription_id),
+                )
+                .await?
             }
             fs::FlowScope::System => {
                 FlowDescription::System(self.system_flow_description(flow_type)?)
             }
         })
+    }
+
+    async fn webhook_flow_description(
+        &self,
+        ctx: &Context<'_>,
+        flow_state: &fs::FlowState,
+        flow_type: &str,
+        subscription_id: kamu_webhooks::WebhookSubscriptionID,
+    ) -> Result<FlowDescription> {
+        match flow_type {
+            FLOW_TYPE_WEBHOOK_DELIVER => {
+                // TODO
+                let webhook_subscription_query_svc =
+                    from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionQueryService);
+
+                let webhook_event_repo =
+                    from_catalog_n!(ctx, dyn kamu_webhooks::WebhookEventRepository);
+
+                let subscription = webhook_subscription_query_svc
+                    .find_webhook_subscription(subscription_id)
+                    .await
+                    .int_err()?
+                    .ok_or_else(|| {
+                        GqlError::Internal(InternalError::new(format!(
+                            "Webhook subscription not found: {subscription_id}",
+                        )))
+                    })?;
+
+                let run_arguments = flow_state.run_arguments.as_ref().ok_or_else(|| {
+                    GqlError::Internal(InternalError::new(format!(
+                        "Flow run arguments not found for flow state: {flow_state:?}",
+                    )))
+                })?;
+
+                let webhook_run_arguments =
+                    FlowRunArgumentsWebhookDeliver::from_flow_run_arguments(run_arguments)
+                        .map_err(|e| {
+                            GqlError::Internal(InternalError::new(format!(
+                                "Failed to parse webhook run arguments: {e}",
+                            )))
+                        })?;
+
+                let event: WebhookEvent = webhook_event_repo
+                    .get_event_by_id(WebhookEventID::new(webhook_run_arguments.event_id))
+                    .await
+                    .int_err()?;
+
+                Ok(FlowDescription::Webhook(FlowDescriptionWebhook::Deliver(
+                    FlowDescriptionWebhookDeliver {
+                        target_url: subscription.target_url().clone(),
+                        label: subscription.label().to_string(),
+                        event_type: event.event_type.to_string(),
+                    },
+                )))
+            }
+            _ => {
+                tracing::error!("Unexpected webhook flow type: {}", flow_type);
+                Err(GqlError::Internal(InternalError::new(format!(
+                    "Unexpected webhook flow type: {flow_type}",
+                ))))
+            }
+        }
     }
 
     fn system_flow_description(&self, flow_type: &str) -> Result<FlowDescriptionSystem> {
@@ -471,7 +557,7 @@ impl FlowDescriptionBuilder {
     }
 
     async fn dataset_flow_description(
-        &mut self,
+        &self,
         ctx: &Context<'_>,
         flow_state: &fs::FlowState,
         flow_type: &str,

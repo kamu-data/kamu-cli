@@ -138,7 +138,7 @@ impl PostgresFlowTriggerEventStore {
                 ORDER BY event_id ASC
                 "#,
                 flow_type,
-                subscription_id as uuid::Uuid,
+                subscription_id.to_string(),
                 maybe_from_id,
                 maybe_to_id,
             ).try_map(|event_row| {

@@ -6823,6 +6823,7 @@ dependencies = [
  "kamu-accounts-services",
  "kamu-adapter-auth-oso-rebac",
  "kamu-adapter-flow-dataset",
+ "kamu-adapter-flow-webhook",
  "kamu-adapter-graphql",
  "kamu-adapter-task-dataset",
  "kamu-auth-rebac",
