@@ -112,6 +112,49 @@ impl PostgresFlowConfigurationEventStore {
             }
         })
     }
+
+    fn get_webhook_subscription_events(
+        &self,
+        subscription_id: uuid::Uuid,
+        dataset_flow_type: String,
+        maybe_from_id: Option<i64>,
+        maybe_to_id: Option<i64>,
+    ) -> EventStream<FlowConfigurationEvent> {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT event_id, event_payload
+                FROM flow_configuration_events
+                WHERE flow_type = $1
+                    AND scope_data->>'subscription_id' = $2
+                    AND scope_data->>'type' = 'WebhookSubscription'
+                    AND (cast($3 as INT8) IS NULL or event_id > $3)
+                    AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                ORDER BY event_id ASC
+                "#,
+                dataset_flow_type,
+                subscription_id as uuid::Uuid,
+                maybe_from_id,
+                maybe_to_id,
+            ).try_map(|event_row| {
+                let event = serde_json::from_value::<FlowConfigurationEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,6 +172,15 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
         match &flow_binding.scope {
             FlowScope::Dataset { dataset_id } => self.get_dataset_events(
                 dataset_id,
+                flow_binding.flow_type.clone(),
+                maybe_from_id,
+                maybe_to_id,
+            ),
+            FlowScope::WebhookSubscription {
+                subscription_id,
+                dataset_id: _,
+            } => self.get_webhook_subscription_events(
+                *subscription_id,
                 flow_binding.flow_type.clone(),
                 maybe_from_id,
                 maybe_to_id,
@@ -327,15 +379,16 @@ impl FlowConfigurationEventStore for PostgresFlowConfigurationEventStore {
         .await
         .int_err()?;
 
-        Ok(flow_bindings
+        flow_bindings
             .into_iter()
-            .map(|row| FlowBinding {
-                flow_type: row.flow_type,
-                scope: FlowScope::Dataset {
-                    dataset_id: dataset_id.clone(),
-                },
+            .map(|row| {
+                let scope: FlowScope = serde_json::from_value(row.scope_data).int_err()?;
+                Ok(FlowBinding {
+                    flow_type: row.flow_type,
+                    scope,
+                })
             })
-            .collect())
+            .collect()
     }
 }
 

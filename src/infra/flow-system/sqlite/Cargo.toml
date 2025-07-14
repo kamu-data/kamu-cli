@@ -38,8 +38,10 @@ sqlx = { version = "0.8", default-features = false, features = [
     "macros",
     "sqlite",
     "chrono",
+    "uuid"
 ] }
 tracing = { version = "0.1", default-features = false }
+uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]

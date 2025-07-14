@@ -546,7 +546,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                         },
                                     )
                                 }
-                                FlowScope::System => {
+                                FlowScope::System | FlowScope::WebhookSubscription { .. } => {
                                     // TODO: revise this, but there is no better trigger yet
                                     FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
                                         trigger_time: finish_time,

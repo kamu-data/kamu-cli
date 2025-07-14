@@ -70,6 +70,10 @@ impl FlowSchedulingHelper {
                         .await?;
                 }
             },
+            FlowScope::WebhookSubscription { .. } => {
+                self.schedule_auto_polling_flow_unconditionally(start_time, flow_binding)
+                    .await?;
+            }
             FlowScope::System => {
                 if let FlowTriggerRule::Schedule(schedule) = &rule {
                     self.schedule_auto_polling_flow(start_time, flow_binding, schedule)

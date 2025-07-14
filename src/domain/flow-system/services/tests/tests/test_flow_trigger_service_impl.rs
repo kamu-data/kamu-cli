@@ -423,6 +423,9 @@ impl FlowTriggerHarness {
                     .await
                     .unwrap();
             }
+            FlowScope::WebhookSubscription { .. } => {
+                unimplemented!("WebhookSubscription flow pause is not implemented yet");
+            }
             FlowScope::System => {
                 self.flow_trigger_service
                     .pause_system_flows(Utc::now(), Some(&flow_binding.flow_type))
@@ -446,6 +449,9 @@ impl FlowTriggerHarness {
                     .resume_dataset_flows(Utc::now(), dataset_id, Some(&flow_binding.flow_type))
                     .await
                     .unwrap();
+            }
+            FlowScope::WebhookSubscription { .. } => {
+                unimplemented!("WebhookSubscription flow resume is not implemented yet");
             }
             FlowScope::System => {
                 self.flow_trigger_service

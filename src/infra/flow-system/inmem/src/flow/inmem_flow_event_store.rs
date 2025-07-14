@@ -28,6 +28,7 @@ struct State {
     events: Vec<FlowEvent>,
     last_flow_id: Option<FlowID>,
     all_flows_by_dataset: HashMap<odf::DatasetID, Vec<FlowID>>,
+    all_flows_by_webhook_subscription: HashMap<uuid::Uuid, Vec<FlowID>>,
     all_system_flows: Vec<FlowID>,
     all_flows: Vec<FlowID>,
     flow_search_index: HashMap<FlowID, FlowIndexEntry>,
@@ -144,12 +145,17 @@ impl InMemoryFlowEventStore {
 
             match &e.flow_binding.scope {
                 FlowScope::Dataset { dataset_id } => {
-                    let all_dataset_entries =
-                        match state.all_flows_by_dataset.entry(dataset_id.clone()) {
-                            Entry::Occupied(v) => v.into_mut(),
-                            Entry::Vacant(v) => v.insert(Vec::default()),
-                        };
-                    all_dataset_entries.push(event.flow_id());
+                    Self::register_dataset_entry(state, dataset_id, event);
+                }
+
+                FlowScope::WebhookSubscription {
+                    subscription_id,
+                    dataset_id,
+                } => {
+                    Self::register_webhook_entry(state, subscription_id, event);
+                    if let Some(dataset_id) = dataset_id {
+                        Self::register_dataset_entry(state, dataset_id, event);
+                    }
                 }
 
                 FlowScope::System => {
@@ -216,6 +222,25 @@ impl InMemoryFlowEventStore {
             let flow_id = event.flow_id();
             Self::remove_flow_scheduling_record(state, flow_id);
         }
+    }
+
+    fn register_dataset_entry(state: &mut State, dataset_id: &odf::DatasetID, event: &FlowEvent) {
+        let all_dataset_entries = match state.all_flows_by_dataset.entry(dataset_id.clone()) {
+            Entry::Occupied(v) => v.into_mut(),
+            Entry::Vacant(v) => v.insert(Vec::default()),
+        };
+        all_dataset_entries.push(event.flow_id());
+    }
+
+    fn register_webhook_entry(state: &mut State, subscription_id: &uuid::Uuid, event: &FlowEvent) {
+        let all_webhook_entries = match state
+            .all_flows_by_webhook_subscription
+            .entry(*subscription_id)
+        {
+            Entry::Occupied(v) => v.into_mut(),
+            Entry::Vacant(v) => v.insert(Vec::default()),
+        };
+        all_webhook_entries.push(event.flow_id());
     }
 
     fn insert_flow_scheduling_record(
@@ -326,6 +351,21 @@ impl FlowEventStore for InMemoryFlowEventStore {
                 .get(dataset_id)
                 .map(|dataset_flow_ids| {
                     dataset_flow_ids.iter().rev().find(|flow_id| {
+                        g.matches_flow(**flow_id, &waiting_filter)
+                            || g.matches_flow(**flow_id, &running_filter)
+                    })
+                })
+                .unwrap_or_default()
+                .copied(),
+
+            FlowScope::WebhookSubscription {
+                subscription_id,
+                dataset_id: _,
+            } => g
+                .all_flows_by_webhook_subscription
+                .get(subscription_id)
+                .map(|subscription_flow_ids| {
+                    subscription_flow_ids.iter().rev().find(|flow_id| {
                         g.matches_flow(**flow_id, &waiting_filter)
                             || g.matches_flow(**flow_id, &running_filter)
                     })
@@ -509,7 +549,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
                 // Also also apply given filters on this stage in order to reduce amount of
                 // items to process in further steps
                 let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
-                if let FlowScope::Dataset { dataset_id } = &flow_binding.scope
+                if let Some(dataset_id) = flow_binding.dataset_id()
                     && dataset_ids.contains(dataset_id)
                     && g.matches_flow(*flow_id, filters)
                     && let Some(flow) = g.flow_search_index.get(flow_id)
@@ -652,7 +692,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let mut count = 0;
         for flow_id in &g.all_flows {
             let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
-            if let FlowScope::Dataset { dataset_id } = &flow_binding.scope
+            if let Some(dataset_id) = &flow_binding.dataset_id()
                 && dataset_ids.contains(dataset_id)
                 && g.matches_flow(*flow_id, filters)
             {
@@ -674,7 +714,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
         let mut filtered_dataset_ids = HashSet::new();
         for flow_id in &g.all_flows {
             let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
-            if let FlowScope::Dataset { dataset_id } = &flow_binding.scope
+            if let Some(dataset_id) = flow_binding.dataset_id()
                 && dataset_ids.contains(dataset_id)
             {
                 filtered_dataset_ids.insert(dataset_id.clone());

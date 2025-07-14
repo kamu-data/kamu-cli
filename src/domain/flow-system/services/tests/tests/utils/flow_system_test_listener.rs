@@ -145,6 +145,22 @@ impl std::fmt::Display for FlowSystemTestListener {
                                     .unwrap_or_else(|| dataset_id.to_string()),
                                 Self::display_flow_type(flow_binding.flow_type.as_str())
                             ),
+                            FlowScope::WebhookSubscription {
+                                subscription_id,
+                                dataset_id,
+                            } => format!(
+                                "\"{}\" Subscription: {} {}",
+                                match dataset_id {
+                                    Some(dataset_id) => state
+                                        .dataset_display_names
+                                        .get(dataset_id)
+                                        .cloned()
+                                        .unwrap_or_else(|| dataset_id.to_string()),
+                                    None => "<None>".to_string(),
+                                },
+                                subscription_id,
+                                Self::display_flow_type(flow_binding.flow_type.as_str())
+                            ),
                             FlowScope::System => {
                                 format!(
                                     "System {}",

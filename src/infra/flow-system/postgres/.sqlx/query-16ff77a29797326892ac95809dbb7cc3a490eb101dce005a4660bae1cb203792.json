@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT flow_id FROM flows\n                WHERE\n                    scope_data->>'type' = 'Dataset'\n                    AND scope_data->>'dataset_id' = $1\n                    AND ($2::text IS NULL OR flow_type = $2)\n                    AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)\n                    AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))\n                ORDER BY flow_status, last_event_id DESC\n                LIMIT $5 OFFSET $6\n                ",
+  "query": "\n                SELECT flow_id FROM flows\n                WHERE\n                    scope_data->>'dataset_id' = $1\n                    AND ($2::text IS NULL OR flow_type = $2)\n                    AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)\n                    AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))\n                ORDER BY flow_status, last_event_id DESC\n                LIMIT $5 OFFSET $6\n                ",
   "describe": {
     "columns": [
       {
@@ -35,5 +35,5 @@
       false
     ]
   },
-  "hash": "2a83ae5dbcc1a4fbf30bfb1f540c456781edbd3d796bdfc12d9276155a151e0c"
+  "hash": "16ff77a29797326892ac95809dbb7cc3a490eb101dce005a4660bae1cb203792"
 }

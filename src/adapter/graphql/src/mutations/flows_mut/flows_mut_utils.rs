@@ -41,18 +41,16 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
     let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
     match flow_query_service.get_flow(flow_id.into()).await {
-        Ok(flow_state) => match flow_state.flow_binding.scope {
-            fs::FlowScope::Dataset {
-                dataset_id: flow_dataset_id,
-            } => {
-                if flow_dataset_id != *dataset_id {
+        Ok(flow_state) => {
+            if let Some(flow_dataset_id) = flow_state.flow_binding.dataset_id() {
+                if flow_dataset_id != dataset_id {
                     return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }
-            }
-            fs::FlowScope::System => {
+            } else {
+                // If the flow is not bound to a dataset, treat as not found in this dataset
                 return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
             }
-        },
+        }
         Err(e) => {
             return match e {
                 fs::GetFlowError::NotFound(_) => {

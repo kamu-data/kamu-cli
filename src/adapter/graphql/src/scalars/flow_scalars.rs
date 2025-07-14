@@ -43,6 +43,9 @@ impl From<fs::FlowBinding> for FlowKey {
                     _ => panic!("Unexpected dataset flow type: {:?}", value.flow_type),
                 },
             }),
+            fs::FlowScope::WebhookSubscription { .. } => {
+                unimplemented!("WebhookSubscription flow key is not implemented yet")
+            }
             fs::FlowScope::System => Self::System(FlowKeySystem {
                 flow_type: match value.flow_type.as_str() {
                     FLOW_TYPE_SYSTEM_GC => SystemFlowType::GC,

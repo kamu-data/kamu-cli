@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(DISTINCT json_extract(scope_data, '$.dataset_id')) AS count\n            FROM flow_trigger_events\n            WHERE\n                event_type = 'FlowTriggerEventCreated'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c435f644c8037c0bf47563bc85d48ae0af3e81c6840f4e1bd211b3a4e41c3e6d"
+}

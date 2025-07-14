@@ -40,6 +40,7 @@ sqlx = { version = "0.8", default-features = false, features = ["macros"] }
 strum = { version = "0.26", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
+uuid = { version = "1", default-features = false }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }

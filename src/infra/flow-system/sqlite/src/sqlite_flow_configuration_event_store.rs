@@ -17,6 +17,7 @@ use database_common::{
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
+use sqlx::types::uuid;
 use sqlx::{QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +37,7 @@ impl SqliteFlowConfigurationEventStore {
 
     fn get_system_events(
         &self,
-        system_flow_type: String,
+        flow_type: String,
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
@@ -57,7 +58,7 @@ impl SqliteFlowConfigurationEventStore {
                     AND (cast($3 as INT8) IS NULL or event_id <= $3)
                 ORDER BY event_id ASC
                 "#,
-                system_flow_type,
+                flow_type,
                 maybe_from_id,
                 maybe_to_id,
             )
@@ -79,7 +80,7 @@ impl SqliteFlowConfigurationEventStore {
     fn get_dataset_events(
         &self,
         dataset_id: &odf::DatasetID,
-        dataset_flow_type: String,
+        flow_type: String,
         maybe_from_id: Option<i64>,
         maybe_to_id: Option<i64>,
     ) -> EventStream<FlowConfigurationEvent> {
@@ -103,8 +104,53 @@ impl SqliteFlowConfigurationEventStore {
                     AND (cast($4 as INT8) IS NULL or event_id <= $4)
                 ORDER BY event_id ASC
                 "#,
-                dataset_flow_type,
+                flow_type,
                 dataset_id,
+                maybe_from_id,
+                maybe_to_id,
+            )
+            .try_map(|event_row| {
+                let event = serde_json::from_value::<FlowConfigurationEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((event_id, event)) = query_stream.try_next().await? {
+                yield Ok((event_id, event));
+            }
+        })
+    }
+
+    fn get_webhook_subscription_events(
+        &self,
+        webhook_subscription_id: uuid::Uuid,
+        flow_type: String,
+        maybe_from_id: Option<i64>,
+        maybe_to_id: Option<i64>,
+    ) -> EventStream<FlowConfigurationEvent> {
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query_as!(
+                EventModel,
+                r#"
+                SELECT event_id, event_payload as "event_payload: _"
+                FROM flow_configuration_events
+                WHERE flow_type = $1
+                    AND json_extract(scope_data, '$.subscription_id') = $2
+                    AND json_extract(scope_data, '$.type') = 'WebhookSubscription'
+                    AND (cast($3 as INT8) IS NULL or event_id > $3)
+                    AND (cast($4 as INT8) IS NULL or event_id <= $4)
+                ORDER BY event_id ASC
+                "#,
+                flow_type,
+                webhook_subscription_id,
                 maybe_from_id,
                 maybe_to_id,
             )
@@ -139,6 +185,15 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
         match &flow_binding.scope {
             FlowScope::Dataset { dataset_id } => self.get_dataset_events(
                 dataset_id,
+                flow_binding.flow_type.clone(),
+                maybe_from_id,
+                maybe_to_id,
+            ),
+            FlowScope::WebhookSubscription {
+                subscription_id,
+                dataset_id: _,
+            } => self.get_webhook_subscription_events(
+                *subscription_id,
                 flow_binding.flow_type.clone(),
                 maybe_from_id,
                 maybe_to_id,
@@ -229,15 +284,14 @@ impl FlowConfigurationEventStore for SqliteFlowConfigurationEventStore {
             r#"
             WITH scope AS (
                 SELECT
-                    json_extract(scope_data, '$.type') AS scope_type,
                     json_extract(scope_data, '$.dataset_id') AS dataset_id,
                     event_type
                 FROM flow_configuration_events
+                WHERE dataset_id IS NOT NULL
             )
             SELECT DISTINCT dataset_id as "dataset_id: String"
             FROM scope
-                WHERE scope_type = 'Dataset'
-                AND event_type = 'FlowConfigurationEventCreated'
+                WHERE event_type = 'FlowConfigurationEventCreated'
             ORDER BY dataset_id
             LIMIT $1 OFFSET $2
             "#,
@@ -266,8 +320,9 @@ impl FlowConfigurationEventStore for SqliteFlowConfigurationEventStore {
             r#"
             SELECT COUNT(DISTINCT json_extract(scope_data, '$.dataset_id')) AS count
             FROM flow_configuration_events
-            WHERE json_extract(scope_data, '$.type') = 'Dataset'
-                AND event_type = 'FlowConfigurationEventCreated'
+            WHERE
+                event_type = 'FlowConfigurationEventCreated' AND
+                json_extract(scope_data, '$.dataset_id') IS NOT NULL
             "#,
         )
         .fetch_one(connection_mut)

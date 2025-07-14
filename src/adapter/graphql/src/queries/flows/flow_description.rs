@@ -446,6 +446,9 @@ impl FlowDescriptionBuilder {
                 self.dataset_flow_description(ctx, flow_state, flow_type, dataset_id)
                     .await?,
             ),
+            fs::FlowScope::WebhookSubscription { .. } => {
+                unimplemented!("WebhookSubscription flow description is not implemented yet")
+            }
             fs::FlowScope::System => {
                 FlowDescription::System(self.system_flow_description(flow_type)?)
             }

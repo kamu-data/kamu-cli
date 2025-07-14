@@ -403,7 +403,6 @@ impl FlowEventStore for PostgresFlowEventStore {
             r#"
             SELECT flow_id FROM flows
                 WHERE
-                    scope_data->>'type' = 'Dataset' AND
                     scope_data->>'dataset_id' = $1 AND
                     flow_status != 'finished'::flow_status_type
                 ORDER BY flow_id DESC
@@ -564,8 +563,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    scope_data->>'type' = 'Dataset'
-                    AND scope_data->>'dataset_id' = $1
+                    scope_data->>'dataset_id' = $1
                     AND ($2::text IS NULL OR flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
@@ -608,8 +606,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
             WHERE
-                scope_data->>'type' = 'Dataset'
-                AND scope_data->>'dataset_id' = $1
+                scope_data->>'dataset_id' = $1
                 AND ($2::text IS NULL OR flow_type = $2)
                 AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                 AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
@@ -654,8 +651,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    scope_data->>'type' = 'Dataset'
-                    AND scope_data->>'dataset_id' = ANY($1)
+                    scope_data->>'dataset_id' = ANY($1)
                     AND ($2::text IS NULL OR flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
@@ -697,9 +693,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 r#"
                 SELECT DISTINCT(initiator) FROM flows
                 WHERE
-                    scope_data->>'type' = 'Dataset'
-                    AND scope_data->>'dataset_id' = $1
-                    AND initiator != $2
+                    scope_data->>'dataset_id' = $1 AND initiator != $2
                 "#,
                 dataset_id,
                 SYSTEM_INITIATOR,
@@ -913,8 +907,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
             WHERE
-                scope_data->>'type' = 'Dataset'
-                AND scope_data->>'dataset_id' = ANY($1)
+                scope_data->>'dataset_id' = ANY($1)
                 AND ($2::text IS NULL OR flow_type = $2)
                 AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                 AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
@@ -946,8 +939,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id
             FROM flows
             WHERE
-                scope_data->>'type' = 'Dataset'
-                AND scope_data->>'dataset_id' = ANY($1)
+                scope_data->>'dataset_id' = ANY($1)
             "#,
             &ids,
         )

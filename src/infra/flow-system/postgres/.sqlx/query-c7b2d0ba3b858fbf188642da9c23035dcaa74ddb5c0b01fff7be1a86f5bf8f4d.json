@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT flow_id FROM flows\n                WHERE\n                    scope_data->>'dataset_id' = $1 AND\n                    flow_status != 'finished'::flow_status_type\n                ORDER BY flow_id DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c7b2d0ba3b858fbf188642da9c23035dcaa74ddb5c0b01fff7be1a86f5bf8f4d"
+}

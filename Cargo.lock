@@ -6762,6 +6762,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-flow-webhook"
+version = "0.245.0"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "futures",
+ "internal-error",
+ "kamu-adapter-task-webhook",
+ "kamu-flow-system",
+ "kamu-task-system",
+ "messaging-outbox",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "time-source",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-adapter-graphql"
 version = "0.245.1"
 dependencies = [
@@ -7239,6 +7262,7 @@ dependencies = [
  "kamu-adapter-auth-web3",
  "kamu-adapter-flight-sql",
  "kamu-adapter-flow-dataset",
+ "kamu-adapter-flow-webhook",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-adapter-oauth",
@@ -7701,6 +7725,7 @@ dependencies = [
  "strum 0.26.3",
  "thiserror 2.0.12",
  "tokio-stream",
+ "uuid",
 ]
 
 [[package]]
@@ -7721,6 +7746,7 @@ dependencies = [
  "test-log",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -7743,6 +7769,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -7818,6 +7845,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

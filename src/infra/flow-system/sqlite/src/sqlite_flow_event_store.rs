@@ -465,7 +465,6 @@ impl FlowEventStore for SqliteFlowEventStore {
             r#"
             SELECT flow_id FROM flows
                 WHERE
-                    scope_data->>'type' = 'Dataset' AND
                     scope_data->>'dataset_id' = $1 AND
                     flow_status != 'finished'
                 ORDER BY flow_id DESC
@@ -633,8 +632,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    scope_data->>'type' = 'Dataset'
-                    AND scope_data->>'dataset_id' = $1
+                    scope_data->>'dataset_id' = $1
                     AND ($2::text IS NULL OR flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND ($4 = 0 OR initiator IN ({}))
@@ -696,8 +694,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
             WHERE
-                scope_data->>'type' = 'Dataset'
-                AND scope_data->>'dataset_id' = $1
+                scope_data->>'dataset_id' = $1
                 AND ($2::text IS NULL OR flow_type = $2)
                 AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                 AND ($4 = 0 OR initiator IN ({}))
@@ -756,8 +753,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    scope_data->>'type' = 'Dataset'
-                    AND scope_data->>'dataset_id' in ({})
+                    scope_data->>'dataset_id' in ({})
                     AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                     AND ($3 = 0 OR initiator in ({}))
                 ORDER BY flow_status DESC, last_event_id DESC
@@ -817,9 +813,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 r#"
                 SELECT DISTINCT(initiator) FROM flows
                 WHERE
-                    scope_data->>'type' = 'Dataset'
-                    AND scope_data->>'dataset_id' = $1
-                    AND initiator != $2
+                    scope_data->>'dataset_id' = $1 AND initiator != $2
                 "#,
                 dataset_id,
                 SYSTEM_INITIATOR,
@@ -1089,8 +1083,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
             WHERE
-                scope_data->>'type' = 'Dataset'
-                AND scope_data->>'dataset_id' IN ({})
+                scope_data->>'dataset_id' IN ({})
                 AND ($1::text IS NULL OR flow_type = $1)
                 AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
                 AND ($3 = 0 OR initiator IN ({}))
@@ -1140,8 +1133,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id
             FROM flows
             WHERE
-                scope_data->>'type' = 'Dataset'
-                AND scope_data->>'dataset_id' IN ({})
+                scope_data->>'dataset_id' IN ({})
             "#,
             sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(1).unwrap())
         );
