@@ -14,58 +14,13 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
 };
-use kamu_flow_system::{self as fs, FLOW_TYPE_SYSTEM_GC};
+use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 simple_scalar!(FlowID, fs::FlowID);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Eq, PartialEq)]
-pub enum FlowKey {
-    Dataset(FlowKeyDataset),
-    System(FlowKeySystem),
-}
-
-impl From<fs::FlowBinding> for FlowKey {
-    fn from(value: fs::FlowBinding) -> Self {
-        match value.scope {
-            fs::FlowScope::Dataset { dataset_id } => Self::Dataset(FlowKeyDataset {
-                dataset_id: dataset_id.into(),
-                flow_type: match value.flow_type.as_str() {
-                    FLOW_TYPE_DATASET_INGEST => DatasetFlowType::Ingest,
-                    FLOW_TYPE_DATASET_TRANSFORM => DatasetFlowType::ExecuteTransform,
-                    FLOW_TYPE_DATASET_COMPACT => DatasetFlowType::HardCompaction,
-                    FLOW_TYPE_DATASET_RESET => DatasetFlowType::Reset,
-                    _ => panic!("Unexpected dataset flow type: {:?}", value.flow_type),
-                },
-            }),
-            fs::FlowScope::WebhookSubscription { .. } => {
-                unimplemented!("WebhookSubscription flow key is not implemented yet")
-            }
-            fs::FlowScope::System => Self::System(FlowKeySystem {
-                flow_type: match value.flow_type.as_str() {
-                    FLOW_TYPE_SYSTEM_GC => SystemFlowType::GC,
-                    _ => panic!("Unexpected system flow type: {:?}", value.flow_type),
-                },
-            }),
-        }
-    }
-}
-
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowKeyDataset {
-    pub dataset_id: DatasetID<'static>,
-    pub flow_type: DatasetFlowType,
-}
-
-#[derive(SimpleObject, PartialEq, Eq)]
-pub struct FlowKeySystem {
-    pub flow_type: SystemFlowType,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
