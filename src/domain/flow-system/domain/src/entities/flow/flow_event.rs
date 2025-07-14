@@ -64,6 +64,7 @@ pub struct FlowEventInitiated {
     pub trigger: FlowTriggerInstance,
     pub config_snapshot: Option<FlowConfigurationRule>,
     pub retry_policy: Option<RetryPolicy>,
+    pub run_arguments: Option<FlowRunArguments>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

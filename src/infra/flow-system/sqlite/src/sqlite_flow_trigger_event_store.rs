@@ -323,7 +323,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
             SELECT COUNT(DISTINCT json_extract(scope_data, '$.dataset_id')) AS count
             FROM flow_trigger_events
             WHERE
-                event_type = 'FlowTriggerEventCreated' AND 
+                event_type = 'FlowTriggerEventCreated' AND
                 json_extract(scope_data, '$.dataset_id') IS NOT NULL
             "#,
         )

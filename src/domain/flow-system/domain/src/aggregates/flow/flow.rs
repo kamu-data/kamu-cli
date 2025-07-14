@@ -27,6 +27,7 @@ impl Flow {
         trigger: FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
+        run_arguments: Option<FlowRunArguments>,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -38,6 +39,7 @@ impl Flow {
                     trigger,
                     config_snapshot,
                     retry_policy,
+                    run_arguments,
                 },
             )
             .unwrap(),

@@ -230,6 +230,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     }),
                     config_snapshot: None,
                     retry_policy: None,
+                    run_arguments: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {

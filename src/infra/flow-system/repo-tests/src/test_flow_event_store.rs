@@ -1208,6 +1208,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
             automatic_trigger.clone(),
             None,
             None,
+            None,
         )
         .await;
 
@@ -1254,6 +1255,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
+            None,
             None,
             None,
         )
@@ -1437,6 +1439,7 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
             automatic_trigger.clone(),
             None,
             None,
+            None,
         )
         .await;
 
@@ -1506,6 +1509,7 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
             automatic_trigger.clone(),
             None,
             None,
+            None,
         )
         .await;
     let flow_id_compact = flow_generator
@@ -1513,6 +1517,7 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
             FLOW_TYPE_DATASET_COMPACT,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
+            None,
             None,
             None,
         )
@@ -1623,6 +1628,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
             automatic_trigger.clone(),
             None,
             None,
+            None,
         )
         .await;
     let flow_id_bar_ingest = bar_flow_generator
@@ -1632,6 +1638,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
             automatic_trigger.clone(),
             None,
             None,
+            None,
         )
         .await;
     let flow_id_foo_compacting = foo_flow_generator
@@ -1639,6 +1646,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
             FLOW_TYPE_DATASET_COMPACT,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
+            None,
             None,
             None,
         )
@@ -1780,6 +1788,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                     }),
                     config_snapshot: None,
                     retry_policy: None,
+                    run_arguments: None,
                 }
                 .into(),
             ],
@@ -1802,6 +1811,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                     }),
                     config_snapshot: None,
                     retry_policy: None,
+                    run_arguments: None,
                 }
                 .into(),
             ],
@@ -1886,6 +1896,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
                     }),
                     config_snapshot: None,
                     retry_policy: None,
+                    run_arguments: None,
                 }
                 .into(),
             ],
@@ -2049,6 +2060,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                     }),
                     config_snapshot: None,
                     retry_policy: None,
+                    run_arguments: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
@@ -2145,6 +2157,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     }),
                     config_snapshot: None,
                     retry_policy: None,
+                    run_arguments: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
@@ -2181,6 +2194,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     }),
                     config_snapshot: None,
                     retry_policy: None,
+                    run_arguments: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
@@ -2217,6 +2231,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     }),
                     config_snapshot: None,
                     retry_policy: None,
+                    run_arguments: None,
                 }
                 .into(),
                 FlowEventStartConditionUpdated {
@@ -2279,6 +2294,7 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
             automatic_trigger.clone(),
             None,
             None,
+            None,
         )
         .await;
 
@@ -2289,6 +2305,7 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
             automatic_trigger.clone(),
             None,
             None,
+            None,
         )
         .await;
 
@@ -2297,6 +2314,7 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
             FLOW_TYPE_DATASET_RESET,
             FlowStatus::Waiting,
             automatic_trigger.clone(),
+            None,
             None,
             None,
         )
@@ -2410,6 +2428,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
                 min_delay_seconds: 30,
                 backoff_type: RetryBackoffType::Fixed,
             }),
+            None,
         )
         .await;
 
@@ -2548,6 +2567,7 @@ async fn make_dataset_test_flows(
             petya_manual_trigger,
             None,
             None,
+            None,
         )
         .await;
     let flow_id_running = flow_generator
@@ -2557,6 +2577,7 @@ async fn make_dataset_test_flows(
             wasya_manual_trigger,
             None,
             None,
+            None,
         )
         .await;
     let flow_id_finished = flow_generator
@@ -2564,6 +2585,7 @@ async fn make_dataset_test_flows(
             flow_type,
             FlowStatus::Finished,
             automatic_trigger,
+            None,
             None,
             None,
         )
@@ -2716,6 +2738,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         initial_trigger: FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
+        run_arguments: Option<FlowRunArguments>,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
 
@@ -2728,6 +2751,7 @@ impl<'a> DatasetFlowGenerator<'a> {
             initial_trigger,
             config_snapshot,
             retry_policy,
+            run_arguments,
         );
 
         drive_flow_to_status(&mut flow, expected_status);
@@ -2798,6 +2822,7 @@ impl SystemFlowGenerator {
             FlowBinding::for_system(flow_type),
             initial_trigger_type,
             config_snapshot,
+            None,
             None,
         );
 

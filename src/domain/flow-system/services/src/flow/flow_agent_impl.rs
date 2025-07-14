@@ -354,7 +354,11 @@ impl FlowAgentImpl {
 
         // Dispatcher should create a logical plan that corresponds to the flow type
         let logical_plan = flow_dispatcher
-            .build_task_logical_plan(&flow.flow_binding, flow.config_snapshot.as_ref())
+            .build_task_logical_plan(
+                &flow.flow_binding,
+                flow.config_snapshot.as_ref(),
+                flow.run_arguments.as_ref(),
+            )
             .await
             .int_err()?;
 

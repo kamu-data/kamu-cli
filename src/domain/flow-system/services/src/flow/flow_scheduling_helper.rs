@@ -276,6 +276,7 @@ impl FlowSchedulingHelper {
                         &trigger_type,
                         maybe_flow_config_rule_snapshot,
                         retry_policy,
+                        None, /* TODO: run arguments */
                     )
                     .await?;
 
@@ -518,6 +519,7 @@ impl FlowSchedulingHelper {
         trigger_type: &FlowTriggerInstance,
         maybe_config_rule_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
+        run_arguments: Option<FlowRunArguments>,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(flow_key = ?flow_binding, trigger = ?trigger_type, "Creating new flow");
 
@@ -528,6 +530,7 @@ impl FlowSchedulingHelper {
             trigger_type.clone(),
             maybe_config_rule_snapshot,
             retry_policy,
+            run_arguments,
         );
 
         Ok(flow)

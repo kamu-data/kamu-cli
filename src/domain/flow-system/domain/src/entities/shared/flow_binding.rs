@@ -71,6 +71,12 @@ impl FlowBinding {
             InternalError::new("Expecting dataset or webhook flow binding scope with dataset_id")
         })
     }
+
+    pub fn get_webhook_subscription_id_or_die(&self) -> Result<uuid::Uuid, InternalError> {
+        self.webhook_subscription_id().ok_or_else(|| {
+            InternalError::new("Expecting webhook flow binding scope with subscription_id")
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

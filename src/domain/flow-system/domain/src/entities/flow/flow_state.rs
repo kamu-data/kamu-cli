@@ -35,6 +35,8 @@ pub struct FlowState {
     pub config_snapshot: Option<FlowConfigurationRule>,
     /// Retry policy used
     pub retry_policy: Option<RetryPolicy>,
+    /// Optional run arguments
+    pub run_arguments: Option<FlowRunArguments>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -96,6 +98,7 @@ impl Projection for FlowState {
                     trigger,
                     config_snapshot,
                     retry_policy,
+                    run_arguments,
                 }) => Ok(Self {
                     flow_id,
                     flow_binding,
@@ -111,6 +114,7 @@ impl Projection for FlowState {
                     config_snapshot,
                     outcome: None,
                     retry_policy,
+                    run_arguments,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
