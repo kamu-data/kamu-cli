@@ -194,6 +194,7 @@ impl FlowAgentImpl {
                                 trigger_time: start_time,
                             }),
                             None,
+                            flow.run_arguments,
                         )
                         .await?;
                 }

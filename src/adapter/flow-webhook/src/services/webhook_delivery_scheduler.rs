@@ -12,9 +12,12 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{DatasetReferenceMessage, MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE};
-use kamu_task_system::TaskScheduler;
+use kamu_flow_system as fs;
 use kamu_webhooks::*;
 use messaging_outbox::*;
+use time_source::SystemTimeSource;
+
+use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowRunArgumentsWebhookDeliver};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,9 +33,9 @@ use messaging_outbox::*;
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct WebhookDeliveryScheduler {
-    task_scheduler: Arc<dyn TaskScheduler>,
     webhook_event_builder: Arc<dyn WebhookEventBuilder>,
-    webhook_task_factory: Arc<dyn WebhookTaskFactory>,
+    flow_run_service: Arc<dyn fs::FlowRunService>,
+    time_source: Arc<dyn SystemTimeSource>,
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
 }
 
@@ -49,9 +52,9 @@ impl WebhookDeliveryScheduler {
             .list_enabled_webhook_subscriptions_for_dataset_event(dataset_id, &event.event_type)
             .await?;
 
-        // Schedule webhook delivery tasks for each subscription
+        // Schedule webhook delivery flow for each subscription
         for subscription_id in subscription_ids {
-            self.schedule_webhook_delivery_task(subscription_id, event.id)
+            self.schedule_webhook_delivery_flow(subscription_id, dataset_id, event.id)
                 .await?;
         }
 
@@ -81,23 +84,41 @@ impl WebhookDeliveryScheduler {
         Ok(subscription_ids)
     }
 
-    async fn schedule_webhook_delivery_task(
+    async fn schedule_webhook_delivery_flow(
         &self,
         subscription_id: WebhookSubscriptionID,
+        dataset_id: &odf::DatasetID,
         event_id: WebhookEventID,
     ) -> Result<(), InternalError> {
-        let task = self
-            .task_scheduler
-            .create_task(
-                self.webhook_task_factory
-                    .build_delivery_task_plan(subscription_id, event_id)
-                    .await?,
+        let flow_binding = fs::FlowBinding::for_webhook_subscription(
+            subscription_id.into_inner(),
+            Some(dataset_id.clone()),
+            FLOW_TYPE_WEBHOOK_DELIVER,
+        );
+
+        let flow_trigger_instance =
+            fs::FlowTriggerInstance::AutoPolling(fs::FlowTriggerAutoPolling {
+                trigger_time: self.time_source.now(),
+            });
+
+        let flow_run_arguments = FlowRunArgumentsWebhookDeliver {
+            event_id: event_id.into_inner(),
+        }
+        .into_flow_run_arguments();
+
+        let flow = self
+            .flow_run_service
+            .run_flow_with_trigger(
+                &flow_binding,
+                flow_trigger_instance,
                 None,
+                None,
+                Some(flow_run_arguments),
             )
             .await
             .int_err()?;
 
-        tracing::debug!(task_id = ?task.task_id, %event_id, %subscription_id, "Scheduled webhook delivery task");
+        tracing::debug!(flow = ?flow.flow_id, %event_id, %subscription_id, "Scheduled webhook delivery flow");
 
         Ok(())
     }

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod webhook_dataset_removal_handler;
-mod webhook_delivery_scheduler;
 mod webhook_delivery_worker_impl;
 mod webhook_event_builder_impl;
 mod webhook_headers;
@@ -18,7 +17,6 @@ mod webhook_signer_impl;
 mod webhook_subscription_query_service_impl;
 
 pub use webhook_dataset_removal_handler::*;
-pub use webhook_delivery_scheduler::*;
 pub use webhook_delivery_worker_impl::*;
 pub use webhook_event_builder_impl::*;
 pub use webhook_headers::*;

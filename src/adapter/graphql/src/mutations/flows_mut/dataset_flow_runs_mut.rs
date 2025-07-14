@@ -85,6 +85,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
                 &flow_binding,
                 logged_account.account_id,
                 maybe_forced_configuration_rule,
+                None,
             )
             .await
             .int_err()?;
@@ -129,7 +130,13 @@ impl<'a> DatasetFlowRunsMut<'a> {
         );
 
         let flow_state = flow_run_service
-            .run_flow_manually(Utc::now(), &flow_binding, logged_account.account_id, None)
+            .run_flow_manually(
+                Utc::now(),
+                &flow_binding,
+                logged_account.account_id,
+                None,
+                None,
+            )
             .await
             .int_err()?;
 
@@ -199,6 +206,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
                 &flow_binding,
                 logged_account.account_id,
                 maybe_forced_configuration_rule,
+                None,
             )
             .await
             .int_err()?;
@@ -284,6 +292,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
                 &flow_binding,
                 logged_account.account_id,
                 maybe_forced_flow_config_rule,
+                None,
             )
             .await
             .int_err()?;

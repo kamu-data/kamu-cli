@@ -7,6 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod webhook_task_factory_impl;
-
-pub use webhook_task_factory_impl::*;
+mod tests;

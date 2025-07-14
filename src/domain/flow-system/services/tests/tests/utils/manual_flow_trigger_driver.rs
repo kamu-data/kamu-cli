@@ -29,6 +29,7 @@ pub(crate) struct ManualFlowTriggerArgs {
     pub(crate) run_since_start: Duration,
     pub(crate) initiator_id: Option<odf::AccountID>,
     pub(crate) maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
+    pub(crate) maybe_flow_run_arguments: Option<kamu_flow_system::FlowRunArguments>,
 }
 
 impl ManualFlowTriggerDriver {
@@ -66,6 +67,7 @@ impl ManualFlowTriggerDriver {
                     .clone()
                     .unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
                 self.args.maybe_forced_flow_config_rule.clone(),
+                self.args.maybe_flow_run_arguments.clone(),
             )
             .await?;
         Ok(())

@@ -58,6 +58,7 @@ impl FlowSchedulingHelper {
                                 trigger_time: start_time,
                             }),
                             None,
+                            None,
                         )
                         .await?;
                     } else {
@@ -123,6 +124,7 @@ impl FlowSchedulingHelper {
                 trigger_time: start_time,
             }),
             None,
+            None,
         )
         .await
     }
@@ -140,6 +142,7 @@ impl FlowSchedulingHelper {
                 trigger_time: start_time,
             }),
             None,
+            None,
         )
         .await
     }
@@ -150,6 +153,7 @@ impl FlowSchedulingHelper {
         trigger_rule_maybe: Option<FlowTriggerRule>,
         trigger_type: FlowTriggerInstance,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
+        maybe_flow_run_arguments: Option<FlowRunArguments>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self
@@ -276,7 +280,7 @@ impl FlowSchedulingHelper {
                         &trigger_type,
                         maybe_flow_config_rule_snapshot,
                         retry_policy,
-                        None, /* TODO: run arguments */
+                        maybe_flow_run_arguments,
                     )
                     .await?;
 

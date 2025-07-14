@@ -42,6 +42,7 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
                     input_trigger.clone(),
                     Some(fs::FlowTriggerRule::Batching(batching_rule)),
                     None,
+                    None,
                 )
                 .await
                 .int_err()?;
@@ -86,6 +87,7 @@ pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
                     Some(
                         FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
                     ),
+                    None,
                 )
                 .await
                 .int_err()?;

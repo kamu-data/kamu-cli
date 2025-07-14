@@ -28,8 +28,10 @@ database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
+time-source = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-task-system = { workspace = true }
+kamu-flow-system = { workspace = true }
 kamu-webhooks = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

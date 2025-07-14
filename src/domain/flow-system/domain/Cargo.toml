@@ -21,6 +21,10 @@ workspace = true
 doctest = false
 
 
+[features]
+default = []
+testing = ["dep:mockall"]
+
 [dependencies]
 database-common = { workspace = true }
 enum-variants = { workspace = true }
@@ -48,6 +52,7 @@ serde_with = { version = "3", default-features = false, features = [
     "chrono_0_4",
 ] }
 
+mockall = { optional = true, version = "0.13", default-features = false }
 
 [dev-dependencies]
 kamu-accounts = { workspace = true }

@@ -13,34 +13,49 @@ use chrono::Utc;
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
-use kamu_adapter_task_webhook::{LogicalPlanWebhookDeliver, WebhookTaskFactoryImpl};
+use kamu_adapter_flow_webhook::{
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowRunArgumentsWebhookDeliver,
+    WebhookDeliveryScheduler,
+};
 use kamu_datasets::{
     DatasetEntry,
     DatasetReferenceMessage,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
 };
 use kamu_datasets_services::testing::FakeDatasetEntryService;
-use kamu_task_system::*;
+use kamu_flow_system::{
+    FlowBinding,
+    FlowID,
+    FlowRunService,
+    FlowState,
+    FlowTimingRecords,
+    FlowTriggerAutoPolling,
+    FlowTriggerInstance,
+    MockFlowRunService,
+};
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::{InMemoryWebhookEventRepository, InMemoryWebhookSubscriptionEventStore};
-use kamu_webhooks_services::{WebhookDeliveryScheduler, WebhookEventBuilderImpl};
+use kamu_webhooks_services::WebhookEventBuilderImpl;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use serde_json::json;
+use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_subscription_scheduled_on_dataset_update() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-
     let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
-    let mut mock_task_scheduler = MockTaskScheduler::new();
-    TestWebhookDeliverySchedulerHarness::add_task_expectation(
-        &mut mock_task_scheduler,
-        subscription_id.into_inner(),
+    let mut mock_flow_run_service = MockFlowRunService::new();
+    TestWebhookDeliverySchedulerHarness::add_flow_trigger_expectation(
+        &mut mock_flow_run_service,
+        &dataset_id,
+        subscription_id,
     );
-    let harness = TestWebhookDeliverySchedulerHarness::new(mock_task_scheduler);
+
+    let harness = TestWebhookDeliverySchedulerHarness::new(mock_flow_run_service);
 
     harness.register_dataset_entry(&dataset_id, "foo");
 
@@ -81,17 +96,20 @@ async fn test_subscriptions_in_different_statuses() {
     let subscription_id_3 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
     let subscription_id_4 = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
+    let mut mock_flow_run_service = MockFlowRunService::new();
+    TestWebhookDeliverySchedulerHarness::add_flow_trigger_expectation(
+        &mut mock_flow_run_service,
+        &dataset_id,
+        subscription_id_1,
+    );
+    TestWebhookDeliverySchedulerHarness::add_flow_trigger_expectation(
+        &mut mock_flow_run_service,
+        &dataset_id,
+        subscription_id_2,
+    );
+
     // No task for subscriptions 3 and 4
-    let mut mock_task_scheduler = MockTaskScheduler::new();
-    TestWebhookDeliverySchedulerHarness::add_task_expectation(
-        &mut mock_task_scheduler,
-        subscription_id_1.into_inner(),
-    );
-    TestWebhookDeliverySchedulerHarness::add_task_expectation(
-        &mut mock_task_scheduler,
-        subscription_id_2.into_inner(),
-    );
-    let harness = TestWebhookDeliverySchedulerHarness::new(mock_task_scheduler);
+    let harness = TestWebhookDeliverySchedulerHarness::new(mock_flow_run_service);
 
     harness.register_dataset_entry(&dataset_id, "foo");
 
@@ -140,8 +158,7 @@ async fn test_update_in_wrong_dataset() {
     let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     // No tasks
-    let mock_task_scheduler = MockTaskScheduler::new();
-    let harness = TestWebhookDeliverySchedulerHarness::new(mock_task_scheduler);
+    let harness = TestWebhookDeliverySchedulerHarness::new(MockFlowRunService::new());
 
     harness.register_dataset_entry(&dataset_id_1, "foo");
     harness.register_dataset_entry(&dataset_id_2, "bar");
@@ -182,8 +199,7 @@ async fn test_subscription_non_matching_event_type() {
     let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     // No tasks
-    let mock_task_scheduler = MockTaskScheduler::new();
-    let harness = TestWebhookDeliverySchedulerHarness::new(mock_task_scheduler);
+    let harness = TestWebhookDeliverySchedulerHarness::new(MockFlowRunService::new());
 
     harness.register_dataset_entry(&dataset_id, "foo");
 
@@ -235,7 +251,7 @@ struct TestWebhookDeliverySchedulerHarness {
 }
 
 impl TestWebhookDeliverySchedulerHarness {
-    fn new(mock_task_scheduler: MockTaskScheduler) -> Self {
+    fn new(mock_flow_run_service: MockFlowRunService) -> Self {
         let mut b = CatalogBuilder::new();
         b.add::<WebhookDeliveryScheduler>()
             .add::<WebhookEventBuilderImpl>()
@@ -246,10 +262,10 @@ impl TestWebhookDeliverySchedulerHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<InMemoryWebhookSubscriptionEventStore>()
             .add::<InMemoryWebhookEventRepository>()
-            .add_value(mock_task_scheduler)
-            .bind::<dyn TaskScheduler, MockTaskScheduler>()
             .add::<FakeDatasetEntryService>()
-            .add::<WebhookTaskFactoryImpl>();
+            .add::<SystemTimeSourceDefault>()
+            .add_value(mock_flow_run_service)
+            .bind::<dyn FlowRunService, MockFlowRunService>();
 
         register_message_dispatcher::<DatasetReferenceMessage>(
             &mut b,
@@ -304,23 +320,64 @@ impl TestWebhookDeliverySchedulerHarness {
             .unwrap();
     }
 
-    fn add_task_expectation(
-        mock_task_scheduler: &mut MockTaskScheduler,
-        subscription_id_uuid: uuid::Uuid,
+    fn add_flow_trigger_expectation(
+        mock_flow_run_service: &mut MockFlowRunService,
+        dataset_id: &odf::DatasetID,
+        subscription_id: WebhookSubscriptionID,
     ) {
-        mock_task_scheduler
-            .expect_create_task()
-            .withf(move |plan, _| {
-                plan.plan_type == LogicalPlanWebhookDeliver::TYPE_ID
-                    && LogicalPlanWebhookDeliver::from_logical_plan(plan)
-                        .unwrap()
-                        .webhook_subscription_id
-                        == subscription_id_uuid
-            })
-            .returning(|plan, _| {
-                let task_id = TaskID::new(35);
-                let task = Task::new(Utc::now(), task_id, plan, None);
-                Ok(task.into())
+        let dataset_id_clone_1 = dataset_id.clone();
+        let dataset_id_clone_2 = dataset_id.clone();
+
+        mock_flow_run_service
+            .expect_run_flow_with_trigger()
+            .withf(
+                move |flow_binding: &kamu_flow_system::FlowBinding,
+                      _trigger_instance,
+                      maybe_flow_trigger_rule,
+                      maybe_forced_flow_config_rule,
+                      maybe_flow_run_arguments| {
+                    assert_eq!(flow_binding.flow_type, FLOW_TYPE_WEBHOOK_DELIVER);
+
+                    assert!(maybe_flow_trigger_rule.is_none());
+                    assert!(maybe_forced_flow_config_rule.is_none());
+                    assert!(maybe_flow_run_arguments.is_some());
+
+                    flow_binding.dataset_id() == Some(&dataset_id_clone_1)
+                        && flow_binding.get_webhook_subscription_id_or_die().unwrap()
+                            == subscription_id.into_inner()
+                },
+            )
+            .returning(move |_, _, _, _, _| {
+                let now = Utc::now();
+
+                Ok(FlowState {
+                    flow_id: FlowID::new(1),
+                    flow_binding: FlowBinding::for_webhook_subscription(
+                        subscription_id.into_inner(),
+                        Some(dataset_id_clone_2.clone()),
+                        FLOW_TYPE_WEBHOOK_DELIVER,
+                    ),
+                    start_condition: None,
+                    task_ids: vec![],
+                    triggers: vec![FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
+                        trigger_time: now,
+                    })],
+                    outcome: None,
+                    timing: FlowTimingRecords {
+                        scheduled_for_activation_at: Some(now),
+                        running_since: None,
+                        awaiting_executor_since: None,
+                        last_attempt_finished_at: None,
+                    },
+                    config_snapshot: None,
+                    retry_policy: None,
+                    run_arguments: Some(
+                        FlowRunArgumentsWebhookDeliver {
+                            event_id: uuid::Uuid::new_v4(),
+                        }
+                        .into_flow_run_arguments(),
+                    ),
+                })
             });
     }
 
