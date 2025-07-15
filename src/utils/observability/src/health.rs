@@ -21,6 +21,7 @@ pub trait HealthCheck: Send + Sync {
 
 /// Axum handler for serving the health checks. Depends on [`dill::Catalog`] to
 /// instantiate the implementations of the [`HealthCheck`] trait.
+#[cfg(feature = "dill")]
 pub async fn health_handler(
     axum::Extension(catalog): axum::Extension<dill::Catalog>,
     axum::extract::Query(args): axum::extract::Query<CheckArgs>,
