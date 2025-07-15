@@ -96,9 +96,9 @@ impl WebhookDeliveryScheduler {
             FLOW_TYPE_WEBHOOK_DELIVER,
         );
 
-        let flow_trigger_instance =
-            fs::FlowTriggerInstance::AutoPolling(fs::FlowTriggerAutoPolling {
-                trigger_time: self.time_source.now(),
+        let activation_cause =
+            fs::FlowActivationCause::AutoPolling(fs::FlowActivationCauseAutoPolling {
+                activation_time: self.time_source.now(),
             });
 
         let flow_run_arguments = FlowRunArgumentsWebhookDeliver {
@@ -108,9 +108,9 @@ impl WebhookDeliveryScheduler {
 
         let flow = self
             .flow_run_service
-            .run_flow_with_trigger(
+            .run_flow_automatically(
                 &flow_binding,
-                flow_trigger_instance,
+                activation_cause,
                 None,
                 None,
                 Some(flow_run_arguments),

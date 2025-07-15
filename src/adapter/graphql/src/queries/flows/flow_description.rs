@@ -581,16 +581,16 @@ impl FlowDescriptionBuilder {
                         polling_source: polling_source.clone().into(),
                     })
                 } else {
-                    let source_name = flow_state.primary_trigger().push_source_name();
-                    let trigger_description = flow_state
-                        .primary_trigger()
-                        .trigger_source_description()
+                    let source_name = flow_state.primary_activation_cause().push_source_name();
+                    let activation_cause_description = flow_state
+                        .primary_activation_cause()
+                        .activation_cause_description()
                         .unwrap();
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
                         source_name,
                         input_records_count: 0, // TODO
                         ingest_result,
-                        message: trigger_description,
+                        message: activation_cause_description,
                     })
                 }
             }

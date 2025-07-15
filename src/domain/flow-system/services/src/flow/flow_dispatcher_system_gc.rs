@@ -44,7 +44,7 @@ impl FlowDispatcher for FlowDispatcherSystemGC {
     async fn propagate_success(
         &self,
         _flow_binding: &FlowBinding,
-        _trigger_instance: FlowTriggerInstance,
+        _activation_cause: FlowActivationCause,
         _maybe_config_snapshot: Option<FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
         // No propagation needed for system GC dispatcher

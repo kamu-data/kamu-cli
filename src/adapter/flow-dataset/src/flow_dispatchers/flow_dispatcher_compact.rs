@@ -70,7 +70,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
     async fn propagate_success(
         &self,
         flow_binding: &fs::FlowBinding,
-        trigger_instance: fs::FlowTriggerInstance,
+        activation_cause: fs::FlowActivationCause,
         maybe_config_snapshot: Option<fs::FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
         let dataset_id = flow_binding.get_dataset_id_or_die()?;
@@ -85,7 +85,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
                     self.dependency_graph_service.as_ref(),
                     self.flow_run_service.as_ref(),
                     &dataset_id,
-                    trigger_instance,
+                    activation_cause,
                 )
                 .await
             } else {
@@ -100,7 +100,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
                 self.flow_trigger_service.as_ref(),
                 self.flow_run_service.as_ref(),
                 flow_binding,
-                trigger_instance,
+                activation_cause,
             )
             .await
         }

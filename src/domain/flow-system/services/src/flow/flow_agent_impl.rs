@@ -190,8 +190,8 @@ impl FlowAgentImpl {
                         .trigger_flow_common(
                             &flow.flow_binding,
                             Some(FlowTriggerRule::Batching(b.active_batching_rule)),
-                            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                                trigger_time: start_time,
+                            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+                                activation_time: start_time,
                             }),
                             None,
                             flow.run_arguments,
@@ -539,11 +539,11 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 &flow.flow_binding.flow_type,
                             )?;
 
-                            let trigger_instance = match &flow.flow_binding.scope {
+                            let activation_cause = match &flow.flow_binding.scope {
                                 FlowScope::Dataset { dataset_id } => {
-                                    FlowTriggerInstance::InputDatasetFlow(
-                                        FlowTriggerInputDatasetFlow {
-                                            trigger_time: finish_time,
+                                    FlowActivationCause::InputDatasetFlow(
+                                        FlowActivationCauseInputDatasetFlow {
+                                            activation_time: finish_time,
                                             dataset_id: dataset_id.clone(),
                                             flow_type: flow.flow_binding.flow_type.clone(),
                                             flow_id: flow.flow_id,
@@ -553,16 +553,18 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 }
                                 FlowScope::System | FlowScope::WebhookSubscription { .. } => {
                                     // TODO: revise this, but there is no better trigger yet
-                                    FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                                        trigger_time: finish_time,
-                                    })
+                                    FlowActivationCause::AutoPolling(
+                                        FlowActivationCauseAutoPolling {
+                                            activation_time: finish_time,
+                                        },
+                                    )
                                 }
                             };
 
                             flow_dispatcher
                                 .propagate_success(
                                     &flow.flow_binding,
-                                    trigger_instance,
+                                    activation_cause,
                                     flow.config_snapshot.clone(),
                                 )
                                 .await

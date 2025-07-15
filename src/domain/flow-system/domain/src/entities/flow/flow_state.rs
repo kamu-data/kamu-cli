@@ -21,8 +21,8 @@ pub struct FlowState {
     pub flow_id: FlowID,
     /// Flow binding
     pub flow_binding: FlowBinding,
-    /// Triggers
-    pub triggers: Vec<FlowTriggerInstance>,
+    /// Activation causes
+    pub activation_causes: Vec<FlowActivationCause>,
     /// Start condition (if defined)
     pub start_condition: Option<FlowStartCondition>,
     /// Timing records
@@ -52,10 +52,10 @@ pub struct FlowTimingRecords {
 }
 
 impl FlowState {
-    /// Extract primary trigger
-    pub fn primary_trigger(&self) -> &FlowTriggerInstance {
-        // At least 1 trigger is initially defined for sure
-        self.triggers.first().unwrap()
+    /// Extract primary activation cause
+    pub fn primary_activation_cause(&self) -> &FlowActivationCause {
+        // At least 1 cause is initially defined for sure
+        self.activation_causes.first().unwrap()
     }
 
     /// Computes status
@@ -95,14 +95,14 @@ impl Projection for FlowState {
                     event_time: _,
                     flow_id,
                     flow_binding,
-                    trigger,
+                    activation_cause,
                     config_snapshot,
                     retry_policy,
                     run_arguments,
                 }) => Ok(Self {
                     flow_id,
                     flow_binding,
-                    triggers: vec![trigger],
+                    activation_causes: vec![activation_cause],
                     start_condition: None,
                     timing: FlowTimingRecords {
                         scheduled_for_activation_at: None,
@@ -147,13 +147,19 @@ impl Projection for FlowState {
                         ..s
                     }),
 
-                    E::TriggerAdded(FlowEventTriggerAdded { ref trigger, .. }) => {
+                    E::ActivationCauseAdded(FlowEventActivationCauseAdded {
+                        ref activation_cause,
+                        ..
+                    }) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            let mut triggers = s.triggers;
-                            triggers.push(trigger.clone());
-                            Ok(FlowState { triggers, ..s })
+                            let mut activation_causes = s.activation_causes;
+                            activation_causes.push(activation_cause.clone());
+                            Ok(FlowState {
+                                activation_causes,
+                                ..s
+                            })
                         }
                     }
 

@@ -37,20 +37,20 @@ impl FlowRunService for FlowRunServiceImpl {
     )]
     async fn run_flow_manually(
         &self,
-        trigger_time: DateTime<Utc>,
+        activation_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
         maybe_flow_run_arguments: Option<FlowRunArguments>,
     ) -> Result<FlowState, RunFlowError> {
-        let activation_time = self.agent_config.round_time(trigger_time)?;
+        let activation_time = self.agent_config.round_time(activation_time)?;
 
         self.flow_scheduling_helper
             .trigger_flow_common(
                 flow_binding,
                 None,
-                FlowTriggerInstance::Manual(FlowTriggerManual {
-                    trigger_time: activation_time,
+                FlowActivationCause::Manual(FlowActivationCauseManual {
+                    activation_time,
                     initiator_account_id,
                 }),
                 maybe_forced_flow_config_rule,
@@ -62,10 +62,10 @@ impl FlowRunService for FlowRunServiceImpl {
 
     /// Triggers the specified flow with custom trigger instance,
     /// unless it's already waiting
-    async fn run_flow_with_trigger(
+    async fn run_flow_automatically(
         &self,
         flow_binding: &FlowBinding,
-        trigger_instance: FlowTriggerInstance,
+        activation_cause: FlowActivationCause,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
         maybe_flow_run_arguments: Option<FlowRunArguments>,
@@ -74,7 +74,7 @@ impl FlowRunService for FlowRunServiceImpl {
             .trigger_flow_common(
                 flow_binding,
                 maybe_flow_trigger_rule,
-                trigger_instance,
+                activation_cause,
                 maybe_forced_flow_config_rule,
                 maybe_flow_run_arguments,
             )

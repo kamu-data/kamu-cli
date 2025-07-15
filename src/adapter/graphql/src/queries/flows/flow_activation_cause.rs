@@ -22,29 +22,29 @@ use crate::queries::{Account, Dataset};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union)]
-pub(crate) enum FlowTriggerInstance {
-    Manual(FlowTriggerManual),
-    AutoPolling(FlowTriggerAutoPolling),
-    Push(FlowTriggerPush),
-    InputDatasetFlow(FlowTriggerInputDatasetFlow),
+pub(crate) enum FlowActivationCause {
+    Manual(FlowActivationCauseManual),
+    AutoPolling(FlowActivationCauseAutoPolling),
+    Push(FlowActivationCausePush),
+    InputDatasetFlow(FlowActivationCauseInputDatasetFlow),
 }
 
-impl FlowTriggerInstance {
+impl FlowActivationCause {
     pub async fn build(
-        trigger: &fs::FlowTriggerInstance,
+        activation_cause: &fs::FlowActivationCause,
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
-        Ok(match &trigger {
-            fs::FlowTriggerInstance::Manual(manual) => {
+        Ok(match &activation_cause {
+            fs::FlowActivationCause::Manual(manual) => {
                 let initiator =
                     Account::from_account_id(ctx, manual.initiator_account_id.clone()).await?;
-                Self::Manual(FlowTriggerManual { initiator })
+                Self::Manual(FlowActivationCauseManual { initiator })
             }
-            fs::FlowTriggerInstance::AutoPolling(auto_polling) => {
+            fs::FlowActivationCause::AutoPolling(auto_polling) => {
                 Self::AutoPolling(auto_polling.clone().into())
             }
-            fs::FlowTriggerInstance::Push(push) => Self::Push(push.clone().into()),
-            fs::FlowTriggerInstance::InputDatasetFlow(input) => {
+            fs::FlowActivationCause::Push(push) => Self::Push(push.clone().into()),
+            fs::FlowActivationCause::InputDatasetFlow(input) => {
                 let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
 
                 let hdl = dataset_registry
@@ -54,7 +54,7 @@ impl FlowTriggerInstance {
                 let account = Account::from_dataset_alias(ctx, &hdl.alias)
                     .await?
                     .expect("Account must exist");
-                Self::InputDatasetFlow(FlowTriggerInputDatasetFlow::new(
+                Self::InputDatasetFlow(FlowActivationCauseInputDatasetFlow::new(
                     Dataset::new_access_checked(account, hdl),
                     match input.flow_type.as_str() {
                         FLOW_TYPE_DATASET_INGEST => DatasetFlowType::Ingest,
@@ -64,7 +64,7 @@ impl FlowTriggerInstance {
 
                         _ => {
                             return InternalError::bail(format!(
-                                "Unexpected flow type '{}' for input dataset flow trigger",
+                                "Unexpected flow type '{}' for input dataset flow activation cause",
                                 input.flow_type.as_str()
                             ));
                         }
@@ -77,40 +77,40 @@ impl FlowTriggerInstance {
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct FlowTriggerManual {
+pub(crate) struct FlowActivationCauseManual {
     initiator: Account,
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct FlowTriggerAutoPolling {
+pub(crate) struct FlowActivationCauseAutoPolling {
     dummy: bool,
 }
 
-impl From<fs::FlowTriggerAutoPolling> for FlowTriggerAutoPolling {
-    fn from(_: fs::FlowTriggerAutoPolling) -> Self {
+impl From<fs::FlowActivationCauseAutoPolling> for FlowActivationCauseAutoPolling {
+    fn from(_: fs::FlowActivationCauseAutoPolling) -> Self {
         Self { dummy: true }
     }
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct FlowTriggerPush {
+pub(crate) struct FlowActivationCausePush {
     dummy: bool,
 }
 
-impl From<fs::FlowTriggerPush> for FlowTriggerPush {
-    fn from(_: fs::FlowTriggerPush) -> Self {
+impl From<fs::FlowActivationCausePush> for FlowActivationCausePush {
+    fn from(_: fs::FlowActivationCausePush) -> Self {
         Self { dummy: true }
     }
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct FlowTriggerInputDatasetFlow {
+pub(crate) struct FlowActivationCauseInputDatasetFlow {
     dataset: Dataset,
     flow_type: DatasetFlowType,
     flow_id: FlowID,
 }
 
-impl FlowTriggerInputDatasetFlow {
+impl FlowActivationCauseInputDatasetFlow {
     pub fn new(dataset: Dataset, flow_type: DatasetFlowType, flow_id: FlowID) -> Self {
         Self {
             dataset,

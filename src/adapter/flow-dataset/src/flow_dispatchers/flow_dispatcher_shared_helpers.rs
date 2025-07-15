@@ -20,7 +20,7 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
     flow_trigger_service: &dyn fs::FlowTriggerService,
     flow_run_service: &dyn fs::FlowRunService,
     flow_binding: &fs::FlowBinding,
-    input_trigger: fs::FlowTriggerInstance,
+    activation_cause: fs::FlowActivationCause,
 ) -> Result<(), InternalError> {
     let dataset_id = flow_binding.get_dataset_id_or_die()?;
     let downstream_dataset_ids =
@@ -37,9 +37,9 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
             .int_err()?
         {
             flow_run_service
-                .run_flow_with_trigger(
+                .run_flow_automatically(
                     &downstream_binding,
-                    input_trigger.clone(),
+                    activation_cause.clone(),
                     Some(fs::FlowTriggerRule::Batching(batching_rule)),
                     None,
                     None,
@@ -59,7 +59,7 @@ pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
     dependency_graph_service: &dyn DependencyGraphService,
     flow_run_service: &dyn fs::FlowRunService,
     dataset_id: &odf::DatasetID,
-    input_trigger: fs::FlowTriggerInstance,
+    activation_cause: fs::FlowActivationCause,
 ) -> Result<(), InternalError> {
     let owner_account_id = dataset_entry_service
         .get_entry(dataset_id)
@@ -80,9 +80,9 @@ pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
                 fs::FlowBinding::for_dataset(downstream_dataset_id, FLOW_TYPE_DATASET_COMPACT);
             // Trigger hard compaction
             flow_run_service
-                .run_flow_with_trigger(
+                .run_flow_automatically(
                     &downstream_binding,
-                    input_trigger.clone(),
+                    activation_cause.clone(),
                     None,
                     Some(
                         FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),

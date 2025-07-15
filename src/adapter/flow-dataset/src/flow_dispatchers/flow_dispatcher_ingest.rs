@@ -77,7 +77,7 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
     async fn propagate_success(
         &self,
         flow_binding: &fs::FlowBinding,
-        trigger_instance: fs::FlowTriggerInstance,
+        activation_cause: fs::FlowActivationCause,
         _: Option<fs::FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
         trigger_transform_flow_for_all_downstream_datasets(
@@ -85,7 +85,7 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
             self.flow_trigger_service.as_ref(),
             self.flow_run_service.as_ref(),
             flow_binding,
-            trigger_instance,
+            activation_cause,
         )
         .await
     }
@@ -113,10 +113,10 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
 
         let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();
 
-        let (trigger_type, dataset_id) = match message {
+        let (activation_cause, dataset_id) = match message {
             DatasetExternallyChangedMessage::HttpIngest(update_message) => (
-                fs::FlowTriggerInstance::Push(fs::FlowTriggerPush {
-                    trigger_time: time_source.now(),
+                fs::FlowActivationCause::Push(fs::FlowActivationCausePush {
+                    activation_time: time_source.now(),
                     source_name: None,
                     dataset_id: update_message.dataset_id.clone(),
                     result: fs::DatasetPushResult::HttpIngest(fs::DatasetPushHttpIngestResult {
@@ -127,8 +127,8 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
                 &update_message.dataset_id,
             ),
             DatasetExternallyChangedMessage::SmartTransferProtocolSync(update_message) => (
-                fs::FlowTriggerInstance::Push(fs::FlowTriggerPush {
-                    trigger_time: time_source.now(),
+                fs::FlowActivationCause::Push(fs::FlowActivationCausePush {
+                    activation_time: time_source.now(),
                     source_name: None,
                     dataset_id: update_message.dataset_id.clone(),
                     result: fs::DatasetPushResult::SmtpSync(fs::DatasetPushSmtpSyncResult {
@@ -146,7 +146,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
             fs::FlowBinding::for_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
         use fs::FlowDispatcher;
-        self.propagate_success(&flow_binding, trigger_type, None)
+        self.propagate_success(&flow_binding, activation_cause, None)
             .await
             .int_err()?;
 

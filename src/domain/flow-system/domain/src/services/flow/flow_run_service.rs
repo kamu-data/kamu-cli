@@ -12,13 +12,13 @@ use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
+    FlowActivationCause,
     FlowBinding,
     FlowConfigurationRule,
     FlowID,
     FlowNotFoundError,
     FlowRunArguments,
     FlowState,
-    FlowTriggerInstance,
     FlowTriggerRule,
 };
 
@@ -30,19 +30,19 @@ pub trait FlowRunService: Sync + Send {
     /// Initiates the specified flow manually, unless it's already waiting
     async fn run_flow_manually(
         &self,
-        trigger_time: DateTime<Utc>,
+        activation_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
         maybe_flow_run_arguments: Option<FlowRunArguments>,
     ) -> Result<FlowState, RunFlowError>;
 
-    /// Initiates the specified flow with custom trigger instance,
+    /// Initiates the specified flow with custom activation cause,
     /// unless it's already waiting
-    async fn run_flow_with_trigger(
+    async fn run_flow_automatically(
         &self,
         flow_binding: &FlowBinding,
-        trigger_instance: FlowTriggerInstance,
+        activation_cause: FlowActivationCause,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
         maybe_flow_run_arguments: Option<FlowRunArguments>,

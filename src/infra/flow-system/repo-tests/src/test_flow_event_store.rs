@@ -1197,15 +1197,15 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
     // Schedule flow
 
     let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     let flow_id = flow_generator
         .make_new_flow(
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -1254,7 +1254,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -1314,15 +1314,15 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
     // Schedule flow
 
     let flow_generator = SystemFlowGenerator::new(flow_event_store.clone());
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     let flow_id = flow_generator
         .make_new_flow(
             FLOW_TYPE_SYSTEM_GC,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
         )
         .await;
@@ -1369,7 +1369,7 @@ pub async fn test_system_flow_run_stats(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_SYSTEM_GC,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
         )
         .await;
@@ -1428,15 +1428,15 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
 
     // Schedule flow
     let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     let flow_id = flow_generator
         .make_new_flow(
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -1498,15 +1498,15 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 
     // Schedule flows
     let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     let flow_id_ingest = flow_generator
         .make_new_flow(
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -1516,7 +1516,7 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_DATASET_COMPACT,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -1617,15 +1617,15 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
     // Schedule flows
     let foo_flow_generator = DatasetFlowGenerator::new(&dataset_foo_id, flow_event_store.clone());
     let bar_flow_generator = DatasetFlowGenerator::new(&dataset_bar_id, flow_event_store.clone());
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     let flow_id_foo_ingest = foo_flow_generator
         .make_new_flow(
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -1635,7 +1635,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -1645,7 +1645,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_DATASET_COMPACT,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -1723,15 +1723,15 @@ pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
     // Schedule flow
 
     let flow_generator = SystemFlowGenerator::new(flow_event_store.clone());
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     let flow_id = flow_generator
         .make_new_flow(
             FLOW_TYPE_SYSTEM_GC,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
         )
         .await;
@@ -1783,9 +1783,11 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                     event_time: Utc::now(),
                     flow_binding: flow_binding.clone(),
                     flow_id,
-                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: Utc::now(),
-                    }),
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: Utc::now(),
+                        },
+                    ),
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: None,
@@ -1806,9 +1808,11 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
                     event_time: Utc::now(),
                     flow_binding,
                     flow_id,
-                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: Utc::now(),
-                    }),
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: Utc::now(),
+                        },
+                    ),
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: None,
@@ -1891,9 +1895,11 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
                     event_time: start_moment,
                     flow_binding,
                     flow_id,
-                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: start_moment,
-                    }),
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: start_moment,
+                        },
+                    ),
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: None,
@@ -1918,7 +1924,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment,
                     }),
-                    last_trigger_index: 0,
+                    last_activation_cause_index: 0,
                 }
                 .into(),
             ],
@@ -2055,9 +2061,11 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                     event_time: start_moment,
                     flow_binding,
                     flow_id,
-                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: start_moment,
-                    }),
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: start_moment,
+                        },
+                    ),
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: None,
@@ -2069,7 +2077,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment,
                     }),
-                    last_trigger_index: 0,
+                    last_activation_cause_index: 0,
                 }
                 .into(),
                 FlowEventScheduledForActivation {
@@ -2152,9 +2160,11 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     event_time: start_moment,
                     flow_binding: flow_binding_foo,
                     flow_id: flow_id_foo,
-                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: start_moment,
-                    }),
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: start_moment,
+                        },
+                    ),
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: None,
@@ -2166,7 +2176,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_1,
                     }),
-                    last_trigger_index: 0,
+                    last_activation_cause_index: 0,
                 }
                 .into(),
                 FlowEventScheduledForActivation {
@@ -2189,9 +2199,11 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     event_time: start_moment,
                     flow_binding: flow_binding_bar,
                     flow_id: flow_id_bar,
-                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: start_moment,
-                    }),
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: start_moment,
+                        },
+                    ),
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: None,
@@ -2203,7 +2215,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_1,
                     }),
-                    last_trigger_index: 0,
+                    last_activation_cause_index: 0,
                 }
                 .into(),
                 FlowEventScheduledForActivation {
@@ -2226,9 +2238,11 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     event_time: start_moment,
                     flow_binding: flow_binding_baz,
                     flow_id: flow_id_baz,
-                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: start_moment,
-                    }),
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: start_moment,
+                        },
+                    ),
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: None,
@@ -2240,7 +2254,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: activation_moment_2,
                     }),
-                    last_trigger_index: 0,
+                    last_activation_cause_index: 0,
                 }
                 .into(),
                 FlowEventScheduledForActivation {
@@ -2281,8 +2295,8 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
 
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     // Schedule two flows for the dataset
@@ -2291,7 +2305,7 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -2302,7 +2316,7 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_DATASET_COMPACT,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -2313,7 +2327,7 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_DATASET_RESET,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             None,
             None,
@@ -2411,8 +2425,8 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let flow_generator = DatasetFlowGenerator::new(&dataset_id, flow_event_store.clone());
 
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     // Schedule two flows for the dataset
@@ -2421,7 +2435,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
         .make_new_flow(
             FLOW_TYPE_DATASET_INGEST,
             FlowStatus::Waiting,
-            automatic_trigger.clone(),
+            automatic_cause.clone(),
             None,
             Some(RetryPolicy {
                 max_attempts: 3,
@@ -2546,25 +2560,25 @@ async fn make_dataset_test_flows(
 ) -> TestFlowIDs {
     let flow_generator = DatasetFlowGenerator::new(dataset_id, flow_event_store.clone());
 
-    let wasya_manual_trigger = FlowTriggerInstance::Manual(FlowTriggerManual {
-        trigger_time: Utc::now(),
+    let wasya_manual_cause = FlowActivationCause::Manual(FlowActivationCauseManual {
+        activation_time: Utc::now(),
         initiator_account_id: odf::AccountID::new_seeded_ed25519(b"wasya"),
     });
 
-    let petya_manual_trigger = FlowTriggerInstance::Manual(FlowTriggerManual {
-        trigger_time: Utc::now(),
+    let petya_manual_cause = FlowActivationCause::Manual(FlowActivationCauseManual {
+        activation_time: Utc::now(),
         initiator_account_id: odf::AccountID::new_seeded_ed25519(b"petya"),
     });
 
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     let flow_id_waiting = flow_generator
         .make_new_flow(
             flow_type,
             FlowStatus::Waiting,
-            petya_manual_trigger,
+            petya_manual_cause,
             None,
             None,
             None,
@@ -2574,7 +2588,7 @@ async fn make_dataset_test_flows(
         .make_new_flow(
             flow_type,
             FlowStatus::Running,
-            wasya_manual_trigger,
+            wasya_manual_cause,
             None,
             None,
             None,
@@ -2584,7 +2598,7 @@ async fn make_dataset_test_flows(
         .make_new_flow(
             flow_type,
             FlowStatus::Finished,
-            automatic_trigger,
+            automatic_cause,
             None,
             None,
             None,
@@ -2604,28 +2618,28 @@ async fn make_system_test_flows(
 ) -> TestFlowIDs {
     let flow_generator = SystemFlowGenerator::new(flow_event_store.clone());
 
-    let wasya_manual_trigger = FlowTriggerInstance::Manual(FlowTriggerManual {
-        trigger_time: Utc::now(),
+    let wasya_manual_cause = FlowActivationCause::Manual(FlowActivationCauseManual {
+        activation_time: Utc::now(),
         initiator_account_id: odf::AccountID::new_seeded_ed25519(b"wasya"),
     });
 
-    let petya_manual_trigger = FlowTriggerInstance::Manual(FlowTriggerManual {
-        trigger_time: Utc::now(),
+    let petya_manual_cause = FlowActivationCause::Manual(FlowActivationCauseManual {
+        activation_time: Utc::now(),
         initiator_account_id: odf::AccountID::new_seeded_ed25519(b"petya"),
     });
 
-    let automatic_trigger = FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-        trigger_time: Utc::now(),
+    let automatic_cause = FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+        activation_time: Utc::now(),
     });
 
     let flow_id_waiting = flow_generator
-        .make_new_flow(flow_type, FlowStatus::Waiting, petya_manual_trigger, None)
+        .make_new_flow(flow_type, FlowStatus::Waiting, petya_manual_cause, None)
         .await;
     let flow_id_running = flow_generator
-        .make_new_flow(flow_type, FlowStatus::Running, wasya_manual_trigger, None)
+        .make_new_flow(flow_type, FlowStatus::Running, wasya_manual_cause, None)
         .await;
     let flow_id_finished = flow_generator
-        .make_new_flow(flow_type, FlowStatus::Finished, automatic_trigger, None)
+        .make_new_flow(flow_type, FlowStatus::Finished, automatic_cause, None)
         .await;
 
     TestFlowIDs {
@@ -2735,7 +2749,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         &self,
         flow_type: &str,
         expected_status: FlowStatus,
-        initial_trigger: FlowTriggerInstance,
+        initial_activation_cause: FlowActivationCause,
         config_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
         run_arguments: Option<FlowRunArguments>,
@@ -2748,7 +2762,7 @@ impl<'a> DatasetFlowGenerator<'a> {
             creation_moment,
             flow_id,
             FlowBinding::for_dataset(self.dataset_id.clone(), flow_type),
-            initial_trigger,
+            initial_activation_cause,
             config_snapshot,
             retry_policy,
             run_arguments,
@@ -2809,7 +2823,7 @@ impl SystemFlowGenerator {
         &self,
         flow_type: &str,
         expected_status: FlowStatus,
-        initial_trigger_type: FlowTriggerInstance,
+        initial_activation_cause: FlowActivationCause,
         config_snapshot: Option<FlowConfigurationRule>,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
@@ -2820,7 +2834,7 @@ impl SystemFlowGenerator {
             creation_moment,
             flow_id,
             FlowBinding::for_system(flow_type),
-            initial_trigger_type,
+            initial_activation_cause,
             config_snapshot,
             None,
             None,

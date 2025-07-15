@@ -139,7 +139,7 @@ impl InMemoryFlowEventStore {
                 FlowIndexEntry {
                     flow_binding: e.flow_binding.clone(),
                     flow_status: FlowStatus::Waiting,
-                    initiator: e.trigger.initiator_account_id().cloned(),
+                    initiator: e.activation_cause.initiator_account_id().cloned(),
                 },
             );
 

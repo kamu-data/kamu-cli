@@ -41,7 +41,7 @@ use super::{
     FlowHarnessOverrides,
     FlowSystemTestListener,
     ManualFlowAbortArgs,
-    ManualFlowTriggerArgs,
+    ManualFlowActivationArgs,
     SCHEDULING_ALIGNMENT_MS,
     TaskDriverArgs,
 };
@@ -225,9 +225,11 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     event_time: start_time,
                     flow_id,
                     flow_binding: foo_ingest_binding.clone(),
-                    trigger: FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: start_time,
-                    }),
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: start_time,
+                        },
+                    ),
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: None,
@@ -239,7 +241,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
                     start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
                         wake_up_at: start_time + Duration::milliseconds(100),
                     }),
-                    last_trigger_index: 0,
+                    last_activation_cause_index: 0,
                 }
                 .into(),
                 FlowEventScheduledForActivation {
@@ -512,7 +514,7 @@ async fn test_manual_trigger() {
                 let task2_handle = task2_driver.run();
 
                 // Manual trigger for "foo" at 40ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
@@ -522,7 +524,7 @@ async fn test_manual_trigger() {
                 let trigger0_handle = trigger0_driver.run();
 
                 // Manual trigger for "bar" at 80ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                   flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
@@ -730,7 +732,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                 let task2_handle = task2_driver.run();
 
                 // Manual trigger for "foo" at 40ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
@@ -740,7 +742,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                 let trigger0_handle = trigger0_driver.run();
 
                 // Manual trigger for "bar" at 80ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
@@ -920,7 +922,7 @@ async fn test_manual_trigger_compaction() {
                 let task1_handle = task1_driver.run();
 
                 // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
@@ -930,7 +932,7 @@ async fn test_manual_trigger_compaction() {
                 let trigger0_handle = trigger0_driver.run();
 
                 // Manual trigger for "bar" at 50ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: None,
@@ -1058,7 +1060,7 @@ async fn test_manual_trigger_reset() {
                 let task0_handle = task0_driver.run();
 
                 // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
@@ -1161,7 +1163,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
       // Run simulation script and task drivers
       _ = async {
-          let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+          let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
               flow_binding: foo_flow_binding,
               run_since_start: Duration::milliseconds(10),
               initiator_id: None,
@@ -1377,7 +1379,7 @@ async fn test_manual_trigger_compaction_with_config() {
                 });
                 let task0_handle = task0_driver.run();
 
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
@@ -1481,7 +1483,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
         // Run simulation script and task drivers
         _ = async {
-            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
@@ -1707,7 +1709,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
         // Run simulation script and task drivers
         _ = async {
-            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
@@ -1935,7 +1937,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
         // Run simulation script and task drivers
         _ = async {
-            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
@@ -2091,7 +2093,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
                   keep_metadata_only: true,
                 }.into_logical_plan(),
             });
-            let task0_handle = task0_driver.run();          let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+            let task0_handle = task0_driver.run();          let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
               flow_binding: foo_flow_binding,
               run_since_start: Duration::milliseconds(10),
               initiator_id: None,
@@ -3306,7 +3308,7 @@ async fn test_throttling_manual_triggers() {
       // Run simulation script and task drivers
       _ = async {
         // Manual trigger for "foo" at 20ms
-        let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+        let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
             flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
@@ -3316,7 +3318,7 @@ async fn test_throttling_manual_triggers() {
         let trigger0_handle = trigger0_driver.run();
 
         // Manual trigger for "foo" at 30ms
-        let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+        let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
             flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
@@ -3326,7 +3328,7 @@ async fn test_throttling_manual_triggers() {
         let trigger1_handle = trigger1_driver.run();
 
         // Manual trigger for "foo" at 70ms
-        let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+        let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
           flow_binding: foo_flow_binding,
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
@@ -5459,7 +5461,7 @@ async fn test_list_all_flow_initiators() {
                 let task1_handle = task1_driver.run();
 
                 // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
@@ -5469,7 +5471,7 @@ async fn test_list_all_flow_initiators() {
                 let trigger0_handle = trigger0_driver.run();
 
                 // Manual trigger for "bar" at 50ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
@@ -5607,7 +5609,7 @@ async fn test_list_all_datasets_with_flow() {
                 let task1_handle = task1_driver.run();
 
                 // Manual trigger for "foo" at 10ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
@@ -5617,7 +5619,7 @@ async fn test_list_all_datasets_with_flow() {
                 let trigger0_handle = trigger0_driver.run();
 
                 // Manual trigger for "bar" at 50ms
-                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: bar_flow_binding,
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
@@ -6456,7 +6458,7 @@ async fn test_trigger_enable_during_flow_throttling() {
       // Run simulation script and task drivers
       _ = async {
         // Manual trigger for "foo" at 20ms
-        let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+        let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
             flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
@@ -6466,7 +6468,7 @@ async fn test_trigger_enable_during_flow_throttling() {
         let trigger0_handle = trigger0_driver.run();
 
         // Manual trigger for "foo" at 30ms
-        let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+        let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
             flow_binding: foo_flow_binding.clone(),
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
@@ -6476,7 +6478,7 @@ async fn test_trigger_enable_during_flow_throttling() {
         let trigger1_handle = trigger1_driver.run();
 
         // Manual trigger for "foo" at 70ms
-        let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+        let trigger2_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
           flow_binding: foo_flow_binding,
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
@@ -6923,7 +6925,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
         // Run simulation script and task drivers
         _ = async {
                 // Manual trigger for "foo" at 20ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
@@ -7072,7 +7074,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
         // Run simulation script and task drivers
         _ = async {
                 // Manual trigger for "foo" at 20ms
-                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                     flow_binding: foo_flow_binding,
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,

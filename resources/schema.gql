@@ -1932,9 +1932,9 @@ type Flow {
 	"""
 	initiator: Account
 	"""
-	Primary flow trigger
+	Primary flow activation cause
 	"""
-	primaryTrigger: FlowTriggerInstance!
+	primaryActivationCause: FlowActivationCause!
 	"""
 	Start condition
 	"""
@@ -1951,6 +1951,26 @@ type Flow {
 
 type FlowAbortedResult {
 	message: String!
+}
+
+union FlowActivationCause = FlowActivationCauseManual | FlowActivationCauseAutoPolling | FlowActivationCausePush | FlowActivationCauseInputDatasetFlow
+
+type FlowActivationCauseAutoPolling {
+	dummy: Boolean!
+}
+
+type FlowActivationCauseInputDatasetFlow {
+	dataset: Dataset!
+	flowType: DatasetFlowType!
+	flowId: FlowID!
+}
+
+type FlowActivationCauseManual {
+	initiator: Account!
+}
+
+type FlowActivationCausePush {
+	dummy: Boolean!
 }
 
 input FlowConfigCompactionInput @oneOf {
@@ -2146,10 +2166,16 @@ type FlowEventAborted implements FlowEvent {
 	eventTime: DateTime!
 }
 
+type FlowEventActivationCauseAdded implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	activationCause: FlowActivationCause!
+}
+
 type FlowEventInitiated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	trigger: FlowTriggerInstance!
+	activationCause: FlowActivationCause!
 }
 
 type FlowEventScheduledForActivation implements FlowEvent {
@@ -2171,12 +2197,6 @@ type FlowEventTaskChanged implements FlowEvent {
 	taskStatus: TaskStatus!
 	nextAttemptAt: DateTime
 	task: Task!
-}
-
-type FlowEventTriggerAdded implements FlowEvent {
-	eventId: EventID!
-	eventTime: DateTime!
-	trigger: FlowTriggerInstance!
 }
 
 type FlowFailedError {
@@ -2301,10 +2321,6 @@ type FlowTrigger {
 	batching: FlowTriggerBatchingRule
 }
 
-type FlowTriggerAutoPolling {
-	dummy: Boolean!
-}
-
 type FlowTriggerBatchingRule {
 	minRecordsToAwait: Int!
 	maxBatchingInterval: TimeDelta!
@@ -2313,22 +2329,6 @@ type FlowTriggerBatchingRule {
 input FlowTriggerInput @oneOf {
 	schedule: ScheduleInput
 	batching: BatchingInput
-}
-
-type FlowTriggerInputDatasetFlow {
-	dataset: Dataset!
-	flowType: DatasetFlowType!
-	flowId: FlowID!
-}
-
-union FlowTriggerInstance = FlowTriggerManual | FlowTriggerAutoPolling | FlowTriggerPush | FlowTriggerInputDatasetFlow
-
-type FlowTriggerManual {
-	initiator: Account!
-}
-
-type FlowTriggerPush {
-	dummy: Boolean!
 }
 
 union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression

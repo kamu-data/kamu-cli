@@ -173,9 +173,9 @@ impl std::fmt::Display for FlowSystemTestListener {
                 .collect::<Vec<_>>();
             flow_headings.sort_by_key(|(_, title)| title.clone());
 
-            for (flow_key, heading) in flow_headings {
+            for (flow_binding, heading) in flow_headings {
                 writeln!(f, "  {heading}:")?;
-                for flow_state in snapshots.get(flow_key).unwrap() {
+                for flow_state in snapshots.get(flow_binding).unwrap() {
                     write!(
                         f,
                         "    Flow ID = {} {}",
@@ -207,11 +207,11 @@ impl std::fmt::Display for FlowSystemTestListener {
                         write!(
                             f,
                             " {}",
-                            match flow_state.primary_trigger() {
-                                FlowTriggerInstance::Manual(_) => String::from("Manual"),
-                                FlowTriggerInstance::AutoPolling(_) => String::from("AutoPolling"),
-                                FlowTriggerInstance::Push(_) => String::from("Push"),
-                                FlowTriggerInstance::InputDatasetFlow(i) => format!(
+                            match flow_state.primary_activation_cause() {
+                                FlowActivationCause::Manual(_) => String::from("Manual"),
+                                FlowActivationCause::AutoPolling(_) => String::from("AutoPolling"),
+                                FlowActivationCause::Push(_) => String::from("Push"),
+                                FlowActivationCause::InputDatasetFlow(i) => format!(
                                     "Input({})",
                                     state
                                         .dataset_display_names

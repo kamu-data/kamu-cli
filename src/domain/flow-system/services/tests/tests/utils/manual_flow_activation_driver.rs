@@ -18,13 +18,13 @@ use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct ManualFlowTriggerDriver {
+pub(crate) struct ManualFlowActivationDriver {
     catalog: Catalog,
     time_source: Arc<dyn SystemTimeSource>,
-    args: ManualFlowTriggerArgs,
+    args: ManualFlowActivationArgs,
 }
 
-pub(crate) struct ManualFlowTriggerArgs {
+pub(crate) struct ManualFlowActivationArgs {
     pub(crate) flow_binding: FlowBinding,
     pub(crate) run_since_start: Duration,
     pub(crate) initiator_id: Option<odf::AccountID>,
@@ -32,11 +32,11 @@ pub(crate) struct ManualFlowTriggerArgs {
     pub(crate) maybe_flow_run_arguments: Option<kamu_flow_system::FlowRunArguments>,
 }
 
-impl ManualFlowTriggerDriver {
+impl ManualFlowActivationDriver {
     pub(crate) fn new(
         catalog: Catalog,
         time_source: Arc<dyn SystemTimeSource>,
-        args: ManualFlowTriggerArgs,
+        args: ManualFlowActivationArgs,
     ) -> Self {
         Self {
             catalog,

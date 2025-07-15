@@ -33,8 +33,8 @@ use super::{
     FlowSystemTestListener,
     ManualFlowAbortArgs,
     ManualFlowAbortDriver,
-    ManualFlowTriggerArgs,
-    ManualFlowTriggerDriver,
+    ManualFlowActivationArgs,
+    ManualFlowActivationDriver,
     TaskDriver,
     TaskDriverArgs,
 };
@@ -354,9 +354,9 @@ impl FlowHarness {
 
     pub fn manual_flow_trigger_driver(
         &self,
-        args: ManualFlowTriggerArgs,
-    ) -> ManualFlowTriggerDriver {
-        ManualFlowTriggerDriver::new(self.catalog.clone(), self.catalog.get_one().unwrap(), args)
+        args: ManualFlowActivationArgs,
+    ) -> ManualFlowActivationDriver {
+        ManualFlowActivationDriver::new(self.catalog.clone(), self.catalog.get_one().unwrap(), args)
     }
 
     pub fn manual_flow_abort_driver(&self, args: ManualFlowAbortArgs) -> ManualFlowAbortDriver {

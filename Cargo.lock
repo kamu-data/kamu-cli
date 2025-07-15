@@ -6763,7 +6763,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flow-webhook"
-version = "0.245.0"
+version = "0.245.1"
 dependencies = [
  "async-trait",
  "chrono",

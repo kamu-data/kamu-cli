@@ -142,8 +142,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -213,8 +213,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -291,8 +291,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -383,8 +383,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -537,8 +537,8 @@ async fn test_trigger_reset_root_dataset_flow() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -768,8 +768,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -874,8 +874,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -994,8 +994,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -1060,8 +1060,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -1131,8 +1131,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -1222,8 +1222,8 @@ async fn test_trigger_compaction_root_dataset() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -2503,10 +2503,10 @@ async fn test_history_of_completed_flow() {
     let flow_task_metadata = ts::TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
     harness
-        .mimic_flow_secondary_trigger(
+        .mimic_flow_secondary_activation_cause(
             flow_id,
-            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                trigger_time: Utc::now(),
+            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+                activation_time: Utc::now(),
             }),
         )
         .await;
@@ -2548,8 +2548,8 @@ async fn test_history_of_completed_flow() {
                                         {
                                             "__typename": "FlowEventInitiated",
                                             "eventId": "1",
-                                            "trigger": {
-                                                "__typename": "FlowTriggerManual"
+                                            "activationCause": {
+                                                "__typename": "FlowActivationCauseManual"
                                             }
                                         },
                                         {
@@ -2557,10 +2557,10 @@ async fn test_history_of_completed_flow() {
                                             "eventId": "2",
                                         },
                                         {
-                                            "__typename": "FlowEventTriggerAdded",
+                                            "__typename": "FlowEventActivationCauseAdded",
                                             "eventId": "3",
-                                            "trigger": {
-                                                "__typename": "FlowTriggerAutoPolling"
+                                            "activationCause": {
+                                                "__typename": "FlowActivationCauseAutoPolling",
                                             }
                                         },
                                         {
@@ -2744,8 +2744,8 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -2892,8 +2892,8 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -3050,8 +3050,8 @@ async fn test_config_snapshot_returned_correctly() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -3262,8 +3262,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -3354,8 +3354,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
                                         },
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                             "initiator": {
                                                 "id": harness.logged_account_id().to_string(),
                                                 "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -3437,8 +3437,8 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                         {
                                             "__typename": "FlowEventInitiated",
                                             "eventId": "1",
-                                            "trigger": {
-                                                "__typename": "FlowTriggerManual",
+                                            "activationCause": {
+                                                "__typename": "FlowActivationCauseManual",
                                             }
                                         },
                                         {
@@ -3746,7 +3746,11 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn mimic_flow_secondary_trigger(&self, flow_id: &str, flow_trigger: FlowTriggerInstance) {
+    async fn mimic_flow_secondary_activation_cause(
+        &self,
+        flow_id: &str,
+        activation_cause: FlowActivationCause,
+    ) {
         let flow_event_store = self
             .catalog_authorized
             .get_one::<dyn FlowEventStore>()
@@ -3759,7 +3763,7 @@ impl FlowRunsHarness {
         .await
         .unwrap();
 
-        flow.add_trigger_if_unique(Utc::now(), flow_trigger)
+        flow.add_activation_cause_if_unique(Utc::now(), activation_cause)
             .unwrap();
         flow.save(flow_event_store.as_ref()).await.unwrap();
     }
@@ -3948,9 +3952,9 @@ impl FlowRunsHarness {
                                             id
                                             accountName
                                         }
-                                        primaryTrigger {
+                                        primaryActivationCause {
                                             __typename
-                                            ... on FlowTriggerInputDatasetFlow {
+                                            ... on FlowActivationCauseInputDatasetFlow {
                                                 dataset {
                                                     id
                                                     name
@@ -3958,7 +3962,7 @@ impl FlowRunsHarness {
                                                 flowType
                                                 flowId
                                             }
-                                            ... on FlowTriggerManual {
+                                            ... on FlowActivationCauseManual {
                                                 initiator {
                                                     id
                                                     accountName
@@ -4056,7 +4060,7 @@ impl FlowRunsHarness {
                                                 __typename
                                                 eventId
                                                 ... on FlowEventInitiated {
-                                                    trigger {
+                                                    activationCause {
                                                         __typename
                                                     }
                                                 }
@@ -4065,8 +4069,8 @@ impl FlowRunsHarness {
                                                         __typename
                                                     }
                                                 }
-                                                ... on FlowEventTriggerAdded {
-                                                    trigger {
+                                                ... on FlowEventActivationCauseAdded {
+                                                    activationCause {
                                                         __typename
                                                     }
                                                 }

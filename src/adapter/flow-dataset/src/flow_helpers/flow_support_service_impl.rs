@@ -51,9 +51,8 @@ impl fs::FlowSupportService for FlowSupportServiceImpl {
             TaskResultDatasetUpdate::TYPE_ID => {
                 let update = TaskResultDatasetUpdate::from_task_result(input_result).int_err()?;
 
-                // Compute increment since the first trigger by this dataset.
+                // Compute increment since the initial activation of this dataset.
                 // Note: there might have been multiple updates since that time.
-                // We are only recording the first trigger of particular dataset.
                 let mut accumulated_records_count = 0;
                 if let Some((old_head, _)) = update.try_as_increment() {
                     let increment = self

@@ -90,8 +90,8 @@ async fn test_list_account_flows() {
                                             "lastAttemptFinishedAt": null,
                                         },
                                         "taskIds": [],
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                         },
                                         "startCondition": null,
                                     }
@@ -267,9 +267,8 @@ async fn test_pause_resume_account_flows() {
                                             "lastAttemptFinishedAt": null,
                                         },
                                         "taskIds": [],
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
-
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
                                         },
                                         "startCondition": null,
                                     }
@@ -467,8 +466,8 @@ async fn test_account_triggers_all_paused() {
                                             "lastAttemptFinishedAt": null,
                                         },
                                         "taskIds": [],
-                                        "primaryTrigger": {
-                                            "__typename": "FlowTriggerManual",
+                                        "primaryActivationCause": {
+                                            "__typename": "FlowActivationCauseManual",
 
                                         },
                                         "startCondition": null,
@@ -735,9 +734,9 @@ impl FlowTriggerHarness {
                                           lastAttemptFinishedAt
                                       }
                                       taskIds
-                                      primaryTrigger {
+                                      primaryActivationCause {
                                           __typename
-                                          ... on FlowTriggerInputDatasetFlow {
+                                          ... on FlowActivationCauseInputDatasetFlow {
                                               dataset {
                                                   id
                                                   name
@@ -745,7 +744,7 @@ impl FlowTriggerHarness {
                                               flowType
                                               flowId
                                           }
-                                          ... on FlowTriggerManual {
+                                          ... on FlowActivationCauseManual {
                                             __typename
                                           }
                                       }

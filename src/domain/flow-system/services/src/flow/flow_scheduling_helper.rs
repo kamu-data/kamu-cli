@@ -41,7 +41,7 @@ impl FlowSchedulingHelper {
         flow_binding: &FlowBinding,
         rule: FlowTriggerRule,
     ) -> Result<(), InternalError> {
-        tracing::trace!(flow_key = ?flow_binding, rule = ?rule, "Activating flow trigger");
+        tracing::trace!(?flow_binding, ?rule, "Activating flow trigger");
 
         match &flow_binding.scope {
             FlowScope::Dataset { .. } => match &rule {
@@ -54,8 +54,8 @@ impl FlowSchedulingHelper {
                         self.trigger_flow_common(
                             flow_binding,
                             Some(FlowTriggerRule::Batching(*batching_rule)),
-                            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                                trigger_time: start_time,
+                            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+                                activation_time: start_time,
                             }),
                             None,
                             None,
@@ -115,13 +115,13 @@ impl FlowSchedulingHelper {
         flow_binding: &FlowBinding,
         schedule: &Schedule,
     ) -> Result<FlowState, InternalError> {
-        tracing::trace!(flow_key = ?flow_binding, schedule = ?schedule, "Enqueuing scheduled flow");
+        tracing::trace!(?flow_binding, ?schedule, "Enqueuing scheduled flow");
 
         self.trigger_flow_common(
             flow_binding,
             Some(FlowTriggerRule::Schedule(schedule.clone())),
-            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                trigger_time: start_time,
+            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+                activation_time: start_time,
             }),
             None,
             None,
@@ -138,8 +138,8 @@ impl FlowSchedulingHelper {
         self.trigger_flow_common(
             flow_binding,
             None,
-            FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                trigger_time: start_time,
+            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+                activation_time: start_time,
             }),
             None,
             None,
@@ -151,7 +151,7 @@ impl FlowSchedulingHelper {
         &self,
         flow_binding: &FlowBinding,
         trigger_rule_maybe: Option<FlowTriggerRule>,
-        trigger_type: FlowTriggerInstance,
+        activation_cause: FlowActivationCause,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
         maybe_flow_run_arguments: Option<FlowRunArguments>,
     ) -> Result<FlowState, InternalError> {
@@ -163,14 +163,15 @@ impl FlowSchedulingHelper {
 
         // Flows may not be attempted more frequent than mandatory throttling period.
         // If flow has never run before, let it go without restriction.
-        let trigger_time = trigger_type.trigger_time();
-        let mut throttling_boundary_time =
-            flow_run_stats.last_attempt_time.map_or(trigger_time, |t| {
+        let activation_time = activation_cause.activation_time();
+        let mut throttling_boundary_time = flow_run_stats
+            .last_attempt_time
+            .map_or(activation_time, |t| {
                 t + self.agent_config.mandatory_throttling_period
             });
         // It's also possible we are waiting for some start condition much longer..
-        if throttling_boundary_time < trigger_time {
-            throttling_boundary_time = trigger_time;
+        if throttling_boundary_time < activation_time {
+            throttling_boundary_time = activation_time;
         }
 
         let trigger_context = match &trigger_rule_maybe {
@@ -193,15 +194,18 @@ impl FlowSchedulingHelper {
                     .int_err()?;
 
                 // Only merge unique triggers, ignore identical
-                flow.add_trigger_if_unique(self.time_source.now(), trigger_type.clone())
-                    .int_err()?;
+                flow.add_activation_cause_if_unique(
+                    self.time_source.now(),
+                    activation_cause.clone(),
+                )
+                .int_err()?;
 
                 match trigger_context {
                     FlowTriggerContext::Batching(batching_rule) => {
                         // Is this rule still waited?
                         if matches!(flow.start_condition, Some(FlowStartCondition::Batching(_))) {
                             self.evaluate_flow_batching_rule(
-                                trigger_time,
+                                activation_time,
                                 &mut flow,
                                 &batching_rule,
                                 throttling_boundary_time,
@@ -222,16 +226,16 @@ impl FlowSchedulingHelper {
                                 .is_some_and(|planned_time| throttling_boundary_time < planned_time)
                         {
                             // Indicate throttling, if applied
-                            if throttling_boundary_time > trigger_time {
+                            if throttling_boundary_time > activation_time {
                                 self.indicate_throttling_activity(
                                     &mut flow,
                                     throttling_boundary_time,
-                                    trigger_time,
+                                    activation_time,
                                 )?;
                             }
 
                             if let Some(config_snapshot) = maybe_forced_flow_config_rule {
-                                flow.modify_config_snapshot(trigger_time, config_snapshot)
+                                flow.modify_config_snapshot(activation_time, config_snapshot)
                                     .int_err()?;
                             }
 
@@ -284,7 +288,7 @@ impl FlowSchedulingHelper {
                     .make_new_flow(
                         self.flow_event_store.as_ref(),
                         flow_binding.clone(),
-                        &trigger_type,
+                        &activation_cause,
                         maybe_flow_config_rule_snapshot,
                         retry_policy,
                         maybe_flow_run_arguments,
@@ -295,7 +299,7 @@ impl FlowSchedulingHelper {
                     FlowTriggerContext::Batching(batching_rule) => {
                         // Don't activate if batching condition not satisfied
                         self.evaluate_flow_batching_rule(
-                            trigger_time,
+                            activation_time,
                             &mut flow,
                             &batching_rule,
                             throttling_boundary_time,
@@ -306,8 +310,10 @@ impl FlowSchedulingHelper {
                         // Next activation time depends on:
                         //  - last success time, if ever launched
                         //  - schedule, if defined
-                        let naive_next_activation_time = schedule
-                            .next_activation_time(trigger_time, flow_run_stats.last_success_time);
+                        let naive_next_activation_time = schedule.next_activation_time(
+                            activation_time,
+                            flow_run_stats.last_success_time,
+                        );
 
                         // Apply throttling boundary
                         let next_activation_time =
@@ -320,7 +326,7 @@ impl FlowSchedulingHelper {
                                 throttling_boundary_time,
                                 naive_next_activation_time,
                             )?;
-                        } else if naive_next_activation_time > trigger_time {
+                        } else if naive_next_activation_time > activation_time {
                             // Set waiting according to the schedule
                             flow.set_relevant_start_condition(
                                 self.time_source.now(),
@@ -338,14 +344,14 @@ impl FlowSchedulingHelper {
                     FlowTriggerContext::Unconditional => {
                         // Apply throttling boundary
                         let next_activation_time =
-                            std::cmp::max(throttling_boundary_time, trigger_time);
+                            std::cmp::max(throttling_boundary_time, activation_time);
 
                         // Set throttling activity as start condition
-                        if throttling_boundary_time > trigger_time {
+                        if throttling_boundary_time > activation_time {
                             self.indicate_throttling_activity(
                                 &mut flow,
                                 throttling_boundary_time,
-                                trigger_time,
+                                activation_time,
                             )?;
                         }
 
@@ -369,13 +375,6 @@ impl FlowSchedulingHelper {
         batching_rule: &BatchingRule,
         throttling_boundary_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        /*assert!(matches!(
-            flow.flow_key.get_type(),
-            AnyFlowType::Dataset(
-                DatasetFlowType::ExecuteTransform | DatasetFlowType::HardCompaction
-            )
-        )); */
-
         // TODO: it's likely assumed the accumulation is per each input separately, but
         // for now count overall number
         let mut accumulated_records_count = 0;
@@ -383,14 +382,14 @@ impl FlowSchedulingHelper {
         let mut is_compacted = false;
 
         // Scan each accumulated trigger to decide
-        for trigger in &flow.triggers {
+        for trigger in &flow.activation_causes {
             match trigger {
-                FlowTriggerInstance::InputDatasetFlow(trigger_type) => {
+                FlowActivationCause::InputDatasetFlow(activation_cause) => {
                     let interpretation = self
                         .flow_support_service
                         .interpret_input_dataset_result(
-                            &trigger_type.dataset_id,
-                            &trigger_type.task_result,
+                            &activation_cause.dataset_id,
+                            &activation_cause.task_result,
                         )
                         .await?;
 
@@ -401,8 +400,8 @@ impl FlowSchedulingHelper {
                         accumulated_something = true;
                     }
                 }
-                FlowTriggerInstance::Push(trigger_type) => {
-                    let old_head_maybe = match trigger_type.result {
+                FlowActivationCause::Push(activation_cause) => {
+                    let old_head_maybe = match activation_cause.result {
                         DatasetPushResult::HttpIngest(ref update_result) => {
                             update_result.old_head_maybe.as_ref()
                         }
@@ -418,7 +417,7 @@ impl FlowSchedulingHelper {
 
                     let increment = self
                         .dataset_increment_query_service
-                        .get_increment_since(&trigger_type.dataset_id, old_head_maybe)
+                        .get_increment_since(&activation_cause.dataset_id, old_head_maybe)
                         .await
                         .int_err()?;
 
@@ -430,8 +429,8 @@ impl FlowSchedulingHelper {
         }
 
         // The timeout for batching will happen at:
-        let batching_deadline =
-            flow.primary_trigger().trigger_time() + *batching_rule.max_batching_interval();
+        let batching_deadline = flow.primary_activation_cause().activation_time()
+            + *batching_rule.max_batching_interval();
 
         // The condition is satisfied if
         //   - we crossed the number of new records thresholds
@@ -527,18 +526,18 @@ impl FlowSchedulingHelper {
         &self,
         flow_event_store: &dyn FlowEventStore,
         flow_binding: FlowBinding,
-        trigger_type: &FlowTriggerInstance,
+        activation_cause: &FlowActivationCause,
         maybe_config_rule_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
         run_arguments: Option<FlowRunArguments>,
     ) -> Result<Flow, InternalError> {
-        tracing::trace!(flow_key = ?flow_binding, trigger = ?trigger_type, "Creating new flow");
+        tracing::trace!(?flow_binding, ?activation_cause, "Creating new flow");
 
         let flow = Flow::new(
             self.time_source.now(),
             flow_event_store.new_flow_id().await?,
             flow_binding,
-            trigger_type.clone(),
+            activation_cause.clone(),
             maybe_config_rule_snapshot,
             retry_policy,
             run_arguments,

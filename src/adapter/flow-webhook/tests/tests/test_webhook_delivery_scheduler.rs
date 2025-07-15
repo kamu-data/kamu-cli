@@ -25,13 +25,13 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::{
+    FlowActivationCause,
+    FlowActivationCauseAutoPolling,
     FlowBinding,
     FlowID,
     FlowRunService,
     FlowState,
     FlowTimingRecords,
-    FlowTriggerAutoPolling,
-    FlowTriggerInstance,
     MockFlowRunService,
 };
 use kamu_webhooks::*;
@@ -329,10 +329,10 @@ impl TestWebhookDeliverySchedulerHarness {
         let dataset_id_clone_2 = dataset_id.clone();
 
         mock_flow_run_service
-            .expect_run_flow_with_trigger()
+            .expect_run_flow_automatically()
             .withf(
                 move |flow_binding: &kamu_flow_system::FlowBinding,
-                      _trigger_instance,
+                      _,
                       maybe_flow_trigger_rule,
                       maybe_forced_flow_config_rule,
                       maybe_flow_run_arguments| {
@@ -359,9 +359,11 @@ impl TestWebhookDeliverySchedulerHarness {
                     ),
                     start_condition: None,
                     task_ids: vec![],
-                    triggers: vec![FlowTriggerInstance::AutoPolling(FlowTriggerAutoPolling {
-                        trigger_time: now,
-                    })],
+                    activation_causes: vec![FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: now,
+                        },
+                    )],
                     outcome: None,
                     timing: FlowTimingRecords {
                         scheduled_for_activation_at: Some(now),

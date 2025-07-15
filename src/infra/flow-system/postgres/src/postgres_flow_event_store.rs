@@ -48,7 +48,7 @@ impl PostgresFlowEventStore {
         let connection_mut = tr.connection_mut().await?;
 
         let initiator = e
-            .trigger
+            .activation_cause
             .initiator_account_id()
             .map_or_else(|| SYSTEM_INITIATOR.to_string(), ToString::to_string);
 

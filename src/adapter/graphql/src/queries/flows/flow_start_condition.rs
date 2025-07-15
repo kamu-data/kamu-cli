@@ -27,7 +27,7 @@ pub(crate) enum FlowStartCondition {
 impl FlowStartCondition {
     pub async fn create_from_raw_flow_data(
         start_condition: &fs::FlowStartCondition,
-        matching_triggers: &[fs::FlowTriggerInstance],
+        matching_activation_causes: &[fs::FlowActivationCause],
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(match start_condition {
@@ -45,18 +45,18 @@ impl FlowStartCondition {
                 // TODO: somehow limit dataset traversal to blocks that existed at the time of
                 // flow latest event, as they might have evolved after this state was loaded
 
-                // For each dataset trigger, add accumulated changes since trigger first fired
-                for trigger in matching_triggers {
-                    if let fs::FlowTriggerInstance::InputDatasetFlow(dataset_trigger) = trigger
-                        && dataset_trigger.task_result.result_type
-                            == TaskResultDatasetUpdate::TYPE_ID
+                // For each dataset activation cause, add accumulated changes since the initial
+                for activation_cause in matching_activation_causes {
+                    if let fs::FlowActivationCause::InputDatasetFlow(dataset_cause) =
+                        activation_cause
+                        && dataset_cause.task_result.result_type == TaskResultDatasetUpdate::TYPE_ID
                         && let dataset_update =
-                            TaskResultDatasetUpdate::from_task_result(&dataset_trigger.task_result)
+                            TaskResultDatasetUpdate::from_task_result(&dataset_cause.task_result)
                                 .int_err()?
                         && let Some((old_head, _)) = dataset_update.try_as_increment()
                     {
                         total_increment += increment_query_service
-                            .get_increment_since(&dataset_trigger.dataset_id, old_head)
+                            .get_increment_since(&dataset_cause.dataset_id, old_head)
                             .await
                             .int_err()?;
                     }

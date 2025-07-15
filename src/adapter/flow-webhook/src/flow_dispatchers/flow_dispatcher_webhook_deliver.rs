@@ -62,7 +62,7 @@ impl fs::FlowDispatcher for FlowDispatcherWebhookDeliver {
     async fn propagate_success(
         &self,
         _flow_binding: &fs::FlowBinding,
-        _trigger_instance: fs::FlowTriggerInstance,
+        _activation_cause: fs::FlowActivationCause,
         _: Option<fs::FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
         // No further actions triggered with a webhook delivery

@@ -60,7 +60,7 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
     async fn propagate_success(
         &self,
         flow_binding: &fs::FlowBinding,
-        trigger_instance: fs::FlowTriggerInstance,
+        activation_cause: fs::FlowActivationCause,
         _: Option<fs::FlowConfigurationRule>,
     ) -> Result<(), InternalError> {
         trigger_transform_flow_for_all_downstream_datasets(
@@ -68,7 +68,7 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
             self.flow_trigger_service.as_ref(),
             self.flow_run_service.as_ref(),
             flow_binding,
-            trigger_instance,
+            activation_cause,
         )
         .await
     }
