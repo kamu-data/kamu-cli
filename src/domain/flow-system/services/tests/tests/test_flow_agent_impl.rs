@@ -1046,7 +1046,10 @@ async fn test_manual_trigger_reset() {
                     run_since_start: Duration::milliseconds(20),
                     finish_in_with: Some((Duration::milliseconds(90), TaskOutcome::Success(
                       TaskResultDatasetReset {
-                        reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-slice") },
+                        reset_result: ResetResult {
+                          old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                          new_head: odf::Multihash::from_digest_sha3_256(b"new-slice")
+                        },
                       }.into_task_result())
                     )),
                     expected_logical_plan: LogicalPlanDatasetReset {
@@ -1158,105 +1161,108 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
-      // Run API service
-      res = harness.flow_agent.run() => res.int_err(),
+        // Run API service
+        res = harness.flow_agent.run() => res.int_err(),
 
-      // Run simulation script and task drivers
-      _ = async {
-          let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
-              flow_binding: foo_flow_binding,
-              run_since_start: Duration::milliseconds(10),
-              initiator_id: None,
-              maybe_forced_flow_config_rule: None,
-              maybe_task_run_arguments: None,
-          });
-          let trigger0_handle = trigger0_driver.run();
+        // Run simulation script and task drivers
+        _ = async {
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(10),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+                maybe_task_run_arguments: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
 
-          // Task 0: "foo" start running at 20ms, finish at 90ms
-          let task0_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(0),
-              task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-              dataset_id: Some(foo_id.clone()),
-              run_since_start: Duration::milliseconds(20),
-              finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(
-                TaskResultDatasetReset {
-                  reset_result: ResetResult { new_head: odf::Multihash::from_digest_sha3_256(b"new-slice") }
-                }.into_task_result()
-              ))),
-              expected_logical_plan: LogicalPlanDatasetReset {
-                dataset_id: foo_id.clone(),
-                new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                recursive: true,
-              }.into_logical_plan(),
-          });
-          let task0_handle = task0_driver.run();
-
-          // Task 1: "foo_bar" start running at 110ms, finish at 180sms
-          let task1_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(1),
-              task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
-              dataset_id: Some(foo_baz_id.clone()),
-              run_since_start: Duration::milliseconds(110),
-              finish_in_with: Some(
-                (
-                  Duration::milliseconds(70),
-                  TaskOutcome::Success(TaskResultDatasetHardCompact {
-                    compaction_result: CompactionResult::Success {
-                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
-                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
-                      old_num_blocks: 5,
-                      new_num_blocks: 4,
+            // Task 0: "foo" start running at 20ms, finish at 90ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((Duration::milliseconds(70), TaskOutcome::Success(
+                  TaskResultDatasetReset {
+                    reset_result: ResetResult {
+                      old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice")
                     }
                   }.into_task_result()
-                )
-              )),
-              expected_logical_plan: LogicalPlanDatasetHardCompact {
-                dataset_id: foo_baz_id.clone(),
-                max_slice_size: None,
-                max_slice_records: None,
-                keep_metadata_only: true,
-              }.into_logical_plan(),
-          });
-          let task1_handle = task1_driver.run();
+                ))),
+                expected_logical_plan: LogicalPlanDatasetReset {
+                  dataset_id: foo_id.clone(),
+                  new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                  old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                  recursive: true,
+                }.into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
 
-          // Task 2: "foo_bar_baz" start running at 200ms, finish at 240ms
-          let task2_driver = harness.task_driver(TaskDriverArgs {
-              task_id: TaskID::new(2),
-              task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
-              dataset_id: Some(foo_bar_id.clone()),
-              run_since_start: Duration::milliseconds(200),
-              finish_in_with: Some(
-                (
-                  Duration::milliseconds(40),
-                  TaskOutcome::Success(TaskResultDatasetHardCompact {
-                    compaction_result: CompactionResult::Success {
-                      old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
-                      new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
-                      old_num_blocks: 8,
-                      new_num_blocks: 3,
-                    }
-                  }.into_task_result()
-                )
-              )),
-              expected_logical_plan: LogicalPlanDatasetHardCompact {
-                dataset_id: foo_bar_id.clone(),
-                max_slice_size: None,
-                max_slice_records: None,
-                keep_metadata_only: true,
-              }.into_logical_plan(),
-          });
-          let task2_handle = task2_driver.run();
+            // Task 1: "foo_bar" start running at 110ms, finish at 180sms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_baz_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: Some(
+                  (
+                    Duration::milliseconds(70),
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
+                      compaction_result: CompactionResult::Success {
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-2"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
+                        old_num_blocks: 5,
+                        new_num_blocks: 4,
+                      }
+                    }.into_task_result()
+                  )
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_baz_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
 
-          // Main simulation script
-          let main_handle = async {
-              harness.advance_time(Duration::milliseconds(400)).await;
-          };
+            // Task 2: "foo_bar_baz" start running at 200ms, finish at 240ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_bar_id.clone()),
+                run_since_start: Duration::milliseconds(200),
+                finish_in_with: Some(
+                  (
+                    Duration::milliseconds(40),
+                    TaskOutcome::Success(TaskResultDatasetHardCompact {
+                      compaction_result: CompactionResult::Success {
+                        old_head: odf::Multihash::from_digest_sha3_256(b"old-slice-3"),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
+                        old_num_blocks: 8,
+                        new_num_blocks: 3,
+                      }
+                    }.into_task_result()
+                  )
+                )),
+                expected_logical_plan: LogicalPlanDatasetHardCompact {
+                  dataset_id: foo_bar_id.clone(),
+                  max_slice_size: None,
+                  max_slice_records: None,
+                  keep_metadata_only: true,
+                }.into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
 
-          tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
-      } => Ok(())
-  }
-  .unwrap();
+            // Main simulation script
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(400)).await;
+            };
+
+            tokio::join!(trigger0_handle, task0_handle, task1_handle, task2_handle, main_handle)
+        } => Ok(())
+    }
+    .unwrap();
 
     pretty_assertions::assert_eq!(
         indoc::indoc!(
@@ -3013,7 +3019,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
 #[test_log::test(tokio::test)]
 async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_since(
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 3,
@@ -3405,7 +3411,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
         mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)), /* 100ms */
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_since(
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 2,
                 num_records: 7,
@@ -3881,26 +3887,64 @@ async fn test_throttling_derived_dataset_with_2_parents() {
 async fn test_batching_condition_records_reached() {
     let mut seq = mockall::Sequence::new();
 
+    // foo: reading after task 0
     let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
             })
         });
+    // bar: reading after task 1
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 2,
                 num_records: 10,
+                updated_watermark: None,
+            })
+        });
+    // foo: reading after task 2
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 7,
+                updated_watermark: None,
+            })
+        });
+    // foo: reading after task 3
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    // bar: reading after task 4
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 12,
                 updated_watermark: None,
             })
         });
@@ -4236,14 +4280,51 @@ async fn test_batching_condition_timeout() {
     let mut seq = mockall::Sequence::new();
 
     let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
+    // foo: reading after task 0
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    // bar: reading after task 1
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    // foo: reading after task 2
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 7,
+                updated_watermark: None,
+            })
+        });
+    // bar: reading after task 4
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 7,
                 updated_watermark: None,
             })
         });
@@ -4525,11 +4606,48 @@ async fn test_batching_condition_watermark() {
     let mut seq = mockall::Sequence::new();
 
     let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
+    // foo: reading after task 0
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    // bar: reading after task 1
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    // foo: reading after task 2
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 0, // no records, just watermark
+                updated_watermark: Some(Utc::now()),
+            })
+        });
+    // bar: reading after task 4
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 0, // no records, just watermark
@@ -4814,63 +4932,87 @@ async fn test_batching_condition_with_2_inputs() {
     let mut seq = mockall::Sequence::new();
 
     let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    // 'foo': first reading of task 3 after 'foo' task 3
+    // 'foo': reading after task 0
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
             })
         });
-    // 'foo': Second reading of task 3 after 'bar' task 4
+    // 'bar': reading after task 1
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 5,
                 updated_watermark: None,
             })
         });
-    // 'bar' : First reading of task 4 after task 4
+    // 'baz': reading after task 2
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    // 'foo' : reading after task 3
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 7,
                 updated_watermark: None,
             })
         });
-    // 'foo': third reading of tasks 3, 5 after foo task 5
+    // 'bar': reading after task 4
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 2,
                 num_records: 8,
                 updated_watermark: None,
             })
         });
-    // 'bar' : Second reading of task 4 after foo task 5
+    // 'foo' : reading after task 5
     mock_dataset_changes
-        .expect_get_increment_since()
+        .expect_get_increment_between()
         .times(1)
         .in_sequence(&mut seq)
-        .returning(|_, _| {
+        .returning(|_, _, _| {
             Ok(DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 7,
+                updated_watermark: None,
+            })
+        });
+    // 'baz' : reading after task 6
+    mock_dataset_changes
+        .expect_get_increment_between()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 8,
                 updated_watermark: None,
             })
         });
@@ -4925,7 +5067,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             FlowBinding::for_dataset(baz_id.clone(), FLOW_TYPE_DATASET_TRANSFORM),
             FlowTriggerRule::Batching(
-                BatchingRule::new_checked(15, Duration::milliseconds(200)).unwrap(),
+                BatchingRule::new_checked(16, Duration::milliseconds(200)).unwrap(),
             ),
         )
         .await;
@@ -5224,7 +5366,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Waiting AutoPolling Schedule(wakeup=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
+            Flow ID = 5 Waiting Input(foo) Batching(16, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 6 Waiting AutoPolling Schedule(wakeup=200ms)
@@ -5236,7 +5378,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Waiting AutoPolling Executor(task=4, since=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
+            Flow ID = 5 Waiting Input(foo) Batching(16, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 6 Waiting AutoPolling Schedule(wakeup=200ms)
@@ -5248,7 +5390,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Running(task=4)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
+            Flow ID = 5 Waiting Input(foo) Batching(16, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 6 Waiting AutoPolling Schedule(wakeup=200ms)
@@ -5261,7 +5403,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
+            Flow ID = 5 Waiting Input(foo) Batching(16, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 6 Waiting AutoPolling Schedule(wakeup=200ms)
@@ -5274,7 +5416,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
+            Flow ID = 5 Waiting Input(foo) Batching(16, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 6 Waiting AutoPolling Executor(task=5, since=200ms)
@@ -5287,7 +5429,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
+            Flow ID = 5 Waiting Input(foo) Batching(16, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 6 Running(task=5)
@@ -5300,7 +5442,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
+            Flow ID = 5 Waiting Input(foo) Batching(16, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 8 Waiting AutoPolling Schedule(wakeup=300ms)
@@ -6629,7 +6771,7 @@ async fn test_trigger_enable_during_flow_throttling() {
 #[test_log::test(tokio::test)]
 async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_since(
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
             DatasetIntervalIncrement {
                 num_blocks: 1,
                 num_records: 0,

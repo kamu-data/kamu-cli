@@ -8,19 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_task_system as ts;
 use serde::{Deserialize, Serialize};
 
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FlowActivationCause {
     Manual(FlowActivationCauseManual),
     AutoPolling(FlowActivationCauseAutoPolling),
-    Push(FlowActivationCausePush),
-    InputDatasetFlow(FlowActivationCauseInputDatasetFlow),
+    DatasetUpdate(FlowActivationCauseDatasetUpdate),
 }
 
 impl FlowActivationCause {
@@ -28,8 +26,7 @@ impl FlowActivationCause {
         match self {
             Self::Manual(t) => t.activation_time,
             Self::AutoPolling(t) => t.activation_time,
-            Self::Push(t) => t.activation_time,
-            Self::InputDatasetFlow(t) => t.activation_time,
+            Self::DatasetUpdate(t) => t.activation_time,
         }
     }
 
@@ -42,8 +39,8 @@ impl FlowActivationCause {
     }
 
     pub fn push_source_name(&self) -> Option<String> {
-        if let Self::Push(cause_pish) = self {
-            cause_pish.source_name.clone()
+        if let Self::DatasetUpdate(cause_update) = self {
+            cause_update.push_source_name().cloned()
         } else {
             None
         }
@@ -53,25 +50,30 @@ impl FlowActivationCause {
         match self {
             Self::Manual(_) => Some("Flow activated manually".to_string()),
             Self::AutoPolling(_) => Some("Flow activated automatically".to_string()),
-            Self::Push(cause_push) => match &cause_push.result {
-                DatasetPushResult::HttpIngest(_) => {
-                    Some("Flow activated by root dataset ingest via http endpoint".to_string())
+            Self::DatasetUpdate(cause_update) => match &cause_update.source {
+                DatasetUpdateSource::UpstreamFlow { .. } => {
+                    Some("Flow activated by upstream flow".to_string())
                 }
-                DatasetPushResult::SmtpSync(sync_result) => {
-                    if let Some(account_name) = sync_result.account_name_maybe.as_ref() {
+                DatasetUpdateSource::HttpIngest { source_name } => Some(format!(
+                    "Flow activated by root dataset ingest via HTTP endpoint: {source_name:?}"
+                )),
+                DatasetUpdateSource::SmartProtocolPush {
+                    account_name,
+                    is_force: _,
+                } => {
+                    if let Some(account_name) = account_name {
                         Some(format!(
-                            "Flow activated by root dataset ingest via SMTP sync by account: \
-                             {account_name}",
+                            "Flow activated via Smart Transfer Protocol push by account: \
+                             {account_name})"
                         ))
                     } else {
                         Some(
-                            "Flow activated by root dataset ingest via SMTP sync anonymously"
+                            "Flow activated via Smart Transfer Protocol push anonymously"
                                 .to_string(),
                         )
                     }
                 }
             },
-            Self::InputDatasetFlow(_) => Some("Flow activated by completed root flow".to_string()),
         }
     }
 
@@ -80,17 +82,25 @@ impl FlowActivationCause {
         // Try finding a similar existing causes and abort early, when found
         for existing in existing_causes {
             match (self, existing) {
-                (Self::Manual(this), Self::Manual(existing)) if this == existing => return false,
-                (Self::AutoPolling(_), Self::AutoPolling(_)) => return false,
-                (Self::Push(this), Self::Push(existing))
-                    if this.source_name == existing.source_name =>
+                // If both are manual, compare initiator accounts. One cause is enough per account
+                (Self::Manual(this), Self::Manual(existing))
+                    if this.initiator_account_id == existing.initiator_account_id =>
                 {
                     return false;
                 }
-                (Self::InputDatasetFlow(this), Self::InputDatasetFlow(existing)) => {
-                    if this.is_same_key_as(existing) {
-                        return false;
-                    }
+                // If both are auto-polling, they are the same, one cause is enough
+                (Self::AutoPolling(_), Self::AutoPolling(_)) => return false,
+                // If both are dataset updates, compare the structures, but any key attribute
+                // difference means it's unique
+                (Self::DatasetUpdate(this), Self::DatasetUpdate(existing)) => {
+                    return this.dataset_id != existing.dataset_id
+                        || this.source != existing.source
+                        || this.new_head != existing.new_head
+                        || this.old_head_maybe != existing.old_head_maybe
+                        || this.blocks_added != existing.blocks_added
+                        || this.records_added != existing.records_added
+                        || this.was_compacted != existing.was_compacted
+                        || this.new_watermark != existing.new_watermark;
                 }
                 _ => { /* Continue comparing */ }
             }
@@ -103,7 +113,7 @@ impl FlowActivationCause {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowActivationCauseManual {
     pub activation_time: DateTime<Utc>,
     pub initiator_account_id: odf::AccountID,
@@ -117,56 +127,49 @@ pub type InitiatorIDStream<'a> = std::pin::Pin<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowActivationCauseAutoPolling {
     pub activation_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowActivationCausePush {
-    pub activation_time: DateTime<Utc>,
-    pub source_name: Option<String>,
-    pub dataset_id: odf::DatasetID,
-    pub result: DatasetPushResult,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DatasetPushResult {
-    HttpIngest(DatasetPushHttpIngestResult),
-    SmtpSync(DatasetPushSmtpSyncResult),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetPushHttpIngestResult {
-    pub old_head_maybe: Option<odf::Multihash>,
-    pub new_head: odf::Multihash,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DatasetPushSmtpSyncResult {
-    pub old_head_maybe: Option<odf::Multihash>,
-    pub new_head: odf::Multihash,
-    pub account_name_maybe: Option<odf::AccountName>,
-    pub is_force: bool,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FlowActivationCauseInputDatasetFlow {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowActivationCauseDatasetUpdate {
     pub activation_time: DateTime<Utc>,
     pub dataset_id: odf::DatasetID,
-    pub flow_type: String,
-    pub flow_id: FlowID,
-    pub task_result: ts::TaskResult,
+    pub source: DatasetUpdateSource,
+    pub new_head: odf::Multihash,
+    pub old_head_maybe: Option<odf::Multihash>,
+    pub blocks_added: u64,
+    pub records_added: u64,
+    pub was_compacted: bool,
+    pub new_watermark: Option<DateTime<Utc>>,
 }
 
-impl FlowActivationCauseInputDatasetFlow {
-    pub fn is_same_key_as(&self, other: &FlowActivationCauseInputDatasetFlow) -> bool {
-        self.flow_type == other.flow_type && self.dataset_id == other.dataset_id
+impl FlowActivationCauseDatasetUpdate {
+    pub fn push_source_name(&self) -> Option<&String> {
+        match &self.source {
+            DatasetUpdateSource::HttpIngest { source_name } => source_name.as_ref(),
+            DatasetUpdateSource::SmartProtocolPush { .. }
+            | DatasetUpdateSource::UpstreamFlow { .. } => None,
+        }
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum DatasetUpdateSource {
+    UpstreamFlow {
+        flow_type: String,
+        flow_id: FlowID,
+    },
+    HttpIngest {
+        source_name: Option<String>,
+    },
+    SmartProtocolPush {
+        account_name: Option<odf::AccountName>,
+        is_force: bool,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -193,23 +196,34 @@ mod tests {
         })
     });
     static PUSH_SOURCE_ACTIVATION_CAUSE: LazyLock<FlowActivationCause> = LazyLock::new(|| {
-        FlowActivationCause::Push(FlowActivationCausePush {
+        FlowActivationCause::DatasetUpdate(FlowActivationCauseDatasetUpdate {
             activation_time: Utc::now(),
-            source_name: None,
+            source: DatasetUpdateSource::HttpIngest {
+                source_name: Some("some-source".to_string()),
+            },
             dataset_id: TEST_DATASET_ID.clone(),
-            result: DatasetPushResult::HttpIngest(DatasetPushHttpIngestResult {
-                old_head_maybe: None,
-                new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
-            }),
+            old_head_maybe: None,
+            new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
+            blocks_added: 1,
+            records_added: 5,
+            was_compacted: false,
+            new_watermark: None,
         })
     });
     static INPUT_DATASET_ACTIVATION_CAUSE: LazyLock<FlowActivationCause> = LazyLock::new(|| {
-        FlowActivationCause::InputDatasetFlow(FlowActivationCauseInputDatasetFlow {
+        FlowActivationCause::DatasetUpdate(FlowActivationCauseDatasetUpdate {
             activation_time: Utc::now(),
+            source: DatasetUpdateSource::UpstreamFlow {
+                flow_type: "SOME.FLOW.TYPE".to_string(),
+                flow_id: FlowID::new(5),
+            },
             dataset_id: TEST_DATASET_ID.clone(),
-            flow_type: "SOME.FLOW.TYPE".to_string(),
-            flow_id: FlowID::new(5),
-            task_result: ts::TaskResult::empty(),
+            old_head_maybe: None,
+            new_head: odf::Multihash::from_digest_sha3_256(b"some-other-slice"),
+            blocks_added: 2,
+            records_added: 3,
+            was_compacted: false,
+            new_watermark: None,
         })
     });
 
@@ -259,15 +273,19 @@ mod tests {
         ]));
 
         assert!(
-            PUSH_SOURCE_ACTIVATION_CAUSE.is_unique_vs(&[FlowActivationCause::Push(
-                FlowActivationCausePush {
+            PUSH_SOURCE_ACTIVATION_CAUSE.is_unique_vs(&[FlowActivationCause::DatasetUpdate(
+                FlowActivationCauseDatasetUpdate {
                     activation_time: Utc::now(),
-                    source_name: Some("some-source".to_string()),
+                    source: DatasetUpdateSource::HttpIngest {
+                        source_name: Some("some-source".to_string()),
+                    },
                     dataset_id: TEST_DATASET_ID.clone(),
-                    result: DatasetPushResult::HttpIngest(DatasetPushHttpIngestResult {
-                        old_head_maybe: None,
-                        new_head: odf::Multihash::from_digest_sha3_256(b"some-slice")
-                    }),
+                    old_head_maybe: None,
+                    new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
+                    blocks_added: 2,
+                    records_added: 5,
+                    was_compacted: false,
+                    new_watermark: None,
                 }
             )])
         );
@@ -288,23 +306,37 @@ mod tests {
 
         // Test unrelated flow for same dataset
         assert!(INPUT_DATASET_ACTIVATION_CAUSE.is_unique_vs(&[
-            FlowActivationCause::InputDatasetFlow(FlowActivationCauseInputDatasetFlow {
+            FlowActivationCause::DatasetUpdate(FlowActivationCauseDatasetUpdate {
                 activation_time: Utc::now(),
                 dataset_id: TEST_DATASET_ID.clone(),
-                flow_type: "SOME.OTHER.FLOW_TYPE".to_string(), // unrelated
-                flow_id: FlowID::new(7),
-                task_result: ts::TaskResult::empty()
+                source: DatasetUpdateSource::UpstreamFlow {
+                    flow_type: "SOME.OTHER.FLOW_TYPE".to_string(),
+                    flow_id: FlowID::new(7),
+                },
+                old_head_maybe: None,
+                new_head: odf::Multihash::from_digest_sha3_256(b"some-other-slice"),
+                blocks_added: 1,
+                records_added: 3,
+                was_compacted: false,
+                new_watermark: None,
             })
         ]));
 
         // Test same flow type for different dataset
         assert!(INPUT_DATASET_ACTIVATION_CAUSE.is_unique_vs(&[
-            FlowActivationCause::InputDatasetFlow(FlowActivationCauseInputDatasetFlow {
+            FlowActivationCause::DatasetUpdate(FlowActivationCauseDatasetUpdate {
                 activation_time: Utc::now(),
                 dataset_id: odf::DatasetID::new_seeded_ed25519(b"different"),
-                flow_type: "SOME.FLOW.TYPE".to_string(),
-                flow_id: FlowID::new(7),
-                task_result: ts::TaskResult::empty()
+                source: DatasetUpdateSource::UpstreamFlow {
+                    flow_type: "SOME.FLOW.TYPE".to_string(),
+                    flow_id: FlowID::new(8),
+                },
+                old_head_maybe: None,
+                new_head: odf::Multihash::from_digest_sha3_256(b"some-totally-different-slice"),
+                blocks_added: 2,
+                records_added: 3,
+                was_compacted: false,
+                new_watermark: None,
             })
         ]));
 

@@ -15,7 +15,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct FlowState {
     /// Unique flow identifier
     pub flow_id: FlowID,

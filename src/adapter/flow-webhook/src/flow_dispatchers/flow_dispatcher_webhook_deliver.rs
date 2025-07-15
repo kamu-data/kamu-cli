@@ -16,6 +16,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use {kamu_adapter_task_webhook as atw, kamu_flow_system as fs, kamu_task_system as ts};
 
@@ -58,9 +59,9 @@ impl fs::FlowDispatcher for FlowDispatcherWebhookDeliver {
 
     async fn propagate_success(
         &self,
-        _flow_binding: &fs::FlowBinding,
-        _activation_cause: fs::FlowActivationCause,
-        _: Option<fs::FlowConfigurationRule>,
+        _: &fs::FlowState,
+        _: &ts::TaskResult,
+        _: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         // No further actions triggered with a webhook delivery
         Ok(())

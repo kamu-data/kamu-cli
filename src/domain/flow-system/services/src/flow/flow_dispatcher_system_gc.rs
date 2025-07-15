@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_flow_system::*;
 use kamu_task_system as ts;
@@ -43,9 +44,9 @@ impl FlowDispatcher for FlowDispatcherSystemGC {
 
     async fn propagate_success(
         &self,
-        _flow_binding: &FlowBinding,
-        _activation_cause: FlowActivationCause,
-        _maybe_config_snapshot: Option<FlowConfigurationRule>,
+        _: &FlowState,
+        _: &ts::TaskResult,
+        _: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         // No propagation needed for system GC dispatcher
         Ok(())

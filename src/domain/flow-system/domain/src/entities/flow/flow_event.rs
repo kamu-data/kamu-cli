@@ -16,7 +16,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FlowEvent {
     /// Flow initiated
     Initiated(FlowEventInitiated),
@@ -56,7 +56,7 @@ impl FlowEvent {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventInitiated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -69,7 +69,7 @@ pub struct FlowEventInitiated {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -79,7 +79,7 @@ pub struct FlowEventStartConditionUpdated {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventActivationCauseAdded {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -88,7 +88,7 @@ pub struct FlowEventActivationCauseAdded {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowConfigSnapshotModified {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -97,7 +97,7 @@ pub struct FlowConfigSnapshotModified {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventScheduledForActivation {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -106,7 +106,7 @@ pub struct FlowEventScheduledForActivation {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventTaskScheduled {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -115,7 +115,7 @@ pub struct FlowEventTaskScheduled {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventTaskRunning {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -124,7 +124,7 @@ pub struct FlowEventTaskRunning {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventTaskFinished {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -136,7 +136,7 @@ pub struct FlowEventTaskFinished {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowEventAborted {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,

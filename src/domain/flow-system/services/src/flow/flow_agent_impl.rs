@@ -539,34 +539,8 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 &flow.flow_binding.flow_type,
                             )?;
 
-                            let activation_cause = match &flow.flow_binding.scope {
-                                FlowScope::Dataset { dataset_id } => {
-                                    FlowActivationCause::InputDatasetFlow(
-                                        FlowActivationCauseInputDatasetFlow {
-                                            activation_time: finish_time,
-                                            dataset_id: dataset_id.clone(),
-                                            flow_type: flow.flow_binding.flow_type.clone(),
-                                            flow_id: flow.flow_id,
-                                            task_result: task_result.clone(),
-                                        },
-                                    )
-                                }
-                                FlowScope::System | FlowScope::WebhookSubscription { .. } => {
-                                    // TODO: revise this, but there is no better trigger yet
-                                    FlowActivationCause::AutoPolling(
-                                        FlowActivationCauseAutoPolling {
-                                            activation_time: finish_time,
-                                        },
-                                    )
-                                }
-                            };
-
                             flow_dispatcher
-                                .propagate_success(
-                                    &flow.flow_binding,
-                                    activation_cause,
-                                    flow.config_snapshot.clone(),
-                                )
+                                .propagate_success(&flow, task_result, finish_time)
                                 .await
                                 .int_err()?;
                         }

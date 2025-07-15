@@ -16,7 +16,6 @@ use chrono::Duration;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
-use kamu_adapter_flow_dataset::*;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
@@ -605,8 +604,7 @@ impl FlowTriggerHarness {
                     HashMap::new(),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>()
-                .add::<FlowSupportServiceImpl>();
+                .add::<InMemoryTaskEventStore>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 
@@ -736,13 +734,11 @@ impl FlowTriggerHarness {
                                       taskIds
                                       primaryActivationCause {
                                           __typename
-                                          ... on FlowActivationCauseInputDatasetFlow {
+                                          ... on FlowActivationCauseDatasetUpdate {
                                               dataset {
                                                   id
                                                   name
                                               }
-                                              flowType
-                                              flowId
                                           }
                                           ... on FlowActivationCauseManual {
                                             __typename

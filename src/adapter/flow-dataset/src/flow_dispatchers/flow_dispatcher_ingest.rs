@@ -9,9 +9,11 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
+    DatasetIncrementQueryService,
     DependencyGraphService,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
 };
@@ -23,6 +25,7 @@ use crate::{
     FLOW_TYPE_DATASET_INGEST,
     FlowConfigRuleIngest,
     MESSAGE_CONSUMER_KAMU_FLOW_DISPATCHER_INGEST,
+    create_activation_cause_from_upstream_flow,
     trigger_transform_flow_for_all_downstream_datasets,
 };
 
@@ -47,6 +50,7 @@ pub struct FlowDispatcherIngest {
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
     flow_run_service: Arc<dyn fs::FlowRunService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
 
 #[async_trait::async_trait]
@@ -76,18 +80,30 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
 
     async fn propagate_success(
         &self,
-        flow_binding: &fs::FlowBinding,
-        activation_cause: fs::FlowActivationCause,
-        _: Option<fs::FlowConfigurationRule>,
+        success_flow_state: &fs::FlowState,
+        task_result: &ts::TaskResult,
+        finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        trigger_transform_flow_for_all_downstream_datasets(
-            self.dependency_graph_service.as_ref(),
-            self.flow_trigger_service.as_ref(),
-            self.flow_run_service.as_ref(),
-            flow_binding,
-            activation_cause,
+        let maybe_activation_cause = create_activation_cause_from_upstream_flow(
+            self.dataset_increment_query_service.as_ref(),
+            success_flow_state,
+            task_result,
+            finish_time,
         )
-        .await
+        .await?;
+
+        if let Some(activation_cause) = maybe_activation_cause {
+            trigger_transform_flow_for_all_downstream_datasets(
+                self.dependency_graph_service.as_ref(),
+                self.flow_trigger_service.as_ref(),
+                self.flow_run_service.as_ref(),
+                &success_flow_state.flow_binding,
+                activation_cause,
+            )
+            .await?;
+        }
+
+        Ok(())
     }
 }
 
@@ -112,44 +128,86 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
         tracing::debug!(received_message = ?message, "Received dataset externally changed message");
 
         let time_source = target_catalog.get_one::<dyn SystemTimeSource>().unwrap();
+        let dataset_increment_query_service = target_catalog
+            .get_one::<dyn kamu_datasets::DatasetIncrementQueryService>()
+            .unwrap();
 
-        let (activation_cause, dataset_id) = match message {
-            DatasetExternallyChangedMessage::HttpIngest(update_message) => (
-                fs::FlowActivationCause::Push(fs::FlowActivationCausePush {
-                    activation_time: time_source.now(),
-                    source_name: None,
-                    dataset_id: update_message.dataset_id.clone(),
-                    result: fs::DatasetPushResult::HttpIngest(fs::DatasetPushHttpIngestResult {
-                        old_head_maybe: update_message.maybe_prev_block_hash.clone(),
-                        new_head: update_message.new_block_hash.clone(),
-                    }),
-                }),
-                &update_message.dataset_id,
-            ),
-            DatasetExternallyChangedMessage::SmartTransferProtocolSync(update_message) => (
-                fs::FlowActivationCause::Push(fs::FlowActivationCausePush {
-                    activation_time: time_source.now(),
-                    source_name: None,
-                    dataset_id: update_message.dataset_id.clone(),
-                    result: fs::DatasetPushResult::SmtpSync(fs::DatasetPushSmtpSyncResult {
-                        old_head_maybe: update_message.maybe_prev_block_hash.clone(),
-                        new_head: update_message.new_block_hash.clone(),
-                        account_name_maybe: update_message.account_name.clone(),
-                        is_force: update_message.is_force,
-                    }),
-                }),
-                &update_message.dataset_id,
-            ),
+        let (update_cause, dataset_id) = match message {
+            DatasetExternallyChangedMessage::HttpIngest(ingest_message) => {
+                let increment = dataset_increment_query_service
+                    .get_increment_between(
+                        &ingest_message.dataset_id,
+                        ingest_message.maybe_prev_block_hash.as_ref(),
+                        &ingest_message.new_block_hash,
+                    )
+                    .await
+                    .int_err()?;
+                (
+                    fs::FlowActivationCauseDatasetUpdate {
+                        activation_time: time_source.now(),
+                        dataset_id: ingest_message.dataset_id.clone(),
+                        source: fs::DatasetUpdateSource::HttpIngest {
+                            source_name: ingest_message.maybe_source_name.clone(),
+                        },
+                        new_head: ingest_message.new_block_hash.clone(),
+                        old_head_maybe: ingest_message.maybe_prev_block_hash.clone(),
+                        blocks_added: increment.num_blocks,
+                        records_added: increment.num_records,
+                        was_compacted: false,
+                        new_watermark: increment.updated_watermark,
+                    },
+                    &ingest_message.dataset_id,
+                )
+            }
+            DatasetExternallyChangedMessage::SmartTransferProtocolSync(sync_message) => {
+                // TODO: check what happens when the sync is forced. It might fail
+                let increment = dataset_increment_query_service
+                    .get_increment_between(
+                        &sync_message.dataset_id,
+                        sync_message.maybe_prev_block_hash.as_ref(),
+                        &sync_message.new_block_hash,
+                    )
+                    .await
+                    .int_err()?;
+                (
+                    fs::FlowActivationCauseDatasetUpdate {
+                        activation_time: time_source.now(),
+                        dataset_id: sync_message.dataset_id.clone(),
+                        source: fs::DatasetUpdateSource::SmartProtocolPush {
+                            account_name: sync_message.account_name.clone(),
+                            is_force: sync_message.is_force,
+                        },
+                        new_head: sync_message.new_block_hash.clone(),
+                        old_head_maybe: sync_message.maybe_prev_block_hash.clone(),
+                        blocks_added: increment.num_blocks,
+                        records_added: increment.num_records,
+                        was_compacted: false,
+                        new_watermark: increment.updated_watermark,
+                    },
+                    &sync_message.dataset_id,
+                )
+            }
         };
+
+        if update_cause.blocks_added == 0 {
+            tracing::debug!(
+                %dataset_id,
+                "No new blocks added, skipping flow activation",
+            );
+            return Ok(());
+        }
 
         let flow_binding =
             fs::FlowBinding::for_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
-        use fs::FlowDispatcher;
-        self.propagate_success(&flow_binding, activation_cause, None)
-            .await
-            .int_err()?;
-
+        trigger_transform_flow_for_all_downstream_datasets(
+            self.dependency_graph_service.as_ref(),
+            self.flow_trigger_service.as_ref(),
+            self.flow_run_service.as_ref(),
+            &flow_binding,
+            fs::FlowActivationCause::DatasetUpdate(update_cause),
+        )
+        .await?;
         Ok(())
     }
 }

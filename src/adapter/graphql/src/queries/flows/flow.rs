@@ -189,21 +189,18 @@ impl Flow {
     }
 
     /// Start condition
-    async fn start_condition(&self, ctx: &Context<'_>) -> Result<Option<FlowStartCondition>> {
-        let maybe_condition =
-            if let Some(start_condition) = self.flow_state.start_condition.as_ref() {
-                Some(
-                    FlowStartCondition::create_from_raw_flow_data(
-                        start_condition,
-                        &self.flow_state.activation_causes,
-                        ctx,
-                    )
-                    .await
-                    .int_err()?,
+    #[allow(clippy::unused_async)]
+    async fn start_condition(&self) -> Result<Option<FlowStartCondition>> {
+        let maybe_condition = self
+            .flow_state
+            .start_condition
+            .as_ref()
+            .map(|start_condition| {
+                FlowStartCondition::create_from_raw_flow_data(
+                    start_condition,
+                    &self.flow_state.activation_causes,
                 )
-            } else {
-                None
-            };
+            });
 
         Ok(maybe_condition)
     }

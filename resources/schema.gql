@@ -1953,24 +1953,18 @@ type FlowAbortedResult {
 	message: String!
 }
 
-union FlowActivationCause = FlowActivationCauseManual | FlowActivationCauseAutoPolling | FlowActivationCausePush | FlowActivationCauseInputDatasetFlow
+union FlowActivationCause = FlowActivationCauseManual | FlowActivationCauseAutoPolling | FlowActivationCauseDatasetUpdate
 
 type FlowActivationCauseAutoPolling {
 	dummy: Boolean!
 }
 
-type FlowActivationCauseInputDatasetFlow {
+type FlowActivationCauseDatasetUpdate {
 	dataset: Dataset!
-	flowType: DatasetFlowType!
-	flowId: FlowID!
 }
 
 type FlowActivationCauseManual {
 	initiator: Account!
-}
-
-type FlowActivationCausePush {
-	dummy: Boolean!
 }
 
 input FlowConfigCompactionInput @oneOf {

@@ -210,15 +210,21 @@ impl std::fmt::Display for FlowSystemTestListener {
                             match flow_state.primary_activation_cause() {
                                 FlowActivationCause::Manual(_) => String::from("Manual"),
                                 FlowActivationCause::AutoPolling(_) => String::from("AutoPolling"),
-                                FlowActivationCause::Push(_) => String::from("Push"),
-                                FlowActivationCause::InputDatasetFlow(i) => format!(
-                                    "Input({})",
-                                    state
-                                        .dataset_display_names
-                                        .get(&i.dataset_id)
-                                        .cloned()
-                                        .unwrap_or_else(|| i.dataset_id.to_string()),
-                                ),
+                                FlowActivationCause::DatasetUpdate(update) =>
+                                    match &update.source {
+                                        DatasetUpdateSource::HttpIngest { .. } =>
+                                            String::from("HttpIngest"),
+                                        DatasetUpdateSource::SmartProtocolPush { .. } =>
+                                            String::from("SmartProtocolPush"),
+                                        DatasetUpdateSource::UpstreamFlow { .. } => format!(
+                                            "Input({})",
+                                            state
+                                                .dataset_display_names
+                                                .get(&update.dataset_id)
+                                                .cloned()
+                                                .unwrap_or_else(|| update.dataset_id.to_string())
+                                        ),
+                                    },
                             }
                         )?;
                     }

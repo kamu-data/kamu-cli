@@ -28,6 +28,7 @@ testing = []
 
 [dependencies]
 kamu-adapter-task-dataset = { workspace = true }
+kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system ={ workspace = true }
@@ -39,6 +40,7 @@ odf = { workspace = true }
 time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
 dill = { version = "0.14", default-features = false }
 futures = { version = "0.3", default-features = false }
 serde = { version = "1", features = ["derive"] }

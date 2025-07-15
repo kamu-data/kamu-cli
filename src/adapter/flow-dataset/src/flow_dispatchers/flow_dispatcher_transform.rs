@@ -9,13 +9,15 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use kamu_datasets::DependencyGraphService;
+use kamu_datasets::{DatasetIncrementQueryService, DependencyGraphService};
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowConfigRuleIngest,
+    create_activation_cause_from_upstream_flow,
     trigger_transform_flow_for_all_downstream_datasets,
 };
 
@@ -28,6 +30,7 @@ use crate::{
 })]
 pub struct FlowDispatcherTransform {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
     flow_run_service: Arc<dyn fs::FlowRunService>,
 }
@@ -59,18 +62,30 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
 
     async fn propagate_success(
         &self,
-        flow_binding: &fs::FlowBinding,
-        activation_cause: fs::FlowActivationCause,
-        _: Option<fs::FlowConfigurationRule>,
+        success_flow_state: &fs::FlowState,
+        task_result: &ts::TaskResult,
+        finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        trigger_transform_flow_for_all_downstream_datasets(
-            self.dependency_graph_service.as_ref(),
-            self.flow_trigger_service.as_ref(),
-            self.flow_run_service.as_ref(),
-            flow_binding,
-            activation_cause,
+        let maybe_activation_cause = create_activation_cause_from_upstream_flow(
+            self.dataset_increment_query_service.as_ref(),
+            success_flow_state,
+            task_result,
+            finish_time,
         )
-        .await
+        .await?;
+
+        if let Some(maybe_activation_cause) = maybe_activation_cause {
+            trigger_transform_flow_for_all_downstream_datasets(
+                self.dependency_graph_service.as_ref(),
+                self.flow_trigger_service.as_ref(),
+                self.flow_run_service.as_ref(),
+                &success_flow_state.flow_binding,
+                maybe_activation_cause,
+            )
+            .await?;
+        }
+
+        Ok(())
     }
 }
 

@@ -12,7 +12,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::component;
 use internal_error::InternalError;
-use kamu_datasets::DatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system as ts;
 use messaging_outbox::{Outbox, OutboxExt};
@@ -27,9 +26,7 @@ pub(crate) struct FlowSchedulingHelper {
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_trigger_service: Arc<dyn FlowTriggerService>,
-    flow_support_service: Arc<dyn FlowSupportService>,
     outbox: Arc<dyn Outbox>,
-    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
 }
@@ -382,49 +379,14 @@ impl FlowSchedulingHelper {
         let mut is_compacted = false;
 
         // Scan each accumulated trigger to decide
-        for trigger in &flow.activation_causes {
-            match trigger {
-                FlowActivationCause::InputDatasetFlow(activation_cause) => {
-                    let interpretation = self
-                        .flow_support_service
-                        .interpret_input_dataset_result(
-                            &activation_cause.dataset_id,
-                            &activation_cause.task_result,
-                        )
-                        .await?;
-
-                    if interpretation.was_compacted {
-                        is_compacted = true;
-                    } else {
-                        accumulated_records_count += interpretation.new_records_count;
-                        accumulated_something = true;
-                    }
-                }
-                FlowActivationCause::Push(activation_cause) => {
-                    let old_head_maybe = match activation_cause.result {
-                        DatasetPushResult::HttpIngest(ref update_result) => {
-                            update_result.old_head_maybe.as_ref()
-                        }
-                        DatasetPushResult::SmtpSync(ref update_result) => {
-                            if update_result.is_force {
-                                // Force sync currently does not supported as a trigger for
-                                // dependent datasets
-                                return Ok(());
-                            }
-                            update_result.old_head_maybe.as_ref()
-                        }
-                    };
-
-                    let increment = self
-                        .dataset_increment_query_service
-                        .get_increment_since(&activation_cause.dataset_id, old_head_maybe)
-                        .await
-                        .int_err()?;
-
-                    accumulated_records_count += increment.num_records;
+        for activation_cause in &flow.activation_causes {
+            if let FlowActivationCause::DatasetUpdate(activation_cause) = activation_cause {
+                if activation_cause.was_compacted {
+                    is_compacted = true;
+                } else {
+                    accumulated_records_count += activation_cause.records_added;
                     accumulated_something = true;
                 }
-                _ => {}
             }
         }
 

@@ -487,6 +487,7 @@ async fn test_trigger_reset_root_dataset_flow() {
             ts::TaskOutcome::Success(
                 TaskResultDatasetReset {
                     reset_result: ResetResult {
+                        old_head: Some(root_dataset_blocks[0].0.clone()),
                         new_head: root_dataset_blocks[1].0.clone(),
                     },
                 }
@@ -3954,13 +3955,11 @@ impl FlowRunsHarness {
                                         }
                                         primaryActivationCause {
                                             __typename
-                                            ... on FlowActivationCauseInputDatasetFlow {
+                                            ... on FlowActivationCauseDatasetUpdate {
                                                 dataset {
                                                     id
                                                     name
                                                 }
-                                                flowType
-                                                flowId
                                             }
                                             ... on FlowActivationCauseManual {
                                                 initiator {

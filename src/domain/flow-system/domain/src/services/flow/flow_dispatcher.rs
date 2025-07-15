@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_task_system as ts;
 
-use crate::{FlowActivationCause, FlowBinding, FlowConfigurationRule, RetryPolicy};
+use crate::{FlowBinding, FlowConfigurationRule, FlowState, RetryPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,9 +26,9 @@ pub trait FlowDispatcher: Send + Sync {
 
     async fn propagate_success(
         &self,
-        flow_binding: &FlowBinding,
-        activation_cause: FlowActivationCause,
-        maybe_config_snapshot: Option<FlowConfigurationRule>,
+        success_flow_state: &FlowState,
+        task_result: &ts::TaskResult,
+        finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError>;
 
     fn default_retry_policy(&self) -> Option<RetryPolicy> {

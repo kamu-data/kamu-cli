@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
-use kamu_datasets::{DatasetIncrementQueryService, DatasetIntervalIncrement};
+use kamu_datasets::DatasetIntervalIncrement;
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
@@ -25,20 +24,16 @@ pub(crate) enum FlowStartCondition {
 }
 
 impl FlowStartCondition {
-    pub async fn create_from_raw_flow_data(
+    pub fn create_from_raw_flow_data(
         start_condition: &fs::FlowStartCondition,
         matching_activation_causes: &[fs::FlowActivationCause],
-        ctx: &Context<'_>,
-    ) -> Result<Self, InternalError> {
-        Ok(match start_condition {
+    ) -> Self {
+        match start_condition {
             fs::FlowStartCondition::Schedule(s) => Self::Schedule(FlowStartConditionSchedule {
                 wake_up_at: s.wake_up_at,
             }),
             fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
             fs::FlowStartCondition::Batching(b) => {
-                let increment_query_service =
-                    from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
-
                 // Start from zero increment
                 let mut total_increment = DatasetIntervalIncrement::default();
 
@@ -47,18 +42,12 @@ impl FlowStartCondition {
 
                 // For each dataset activation cause, add accumulated changes since the initial
                 for activation_cause in matching_activation_causes {
-                    if let fs::FlowActivationCause::InputDatasetFlow(dataset_cause) =
-                        activation_cause
-                        && dataset_cause.task_result.result_type == TaskResultDatasetUpdate::TYPE_ID
-                        && let dataset_update =
-                            TaskResultDatasetUpdate::from_task_result(&dataset_cause.task_result)
-                                .int_err()?
-                        && let Some((old_head, _)) = dataset_update.try_as_increment()
-                    {
-                        total_increment += increment_query_service
-                            .get_increment_since(&dataset_cause.dataset_id, old_head)
-                            .await
-                            .int_err()?;
+                    if let fs::FlowActivationCause::DatasetUpdate(update_cause) = activation_cause {
+                        total_increment += DatasetIntervalIncrement {
+                            num_blocks: update_cause.blocks_added,
+                            num_records: update_cause.records_added,
+                            updated_watermark: update_cause.new_watermark,
+                        };
                     }
                 }
 
@@ -73,7 +62,7 @@ impl FlowStartCondition {
             fs::FlowStartCondition::Executor(e) => Self::Executor(FlowStartConditionExecutor {
                 task_id: e.task_id.into(),
             }),
-        })
+        }
     }
 }
 
