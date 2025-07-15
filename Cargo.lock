@@ -6826,6 +6826,7 @@ dependencies = [
  "kamu-adapter-flow-webhook",
  "kamu-adapter-graphql",
  "kamu-adapter-task-dataset",
+ "kamu-adapter-task-webhook",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
@@ -7025,6 +7026,7 @@ name = "kamu-adapter-task-webhook"
 version = "0.245.1"
 dependencies = [
  "async-trait",
+ "chrono",
  "database-common",
  "database-common-macros",
  "dill",

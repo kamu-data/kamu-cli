@@ -10,14 +10,10 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use database_common::PaginationOpts;
 use dill::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
-use kamu_adapter_flow_webhook::{
-    FLOW_TYPE_WEBHOOK_DELIVER,
-    FlowRunArgumentsWebhookDeliver,
-    WebhookDeliveryScheduler,
-};
+use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, WebhookDeliveryScheduler};
+use kamu_adapter_task_webhook as atw;
 use kamu_datasets::{
     DatasetEntry,
     DatasetReferenceMessage,
@@ -35,8 +31,8 @@ use kamu_flow_system::{
     MockFlowRunService,
 };
 use kamu_webhooks::*;
-use kamu_webhooks_inmem::{InMemoryWebhookEventRepository, InMemoryWebhookSubscriptionEventStore};
-use kamu_webhooks_services::WebhookEventBuilderImpl;
+use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_services::WebhookPayloadBuilderImpl;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -79,10 +75,6 @@ async fn test_subscription_scheduled_on_dataset_update() {
         )
         .await
         .unwrap();
-
-    harness
-        .assert_dataset_update_event_recorded(&dataset_id, &old_hash, &new_hash)
-        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,10 +134,6 @@ async fn test_subscriptions_in_different_statuses() {
         )
         .await
         .unwrap();
-
-    harness
-        .assert_dataset_update_event_recorded(&dataset_id, &old_hash, &new_hash)
-        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,7 +143,7 @@ async fn test_update_in_wrong_dataset() {
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let subscription_id: WebhookSubscriptionID = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
     // No tasks
     let harness = TestWebhookDeliverySchedulerHarness::new(MockFlowRunService::new());
@@ -184,10 +172,6 @@ async fn test_update_in_wrong_dataset() {
         )
         .await
         .unwrap();
-
-    harness
-        .assert_dataset_update_event_recorded(&dataset_id_2, &old_hash, &new_hash)
-        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -235,17 +219,12 @@ async fn test_subscription_non_matching_event_type() {
         )
         .await
         .unwrap();
-
-    harness
-        .assert_dataset_update_event_recorded(&dataset_id, &old_hash, &new_hash)
-        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TestWebhookDeliverySchedulerHarness {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
-    webhook_event_repository: Arc<dyn WebhookEventRepository>,
     outbox: Arc<dyn Outbox>,
     fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
 }
@@ -254,14 +233,13 @@ impl TestWebhookDeliverySchedulerHarness {
     fn new(mock_flow_run_service: MockFlowRunService) -> Self {
         let mut b = CatalogBuilder::new();
         b.add::<WebhookDeliveryScheduler>()
-            .add::<WebhookEventBuilderImpl>()
+            .add::<WebhookPayloadBuilderImpl>()
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),
             )
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<InMemoryWebhookSubscriptionEventStore>()
-            .add::<InMemoryWebhookEventRepository>()
             .add::<FakeDatasetEntryService>()
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_flow_run_service)
@@ -277,7 +255,6 @@ impl TestWebhookDeliverySchedulerHarness {
         Self {
             subscription_event_store: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
-            webhook_event_repository: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
         }
     }
@@ -374,46 +351,16 @@ impl TestWebhookDeliverySchedulerHarness {
                     config_snapshot: None,
                     retry_policy: None,
                     run_arguments: Some(
-                        FlowRunArgumentsWebhookDeliver {
-                            event_id: uuid::Uuid::new_v4(),
+                        atw::TaskRunArgumentsWebhookDeliver {
+                            event_type: WebhookEventTypeCatalog::dataset_ref_updated(),
+                            payload: json!({
+                                "foo": "bar",
+                            }),
                         }
-                        .into_flow_run_arguments(),
+                        .into_task_run_arguments(),
                     ),
                 })
             });
-    }
-
-    async fn assert_dataset_update_event_recorded(
-        &self,
-        dataset_id: &odf::DatasetID,
-        old_hash: &odf::Multihash,
-        new_hash: &odf::Multihash,
-    ) {
-        let events = self
-            .webhook_event_repository
-            .list_recent_events(PaginationOpts {
-                offset: 0,
-                limit: 100,
-            })
-            .await
-            .unwrap();
-
-        assert_eq!(events.len(), 1);
-        assert_eq!(
-            events[0].event_type,
-            WebhookEventTypeCatalog::dataset_ref_updated()
-        );
-        assert_eq!(
-            events[0].payload,
-            json!({
-                "blockRef": "head",
-                "datasetId": dataset_id.to_string(),
-                "newHash": new_hash.to_string(),
-                "oldHash": old_hash.to_string(),
-                "ownerAccountId": DEFAULT_ACCOUNT_ID.to_string(),
-                "version": 1
-            })
-        );
     }
 }
 

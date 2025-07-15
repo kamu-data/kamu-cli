@@ -19,7 +19,7 @@
 use internal_error::InternalError;
 use {kamu_adapter_task_webhook as atw, kamu_flow_system as fs, kamu_task_system as ts};
 
-use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowRunArgumentsWebhookDeliver};
+use crate::FLOW_TYPE_WEBHOOK_DELIVER;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,25 +36,22 @@ impl fs::FlowDispatcher for FlowDispatcherWebhookDeliver {
         &self,
         flow_binding: &fs::FlowBinding,
         _maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
-        maybe_flow_run_arguments: Option<&fs::FlowRunArguments>,
+        maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
         let subscription_id = flow_binding.get_webhook_subscription_id_or_die()?;
 
-        let event_id = if let Some(flow_run_arguments) = maybe_flow_run_arguments
-            && flow_run_arguments.arguments_type == FlowRunArgumentsWebhookDeliver::TYPE_ID
+        let delivery_args = if let Some(task_run_arguments) = maybe_task_run_arguments
+            && task_run_arguments.arguments_type == atw::TaskRunArgumentsWebhookDeliver::TYPE_ID
         {
-            let delivery_args =
-                FlowRunArgumentsWebhookDeliver::from_flow_run_arguments(flow_run_arguments)?;
-            delivery_args.event_id
+            atw::TaskRunArgumentsWebhookDeliver::from_task_run_arguments(task_run_arguments)?
         } else {
-            return InternalError::bail(
-                "Webhook delivery flow cannot be called without event ID in arguments",
-            );
+            return InternalError::bail("Webhook delivery flow cannot be called without arguments");
         };
 
         Ok(atw::LogicalPlanWebhookDeliver {
             webhook_subscription_id: subscription_id,
-            webhook_event_id: event_id,
+            webhook_event_type: delivery_args.event_type,
+            webhook_payload: delivery_args.payload,
         }
         .into_logical_plan())
     }

@@ -45,7 +45,7 @@ async fn test_deliver_webhook() {
 
     harness
         .webhook_delivery_worker
-        .deliver_webhook(task_id, subscription_id.into_inner(), event_id.into_inner())
+        .deliver_webhook(task_id, subscription_id, event_id)
         .await
         .unwrap();
 
@@ -86,7 +86,7 @@ async fn test_deliver_webhook_failed() {
 
     harness
         .webhook_delivery_worker
-        .deliver_webhook(task_id, subscription_id.into_inner(), event_id.into_inner())
+        .deliver_webhook(task_id, subscription_id, event_id)
         .await
         .unwrap();
 

@@ -174,15 +174,11 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
     async fn deliver_webhook(
         &self,
         task_id: ts::TaskID,
-        webhook_subscription_id: uuid::Uuid,
-        webhook_event_id: uuid::Uuid,
+        webhook_subscription_id: WebhookSubscriptionID,
+        webhook_event_id: WebhookEventID,
     ) -> Result<(), internal_error::InternalError> {
         let delivery_data = self
-            .prepare_delivery(
-                task_id,
-                WebhookSubscriptionID::new(webhook_subscription_id),
-                WebhookEventID::new(webhook_event_id),
-            )
+            .prepare_delivery(task_id, webhook_subscription_id, webhook_event_id)
             .await?;
 
         let webhook_response = self

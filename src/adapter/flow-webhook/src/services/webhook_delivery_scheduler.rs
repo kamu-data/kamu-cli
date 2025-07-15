@@ -12,12 +12,12 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{DatasetReferenceMessage, MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE};
-use kamu_flow_system as fs;
 use kamu_webhooks::*;
 use messaging_outbox::*;
 use time_source::SystemTimeSource;
+use {kamu_adapter_task_webhook as atw, kamu_flow_system as fs, kamu_task_system as ts};
 
-use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowRunArgumentsWebhookDeliver};
+use crate::FLOW_TYPE_WEBHOOK_DELIVER;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +33,7 @@ use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowRunArgumentsWebhookDeliver};
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct WebhookDeliveryScheduler {
-    webhook_event_builder: Arc<dyn WebhookEventBuilder>,
+    webhook_event_builder: Arc<dyn WebhookPayloadBuilder>,
     flow_run_service: Arc<dyn fs::FlowRunService>,
     time_source: Arc<dyn SystemTimeSource>,
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
@@ -45,17 +45,22 @@ impl WebhookDeliveryScheduler {
     async fn schedule_dataset_webhook_event_delivery(
         &self,
         dataset_id: &odf::DatasetID,
-        event: WebhookEvent,
+        event_type: WebhookEventType,
+        task_run_arguments: ts::TaskRunArguments,
     ) -> Result<(), InternalError> {
         // Match subscriptions for this event type
         let subscription_ids = self
-            .list_enabled_webhook_subscriptions_for_dataset_event(dataset_id, &event.event_type)
+            .list_enabled_webhook_subscriptions_for_dataset_event(dataset_id, &event_type)
             .await?;
 
         // Schedule webhook delivery flow for each subscription
         for subscription_id in subscription_ids {
-            self.schedule_webhook_delivery_flow(subscription_id, dataset_id, event.id)
-                .await?;
+            self.schedule_webhook_delivery_flow(
+                subscription_id,
+                dataset_id,
+                task_run_arguments.clone(),
+            )
+            .await?;
         }
 
         Ok(())
@@ -88,7 +93,7 @@ impl WebhookDeliveryScheduler {
         &self,
         subscription_id: WebhookSubscriptionID,
         dataset_id: &odf::DatasetID,
-        event_id: WebhookEventID,
+        task_run_arguments: ts::TaskRunArguments,
     ) -> Result<(), InternalError> {
         let flow_binding = fs::FlowBinding::for_webhook_subscription(
             subscription_id.into_inner(),
@@ -101,11 +106,6 @@ impl WebhookDeliveryScheduler {
                 activation_time: self.time_source.now(),
             });
 
-        let flow_run_arguments = FlowRunArgumentsWebhookDeliver {
-            event_id: event_id.into_inner(),
-        }
-        .into_flow_run_arguments();
-
         let flow = self
             .flow_run_service
             .run_flow_automatically(
@@ -113,12 +113,12 @@ impl WebhookDeliveryScheduler {
                 activation_cause,
                 None,
                 None,
-                Some(flow_run_arguments),
+                Some(task_run_arguments),
             )
             .await
             .int_err()?;
 
-        tracing::debug!(flow = ?flow.flow_id, %event_id, %subscription_id, "Scheduled webhook delivery flow");
+        tracing::debug!(flow = ?flow.flow_id, %subscription_id, "Scheduled webhook delivery flow");
 
         Ok(())
     }
@@ -146,17 +146,30 @@ impl MessageConsumerT<DatasetReferenceMessage> for WebhookDeliveryScheduler {
 
         match message {
             DatasetReferenceMessage::Updated(msg) => {
-                // Build the event
-                let event = self
+                // Build the payload for the webhook event
+                let webhook_payload = self
                     .webhook_event_builder
-                    .build_dataset_ref_updated(msg)
+                    .build_dataset_ref_updated_payload(
+                        &msg.dataset_id,
+                        &msg.block_ref,
+                        &msg.new_block_hash,
+                        msg.maybe_prev_block_hash.as_ref(),
+                    )
                     .await
                     .int_err()?;
 
                 // Schedule the delivery of the event to all subscriptions
-                self.schedule_dataset_webhook_event_delivery(&msg.dataset_id, event)
-                    .await
-                    .int_err()?;
+                self.schedule_dataset_webhook_event_delivery(
+                    &msg.dataset_id,
+                    WebhookEventTypeCatalog::dataset_ref_updated(),
+                    atw::TaskRunArgumentsWebhookDeliver {
+                        event_type: WebhookEventTypeCatalog::dataset_ref_updated(),
+                        payload: webhook_payload,
+                    }
+                    .into_task_run_arguments(),
+                )
+                .await
+                .int_err()?;
 
                 Ok(())
             }

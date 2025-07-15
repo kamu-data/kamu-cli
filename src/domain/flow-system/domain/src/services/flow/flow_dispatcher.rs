@@ -10,13 +10,7 @@
 use internal_error::InternalError;
 use kamu_task_system as ts;
 
-use crate::{
-    FlowActivationCause,
-    FlowBinding,
-    FlowConfigurationRule,
-    FlowRunArguments,
-    RetryPolicy,
-};
+use crate::{FlowActivationCause, FlowBinding, FlowConfigurationRule, RetryPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +20,7 @@ pub trait FlowDispatcher: Send + Sync {
         &self,
         flow_binding: &FlowBinding,
         maybe_config_snapshot: Option<&FlowConfigurationRule>,
-        maybe_flow_run_arguments: Option<&FlowRunArguments>,
+        maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError>;
 
     async fn propagate_success(

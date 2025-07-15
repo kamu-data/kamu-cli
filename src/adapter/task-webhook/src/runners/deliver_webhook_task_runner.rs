@@ -9,9 +9,10 @@
 
 use std::sync::Arc;
 
+use chrono::Utc;
 use internal_error::InternalError;
 use kamu_task_system::*;
-use kamu_webhooks::WebhookDeliveryWorker;
+use kamu_webhooks::{WebhookDeliveryWorker, WebhookEvent, WebhookEventID, WebhookSubscriptionID};
 
 use crate::TaskDefinitionWebhookDeliver;
 
@@ -23,6 +24,7 @@ use crate::TaskDefinitionWebhookDeliver;
     task_type: TaskDefinitionWebhookDeliver::TASK_TYPE,
 })]
 pub struct DeliverWebhookTaskRunner {
+    webhook_event_repo: Arc<dyn kamu_webhooks::WebhookEventRepository>,
     webhook_delivery_worker: Arc<dyn WebhookDeliveryWorker>,
 }
 
@@ -32,12 +34,25 @@ impl DeliverWebhookTaskRunner {
         &self,
         task_webhook: TaskDefinitionWebhookDeliver,
     ) -> Result<TaskOutcome, InternalError> {
+        // Create and save webhook event
+        let webhook_event_id = WebhookEventID::new(uuid::Uuid::new_v4());
+        let webhook_event = WebhookEvent::new(
+            webhook_event_id,
+            task_webhook.webhook_event_type,
+            task_webhook.webhook_payload,
+            Utc::now(),
+        );
+        self.webhook_event_repo
+            .create_event(&webhook_event)
+            .await
+            .int_err()?;
+
         match self
             .webhook_delivery_worker
             .deliver_webhook(
                 task_webhook.task_id,
-                task_webhook.webhook_subscription_id,
-                task_webhook.webhook_event_id,
+                WebhookSubscriptionID::new(task_webhook.webhook_subscription_id),
+                webhook_event_id,
             )
             .await
         {

@@ -10,6 +10,8 @@
 use internal_error::InternalError;
 use kamu_task_system as ts;
 
+use crate::{WebhookEventID, WebhookSubscriptionID};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -17,8 +19,8 @@ pub trait WebhookDeliveryWorker: Send + Sync {
     async fn deliver_webhook(
         &self,
         task_id: ts::TaskID,
-        webhook_subscription_id: uuid::Uuid,
-        webhook_event_id: uuid::Uuid,
+        webhook_subscription_id: WebhookSubscriptionID,
+        webhook_event_id: WebhookEventID,
     ) -> Result<(), InternalError>;
 }
 

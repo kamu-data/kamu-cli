@@ -26,7 +26,7 @@ impl FlowDispatcher for FlowDispatcherSystemGC {
         &self,
         flow_binding: &FlowBinding,
         _maybe_config_snapshot: Option<&FlowConfigurationRule>,
-        _maybe_flow_run_arguments: Option<&FlowRunArguments>,
+        _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
         if !matches!(flow_binding.scope, FlowScope::System) {
             return InternalError::bail("Expecting system flow binding scope for GC dispatcher");

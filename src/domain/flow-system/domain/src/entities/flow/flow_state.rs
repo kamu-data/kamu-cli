@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
-use kamu_task_system as ts;
+use kamu_task_system::{self as ts, TaskRunArguments};
 
 use crate::*;
 
@@ -36,7 +36,7 @@ pub struct FlowState {
     /// Retry policy used
     pub retry_policy: Option<RetryPolicy>,
     /// Optional run arguments
-    pub run_arguments: Option<FlowRunArguments>,
+    pub run_arguments: Option<TaskRunArguments>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

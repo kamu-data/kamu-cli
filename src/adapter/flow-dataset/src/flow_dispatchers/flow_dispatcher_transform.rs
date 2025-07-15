@@ -38,7 +38,7 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
         &self,
         flow_binding: &fs::FlowBinding,
         maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
-        _maybe_flow_run_arguments: Option<&fs::FlowRunArguments>,
+        _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
         let dataset_id = flow_binding.get_dataset_id_or_die()?;
 

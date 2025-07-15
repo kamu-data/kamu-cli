@@ -9,8 +9,8 @@
 
 mod webhook_dataset_removal_handler;
 mod webhook_delivery_worker_impl;
-mod webhook_event_builder_impl;
 mod webhook_headers;
+mod webhook_payload_builder_impl;
 mod webhook_secret_generator_impl;
 mod webhook_sender_impl;
 mod webhook_signer_impl;
@@ -18,8 +18,8 @@ mod webhook_subscription_query_service_impl;
 
 pub use webhook_dataset_removal_handler::*;
 pub use webhook_delivery_worker_impl::*;
-pub use webhook_event_builder_impl::*;
 pub use webhook_headers::*;
+pub use webhook_payload_builder_impl::*;
 pub use webhook_secret_generator_impl::*;
 pub use webhook_sender_impl::*;
 pub use webhook_signer_impl::*;

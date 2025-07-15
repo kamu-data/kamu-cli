@@ -16,16 +16,16 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
 };
-use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowRunArgumentsWebhookDeliver};
+use kamu_adapter_flow_webhook::FLOW_TYPE_WEBHOOK_DELIVER;
 use kamu_adapter_task_dataset::{
     TaskResultDatasetHardCompact,
     TaskResultDatasetReset,
     TaskResultDatasetUpdate,
 };
+use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
 use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
 use kamu_flow_system::FLOW_TYPE_SYSTEM_GC;
-use kamu_webhooks::{WebhookEvent, WebhookEventID};
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::prelude::*;
@@ -492,9 +492,6 @@ impl FlowDescriptionBuilder {
                 let webhook_subscription_query_svc =
                     from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionQueryService);
 
-                let webhook_event_repo =
-                    from_catalog_n!(ctx, dyn kamu_webhooks::WebhookEventRepository);
-
                 let subscription = webhook_subscription_query_svc
                     .find_webhook_subscription(subscription_id)
                     .await
@@ -512,23 +509,18 @@ impl FlowDescriptionBuilder {
                 })?;
 
                 let webhook_run_arguments =
-                    FlowRunArgumentsWebhookDeliver::from_flow_run_arguments(run_arguments)
+                    TaskRunArgumentsWebhookDeliver::from_task_run_arguments(run_arguments)
                         .map_err(|e| {
                             GqlError::Internal(InternalError::new(format!(
                                 "Failed to parse webhook run arguments: {e}",
                             )))
                         })?;
 
-                let event: WebhookEvent = webhook_event_repo
-                    .get_event_by_id(WebhookEventID::new(webhook_run_arguments.event_id))
-                    .await
-                    .int_err()?;
-
                 Ok(FlowDescription::Webhook(FlowDescriptionWebhook::Deliver(
                     FlowDescriptionWebhookDeliver {
                         target_url: subscription.target_url().clone(),
                         label: subscription.label().to_string(),
-                        event_type: event.event_type.to_string(),
+                        event_type: webhook_run_arguments.event_type.to_string(),
                     },
                 )))
             }

@@ -22,7 +22,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_TRANSFORM,
 };
 use kamu_flow_system::*;
-use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
+use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult, TaskRunArguments};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2752,7 +2752,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         initial_activation_cause: FlowActivationCause,
         config_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
-        run_arguments: Option<FlowRunArguments>,
+        run_arguments: Option<TaskRunArguments>,
     ) -> FlowID {
         let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
 

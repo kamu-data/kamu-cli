@@ -14,14 +14,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowRunArguments {
+pub struct TaskRunArguments {
     pub arguments_type: String,
     pub payload: serde_json::Value,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Serialize for FlowRunArguments {
+impl Serialize for TaskRunArguments {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -32,43 +32,43 @@ impl Serialize for FlowRunArguments {
     }
 }
 
-impl<'de> Deserialize<'de> for FlowRunArguments {
+impl<'de> Deserialize<'de> for TaskRunArguments {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct FlowRunArgumentsVisitor;
+        struct TaskRunArgumentsVisitor;
 
-        impl<'de> Visitor<'de> for FlowRunArgumentsVisitor {
-            type Value = FlowRunArguments;
+        impl<'de> Visitor<'de> for TaskRunArgumentsVisitor {
+            type Value = TaskRunArguments;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("a map with one key representing the arguments type")
             }
 
-            fn visit_map<M>(self, mut map: M) -> Result<FlowRunArguments, M::Error>
+            fn visit_map<M>(self, mut map: M) -> Result<TaskRunArguments, M::Error>
             where
                 M: MapAccess<'de>,
             {
                 let (type_id, payload): (String, serde_json::Value) = map
                     .next_entry()?
                     .ok_or_else(|| serde::de::Error::custom("Expected a single-key map"))?;
-                Ok(FlowRunArguments {
+                Ok(TaskRunArguments {
                     arguments_type: type_id,
                     payload,
                 })
             }
         }
 
-        deserializer.deserialize_map(FlowRunArgumentsVisitor)
+        deserializer.deserialize_map(TaskRunArgumentsVisitor)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Macro to generate flow run argument structs with serialization helpers
+/// Macro to generate task run argument structs with serialization helpers
 #[macro_export]
-macro_rules! flow_run_arguments_struct {
+macro_rules! task_run_arguments_struct {
     (
         $(#[$meta:meta])*
         $vis:vis struct $name:ident {
@@ -85,19 +85,19 @@ macro_rules! flow_run_arguments_struct {
         impl $name {
             pub const TYPE_ID: &'static str = $type_id;
 
-            pub fn into_flow_run_arguments(self) -> $crate::FlowRunArguments {
-                $crate::FlowRunArguments {
+            pub fn into_task_run_arguments(self) -> $crate::TaskRunArguments {
+                $crate::TaskRunArguments {
                     arguments_type: Self::TYPE_ID.to_string(),
                     payload: serde_json::to_value(self)
                         .expect(concat!("Failed to serialize ", stringify!($name), " into JSON")),
                 }
             }
 
-            pub fn from_flow_run_arguments(
-                flow_run_arguments: &$crate::FlowRunArguments,
+            pub fn from_task_run_arguments(
+                task_run_arguments: &$crate::TaskRunArguments,
             ) -> Result<Self, internal_error::InternalError> {
                 use internal_error::ResultIntoInternal;
-                serde_json::from_value(flow_run_arguments.payload.clone()).int_err()
+                serde_json::from_value(task_run_arguments.payload.clone()).int_err()
             }
         }
     };

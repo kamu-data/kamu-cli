@@ -12,6 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use kamu_flow_system::*;
+use kamu_task_system as ts;
 
 use crate::{FlowAbortHelper, FlowSchedulingHelper};
 
@@ -41,7 +42,7 @@ impl FlowRunService for FlowRunServiceImpl {
         flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
-        maybe_flow_run_arguments: Option<FlowRunArguments>,
+        maybe_task_run_arguments: Option<ts::TaskRunArguments>,
     ) -> Result<FlowState, RunFlowError> {
         let activation_time = self.agent_config.round_time(activation_time)?;
 
@@ -54,7 +55,7 @@ impl FlowRunService for FlowRunServiceImpl {
                     initiator_account_id,
                 }),
                 maybe_forced_flow_config_rule,
-                maybe_flow_run_arguments,
+                maybe_task_run_arguments,
             )
             .await
             .map_err(Into::into)
@@ -68,7 +69,7 @@ impl FlowRunService for FlowRunServiceImpl {
         activation_cause: FlowActivationCause,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
-        maybe_flow_run_arguments: Option<FlowRunArguments>,
+        maybe_task_run_arguments: Option<ts::TaskRunArguments>,
     ) -> Result<FlowState, RunFlowError> {
         self.flow_scheduling_helper
             .trigger_flow_common(
@@ -76,7 +77,7 @@ impl FlowRunService for FlowRunServiceImpl {
                 maybe_flow_trigger_rule,
                 activation_cause,
                 maybe_forced_flow_config_rule,
-                maybe_flow_run_arguments,
+                maybe_task_run_arguments,
             )
             .await
             .map_err(Into::into)

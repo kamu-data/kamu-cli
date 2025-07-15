@@ -7,13 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_flow_system::flow_run_arguments_struct! {
-    pub struct FlowRunArgumentsWebhookDeliver {
-        pub event_id: uuid::Uuid,
-    }
-    => "WebhookDeliverArguments"
+#[async_trait::async_trait]
+pub trait WebhookPayloadBuilder: Send + Sync {
+    async fn build_dataset_ref_updated_payload(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+        new_block_hash: &odf::Multihash,
+        maybe_prev_block_hash: Option<&odf::Multihash>,
+    ) -> Result<serde_json::Value, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

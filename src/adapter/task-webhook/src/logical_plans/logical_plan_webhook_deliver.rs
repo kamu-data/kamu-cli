@@ -7,13 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_webhooks::WebhookEventType;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_task_system::logical_plan_struct! {
     /// A task to perform delivery of a webhook event
     pub struct LogicalPlanWebhookDeliver {
         pub webhook_subscription_id: uuid::Uuid,
-        pub webhook_event_id: uuid::Uuid,
+        pub webhook_event_type: WebhookEventType,
+        pub webhook_payload: serde_json::Value,
     }
     => "DeliverWebhook"
 }

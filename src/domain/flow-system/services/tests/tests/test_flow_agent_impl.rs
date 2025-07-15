@@ -519,7 +519,7 @@ async fn test_manual_trigger() {
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -531,7 +531,7 @@ async fn test_manual_trigger() {
                     maybe_forced_flow_config_rule: Some(FlowConfigRuleIngest {
                       fetch_uncacheable: true
                     }.into_flow_config()),
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -737,7 +737,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     run_since_start: Duration::milliseconds(40),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -747,7 +747,7 @@ async fn test_ingest_trigger_with_ingest_config() {
                     run_since_start: Duration::milliseconds(80),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -927,7 +927,7 @@ async fn test_manual_trigger_compaction() {
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -937,7 +937,7 @@ async fn test_manual_trigger_compaction() {
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -1065,7 +1065,7 @@ async fn test_manual_trigger_reset() {
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -1168,7 +1168,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
               run_since_start: Duration::milliseconds(10),
               initiator_id: None,
               maybe_forced_flow_config_rule: None,
-              maybe_flow_run_arguments: None,
+              maybe_task_run_arguments: None,
           });
           let trigger0_handle = trigger0_driver.run();
 
@@ -1384,7 +1384,7 @@ async fn test_manual_trigger_compaction_with_config() {
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -1488,7 +1488,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
                 maybe_forced_flow_config_rule: None,
-                maybe_flow_run_arguments: None,
+                maybe_task_run_arguments: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -1714,7 +1714,7 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
                 maybe_forced_flow_config_rule: None,
-                maybe_flow_run_arguments: None,
+                maybe_task_run_arguments: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -1942,7 +1942,7 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
                 run_since_start: Duration::milliseconds(10),
                 initiator_id: None,
                 maybe_forced_flow_config_rule: None,
-                maybe_flow_run_arguments: None,
+                maybe_task_run_arguments: None,
             });
             let trigger0_handle = trigger0_driver.run();
 
@@ -2098,7 +2098,7 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
               run_since_start: Duration::milliseconds(10),
               initiator_id: None,
               maybe_forced_flow_config_rule: None,
-              maybe_flow_run_arguments: None,
+              maybe_task_run_arguments: None,
           });
             let trigger0_handle = trigger0_driver.run();
 
@@ -3313,7 +3313,7 @@ async fn test_throttling_manual_triggers() {
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
             maybe_forced_flow_config_rule: None,
-            maybe_flow_run_arguments: None,
+            maybe_task_run_arguments: None,
         });
         let trigger0_handle = trigger0_driver.run();
 
@@ -3323,7 +3323,7 @@ async fn test_throttling_manual_triggers() {
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
             maybe_forced_flow_config_rule: None,
-            maybe_flow_run_arguments: None,
+            maybe_task_run_arguments: None,
         });
         let trigger1_handle = trigger1_driver.run();
 
@@ -3333,7 +3333,7 @@ async fn test_throttling_manual_triggers() {
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
           maybe_forced_flow_config_rule: None,
-          maybe_flow_run_arguments: None,
+          maybe_task_run_arguments: None,
         });
         let trigger2_handle = trigger2_driver.run();
 
@@ -5466,7 +5466,7 @@ async fn test_list_all_flow_initiators() {
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -5476,7 +5476,7 @@ async fn test_list_all_flow_initiators() {
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -5614,7 +5614,7 @@ async fn test_list_all_datasets_with_flow() {
                     run_since_start: Duration::milliseconds(10),
                     initiator_id: Some(foo_account_id.clone()),
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -5624,7 +5624,7 @@ async fn test_list_all_datasets_with_flow() {
                     run_since_start: Duration::milliseconds(50),
                     initiator_id: Some(bar_account_id.clone()),
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger1_handle = trigger1_driver.run();
 
@@ -6463,7 +6463,7 @@ async fn test_trigger_enable_during_flow_throttling() {
             run_since_start: Duration::milliseconds(20),
             initiator_id: None,
             maybe_forced_flow_config_rule: None,
-            maybe_flow_run_arguments: None,
+            maybe_task_run_arguments: None,
         });
         let trigger0_handle = trigger0_driver.run();
 
@@ -6473,7 +6473,7 @@ async fn test_trigger_enable_during_flow_throttling() {
             run_since_start: Duration::milliseconds(30),
             initiator_id: None,
             maybe_forced_flow_config_rule: None,
-            maybe_flow_run_arguments: None,
+            maybe_task_run_arguments: None,
         });
         let trigger1_handle = trigger1_driver.run();
 
@@ -6483,7 +6483,7 @@ async fn test_trigger_enable_during_flow_throttling() {
           run_since_start: Duration::milliseconds(70),
           initiator_id: None,
           maybe_forced_flow_config_rule: None,
-          maybe_flow_run_arguments: None,
+          maybe_task_run_arguments: None,
         });
         let trigger2_handle = trigger2_driver.run();
 
@@ -6930,7 +6930,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 
@@ -7079,7 +7079,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
                     run_since_start: Duration::milliseconds(20),
                     initiator_id: None,
                     maybe_forced_flow_config_rule: None,
-                    maybe_flow_run_arguments: None,
+                    maybe_task_run_arguments: None,
                 });
                 let trigger0_handle = trigger0_driver.run();
 

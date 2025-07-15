@@ -43,7 +43,8 @@ impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
         Ok(TaskDefinition::new(TaskDefinitionWebhookDeliver {
             task_id,
             webhook_subscription_id: webhook_plan.webhook_subscription_id,
-            webhook_event_id: webhook_plan.webhook_event_id,
+            webhook_event_type: webhook_plan.webhook_event_type,
+            webhook_payload: webhook_plan.webhook_payload,
         }))
     }
 }

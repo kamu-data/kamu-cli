@@ -14,6 +14,7 @@ use dill::component;
 use internal_error::InternalError;
 use kamu_datasets::DatasetIncrementQueryService;
 use kamu_flow_system::*;
+use kamu_task_system as ts;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
@@ -152,7 +153,7 @@ impl FlowSchedulingHelper {
         trigger_rule_maybe: Option<FlowTriggerRule>,
         activation_cause: FlowActivationCause,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
-        maybe_flow_run_arguments: Option<FlowRunArguments>,
+        maybe_task_run_arguments: Option<ts::TaskRunArguments>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self
@@ -290,7 +291,7 @@ impl FlowSchedulingHelper {
                         &activation_cause,
                         maybe_flow_config_rule_snapshot,
                         retry_policy,
-                        maybe_flow_run_arguments,
+                        maybe_task_run_arguments,
                     )
                     .await?;
 
@@ -528,7 +529,7 @@ impl FlowSchedulingHelper {
         activation_cause: &FlowActivationCause,
         maybe_config_rule_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
-        run_arguments: Option<FlowRunArguments>,
+        maybe_task_run_arguments: Option<ts::TaskRunArguments>,
     ) -> Result<Flow, InternalError> {
         tracing::trace!(?flow_binding, ?activation_cause, "Creating new flow");
 
@@ -539,7 +540,7 @@ impl FlowSchedulingHelper {
             activation_cause.clone(),
             maybe_config_rule_snapshot,
             retry_policy,
-            run_arguments,
+            maybe_task_run_arguments,
         );
 
         Ok(flow)

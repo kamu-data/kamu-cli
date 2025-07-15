@@ -7,19 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-use kamu_datasets::DatasetReferenceMessageUpdated;
-
-use crate::WebhookEvent;
+use kamu_webhooks::WebhookEventType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait WebhookEventBuilder: Send + Sync {
-    async fn build_dataset_ref_updated(
-        &self,
-        event: &DatasetReferenceMessageUpdated,
-    ) -> Result<WebhookEvent, InternalError>;
+kamu_task_system::task_run_arguments_struct! {
+    pub struct TaskRunArgumentsWebhookDeliver {
+        pub event_type: WebhookEventType,
+        pub payload: serde_json::Value,
+    }
+    => "WebhookDeliverArguments"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

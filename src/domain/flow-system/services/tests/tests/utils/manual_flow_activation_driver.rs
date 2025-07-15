@@ -14,6 +14,7 @@ use database_common_macros::transactional_method1;
 use dill::Catalog;
 use kamu_accounts::DEFAULT_ACCOUNT_ID;
 use kamu_flow_system::{FlowBinding, FlowConfigurationRule, FlowRunService, RunFlowError};
+use kamu_task_system::TaskRunArguments;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +30,7 @@ pub(crate) struct ManualFlowActivationArgs {
     pub(crate) run_since_start: Duration,
     pub(crate) initiator_id: Option<odf::AccountID>,
     pub(crate) maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
-    pub(crate) maybe_flow_run_arguments: Option<kamu_flow_system::FlowRunArguments>,
+    pub(crate) maybe_task_run_arguments: Option<TaskRunArguments>,
 }
 
 impl ManualFlowActivationDriver {
@@ -67,7 +68,7 @@ impl ManualFlowActivationDriver {
                     .clone()
                     .unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
                 self.args.maybe_forced_flow_config_rule.clone(),
-                self.args.maybe_flow_run_arguments.clone(),
+                self.args.maybe_task_run_arguments.clone(),
             )
             .await?;
         Ok(())
