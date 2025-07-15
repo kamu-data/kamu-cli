@@ -11,6 +11,12 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.244.2] - 2025-07-15
+### Added
+- Migration to update flow event payloads
+### Fixed
+- Fetching list of flow triggers and configuration stuck
+
 ## [0.244.1] - 2025-07-11
 ### Fixed
 - `AuthPolicyLayer` correctly works for FlightSQL
