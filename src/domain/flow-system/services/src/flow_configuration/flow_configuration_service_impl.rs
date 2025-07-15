@@ -101,7 +101,13 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
             let flow_configurations = FlowConfiguration::load_multi_simple(flow_bindings, self.event_store.as_ref()).await.int_err()?;
             let stream = stream::iter(flow_configurations)
-                .map(|flow_configuration| Ok::<_, InternalError>(flow_configuration.into()));
+                .filter_map(|flow_configuration| async {
+                if flow_configuration.is_active() {
+                    Some(Ok::<_, InternalError>(flow_configuration.into()))
+                } else {
+                    None
+                }
+            });
 
             for await item in stream {
                 yield item?;
