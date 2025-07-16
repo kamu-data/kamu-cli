@@ -10,15 +10,14 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::InternalError;
-use kamu_datasets::{DatasetEntryService, DatasetIncrementQueryService, DependencyGraphService};
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_datasets::{DatasetEntryService, DependencyGraphService};
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
     FLOW_TYPE_DATASET_RESET,
     FlowConfigRuleReset,
-    create_activation_cause_from_upstream_flow,
-    trigger_hard_compaction_flow_for_own_downstream_datasets,
+    trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +30,6 @@ use crate::{
 pub struct FlowDispatcherReset {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     flow_run_service: Arc<dyn fs::FlowRunService>,
 }
 
@@ -50,9 +48,9 @@ impl fs::FlowDispatcher for FlowDispatcherReset {
         {
             let reset_rule = FlowConfigRuleReset::from_flow_config(config_snapshot)?;
             Ok(ats::LogicalPlanDatasetReset {
-                dataset_id: dataset_id.clone(),
-                new_head_hash: reset_rule.new_head_hash.clone(),
-                old_head_hash: reset_rule.old_head_hash.clone(),
+                dataset_id,
+                new_head_hash: reset_rule.new_head_hash,
+                old_head_hash: reset_rule.old_head_hash,
                 recursive: reset_rule.recursive,
             }
             .into_logical_plan())
@@ -67,18 +65,34 @@ impl fs::FlowDispatcher for FlowDispatcherReset {
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let maybe_activation_cause = create_activation_cause_from_upstream_flow(
-            self.dataset_increment_query_service.as_ref(),
-            success_flow_state,
-            task_result,
-            finish_time,
-        )
-        .await?;
+        let reset_result = ats::TaskResultDatasetReset::from_task_result(task_result)
+            .int_err()?
+            .reset_result;
 
-        let Some(activation_cause) = maybe_activation_cause else {
-            // No activation cause means no further propagation needed
+        if reset_result
+            .old_head
+            .as_ref()
+            .is_some_and(|old_head| *old_head == reset_result.new_head)
+        {
+            // No reset was performed, no propagation needed
             return Ok(());
-        };
+        }
+
+        let activation_cause =
+            fs::FlowActivationCause::DatasetUpdate(fs::FlowActivationCauseDatasetUpdate {
+                activation_time: finish_time,
+                dataset_id: success_flow_state.flow_binding.get_dataset_id_or_die()?,
+                source: fs::DatasetUpdateSource::UpstreamFlow {
+                    flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                    flow_id: success_flow_state.flow_id,
+                },
+                new_head: reset_result.new_head,
+                old_head_maybe: reset_result.old_head,
+                blocks_added: 0,
+                records_added: 0,
+                had_breaking_changes: true,
+                new_watermark: None,
+            });
 
         if let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
             && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
@@ -87,7 +101,7 @@ impl fs::FlowDispatcher for FlowDispatcherReset {
 
             let reset_rule = FlowConfigRuleReset::from_flow_config(config_snapshot)?;
             if reset_rule.recursive {
-                return trigger_hard_compaction_flow_for_own_downstream_datasets(
+                return trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets(
                     self.dataset_entry_service.as_ref(),
                     self.dependency_graph_service.as_ref(),
                     self.flow_run_service.as_ref(),

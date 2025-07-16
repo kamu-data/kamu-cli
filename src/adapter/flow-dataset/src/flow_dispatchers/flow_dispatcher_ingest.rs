@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_core::PullResult;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
     DatasetIncrementQueryService,
@@ -25,7 +26,6 @@ use crate::{
     FLOW_TYPE_DATASET_INGEST,
     FlowConfigRuleIngest,
     MESSAGE_CONSUMER_KAMU_FLOW_DISPATCHER_INGEST,
-    create_activation_cause_from_upstream_flow,
     trigger_transform_flow_for_all_downstream_datasets,
 };
 
@@ -72,7 +72,7 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
         }
 
         Ok(ats::LogicalPlanDatasetUpdate {
-            dataset_id: dataset_id.clone(),
+            dataset_id,
             fetch_uncacheable,
         }
         .into_logical_plan())
@@ -84,23 +84,44 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let maybe_activation_cause = create_activation_cause_from_upstream_flow(
-            self.dataset_increment_query_service.as_ref(),
-            success_flow_state,
-            task_result,
-            finish_time,
-        )
-        .await?;
+        let task_result_update =
+            ats::TaskResultDatasetUpdate::from_task_result(task_result).int_err()?;
+        match task_result_update.pull_result {
+            PullResult::UpToDate(_) => return Ok(()),
+            PullResult::Updated { old_head, new_head } => {
+                let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
 
-        if let Some(activation_cause) = maybe_activation_cause {
-            trigger_transform_flow_for_all_downstream_datasets(
-                self.dependency_graph_service.as_ref(),
-                self.flow_trigger_service.as_ref(),
-                self.flow_run_service.as_ref(),
-                &success_flow_state.flow_binding,
-                activation_cause,
-            )
-            .await?;
+                let dataset_increment = self
+                    .dataset_increment_query_service
+                    .get_increment_between(&dataset_id, old_head.as_ref(), &new_head)
+                    .await
+                    .int_err()?;
+
+                let activation_cause =
+                    fs::FlowActivationCause::DatasetUpdate(fs::FlowActivationCauseDatasetUpdate {
+                        activation_time: finish_time,
+                        dataset_id,
+                        source: fs::DatasetUpdateSource::UpstreamFlow {
+                            flow_id: success_flow_state.flow_id,
+                            flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                        },
+                        new_head,
+                        old_head_maybe: old_head,
+                        blocks_added: dataset_increment.num_blocks,
+                        records_added: dataset_increment.num_records,
+                        had_breaking_changes: false,
+                        new_watermark: dataset_increment.updated_watermark,
+                    });
+
+                trigger_transform_flow_for_all_downstream_datasets(
+                    self.dependency_graph_service.as_ref(),
+                    self.flow_trigger_service.as_ref(),
+                    self.flow_run_service.as_ref(),
+                    &success_flow_state.flow_binding,
+                    activation_cause,
+                )
+                .await?;
+            }
         }
 
         Ok(())
@@ -153,7 +174,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
                         old_head_maybe: ingest_message.maybe_prev_block_hash.clone(),
                         blocks_added: increment.num_blocks,
                         records_added: increment.num_records,
-                        was_compacted: false,
+                        had_breaking_changes: false,
                         new_watermark: increment.updated_watermark,
                     },
                     &ingest_message.dataset_id,
@@ -181,7 +202,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
                         old_head_maybe: sync_message.maybe_prev_block_hash.clone(),
                         blocks_added: increment.num_blocks,
                         records_added: increment.num_records,
-                        was_compacted: false,
+                        had_breaking_changes: false,
                         new_watermark: increment.updated_watermark,
                     },
                     &sync_message.dataset_id,

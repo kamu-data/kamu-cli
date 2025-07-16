@@ -376,13 +376,13 @@ impl FlowSchedulingHelper {
         // for now count overall number
         let mut accumulated_records_count = 0;
         let mut accumulated_something = false;
-        let mut is_compacted = false;
+        let mut had_breaking_changes = false;
 
         // Scan each accumulated trigger to decide
         for activation_cause in &flow.activation_causes {
             if let FlowActivationCause::DatasetUpdate(activation_cause) = activation_cause {
-                if activation_cause.was_compacted {
-                    is_compacted = true;
+                if activation_cause.had_breaking_changes {
+                    had_breaking_changes = true;
                 } else {
                     accumulated_records_count += activation_cause.records_added;
                     accumulated_something = true;
@@ -420,9 +420,9 @@ impl FlowSchedulingHelper {
 
         //  If we accumulated at least something (records or watermarks),
         //   the upper bound of potential finish time for batching is known
-        if accumulated_something || is_compacted {
+        if accumulated_something || had_breaking_changes {
             // Finish immediately if satisfied, or not later than the deadline
-            let batching_finish_time = if satisfied || is_compacted {
+            let batching_finish_time = if satisfied || had_breaking_changes {
                 evaluation_time
             } else {
                 batching_deadline
@@ -430,7 +430,9 @@ impl FlowSchedulingHelper {
 
             // If batching is over, it's start condition is no longer valid.
             // However, set throttling condition, if it applies
-            if (satisfied || is_compacted) && throttling_boundary_time > batching_finish_time {
+            if (satisfied || had_breaking_changes)
+                && throttling_boundary_time > batching_finish_time
+            {
                 self.indicate_throttling_activity(
                     flow,
                     throttling_boundary_time,

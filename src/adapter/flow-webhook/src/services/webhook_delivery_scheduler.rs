@@ -101,6 +101,7 @@ impl WebhookDeliveryScheduler {
             FLOW_TYPE_WEBHOOK_DELIVER,
         );
 
+        // TODO: this is a wrong activation cause
         let activation_cause =
             fs::FlowActivationCause::AutoPolling(fs::FlowActivationCauseAutoPolling {
                 activation_time: self.time_source.now(),

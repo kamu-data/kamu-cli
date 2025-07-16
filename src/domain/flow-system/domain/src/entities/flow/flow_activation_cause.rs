@@ -99,7 +99,7 @@ impl FlowActivationCause {
                         || this.old_head_maybe != existing.old_head_maybe
                         || this.blocks_added != existing.blocks_added
                         || this.records_added != existing.records_added
-                        || this.was_compacted != existing.was_compacted
+                        || this.had_breaking_changes != existing.had_breaking_changes
                         || this.new_watermark != existing.new_watermark;
                 }
                 _ => { /* Continue comparing */ }
@@ -143,7 +143,7 @@ pub struct FlowActivationCauseDatasetUpdate {
     pub old_head_maybe: Option<odf::Multihash>,
     pub blocks_added: u64,
     pub records_added: u64,
-    pub was_compacted: bool,
+    pub had_breaking_changes: bool,
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
@@ -206,7 +206,7 @@ mod tests {
             new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
             blocks_added: 1,
             records_added: 5,
-            was_compacted: false,
+            had_breaking_changes: false,
             new_watermark: None,
         })
     });
@@ -222,7 +222,7 @@ mod tests {
             new_head: odf::Multihash::from_digest_sha3_256(b"some-other-slice"),
             blocks_added: 2,
             records_added: 3,
-            was_compacted: false,
+            had_breaking_changes: false,
             new_watermark: None,
         })
     });
@@ -284,7 +284,7 @@ mod tests {
                     new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
                     blocks_added: 2,
                     records_added: 5,
-                    was_compacted: false,
+                    had_breaking_changes: false,
                     new_watermark: None,
                 }
             )])
@@ -317,7 +317,7 @@ mod tests {
                 new_head: odf::Multihash::from_digest_sha3_256(b"some-other-slice"),
                 blocks_added: 1,
                 records_added: 3,
-                was_compacted: false,
+                had_breaking_changes: false,
                 new_watermark: None,
             })
         ]));
@@ -335,7 +335,7 @@ mod tests {
                 new_head: odf::Multihash::from_digest_sha3_256(b"some-totally-different-slice"),
                 blocks_added: 2,
                 records_added: 3,
-                was_compacted: false,
+                had_breaking_changes: false,
                 new_watermark: None,
             })
         ]));

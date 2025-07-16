@@ -7,135 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_adapter_task_dataset::{
-    TaskResultDatasetHardCompact,
-    TaskResultDatasetReset,
-    TaskResultDatasetUpdate,
-};
-use kamu_core::{CompactionResult, PullResult};
-use kamu_datasets::{DatasetEntryServiceExt, DatasetIncrementQueryService, DependencyGraphService};
+use kamu_datasets::{DatasetEntryServiceExt, DependencyGraphService};
 use kamu_flow_system::{self as fs, FlowTriggerServiceExt};
-use kamu_task_system as ts;
 
 use crate::{FLOW_TYPE_DATASET_COMPACT, FLOW_TYPE_DATASET_TRANSFORM, FlowConfigRuleCompact};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn create_activation_cause_from_upstream_flow(
-    dataset_increment_query_service: &dyn DatasetIncrementQueryService,
-    success_flow_state: &fs::FlowState,
-    task_result: &ts::TaskResult,
-    finished_at: DateTime<Utc>,
-) -> Result<Option<fs::FlowActivationCause>, InternalError> {
-    let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
-
-    struct ResultData {
-        new_block_hash: odf::Multihash,
-        maybe_prev_block_hash: Option<odf::Multihash>,
-        blocks_added: u64,
-        records_added: u64,
-        was_compacted: bool,
-        new_watermark: Option<DateTime<Utc>>,
-    }
-
-    let result_data: ResultData = match task_result.result_type.as_str() {
-        ts::TaskResult::TASK_RESULT_EMPTY => return Ok(None),
-
-        TaskResultDatasetReset::TYPE_ID => {
-            let reset_result = TaskResultDatasetReset::from_task_result(task_result)
-                .int_err()?
-                .reset_result;
-            ResultData {
-                new_block_hash: reset_result.new_head,
-                maybe_prev_block_hash: reset_result.old_head,
-                blocks_added: 0,
-                records_added: 0,
-                was_compacted: false,
-                new_watermark: None,
-            }
-        }
-
-        TaskResultDatasetUpdate::TYPE_ID => {
-            let update_result = TaskResultDatasetUpdate::from_task_result(task_result).int_err()?;
-            match update_result.pull_result {
-                PullResult::Updated { old_head, new_head } => {
-                    let dataset_increment = dataset_increment_query_service
-                        .get_increment_between(&dataset_id, old_head.as_ref(), &new_head)
-                        .await
-                        .int_err()?;
-
-                    ResultData {
-                        new_block_hash: new_head,
-                        maybe_prev_block_hash: old_head,
-                        blocks_added: dataset_increment.num_blocks,
-                        records_added: dataset_increment.num_records,
-                        was_compacted: false,
-                        new_watermark: dataset_increment.updated_watermark,
-                    }
-                }
-                PullResult::UpToDate(_) => {
-                    // Dataset up to date, no new data
-                    return Ok(None);
-                }
-            }
-        }
-        TaskResultDatasetHardCompact::TYPE_ID => {
-            let compaction_result = TaskResultDatasetHardCompact::from_task_result(task_result)
-                .int_err()?
-                .compaction_result;
-
-            match compaction_result {
-                CompactionResult::NothingToDo => {
-                    // Nothing to do, no data modifications
-                    return Ok(None);
-                }
-                CompactionResult::Success {
-                    old_head,
-                    new_head,
-                    old_num_blocks: _,
-                    new_num_blocks: _,
-                } => ResultData {
-                    new_block_hash: new_head,
-                    maybe_prev_block_hash: Some(old_head),
-                    blocks_added: 0,
-                    records_added: 0,
-                    was_compacted: true,
-                    new_watermark: None,
-                },
-            }
-        }
-
-        _ => {
-            tracing::error!(
-                "Unexpected input dataset result type: {}",
-                task_result.result_type
-            );
-            return Err(InternalError::new(format!(
-                "Unexpected input dataset result type: {}",
-                task_result.result_type
-            )));
-        }
-    };
-
-    Ok(Some(fs::FlowActivationCause::DatasetUpdate(
-        fs::FlowActivationCauseDatasetUpdate {
-            activation_time: finished_at,
-            dataset_id: dataset_id.clone(),
-            source: fs::DatasetUpdateSource::UpstreamFlow {
-                flow_type: success_flow_state.flow_binding.flow_type.clone(),
-                flow_id: success_flow_state.flow_id,
-            },
-            new_head: result_data.new_block_hash,
-            old_head_maybe: result_data.maybe_prev_block_hash,
-            blocks_added: result_data.blocks_added,
-            records_added: result_data.records_added,
-            was_compacted: result_data.was_compacted,
-            new_watermark: result_data.new_watermark,
-        },
-    )))
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -178,7 +54,7 @@ pub(crate) async fn trigger_transform_flow_for_all_downstream_datasets(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn trigger_hard_compaction_flow_for_own_downstream_datasets(
+pub(crate) async fn trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets(
     dataset_entry_service: &dyn kamu_datasets::DatasetEntryService,
     dependency_graph_service: &dyn DependencyGraphService,
     flow_run_service: &dyn fs::FlowRunService,

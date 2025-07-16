@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_task_system as ts;
 
-use crate::{FlowBinding, FlowConfigurationRule, FlowState, RetryPolicy};
+use crate::{FlowBinding, FlowConfigurationRule, FlowState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,10 +30,6 @@ pub trait FlowDispatcher: Send + Sync {
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError>;
-
-    fn default_retry_policy(&self) -> Option<RetryPolicy> {
-        None
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

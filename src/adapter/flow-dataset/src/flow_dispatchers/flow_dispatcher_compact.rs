@@ -10,15 +10,15 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::InternalError;
-use kamu_datasets::{DatasetEntryService, DatasetIncrementQueryService, DependencyGraphService};
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_core::CompactionResult;
+use kamu_datasets::{DatasetEntryService, DependencyGraphService};
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
     FLOW_TYPE_DATASET_COMPACT,
     FlowConfigRuleCompact,
-    create_activation_cause_from_upstream_flow,
-    trigger_hard_compaction_flow_for_own_downstream_datasets,
+    trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets,
     trigger_transform_flow_for_all_downstream_datasets,
 };
 
@@ -33,7 +33,6 @@ pub struct FlowDispatcherCompact {
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
     flow_run_service: Arc<dyn fs::FlowRunService>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
-    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
@@ -62,7 +61,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
         }
 
         Ok(ats::LogicalPlanDatasetHardCompact {
-            dataset_id: dataset_id.clone(),
+            dataset_id,
             max_slice_size,
             max_slice_records,
             keep_metadata_only,
@@ -76,49 +75,72 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
         task_result: &ts::TaskResult,
         finish_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        let maybe_activation_cause = create_activation_cause_from_upstream_flow(
-            self.dataset_increment_query_service.as_ref(),
-            success_flow_state,
-            task_result,
-            finish_time,
-        )
-        .await?;
+        let compact_compaction_result =
+            ats::TaskResultDatasetHardCompact::from_task_result(task_result)
+                .int_err()?
+                .compaction_result;
 
-        let Some(activation_cause) = maybe_activation_cause else {
-            // No activation cause means no further propagation needed
-            return Ok(());
-        };
-
-        if let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
-            && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
-        {
-            let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
-
-            let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
-            if compaction_rule.recursive() {
-                trigger_hard_compaction_flow_for_own_downstream_datasets(
-                    self.dataset_entry_service.as_ref(),
-                    self.dependency_graph_service.as_ref(),
-                    self.flow_run_service.as_ref(),
-                    &dataset_id,
-                    activation_cause,
-                )
-                .await
-            } else {
-                // Nothing to do here, non-recursive compaction
-                Ok(())
+        match compact_compaction_result {
+            CompactionResult::NothingToDo => {
+                // No compaction was performed, no propagation needed
+                return Ok(());
             }
-        } else {
-            // Trigger transform flow for all downstream datasets ...
-            //   .. they will all explicitly break, and we need this visibility
-            trigger_transform_flow_for_all_downstream_datasets(
-                self.dependency_graph_service.as_ref(),
-                self.flow_trigger_service.as_ref(),
-                self.flow_run_service.as_ref(),
-                &success_flow_state.flow_binding,
-                activation_cause,
-            )
-            .await
+            CompactionResult::Success {
+                old_head,
+                new_head,
+                old_num_blocks: _,
+                new_num_blocks: _,
+            } => {
+                let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
+
+                let activation_cause =
+                    fs::FlowActivationCause::DatasetUpdate(fs::FlowActivationCauseDatasetUpdate {
+                        activation_time: finish_time,
+                        dataset_id,
+                        source: fs::DatasetUpdateSource::UpstreamFlow {
+                            flow_id: success_flow_state.flow_id,
+                            flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                        },
+                        new_head,
+                        old_head_maybe: Some(old_head),
+                        blocks_added: 0,
+                        records_added: 0,
+                        had_breaking_changes: true,
+                        new_watermark: None,
+                    });
+
+                if let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
+                    && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
+                {
+                    let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
+
+                    let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
+                    if compaction_rule.recursive() {
+                        trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets(
+                            self.dataset_entry_service.as_ref(),
+                            self.dependency_graph_service.as_ref(),
+                            self.flow_run_service.as_ref(),
+                            &dataset_id,
+                            activation_cause,
+                        )
+                        .await
+                    } else {
+                        // Nothing to do here, non-recursive compaction
+                        Ok(())
+                    }
+                } else {
+                    // Trigger transform flow for all downstream datasets ...
+                    //   .. they will all explicitly break, and we need this visibility
+                    trigger_transform_flow_for_all_downstream_datasets(
+                        self.dependency_graph_service.as_ref(),
+                        self.flow_trigger_service.as_ref(),
+                        self.flow_run_service.as_ref(),
+                        &success_flow_state.flow_binding,
+                        activation_cause,
+                    )
+                    .await
+                }
+            }
         }
     }
 }
