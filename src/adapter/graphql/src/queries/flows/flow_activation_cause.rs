@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::DatasetRegistry;
-use kamu_flow_system as fs;
+use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -46,9 +46,20 @@ impl FlowActivationCause {
                 let account = Account::from_dataset_alias(ctx, &hdl.alias)
                     .await?
                     .expect("Account must exist");
-                Self::DatasetUpdate(FlowActivationCauseDatasetUpdate::new(
-                    Dataset::new_access_checked(account, hdl),
-                ))
+                Self::DatasetUpdate(FlowActivationCauseDatasetUpdate {
+                    dataset: Dataset::new_access_checked(account, hdl),
+                    source: match update.source {
+                        fs::DatasetUpdateSource::UpstreamFlow { .. } => {
+                            FlowActivationCauseDatasetUpdateSource::UpstreamFlow
+                        }
+                        fs::DatasetUpdateSource::HttpIngest { .. } => {
+                            FlowActivationCauseDatasetUpdateSource::HttpIngest
+                        }
+                        fs::DatasetUpdateSource::SmartProtocolPush { .. } => {
+                            FlowActivationCauseDatasetUpdateSource::SmartProtocolPush
+                        }
+                    },
+                })
             }
         })
     }
@@ -73,12 +84,14 @@ impl From<fs::FlowActivationCauseAutoPolling> for FlowActivationCauseAutoPolling
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseDatasetUpdate {
     dataset: Dataset,
+    source: FlowActivationCauseDatasetUpdateSource,
 }
 
-impl FlowActivationCauseDatasetUpdate {
-    pub fn new(dataset: Dataset) -> Self {
-        Self { dataset }
-    }
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) enum FlowActivationCauseDatasetUpdateSource {
+    UpstreamFlow,
+    HttpIngest,
+    SmartProtocolPush,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

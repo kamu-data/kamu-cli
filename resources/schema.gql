@@ -1961,6 +1961,13 @@ type FlowActivationCauseAutoPolling {
 
 type FlowActivationCauseDatasetUpdate {
 	dataset: Dataset!
+	source: FlowActivationCauseDatasetUpdateSource!
+}
+
+enum FlowActivationCauseDatasetUpdateSource {
+	UPSTREAM_FLOW
+	HTTP_INGEST
+	SMART_PROTOCOL_PUSH
 }
 
 type FlowActivationCauseManual {
