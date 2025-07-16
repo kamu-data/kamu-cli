@@ -199,6 +199,17 @@ impl InMemoryFlowEventStore {
             Self::remove_flow_scheduling_record(state, e.flow_id);
             // make new record
             Self::insert_flow_scheduling_record(state, e.flow_id, e.scheduled_for_activation_at);
+        } else if let FlowEvent::TaskFinished(e) = &event {
+            // Will there be a retry?
+            if let Some(next_attempt_at) = e.next_attempt_at {
+                // Remove any possible previous enqueuing
+                Self::remove_flow_scheduling_record(state, e.flow_id);
+                // make new record
+                Self::insert_flow_scheduling_record(state, e.flow_id, next_attempt_at);
+            } else {
+                // If no next attempt is scheduled, remove the scheduling record
+                Self::remove_flow_scheduling_record(state, e.flow_id);
+            }
         }
         // and removals
         else if let FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) = &event {
@@ -348,6 +359,12 @@ impl FlowEventStore for InMemoryFlowEventStore {
             by_initiator: None,
         };
 
+        let retrying_filter = FlowFilters {
+            by_flow_type: None,
+            by_flow_status: Some(FlowStatus::Retrying),
+            by_initiator: None,
+        };
+
         let running_filter = FlowFilters {
             by_flow_type: None,
             by_flow_status: Some(FlowStatus::Running),
@@ -362,6 +379,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
                     .rev()
                     .filter(|flow_id| {
                         g.matches_flow(**flow_id, &waiting_filter)
+                            || g.matches_flow(**flow_id, &retrying_filter)
                             || g.matches_flow(**flow_id, &running_filter)
                     })
                     .copied()
@@ -484,7 +502,9 @@ impl FlowEventStore for InMemoryFlowEventStore {
             // Split events by type
             let mut waiting_flows: Vec<_> = vec![];
             let mut running_flows: Vec<_> = vec![];
+            let mut retrying_flows: Vec<_> = vec![];
             let mut finished_flows: Vec<_> = vec![];
+
             for flow_id in &g.all_flows {
                 // Also also apply given filters on this stage in order to reduce amount of
                 // items to process in further steps
@@ -498,6 +518,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
                     match flow.flow_status {
                         FlowStatus::Waiting => waiting_flows.push(item),
                         FlowStatus::Running => running_flows.push(item),
+                        FlowStatus::Retrying => retrying_flows.push(item),
                         FlowStatus::Finished => finished_flows.push(item),
                     }
                 }
@@ -505,11 +526,13 @@ impl FlowEventStore for InMemoryFlowEventStore {
             // Sort every group separately
             waiting_flows.sort_by(|a, b| b.cmp(a));
             running_flows.sort_by(|a, b| b.cmp(a));
+            retrying_flows.sort_by(|a, b| b.cmp(a));
             finished_flows.sort_by(|a, b| b.cmp(a));
 
             let mut ordered_flows = vec![];
             ordered_flows.append(&mut waiting_flows);
             ordered_flows.append(&mut running_flows);
+            ordered_flows.append(&mut retrying_flows);
             ordered_flows.append(&mut finished_flows);
 
             ordered_flows

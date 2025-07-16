@@ -185,7 +185,7 @@ pub async fn test_save_blocks_batch_duplicate_sequence_number(catalog: &Catalog)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_filter_datasets_having_blocks(catalog: &Catalog) {
+pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
     let (test_account_id, test_account_name) = init_test_account(catalog).await;
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"dataset_1");
@@ -232,12 +232,17 @@ pub async fn test_filter_datasets_having_blocks(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let blocks = vec![make_seed_block(), make_info_block(1)];
+    let blocks = vec![make_seed_block(), make_info_block(1), make_info_block(2)];
     repo.save_blocks_batch(&dataset_id_2, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
 
-    let blocks = vec![make_seed_block(), make_license_block(1)];
+    let blocks = vec![
+        make_seed_block(),
+        make_info_block(1),
+        make_license_block(2),
+        make_license_block(3),
+    ];
     repo.save_blocks_batch(&dataset_id_3, &odf::BlockRef::Head, &blocks)
         .await
         .unwrap();
@@ -248,18 +253,52 @@ pub async fn test_filter_datasets_having_blocks(catalog: &Catalog) {
         dataset_id_3.clone(),
     ];
 
-    let filtered_datasets = repo
-        .filter_datasets_having_blocks(
-            dataset_ids,
+    let matches = repo
+        .match_datasets_having_blocks(
+            &dataset_ids,
             &odf::BlockRef::Head,
             kamu_datasets::MetadataEventType::SetLicense,
         )
         .await
         .unwrap();
 
-    assert_eq!(filtered_datasets.len(), 2);
-    assert!(filtered_datasets.contains(&dataset_id_1));
-    assert!(filtered_datasets.contains(&dataset_id_3));
+    assert_eq!(matches.len(), 2);
+    assert!(
+        matches
+            .iter()
+            .any(|(id, key_block)| id == &dataset_id_1 && key_block.sequence_number == 2)
+    );
+    assert!(
+        matches
+            .iter()
+            .any(|(id, key_block)| id == &dataset_id_3 && key_block.sequence_number == 3)
+    );
+
+    let matches = repo
+        .match_datasets_having_blocks(
+            &dataset_ids,
+            &odf::BlockRef::Head,
+            kamu_datasets::MetadataEventType::SetInfo,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(matches.len(), 3);
+    assert!(
+        matches
+            .iter()
+            .any(|(id, key_block)| id == &dataset_id_1 && key_block.sequence_number == 1)
+    );
+    assert!(
+        matches
+            .iter()
+            .any(|(id, key_block)| id == &dataset_id_2 && key_block.sequence_number == 2)
+    );
+    assert!(
+        matches
+            .iter()
+            .any(|(id, key_block)| id == &dataset_id_3 && key_block.sequence_number == 1)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

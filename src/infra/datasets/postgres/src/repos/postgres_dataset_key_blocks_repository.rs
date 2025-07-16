@@ -89,22 +89,31 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             .collect())
     }
 
-    async fn filter_datasets_having_blocks(
+    async fn match_datasets_having_blocks(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+    ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
-        let dataset_ids: Vec<String> = dataset_ids.into_iter().map(|id| id.to_string()).collect();
+        let dataset_ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
 
         let rows = sqlx::query!(
             r#"
-            SELECT DISTINCT dataset_id
-                FROM dataset_key_blocks
-                WHERE dataset_id = ANY($1) AND block_ref_name = $2 AND event_type = ($3::text)::metadata_event_type
+            SELECT DISTINCT ON (dataset_id)
+                dataset_id,
+                event_type as "event_type: MetadataEventType",
+                sequence_number,
+                block_hash,
+                block_payload
+            FROM dataset_key_blocks
+            WHERE
+                dataset_id = ANY($1) AND
+                block_ref_name = $2 AND
+                event_type = ($3::text)::metadata_event_type
+            ORDER BY dataset_id, sequence_number DESC
             "#,
             &dataset_ids,
             block_ref.as_str(),
@@ -116,7 +125,17 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
 
         Ok(rows
             .into_iter()
-            .map(|r| odf::DatasetID::from_did_str(&r.dataset_id).unwrap())
+            .map(|r| {
+                (
+                    odf::DatasetID::from_did_str(&r.dataset_id).unwrap(),
+                    DatasetKeyBlock {
+                        event_kind: r.event_type,
+                        sequence_number: u64::try_from(r.sequence_number).unwrap(),
+                        block_hash: odf::Multihash::from_multibase(&r.block_hash).unwrap(),
+                        block_payload: bytes::Bytes::from(r.block_payload),
+                    },
+                )
+            })
             .collect())
     }
 

@@ -68,25 +68,21 @@ pub struct FlowKeySystem {
 
 #[derive(SimpleObject, Debug)]
 pub struct FlowTimingRecords {
+    /// Initiation time
+    pub initiated_at: DateTime<Utc>,
+
+    /// Planned scheduling time
+    pub scheduled_at: Option<DateTime<Utc>>,
+
     /// Recorded time of last task scheduling
-    awaiting_executor_since: Option<DateTime<Utc>>,
+    pub awaiting_executor_since: Option<DateTime<Utc>>,
 
     /// Recorded start of running (Running state seen at least once)
-    running_since: Option<DateTime<Utc>>,
+    pub running_since: Option<DateTime<Utc>>,
 
     /// Recorded time of finish (successful or failed after retry) or abortion
     /// (Finished state seen at least once)
-    finished_at: Option<DateTime<Utc>>,
-}
-
-impl From<fs::FlowTimingRecords> for FlowTimingRecords {
-    fn from(value: fs::FlowTimingRecords) -> Self {
-        Self {
-            awaiting_executor_since: value.awaiting_executor_since,
-            running_since: value.running_since,
-            finished_at: value.finished_at,
-        }
-    }
+    pub last_attempt_finished_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,6 +92,7 @@ impl From<fs::FlowTimingRecords> for FlowTimingRecords {
 pub enum FlowStatus {
     Waiting,
     Running,
+    Retrying,
     Finished,
 }
 
@@ -124,6 +121,72 @@ pub(crate) fn map_dataset_flow_type(dataset_flow_type: DatasetFlowType) -> &'sta
         DatasetFlowType::ExecuteTransform => FLOW_TYPE_DATASET_TRANSFORM,
         DatasetFlowType::HardCompaction => FLOW_TYPE_DATASET_COMPACT,
         DatasetFlowType::Reset => FLOW_TYPE_DATASET_RESET,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, PartialEq, Eq)]
+pub struct TimeDelta {
+    pub every: i64,
+    pub unit: TimeUnit,
+}
+
+#[derive(Enum, Clone, Copy, PartialEq, Eq)]
+pub enum TimeUnit {
+    Minutes,
+    Hours,
+    Days,
+    Weeks,
+}
+
+impl From<chrono::Duration> for TimeDelta {
+    fn from(value: chrono::Duration) -> Self {
+        assert!(
+            value.num_seconds() >= 0,
+            "Positive or zero interval expected, but received [{value}]"
+        );
+
+        if value.is_zero() {
+            return Self {
+                every: 0,
+                unit: TimeUnit::Minutes,
+            };
+        }
+
+        let num_weeks = value.num_weeks();
+        if (value - chrono::Duration::try_weeks(num_weeks).unwrap()).is_zero() {
+            return Self {
+                every: num_weeks,
+                unit: TimeUnit::Weeks,
+            };
+        }
+
+        let num_days = value.num_days();
+        if (value - chrono::Duration::try_days(num_days).unwrap()).is_zero() {
+            return Self {
+                every: num_days,
+                unit: TimeUnit::Days,
+            };
+        }
+
+        let num_hours = value.num_hours();
+        if (value - chrono::Duration::try_hours(num_hours).unwrap()).is_zero() {
+            return Self {
+                every: num_hours,
+                unit: TimeUnit::Hours,
+            };
+        }
+
+        let num_minutes = value.num_minutes();
+        if (value - chrono::Duration::try_minutes(num_minutes).unwrap()).is_zero() {
+            return Self {
+                every: num_minutes,
+                unit: TimeUnit::Minutes,
+            };
+        }
+
+        panic!("Expecting intervals that are clearly dividable by unit, but received [{value}]");
     }
 }
 

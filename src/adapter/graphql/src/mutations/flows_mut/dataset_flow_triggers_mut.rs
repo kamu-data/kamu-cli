@@ -51,8 +51,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }
 
         if let Some(e) =
-            ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type, None)
-                .await?
+            ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type).await?
         {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }

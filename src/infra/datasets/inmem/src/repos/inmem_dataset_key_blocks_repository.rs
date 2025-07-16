@@ -100,12 +100,12 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             .unwrap_or_default())
     }
 
-    async fn filter_datasets_having_blocks(
+    async fn match_datasets_having_blocks(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
         event_type: MetadataEventType,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+    ) -> Result<Vec<(odf::DatasetID, DatasetKeyBlock)>, InternalError> {
         let guard = self.state.lock().unwrap();
         let mut result = Vec::new();
 
@@ -113,9 +113,12 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
             if let Some(blocks) = guard
                 .key_blocks
                 .get(&(dataset_id.clone(), block_ref.clone()))
-                && blocks.iter().any(|block| block.event_kind == event_type)
+                && let Some(block) = blocks
+                    .iter()
+                    .rev()
+                    .find(|block| block.event_kind == event_type)
             {
-                result.push(dataset_id);
+                result.push((dataset_id.clone(), block.clone()));
             }
         }
 

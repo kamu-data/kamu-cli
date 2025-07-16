@@ -29,6 +29,7 @@ pub struct FlowConfigurationEventCreated {
     pub event_time: DateTime<Utc>,
     pub flow_binding: FlowBinding,
     pub rule: FlowConfigurationRule,
+    pub retry_policy: Option<RetryPolicy>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,6 +39,7 @@ pub struct FlowConfigurationEventModified {
     pub event_time: DateTime<Utc>,
     pub flow_binding: FlowBinding,
     pub rule: FlowConfigurationRule,
+    pub retry_policy: Option<RetryPolicy>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
