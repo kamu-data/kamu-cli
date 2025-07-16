@@ -14,6 +14,7 @@ use std::time::Duration;
 use console::style as s;
 use container_runtime::ContainerRuntime;
 use internal_error::*;
+use kamu_accounts::AuthConfig;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command, SqlShellEngine};
@@ -26,6 +27,7 @@ pub struct NotebookCommand {
     notebook_server_factory: Arc<NotebookServerFactory>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
+    auth_config: Arc<AuthConfig>,
 
     #[dill::component(explicit)]
     address: Option<IpAddr>,
@@ -93,7 +95,11 @@ impl NotebookCommand {
         // 127.0.0.1 as Jupyter will be connection from the outside
         let flight_sql_svc = self
             .flight_sql_service_factory
-            .start(Some(std::net::Ipv4Addr::UNSPECIFIED.into()), None)
+            .start(
+                Some(std::net::Ipv4Addr::UNSPECIFIED.into()),
+                None,
+                self.auth_config.allow_anonymous.unwrap(),
+            )
             .await?;
 
         let client_url = url::Url::parse(&format!(

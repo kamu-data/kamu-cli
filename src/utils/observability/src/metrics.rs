@@ -27,6 +27,7 @@ pub trait MetricsProvider: Send + Sync {
 
 /// Uses catalog to extract all [`MetricsProvider`]s and register all provided
 /// metrics in the [`prometheus::Registry`]
+#[cfg(feature = "dill")]
 pub fn register_all(catalog: &dill::Catalog) -> Arc<prometheus::Registry> {
     let registry: Arc<prometheus::Registry> = catalog
         .get_one()
@@ -42,10 +43,18 @@ pub fn register_all(catalog: &dill::Catalog) -> Arc<prometheus::Registry> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::unused_async)]
+#[cfg(feature = "dill")]
 pub async fn metrics_handler(axum::Extension(catalog): axum::Extension<dill::Catalog>) -> String {
     let reg = catalog.get_one::<prometheus::Registry>().unwrap();
 
+    // Perf: registry has Arc inside and is cheap to clone
+    metrics_handler_raw(axum::Extension(reg.as_ref().clone())).await
+}
+
+#[allow(clippy::unused_async)]
+pub async fn metrics_handler_raw(
+    axum::Extension(reg): axum::Extension<prometheus::Registry>,
+) -> String {
     let mut buf = Vec::new();
 
     prometheus::TextEncoder::new()

@@ -18,11 +18,13 @@ use tower::{Layer, Service};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AuthPolicyLayer {}
+pub struct AuthPolicyLayer {
+    allow_anonymous: bool,
+}
 
 impl AuthPolicyLayer {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(allow_anonymous: bool) -> Self {
+        Self { allow_anonymous }
     }
 }
 
@@ -30,7 +32,10 @@ impl<Svc> Layer<Svc> for AuthPolicyLayer {
     type Service = AuthPolicyMiddleware<Svc>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
-        AuthPolicyMiddleware { inner }
+        AuthPolicyMiddleware {
+            inner,
+            allow_anonymous: self.allow_anonymous,
+        }
     }
 }
 
@@ -39,6 +44,7 @@ impl<Svc> Layer<Svc> for AuthPolicyLayer {
 #[derive(Debug, Clone)]
 pub struct AuthPolicyMiddleware<Svc> {
     inner: Svc,
+    allow_anonymous: bool,
 }
 
 impl<Svc> AuthPolicyMiddleware<Svc> {
@@ -76,15 +82,19 @@ where
 
     fn call(&mut self, request: http::Request<ReqBody>) -> Self::Future {
         let mut inner = self.inner.clone();
+        let allow_anonymous = self.allow_anonymous;
 
         Box::pin(async move {
-            let base_catalog = request
-                .extensions()
-                .get::<dill::Catalog>()
-                .expect("Catalog not found in http server extensions");
+            // ToDo: Modify to not use this value in runtime
+            if !allow_anonymous {
+                let base_catalog = request
+                    .extensions()
+                    .get::<dill::Catalog>()
+                    .expect("Catalog not found in http server extensions");
 
-            if let Err(err_response) = Self::check_tonic_subject(base_catalog) {
-                return Ok(Status::unauthenticated(err_response.to_string()).into_http());
+                if let Err(err_response) = Self::check_tonic_subject(base_catalog) {
+                    return Ok(Status::unauthenticated(err_response.to_string()).into_http());
+                }
             }
 
             inner.call(request).await
