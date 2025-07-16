@@ -9,7 +9,7 @@
 
 use chrono::prelude::*;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{ServerUrlConfig, auth};
+use kamu_core::{ResolvedDataset, ServerUrlConfig, auth};
 use odf::dataset::MetadataChainExt;
 
 use crate::prelude::*;
@@ -70,8 +70,17 @@ impl Dataset {
         }
     }
 
-    async fn push_source_has_columns(&self, ctx: &Context<'_>, columns: &[&str]) -> Result<bool> {
-        let dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+    pub(crate) async fn is_versioned_file(dataset: &ResolvedDataset) -> Result<bool> {
+        // TODO: Currently guessing whether its OK to cast by push source. Replace with
+        // some archetype metadata on ODF layer.
+        Self::push_source_has_columns(dataset, &["version", "content_hash"]).await
+    }
+
+    pub(crate) async fn is_collection(dataset: &ResolvedDataset) -> Result<bool> {
+        Self::push_source_has_columns(dataset, &["path", "ref"]).await
+    }
+
+    async fn push_source_has_columns(dataset: &ResolvedDataset, columns: &[&str]) -> Result<bool> {
         let (source, _merge) = match dataset
             .as_metadata_chain()
             .accept_one(kamu_core::WriterSourceEventVisitor::new(None))
@@ -300,12 +309,9 @@ impl Dataset {
     }
 
     /// Downcast a dataset to a versioned file interface
+    #[tracing::instrument(level = "info", name = Dataset_as_versioned_file, skip_all)]
     async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile>> {
-        // TODO: Currently guessing whether its OK to cast by push source. Replace with
-        // some archetype metadata on ODF layer.
-        if !self
-            .push_source_has_columns(ctx, &["version", "content_hash"])
-            .await?
+        if !Self::is_versioned_file(self.dataset_request_state.resolved_dataset(ctx).await?).await?
         {
             return Ok(None);
         }
@@ -319,10 +325,9 @@ impl Dataset {
     }
 
     /// Downcast a dataset to a collection interface
+    #[tracing::instrument(level = "info", name = Dataset_as_collection, skip_all)]
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<Collection>> {
-        // TODO: Currently guessing whether its OK to cast by push source. Replace with
-        // some archetype metadata on ODF layer.
-        if !self.push_source_has_columns(ctx, &["path", "ref"]).await? {
+        if !Self::is_collection(self.dataset_request_state.resolved_dataset(ctx).await?).await? {
             return Ok(None);
         }
 

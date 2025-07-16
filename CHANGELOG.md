@@ -11,6 +11,13 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [Unreleased]
+### Added
+- GQL: `BigInt` scalar
+### Changed
+- GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
+- Allow `molecule` and `molecule.dev` accounts separation
+
 ## [0.244.2] - 2025-07-15
 ### Added
 - Migration to update flow event payloads

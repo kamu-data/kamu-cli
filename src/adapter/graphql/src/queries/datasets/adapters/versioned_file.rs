@@ -124,7 +124,7 @@ impl VersionedFile {
         let entry = VersionedFileEntry::from_json(
             self.dataset.clone(),
             records.into_iter().next().unwrap(),
-        );
+        )?;
         Ok(Some(entry))
     }
 }
@@ -187,7 +187,7 @@ impl VersionedFile {
         let nodes = records
             .into_iter()
             .map(|r| VersionedFileEntry::from_json(self.dataset.clone(), r))
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         Ok(VersionedFileEntryConnection::new(
             nodes,

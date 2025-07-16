@@ -25,6 +25,12 @@ impl From<String> for CollectionPath {
     }
 }
 
+impl From<CollectionPath> for String {
+    fn from(v: CollectionPath) -> Self {
+        v.0
+    }
+}
+
 impl From<CollectionPath> for serde_json::Value {
     fn from(v: CollectionPath) -> Self {
         serde_json::Value::String(v.0)
