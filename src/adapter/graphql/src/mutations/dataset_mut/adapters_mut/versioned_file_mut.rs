@@ -11,7 +11,7 @@ use kamu::domain;
 use kamu_accounts::CurrentAccountSubject;
 
 use crate::prelude::*;
-use crate::queries::{FileVersion, VersionedFileEntry};
+use crate::queries::{FileVersion, VersionedFileEntry, VersionedFileRecord};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,6 +25,7 @@ impl<'a> VersionedFileMut<'a> {
         Self { dataset }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn get_latest_version(&self, ctx: &Context<'_>) -> Result<(FileVersion, odf::Multihash)> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
@@ -55,6 +56,7 @@ impl<'a> VersionedFileMut<'a> {
         Ok((last_version, query_res.block_hash))
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn get_latest_entry(&self, ctx: &Context<'_>) -> Result<Option<VersionedFileEntry>> {
         let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
@@ -78,29 +80,34 @@ impl<'a> VersionedFileMut<'a> {
         assert_eq!(records.len(), 1);
         let record = records.into_iter().next().unwrap();
 
-        let entry = VersionedFileEntry::from_json(self.dataset.clone(), record);
+        let entry = VersionedFileEntry::from_json(self.dataset.clone(), record)?;
 
         Ok(Some(entry))
     }
 
     // Push ingest the new record
-    // TODO: Compare and swap current head
     // TODO: Handle errors on invalid extra data columns
+    #[tracing::instrument(level = "info", skip_all)]
     async fn write_record(
         &self,
         ctx: &Context<'_>,
-        entry: VersionedFileEntry,
+        record: VersionedFileRecord,
         expected_head: Option<Multihash<'static>>,
     ) -> Result<UpdateVersionResult> {
         let push_ingest_use_case = from_catalog_n!(ctx, dyn domain::PushIngestDataUseCase);
 
-        let new_version = entry.version;
-        let content_hash = entry.content_hash.clone();
+        let new_version = record.version;
+        let content_hash = record.content_hash.clone();
+        let record_string = serde_json::to_string(&record).int_err()?;
+
+        tracing::debug!(record = %record_string, "Writing new versioned file record");
+        let data_source =
+            kamu_core::DataSource::Buffer(bytes::Bytes::from(record_string.into_bytes()));
 
         let ingest_result = match push_ingest_use_case
             .execute(
                 self.dataset,
-                kamu_core::DataSource::Buffer(entry.to_bytes()),
+                data_source,
                 kamu_core::PushIngestDataUseCaseOptions {
                     source_name: None,
                     source_event_time: None,
@@ -139,7 +146,7 @@ impl<'a> VersionedFileMut<'a> {
                 new_version,
                 old_head: old_head.into(),
                 new_head: new_head.into(),
-                content_hash,
+                content_hash: content_hash.into(),
             })),
             kamu_core::PushIngestResult::UpToDate => unreachable!(),
         }
@@ -192,7 +199,8 @@ impl VersionedFileMut<'_> {
             extra_data,
         );
 
-        self.write_record(ctx, entry, expected_head).await
+        self.write_record(ctx, entry.into_input_record(), expected_head)
+            .await
     }
 
     /// Returns a pre-signed URL and upload token for direct uploads of large
@@ -340,7 +348,8 @@ impl VersionedFileMut<'_> {
             extra_data,
         );
 
-        self.write_record(ctx, entry, expected_head).await
+        self.write_record(ctx, entry.into_input_record(), expected_head)
+            .await
     }
 
     /// Creating a new version with that has updated values of extra columns but
@@ -368,7 +377,8 @@ impl VersionedFileMut<'_> {
         entry.version += 1;
         entry.extra_data = extra_data;
 
-        self.write_record(ctx, entry, expected_head).await
+        self.write_record(ctx, entry.into_input_record(), expected_head)
+            .await
     }
 }
 

@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use prometheus::Encoder as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,8 +26,8 @@ pub trait MetricsProvider: Send + Sync {
 /// Uses catalog to extract all [`MetricsProvider`]s and register all provided
 /// metrics in the [`prometheus::Registry`]
 #[cfg(feature = "dill")]
-pub fn register_all(catalog: &dill::Catalog) -> Arc<prometheus::Registry> {
-    let registry: Arc<prometheus::Registry> = catalog
+pub fn register_all(catalog: &dill::Catalog) -> std::sync::Arc<prometheus::Registry> {
+    let registry: std::sync::Arc<prometheus::Registry> = catalog
         .get_one()
         .expect("Prometheus registry is not in the DI catalog");
 
