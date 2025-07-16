@@ -96,14 +96,21 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     fn list_active_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
-            use futures::stream::TryStreamExt;
-            let mut stream_flow_bindings = self.event_store.stream_all_existing_flow_bindings();
-            while let Some(flow_binding) = stream_flow_bindings.try_next().await? {
-                let maybe_flow_configuration = FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref()).await.int_err()?;
+            use futures::stream::{self, StreamExt, TryStreamExt};
+            let flow_bindings: Vec<_> = self.event_store.stream_all_existing_flow_bindings().try_collect().await.int_err()?;
 
-                if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
-                    yield flow_configuration.into();
+            let flow_configurations = FlowConfiguration::load_multi_simple(flow_bindings, self.event_store.as_ref()).await.int_err()?;
+            let stream = stream::iter(flow_configurations)
+                .filter_map(|flow_configuration| async {
+                if flow_configuration.is_active() {
+                    Some(Ok::<_, InternalError>(flow_configuration.into()))
+                } else {
+                    None
                 }
+            });
+
+            for await item in stream {
+                yield item?;
             }
         })
     }
