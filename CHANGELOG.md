@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.245.0] - 2025-07-16
 ### Added
 - Flow system extended with retry policy support:
   - Retry policy model: includes number of attempts, base delay, and four delay growth functions
