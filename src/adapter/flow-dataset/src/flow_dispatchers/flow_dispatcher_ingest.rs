@@ -107,10 +107,11 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
                         },
                         new_head,
                         old_head_maybe: old_head,
-                        blocks_added: dataset_increment.num_blocks,
-                        records_added: dataset_increment.num_records,
-                        had_breaking_changes: false,
-                        new_watermark: dataset_increment.updated_watermark,
+                        changes: fs::DatasetChanges::NewData {
+                            blocks_added: dataset_increment.num_blocks,
+                            records_added: dataset_increment.num_records,
+                            new_watermark: dataset_increment.updated_watermark,
+                        },
                     });
 
                 trigger_transform_flow_for_all_downstream_datasets(
@@ -172,10 +173,11 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
                         },
                         new_head: ingest_message.new_block_hash.clone(),
                         old_head_maybe: ingest_message.maybe_prev_block_hash.clone(),
-                        blocks_added: increment.num_blocks,
-                        records_added: increment.num_records,
-                        had_breaking_changes: false,
-                        new_watermark: increment.updated_watermark,
+                        changes: fs::DatasetChanges::NewData {
+                            blocks_added: increment.num_blocks,
+                            records_added: increment.num_records,
+                            new_watermark: increment.updated_watermark,
+                        },
                     },
                     &ingest_message.dataset_id,
                 )
@@ -200,17 +202,18 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
                         },
                         new_head: sync_message.new_block_hash.clone(),
                         old_head_maybe: sync_message.maybe_prev_block_hash.clone(),
-                        blocks_added: increment.num_blocks,
-                        records_added: increment.num_records,
-                        had_breaking_changes: false,
-                        new_watermark: increment.updated_watermark,
+                        changes: fs::DatasetChanges::NewData {
+                            blocks_added: increment.num_blocks,
+                            records_added: increment.num_records,
+                            new_watermark: increment.updated_watermark,
+                        },
                     },
                     &sync_message.dataset_id,
                 )
             }
         };
 
-        if update_cause.blocks_added == 0 {
+        if update_cause.changes.is_empty() {
             tracing::debug!(
                 %dataset_id,
                 "No new blocks added, skipping flow activation",

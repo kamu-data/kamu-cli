@@ -381,11 +381,15 @@ impl FlowSchedulingHelper {
         // Scan each accumulated trigger to decide
         for activation_cause in &flow.activation_causes {
             if let FlowActivationCause::DatasetUpdate(activation_cause) = activation_cause {
-                if activation_cause.had_breaking_changes {
-                    had_breaking_changes = true;
-                } else {
-                    accumulated_records_count += activation_cause.records_added;
-                    accumulated_something = true;
+                match activation_cause.changes {
+                    DatasetChanges::NewData { records_added, .. } => {
+                        accumulated_records_count += records_added;
+                        accumulated_something = true;
+                    }
+                    DatasetChanges::Breaking => {
+                        had_breaking_changes = true;
+                        break;
+                    }
                 }
             }
         }

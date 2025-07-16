@@ -97,10 +97,7 @@ impl FlowActivationCause {
                         || this.source != existing.source
                         || this.new_head != existing.new_head
                         || this.old_head_maybe != existing.old_head_maybe
-                        || this.blocks_added != existing.blocks_added
-                        || this.records_added != existing.records_added
-                        || this.had_breaking_changes != existing.had_breaking_changes
-                        || this.new_watermark != existing.new_watermark;
+                        || this.changes != existing.changes;
                 }
                 _ => { /* Continue comparing */ }
             }
@@ -141,10 +138,30 @@ pub struct FlowActivationCauseDatasetUpdate {
     pub source: DatasetUpdateSource,
     pub new_head: odf::Multihash,
     pub old_head_maybe: Option<odf::Multihash>,
-    pub blocks_added: u64,
-    pub records_added: u64,
-    pub had_breaking_changes: bool,
-    pub new_watermark: Option<DateTime<Utc>>,
+    pub changes: DatasetChanges,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum DatasetChanges {
+    NewData {
+        blocks_added: u64,
+        records_added: u64,
+        new_watermark: Option<DateTime<Utc>>,
+    },
+    Breaking,
+}
+
+impl DatasetChanges {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            DatasetChanges::NewData {
+                blocks_added,
+                records_added,
+                ..
+            } => *blocks_added == 0 && *records_added == 0,
+            DatasetChanges::Breaking => false,
+        }
+    }
 }
 
 impl FlowActivationCauseDatasetUpdate {
@@ -204,10 +221,11 @@ mod tests {
             dataset_id: TEST_DATASET_ID.clone(),
             old_head_maybe: None,
             new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
-            blocks_added: 1,
-            records_added: 5,
-            had_breaking_changes: false,
-            new_watermark: None,
+            changes: DatasetChanges::NewData {
+                blocks_added: 1,
+                records_added: 5,
+                new_watermark: None,
+            },
         })
     });
     static INPUT_DATASET_ACTIVATION_CAUSE: LazyLock<FlowActivationCause> = LazyLock::new(|| {
@@ -220,10 +238,11 @@ mod tests {
             dataset_id: TEST_DATASET_ID.clone(),
             old_head_maybe: None,
             new_head: odf::Multihash::from_digest_sha3_256(b"some-other-slice"),
-            blocks_added: 2,
-            records_added: 3,
-            had_breaking_changes: false,
-            new_watermark: None,
+            changes: DatasetChanges::NewData {
+                blocks_added: 2,
+                records_added: 3,
+                new_watermark: None,
+            },
         })
     });
 
@@ -282,10 +301,11 @@ mod tests {
                     dataset_id: TEST_DATASET_ID.clone(),
                     old_head_maybe: None,
                     new_head: odf::Multihash::from_digest_sha3_256(b"some-slice"),
-                    blocks_added: 2,
-                    records_added: 5,
-                    had_breaking_changes: false,
-                    new_watermark: None,
+                    changes: DatasetChanges::NewData {
+                        blocks_added: 2,
+                        records_added: 5,
+                        new_watermark: None,
+                    },
                 }
             )])
         );
@@ -315,10 +335,11 @@ mod tests {
                 },
                 old_head_maybe: None,
                 new_head: odf::Multihash::from_digest_sha3_256(b"some-other-slice"),
-                blocks_added: 1,
-                records_added: 3,
-                had_breaking_changes: false,
-                new_watermark: None,
+                changes: DatasetChanges::NewData {
+                    blocks_added: 1,
+                    records_added: 3,
+                    new_watermark: None,
+                },
             })
         ]));
 
@@ -333,10 +354,11 @@ mod tests {
                 },
                 old_head_maybe: None,
                 new_head: odf::Multihash::from_digest_sha3_256(b"some-totally-different-slice"),
-                blocks_added: 2,
-                records_added: 3,
-                had_breaking_changes: false,
-                new_watermark: None,
+                changes: DatasetChanges::NewData {
+                    blocks_added: 2,
+                    records_added: 3,
+                    new_watermark: None,
+                },
             })
         ]));
 

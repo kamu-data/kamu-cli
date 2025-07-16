@@ -78,10 +78,11 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
                         },
                         new_head,
                         old_head_maybe: old_head,
-                        blocks_added: dataset_increment.num_blocks,
-                        records_added: dataset_increment.num_records,
-                        had_breaking_changes: false,
-                        new_watermark: dataset_increment.updated_watermark,
+                        changes: fs::DatasetChanges::NewData {
+                            blocks_added: dataset_increment.num_blocks,
+                            records_added: dataset_increment.num_records,
+                            new_watermark: dataset_increment.updated_watermark,
+                        },
                     });
 
                 trigger_transform_flow_for_all_downstream_datasets(

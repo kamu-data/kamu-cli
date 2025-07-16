@@ -103,10 +103,7 @@ impl fs::FlowDispatcher for FlowDispatcherCompact {
                         },
                         new_head,
                         old_head_maybe: Some(old_head),
-                        blocks_added: 0,
-                        records_added: 0,
-                        had_breaking_changes: true,
-                        new_watermark: None,
+                        changes: fs::DatasetChanges::Breaking,
                     });
 
                 if let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()

@@ -42,11 +42,17 @@ impl FlowStartCondition {
 
                 // For each dataset activation cause, add accumulated changes since the initial
                 for activation_cause in matching_activation_causes {
-                    if let fs::FlowActivationCause::DatasetUpdate(update_cause) = activation_cause {
+                    if let fs::FlowActivationCause::DatasetUpdate(update_cause) = activation_cause
+                        && let fs::DatasetChanges::NewData {
+                            blocks_added,
+                            records_added,
+                            new_watermark,
+                        } = update_cause.changes
+                    {
                         total_increment += DatasetIntervalIncrement {
-                            num_blocks: update_cause.blocks_added,
-                            num_records: update_cause.records_added,
-                            updated_watermark: update_cause.new_watermark,
+                            num_blocks: blocks_added,
+                            num_records: records_added,
+                            updated_watermark: new_watermark,
                         };
                     }
                 }
