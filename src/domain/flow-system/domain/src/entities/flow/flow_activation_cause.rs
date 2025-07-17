@@ -179,6 +179,7 @@ pub enum DatasetUpdateSource {
     UpstreamFlow {
         flow_type: String,
         flow_id: FlowID,
+        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
     },
     HttpIngest {
         source_name: Option<String>,
@@ -187,6 +188,19 @@ pub enum DatasetUpdateSource {
         account_name: Option<odf::AccountName>,
         is_force: bool,
     },
+}
+
+impl DatasetUpdateSource {
+    pub fn maybe_flow_config_snapshot(&self) -> Option<&FlowConfigurationRule> {
+        match self {
+            DatasetUpdateSource::UpstreamFlow {
+                maybe_flow_config_snapshot,
+                ..
+            } => maybe_flow_config_snapshot.as_ref(),
+            DatasetUpdateSource::HttpIngest { .. }
+            | DatasetUpdateSource::SmartProtocolPush { .. } => None,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -234,6 +248,7 @@ mod tests {
             source: DatasetUpdateSource::UpstreamFlow {
                 flow_type: "SOME.FLOW.TYPE".to_string(),
                 flow_id: FlowID::new(5),
+                maybe_flow_config_snapshot: None,
             },
             dataset_id: TEST_DATASET_ID.clone(),
             old_head_maybe: None,
@@ -332,6 +347,7 @@ mod tests {
                 source: DatasetUpdateSource::UpstreamFlow {
                     flow_type: "SOME.OTHER.FLOW_TYPE".to_string(),
                     flow_id: FlowID::new(7),
+                    maybe_flow_config_snapshot: None,
                 },
                 old_head_maybe: None,
                 new_head: odf::Multihash::from_digest_sha3_256(b"some-other-slice"),
@@ -351,6 +367,7 @@ mod tests {
                 source: DatasetUpdateSource::UpstreamFlow {
                     flow_type: "SOME.FLOW.TYPE".to_string(),
                     flow_id: FlowID::new(8),
+                    maybe_flow_config_snapshot: None,
                 },
                 old_head_maybe: None,
                 new_head: odf::Multihash::from_digest_sha3_256(b"some-totally-different-slice"),

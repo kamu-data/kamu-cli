@@ -85,6 +85,7 @@ impl fs::FlowDispatcher for FlowDispatcherReset {
                 source: fs::DatasetUpdateSource::UpstreamFlow {
                     flow_type: success_flow_state.flow_binding.flow_type.clone(),
                     flow_id: success_flow_state.flow_id,
+                    maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
                 },
                 new_head: reset_result.new_head,
                 old_head_maybe: reset_result.old_head,

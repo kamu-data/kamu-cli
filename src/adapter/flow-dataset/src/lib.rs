@@ -18,5 +18,8 @@ pub use flow_config_rules::*;
 mod flow_dispatchers;
 pub use flow_dispatchers::*;
 
+mod flow_sensors;
+pub use flow_sensors::*;
+
 mod messages;
 pub use messages::*;

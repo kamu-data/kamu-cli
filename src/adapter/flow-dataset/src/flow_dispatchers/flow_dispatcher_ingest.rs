@@ -104,6 +104,7 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
                         source: fs::DatasetUpdateSource::UpstreamFlow {
                             flow_id: success_flow_state.flow_id,
                             flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                            maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
                         },
                         new_head,
                         old_head_maybe: old_head,

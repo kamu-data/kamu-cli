@@ -18,6 +18,13 @@ pub struct FlowBinding {
 }
 
 impl FlowBinding {
+    pub fn from_scope(flow_type: &str, scope: FlowScope) -> Self {
+        Self {
+            flow_type: flow_type.to_string(),
+            scope,
+        }
+    }
+
     pub fn for_dataset(dataset_id: odf::DatasetID, flow_type: &str) -> Self {
         Self {
             flow_type: flow_type.to_string(),
@@ -47,14 +54,7 @@ impl FlowBinding {
     }
 
     pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
-        match &self.scope {
-            FlowScope::Dataset { dataset_id }
-            | FlowScope::WebhookSubscription {
-                dataset_id: Some(dataset_id),
-                ..
-            } => Some(dataset_id),
-            _ => None,
-        }
+        self.scope.dataset_id()
     }
 
     pub fn webhook_subscription_id(&self) -> Option<uuid::Uuid> {
@@ -92,6 +92,16 @@ pub enum FlowScope {
         subscription_id: uuid::Uuid,
         dataset_id: Option<odf::DatasetID>,
     },
+}
+
+impl FlowScope {
+    pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
+        match self {
+            FlowScope::Dataset { dataset_id } => Some(dataset_id),
+            FlowScope::WebhookSubscription { dataset_id, .. } => dataset_id.as_ref(),
+            FlowScope::System => None,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
