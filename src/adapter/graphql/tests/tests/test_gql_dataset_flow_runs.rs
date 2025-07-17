@@ -135,7 +135,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -206,13 +206,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "QUEUED",
-                                                "outcome": null,
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -288,12 +282,8 @@ async fn test_trigger_ingest_root_dataset() {
                                             "runningSince": running_time.to_rfc3339(),
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "RUNNING",
-                                                "outcome": null,
-                                            }
+                                        "taskIds": [
+                                            "0"
                                         ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
@@ -386,15 +376,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "runningSince": running_time.to_rfc3339(),
                                             "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeSuccess",
-                                                }
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -548,15 +530,7 @@ async fn test_trigger_reset_root_dataset_flow() {
                                             "runningSince": running_time.to_rfc3339(),
                                             "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeSuccess",
-                                                },
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -787,7 +761,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -893,15 +867,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "runningSince": running_time.to_rfc3339(),
                                             "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeSuccess",
-                                                }
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -1021,7 +987,7 @@ async fn test_trigger_compaction_root_dataset() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -1087,13 +1053,7 @@ async fn test_trigger_compaction_root_dataset() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "QUEUED",
-                                                "outcome": null,
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -1164,13 +1124,7 @@ async fn test_trigger_compaction_root_dataset() {
                                             "runningSince": running_time.to_rfc3339(),
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "RUNNING",
-                                                "outcome": null,
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -1261,15 +1215,7 @@ async fn test_trigger_compaction_root_dataset() {
                                             "runningSince": running_time.to_rfc3339(),
                                             "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeSuccess",
-                                                },
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -2791,15 +2737,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "runningSince": running_time.to_rfc3339(),
                                             "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeSuccess",
-                                                },
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -2947,18 +2885,7 @@ async fn test_execute_transfrom_flow_error_after_compaction() {
                                             "runningSince": running_time.to_rfc3339(),
                                             "lastAttemptFinishedAt": complete_time.to_rfc3339(),
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "1",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeFailed",
-                                                    "reason": {
-                                                        "__typename": "TaskFailureReasonInputDatasetCompacted",
-                                                    }
-                                                },
-                                            }
-                                        ],
+                                        "taskIds": [ "1" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -3116,7 +3043,7 @@ async fn test_config_snapshot_returned_correctly() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -3328,18 +3255,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": complete_time_0.to_rfc3339(),
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeFailed",
-                                                    "reason": {
-                                                        "__typename": "TaskFailureReasonGeneral"
-                                                    }
-                                                }
-                                            }
-                                        ],
+                                        "taskIds": [ "0" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -3431,28 +3347,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": complete_time_1.to_rfc3339(),
                                         },
-                                        "tasks": [
-                                            {
-                                                "taskId": "0",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeFailed",
-                                                    "reason": {
-                                                        "__typename": "TaskFailureReasonGeneral"
-                                                    }
-                                                }
-                                            },
-                                            {
-                                                "taskId": "1",
-                                                "status": "FINISHED",
-                                                "outcome": {
-                                                    "__typename": "TaskOutcomeFailed",
-                                                    "reason": {
-                                                        "__typename": "TaskFailureReasonGeneral"
-                                                    }
-                                                }
-                                            },
-                                        ],
+                                        "taskIds": [ "0", "1" ],
                                         "initiator": {
                                             "id": harness.logged_account_id().to_string(),
                                             "accountName": DEFAULT_ACCOUNT_NAME_STR,
@@ -4045,18 +3940,7 @@ impl FlowRunsHarness {
                                             runningSince
                                             lastAttemptFinishedAt
                                         }
-                                        tasks {
-                                            taskId
-                                            status
-                                            outcome {
-                                                __typename
-                                                ... on TaskOutcomeFailed {
-                                                    reason {
-                                                        __typename
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        taskIds
                                         initiator {
                                             id
                                             accountName
