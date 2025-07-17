@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.245.1] - 2025-07-17
 ### Fixed
 - Performance regression: avoid loading full task model in flow listings, list of IDs is enough
 
