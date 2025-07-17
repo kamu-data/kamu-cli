@@ -145,6 +145,7 @@ impl FlowDescriptionUpdateResult {
                     | TaskResultDatasetReset::TYPE_ID => Ok(None),
 
                     TaskResultDatasetUpdate::TYPE_ID => {
+                        // TODO: consider caching the increment in the task result itself
                         let update = TaskResultDatasetUpdate::from_task_result(result)?;
                         if let Some((old_head, new_head)) = update.try_as_increment() {
                             match increment_query_service
