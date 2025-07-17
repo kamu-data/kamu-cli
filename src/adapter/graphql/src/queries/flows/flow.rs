@@ -14,8 +14,7 @@ use {kamu_flow_system as fs, kamu_task_system as ts};
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
 use super::{FlowEvent, FlowOutcome, FlowStartCondition, FlowTriggerInstance};
 use crate::prelude::*;
-use crate::queries::{Account, Task};
-use crate::utils;
+use crate::queries::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -139,15 +138,14 @@ impl Flow {
         }
     }
 
-    /// Associated tasks
-    #[tracing::instrument(level = "info", name = Flow_tasks, skip_all)]
-    async fn tasks(&self, ctx: &Context<'_>) -> Result<Vec<Task>> {
-        let mut tasks = Vec::new();
-        for task_id in &self.flow_state.task_ids {
-            let ts_task = utils::get_task(ctx, *task_id).await?;
-            tasks.push(Task::new(ts_task));
-        }
-        Ok(tasks)
+    /// IDs of associated tasks
+    async fn task_ids(&self) -> Vec<TaskID> {
+        self.flow_state
+            .task_ids
+            .iter()
+            .copied()
+            .map(Into::into)
+            .collect()
     }
 
     /// History of flow events

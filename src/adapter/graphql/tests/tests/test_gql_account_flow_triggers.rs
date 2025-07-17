@@ -87,7 +87,7 @@ async fn test_list_account_flows() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                         },
@@ -264,7 +264,7 @@ async fn test_pause_resume_account_flows() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
 
@@ -464,7 +464,7 @@ async fn test_account_triggers_all_paused() {
                                             "runningSince": null,
                                             "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
 
@@ -731,13 +731,7 @@ impl FlowTriggerHarness {
                                           runningSince
                                           lastAttemptFinishedAt
                                       }
-                                      tasks {
-                                          taskId
-                                          status
-                                          outcome {
-                                            __typename
-                                          }
-                                      }
+                                      taskIds
                                       primaryTrigger {
                                           __typename
                                           ... on FlowTriggerInputDatasetFlow {

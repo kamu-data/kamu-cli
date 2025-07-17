@@ -1920,9 +1920,9 @@ type Flow {
 	"""
 	timing: FlowTimingRecords!
 	"""
-	Associated tasks
+	IDs of associated tasks
 	"""
-	tasks: [Task!]!
+	taskIds: [TaskID!]!
 	"""
 	History of flow events
 	"""
