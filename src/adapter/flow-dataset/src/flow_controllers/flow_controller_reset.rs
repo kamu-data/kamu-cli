@@ -11,9 +11,15 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_datasets::{DatasetEntryService, DependencyGraphService};
+use kamu_flow_system::FlowRunService;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
-use crate::{FLOW_TYPE_DATASET_RESET, FlowConfigRuleReset};
+use crate::{
+    FLOW_TYPE_DATASET_RESET,
+    FlowConfigRuleReset,
+    trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,8 +29,26 @@ use crate::{FLOW_TYPE_DATASET_RESET, FlowConfigRuleReset};
     flow_type: FLOW_TYPE_DATASET_RESET,
 })]
 pub struct FlowControllerReset {
-    catalog: dill::Catalog,
-    flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
+    flow_run_service: Arc<dyn FlowRunService>,
+}
+
+impl FlowControllerReset {
+    fn is_recursive_mode(
+        &self,
+        maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
+    ) -> Result<bool, InternalError> {
+        if let Some(config_snapshot) = maybe_config_snapshot
+            && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
+        {
+            let reset_rule = FlowConfigRuleReset::from_flow_config(config_snapshot)?;
+            if reset_rule.recursive {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }
 
 #[async_trait::async_trait]
@@ -76,28 +100,36 @@ impl fs::FlowController for FlowControllerReset {
             return Ok(());
         }
 
-        let activation_cause =
-            fs::FlowActivationCause::DatasetUpdate(fs::FlowActivationCauseDatasetUpdate {
-                activation_time: finish_time,
-                dataset_id: success_flow_state.flow_binding.get_dataset_id_or_die()?,
-                source: fs::DatasetUpdateSource::UpstreamFlow {
-                    flow_type: success_flow_state.flow_binding.flow_type.clone(),
-                    flow_id: success_flow_state.flow_id,
-                    maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
-                },
-                new_head: reset_result.new_head,
-                old_head_maybe: reset_result.old_head,
-                changes: fs::DatasetChanges::Breaking,
-            });
+        // Reset is a breaking operation. So, if it is recursive, we should reset data
+        //  of owned downstream datasets, regardless of whether they have auto-updates
+        // turned on. Datasets of other users will stay unaffected and would
+        // break on next update attempt
+        if self.is_recursive_mode(success_flow_state.config_snapshot.as_ref())? {
+            let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
 
-        self.flow_sensor_dispatcher
-            .dispatch_input_flow_success(
-                &self.catalog,
-                &success_flow_state.flow_binding,
+            let activation_cause =
+                fs::FlowActivationCause::DatasetUpdate(fs::FlowActivationCauseDatasetUpdate {
+                    activation_time: finish_time,
+                    dataset_id: success_flow_state.flow_binding.get_dataset_id_or_die()?,
+                    source: fs::DatasetUpdateSource::UpstreamFlow {
+                        flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                        flow_id: success_flow_state.flow_id,
+                        maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
+                    },
+                    new_head: reset_result.new_head,
+                    old_head_maybe: reset_result.old_head,
+                    changes: fs::DatasetChanges::Breaking,
+                });
+
+            trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets(
+                self.dataset_entry_service.as_ref(),
+                self.dependency_graph_service.as_ref(),
+                self.flow_run_service.as_ref(),
+                &dataset_id,
                 activation_cause,
             )
-            .await
-            .int_err()?;
+            .await?;
+        }
 
         Ok(())
     }

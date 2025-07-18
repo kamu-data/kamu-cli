@@ -13,10 +13,10 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system as fs;
 
 use crate::{
-    FLOW_TYPE_DATASET_COMPACT,
+    // FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_TRANSFORM,
-    FlowConfigRuleCompact,
-    FlowConfigRuleReset,
+    // FlowConfigRuleCompact,
+    // FlowConfigRuleReset,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,6 +88,7 @@ impl DerivedDatasetFlowSensor {
         Ok(())
     }
 
+    /*
     async fn run_metadata_only_compaction_flow(
         &self,
         activation_cause: &fs::FlowActivationCause,
@@ -110,6 +111,7 @@ impl DerivedDatasetFlowSensor {
 
         Ok(())
     }
+    */
 }
 
 #[async_trait::async_trait]
@@ -150,7 +152,9 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                     self.run_transform_flow(activation_cause, flow_run_service.as_ref())
                         .await?;
                 }
+                // Note: will not be activated for now
                 fs::DatasetChanges::Breaking => {
+                    /*
                     // Trigger metadata-only compaction
                     let maybe_config_snapshot = dataset_update.source.maybe_flow_config_snapshot();
                     if let Some(config_snapshot) = maybe_config_snapshot {
@@ -192,7 +196,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                             flow_run_service.as_ref(),
                         )
                         .await?;
-                    }
+                    }*/
                 }
             }
         } else {

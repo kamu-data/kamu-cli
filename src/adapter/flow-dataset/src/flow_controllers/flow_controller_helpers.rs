@@ -1,0 +1,77 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_datasets::{DatasetEntryServiceExt, DependencyGraphService};
+use kamu_flow_system as fs;
+
+use crate::{FLOW_TYPE_DATASET_COMPACT, FlowConfigRuleCompact};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets(
+    dataset_entry_service: &dyn kamu_datasets::DatasetEntryService,
+    dependency_graph_service: &dyn DependencyGraphService,
+    flow_run_service: &dyn fs::FlowRunService,
+    dataset_id: &odf::DatasetID,
+    activation_cause: fs::FlowActivationCause,
+) -> Result<(), InternalError> {
+    let owner_account_id = dataset_entry_service
+        .get_entry(dataset_id)
+        .await
+        .int_err()?
+        .owner_id;
+
+    for downstream_dataset_id in
+        fetch_downstream_dataset_ids(dependency_graph_service, dataset_id).await
+    {
+        let owned = dataset_entry_service
+            .is_dataset_owned_by(&downstream_dataset_id, &owner_account_id)
+            .await
+            .int_err()?;
+
+        if owned {
+            let downstream_binding =
+                fs::FlowBinding::for_dataset(downstream_dataset_id, FLOW_TYPE_DATASET_COMPACT);
+            // Trigger hard compaction
+            flow_run_service
+                .run_flow_automatically(
+                    &downstream_binding,
+                    activation_cause.clone(),
+                    None,
+                    Some(
+                        FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
+                    ),
+                    None,
+                )
+                .await
+                .int_err()?;
+        }
+    }
+
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn fetch_downstream_dataset_ids(
+    dependency_graph_service: &dyn DependencyGraphService,
+    dataset_id: &odf::DatasetID,
+) -> Vec<odf::DatasetID> {
+    // ToDo: extend dependency graph with possibility to fetch downstream
+    // dependencies by owner
+    use futures::StreamExt;
+    dependency_graph_service
+        .get_downstream_dependencies(dataset_id)
+        .await
+        .collect()
+        .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,12 +9,14 @@
 
 mod flow_controller_compact;
 mod flow_controller_constants;
+mod flow_controller_helpers;
 mod flow_controller_ingest;
 mod flow_controller_reset;
 mod flow_controller_transform;
 
 pub use flow_controller_compact::*;
 pub use flow_controller_constants::*;
+pub(crate) use flow_controller_helpers::*;
 pub use flow_controller_ingest::*;
 pub use flow_controller_reset::*;
 pub use flow_controller_transform::*;
