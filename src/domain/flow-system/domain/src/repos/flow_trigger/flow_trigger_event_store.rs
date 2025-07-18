@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
 use event_sourcing::EventStore;
 
 use crate::*;
@@ -16,12 +15,6 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait FlowTriggerEventStore: EventStore<FlowTriggerState> {
-    /// Returns unique values of dataset IDs associated with update configs
-    async fn list_dataset_ids(
-        &self,
-        pagination: &PaginationOpts,
-    ) -> Result<Vec<odf::DatasetID>, InternalError>;
-
     /// Returns all existing flow bindings, where triggers are active
     fn stream_all_active_flow_bindings(&self) -> FlowBindingStream;
 
@@ -32,13 +25,18 @@ pub trait FlowTriggerEventStore: EventStore<FlowTriggerState> {
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<FlowBinding>, InternalError>;
 
+    /// Returns all bindings for a given webhook subscription ID where triggers
+    /// are defined regardless of status
+    async fn all_trigger_bindings_for_webhook_flows(
+        &self,
+        webhook_subscription_id: uuid::Uuid,
+    ) -> Result<Vec<FlowBinding>, InternalError>;
+
     /// Returns all bindings of system flows where triggers are defined
     /// regardless of status
     async fn all_trigger_bindings_for_system_flows(
         &self,
     ) -> Result<Vec<FlowBinding>, InternalError>;
-
-    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError>;
 
     /// Checks if there are any active triggers for the given list of datasets
     async fn has_active_triggers_for_datasets(

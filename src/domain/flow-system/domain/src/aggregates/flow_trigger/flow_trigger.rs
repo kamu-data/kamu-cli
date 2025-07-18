@@ -85,12 +85,12 @@ impl FlowTrigger {
         }
     }
 
-    /// Handle dataset removal
-    pub fn notify_dataset_removed(
+    /// Handle scope removal
+    pub fn notify_scope_removed(
         &mut self,
         now: DateTime<Utc>,
     ) -> Result<(), ProjectionError<FlowTriggerState>> {
-        let event = FlowTriggerEventDatasetRemoved {
+        let event = FlowTriggerEventScopeRemoved {
             event_time: now,
             flow_binding: self.flow_binding.clone(),
         };

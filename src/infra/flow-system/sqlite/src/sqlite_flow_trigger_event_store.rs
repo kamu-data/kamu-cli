@@ -11,7 +11,6 @@ use std::num::NonZeroUsize;
 
 use database_common::{
     EventModel,
-    PaginationOpts,
     ReturningEventModel,
     TransactionRef,
     TransactionRefT,
@@ -100,8 +99,8 @@ impl SqliteFlowTriggerEventStore {
                 SELECT event_id, event_payload as "event_payload: _"
                 FROM flow_trigger_events
                 WHERE flow_type = $1
-                    AND json_extract(scope_data, '$.dataset_id') = $2
                     AND json_extract(scope_data, '$.type') = 'Dataset'
+                    AND json_extract(scope_data, '$.dataset_id') = $2
                     AND (cast($3 as INT8) IS NULL or event_id > $3)
                     AND (cast($4 as INT8) IS NULL or event_id <= $4)
                 ORDER BY event_id ASC
@@ -274,68 +273,6 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
-    async fn list_dataset_ids(
-        &self,
-        pagination: &PaginationOpts,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-        let limit = i64::try_from(pagination.limit).unwrap();
-        let offset = i64::try_from(pagination.offset).unwrap();
-
-        let dataset_ids = sqlx::query!(
-            r#"
-            WITH scope AS (
-                SELECT
-                    json_extract(scope_data, '$.dataset_id') AS dataset_id,
-                    event_type
-                FROM flow_trigger_events
-                WHERE dataset_id IS NOT NULL
-            )
-            SELECT DISTINCT dataset_id as "dataset_id: String"
-            FROM scope
-                WHERE event_type = 'FlowTriggerEventCreated'
-            ORDER BY dataset_id
-            LIMIT $1 OFFSET $2
-            "#,
-            limit,
-            offset,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(dataset_ids
-            .into_iter()
-            .map(|event_row| {
-                odf::DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str()).int_err()
-            })
-            .collect::<Result<Vec<_>, InternalError>>()?)
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let dataset_ids_count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(DISTINCT json_extract(scope_data, '$.dataset_id')) AS count
-            FROM flow_trigger_events
-            WHERE
-                event_type = 'FlowTriggerEventCreated' AND
-                json_extract(scope_data, '$.dataset_id') IS NOT NULL
-            "#,
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(usize::try_from(dataset_ids_count).unwrap_or(0))
-    }
-
     #[tracing::instrument(level = "debug", skip_all)]
     fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
         Box::pin(async_stream::stream! {
@@ -401,7 +338,9 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
             r#"
             SELECT DISTINCT flow_type, scope_data as "scope_data: String"
                 FROM flow_trigger_events
-                WHERE json_extract(scope_data, '$.dataset_id') = $1
+                WHERE
+                    json_extract(scope_data, '$.type') = 'Dataset'
+                    AND json_extract(scope_data, '$.dataset_id') = $1
                     AND event_type = 'FlowTriggerEventCreated'
             "#,
             dataset_id_str,
@@ -412,11 +351,50 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
 
         Ok(flow_bindings
             .into_iter()
-            .map(|row| FlowBinding {
-                flow_type: row.flow_type,
-                scope: FlowScope::Dataset {
-                    dataset_id: dataset_id.clone(),
-                },
+            .map(|row| {
+                let scope: FlowScope = serde_json::from_str(&row.scope_data).unwrap();
+                FlowBinding {
+                    flow_type: row.flow_type,
+                    scope,
+                }
+            })
+            .collect())
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%webhook_subscription_id))]
+    async fn all_trigger_bindings_for_webhook_flows(
+        &self,
+        webhook_subscription_id: uuid::Uuid,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let webhook_subscription_id_str = webhook_subscription_id.to_string();
+
+        let flow_bindings = sqlx::query!(
+            r#"
+            SELECT DISTINCT flow_type, scope_data as "scope_data: String"
+                FROM flow_trigger_events
+                WHERE
+                    json_extract(scope_data, '$.type') = 'WebhookSubscription'
+                    AND json_extract(scope_data, '$.subscription_id') = $1
+                    AND event_type = 'FlowTriggerEventCreated'
+            "#,
+            webhook_subscription_id_str,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(flow_bindings
+            .into_iter()
+            .map(|row| {
+                let scope: FlowScope = serde_json::from_str(&row.scope_data).unwrap();
+                FlowBinding {
+                    flow_type: row.flow_type,
+                    scope,
+                }
             })
             .collect())
     }
@@ -480,6 +458,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                     FROM flow_trigger_events
                 ) AS latest_events
                 WHERE row_num = 1
+                AND json_extract(scope_data, '$.type') = 'Dataset'
                 AND json_extract(scope_data, '$.dataset_id') IN ({})
                 AND event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dill::*;
 use kamu_webhooks::RemoveWebhookSubscriptionUseCase;
 use kamu_webhooks_services::RemoveWebhookSubscriptionUseCaseImpl;
+use messaging_outbox::DummyOutboxImpl;
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -57,6 +58,7 @@ impl RemoveWebhookSubscriptionUseCaseHarness {
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<RemoveWebhookSubscriptionUseCaseImpl>();
+        b.add::<DummyOutboxImpl>();
 
         let catalog = b.build();
 

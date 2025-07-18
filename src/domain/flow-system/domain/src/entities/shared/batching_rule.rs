@@ -24,6 +24,13 @@ pub struct BatchingRule {
 impl BatchingRule {
     const MAX_BATCHING_INTERVAL_HOURS: i64 = 24;
 
+    pub fn empty() -> Self {
+        Self {
+            min_records_to_await: 0,
+            max_batching_interval: Duration::seconds(0),
+        }
+    }
+
     pub fn new_checked(
         min_records_to_await: u64,
         max_batching_interval: Duration,

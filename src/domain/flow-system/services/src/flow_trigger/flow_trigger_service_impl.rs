@@ -108,6 +108,64 @@ impl FlowTriggerServiceImpl {
                 .await
         }
     }
+
+    async fn remove_dataset_bindings(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<(), InternalError> {
+        tracing::trace!(%dataset_id, "Removing dataset flow bindings");
+
+        let flow_bindings = self
+            .get_dataset_flow_bindings(dataset_id, None)
+            .await
+            .int_err()?;
+
+        self.remove_given_bindings(flow_bindings).await.int_err()?;
+
+        Ok(())
+    }
+
+    async fn remove_webhook_subscription_bindings(
+        &self,
+        webhook_subscription_id: uuid::Uuid,
+    ) -> Result<(), InternalError> {
+        tracing::trace!(%webhook_subscription_id, "Removing webhook subscription bindings");
+
+        let flow_bindings = self
+            .event_store
+            .all_trigger_bindings_for_webhook_flows(webhook_subscription_id)
+            .await?;
+
+        self.remove_given_bindings(flow_bindings).await.int_err()?;
+
+        Ok(())
+    }
+
+    async fn remove_given_bindings(
+        &self,
+        flow_bindings: Vec<FlowBinding>,
+    ) -> Result<(), InternalError> {
+        tracing::trace!(?flow_bindings, "Removing flow bindings");
+
+        for flow_binding in flow_bindings {
+            let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
+                .await
+                .int_err()?;
+
+            if let Some(mut flow_trigger) = maybe_flow_trigger {
+                flow_trigger
+                    .notify_scope_removed(self.time_source.now())
+                    .int_err()?;
+
+                flow_trigger
+                    .save(self.event_store.as_ref())
+                    .await
+                    .int_err()?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -163,6 +221,27 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .await?;
 
         Ok(flow_trigger.into())
+    }
+
+    async fn on_trigger_scope_removed(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        tracing::trace!(?flow_scope, "Removing flow trigger scope");
+
+        match flow_scope {
+            FlowScope::Dataset { dataset_id, .. } => {
+                self.remove_dataset_bindings(dataset_id).await?;
+            }
+            FlowScope::WebhookSubscription {
+                subscription_id, ..
+            } => {
+                self.remove_webhook_subscription_bindings(*subscription_id)
+                    .await?;
+            }
+            FlowScope::System => {
+                panic!("System flow scope removed? I don't beleive it!")
+            }
+        }
+
+        Ok(())
     }
 
     /// Lists all flow triggers, which are currently enabled
@@ -340,28 +419,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowTriggerServiceImpl {
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
-                let flow_bindings = self
-                    .get_dataset_flow_bindings(&message.dataset_id, None)
-                    .await
-                    .int_err()?;
-
-                for flow_binding in flow_bindings {
-                    let maybe_flow_trigger =
-                        FlowTrigger::try_load(&flow_binding, self.event_store.as_ref())
-                            .await
-                            .int_err()?;
-
-                    if let Some(mut flow_trigger) = maybe_flow_trigger {
-                        flow_trigger
-                            .notify_dataset_removed(self.time_source.now())
-                            .int_err()?;
-
-                        flow_trigger
-                            .save(self.event_store.as_ref())
-                            .await
-                            .int_err()?;
-                    }
-                }
+                self.remove_dataset_bindings(&message.dataset_id).await?;
             }
 
             DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {

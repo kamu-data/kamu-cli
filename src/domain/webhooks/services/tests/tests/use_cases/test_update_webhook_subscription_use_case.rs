@@ -17,6 +17,7 @@ use kamu_webhooks::{
     WebhookSubscriptionLabel,
 };
 use kamu_webhooks_services::UpdateWebhookSubscriptionUseCaseImpl;
+use messaging_outbox::DummyOutboxImpl;
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -231,6 +232,7 @@ impl UpdateWebhookSubscriptionUseCaseHarness {
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<UpdateWebhookSubscriptionUseCaseImpl>();
+        b.add::<DummyOutboxImpl>();
 
         let catalog = b.build();
 

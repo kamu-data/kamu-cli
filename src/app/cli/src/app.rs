@@ -25,17 +25,13 @@ use kamu_accounts::*;
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
-use kamu_flow_system::{
-    FlowConfigurationUpdatedMessage,
-    FlowProgressMessage,
-    FlowTriggerUpdatedMessage,
-};
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
 };
-use kamu_task_system_inmem::domain::{MESSAGE_PRODUCER_KAMU_TASK_AGENT, TaskProgressMessage};
+use kamu_task_system_inmem::domain::MESSAGE_PRODUCER_KAMU_TASK_AGENT;
+use kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE;
 use merge::Merge as _;
 use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
@@ -651,23 +647,31 @@ pub fn configure_server_catalog(
 
     b.add::<UploadServiceLocal>();
 
-    register_message_dispatcher::<FlowProgressMessage>(
+    register_message_dispatcher::<kamu_flow_system::FlowProgressMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
     );
-    register_message_dispatcher::<FlowConfigurationUpdatedMessage>(
+    register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
     );
-    register_message_dispatcher::<FlowTriggerUpdatedMessage>(
+    register_message_dispatcher::<kamu_flow_system::FlowTriggerUpdatedMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
     );
-    register_message_dispatcher::<TaskProgressMessage>(&mut b, MESSAGE_PRODUCER_KAMU_TASK_AGENT);
+    register_message_dispatcher::<kamu_task_system::TaskProgressMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+    );
 
     register_message_dispatcher::<AccessTokenLifecycleMessage>(
         &mut b,
         MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
+    );
+
+    register_message_dispatcher::<kamu_webhooks::WebhookSubscriptionLifecycleMessage>(
+        &mut b,
+        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
     );
 
     b

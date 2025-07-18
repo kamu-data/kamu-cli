@@ -20,11 +20,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use kamu_webhooks::{
-    WebhookEventTypeCatalog,
-    WebhookSubscriptionID,
-    WebhookSubscriptionQueryService,
-};
 use {kamu_adapter_task_webhook as atw, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{DatasetUpdatedWebhookSensor, FLOW_TYPE_WEBHOOK_DELIVER};
@@ -37,7 +32,6 @@ use crate::{DatasetUpdatedWebhookSensor, FLOW_TYPE_WEBHOOK_DELIVER};
     flow_type: FLOW_TYPE_WEBHOOK_DELIVER,
 })]
 pub struct FlowControllerWebhookDeliver {
-    webhook_subscription_query_service: Arc<dyn WebhookSubscriptionQueryService>,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
 }
 
@@ -50,31 +44,14 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
     async fn register_flow_sensor(
         &self,
         flow_binding: &fs::FlowBinding,
-        _: fs::FlowTriggerRule,
+        flow_trigger_rule: fs::FlowTriggerRule,
     ) -> Result<(), InternalError> {
-        let webhook_subscription_id = flow_binding.get_webhook_subscription_id_or_die()?;
-
-        let webhook_subscription = self
-            .webhook_subscription_query_service
-            .find_webhook_subscription(WebhookSubscriptionID::new(webhook_subscription_id))
-            .await?
-            .ok_or_else(|| {
-                InternalError::new(format!(
-                    "Webhook subscription with ID '{webhook_subscription_id}' not found"
-                ))
-            })?;
-
-        if webhook_subscription.dataset_id().is_some()
-            && webhook_subscription
-                .expects_event_type(&WebhookEventTypeCatalog::dataset_ref_updated())
-        {
-            // TODO: should we respect a BatchingRule here?
-            self.flow_sensor_dispatcher
-                .register_sensor(Arc::new(DatasetUpdatedWebhookSensor::new(
-                    &webhook_subscription,
-                )))
-                .await?;
-        }
+        self.flow_sensor_dispatcher
+            .register_sensor(Arc::new(DatasetUpdatedWebhookSensor::new(
+                flow_binding.scope.clone(),
+                flow_trigger_rule,
+            )))
+            .await?;
 
         Ok(())
     }

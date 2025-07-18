@@ -9,7 +9,6 @@
 
 use std::collections::HashSet;
 
-use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
 
@@ -100,29 +99,6 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
 #[async_trait::async_trait]
 impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn list_dataset_ids(
-        &self,
-        pagination: &PaginationOpts,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        Ok(self
-            .inner
-            .as_state()
-            .lock()
-            .unwrap()
-            .dataset_ids
-            .iter()
-            .skip(pagination.offset)
-            .take(pagination.limit)
-            .cloned()
-            .collect())
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
-        Ok(self.inner.as_state().lock().unwrap().dataset_ids.len())
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
     fn stream_all_active_flow_bindings(&self) -> FlowBindingStream {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -141,7 +117,7 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
             let is_active = match event {
                 FlowTriggerEvent::Created(e) => !e.paused,
                 FlowTriggerEvent::Modified(e) => !e.paused,
-                FlowTriggerEvent::DatasetRemoved { .. } => false,
+                FlowTriggerEvent::ScopeRemoved { .. } => false,
             };
 
             if is_active {
@@ -173,6 +149,40 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
                 && seen_flow_types.insert(flow_type)
             {
                 bindings.push(FlowBinding::for_dataset(id.clone(), flow_type));
+            }
+        }
+
+        Ok(bindings)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%webhook_subscription_id))]
+    async fn all_trigger_bindings_for_webhook_flows(
+        &self,
+        webhook_subscription_id: uuid::Uuid,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let mut seen_flow_types = HashSet::new();
+        let mut bindings = Vec::new();
+
+        for event in g.events.iter().rev() {
+            if let FlowBinding {
+                scope:
+                    FlowScope::WebhookSubscription {
+                        subscription_id,
+                        dataset_id,
+                    },
+                flow_type,
+            } = event.flow_binding()
+                && *subscription_id == webhook_subscription_id
+                && seen_flow_types.insert(flow_type)
+            {
+                bindings.push(FlowBinding::for_webhook_subscription(
+                    *subscription_id,
+                    dataset_id.clone(),
+                    flow_type,
+                ));
             }
         }
 
@@ -238,7 +248,7 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
                                 return Ok(true);
                             }
                         }
-                        FlowTriggerEvent::DatasetRemoved { .. } => {
+                        FlowTriggerEvent::ScopeRemoved { .. } => {
                             // permanently stopped — not active
                         }
                     }

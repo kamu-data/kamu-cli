@@ -7,15 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
 use kamu_flow_system as fs;
-use kamu_webhooks::{
-    InternalError,
-    ResultIntoInternal,
-    WebhookEventTypeCatalog,
-    WebhookPayloadBuilder,
-    WebhookSubscription,
-};
+use kamu_webhooks::{WebhookEventTypeCatalog, WebhookPayloadBuilder};
 
 use crate::FLOW_TYPE_WEBHOOK_DELIVER;
 
@@ -23,15 +18,14 @@ use crate::FLOW_TYPE_WEBHOOK_DELIVER;
 
 pub struct DatasetUpdatedWebhookSensor {
     flow_scope: fs::FlowScope,
+    trigger_rule: fs::FlowTriggerRule,
 }
 
 impl DatasetUpdatedWebhookSensor {
-    pub fn new(webhook_subscription: &WebhookSubscription) -> Self {
+    pub fn new(flow_scope: fs::FlowScope, trigger_rule: fs::FlowTriggerRule) -> Self {
         Self {
-            flow_scope: fs::FlowScope::WebhookSubscription {
-                subscription_id: webhook_subscription.id().into_inner(),
-                dataset_id: webhook_subscription.dataset_id().cloned(),
-            },
+            flow_scope,
+            trigger_rule,
         }
     }
 }
@@ -88,7 +82,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 .run_flow_automatically(
                     &target_flow_binding,
                     activation_cause.clone(),
-                    None,
+                    Some(self.trigger_rule.clone()),
                     None,
                     Some(
                         TaskRunArgumentsWebhookDeliver {

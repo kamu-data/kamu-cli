@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use kamu_webhooks::*;
+use messaging_outbox::{Outbox, OutboxExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,6 +19,7 @@ use kamu_webhooks::*;
 #[interface(dyn PauseWebhookSubscriptionUseCase)]
 pub struct PauseWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,6 +52,17 @@ impl PauseWebhookSubscriptionUseCase for PauseWebhookSubscriptionUseCaseImpl {
             .save(self.subscription_event_store.as_ref())
             .await
             .map_err(|e| PauseWebhookSubscriptionError::Internal(e.int_err()))?;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
+                WebhookSubscriptionLifecycleMessage::paused(
+                    subscription.id(),
+                    subscription.dataset_id().cloned(),
+                    subscription.event_types(),
+                ),
+            )
+            .await?;
 
         Ok(())
     }

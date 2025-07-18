@@ -7,16 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
-use crate::*;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<FlowControllerWebhookDeliver>();
-
-    catalog_builder.add::<WebhookTriggerEnabler>();
-}
+pub const MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE: &str =
+    "dev.kamu.domain.webhooks.WebhookSubscriptionService";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

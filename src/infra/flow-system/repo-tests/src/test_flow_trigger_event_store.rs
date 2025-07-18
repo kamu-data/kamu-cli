@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{Duration, Utc};
-use database_common::PaginationOpts;
 use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_adapter_flow_dataset as afs;
@@ -44,15 +43,6 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
         .await
         .unwrap();
     assert_eq!(events, []);
-
-    let dataset_ids: Vec<_> = event_store
-        .list_dataset_ids(&PaginationOpts {
-            limit: 10,
-            offset: 0,
-        })
-        .await
-        .unwrap();
-    assert_eq!(dataset_ids, []);
 
     let bindings = event_store
         .all_trigger_bindings_for_dataset_flows(&dataset_id)
@@ -168,21 +158,6 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .await
         .unwrap();
     assert_eq!(&events[..], [event_3.into()]);
-
-    let mut dataset_ids: Vec<_> = event_store
-        .list_dataset_ids(&PaginationOpts {
-            limit: 10,
-            offset: 0,
-        })
-        .await
-        .unwrap();
-
-    dataset_ids.sort();
-
-    let mut expected_dataset_ids = vec![dataset_id_1.clone(), dataset_id_2.clone()];
-    expected_dataset_ids.sort();
-
-    assert_eq!(expected_dataset_ids, dataset_ids);
 
     let bindings = event_store
         .all_trigger_bindings_for_dataset_flows(&dataset_id_1)
@@ -433,7 +408,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
                     rule: dummy_schedule(),
                 }
                 .into(),
-                FlowTriggerEventDatasetRemoved {
+                FlowTriggerEventScopeRemoved {
                     event_time: Utc::now(),
                     flow_binding: flow_removed.clone(),
                 }

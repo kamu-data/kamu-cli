@@ -17,6 +17,7 @@ use kamu_webhooks::{
     WebhookSubscriptionLabel,
 };
 use kamu_webhooks_services::{CreateWebhookSubscriptionUseCaseImpl, WebhookSecretGeneratorImpl};
+use messaging_outbox::DummyOutboxImpl;
 
 use super::WebhookSubscriptionUseCaseHarness;
 
@@ -197,6 +198,7 @@ impl CreateWebhookSubscriptionUseCaseHarness {
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<CreateWebhookSubscriptionUseCaseImpl>();
         b.add::<WebhookSecretGeneratorImpl>();
+        b.add::<DummyOutboxImpl>();
 
         let catalog = b.build();
 

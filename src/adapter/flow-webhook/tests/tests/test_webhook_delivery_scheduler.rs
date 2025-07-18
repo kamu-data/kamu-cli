@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use dill::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
-use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, WebhookDeliveryScheduler};
+use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, WebhookTriggerEnabler};
 use kamu_adapter_task_webhook as atw;
 use kamu_datasets::{
     DatasetEntry,
@@ -232,7 +232,7 @@ struct TestWebhookDeliverySchedulerHarness {
 impl TestWebhookDeliverySchedulerHarness {
     fn new(mock_flow_run_service: MockFlowRunService) -> Self {
         let mut b = CatalogBuilder::new();
-        b.add::<WebhookDeliveryScheduler>()
+        b.add::<WebhookTriggerEnabler>()
             .add::<WebhookPayloadBuilderImpl>()
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
