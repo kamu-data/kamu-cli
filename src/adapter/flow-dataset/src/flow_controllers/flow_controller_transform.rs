@@ -15,24 +15,57 @@ use kamu_core::PullResult;
 use kamu_datasets::{DatasetIncrementQueryService, DependencyGraphService};
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
-use crate::{FLOW_TYPE_DATASET_TRANSFORM, trigger_transform_flow_for_all_downstream_datasets};
+use crate::{DerivedDatasetFlowSensor, FLOW_TYPE_DATASET_TRANSFORM};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn fs::FlowDispatcher)]
-#[dill::meta(fs::FlowDispatcherMeta {
+#[dill::interface(dyn fs::FlowController)]
+#[dill::meta(fs::FlowControllerMeta {
     flow_type: FLOW_TYPE_DATASET_TRANSFORM,
 })]
-pub struct FlowDispatcherTransform {
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
+pub struct FlowControllerTransform {
+    catalog: dill::Catalog,
+    flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
-    flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
-    flow_run_service: Arc<dyn fs::FlowRunService>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
 #[async_trait::async_trait]
-impl fs::FlowDispatcher for FlowDispatcherTransform {
+impl fs::FlowController for FlowControllerTransform {
+    fn flow_type(&self) -> &'static str {
+        FLOW_TYPE_DATASET_TRANSFORM
+    }
+
+    async fn register_flow_sensor(
+        &self,
+        flow_binding: &fs::FlowBinding,
+        trigger_rule: fs::FlowTriggerRule,
+    ) -> Result<(), InternalError> {
+        let dataset_id = flow_binding.get_dataset_id_or_die()?;
+
+        let fs::FlowTriggerRule::Batching(batching_rule) = trigger_rule else {
+            return Err(InternalError::new(
+                "FlowControllerTransform expects a BatchingRule for registering sensors",
+            ));
+        };
+
+        use futures::StreamExt;
+        let upstream_dataset_ids = self
+            .dependency_graph_service
+            .get_upstream_dependencies(&dataset_id)
+            .await
+            .collect()
+            .await;
+
+        let sensor = DerivedDatasetFlowSensor::new(dataset_id, upstream_dataset_ids, batching_rule);
+        self.flow_sensor_dispatcher
+            .register_sensor(Arc::new(sensor))
+            .await?;
+
+        Ok(())
+    }
+
     async fn build_task_logical_plan(
         &self,
         flow_binding: &fs::FlowBinding,
@@ -86,14 +119,14 @@ impl fs::FlowDispatcher for FlowDispatcherTransform {
                         },
                     });
 
-                trigger_transform_flow_for_all_downstream_datasets(
-                    self.dependency_graph_service.as_ref(),
-                    self.flow_trigger_service.as_ref(),
-                    self.flow_run_service.as_ref(),
-                    &success_flow_state.flow_binding,
-                    activation_cause,
-                )
-                .await?;
+                self.flow_sensor_dispatcher
+                    .dispatch_input_flow_success(
+                        &self.catalog,
+                        &success_flow_state.flow_binding,
+                        activation_cause,
+                    )
+                    .await
+                    .int_err()?;
             }
         }
 

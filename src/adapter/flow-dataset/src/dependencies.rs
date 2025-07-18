@@ -14,10 +14,10 @@ use super::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<FlowDispatcherIngest>();
-    catalog_builder.add::<FlowDispatcherTransform>();
-    catalog_builder.add::<FlowDispatcherCompact>();
-    catalog_builder.add::<FlowDispatcherReset>();
+    catalog_builder.add::<FlowControllerIngest>();
+    catalog_builder.add::<FlowControllerTransform>();
+    catalog_builder.add::<FlowControllerCompact>();
+    catalog_builder.add::<FlowControllerReset>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

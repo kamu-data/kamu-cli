@@ -15,14 +15,18 @@ use kamu_task_system as ts;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn FlowDispatcher)]
-#[dill::meta(FlowDispatcherMeta {
+#[dill::interface(dyn FlowController)]
+#[dill::meta(FlowControllerMeta {
     flow_type: FLOW_TYPE_SYSTEM_GC,
 })]
-pub struct FlowDispatcherSystemGC {}
+pub struct FlowControllerSystemGC {}
 
 #[async_trait::async_trait]
-impl FlowDispatcher for FlowDispatcherSystemGC {
+impl FlowController for FlowControllerSystemGC {
+    fn flow_type(&self) -> &'static str {
+        FLOW_TYPE_SYSTEM_GC
+    }
+
     async fn build_task_logical_plan(
         &self,
         flow_binding: &FlowBinding,

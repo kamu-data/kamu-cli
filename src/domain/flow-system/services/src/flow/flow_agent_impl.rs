@@ -94,25 +94,6 @@ impl FlowAgentImpl {
         }
     }
 
-    fn get_flow_dispatcher(
-        &self,
-        target_catalog: &Catalog,
-        flow_type: &str,
-    ) -> Result<Arc<dyn FlowDispatcher>, InternalError> {
-        // Find a dispatcher for this flow type in dependency catalog
-        target_catalog
-            .builders_for_with_meta::<dyn FlowDispatcher, _>(|meta: &FlowDispatcherMeta| {
-                meta.flow_type == flow_type
-            })
-            .next()
-            .map(|builder| builder.get(target_catalog))
-            .transpose()
-            .int_err()?
-            .ok_or_else(|| {
-                InternalError::new(format!("Flow dispatcher for type '{flow_type}' not found",))
-            })
-    }
-
     #[transactional_method]
     #[tracing::instrument(level = "info", skip_all)]
     async fn recover_initial_flows_state(
@@ -242,6 +223,7 @@ impl FlowAgentImpl {
             if maybe_pending_flow_id.is_none() {
                 scheduling_helper
                     .activate_flow_trigger(
+                        target_catalog,
                         start_time,
                         &enabled_trigger.flow_binding,
                         enabled_trigger.rule,
@@ -349,12 +331,12 @@ impl FlowAgentImpl {
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
     ) -> Result<TaskID, InternalError> {
-        // Find a dispatcher for this flow type
-        let flow_dispatcher =
-            self.get_flow_dispatcher(&target_catalog, &flow.flow_binding.flow_type)?;
+        // Find a controller for this flow type
+        let flow_controller =
+            get_flow_controller_from_catalog(&target_catalog, &flow.flow_binding.flow_type)?;
 
-        // Dispatcher should create a logical plan that corresponds to the flow type
-        let logical_plan = flow_dispatcher
+        // Controller should create a logical plan that corresponds to the flow type
+        let logical_plan = flow_controller
             .build_task_logical_plan(
                 &flow.flow_binding,
                 flow.config_snapshot.as_ref(),
@@ -534,12 +516,12 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         if let Some(task_result) = flow.try_task_result_as_ref()
                             && !task_result.is_empty()
                         {
-                            let flow_dispatcher = self.get_flow_dispatcher(
+                            let flow_controller = get_flow_controller_from_catalog(
                                 target_catalog,
                                 &flow.flow_binding.flow_type,
                             )?;
 
-                            flow_dispatcher
+                            flow_controller
                                 .propagate_success(&flow, task_result, finish_time)
                                 .await
                                 .int_err()?;
@@ -630,21 +612,15 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
         tracing::debug!(received_message = ?message, "Received flow configuration message");
 
         if message.paused {
-            let maybe_pending_flow_id = {
-                let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-                flow_event_store
-                    .try_get_pending_flow(&message.flow_binding)
-                    .await?
-            };
-
-            if let Some(flow_id) = maybe_pending_flow_id {
-                let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
-                abort_helper.abort_flow(flow_id).await?;
-            }
+            let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
+            abort_helper
+                .deactivate_flow_trigger(target_catalog, &message.flow_binding)
+                .await?;
         } else {
             let scheduling_helper = target_catalog.get_one::<FlowSchedulingHelper>().unwrap();
             scheduling_helper
                 .activate_flow_trigger(
+                    target_catalog,
                     self.agent_config.round_time(message.event_time)?,
                     &message.flow_binding,
                     message.rule.clone(),
@@ -674,22 +650,10 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
-                let flow_ids_2_abort = {
-                    let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-                    // For every possible dataset flow:
-                    //  - drop queued activations
-                    //  - collect ID of aborted flow
-                    flow_event_store
-                        .try_get_all_dataset_pending_flows(&message.dataset_id)
-                        .await?
-                };
-
-                // Abort matched flows
-                for flow_id in flow_ids_2_abort {
-                    let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
-                    abort_helper.abort_flow(flow_id).await?;
-                }
+                let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
+                abort_helper
+                    .on_dataset_deleted(target_catalog, &message.dataset_id)
+                    .await?;
             }
 
             DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {

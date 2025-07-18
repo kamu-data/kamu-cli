@@ -7,16 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_task_system as ts;
 
-use crate::{FlowBinding, FlowConfigurationRule, FlowState};
+use crate::{FlowBinding, FlowConfigurationRule, FlowState, FlowTriggerRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowDispatcher: Send + Sync {
+pub trait FlowController: Send + Sync {
+    fn flow_type(&self) -> &'static str;
+
+    async fn register_flow_sensor(
+        &self,
+        flow_binding: &FlowBinding,
+        _: FlowTriggerRule,
+    ) -> Result<(), InternalError> {
+        tracing::error!(
+            "{} does not expect regiostering flow sensors, flow_binding: {:?}",
+            self.flow_type(),
+            flow_binding
+        );
+
+        Ok(())
+    }
+
     async fn build_task_logical_plan(
         &self,
         flow_binding: &FlowBinding,
@@ -34,8 +52,28 @@ pub trait FlowDispatcher: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub fn get_flow_controller_from_catalog(
+    target_catalog: &dill::Catalog,
+    flow_type: &str,
+) -> Result<Arc<dyn FlowController>, InternalError> {
+    // Find a controller for this flow type in dependency catalog
+    target_catalog
+        .builders_for_with_meta::<dyn FlowController, _>(|meta: &FlowControllerMeta| {
+            meta.flow_type == flow_type
+        })
+        .next()
+        .map(|builder| builder.get(target_catalog))
+        .transpose()
+        .int_err()?
+        .ok_or_else(|| {
+            InternalError::new(format!("Flow controller for type '{flow_type}' not found",))
+        })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
-pub struct FlowDispatcherMeta {
+pub struct FlowControllerMeta {
     pub flow_type: &'static str,
 }
 

@@ -34,6 +34,7 @@ pub(crate) struct FlowSchedulingHelper {
 impl FlowSchedulingHelper {
     pub(crate) async fn activate_flow_trigger(
         &self,
+        target_catalog: &dill::Catalog,
         start_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         rule: FlowTriggerRule,
@@ -62,6 +63,13 @@ impl FlowSchedulingHelper {
                         self.schedule_auto_polling_flow_unconditionally(start_time, flow_binding)
                             .await?;
                     }
+
+                    let flow_controller =
+                        get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)?;
+                    flow_controller
+                        .register_flow_sensor(flow_binding, rule)
+                        .await
+                        .int_err()?;
                 }
                 FlowTriggerRule::Schedule(schedule_rule) => {
                     self.schedule_auto_polling_flow(start_time, flow_binding, schedule_rule)
@@ -69,8 +77,14 @@ impl FlowSchedulingHelper {
                 }
             },
             FlowScope::WebhookSubscription { .. } => {
-                self.schedule_auto_polling_flow_unconditionally(start_time, flow_binding)
-                    .await?;
+                // Don't schedule webhook flows, they are triggered by events solely.
+                // But register necessary sensors
+                let flow_controller =
+                    get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)?;
+                flow_controller
+                    .register_flow_sensor(flow_binding, rule)
+                    .await
+                    .int_err()?;
             }
             FlowScope::System => {
                 if let FlowTriggerRule::Schedule(schedule) = &rule {

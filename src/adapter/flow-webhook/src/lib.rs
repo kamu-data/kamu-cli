@@ -12,8 +12,8 @@
 mod dependencies;
 pub use dependencies::*;
 
-mod flow_dispatchers;
-pub use flow_dispatchers::*;
+mod flow_controllers;
+pub use flow_controllers::*;
 
 mod flow_sensors;
 pub use flow_sensors::*;

@@ -7,23 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use internal_error::InternalError;
 
-use crate::{FlowActivationCause, FlowBinding, FlowScope};
+use crate::{FlowActivationCause, FlowBinding, FlowScope, FlowSensor};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowSensor: Send + Sync {
-    fn flow_scope(&self) -> &FlowScope;
+pub trait FlowSensorDispatcher: Send + Sync {
+    async fn register_sensor(&self, flow_sensor: Arc<dyn FlowSensor>) -> Result<(), InternalError>;
 
-    fn get_sensitive_datasets(&self) -> Vec<odf::DatasetID>;
+    async fn unregister_sensor(&self, flow_scope: &FlowScope) -> Result<(), InternalError>;
 
-    async fn on_sensitized(
+    async fn on_dataset_deleted(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError>;
+
+    async fn dispatch_input_flow_success(
         &self,
         catalog: &dill::Catalog,
         input_flow_binding: &FlowBinding,
-        activation_cause: &FlowActivationCause,
+        activation_cause: FlowActivationCause,
     ) -> Result<(), InternalError>;
 }
 

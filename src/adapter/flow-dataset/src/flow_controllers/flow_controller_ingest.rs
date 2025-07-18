@@ -15,7 +15,6 @@ use kamu_core::PullResult;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
     DatasetIncrementQueryService,
-    DependencyGraphService,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
 };
 use messaging_outbox::*;
@@ -26,14 +25,13 @@ use crate::{
     FLOW_TYPE_DATASET_INGEST,
     FlowConfigRuleIngest,
     MESSAGE_CONSUMER_KAMU_FLOW_DISPATCHER_INGEST,
-    trigger_transform_flow_for_all_downstream_datasets,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn fs::FlowDispatcher)]
-#[dill::meta(fs::FlowDispatcherMeta {
+#[dill::interface(dyn fs::FlowController)]
+#[dill::meta(fs::FlowControllerMeta {
     flow_type: FLOW_TYPE_DATASET_INGEST,
 })]
 #[dill::interface(dyn MessageConsumer)]
@@ -46,15 +44,18 @@ use crate::{
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
-pub struct FlowDispatcherIngest {
-    flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
-    flow_run_service: Arc<dyn fs::FlowRunService>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
+pub struct FlowControllerIngest {
+    catalog: dill::Catalog,
+    flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
 
 #[async_trait::async_trait]
-impl fs::FlowDispatcher for FlowDispatcherIngest {
+impl fs::FlowController for FlowControllerIngest {
+    fn flow_type(&self) -> &'static str {
+        FLOW_TYPE_DATASET_INGEST
+    }
+
     async fn build_task_logical_plan(
         &self,
         flow_binding: &fs::FlowBinding,
@@ -115,14 +116,14 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
                         },
                     });
 
-                trigger_transform_flow_for_all_downstream_datasets(
-                    self.dependency_graph_service.as_ref(),
-                    self.flow_trigger_service.as_ref(),
-                    self.flow_run_service.as_ref(),
-                    &success_flow_state.flow_binding,
-                    activation_cause,
-                )
-                .await?;
+                self.flow_sensor_dispatcher
+                    .dispatch_input_flow_success(
+                        &self.catalog,
+                        &success_flow_state.flow_binding,
+                        activation_cause,
+                    )
+                    .await
+                    .int_err()?;
             }
         }
 
@@ -132,12 +133,12 @@ impl fs::FlowDispatcher for FlowDispatcherIngest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for FlowDispatcherIngest {}
+impl MessageConsumer for FlowControllerIngest {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest {
+impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowControllerIngest {
     #[tracing::instrument(
         level = "debug",
         skip_all,
@@ -225,14 +226,15 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDispatcherIngest 
         let flow_binding =
             fs::FlowBinding::for_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
 
-        trigger_transform_flow_for_all_downstream_datasets(
-            self.dependency_graph_service.as_ref(),
-            self.flow_trigger_service.as_ref(),
-            self.flow_run_service.as_ref(),
-            &flow_binding,
-            fs::FlowActivationCause::DatasetUpdate(update_cause),
-        )
-        .await?;
+        self.flow_sensor_dispatcher
+            .dispatch_input_flow_success(
+                &self.catalog,
+                &flow_binding,
+                fs::FlowActivationCause::DatasetUpdate(update_cause),
+            )
+            .await
+            .int_err()?;
+
         Ok(())
     }
 }

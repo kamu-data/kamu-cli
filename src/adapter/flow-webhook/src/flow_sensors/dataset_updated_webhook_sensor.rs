@@ -28,8 +28,9 @@ pub struct DatasetUpdatedWebhookSensor {
 impl DatasetUpdatedWebhookSensor {
     pub fn new(webhook_subscription: &WebhookSubscription) -> Self {
         Self {
-            flow_scope: fs::FlowScope::Dataset {
-                dataset_id: webhook_subscription.dataset_id().unwrap().clone(),
+            flow_scope: fs::FlowScope::WebhookSubscription {
+                subscription_id: webhook_subscription.id().into_inner(),
+                dataset_id: webhook_subscription.dataset_id().cloned(),
             },
         }
     }
