@@ -971,7 +971,7 @@
     },
     "termsOfService": "https://docs.kamu.dev/terms-of-service/",
     "title": "Kamu REST API",
-    "version": "0.245.1"
+    "version": "0.245.2"
   },
   "openapi": "3.1.0",
   "paths": {

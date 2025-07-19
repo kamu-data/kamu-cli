@@ -11,6 +11,10 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
+## [0.245.2] - 2025-07-19
+### Added
+- Made `observability` crate compatible with `tracing-error` to pave the road for more informative error.
+
 ## [0.245.1] - 2025-07-17
 ### Fixed
 - Performance regression: avoid loading full task model in flow listings, list of IDs is enough
