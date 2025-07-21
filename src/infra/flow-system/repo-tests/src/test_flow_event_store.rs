@@ -2288,7 +2288,7 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
+pub async fn test_get_all_scope_pending_flows(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
     // Create a dataset and schedule multiple flows
@@ -2345,7 +2345,9 @@ pub async fn test_get_all_dataset_pending_flows(catalog: &Catalog) {
 
     // Call the method under test
     let pending_flows = flow_event_store
-        .try_get_all_dataset_pending_flows(&dataset_id)
+        .try_get_all_scope_pending_flows(&FlowScope::Dataset {
+            dataset_id: dataset_id.clone(),
+        })
         .await
         .unwrap();
 
@@ -2469,7 +2471,9 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
         // The flow should still be pending, because of retrying status
         let pending_flows = flow_event_store
-            .try_get_all_dataset_pending_flows(&dataset_id)
+            .try_get_all_scope_pending_flows(&FlowScope::Dataset {
+                dataset_id: dataset_id.clone(),
+            })
             .await
             .unwrap();
         assert_eq!(pending_flows.len(), 1);
@@ -2495,7 +2499,9 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
     // The flow should no longer be pending
     let pending_flows = flow_event_store
-        .try_get_all_dataset_pending_flows(&dataset_id)
+        .try_get_all_scope_pending_flows(&FlowScope::Dataset {
+            dataset_id: dataset_id.clone(),
+        })
         .await
         .unwrap();
     assert!(pending_flows.is_empty());

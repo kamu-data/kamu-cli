@@ -385,10 +385,10 @@ impl FlowEventStore for InMemoryFlowEventStore {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn try_get_all_dataset_pending_flows(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
+    async fn try_get_all_scope_pending_flows(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope: &FlowScope,
     ) -> Result<Vec<FlowID>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -411,63 +411,55 @@ impl FlowEventStore for InMemoryFlowEventStore {
             by_initiator: None,
         };
 
-        Ok(g.all_flows_by_dataset
-            .get(dataset_id)
-            .map(|dataset_flow_ids| {
-                dataset_flow_ids
-                    .iter()
-                    .rev()
-                    .filter(|flow_id| {
-                        g.matches_flow(**flow_id, &waiting_filter)
-                            || g.matches_flow(**flow_id, &retrying_filter)
-                            || g.matches_flow(**flow_id, &running_filter)
-                    })
-                    .copied()
-                    .collect()
-            })
-            .unwrap_or_default())
-    }
+        Ok(match flow_scope {
+            FlowScope::Dataset { dataset_id } => g
+                .all_flows_by_dataset
+                .get(dataset_id)
+                .map(|dataset_flow_ids| {
+                    dataset_flow_ids
+                        .iter()
+                        .rev()
+                        .filter(|flow_id| {
+                            g.matches_flow(**flow_id, &waiting_filter)
+                                || g.matches_flow(**flow_id, &retrying_filter)
+                                || g.matches_flow(**flow_id, &running_filter)
+                        })
+                        .copied()
+                        .collect()
+                })
+                .unwrap_or_default(),
 
-    async fn try_get_all_webhook_pending_flows(
-        &self,
-        subscription_id: uuid::Uuid,
-    ) -> Result<Vec<FlowID>, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
+            FlowScope::WebhookSubscription {
+                subscription_id, ..
+            } => g
+                .all_flows_by_webhook_subscription
+                .get(subscription_id)
+                .map(|subscription_flow_ids| {
+                    subscription_flow_ids
+                        .iter()
+                        .rev()
+                        .filter(|flow_id| {
+                            g.matches_flow(**flow_id, &waiting_filter)
+                                || g.matches_flow(**flow_id, &retrying_filter)
+                                || g.matches_flow(**flow_id, &running_filter)
+                        })
+                        .copied()
+                        .collect()
+                })
+                .unwrap_or_default(),
 
-        let waiting_filter = FlowFilters {
-            by_flow_type: None,
-            by_flow_status: Some(FlowStatus::Waiting),
-            by_initiator: None,
-        };
-
-        let retrying_filter = FlowFilters {
-            by_flow_type: None,
-            by_flow_status: Some(FlowStatus::Retrying),
-            by_initiator: None,
-        };
-
-        let running_filter = FlowFilters {
-            by_flow_type: None,
-            by_flow_status: Some(FlowStatus::Running),
-            by_initiator: None,
-        };
-
-        Ok(g.all_flows_by_webhook_subscription
-            .get(&subscription_id)
-            .map(|subscription_flow_ids| {
-                subscription_flow_ids
-                    .iter()
-                    .rev()
-                    .filter(|flow_id| {
-                        g.matches_flow(**flow_id, &waiting_filter)
-                            || g.matches_flow(**flow_id, &retrying_filter)
-                            || g.matches_flow(**flow_id, &running_filter)
-                    })
-                    .copied()
-                    .collect()
-            })
-            .unwrap_or_default())
+            FlowScope::System => g
+                .all_system_flows
+                .iter()
+                .rev()
+                .filter(|flow_id| {
+                    g.matches_flow(**flow_id, &waiting_filter)
+                        || g.matches_flow(**flow_id, &retrying_filter)
+                        || g.matches_flow(**flow_id, &running_filter)
+                })
+                .copied()
+                .collect(),
+        })
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]

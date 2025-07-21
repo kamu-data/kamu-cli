@@ -114,25 +114,10 @@ impl FlowScopeRemovalHandler for FlowAbortHelper {
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-        let flow_ids_2_abort = match flow_scope {
-            FlowScope::Dataset { dataset_id, .. } => {
-                tracing::trace!(%dataset_id, "Deactivating flow triggers for deleted dataset");
-                flow_event_store
-                    .try_get_all_dataset_pending_flows(dataset_id)
-                    .await?
-            }
-            FlowScope::WebhookSubscription {
-                subscription_id, ..
-            } => {
-                tracing::trace!(%subscription_id, "Deactivating flow triggers for deleted webhook subscription");
-                flow_event_store
-                    .try_get_all_webhook_pending_flows(*subscription_id)
-                    .await?
-            }
-            FlowScope::System => {
-                panic!("System flow scope removed? I don't beleive it!")
-            }
-        };
+        // Query flows by this scope
+        let flow_ids_2_abort = flow_event_store
+            .try_get_all_scope_pending_flows(flow_scope)
+            .await?;
 
         // Abort matched flows
         for flow_id in flow_ids_2_abort {
