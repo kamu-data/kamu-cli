@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
+use database_common::{TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
@@ -263,63 +263,6 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
 
 #[async_trait::async_trait]
 impl FlowConfigurationEventStore for PostgresFlowConfigurationEventStore {
-    async fn list_dataset_ids(
-        &self,
-        pagination: &PaginationOpts,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-        let limit = i64::try_from(pagination.limit).unwrap();
-        let offset = i64::try_from(pagination.offset).unwrap();
-
-        let dataset_ids = sqlx::query!(
-            r#"
-            SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id
-                FROM flow_configuration_events
-                WHERE
-                    scope_data->>'dataset_id' IS NOT NULL AND
-                    event_type = 'FlowConfigurationEventCreated'
-                ORDER BY scope_data->>'dataset_id'
-                LIMIT $1 OFFSET $2
-            "#,
-            limit,
-            offset,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(dataset_ids
-            .into_iter()
-            .map(|event_row| {
-                odf::DatasetID::from_did_str(event_row.dataset_id.unwrap().as_str()).int_err()
-            })
-            .collect::<Result<Vec<_>, InternalError>>()?)
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_dataset_ids_count(&self) -> Result<usize, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let dataset_ids_count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(DISTINCT scope_data->>'dataset_id')
-                FROM flow_configuration_events
-                WHERE
-                    scope_data->>'dataset_id' IS NOT NULL AND
-                    event_type = 'FlowConfigurationEventCreated'
-            "#,
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(usize::try_from(dataset_ids_count.unwrap_or(0)).unwrap())
-    }
-
     #[tracing::instrument(level = "debug", skip_all)]
     fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream {
         Box::pin(async_stream::stream! {
@@ -355,25 +298,25 @@ impl FlowConfigurationEventStore for PostgresFlowConfigurationEventStore {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn all_bindings_for_dataset_flows(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
+    async fn all_bindings_for_scope(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope: &FlowScope,
     ) -> Result<Vec<FlowBinding>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let dataset_id_str = dataset_id.to_string();
+        let scope_json = serde_json::to_value(flow_scope).int_err()?;
 
         let flow_bindings = sqlx::query!(
             r#"
             SELECT DISTINCT flow_type, scope_data
                 FROM flow_configuration_events
-                WHERE scope_data->>'dataset_id' = $1
+                WHERE scope_data = $1
                     AND event_type = 'FlowConfigurationEventCreated'
             "#,
-            dataset_id_str,
+            scope_json,
         )
         .fetch_all(connection_mut)
         .await

@@ -128,36 +128,24 @@ impl FlowScopeRemovalHandler for FlowConfigurationServiceImpl {
         name = "FlowConfigurationServiceImpl::handle_flow_scope_removal"
     )]
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
-        // TODO: we only support dataset scope removal for now
-        if let FlowScope::Dataset { dataset_id } = flow_scope {
-            let flow_bindings = self
-                .event_store
-                .all_bindings_for_dataset_flows(dataset_id)
-                .await?;
+        let flow_bindings = self.event_store.all_bindings_for_scope(flow_scope).await?;
 
-            for flow_binding in flow_bindings {
-                let maybe_flow_configuration =
-                    FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
-                        .await
-                        .int_err()?;
+        for flow_binding in flow_bindings {
+            let maybe_flow_configuration =
+                FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
+                    .await
+                    .int_err()?;
 
-                if let Some(mut flow_configuration) = maybe_flow_configuration {
-                    flow_configuration
-                        .notify_dataset_removed(self.time_source.now())
-                        .int_err()?;
+            if let Some(mut flow_configuration) = maybe_flow_configuration {
+                flow_configuration
+                    .notify_dataset_removed(self.time_source.now())
+                    .int_err()?;
 
-                    flow_configuration
-                        .save(self.event_store.as_ref())
-                        .await
-                        .int_err()?;
-                }
+                flow_configuration
+                    .save(self.event_store.as_ref())
+                    .await
+                    .int_err()?;
             }
-        } else {
-            tracing::error!(
-                "Handling flow scope removal for unknown scope: {:?}",
-                flow_scope
-            );
-            return Ok(());
         }
 
         Ok(())
