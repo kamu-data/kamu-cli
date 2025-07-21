@@ -83,9 +83,8 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
             return (Request::from_parts(parts, Body::from(body_bytes)), false);
         };
 
-        let parsed_query = match parse_query::<&str>(query_str) {
-            Ok(doc) => doc,
-            Err(_) => return (Request::from_parts(parts, Body::from(body_bytes)), false),
+        let Ok(parsed_query) = parse_query::<&str>(query_str) else {
+            return (Request::from_parts(parts, Body::from(body_bytes)), false);
         };
 
         let is_auth = parsed_query.definitions.iter().any(|def| match def {
