@@ -63,6 +63,7 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
     pub async fn is_auth_graphql_operation_request(
         request: Request<Body>,
     ) -> (Request<Body>, bool) {
+        // '/graphql' GET endpoint is a GQL playground. Ignore auth policy checks.
         if request.method() == http::Method::GET {
             return (request, true);
         }
