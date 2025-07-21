@@ -14,6 +14,8 @@ Recommendation: for ease of reading, use the following order:
 ## [Unreleased]
 ### Fixed
 - GQL playground is accessible in anonymous mode
+### Changed
+- GQL: `search` also filters dataset by id
 
 ## [0.245.2] - 2025-07-19
 ### Added
