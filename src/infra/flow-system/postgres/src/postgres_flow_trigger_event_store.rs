@@ -303,26 +303,25 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn all_trigger_bindings_for_dataset_flows(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
+    async fn all_trigger_bindings_for_scope(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope: &FlowScope,
     ) -> Result<Vec<FlowBinding>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let dataset_id_str = dataset_id.to_string();
+        let scope_json = serde_json::to_value(flow_scope).int_err()?;
 
         let flow_bindings = sqlx::query!(
             r#"
             SELECT DISTINCT flow_type, scope_data
                 FROM flow_trigger_events
-                WHERE scope_data->>'type' = 'Dataset'
-                    AND scope_data->>'dataset_id' = $1
+                WHERE scope_data = $1
                     AND event_type = 'FlowTriggerEventCreated'
             "#,
-            dataset_id_str,
+            scope_json,
         )
         .fetch_all(connection_mut)
         .await
@@ -338,73 +337,6 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
                 })
             })
             .collect()
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(%webhook_subscription_id))]
-    async fn all_trigger_bindings_for_webhook_flows(
-        &self,
-        webhook_subscription_id: uuid::Uuid,
-    ) -> Result<Vec<FlowBinding>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let webhook_subscription_id = webhook_subscription_id.to_string();
-
-        let flow_bindings = sqlx::query!(
-            r#"
-            SELECT DISTINCT flow_type, scope_data
-                FROM flow_trigger_events
-                WHERE
-                    scope_data->>'type' = 'WebhookSubscription'
-                    AND scope_data->>'subscription_id' = $1
-                    AND event_type = 'FlowTriggerEventCreated'
-            "#,
-            webhook_subscription_id,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        flow_bindings
-            .into_iter()
-            .map(|row| {
-                let scope: FlowScope = serde_json::from_value(row.scope_data).int_err()?;
-                Ok(FlowBinding {
-                    flow_type: row.flow_type,
-                    scope,
-                })
-            })
-            .collect()
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_trigger_bindings_for_system_flows(
-        &self,
-    ) -> Result<Vec<FlowBinding>, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let flow_bindings = sqlx::query!(
-            r#"
-            SELECT DISTINCT flow_type, scope_data
-                FROM flow_trigger_events
-                WHERE scope_data->>'type' = 'System'
-                    AND event_type = 'FlowTriggerEventCreated'
-            "#,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(flow_bindings
-            .into_iter()
-            .map(|row| FlowBinding {
-                flow_type: row.flow_type,
-                scope: FlowScope::System,
-            })
-            .collect())
     }
 
     #[tracing::instrument(level = "debug", skip_all)]

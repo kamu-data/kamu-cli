@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT DISTINCT flow_type, scope_data\n                FROM flow_trigger_events\n                WHERE scope_data->>'type' = 'System'\n                    AND event_type = 'FlowTriggerEventCreated'\n            ",
+  "query": "\n            SELECT DISTINCT flow_type, scope_data\n                FROM flow_trigger_events\n                WHERE scope_data = $1\n                    AND event_type = 'FlowTriggerEventCreated'\n            ",
   "describe": {
     "columns": [
       {
@@ -15,12 +15,14 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Jsonb"
+      ]
     },
     "nullable": [
       false,
       false
     ]
   },
-  "hash": "a93834fe109bfd4ec7b8b6f39315fec66a8ec5a3024ef715a593d3b93a22a1ab"
+  "hash": "c7aeefa966b69e478df4471304c35a31dd9f7e641b04ac3aab360780a10d6aab"
 }

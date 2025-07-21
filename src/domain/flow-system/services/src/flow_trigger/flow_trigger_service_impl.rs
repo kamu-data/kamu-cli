@@ -72,7 +72,9 @@ impl FlowTriggerServiceImpl {
             )])
         } else {
             self.event_store
-                .all_trigger_bindings_for_dataset_flows(dataset_id)
+                .all_trigger_bindings_for_scope(&FlowScope::Dataset {
+                    dataset_id: dataset_id.clone(),
+                })
                 .await
         }
     }
@@ -85,41 +87,9 @@ impl FlowTriggerServiceImpl {
             Ok(vec![FlowBinding::for_system(system_flow_type)])
         } else {
             self.event_store
-                .all_trigger_bindings_for_system_flows()
+                .all_trigger_bindings_for_scope(&FlowScope::System)
                 .await
         }
-    }
-
-    async fn remove_dataset_bindings(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<(), InternalError> {
-        tracing::trace!(%dataset_id, "Removing dataset flow bindings");
-
-        let flow_bindings = self
-            .get_dataset_flow_bindings(dataset_id, None)
-            .await
-            .int_err()?;
-
-        self.remove_given_bindings(flow_bindings).await.int_err()?;
-
-        Ok(())
-    }
-
-    async fn remove_webhook_subscription_bindings(
-        &self,
-        webhook_subscription_id: uuid::Uuid,
-    ) -> Result<(), InternalError> {
-        tracing::trace!(%webhook_subscription_id, "Removing webhook subscription bindings");
-
-        let flow_bindings = self
-            .event_store
-            .all_trigger_bindings_for_webhook_flows(webhook_subscription_id)
-            .await?;
-
-        self.remove_given_bindings(flow_bindings).await.int_err()?;
-
-        Ok(())
     }
 
     async fn remove_given_bindings(
@@ -364,20 +334,12 @@ impl FlowScopeRemovalHandler for FlowTriggerServiceImpl {
     /// Handles the removal of a resource associated with the flow scope
     #[tracing::instrument(level = "debug", skip_all, fields(flow_scope = ?flow_scope))]
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
-        match flow_scope {
-            FlowScope::Dataset { dataset_id, .. } => {
-                self.remove_dataset_bindings(dataset_id).await?;
-            }
-            FlowScope::WebhookSubscription {
-                subscription_id, ..
-            } => {
-                self.remove_webhook_subscription_bindings(*subscription_id)
-                    .await?;
-            }
-            FlowScope::System => {
-                panic!("System flow scope removed? I don't beleive it!")
-            }
-        }
+        let flow_bindings = self
+            .event_store
+            .all_trigger_bindings_for_scope(flow_scope)
+            .await?;
+
+        self.remove_given_bindings(flow_bindings).await.int_err()?;
 
         Ok(())
     }

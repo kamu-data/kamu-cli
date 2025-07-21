@@ -18,24 +18,11 @@ pub trait FlowTriggerEventStore: EventStore<FlowTriggerState> {
     /// Returns all existing flow bindings, where triggers are active
     fn stream_all_active_flow_bindings(&self) -> FlowBindingStream;
 
-    /// Returns all bindings for a given dataset ID where triggers are defined
+    /// Returns all bindings for a given scope where triggers are defined
     /// regardless of status
-    async fn all_trigger_bindings_for_dataset_flows(
+    async fn all_trigger_bindings_for_scope(
         &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Vec<FlowBinding>, InternalError>;
-
-    /// Returns all bindings for a given webhook subscription ID where triggers
-    /// are defined regardless of status
-    async fn all_trigger_bindings_for_webhook_flows(
-        &self,
-        webhook_subscription_id: uuid::Uuid,
-    ) -> Result<Vec<FlowBinding>, InternalError>;
-
-    /// Returns all bindings of system flows where triggers are defined
-    /// regardless of status
-    async fn all_trigger_bindings_for_system_flows(
-        &self,
+        scope: &FlowScope,
     ) -> Result<Vec<FlowBinding>, InternalError>;
 
     /// Checks if there are any active triggers for the given list of datasets

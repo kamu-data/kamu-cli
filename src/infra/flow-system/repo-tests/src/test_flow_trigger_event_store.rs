@@ -45,13 +45,13 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     assert_eq!(events, []);
 
     let bindings = event_store
-        .all_trigger_bindings_for_dataset_flows(&dataset_id)
+        .all_trigger_bindings_for_scope(&flow_binding.scope)
         .await
         .unwrap();
     assert_eq!(bindings, []);
 
     let system_bindings = event_store
-        .all_trigger_bindings_for_system_flows()
+        .all_trigger_bindings_for_scope(&FlowScope::System)
         .await
         .unwrap();
     assert_eq!(system_bindings, []);
@@ -160,19 +160,19 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(&events[..], [event_3.into()]);
 
     let bindings = event_store
-        .all_trigger_bindings_for_dataset_flows(&dataset_id_1)
+        .all_trigger_bindings_for_scope(&flow_binding_1.scope)
         .await
         .unwrap();
     assert_eq!(bindings, vec![flow_binding_1.clone()]);
 
     let bindings = event_store
-        .all_trigger_bindings_for_dataset_flows(&dataset_id_2)
+        .all_trigger_bindings_for_scope(&flow_binding_2.scope)
         .await
         .unwrap();
     assert_eq!(bindings, vec![flow_binding_2.clone()]);
 
     let bindings = event_store
-        .all_trigger_bindings_for_system_flows()
+        .all_trigger_bindings_for_scope(&flow_binding_3.scope)
         .await
         .unwrap();
     assert_eq!(bindings, vec![flow_binding_3.clone()]);

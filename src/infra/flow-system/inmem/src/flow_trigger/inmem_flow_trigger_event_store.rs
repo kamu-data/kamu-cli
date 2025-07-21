@@ -129,10 +129,10 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         Box::pin(futures::stream::iter(active_bindings.into_iter().map(Ok)))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn all_trigger_bindings_for_dataset_flows(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
+    async fn all_trigger_bindings_for_scope(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope: &FlowScope,
     ) -> Result<Vec<FlowBinding>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -141,72 +141,12 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         let mut bindings = Vec::new();
 
         for event in g.events.iter().rev() {
-            if let FlowBinding {
-                scope: FlowScope::Dataset { dataset_id: id },
-                flow_type,
-            } = event.flow_binding()
-                && id == dataset_id
-                && seen_flow_types.insert(flow_type)
-            {
-                bindings.push(FlowBinding::for_dataset(id.clone(), flow_type));
+            let binding = event.flow_binding();
+            if binding.scope != *flow_scope {
+                continue;
             }
-        }
-
-        Ok(bindings)
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(%webhook_subscription_id))]
-    async fn all_trigger_bindings_for_webhook_flows(
-        &self,
-        webhook_subscription_id: uuid::Uuid,
-    ) -> Result<Vec<FlowBinding>, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-
-        let mut seen_flow_types = HashSet::new();
-        let mut bindings = Vec::new();
-
-        for event in g.events.iter().rev() {
-            if let FlowBinding {
-                scope:
-                    FlowScope::WebhookSubscription {
-                        subscription_id,
-                        dataset_id,
-                    },
-                flow_type,
-            } = event.flow_binding()
-                && *subscription_id == webhook_subscription_id
-                && seen_flow_types.insert(flow_type)
-            {
-                bindings.push(FlowBinding::for_webhook_subscription(
-                    *subscription_id,
-                    dataset_id.clone(),
-                    flow_type,
-                ));
-            }
-        }
-
-        Ok(bindings)
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn all_trigger_bindings_for_system_flows(
-        &self,
-    ) -> Result<Vec<FlowBinding>, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-
-        let mut seen_flow_types = HashSet::new();
-        let mut bindings = Vec::new();
-
-        for event in g.events.iter().rev() {
-            if let FlowBinding {
-                scope: FlowScope::System,
-                flow_type,
-            } = event.flow_binding()
-                && seen_flow_types.insert(flow_type)
-            {
-                bindings.push(FlowBinding::for_system(flow_type));
+            if seen_flow_types.insert(binding.flow_type.clone()) {
+                bindings.push(binding.clone());
             }
         }
 
