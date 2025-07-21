@@ -102,6 +102,15 @@ impl FlowScope {
             FlowScope::System => None,
         }
     }
+
+    pub fn webhook_subscription_id(&self) -> Option<uuid::Uuid> {
+        match self {
+            FlowScope::WebhookSubscription {
+                subscription_id, ..
+            } => Some(*subscription_id),
+            FlowScope::Dataset { .. } | FlowScope::System => None,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,9 +9,6 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_TRIGGER_ENABLER: &str =
-    "dev.kamu.domain.webhooks.WebhookTriggerEnabler";
-
 pub const MESSAGE_CONSUMER_KAMU_WEBHOOK_DATASET_REMOVAL_HANDLER: &str =
     "dev.kamu.domain.webhooks.WebhookDatasetRemovalHandler";
 

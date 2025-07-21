@@ -489,12 +489,14 @@ impl FlowDescriptionBuilder {
     ) -> Result<FlowDescription> {
         match flow_type {
             FLOW_TYPE_WEBHOOK_DELIVER => {
-                // TODO
                 let webhook_subscription_query_svc =
                     from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionQueryService);
 
                 let subscription = webhook_subscription_query_svc
-                    .find_webhook_subscription(subscription_id)
+                    .find_webhook_subscription(
+                        subscription_id,
+                        kamu_webhooks::WebhookSubscriptionQueryMode::IncludingRemoved,
+                    )
                     .await
                     .int_err()?
                     .ok_or_else(|| {

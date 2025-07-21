@@ -83,27 +83,18 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                 .await
                 .map_err(|e| CreateWebhookSubscriptionError::Internal(e.int_err()))?;
 
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
-                    WebhookSubscriptionLifecycleMessage::created(
-                        subscription.id(),
-                        subscription.dataset_id().cloned(),
-                        subscription.event_types(),
-                    ),
-                )
-                .await?;
-
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
-                    WebhookSubscriptionLifecycleMessage::enabled(
-                        subscription.id(),
-                        subscription.dataset_id().cloned(),
-                        subscription.event_types(),
-                    ),
-                )
-                .await?;
+            for event_type in subscription.event_types() {
+                self.outbox
+                    .post_message(
+                        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+                        WebhookSubscriptionEventChangesMessage::event_enabled(
+                            subscription.id(),
+                            subscription.dataset_id(),
+                            event_type.clone(),
+                        ),
+                    )
+                    .await?;
+            }
 
             return Ok(CreateWebhookSubscriptionResult {
                 subscription_id: subscription.id(),

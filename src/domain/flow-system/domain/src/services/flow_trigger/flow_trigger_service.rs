@@ -33,9 +33,6 @@ pub trait FlowTriggerService: Sync + Send {
         rule: FlowTriggerRule,
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
 
-    /// React to scope removal event
-    async fn on_trigger_scope_removed(&self, flow_scope: &FlowScope) -> Result<(), InternalError>;
-
     /// Lists all flow configurations, which are currently enabled
     fn list_enabled_triggers(&self) -> FlowTriggerStateStream;
 

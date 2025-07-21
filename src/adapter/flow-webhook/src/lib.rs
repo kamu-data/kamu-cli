@@ -18,5 +18,8 @@ pub use flow_controllers::*;
 mod flow_sensors;
 pub use flow_sensors::*;
 
+mod messages;
+pub use messages::*;
+
 mod services;
 pub use services::*;

@@ -13,11 +13,12 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use kamu_adapter_flow_dataset as afs;
 use kamu_adapter_flow_dataset::{
+    self as afs,
     FlowConfigRuleCompact,
     FlowConfigRuleCompactFull,
     FlowConfigRuleIngest,
+    FlowDatasetsEventBridge,
 };
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
@@ -255,6 +256,8 @@ impl FlowConfigurationHarness {
             .add::<FlowConfigTestListener>()
             .add::<FlowConfigurationServiceImpl>()
             .add::<InMemoryFlowConfigurationEventStore>()
+            .add::<FlowDatasetsEventBridge>()
+            .add::<FlowSensorDispatcherImpl>()
             .add::<SystemTimeSourceDefault>();
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);

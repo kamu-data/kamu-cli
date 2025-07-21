@@ -15,7 +15,11 @@ use chrono::{Duration, Utc};
 use database_common_macros::transactional_method1;
 use dill::*;
 use futures::TryStreamExt;
-use kamu_adapter_flow_dataset::{FLOW_TYPE_DATASET_COMPACT, FLOW_TYPE_DATASET_INGEST};
+use kamu_adapter_flow_dataset::{
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_INGEST,
+    FlowDatasetsEventBridge,
+};
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -310,6 +314,8 @@ impl FlowTriggerHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowTriggerTestListener>()
             .add::<FlowTriggerServiceImpl>()
+            .add::<FlowDatasetsEventBridge>()
+            .add::<FlowSensorDispatcherImpl>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<SystemTimeSourceDefault>();
 

@@ -69,6 +69,7 @@ impl DatasetIncrementQueryServiceImpl {
 
         while let Some((_, block)) = block_stream.try_next().await.map_err(|err| match err {
             IterBlocksError::BlockNotFound(e) => GetIncrementError::BlockNotFound(e),
+            IterBlocksError::InvalidInterval(e) => GetIncrementError::InvalidInterval(e),
             _ => GetIncrementError::Internal(err.int_err()),
         })? {
             // Each block counts

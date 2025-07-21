@@ -7,16 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
+use internal_error::InternalError;
 
-use crate::*;
+use crate::FlowScope;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<FlowControllerWebhookDeliver>();
-
-    catalog_builder.add::<FlowWebhooksEventBridge>();
+#[async_trait::async_trait]
+pub trait FlowScopeRemovalHandler: Send + Sync {
+    /// Handles the removal of a resource associated with the flow scope
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

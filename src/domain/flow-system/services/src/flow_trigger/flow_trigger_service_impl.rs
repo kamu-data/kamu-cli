@@ -11,23 +11,11 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use dill::*;
-use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::{FlowTriggerEventStore, *};
-use messaging_outbox::{
-    InitialConsumerBoundary,
-    MessageConsumer,
-    MessageConsumerMeta,
-    MessageConsumerT,
-    MessageDeliveryMechanism,
-    Outbox,
-    OutboxExt,
-};
+use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
-use crate::{
-    MESSAGE_CONSUMER_KAMU_FLOW_TRIGGER_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-};
+use crate::MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,14 +29,7 @@ pub struct FlowTriggerServiceImpl {
 
 #[component(pub)]
 #[interface(dyn FlowTriggerService)]
-#[interface(dyn MessageConsumer)]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
-#[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_TRIGGER_SERVICE,
-    feeding_producers: &[MESSAGE_PRODUCER_KAMU_DATASET_SERVICE],
-    delivery: MessageDeliveryMechanism::Transactional,
-    initial_consumer_boundary: InitialConsumerBoundary::Latest,
-})]
+#[interface(dyn FlowScopeRemovalHandler)]
 impl FlowTriggerServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowTriggerEventStore>,
@@ -223,27 +204,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         Ok(flow_trigger.into())
     }
 
-    async fn on_trigger_scope_removed(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
-        tracing::trace!(?flow_scope, "Removing flow trigger scope");
-
-        match flow_scope {
-            FlowScope::Dataset { dataset_id, .. } => {
-                self.remove_dataset_bindings(dataset_id).await?;
-            }
-            FlowScope::WebhookSubscription {
-                subscription_id, ..
-            } => {
-                self.remove_webhook_subscription_bindings(*subscription_id)
-                    .await?;
-            }
-            FlowScope::System => {
-                panic!("System flow scope removed? I don't beleive it!")
-            }
-        }
-
-        Ok(())
-    }
-
     /// Lists all flow triggers, which are currently enabled
     fn list_enabled_triggers(&self) -> FlowTriggerStateStream {
         Box::pin(async_stream::try_stream! {
@@ -399,31 +359,23 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for FlowTriggerServiceImpl {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for FlowTriggerServiceImpl {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "FlowTriggerServiceImpl[DatasetLifecycleMessage]"
-    )]
-    async fn consume_message(
-        &self,
-        _: &Catalog,
-        message: &DatasetLifecycleMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
-
-        match message {
-            DatasetLifecycleMessage::Deleted(message) => {
-                self.remove_dataset_bindings(&message.dataset_id).await?;
+impl FlowScopeRemovalHandler for FlowTriggerServiceImpl {
+    /// Handles the removal of a resource associated with the flow scope
+    #[tracing::instrument(level = "debug", skip_all, fields(flow_scope = ?flow_scope))]
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        match flow_scope {
+            FlowScope::Dataset { dataset_id, .. } => {
+                self.remove_dataset_bindings(dataset_id).await?;
             }
-
-            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
-                // no action required
+            FlowScope::WebhookSubscription {
+                subscription_id, ..
+            } => {
+                self.remove_webhook_subscription_bindings(*subscription_id)
+                    .await?;
+            }
+            FlowScope::System => {
+                panic!("System flow scope removed? I don't beleive it!")
             }
         }
 

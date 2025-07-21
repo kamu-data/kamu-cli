@@ -479,6 +479,33 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(flow_ids)
     }
 
+    async fn try_get_all_webhook_pending_flows(
+        &self,
+        subscription_id: uuid::Uuid,
+    ) -> Result<Vec<FlowID>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let subscription_id = subscription_id.to_string();
+
+        let flow_ids = sqlx::query!(
+            r#"
+            SELECT flow_id FROM flows
+                WHERE
+                    scope_data->>'subscription_id' = $1 AND
+                    flow_status != 'finished'
+                ORDER BY flow_id DESC
+            "#,
+            subscription_id,
+        )
+        .map(|row| FlowID::try_from(row.flow_id).unwrap())
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(flow_ids)
+    }
+
     async fn get_flow_run_stats(
         &self,
         flow_binding: &FlowBinding,

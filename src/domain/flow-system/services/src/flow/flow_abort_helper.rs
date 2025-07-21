@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::component;
+use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     Flow,
@@ -17,6 +17,8 @@ use kamu_flow_system::{
     FlowEventStore,
     FlowID,
     FlowProgressMessage,
+    FlowScope,
+    FlowScopeRemovalHandler,
     FlowSensorDispatcher,
     FlowState,
     FlowStatus,
@@ -30,7 +32,9 @@ use crate::MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn FlowScopeRemovalHandler)]
 pub(crate) struct FlowAbortHelper {
+    catalog: dill::Catalog,
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_sensor_dispatcher: Arc<dyn FlowSensorDispatcher>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -101,34 +105,39 @@ impl FlowAbortHelper {
 
         Ok(())
     }
+}
 
-    pub(crate) async fn on_dataset_deleted(
-        &self,
-        target_catalog: &dill::Catalog,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<(), InternalError> {
-        tracing::trace!(%dataset_id, "Deactivating flow triggers for deleted dataset");
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        let flow_ids_2_abort = {
-            let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
+#[async_trait::async_trait]
+impl FlowScopeRemovalHandler for FlowAbortHelper {
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        let flow_event_store = self.catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-            // For every possible dataset flow:
-            //  - drop queued activations
-            //  - collect ID of aborted flow
-            flow_event_store
-                .try_get_all_dataset_pending_flows(dataset_id)
-                .await?
+        let flow_ids_2_abort = match flow_scope {
+            FlowScope::Dataset { dataset_id, .. } => {
+                tracing::trace!(%dataset_id, "Deactivating flow triggers for deleted dataset");
+                flow_event_store
+                    .try_get_all_dataset_pending_flows(dataset_id)
+                    .await?
+            }
+            FlowScope::WebhookSubscription {
+                subscription_id, ..
+            } => {
+                tracing::trace!(%subscription_id, "Deactivating flow triggers for deleted webhook subscription");
+                flow_event_store
+                    .try_get_all_webhook_pending_flows(*subscription_id)
+                    .await?
+            }
+            FlowScope::System => {
+                panic!("System flow scope removed? I don't beleive it!")
+            }
         };
 
         // Abort matched flows
         for flow_id in flow_ids_2_abort {
             self.abort_flow(flow_id).await?;
         }
-
-        // Remove dataset from sensor dispatcher
-        self.flow_sensor_dispatcher
-            .on_dataset_deleted(dataset_id)
-            .await?;
 
         Ok(())
     }

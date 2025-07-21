@@ -428,6 +428,48 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .unwrap_or_default())
     }
 
+    async fn try_get_all_webhook_pending_flows(
+        &self,
+        subscription_id: uuid::Uuid,
+    ) -> Result<Vec<FlowID>, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+
+        let waiting_filter = FlowFilters {
+            by_flow_type: None,
+            by_flow_status: Some(FlowStatus::Waiting),
+            by_initiator: None,
+        };
+
+        let retrying_filter = FlowFilters {
+            by_flow_type: None,
+            by_flow_status: Some(FlowStatus::Retrying),
+            by_initiator: None,
+        };
+
+        let running_filter = FlowFilters {
+            by_flow_type: None,
+            by_flow_status: Some(FlowStatus::Running),
+            by_initiator: None,
+        };
+
+        Ok(g.all_flows_by_webhook_subscription
+            .get(&subscription_id)
+            .map(|subscription_flow_ids| {
+                subscription_flow_ids
+                    .iter()
+                    .rev()
+                    .filter(|flow_id| {
+                        g.matches_flow(**flow_id, &waiting_filter)
+                            || g.matches_flow(**flow_id, &retrying_filter)
+                            || g.matches_flow(**flow_id, &running_filter)
+                    })
+                    .copied()
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn get_flow_run_stats(
         &self,

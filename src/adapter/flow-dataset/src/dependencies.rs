@@ -18,6 +18,8 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowControllerTransform>();
     catalog_builder.add::<FlowControllerCompact>();
     catalog_builder.add::<FlowControllerReset>();
+
+    catalog_builder.add::<FlowDatasetsEventBridge>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

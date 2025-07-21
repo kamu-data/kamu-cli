@@ -12,4 +12,7 @@
 pub const MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE: &str =
     "dev.kamu.domain.webhooks.WebhookSubscriptionService";
 
+pub const MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE: &str =
+    "dev.kamu.domain.webhooks.WebhookSubscriptionEventChangesService";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -51,7 +51,6 @@ impl RemoveWebhookSubscriptionUseCase for RemoveWebhookSubscriptionUseCaseImpl {
                 WebhookSubscriptionLifecycleMessage::deleted(
                     subscription.id(),
                     subscription.dataset_id().cloned(),
-                    subscription.event_types(),
                 ),
             )
             .await?;

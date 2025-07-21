@@ -15,6 +15,7 @@ use kamu_flow_system::{
     FlowActivationCause,
     FlowBinding,
     FlowScope,
+    FlowScopeRemovalHandler,
     FlowSensor,
     FlowSensorDispatcher,
 };
@@ -27,6 +28,7 @@ pub struct FlowSensorDispatcherImpl {
 
 #[dill::component(pub)]
 #[dill::interface(dyn FlowSensorDispatcher)]
+#[dill::interface(dyn FlowScopeRemovalHandler)]
 #[dill::scope(dill::Singleton)]
 impl FlowSensorDispatcherImpl {
     pub fn new() -> Self {
@@ -43,6 +45,7 @@ struct State {
     sensors: HashMap<FlowScope, Arc<dyn FlowSensor>>,
     dataset_to_sensitive_scopes: HashMap<odf::DatasetID, HashSet<FlowScope>>,
     dataset_own_scopes: HashMap<odf::DatasetID, HashSet<FlowScope>>,
+    webhook_own_scopes: HashMap<uuid::Uuid, HashSet<FlowScope>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,6 +86,15 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
                 .insert(flow_scope.clone());
         }
 
+        // If this sensor is scoped to a webhook subscription, track that relationship
+        if let Some(scope_subscription_id) = flow_scope.webhook_subscription_id() {
+            state
+                .webhook_own_scopes
+                .entry(scope_subscription_id)
+                .or_insert_with(HashSet::new)
+                .insert(flow_scope.clone());
+        }
+
         // Store the sensor
         state.sensors.insert(flow_scope, flow_sensor);
 
@@ -116,41 +128,15 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
                     state.dataset_own_scopes.remove(scope_dataset_id);
                 }
             }
-        }
 
-        Ok(())
-    }
-
-    async fn on_dataset_deleted(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError> {
-        let mut state = self.state.write().await;
-
-        // Remove the dataset from dataset_to_sensors mapping
-        // This stops any future notifications for this upstream dataset
-        state.dataset_to_sensitive_scopes.remove(dataset_id);
-
-        // Get all sensors that are scoped to the deleted dataset using precomputed
-        // mapping
-        let sensors_to_remove = state
-            .dataset_own_scopes
-            .remove(dataset_id)
-            .unwrap_or_default();
-
-        // Remove sensors that are scoped to the deleted dataset
-        for flow_scope in sensors_to_remove {
-            if let Some(removed_sensor) = state.sensors.remove(&flow_scope) {
-                // Clean up this sensor's associations with all datasets
-                let sensitive_datasets = removed_sensor.get_sensitive_datasets();
-
-                for other_dataset_id in sensitive_datasets {
-                    if let Some(sensor_set) =
-                        state.dataset_to_sensitive_scopes.get_mut(&other_dataset_id)
-                    {
-                        sensor_set.remove(&flow_scope);
-                        // Clean up empty sets
-                        if sensor_set.is_empty() {
-                            state.dataset_to_sensitive_scopes.remove(&other_dataset_id);
-                        }
-                    }
+            // Remove from webhook subscription scoped sensors mapping if applicable
+            if let Some(scope_subscription_id) = flow_scope.webhook_subscription_id()
+                && let Some(scoped_sensor_set) =
+                    state.webhook_own_scopes.get_mut(&scope_subscription_id)
+            {
+                scoped_sensor_set.remove(flow_scope);
+                if scoped_sensor_set.is_empty() {
+                    state.webhook_own_scopes.remove(&scope_subscription_id);
                 }
             }
         }
@@ -193,6 +179,70 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
             sensor
                 .on_sensitized(catalog, input_flow_binding, &activation_cause)
                 .await?;
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl FlowScopeRemovalHandler for FlowSensorDispatcherImpl {
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        let mut state = self.state.write().await;
+
+        // Find sensors that are scoped to the deleted flow scope
+        let sensors_to_remove = match flow_scope {
+            FlowScope::Dataset { dataset_id } => {
+                tracing::debug!(%dataset_id, "Removing sensors for deleted dataset");
+
+                // Remove the dataset from dataset_to_sensors mapping
+                // This stops any future notifications for this upstream dataset
+                state.dataset_to_sensitive_scopes.remove(dataset_id);
+
+                // Get all sensors that are scoped to the deleted dataset
+                state
+                    .dataset_own_scopes
+                    .remove(dataset_id)
+                    .unwrap_or_default()
+            }
+
+            FlowScope::WebhookSubscription {
+                subscription_id, ..
+            } => {
+                tracing::debug!(%subscription_id, "Removing sensors for deleted webhook subscription");
+                // Get all sensors that are scoped to the deleted webhook subscription
+                state
+                    .webhook_own_scopes
+                    .remove(subscription_id)
+                    .unwrap_or_default()
+            }
+            FlowScope::System => {
+                tracing::debug!("Removing sensors for system scope");
+                // For system scope, we don't have specific sensors to remove
+                HashSet::new()
+            }
+        };
+
+        // Remove sensors that are scoped to the deleted dataset
+        for flow_scope in sensors_to_remove {
+            if let Some(removed_sensor) = state.sensors.remove(&flow_scope) {
+                // Clean up this sensor's associations with all datasets
+                let sensitive_datasets = removed_sensor.get_sensitive_datasets();
+
+                for other_dataset_id in sensitive_datasets {
+                    if let Some(sensor_set) =
+                        state.dataset_to_sensitive_scopes.get_mut(&other_dataset_id)
+                    {
+                        sensor_set.remove(&flow_scope);
+                        // Clean up empty sets
+                        if sensor_set.is_empty() {
+                            state.dataset_to_sensitive_scopes.remove(&other_dataset_id);
+                        }
+                    }
+                }
+            }
         }
 
         Ok(())

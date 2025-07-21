@@ -10,9 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_datasets::DatasetLifecycleMessage;
 use kamu_flow_system::*;
-use messaging_outbox::{MessageConsumer, MessageConsumerT};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,7 +24,7 @@ pub struct FlowConfigurationServiceImpl {
 
 #[component(pub)]
 #[interface(dyn FlowConfigurationService)]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
+#[interface(dyn FlowScopeRemovalHandler)]
 impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
@@ -122,53 +120,44 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MessageConsumer for FlowConfigurationServiceImpl {}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl {
+impl FlowScopeRemovalHandler for FlowConfigurationServiceImpl {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "FlowConfigurationServiceImpl[DatasetLifecycleMessage]"
+        name = "FlowConfigurationServiceImpl::handle_flow_scope_removal"
     )]
-    async fn consume_message(
-        &self,
-        _: &Catalog,
-        message: &DatasetLifecycleMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        // TODO: we only support dataset scope removal for now
+        if let FlowScope::Dataset { dataset_id } = flow_scope {
+            let flow_bindings = self
+                .event_store
+                .all_bindings_for_dataset_flows(dataset_id)
+                .await?;
 
-        match message {
-            DatasetLifecycleMessage::Deleted(message) => {
-                let flow_bindings = self
-                    .event_store
-                    .all_bindings_for_dataset_flows(&message.dataset_id)
-                    .await?;
+            for flow_binding in flow_bindings {
+                let maybe_flow_configuration =
+                    FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
+                        .await
+                        .int_err()?;
 
-                for flow_binding in flow_bindings {
-                    let maybe_flow_configuration =
-                        FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
-                            .await
-                            .int_err()?;
+                if let Some(mut flow_configuration) = maybe_flow_configuration {
+                    flow_configuration
+                        .notify_dataset_removed(self.time_source.now())
+                        .int_err()?;
 
-                    if let Some(mut flow_configuration) = maybe_flow_configuration {
-                        flow_configuration
-                            .notify_dataset_removed(self.time_source.now())
-                            .int_err()?;
-
-                        flow_configuration
-                            .save(self.event_store.as_ref())
-                            .await
-                            .int_err()?;
-                    }
+                    flow_configuration
+                        .save(self.event_store.as_ref())
+                        .await
+                        .int_err()?;
                 }
             }
-
-            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
-                // no action required
-            }
+        } else {
+            tracing::error!(
+                "Handling flow scope removal for unknown scope: {:?}",
+                flow_scope
+            );
+            return Ok(());
         }
 
         Ok(())

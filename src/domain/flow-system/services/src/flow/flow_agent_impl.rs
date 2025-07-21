@@ -18,11 +18,6 @@ use dill::*;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
-use kamu_datasets::{
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
-};
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use messaging_outbox::{
@@ -61,15 +56,12 @@ pub struct FlowAgentImpl {
 #[interface(dyn FlowAgentTestDriver)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
-#[interface(dyn MessageConsumerT<DatasetLifecycleMessage>)]
 #[interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
     feeding_producers: &[
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-        MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
@@ -626,39 +618,6 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
                     message.rule.clone(),
                 )
                 .await?;
-        }
-
-        Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl MessageConsumerT<DatasetLifecycleMessage> for FlowAgentImpl {
-    #[tracing::instrument(
-        level = "debug",
-        skip_all,
-        name = "FlowAgentImpl[DatasetLifecycleMessage]"
-    )]
-    async fn consume_message(
-        &self,
-        target_catalog: &Catalog,
-        message: &DatasetLifecycleMessage,
-    ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received dataset lifecycle message");
-
-        match message {
-            DatasetLifecycleMessage::Deleted(message) => {
-                let abort_helper = target_catalog.get_one::<FlowAbortHelper>().unwrap();
-                abort_helper
-                    .on_dataset_deleted(target_catalog, &message.dataset_id)
-                    .await?;
-            }
-
-            DatasetLifecycleMessage::Created(_) | DatasetLifecycleMessage::Renamed(_) => {
-                // No action required
-            }
         }
 
         Ok(())

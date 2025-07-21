@@ -22,6 +22,55 @@ pub struct UpdateWebhookSubscriptionUseCaseImpl {
     outbox: Arc<dyn Outbox>,
 }
 
+impl UpdateWebhookSubscriptionUseCaseImpl {
+    async fn issue_event_type_changes(
+        &self,
+        subscription: &WebhookSubscription,
+        old_event_types: &[WebhookEventType],
+        new_event_types: &[WebhookEventType],
+    ) -> Result<(), InternalError> {
+        let disabled_event_types = old_event_types
+            .iter()
+            .filter(|et| !new_event_types.contains(et))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let enabled_event_types = new_event_types
+            .iter()
+            .filter(|et| !old_event_types.contains(et))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for disabled_event_type in disabled_event_types {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+                    WebhookSubscriptionEventChangesMessage::event_disabled(
+                        subscription.id(),
+                        subscription.dataset_id(),
+                        disabled_event_type,
+                    ),
+                )
+                .await?;
+        }
+
+        for enabled_event_type in enabled_event_types {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
+                    WebhookSubscriptionEventChangesMessage::event_enabled(
+                        subscription.id(),
+                        subscription.dataset_id(),
+                        enabled_event_type,
+                    ),
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[common_macros::method_names_consts]
@@ -64,6 +113,8 @@ impl UpdateWebhookSubscriptionUseCase for UpdateWebhookSubscriptionUseCaseImpl {
                 })?;
             }
 
+            let old_event_types = subscription.event_types().to_vec();
+
             subscription
                 .modify(target_url, label, event_types)
                 .map_err(|e: ProjectionError<WebhookSubscriptionState>| {
@@ -80,16 +131,12 @@ impl UpdateWebhookSubscriptionUseCase for UpdateWebhookSubscriptionUseCaseImpl {
                 .await
                 .map_err(|e| UpdateWebhookSubscriptionError::Internal(e.int_err()))?;
 
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
-                    WebhookSubscriptionLifecycleMessage::updated(
-                        subscription.id(),
-                        subscription.dataset_id().cloned(),
-                        subscription.event_types(),
-                    ),
-                )
-                .await?;
+            self.issue_event_type_changes(
+                subscription,
+                &old_event_types,
+                subscription.event_types(),
+            )
+            .await?;
 
             return Ok(());
         }

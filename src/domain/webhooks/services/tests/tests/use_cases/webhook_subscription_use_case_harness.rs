@@ -67,9 +67,10 @@ impl WebhookSubscriptionUseCaseHarness {
     pub(crate) async fn find_subscription(
         &self,
         subscription_id: WebhookSubscriptionID,
+        query_mode: WebhookSubscriptionQueryMode,
     ) -> Option<WebhookSubscription> {
         self.query_service
-            .find_webhook_subscription(subscription_id)
+            .find_webhook_subscription(subscription_id, query_mode)
             .await
             .unwrap()
     }

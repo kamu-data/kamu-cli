@@ -16,84 +16,72 @@ use kamu_webhooks::*;
 use messaging_outbox::*;
 use time_source::SystemTimeSource;
 
-use crate::FLOW_TYPE_WEBHOOK_DELIVER;
+use crate::{FLOW_TYPE_WEBHOOK_DELIVER, MESSAGE_CONSUMER_KAMU_FLOW_WEBHOOKS_EVENT_BRIDGE};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<WebhookSubscriptionLifecycleMessage>)]
+#[interface(dyn MessageConsumerT<WebhookSubscriptionEventChangesMessage>)]
 #[meta(MessageConsumerMeta {
-    consumer_name: MESSAGE_CONSUMER_KAMU_WEBHOOK_TRIGGER_ENABLER,
+    consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_WEBHOOKS_EVENT_BRIDGE,
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
+        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
     ],
     delivery: MessageDeliveryMechanism::Transactional,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
-pub struct WebhookTriggerEnabler {
+pub struct FlowWebhooksEventBridge {
     time_source: Arc<dyn SystemTimeSource>,
     flow_trigger_service: Arc<dyn fs::FlowTriggerService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl WebhookTriggerEnabler {
-    fn wants_dataset_updates(&self, event_types: &[WebhookEventType]) -> bool {
-        // Check if any of the event types need dataset updates
-        event_types.iter().any(|event_type| {
-            matches!(
-                event_type.as_ref(),
-                WebhookEventTypeCatalog::DATASET_REF_UPDATED
-            )
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MessageConsumer for WebhookTriggerEnabler {}
+impl MessageConsumer for FlowWebhooksEventBridge {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageConsumerT<WebhookSubscriptionLifecycleMessage> for WebhookTriggerEnabler {
+impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEventBridge {
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        name = "WebhookTriggerEnabler[WebhookSubscriptionLifecycleMessage]"
+        name = "FlowWebhooksEventBridge[WebhookSubscriptionEventChangesMessage]"
     )]
     async fn consume_message(
         &self,
         _: &Catalog,
-        message: &WebhookSubscriptionLifecycleMessage,
+        message: &WebhookSubscriptionEventChangesMessage,
     ) -> Result<(), InternalError> {
-        tracing::debug!(received_message = ?message, "Received webhook subscription lifecycle message");
+        tracing::debug!(received_message = ?message, "Received webhook subscription event changes message");
 
         match message {
-            WebhookSubscriptionLifecycleMessage::Enabled(enabled_message) => {
-                if self.wants_dataset_updates(&enabled_message.event_types) {
+            WebhookSubscriptionEventChangesMessage::EventEnabled(message) => {
+                if message.event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
                     let flow_binding = fs::FlowBinding::for_webhook_subscription(
-                        enabled_message.webhook_subscription_id.into_inner(),
-                        enabled_message.dataset_id.clone(),
+                        message.webhook_subscription_id.into_inner(),
+                        message.dataset_id.clone(),
                         FLOW_TYPE_WEBHOOK_DELIVER,
                     );
                     self.flow_trigger_service
                         .set_trigger(
                             self.time_source.now(),
                             flow_binding,
-                            false,
+                            false, // Enabled
                             fs::FlowTriggerRule::Batching(fs::BatchingRule::empty()),
                         )
                         .await
                         .int_err()?;
                 }
             }
-            WebhookSubscriptionLifecycleMessage::Paused(paused_message) => {
-                if self.wants_dataset_updates(&paused_message.event_types) {
+            WebhookSubscriptionEventChangesMessage::EventDisabled(message) => {
+                if message.event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
                     let flow_binding = fs::FlowBinding::for_webhook_subscription(
-                        paused_message.webhook_subscription_id.into_inner(),
-                        paused_message.dataset_id.clone(),
+                        message.webhook_subscription_id.into_inner(),
+                        message.dataset_id.clone(),
                         FLOW_TYPE_WEBHOOK_DELIVER,
                     );
                     self.flow_trigger_service
@@ -107,21 +95,48 @@ impl MessageConsumerT<WebhookSubscriptionLifecycleMessage> for WebhookTriggerEna
                         .int_err()?;
                 }
             }
-            WebhookSubscriptionLifecycleMessage::Updated(_) => {
-                // TODO: a more complex case when even types change
-                unimplemented!()
-            }
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<WebhookSubscriptionLifecycleMessage> for FlowWebhooksEventBridge {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "FlowWebhooksEventBridge[WebhookSubscriptionLifecycleMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        catalog: &Catalog,
+        message: &WebhookSubscriptionLifecycleMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received webhook subscription lifecycle message");
+
+        match message {
+            // Webhook resource is removed,
+            // so we need to wipe all the related data in the flow system
             WebhookSubscriptionLifecycleMessage::Deleted(deleted_message) => {
                 let flow_scope = fs::FlowScope::WebhookSubscription {
                     subscription_id: deleted_message.webhook_subscription_id.into_inner(),
                     dataset_id: deleted_message.dataset_id.clone(),
                 };
-                self.flow_trigger_service
-                    .on_trigger_scope_removed(&flow_scope)
-                    .await?;
-            }
 
-            WebhookSubscriptionLifecycleMessage::Created(_) => { /* Nothing to do */ }
+                tracing::debug!(
+                    ?flow_scope,
+                    "Handling flow scope removal for deleted webhook subscription"
+                );
+                let flow_scope_removal_handlers = catalog
+                    .get::<dill::AllOf<dyn fs::FlowScopeRemovalHandler>>()
+                    .unwrap();
+                for handler in flow_scope_removal_handlers {
+                    handler.handle_flow_scope_removal(&flow_scope).await?;
+                }
+            }
         }
 
         Ok(())

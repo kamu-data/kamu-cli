@@ -36,6 +36,13 @@ pub trait FlowEventStore: EventStore<FlowState> {
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<FlowID>, InternalError>;
 
+    /// Attempts to access all the pending (unfinished) flow ID for the given
+    /// webhook subscription
+    async fn try_get_all_webhook_pending_flows(
+        &self,
+        subscription_id: uuid::Uuid,
+    ) -> Result<Vec<FlowID>, InternalError>;
+
     /// Returns last run statistics for certain type
     async fn get_flow_run_stats(
         &self,

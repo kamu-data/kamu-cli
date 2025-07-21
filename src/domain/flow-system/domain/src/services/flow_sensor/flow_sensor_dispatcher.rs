@@ -21,8 +21,6 @@ pub trait FlowSensorDispatcher: Send + Sync {
 
     async fn unregister_sensor(&self, flow_scope: &FlowScope) -> Result<(), InternalError>;
 
-    async fn on_dataset_deleted(&self, dataset_id: &odf::DatasetID) -> Result<(), InternalError>;
-
     async fn dispatch_input_flow_success(
         &self,
         catalog: &dill::Catalog,

@@ -61,6 +61,9 @@ pub enum GetIncrementError {
     BlockNotFound(odf::storage::BlockNotFoundError),
 
     #[error(transparent)]
+    InvalidInterval(odf::dataset::InvalidIntervalError),
+
+    #[error(transparent)]
     Access(odf::AccessError),
 
     #[error(transparent)]
