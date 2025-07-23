@@ -7797,7 +7797,6 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -7874,7 +7873,6 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
- "uuid",
 ]
 
 [[package]]

@@ -93,19 +93,13 @@ impl Projection for FlowTriggerState {
                     }
 
                     E::ScopeRemoved(_) => {
-                        if let FlowScope::Dataset { .. } | FlowScope::WebhookSubscription { .. } =
-                            &s.flow_binding.scope
-                        {
-                            if s.status == FlowTriggerStatus::StoppedPermanently {
-                                Ok(s) // idempotent DELETE
-                            } else {
-                                Ok(FlowTriggerState {
-                                    status: FlowTriggerStatus::StoppedPermanently,
-                                    ..s
-                                })
-                            }
+                        if s.status == FlowTriggerStatus::StoppedPermanently {
+                            Ok(s) // idempotent DELETE
                         } else {
-                            Err(ProjectionError::new(Some(s), event))
+                            Ok(FlowTriggerState {
+                                status: FlowTriggerStatus::StoppedPermanently,
+                                ..s
+                            })
                         }
                     }
                 }

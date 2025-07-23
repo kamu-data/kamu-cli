@@ -23,7 +23,6 @@ pub struct InMemoryFlowConfigurationEventStore {
 #[derive(Default)]
 struct State {
     events: Vec<FlowConfigurationEvent>,
-    dataset_ids: Vec<odf::DatasetID>,
 }
 
 impl EventStoreState<FlowConfigurationState> for State {
@@ -80,12 +79,6 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {
             return Err(SaveEventsError::NothingToSave);
-        }
-
-        if let FlowScope::Dataset { dataset_id } = &query.scope {
-            let state = self.inner.as_state();
-            let mut g = state.lock().unwrap();
-            g.dataset_ids.push(dataset_id.clone());
         }
 
         self.inner

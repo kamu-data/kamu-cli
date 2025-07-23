@@ -40,7 +40,6 @@ sqlx = { version = "0.8", default-features = false, features = [
     "chrono"
 ] }
 tracing = { version = "0.1", default-features = false }
-uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
