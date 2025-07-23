@@ -697,9 +697,9 @@ pub async fn test_unfiltered_system_flows(catalog: &Catalog) {
         },
         3,
         vec![
-            system_case.gc_flow_ids.flow_id_finished,
-            system_case.gc_flow_ids.flow_id_running,
             system_case.gc_flow_ids.flow_id_waiting,
+            system_case.gc_flow_ids.flow_id_running,
+            system_case.gc_flow_ids.flow_id_finished,
         ],
     )
     .await;
@@ -718,9 +718,9 @@ pub async fn test_system_flows_filtered_by_flow_type(catalog: &Catalog) {
             ..Default::default()
         },
         vec![
-            system_case.gc_flow_ids.flow_id_finished,
-            system_case.gc_flow_ids.flow_id_running,
             system_case.gc_flow_ids.flow_id_waiting,
+            system_case.gc_flow_ids.flow_id_running,
+            system_case.gc_flow_ids.flow_id_finished,
         ],
     )];
 
@@ -899,7 +899,7 @@ pub async fn test_system_flow_pagination(catalog: &Catalog) {
                 limit: 2,
             },
             vec![
-                system_case.gc_flow_ids.flow_id_finished,
+                system_case.gc_flow_ids.flow_id_waiting,
                 system_case.gc_flow_ids.flow_id_running,
             ],
         ),
@@ -910,7 +910,7 @@ pub async fn test_system_flow_pagination(catalog: &Catalog) {
             },
             vec![
                 system_case.gc_flow_ids.flow_id_running,
-                system_case.gc_flow_ids.flow_id_waiting,
+                system_case.gc_flow_ids.flow_id_finished,
             ],
         ),
         (
@@ -918,7 +918,7 @@ pub async fn test_system_flow_pagination(catalog: &Catalog) {
                 offset: 2,
                 limit: 2,
             },
-            vec![system_case.gc_flow_ids.flow_id_waiting],
+            vec![system_case.gc_flow_ids.flow_id_finished],
         ),
         (
             PaginationOpts {
@@ -960,7 +960,7 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
             },
             3,
             vec![
-                system_case.gc_flow_ids.flow_id_finished,
+                system_case.gc_flow_ids.flow_id_waiting,
                 system_case.gc_flow_ids.flow_id_running,
             ],
         ),
@@ -2376,16 +2376,18 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
     ]
     .concat();
 
+    let flow_scope_query = FlowScopeQuery::build_for_multiple_datasets(&dataset_ids);
+
     let total_count = flow_event_store
-        .get_count_flows_by_multiple_datasets(dataset_ids.as_slice(), &FlowFilters::default())
+        .get_count_flows_matching_scope_query(&flow_scope_query, &FlowFilters::default())
         .await
         .unwrap();
 
     assert_eq!(total_count, expected_flow_ids.len());
 
     let mut total_flow_ids: Vec<_> = flow_event_store
-        .get_all_flow_ids_by_datasets(
-            dataset_ids.as_slice(),
+        .get_all_flow_ids_matching_scope_query(
+            flow_scope_query,
             &FlowFilters::default(),
             PaginationOpts {
                 offset: 0,
@@ -2663,14 +2665,16 @@ async fn assert_dataset_flow_expectations(
     expected_total_count: usize,
     expected_flow_ids: Vec<FlowID>,
 ) {
+    let flow_scope_query = FlowScopeQuery::build_for_single_dataset(&dataset_test_case.dataset_id);
+
     let total_flows_count = flow_event_store
-        .get_count_flows_by_dataset(&dataset_test_case.dataset_id, &filters)
+        .get_count_flows_matching_scope_query(&flow_scope_query, &filters)
         .await
         .unwrap();
     assert_eq!(expected_total_count, total_flows_count);
 
     let flow_ids: Vec<_> = flow_event_store
-        .get_all_flow_ids_by_dataset(&dataset_test_case.dataset_id, &filters, pagination)
+        .get_all_flow_ids_matching_scope_query(flow_scope_query, &filters, pagination)
         .try_collect()
         .await
         .unwrap();
@@ -2685,9 +2689,10 @@ async fn assert_multiple_dataset_flow_expectations(
     expected_flow_ids: Vec<FlowID>,
 ) {
     let dataset_id_refs: Vec<_> = dataset_ids.iter().collect();
+    let flow_scope_query = FlowScopeQuery::build_for_multiple_datasets(&dataset_id_refs);
 
     let flow_ids: Vec<_> = flow_event_store
-        .get_all_flow_ids_by_datasets(&dataset_id_refs, &filters, pagination)
+        .get_all_flow_ids_matching_scope_query(flow_scope_query, &filters, pagination)
         .try_collect()
         .await
         .unwrap();
@@ -2701,14 +2706,16 @@ async fn assert_system_flow_expectations(
     expected_total_count: usize,
     expected_flow_ids: Vec<FlowID>,
 ) {
+    let flow_scope_query = FlowScopeQuery::build_for_system_scope();
+
     let total_flows_count = flow_event_store
-        .get_count_system_flows(&filters)
+        .get_count_flows_matching_scope_query(&flow_scope_query, &filters)
         .await
         .unwrap();
     assert_eq!(expected_total_count, total_flows_count);
 
     let flow_ids: Vec<_> = flow_event_store
-        .get_all_system_flow_ids(&filters, pagination)
+        .get_all_flow_ids_matching_scope_query(flow_scope_query, &filters, pagination)
         .try_collect()
         .await
         .unwrap();

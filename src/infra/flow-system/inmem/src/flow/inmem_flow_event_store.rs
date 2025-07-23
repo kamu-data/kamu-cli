@@ -499,60 +499,34 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .unwrap_or_default())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
-    fn get_all_flow_ids_by_dataset(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query, ?filters))]
+    async fn get_count_flows_matching_scope_query(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope_query: &FlowScopeQuery,
         filters: &FlowFilters,
-        pagination: PaginationOpts,
-    ) -> FlowIDStream {
-        self.get_all_flow_ids_by_datasets(&[dataset_id], filters, pagination)
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    fn get_unique_flow_initiator_ids_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> InitiatorIDStream {
-        let flow_initiators: Vec<_> = {
-            let state = self.inner.as_state();
-            let g = state.lock().unwrap();
-            let mut unique_initiators = HashSet::new();
-            g.all_flows_by_dataset
-                .get(dataset_id)
-                .map(|dataset_flow_ids| {
-                    dataset_flow_ids
-                        .iter()
-                        .filter_map(|flow_id| {
-                            let search_index_maybe = g.flow_search_index.get(flow_id);
-                            if let Some(search_index) = search_index_maybe
-                                && let Some(initiator_id) = &search_index.initiator
-                            {
-                                let is_added = unique_initiators.insert(initiator_id);
-                                if is_added {
-                                    return Some(Ok(initiator_id.clone()));
-                                }
-                                return None;
-                            }
-                            None
+    ) -> Result<usize, InternalError> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        Ok(g.all_flows
+            .iter()
+            .filter(|flow_id| {
+                g.matches_flow(**flow_id, filters)
+                    && g.flow_binding_by_flow_id
+                        .get(flow_id)
+                        .is_some_and(|flow_binding| {
+                            flow_binding.scope.matches_query(flow_scope_query)
                         })
-                        .collect()
-                })
-                .unwrap_or_default()
-        };
-
-        Box::pin(futures::stream::iter(flow_initiators))
+            })
+            .count())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, ?pagination))]
-    fn get_all_flow_ids_by_datasets(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query, ?filters, ?pagination))]
+    fn get_all_flow_ids_matching_scope_query(
         &self,
-        dataset_ids: &[&odf::DatasetID],
+        flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
-        let dataset_ids: HashSet<_> = dataset_ids.iter().copied().collect();
-
         let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
@@ -583,8 +557,7 @@ impl FlowEventStore for InMemoryFlowEventStore {
                 // Also also apply given filters on this stage in order to reduce amount of
                 // items to process in further steps
                 let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
-                if let Some(dataset_id) = flow_binding.dataset_id()
-                    && dataset_ids.contains(dataset_id)
+                if flow_binding.scope.matches_query(&flow_scope_query)
                     && g.matches_flow(*flow_id, filters)
                     && let Some(flow) = g.flow_search_index.get(flow_id)
                 {
@@ -620,55 +593,39 @@ impl FlowEventStore for InMemoryFlowEventStore {
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
-    async fn get_count_flows_by_dataset(
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    fn get_unique_flow_initiator_ids_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: &FlowFilters,
-    ) -> Result<usize, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-        Ok(
-            if let Some(dataset_flow_ids) = g.all_flows_by_dataset.get(dataset_id) {
-                dataset_flow_ids
-                    .iter()
-                    .filter(|flow_id| g.matches_flow(**flow_id, filters))
-                    .count()
-            } else {
-                0
-            },
-        )
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?filters, ?pagination))]
-    fn get_all_system_flow_ids(
-        &self,
-        filters: &FlowFilters,
-        pagination: PaginationOpts,
-    ) -> FlowIDStream {
-        let flow_ids_page: Vec<_> = {
+    ) -> InitiatorIDStream {
+        let flow_initiators: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
-            g.all_system_flows
-                .iter()
-                .rev()
-                .filter(|flow_id| g.matches_flow(**flow_id, filters))
-                .skip(pagination.offset)
-                .take(pagination.limit)
-                .map(|flow_id| Ok(*flow_id))
-                .collect()
+            let mut unique_initiators = HashSet::new();
+            g.all_flows_by_dataset
+                .get(dataset_id)
+                .map(|dataset_flow_ids| {
+                    dataset_flow_ids
+                        .iter()
+                        .filter_map(|flow_id| {
+                            let search_index_maybe = g.flow_search_index.get(flow_id);
+                            if let Some(search_index) = search_index_maybe
+                                && let Some(initiator_id) = &search_index.initiator
+                            {
+                                let is_added = unique_initiators.insert(initiator_id);
+                                if is_added {
+                                    return Some(Ok(initiator_id.clone()));
+                                }
+                                return None;
+                            }
+                            None
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
         };
-        Box::pin(futures::stream::iter(flow_ids_page))
-    }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?filters))]
-    async fn get_count_system_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError> {
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-        Ok(g.all_system_flows
-            .iter()
-            .filter(|flow_id| g.matches_flow(**flow_id, filters))
-            .count())
+        Box::pin(futures::stream::iter(flow_initiators))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pagination))]
@@ -711,29 +668,6 @@ impl FlowEventStore for InMemoryFlowEventStore {
                 }
             }
         })
-    }
-
-    async fn get_count_flows_by_multiple_datasets(
-        &self,
-        dataset_ids: &[&odf::DatasetID],
-        filters: &FlowFilters,
-    ) -> Result<usize, InternalError> {
-        let dataset_ids: HashSet<_> = dataset_ids.iter().copied().collect();
-
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-
-        let mut count = 0;
-        for flow_id in &g.all_flows {
-            let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
-            if let Some(dataset_id) = &flow_binding.dataset_id()
-                && dataset_ids.contains(dataset_id)
-                && g.matches_flow(*flow_id, filters)
-            {
-                count += 1;
-            }
-        }
-        Ok(count)
     }
 
     async fn filter_datasets_having_flows(

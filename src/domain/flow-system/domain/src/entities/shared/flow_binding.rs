@@ -9,6 +9,8 @@
 
 use internal_error::InternalError;
 
+use crate::FlowScope;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -76,44 +78,6 @@ impl FlowBinding {
         self.webhook_subscription_id().ok_or_else(|| {
             InternalError::new("Expecting webhook flow binding scope with subscription_id")
         })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "PascalCase")]
-pub enum FlowScope {
-    Dataset {
-        dataset_id: odf::DatasetID,
-    },
-    System,
-    WebhookSubscription {
-        subscription_id: uuid::Uuid,
-        dataset_id: Option<odf::DatasetID>,
-    },
-}
-
-impl FlowScope {
-    pub fn for_dataset(dataset_id: odf::DatasetID) -> Self {
-        FlowScope::Dataset { dataset_id }
-    }
-
-    pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
-        match self {
-            FlowScope::Dataset { dataset_id } => Some(dataset_id),
-            FlowScope::WebhookSubscription { dataset_id, .. } => dataset_id.as_ref(),
-            FlowScope::System => None,
-        }
-    }
-
-    pub fn webhook_subscription_id(&self) -> Option<uuid::Uuid> {
-        match self {
-            FlowScope::WebhookSubscription {
-                subscription_id, ..
-            } => Some(*subscription_id),
-            FlowScope::Dataset { .. } | FlowScope::System => None,
-        }
     }
 }
 

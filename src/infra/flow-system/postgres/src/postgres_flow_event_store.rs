@@ -12,6 +12,7 @@ use database_common::{PaginationOpts, TransactionRef, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
+use sqlx::postgres::PgRow;
 use sqlx::{FromRow, Postgres, QueryBuilder};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -537,14 +538,12 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(flow_ids)
     }
 
-    fn get_all_flow_ids_by_dataset(
+    fn get_all_flow_ids_matching_scope_query(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
-        let dataset_id = dataset_id.to_string();
-
         let maybe_initiators = filters
             .by_initiator
             .as_ref()
@@ -553,6 +552,23 @@ impl FlowEventStore for PostgresFlowEventStore {
         let by_flow_type = filters.by_flow_type.clone();
         let by_flow_status = filters.by_flow_status;
 
+        let pagination_limit = i64::try_from(pagination.limit).unwrap();
+        let pagination_offset = i64::try_from(pagination.offset).unwrap();
+
+        const BASE_PARAMETERS_COUNT: usize = 5;
+        let mut total_parameters_count = BASE_PARAMETERS_COUNT;
+
+        let mut scope_clauses = Vec::new();
+        let mut scope_values = Vec::new();
+        for (key, values) in flow_scope_query.attributes {
+            scope_clauses.push(format!(
+                "scope_data->>'{key}' = ANY(${})",
+                total_parameters_count + 1,
+            ));
+            total_parameters_count += values.len();
+            scope_values.push(values);
+        }
+
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
 
@@ -560,28 +576,38 @@ impl FlowEventStore for PostgresFlowEventStore {
                 .connection_mut()
                 .await?;
 
-            let mut query_stream = sqlx::query!(
+            let query_str = format!(
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    scope_data->>'dataset_id' = $1
-                    AND ($2::text IS NULL OR flow_type = $2)
-                    AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
-                    AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
+                    ({})
+                    AND ($1::text IS NULL OR flow_type = $1)
+                    AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                    AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
                 ORDER BY flow_status, last_event_id DESC
-                LIMIT $5 OFFSET $6
+                LIMIT $4 OFFSET $5
                 "#,
-               dataset_id,
-               by_flow_type,
-               by_flow_status as Option<FlowStatus>,
-               maybe_initiators as Option<Vec<String>>,
-               i64::try_from(pagination.limit).unwrap(),
-               i64::try_from(pagination.offset).unwrap(),
-            ).try_map(|event_row| {
-                let flow_id = event_row.flow_id;
-                Ok(FlowID::try_from(flow_id).unwrap())
-            })
-            .fetch(connection_mut);
+                scope_clauses.join(" OR ")
+            );
+
+            let mut query = sqlx::query(&query_str)
+                .bind(by_flow_type)
+                .bind(by_flow_status as Option<FlowStatus>)
+                .bind(maybe_initiators as Option<Vec<String>>)
+                .bind(pagination_limit)
+                .bind(pagination_offset);
+
+            for values in scope_values {
+                query = query.bind(values);
+            }
+
+            use sqlx::Row;
+            let mut query_stream = query
+                .try_map(|event_row: PgRow| {
+                    let flow_id: i64 = event_row.get(0);
+                    Ok(FlowID::new(u64::try_from(flow_id).unwrap()))
+                })
+                .fetch(connection_mut);
 
             while let Some(flow_id) = query_stream.try_next().await.int_err()? {
                 yield Ok(flow_id);
@@ -589,9 +615,9 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
-    async fn get_count_flows_by_dataset(
+    async fn get_count_flows_matching_scope_query(
         &self,
-        dataset_id: &odf::DatasetID,
+        flow_scope_query: &FlowScopeQuery,
         filters: &FlowFilters,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -602,79 +628,45 @@ impl FlowEventStore for PostgresFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let query_result = sqlx::query!(
+        const BASE_PARAMETERS_COUNT: usize = 3;
+        let mut total_parameters_count = BASE_PARAMETERS_COUNT;
+
+        let mut scope_clauses = Vec::new();
+        for (key, values) in &flow_scope_query.attributes {
+            scope_clauses.push(format!(
+                "scope_data->>'{key}' = ANY(${})",
+                total_parameters_count + 1,
+            ));
+            total_parameters_count += values.len();
+        }
+
+        let query_str = format!(
             r#"
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
             WHERE
-                scope_data->>'dataset_id' = $1
-                AND ($2::text IS NULL OR flow_type = $2)
-                AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
-                AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
+                ({})
+                AND ($1::text IS NULL OR flow_type = $1)
+                AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
+                AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
             "#,
-            dataset_id.to_string(),
-            filters.by_flow_type,
-            filters.by_flow_status as Option<FlowStatus>,
-            maybe_initiators as Option<Vec<String>>
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
+            scope_clauses.join(" OR ")
+        );
 
-        let flows_count = query_result.flows_count.unwrap_or_default();
+        let mut query = sqlx::query(&query_str)
+            .bind(filters.by_flow_type.clone())
+            .bind(filters.by_flow_status as Option<FlowStatus>)
+            .bind(maybe_initiators as Option<Vec<String>>);
+
+        for (_, values) in &flow_scope_query.attributes {
+            query = query.bind(values);
+        }
+
+        let query_result = query.fetch_one(connection_mut).await.int_err()?;
+
+        use sqlx::Row;
+        let flows_count: i64 = query_result.get(0);
         Ok(usize::try_from(flows_count).unwrap())
-    }
-
-    fn get_all_flow_ids_by_datasets(
-        &self,
-        dataset_ids: &[&odf::DatasetID],
-        filters: &FlowFilters,
-        pagination: PaginationOpts,
-    ) -> FlowIDStream {
-        let dataset_ids: Vec<_> = dataset_ids.iter().map(ToString::to_string).collect();
-
-        let maybe_initiators = filters
-            .by_initiator
-            .as_ref()
-            .map(Self::prepare_initiator_filter);
-
-        let by_flow_type = filters.by_flow_type.clone();
-        let by_flow_status = filters.by_flow_status;
-
-        Box::pin(async_stream::stream! {
-            let mut tr = self.transaction.lock().await;
-
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
-
-            let mut query_stream = sqlx::query!(
-                r#"
-                SELECT flow_id FROM flows
-                WHERE
-                    scope_data->>'dataset_id' = ANY($1)
-                    AND ($2::text IS NULL OR flow_type = $2)
-                    AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
-                    AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
-                ORDER BY flow_status, last_event_id DESC
-                LIMIT $5 OFFSET $6
-                "#,
-                dataset_ids as Vec<String>,
-                by_flow_type,
-                by_flow_status as Option<FlowStatus>,
-                maybe_initiators as Option<Vec<String>>,
-                i64::try_from(pagination.limit).unwrap(),
-                i64::try_from(pagination.offset).unwrap(),
-            ).try_map(|event_row| {
-                let flow_id = event_row.flow_id;
-                Ok(FlowID::try_from(flow_id).unwrap())
-            })
-            .fetch(connection_mut);
-
-            while let Some(flow_id) = query_stream.try_next().await.int_err()? {
-                yield Ok(flow_id);
-            }
-        })
     }
 
     fn get_unique_flow_initiator_ids_by_dataset(
@@ -707,85 +699,6 @@ impl FlowEventStore for PostgresFlowEventStore {
                 yield Ok(initiator);
             }
         })
-    }
-
-    fn get_all_system_flow_ids(
-        &self,
-        filters: &FlowFilters,
-        pagination: PaginationOpts,
-    ) -> FlowIDStream {
-        let maybe_initiators = filters
-            .by_initiator
-            .as_ref()
-            .map(Self::prepare_initiator_filter);
-
-        let maybe_by_flow_type = filters.by_flow_type.clone();
-        let maybe_by_flow_status = filters.by_flow_status;
-
-        Box::pin(async_stream::stream! {
-            let mut tr = self.transaction.lock().await;
-
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
-
-            let mut query_stream = sqlx::query!(
-                r#"
-                SELECT flow_id FROM flows
-                WHERE
-                    scope_data->>'type' = 'System'
-                    AND ($1::text IS NULL OR flow_type = $1)
-                    AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
-                    AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
-                ORDER BY flow_id DESC
-                LIMIT $4 OFFSET $5
-                "#,
-                maybe_by_flow_type,
-                maybe_by_flow_status as Option<FlowStatus>,
-                maybe_initiators as Option<Vec<String>>,
-                i64::try_from(pagination.limit).unwrap(),
-                i64::try_from(pagination.offset).unwrap(),
-            ).try_map(|event_row| {
-                let flow_id = event_row.flow_id;
-                Ok(FlowID::try_from(flow_id).unwrap())
-            })
-            .fetch(connection_mut);
-
-            while let Some(flow_id) = query_stream.try_next().await.int_err()? {
-                yield Ok(flow_id);
-            }
-        })
-    }
-
-    async fn get_count_system_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let maybe_initiators = filters
-            .by_initiator
-            .as_ref()
-            .map(Self::prepare_initiator_filter);
-
-        let query_result = sqlx::query!(
-            r#"
-            SELECT COUNT(flow_id) AS flows_count
-            FROM flows
-            WHERE
-                scope_data->>'type' = 'System'
-                AND ($1::text IS NULL OR flow_type = $1)
-                AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
-                AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
-            "#,
-            filters.by_flow_type,
-            filters.by_flow_status as Option<FlowStatus>,
-            maybe_initiators as Option<Vec<String>>,
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        let flows_count = query_result.flows_count.unwrap_or_default();
-        Ok(usize::try_from(flows_count).unwrap())
     }
 
     fn get_all_flow_ids(
@@ -883,47 +796,6 @@ impl FlowEventStore for PostgresFlowEventStore {
                 }
             }
         })
-    }
-
-    async fn get_count_flows_by_multiple_datasets(
-        &self,
-        dataset_ids: &[&odf::DatasetID],
-        filters: &FlowFilters,
-    ) -> Result<usize, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let maybe_initiators = filters
-            .by_initiator
-            .as_ref()
-            .map(Self::prepare_initiator_filter);
-
-        let by_flow_type = filters.by_flow_type.as_deref();
-        let by_flow_status = filters.by_flow_status;
-
-        let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
-
-        let query_result = sqlx::query!(
-            r#"
-            SELECT COUNT(flow_id) AS flows_count
-            FROM flows
-            WHERE
-                scope_data->>'dataset_id' = ANY($1)
-                AND ($2::text IS NULL OR flow_type = $2)
-                AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
-                AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
-            "#,
-            ids as Vec<String>,
-            by_flow_type,
-            by_flow_status as Option<FlowStatus>,
-            maybe_initiators as Option<Vec<String>>,
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        let flows_count = query_result.flows_count.unwrap_or_default();
-        Ok(usize::try_from(flows_count).unwrap())
     }
 
     async fn filter_datasets_having_flows(

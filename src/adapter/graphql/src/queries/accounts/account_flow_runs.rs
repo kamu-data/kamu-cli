@@ -112,8 +112,8 @@ impl<'a> AccountFlowRuns<'a> {
             .unwrap_or_default();
 
         let flows_state_listing = flow_query_service
-            .list_all_flows_by_dataset_ids(
-                &dataset_id_refs,
+            .list_scoped_flows(
+                fs::FlowScopeQuery::build_for_multiple_datasets(&dataset_id_refs),
                 dataset_flow_filters,
                 PaginationOpts::from_page(page, per_page),
             )

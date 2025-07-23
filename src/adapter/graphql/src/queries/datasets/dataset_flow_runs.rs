@@ -78,7 +78,7 @@ impl<'a> DatasetFlowRuns<'a> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let filters = match filters {
+        let maybe_filters = match filters {
             Some(filters) => Some(kamu_flow_system::FlowFilters {
                 by_flow_type: filters
                     .by_flow_type
@@ -104,19 +104,18 @@ impl<'a> DatasetFlowRuns<'a> {
             None => None,
         };
 
-        let filters = filters.unwrap_or_default();
-
         let flows_state_listing = flow_query_service
-            .list_all_flows_by_dataset(
-                &self.dataset_request_state.dataset_handle().id,
-                filters,
+            .list_scoped_flows(
+                fs::FlowScopeQuery::build_for_single_dataset(
+                    &self.dataset_request_state.dataset_handle().id,
+                ),
+                maybe_filters.unwrap_or_default(),
                 PaginationOpts::from_page(page, per_page),
             )
             .await
             .int_err()?;
 
         let matched_flow_states: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
-
         let matched_flows = Flow::build_batch(matched_flow_states, ctx).await?;
 
         Ok(FlowConnection::new(
