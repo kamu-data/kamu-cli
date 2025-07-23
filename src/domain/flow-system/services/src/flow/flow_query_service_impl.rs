@@ -72,47 +72,6 @@ impl FlowQueryService for FlowQueryServiceImpl {
         })
     }
 
-    /// Returns states of flows associated with a given account
-    /// ordered by creation time from newest to oldest
-    /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?filters, ?pagination))]
-    async fn list_all_flows_by_account(
-        &self,
-        account_id: &odf::AccountID,
-        filters: AccountFlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        let owned_dataset_ids = self
-            .dataset_entry_service
-            .get_owned_dataset_ids(account_id)
-            .await
-            .int_err()?;
-
-        let filtered_dataset_ids = if !filters.by_dataset_ids.is_empty() {
-            owned_dataset_ids
-                .into_iter()
-                .filter(|dataset_id| filters.by_dataset_ids.contains(dataset_id))
-                .collect()
-        } else {
-            owned_dataset_ids
-        };
-
-        let account_dataset_id_refs = filtered_dataset_ids.iter().collect::<Vec<_>>();
-
-        let dataset_flow_filters = FlowFilters {
-            by_flow_status: filters.by_flow_status,
-            by_flow_type: filters.by_flow_type,
-            by_initiator: filters.by_initiator,
-        };
-
-        self.list_all_flows_by_dataset_ids(
-            &account_dataset_id_refs,
-            dataset_flow_filters,
-            pagination,
-        )
-        .await
-    }
-
     async fn list_all_flows_by_dataset_ids(
         &self,
         dataset_ids: &[&odf::DatasetID],

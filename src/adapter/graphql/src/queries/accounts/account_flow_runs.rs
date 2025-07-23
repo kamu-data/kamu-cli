@@ -54,35 +54,19 @@ impl<'a> AccountFlowRuns<'a> {
             return Ok(FlowConnection::new(Vec::new(), page, per_page, 0));
         }
 
-        let maybe_filters = filters.map(|filters| kamu_flow_system::AccountFlowFilters {
-            by_flow_type: filters
-                .by_flow_type
-                .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
-            by_flow_status: filters.by_status.map(Into::into),
-            by_dataset_ids: filters
-                .by_dataset_ids
-                .into_iter()
-                .map(Into::into)
-                .collect::<HashSet<_>>(),
-            by_initiator: filters
-                .by_initiator
-                .map(|initiator_filter| match initiator_filter {
-                    InitiatorFilterInput::System(_) => kamu_flow_system::InitiatorFilter::System,
-                    InitiatorFilterInput::Accounts(account_ids) => {
-                        kamu_flow_system::InitiatorFilter::Account(
-                            account_ids.into_iter().map(Into::into).collect(),
-                        )
-                    }
-                }),
-        });
-
         let (flow_query_service, dataset_entry_service) =
             from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetEntryService);
 
         let dataset_ids = {
-            let maybe_expected_dataset_ids = maybe_filters
-                .as_ref()
-                .map(|filters| &filters.by_dataset_ids);
+            let maybe_expected_dataset_ids: Option<HashSet<odf::DatasetID>> =
+                filters.as_ref().map(|filters| {
+                    filters
+                        .by_dataset_ids
+                        .iter()
+                        .cloned()
+                        .map(Into::into)
+                        .collect()
+                });
 
             // Note: consider using ReBAC to filter dataset
             // It should be okay if any kind of relation exists explicitly to view flows,
@@ -106,13 +90,27 @@ impl<'a> AccountFlowRuns<'a> {
 
         let dataset_id_refs = dataset_ids.iter().collect::<Vec<_>>();
 
-        let dataset_flow_filters = maybe_filters
-            .map(|fs| kamu_flow_system::FlowFilters {
-                by_flow_type: fs.by_flow_type,
-                by_flow_status: fs.by_flow_status,
-                by_initiator: fs.by_initiator,
+        let dataset_flow_filters = filters
+            .map(|filters| kamu_flow_system::FlowFilters {
+                by_flow_type: filters
+                    .by_flow_type
+                    .map(|flow_type| map_dataset_flow_type(flow_type).to_string()),
+                by_flow_status: filters.by_status.map(Into::into),
+                by_initiator: filters
+                    .by_initiator
+                    .map(|initiator_filter| match initiator_filter {
+                        InitiatorFilterInput::System(_) => {
+                            kamu_flow_system::InitiatorFilter::System
+                        }
+                        InitiatorFilterInput::Accounts(account_ids) => {
+                            kamu_flow_system::InitiatorFilter::Account(
+                                account_ids.into_iter().map(Into::into).collect(),
+                            )
+                        }
+                    }),
             })
             .unwrap_or_default();
+
         let flows_state_listing = flow_query_service
             .list_all_flows_by_dataset_ids(
                 &dataset_id_refs,

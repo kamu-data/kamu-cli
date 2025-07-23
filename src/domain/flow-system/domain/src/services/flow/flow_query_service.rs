@@ -12,7 +12,7 @@ use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
 
-use crate::{AccountFlowFilters, FlowFilters, FlowID, FlowState};
+use crate::{FlowFilters, FlowID, FlowState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,16 +44,6 @@ pub trait FlowQueryService: Sync + Send {
         account_id: &odf::AccountID,
     ) -> Result<Vec<odf::DatasetID>, ListFlowsByDatasetError>;
 
-    /// Returns states of flows associated with a given account
-    /// ordered by creation time from newest to oldest.
-    /// Applies specified pagination
-    async fn list_all_flows_by_account(
-        &self,
-        account_id: &odf::AccountID,
-        filters: AccountFlowFilters,
-        pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
-
     /// Returns states of flows associated with the given dataset IDs,
     /// ordered by creation time from newest to oldest.
     async fn list_all_flows_by_dataset_ids(
@@ -63,7 +53,7 @@ pub trait FlowQueryService: Sync + Send {
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
-    /// Returns states of system flows associated with a given dataset
+    /// Returns states of system flows
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination
     async fn list_all_system_flows(

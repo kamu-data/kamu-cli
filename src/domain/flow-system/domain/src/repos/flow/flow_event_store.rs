@@ -134,14 +134,6 @@ pub struct FlowFilters {
     pub by_initiator: Option<InitiatorFilter>,
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct AccountFlowFilters {
-    pub by_dataset_ids: HashSet<odf::DatasetID>,
-    pub by_flow_type: Option<String>,
-    pub by_flow_status: Option<FlowStatus>,
-    pub by_initiator: Option<InitiatorFilter>,
-}
-
 #[derive(Debug, Clone)]
 pub enum InitiatorFilter {
     System,
