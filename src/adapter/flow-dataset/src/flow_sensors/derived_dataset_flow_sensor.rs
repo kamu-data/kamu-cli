@@ -34,7 +34,7 @@ impl DerivedDatasetFlowSensor {
         batching_rule: fs::BatchingRule,
     ) -> Self {
         Self {
-            flow_scope: fs::FlowScope::Dataset { dataset_id },
+            flow_scope: fs::FlowScope::for_dataset(dataset_id),
             sensitive_dataset_ids: HashSet::from_iter(input_dataset_ids),
             batching_rule,
         }

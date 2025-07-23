@@ -154,18 +154,18 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn has_active_triggers_for_datasets(
+    async fn has_active_triggers_for_scopes(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        scopes: &[FlowScope],
     ) -> Result<bool, InternalError> {
-        if dataset_ids.is_empty() {
+        if scopes.is_empty() {
             return Ok(false);
         }
 
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
-        let dataset_ids: HashSet<&odf::DatasetID> = dataset_ids.iter().collect();
+        let scopes: HashSet<&FlowScope> = scopes.iter().collect();
         let mut seen_bindings = HashSet::new();
 
         for event in g.events.iter().rev() {
@@ -175,25 +175,22 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
                 continue;
             }
 
-            match &flow_binding.scope {
-                FlowScope::Dataset { dataset_id } if dataset_ids.contains(dataset_id) => {
-                    match event {
-                        FlowTriggerEvent::Created(e) => {
-                            if !e.paused {
-                                return Ok(true);
-                            }
-                        }
-                        FlowTriggerEvent::Modified(e) => {
-                            if !e.paused {
-                                return Ok(true);
-                            }
-                        }
-                        FlowTriggerEvent::ScopeRemoved { .. } => {
-                            // permanently stopped — not active
+            if scopes.contains(&flow_binding.scope) {
+                match event {
+                    FlowTriggerEvent::Created(e) => {
+                        if !e.paused {
+                            return Ok(true);
                         }
                     }
+                    FlowTriggerEvent::Modified(e) => {
+                        if !e.paused {
+                            return Ok(true);
+                        }
+                    }
+                    FlowTriggerEvent::ScopeRemoved { .. } => {
+                        // permanently stopped — not active
+                    }
                 }
-                _ => {} // skip system flows
             }
         }
 

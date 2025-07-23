@@ -360,11 +360,11 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn has_active_triggers_for_datasets(
+    async fn has_active_triggers_for_scopes(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        scopes: &[FlowScope],
     ) -> Result<bool, InternalError> {
-        if dataset_ids.is_empty() {
+        if scopes.is_empty() {
             return Ok(false);
         }
 
@@ -389,8 +389,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                     FROM flow_trigger_events
                 ) AS latest_events
                 WHERE row_num = 1
-                AND json_extract(scope_data, '$.type') = 'Dataset'
-                AND json_extract(scope_data, '$.dataset_id') IN ({})
+                AND scope_data IN ({})
                 AND event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (
                     (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = false)
@@ -399,12 +398,12 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                 )
             )
             "#,
-            sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(1).unwrap())
+            sqlite_generate_placeholders_list(scopes.len(), NonZeroUsize::new(1).unwrap())
         );
 
         let mut query = sqlx::query_scalar(&query_str);
-        for dataset_id in dataset_ids {
-            query = query.bind(dataset_id.to_string());
+        for scope in scopes {
+            query = query.bind(serde_json::to_value(scope).int_err()?);
         }
 
         let has_active_triggers: Option<bool> = query.fetch_one(connection_mut).await.int_err()?;

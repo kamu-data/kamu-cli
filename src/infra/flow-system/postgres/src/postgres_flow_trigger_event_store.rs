@@ -340,11 +340,11 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn has_active_triggers_for_datasets(
+    async fn has_active_triggers_for_scopes(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        scopes: &[FlowScope],
     ) -> Result<bool, InternalError> {
-        if dataset_ids.is_empty() {
+        if scopes.is_empty() {
             return Ok(false);
         }
 
@@ -352,25 +352,25 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let dataset_ids = dataset_ids
+        let scopes_json = scopes
             .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>();
+            .map(serde_json::to_value)
+            .collect::<Result<Vec<_>, _>>()
+            .int_err()?;
 
         let has_active_triggers = sqlx::query_scalar!(
             r#"
             SELECT EXISTS (
                 SELECT 1
                 FROM (
-                    SELECT DISTINCT ON (scope_data->>'dataset_id', flow_type)
-                        scope_data->>'dataset_id' AS dataset_id,
+                    SELECT DISTINCT ON (scope_data, flow_type)
+                        scope_data,
                         event_type,
                         event_payload
                     FROM flow_trigger_events
                     WHERE
-                        scope_data->>'type' = 'Dataset'
-                        AND scope_data->>'dataset_id' = ANY($1)
-                    ORDER BY scope_data->>'dataset_id', flow_type, event_time DESC
+                        scope_data = ANY($1)
+                    ORDER BY scope_data, flow_type, event_time DESC
                 ) AS latest_events
                 WHERE event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (
@@ -379,7 +379,7 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
                 )
             )
             "#,
-            &dataset_ids,
+            &scopes_json,
         )
         .fetch_one(connection_mut)
         .await

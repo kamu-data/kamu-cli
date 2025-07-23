@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT EXISTS (\n                SELECT 1\n                FROM (\n                    SELECT DISTINCT ON (scope_data, flow_type)\n                        scope_data,\n                        event_type,\n                        event_payload\n                    FROM flow_trigger_events\n                    WHERE\n                        scope_data = ANY($1)\n                    ORDER BY scope_data, flow_type, event_time DESC\n                ) AS latest_events\n                WHERE event_type != 'FlowTriggerEventDatasetRemoved'\n                AND (\n                    (event_type = 'FlowTriggerEventCreated' AND (event_payload#>>'{Created,paused}') = 'false') OR\n                    (event_type = 'FlowTriggerEventModified' AND (event_payload#>>'{Modified,paused}') = 'false')\n                )\n            )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "JsonbArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "930769a304d932459275028e2ba7b0908e80f7baff83aa39235e4b313f865ea8"
+}

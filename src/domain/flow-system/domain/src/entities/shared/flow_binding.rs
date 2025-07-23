@@ -28,7 +28,7 @@ impl FlowBinding {
     pub fn for_dataset(dataset_id: odf::DatasetID, flow_type: &str) -> Self {
         Self {
             flow_type: flow_type.to_string(),
-            scope: FlowScope::Dataset { dataset_id },
+            scope: FlowScope::for_dataset(dataset_id),
         }
     }
 
@@ -95,6 +95,10 @@ pub enum FlowScope {
 }
 
 impl FlowScope {
+    pub fn for_dataset(dataset_id: odf::DatasetID) -> Self {
+        FlowScope::Dataset { dataset_id }
+    }
+
     pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
         match self {
             FlowScope::Dataset { dataset_id } => Some(dataset_id),

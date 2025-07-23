@@ -9,7 +9,7 @@
 
 use kamu_accounts::Account as AccountEntity;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
-use kamu_flow_system::FlowTriggerService;
+use kamu_flow_system::{FlowScope, FlowTriggerService};
 
 use crate::prelude::*;
 
@@ -38,8 +38,13 @@ impl<'a> AccountFlowTriggers<'a> {
             .await
             .int_err()?;
 
+        let lookup_scopes = owned_dataset_ids
+            .into_iter()
+            .map(FlowScope::for_dataset)
+            .collect::<Vec<_>>();
+
         let has_active_triggers = flow_trigger_service
-            .has_active_triggers_for_datasets(&owned_dataset_ids)
+            .has_active_triggers_for_scopes(&lookup_scopes)
             .await?;
 
         Ok(!has_active_triggers)

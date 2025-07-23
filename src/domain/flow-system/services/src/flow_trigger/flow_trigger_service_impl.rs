@@ -316,13 +316,13 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     }
 
     /// Find all triggers by datasets
-    #[tracing::instrument(level = "info", skip_all, fields(?dataset_ids))]
-    async fn has_active_triggers_for_datasets(
+    #[tracing::instrument(level = "info", skip_all, fields(?scopes))]
+    async fn has_active_triggers_for_scopes(
         &self,
-        dataset_ids: &[odf::DatasetID],
+        scopes: &[FlowScope],
     ) -> Result<bool, InternalError> {
         self.event_store
-            .has_active_triggers_for_datasets(dataset_ids)
+            .has_active_triggers_for_scopes(scopes)
             .await
     }
 }
