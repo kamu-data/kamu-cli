@@ -756,7 +756,7 @@ async fn test_pause_resume_dataset_flows() {
         check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
-    let mutation_pause_root_compaction = FlowTriggerHarness::pause_flows_of_type_mutation(
+    let mutation_pause_root_compaction = FlowTriggerHarness::pause_flow_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
     );
@@ -815,10 +815,8 @@ async fn test_pause_resume_dataset_flows() {
     }
 
     // Resume ingestion
-    let mutation_resume_ingest = FlowTriggerHarness::resume_flows_of_type_mutation(
-        &create_root_result.dataset_handle.id,
-        "INGEST",
-    );
+    let mutation_resume_ingest =
+        FlowTriggerHarness::resume_flow_mutation(&create_root_result.dataset_handle.id, "INGEST");
 
     let res = schema
         .execute(
@@ -845,7 +843,7 @@ async fn test_pause_resume_dataset_flows() {
     }
 
     // Pause derived transform
-    let mutation_pause_derived_transform = FlowTriggerHarness::pause_flows_of_type_mutation(
+    let mutation_pause_derived_transform = FlowTriggerHarness::pause_flow_mutation(
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
     );
@@ -1357,7 +1355,7 @@ impl FlowTriggerHarness {
         .replace("<id>", &id.to_string())
     }
 
-    fn pause_flows_of_type_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
+    fn pause_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
             mutation {
@@ -1365,7 +1363,7 @@ impl FlowTriggerHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             triggers {
-                                pauseFlows (
+                                pauseFlow (
                                     datasetFlowType: "<dataset_flow_type>",
                                 )
                             }
@@ -1379,7 +1377,7 @@ impl FlowTriggerHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
-    fn resume_flows_of_type_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
+    fn resume_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
             mutation {
@@ -1387,7 +1385,7 @@ impl FlowTriggerHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             triggers {
-                                resumeFlows (
+                                resumeFlow (
                                     datasetFlowType: "<dataset_flow_type>",
                                 )
                             }

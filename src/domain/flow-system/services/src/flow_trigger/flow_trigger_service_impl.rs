@@ -43,6 +43,40 @@ impl FlowTriggerServiceImpl {
         }
     }
 
+    async fn pause_given_trigger(
+        &self,
+        mut flow_trigger: FlowTrigger,
+        request_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        flow_trigger.pause(request_time).int_err()?;
+        flow_trigger
+            .save(self.event_store.as_ref())
+            .await
+            .int_err()?;
+
+        self.publish_flow_trigger_modified(&flow_trigger, request_time)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn resume_given_trigger(
+        &self,
+        mut flow_trigger: FlowTrigger,
+        request_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        flow_trigger.resume(request_time).int_err()?;
+        flow_trigger
+            .save(self.event_store.as_ref())
+            .await
+            .int_err()?;
+
+        self.publish_flow_trigger_modified(&flow_trigger, request_time)
+            .await?;
+
+        Ok(())
+    }
+
     async fn publish_flow_trigger_modified(
         &self,
         state: &FlowTriggerState,
@@ -58,38 +92,6 @@ impl FlowTriggerServiceImpl {
         self.outbox
             .post_message(MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE, message)
             .await
-    }
-
-    async fn get_dataset_flow_bindings(
-        &self,
-        dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<&str>,
-    ) -> Result<Vec<FlowBinding>, InternalError> {
-        if let Some(dataset_flow_type) = maybe_dataset_flow_type {
-            Ok(vec![FlowBinding::for_dataset(
-                dataset_id.clone(),
-                dataset_flow_type,
-            )])
-        } else {
-            self.event_store
-                .all_trigger_bindings_for_scope(&FlowScope::Dataset {
-                    dataset_id: dataset_id.clone(),
-                })
-                .await
-        }
-    }
-
-    async fn get_system_flow_bindings(
-        &self,
-        maybe_system_flow_type: Option<&str>,
-    ) -> Result<Vec<FlowBinding>, InternalError> {
-        if let Some(system_flow_type) = maybe_system_flow_type {
-            Ok(vec![FlowBinding::for_system(system_flow_type)])
-        } else {
-            self.event_store
-                .all_trigger_bindings_for_scope(&FlowScope::System)
-                .await
-        }
     }
 
     async fn remove_given_bindings(
@@ -200,15 +202,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .await
             .int_err()?;
 
-        if let Some(mut flow_trigger) = maybe_flow_trigger {
-            flow_trigger.pause(request_time).int_err()?;
-            flow_trigger
-                .save(self.event_store.as_ref())
+        if let Some(flow_trigger) = maybe_flow_trigger {
+            self.pause_given_trigger(flow_trigger, request_time)
                 .await
                 .int_err()?;
-
-            self.publish_flow_trigger_modified(&flow_trigger, request_time)
-                .await?;
         }
 
         Ok(())
@@ -224,92 +221,68 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
             .await
             .int_err()?;
 
-        if let Some(mut flow_trigger) = maybe_flow_trigger {
-            flow_trigger.resume(request_time).int_err()?;
-            flow_trigger
-                .save(self.event_store.as_ref())
+        if let Some(flow_trigger) = maybe_flow_trigger {
+            self.resume_given_trigger(flow_trigger, request_time)
+                .await
+                .int_err()?;
+        }
+
+        Ok(())
+    }
+
+    async fn pause_flow_triggers_for_scopes(
+        &self,
+        request_time: DateTime<Utc>,
+        scopes: &[FlowScope],
+    ) -> Result<(), InternalError> {
+        // TODO: maybe batch queries would be helpful here,
+        // but for now we just iterate over scopes
+        for flow_scope in scopes {
+            let flow_bindings = self
+                .event_store
+                .all_trigger_bindings_for_scope(flow_scope)
                 .await
                 .int_err()?;
 
-            self.publish_flow_trigger_modified(&flow_trigger, request_time)
-                .await?;
+            let flow_triggers =
+                FlowTrigger::load_multi_simple(flow_bindings, self.event_store.as_ref())
+                    .await
+                    .int_err()?;
+
+            for flow_trigger in flow_triggers {
+                self.pause_given_trigger(flow_trigger, request_time)
+                    .await
+                    .int_err()?;
+            }
         }
 
         Ok(())
     }
 
-    /// Pauses dataset flows of given type for given dataset.
-    /// If type is omitted, all possible dataset flow types are paused
-    async fn pause_dataset_flows(
+    async fn resume_flow_triggers_for_scopes(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<&str>,
+        scopes: &[FlowScope],
     ) -> Result<(), InternalError> {
-        let flow_bindings = self
-            .get_dataset_flow_bindings(dataset_id, maybe_dataset_flow_type)
-            .await?;
+        // TODO: maybe batch queries would be helpful here,
+        // but for now we just iterate over scopes
+        for flow_scope in scopes {
+            let flow_bindings = self
+                .event_store
+                .all_trigger_bindings_for_scope(flow_scope)
+                .await
+                .int_err()?;
 
-        for flow_binding in flow_bindings {
-            self.pause_flow_trigger(request_time, &flow_binding).await?;
-        }
+            let flow_triggers =
+                FlowTrigger::load_multi_simple(flow_bindings, self.event_store.as_ref())
+                    .await
+                    .int_err()?;
 
-        Ok(())
-    }
-
-    /// Pauses system flows of given type.
-    /// If type is omitted, all possible system flow types are paused
-    async fn pause_system_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<&str>,
-    ) -> Result<(), InternalError> {
-        let flow_bindings = self
-            .get_system_flow_bindings(maybe_system_flow_type)
-            .await?;
-
-        for flow_binding in flow_bindings {
-            self.pause_flow_trigger(request_time, &flow_binding).await?;
-        }
-
-        Ok(())
-    }
-
-    /// Resumes dataset flows of given type for given dataset.
-    /// If type is omitted, all possible types are resumed (where configured)
-    async fn resume_dataset_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<&str>,
-    ) -> Result<(), InternalError> {
-        let flow_bindings = self
-            .get_dataset_flow_bindings(dataset_id, maybe_dataset_flow_type)
-            .await?;
-
-        for flow_binding in flow_bindings {
-            self.resume_flow_trigger(request_time, &flow_binding)
-                .await?;
-        }
-
-        Ok(())
-    }
-
-    /// Resumes system flows of given type.
-    /// If type is omitted, all possible system flow types are resumed (where
-    /// configured)
-    async fn resume_system_flows(
-        &self,
-        request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<&str>,
-    ) -> Result<(), InternalError> {
-        let flow_bindings = self
-            .get_system_flow_bindings(maybe_system_flow_type)
-            .await?;
-
-        for flow_binding in flow_bindings {
-            self.resume_flow_trigger(request_time, &flow_binding)
-                .await?;
+            for flow_trigger in flow_triggers {
+                self.resume_given_trigger(flow_trigger, request_time)
+                    .await
+                    .int_err()?;
+            }
         }
 
         Ok(())

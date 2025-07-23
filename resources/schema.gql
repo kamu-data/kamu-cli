@@ -1136,8 +1136,10 @@ type DatasetFlowTriggers {
 
 type DatasetFlowTriggersMut {
 	setTrigger(datasetFlowType: DatasetFlowType!, paused: Boolean!, triggerInput: FlowTriggerInput!): SetFlowTriggerResult!
-	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
-	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
+	pauseFlow(datasetFlowType: DatasetFlowType!): Boolean!
+	pauseFlows: Boolean!
+	resumeFlow(datasetFlowType: DatasetFlowType!): Boolean!
+	resumeFlows: Boolean!
 }
 
 enum DatasetFlowType {

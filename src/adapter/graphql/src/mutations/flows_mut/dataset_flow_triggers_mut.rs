@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService};
+use kamu_flow_system::{FlowBinding, FlowScope, FlowTriggerRule, FlowTriggerService};
 
 use super::{
     FlowIncompatibleDatasetKind,
@@ -86,23 +86,56 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }))
     }
 
-    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flows, skip_all)]
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn pause_flows(
+    async fn pause_flow(
         &self,
         ctx: &Context<'_>,
-        dataset_flow_type: Option<DatasetFlowType>,
+        dataset_flow_type: DatasetFlowType,
     ) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_handle = self.dataset_request_state.dataset_handle();
+        let dataset_id = self.dataset_request_state.dataset_id();
+        let flow_binding =
+            FlowBinding::for_dataset(dataset_id.clone(), map_dataset_flow_type(dataset_flow_type));
 
         flow_trigger_service
-            .pause_dataset_flows(
-                Utc::now(),
-                &dataset_handle.id,
-                dataset_flow_type.map(map_dataset_flow_type),
-            )
+            .pause_flow_trigger(Utc::now(), &flow_binding)
+            .await?;
+
+        Ok(true)
+    }
+
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flows, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn pause_flows(&self, ctx: &Context<'_>) -> Result<bool> {
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+
+        let dataset_id = self.dataset_request_state.dataset_id();
+        let flow_scope = FlowScope::for_dataset(dataset_id.clone());
+
+        flow_trigger_service
+            .pause_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
+            .await?;
+
+        Ok(true)
+    }
+
+    #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flow, skip_all)]
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn resume_flow(
+        &self,
+        ctx: &Context<'_>,
+        dataset_flow_type: DatasetFlowType,
+    ) -> Result<bool> {
+        let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
+
+        let dataset_id = self.dataset_request_state.dataset_id();
+        let flow_binding =
+            FlowBinding::for_dataset(dataset_id.clone(), map_dataset_flow_type(dataset_flow_type));
+
+        flow_trigger_service
+            .resume_flow_trigger(Utc::now(), &flow_binding)
             .await?;
 
         Ok(true)
@@ -110,21 +143,14 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flows, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resume_flows(
-        &self,
-        ctx: &Context<'_>,
-        dataset_flow_type: Option<DatasetFlowType>,
-    ) -> Result<bool> {
+    async fn resume_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_handle = self.dataset_request_state.dataset_handle();
+        let dataset_id = self.dataset_request_state.dataset_id();
+        let flow_scope = FlowScope::for_dataset(dataset_id.clone());
 
         flow_trigger_service
-            .resume_dataset_flows(
-                Utc::now(),
-                &dataset_handle.id,
-                dataset_flow_type.map(map_dataset_flow_type),
-            )
+            .resume_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
             .await?;
 
         Ok(true)

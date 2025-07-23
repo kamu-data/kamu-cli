@@ -422,55 +422,31 @@ impl FlowTriggerHarness {
     }
 
     async fn pause_flow(&self, flow_binding: &FlowBinding) {
-        match &flow_binding.scope {
-            FlowScope::Dataset { dataset_id } => {
-                self.flow_trigger_service
-                    .pause_dataset_flows(Utc::now(), dataset_id, Some(&flow_binding.flow_type))
-                    .await
-                    .unwrap();
-            }
-            FlowScope::WebhookSubscription { .. } => {
-                unimplemented!("WebhookSubscription flow pause is not implemented yet");
-            }
-            FlowScope::System => {
-                self.flow_trigger_service
-                    .pause_system_flows(Utc::now(), Some(&flow_binding.flow_type))
-                    .await
-                    .unwrap();
-            }
-        }
+        self.flow_trigger_service
+            .pause_flow_trigger(Utc::now(), flow_binding)
+            .await
+            .unwrap();
     }
 
     async fn pause_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
+        let lookup_scopes = vec![FlowScope::for_dataset(dataset_id)];
         self.flow_trigger_service
-            .pause_dataset_flows(Utc::now(), &dataset_id, None)
+            .pause_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
             .await
             .unwrap();
     }
 
     async fn resume_flow(&self, flow_binding: &FlowBinding) {
-        match &flow_binding.scope {
-            FlowScope::Dataset { dataset_id } => {
-                self.flow_trigger_service
-                    .resume_dataset_flows(Utc::now(), dataset_id, Some(&flow_binding.flow_type))
-                    .await
-                    .unwrap();
-            }
-            FlowScope::WebhookSubscription { .. } => {
-                unimplemented!("WebhookSubscription flow resume is not implemented yet");
-            }
-            FlowScope::System => {
-                self.flow_trigger_service
-                    .resume_system_flows(Utc::now(), Some(&flow_binding.flow_type))
-                    .await
-                    .unwrap();
-            }
-        }
+        self.flow_trigger_service
+            .resume_flow_trigger(Utc::now(), flow_binding)
+            .await
+            .unwrap();
     }
 
     async fn resume_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
+        let lookup_scopes = vec![FlowScope::for_dataset(dataset_id)];
         self.flow_trigger_service
-            .resume_dataset_flows(Utc::now(), &dataset_id, None)
+            .resume_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
             .await
             .unwrap();
     }
