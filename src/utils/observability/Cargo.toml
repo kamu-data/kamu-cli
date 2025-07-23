@@ -36,6 +36,8 @@ opentelemetry = [
 
 prometheus = ["dep:prometheus"]
 
+tracing-error = ["dep:tracing-error"]
+
 
 [dependencies]
 async-trait = { version = "0.1" }
@@ -50,6 +52,7 @@ serde_json = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tracing = { version = "0.1", default-features = false }
 tracing-appender = { version = "0.2", default-features = false }
+
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tower-http = { version = "0.6", default-features = false, features = ["trace"] }
 
@@ -63,6 +66,7 @@ opentelemetry-otlp = { optional = true, version = "0.26", default-features = fal
     "grpc-tonic",
 ] }
 opentelemetry-semantic-conventions = { optional = true, version = "0.26", default-features = false }
+tracing-error = { optional = true, version = "0.2", default-features = false }
 tracing-opentelemetry = { optional = true, version = "0.27", default-features = false }
 
 prometheus = { optional = true, version = "0.13", default-features = false }
