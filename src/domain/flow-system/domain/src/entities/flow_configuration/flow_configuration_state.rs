@@ -74,17 +74,13 @@ impl Projection for FlowConfigurationState {
                     }
 
                     E::DatasetRemoved(_) => {
-                        if let FlowScope::Dataset { .. } = &s.flow_binding.scope {
-                            if s.status == FlowConfigurationStatus::Deleted {
-                                Ok(s) // idempotent DELETE
-                            } else {
-                                Ok(FlowConfigurationState {
-                                    status: FlowConfigurationStatus::Deleted,
-                                    ..s
-                                })
-                            }
+                        if s.status == FlowConfigurationStatus::Deleted {
+                            Ok(s) // idempotent DELETE
                         } else {
-                            Err(ProjectionError::new(Some(s), event))
+                            Ok(FlowConfigurationState {
+                                status: FlowConfigurationStatus::Deleted,
+                                ..s
+                            })
                         }
                     }
                 }

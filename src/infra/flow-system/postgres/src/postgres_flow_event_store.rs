@@ -199,6 +199,36 @@ impl PostgresFlowEventStore {
         let last_event_id = rows.last().unwrap().event_id;
         Ok(EventID::new(last_event_id))
     }
+
+    fn generate_scope_condition_clauses(
+        &self,
+        flow_scope_query: &FlowScopeQuery,
+        starting_parameter_index: usize,
+    ) -> (String, usize) {
+        let mut parameter_index = starting_parameter_index;
+
+        let mut scope_clauses = Vec::new();
+        for (key, values) in &flow_scope_query.attributes {
+            if values.is_empty() {
+                continue;
+            }
+
+            scope_clauses.push(format!("scope_data->>'{key}' = ANY(${parameter_index})"));
+            parameter_index += 1;
+        }
+
+        (scope_clauses.join(" AND "), parameter_index)
+    }
+
+    fn form_scope_condition_values(&self, flow_scope_query: FlowScopeQuery) -> Vec<Vec<String>> {
+        let mut scope_values = Vec::new();
+        for (_, values) in flow_scope_query.attributes {
+            if !values.is_empty() {
+                scope_values.push(values);
+            }
+        }
+        scope_values
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -555,19 +585,10 @@ impl FlowEventStore for PostgresFlowEventStore {
         let pagination_limit = i64::try_from(pagination.limit).unwrap();
         let pagination_offset = i64::try_from(pagination.offset).unwrap();
 
-        const BASE_PARAMETERS_COUNT: usize = 5;
-        let mut total_parameters_count = BASE_PARAMETERS_COUNT;
+        let (scope_conditions, _) =
+            self.generate_scope_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
 
-        let mut scope_clauses = Vec::new();
-        let mut scope_values = Vec::new();
-        for (key, values) in flow_scope_query.attributes {
-            scope_clauses.push(format!(
-                "scope_data->>'{key}' = ANY(${})",
-                total_parameters_count + 1,
-            ));
-            total_parameters_count += values.len();
-            scope_values.push(values);
-        }
+        let scope_values = self.form_scope_condition_values(flow_scope_query);
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -580,14 +601,13 @@ impl FlowEventStore for PostgresFlowEventStore {
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    ({})
+                    ({scope_conditions})
                     AND ($1::text IS NULL OR flow_type = $1)
                     AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                     AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
                 ORDER BY flow_status, last_event_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
-                scope_clauses.join(" OR ")
             );
 
             let mut query = sqlx::query(&query_str)
@@ -628,29 +648,19 @@ impl FlowEventStore for PostgresFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        const BASE_PARAMETERS_COUNT: usize = 3;
-        let mut total_parameters_count = BASE_PARAMETERS_COUNT;
-
-        let mut scope_clauses = Vec::new();
-        for (key, values) in &flow_scope_query.attributes {
-            scope_clauses.push(format!(
-                "scope_data->>'{key}' = ANY(${})",
-                total_parameters_count + 1,
-            ));
-            total_parameters_count += values.len();
-        }
+        let (scope_conditions, _) =
+            self.generate_scope_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
 
         let query_str = format!(
             r#"
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
             WHERE
-                ({})
+                ({scope_conditions})
                 AND ($1::text IS NULL OR flow_type = $1)
                 AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                 AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
             "#,
-            scope_clauses.join(" OR ")
         );
 
         let mut query = sqlx::query(&query_str)
@@ -669,34 +679,37 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(usize::try_from(flows_count).unwrap())
     }
 
-    fn get_unique_flow_initiator_ids_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> InitiatorIDStream {
-        let dataset_id = dataset_id.to_string();
+    fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
+        let (scope_conditions, _) =
+            self.generate_scope_condition_clauses(&flow_scope_query, 2 /* 1 param + 1 */);
+
+        let scope_values = self.form_scope_condition_values(flow_scope_query);
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
 
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
-
-            let mut query_stream = sqlx::query!(
+            let query_str = format!(
                 r#"
                 SELECT DISTINCT(initiator) FROM flows
                 WHERE
-                    scope_data->>'dataset_id' = $1 AND initiator != $2
+                    ({scope_conditions})
+                    AND initiator != $1
                 "#,
-                dataset_id,
-                SYSTEM_INITIATOR,
-            ).try_map(|event_row| {
-                Ok(odf::AccountID::from_did_str(&event_row.initiator).unwrap())
-            })
-            .fetch(connection_mut);
+            );
 
-            while let Some(initiator) = query_stream.try_next().await.int_err()? {
-                yield Ok(initiator);
+            let mut query = sqlx::query(&query_str).bind(SYSTEM_INITIATOR);
+            for values in scope_values {
+                query = query.bind(values);
+            }
+
+            let mut query_stream = query.fetch(connection_mut);
+
+            use sqlx::Row;
+            while let Some(event_row) = query_stream.try_next().await.int_err()? {
+                let initiator_id_str: &str = event_row.get("initiator");
+                let initiator_id = odf::AccountID::from_did_str(initiator_id_str).unwrap();
+                yield Ok(initiator_id);
             }
         })
     }

@@ -68,14 +68,11 @@ pub trait FlowEventStore: EventStore<FlowState> {
         filters: &FlowFilters,
     ) -> Result<usize, InternalError>;
 
-    /// Returns IDs of the flow initiators associated with the specified
-    /// dataset in reverse chronological order based on creation time.
-    fn get_unique_flow_initiator_ids_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> InitiatorIDStream;
+    /// Returns IDs of the flow initiators, where flow scope matches the pattern
+    fn list_scoped_flow_initiators(&self, scope_query: FlowScopeQuery) -> InitiatorIDStream;
 
     /// Returns IDs of the datasets who have any flows associated with them
+    // TODO: refactor to avoid mentioning "dataset_id" directly
     async fn filter_datasets_having_flows(
         &self,
         dataset_ids: &[&odf::DatasetID],
@@ -92,6 +89,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Returns number of all flows, matching filters
     async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError>;
 
+    /// Returns stream of flow states for the given flow IDs
     fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream;
 }
 

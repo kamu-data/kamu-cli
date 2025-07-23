@@ -33,7 +33,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn list_all_flows(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsError> {
+    ) -> Result<FlowStateListing, InternalError> {
         let empty_filters = FlowFilters::default();
         let total_count = self
             .flow_event_store
@@ -59,7 +59,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         scope_query: FlowScopeQuery,
         filters: FlowFilters,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsError> {
+    ) -> Result<FlowStateListing, InternalError> {
         let total_count = self
             .flow_event_store
             .get_count_flows_matching_scope_query(&scope_query, &filters)
@@ -79,15 +79,15 @@ impl FlowQueryService for FlowQueryServiceImpl {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn list_all_flow_initiators_by_dataset(
+    #[tracing::instrument(level = "debug", skip_all, fields(?scope_query))]
+    async fn list_scoped_flow_initiators(
         &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<FlowInitiatorListing, ListFlowsError> {
+        scope_query: FlowScopeQuery,
+    ) -> Result<FlowInitiatorListing, InternalError> {
         Ok(FlowInitiatorListing {
             matched_stream: self
                 .flow_event_store
-                .get_unique_flow_initiator_ids_by_dataset(dataset_id),
+                .list_scoped_flow_initiators(scope_query),
         })
     }
 
@@ -97,7 +97,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn list_all_datasets_with_flow_by_account(
         &self,
         account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, ListFlowsError> {
+    ) -> Result<Vec<odf::DatasetID>, InternalError> {
         // Consider using ReBAC: not just owned, but any relation to account
         let owned_dataset_ids = self
             .dataset_entry_service

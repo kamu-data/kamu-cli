@@ -668,7 +668,9 @@ pub async fn test_dataset_get_flow_initiators(catalog: &Catalog) {
     let foo_cases = make_dataset_test_case(flow_event_store.clone()).await;
 
     let res: HashSet<_> = flow_event_store
-        .get_unique_flow_initiator_ids_by_dataset(&foo_cases.dataset_id)
+        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(
+            &foo_cases.dataset_id,
+        ))
         .try_collect()
         .await
         .unwrap();

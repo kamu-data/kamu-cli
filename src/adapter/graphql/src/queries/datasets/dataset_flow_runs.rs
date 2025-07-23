@@ -107,7 +107,7 @@ impl<'a> DatasetFlowRuns<'a> {
         let flows_state_listing = flow_query_service
             .list_scoped_flows(
                 fs::FlowScopeQuery::build_for_single_dataset(
-                    &self.dataset_request_state.dataset_handle().id,
+                    self.dataset_request_state.dataset_id(),
                 ),
                 maybe_filters.unwrap_or_default(),
                 PaginationOpts::from_page(page, per_page),
@@ -131,7 +131,9 @@ impl<'a> DatasetFlowRuns<'a> {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let flow_initiator_ids: Vec<_> = flow_query_service
-            .list_all_flow_initiators_by_dataset(&self.dataset_request_state.dataset_handle().id)
+            .list_scoped_flow_initiators(fs::FlowScopeQuery::build_for_single_dataset(
+                self.dataset_request_state.dataset_id(),
+            ))
             .await
             .int_err()?
             .matched_stream

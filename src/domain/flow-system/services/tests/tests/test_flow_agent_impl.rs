@@ -5641,7 +5641,7 @@ async fn test_list_all_flow_initiators() {
 
     let foo_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
-        .list_all_flow_initiators_by_dataset(&foo_id)
+        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(&foo_id))
         .await
         .unwrap()
         .matched_stream
@@ -5653,7 +5653,7 @@ async fn test_list_all_flow_initiators() {
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
-        .list_all_flow_initiators_by_dataset(&bar_id)
+        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(&bar_id))
         .await
         .unwrap()
         .matched_stream
@@ -5789,7 +5789,7 @@ async fn test_list_all_datasets_with_flow() {
 
     let foo_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
-        .list_all_flow_initiators_by_dataset(&foo_id)
+        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(&foo_id))
         .await
         .unwrap()
         .matched_stream
@@ -5801,7 +5801,7 @@ async fn test_list_all_datasets_with_flow() {
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
-        .list_all_flow_initiators_by_dataset(&bar_id)
+        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(&bar_id))
         .await
         .unwrap()
         .matched_stream

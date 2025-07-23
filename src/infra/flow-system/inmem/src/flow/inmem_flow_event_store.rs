@@ -593,36 +593,35 @@ impl FlowEventStore for InMemoryFlowEventStore {
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    fn get_unique_flow_initiator_ids_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> InitiatorIDStream {
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope_query))]
+    fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
         let flow_initiators: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
             let mut unique_initiators = HashSet::new();
-            g.all_flows_by_dataset
-                .get(dataset_id)
-                .map(|dataset_flow_ids| {
-                    dataset_flow_ids
-                        .iter()
-                        .filter_map(|flow_id| {
-                            let search_index_maybe = g.flow_search_index.get(flow_id);
-                            if let Some(search_index) = search_index_maybe
-                                && let Some(initiator_id) = &search_index.initiator
-                            {
-                                let is_added = unique_initiators.insert(initiator_id);
-                                if is_added {
-                                    return Some(Ok(initiator_id.clone()));
-                                }
-                                return None;
-                            }
-                            None
-                        })
-                        .collect()
+
+            g.all_flows
+                .iter()
+                .filter_map(|flow_id| {
+                    // Check if flow matches the scope query
+                    let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
+                    if !flow_binding.scope.matches_query(&flow_scope_query) {
+                        return None;
+                    }
+
+                    let search_index_maybe = g.flow_search_index.get(flow_id);
+                    if let Some(search_index) = search_index_maybe
+                        && let Some(initiator_id) = &search_index.initiator
+                    {
+                        let is_added = unique_initiators.insert(initiator_id);
+                        if is_added {
+                            return Some(Ok(initiator_id.clone()));
+                        }
+                        return None;
+                    }
+                    None
                 })
-                .unwrap_or_default()
+                .collect()
         };
 
         Box::pin(futures::stream::iter(flow_initiators))

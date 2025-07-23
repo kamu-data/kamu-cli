@@ -23,7 +23,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_flows(
         &self,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsError>;
+    ) -> Result<FlowStateListing, InternalError>;
 
     /// Returns states of flows matching scope and other filters
     /// ordered by creation time from newest to oldest.
@@ -33,15 +33,13 @@ pub trait FlowQueryService: Sync + Send {
         scope_query: FlowScopeQuery,
         filters: FlowFilters,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, ListFlowsError>;
+    ) -> Result<FlowStateListing, InternalError>;
 
-    /// Returns initiators of flows associated with a given dataset
-    /// ordered by creation time from newest to oldest.
-    /// Applies specified filters/pagination
-    async fn list_all_flow_initiators_by_dataset(
+    /// Returns initiators of flows associated with matching scopes
+    async fn list_scoped_flow_initiators(
         &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<FlowInitiatorListing, ListFlowsError>;
+        scope_query: FlowScopeQuery,
+    ) -> Result<FlowInitiatorListing, InternalError>;
 
     /// Returns datasets with flows associated with a given account
     /// ordered by creation time from newest to oldest.
@@ -49,7 +47,7 @@ pub trait FlowQueryService: Sync + Send {
     async fn list_all_datasets_with_flow_by_account(
         &self,
         account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, ListFlowsError>;
+    ) -> Result<Vec<odf::DatasetID>, InternalError>;
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
@@ -75,12 +73,6 @@ pub type InitiatorsStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<odf::AccountID, InternalError>> + Send + 'a>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-pub enum ListFlowsError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
 
 #[derive(thiserror::Error, Debug)]
 pub enum GetFlowError {

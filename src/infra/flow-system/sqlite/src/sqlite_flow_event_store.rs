@@ -211,6 +211,45 @@ impl SqliteFlowEventStore {
         let last_event_id = rows.last().unwrap().event_id;
         Ok(EventID::new(last_event_id))
     }
+
+    fn generate_scope_condition_clauses(
+        &self,
+        flow_scope_query: &FlowScopeQuery,
+        starting_parameter_index: usize,
+    ) -> (String, usize) {
+        let mut parameter_index = starting_parameter_index;
+
+        let mut scope_clauses = Vec::new();
+        for (key, values) in &flow_scope_query.attributes {
+            if values.len() == 1 {
+                scope_clauses.push(format!(
+                    "json_extract(scope_data, '$.{key}') = ${parameter_index}",
+                ));
+                parameter_index += 1;
+            } else if !values.is_empty() {
+                scope_clauses.push(format!(
+                    "json_extract(scope_data, '$.{key}') IN ({})",
+                    sqlite_generate_placeholders_list(
+                        values.len(),
+                        NonZeroUsize::new(parameter_index).unwrap()
+                    )
+                ));
+                parameter_index += values.len();
+            }
+        }
+
+        (scope_clauses.join(" AND "), parameter_index)
+    }
+
+    fn form_scope_condition_values(&self, flow_scope_query: FlowScopeQuery) -> Vec<String> {
+        let mut scope_values = Vec::new();
+        for (_, values) in flow_scope_query.attributes {
+            for value in values {
+                scope_values.push(value);
+            }
+        }
+        scope_values
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -628,44 +667,25 @@ impl FlowEventStore for SqliteFlowEventStore {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
-
-            const BASE_PARAMETERS_COUNT: usize = 5;
-            let mut parameters_count = BASE_PARAMETERS_COUNT;
-
-            let mut scope_clauses = Vec::new();
-            let mut scope_values = Vec::new();
-
-            for (key, values) in flow_scope_query.attributes {
-                scope_clauses.push(format!(
-                    "json_extract(scope_data, '$.{key}') IN ({})",
-                    sqlite_generate_placeholders_list(
-                        values.len(),
-                        NonZeroUsize::new(parameters_count + 1).unwrap()
-                    )
-                ));
-
-                parameters_count += values.len();
-                scope_values.extend(values.into_iter());
-            }
-
+            let (scope_clauses, next_parameter_index) = self.generate_scope_condition_clauses(&flow_scope_query, 6 /* 5 params + 1 */);
+            let scope_values = self.form_scope_condition_values(flow_scope_query);
 
             let query_str = format!(
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    ({})
+                    ({scope_clauses})
                     AND ($1::text IS NULL OR flow_type = $1)
                     AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                     AND ($3 = 0 OR initiator IN ({}))
                 ORDER BY flow_status DESC, last_event_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
-                scope_clauses.join(" OR "),
                 maybe_initiators
                     .as_ref()
                     .map(|initiators| sqlite_generate_placeholders_list(
                         initiators.len(),
-                        NonZeroUsize::new(parameters_count + 1).unwrap()
+                        NonZeroUsize::new(next_parameter_index).unwrap()
                     ))
                     .unwrap_or_default(),
             );
@@ -713,39 +733,25 @@ impl FlowEventStore for SqliteFlowEventStore {
         let maybe_filters_by_flow_type = filters.by_flow_type.as_deref();
         let maybe_filters_by_flow_status = filters.by_flow_status;
 
-        const BASE_PARAMETERS_COUNT: usize = 3;
-        let mut total_parameters_count = BASE_PARAMETERS_COUNT;
-
-        let mut scope_clauses = Vec::new();
-
-        for (key, values) in &flow_scope_query.attributes {
-            scope_clauses.push(format!(
-                "json_extract(scope_data, '$.{key}') IN ({})",
-                sqlite_generate_placeholders_list(
-                    values.len(),
-                    NonZeroUsize::new(total_parameters_count + 1).unwrap()
-                )
-            ));
-            total_parameters_count += values.len();
-        }
+        let (scope_clauses, next_parameter_index) =
+            self.generate_scope_condition_clauses(flow_scope_query, 4 /* 3 params + 1 */);
 
         let query_str = format!(
             r#"
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
             WHERE
-                ({})
+                ({scope_clauses})
                 AND ($1::text IS NULL OR flow_type = $1)
                 AND (cast($2 as flow_status_type) IS NULL OR flow_status = $2)
                 AND ($3 = 0 OR initiator IN ({}))
             "#,
-            scope_clauses.join(" OR "),
             maybe_initiators
                 .as_ref()
                 .map(|initiators| {
                     sqlite_generate_placeholders_list(
                         initiators.len(),
-                        NonZeroUsize::new(total_parameters_count + 1).unwrap(),
+                        NonZeroUsize::new(next_parameter_index).unwrap(),
                     )
                 })
                 .unwrap_or_default()
@@ -774,31 +780,37 @@ impl FlowEventStore for SqliteFlowEventStore {
         Ok(usize::try_from(flows_count).unwrap())
     }
 
-    fn get_unique_flow_initiator_ids_by_dataset(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> InitiatorIDStream {
-        let dataset_id = dataset_id.to_string();
-
+    fn list_scoped_flow_initiators(&self, flow_scope_query: FlowScopeQuery) -> InitiatorIDStream {
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
+            let connection_mut = tr.connection_mut().await?;
 
-            let connection_mut = tr
-                .connection_mut()
-                .await?;
+            let (scope_clauses, _) =
+                self.generate_scope_condition_clauses(&flow_scope_query, 2 /* 1 param + 1 */);
 
-            let mut query_stream = sqlx::query!(
+            let scope_values = self.form_scope_condition_values(flow_scope_query);
+
+            let query_str = format!(
                 r#"
                 SELECT DISTINCT(initiator) FROM flows
                 WHERE
-                    scope_data->>'dataset_id' = $1 AND initiator != $2
+                    ({scope_clauses})
+                    AND initiator != $1
                 "#,
-                dataset_id,
-                SYSTEM_INITIATOR,
-            ).try_map(|event_row| {
-                Ok(odf::AccountID::from_did_str(&event_row.initiator).unwrap())
-            })
-            .fetch(connection_mut);
+            );
+
+            let mut query = sqlx::query(&query_str)
+                .bind(SYSTEM_INITIATOR);
+            for value in scope_values {
+                query = query.bind(value);
+            }
+
+            let mut query_stream = query
+                .try_map(|event_row: SqliteRow| {
+                    let initiator: String = event_row.get("initiator");
+                    Ok(odf::AccountID::from_did_str(&initiator).unwrap())
+                })
+                .fetch(connection_mut);
 
             while let Some(initiator) = query_stream.try_next().await.int_err()? {
                 yield Ok(initiator);
