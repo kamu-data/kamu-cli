@@ -17,7 +17,7 @@ use crate::{FlowActivationCause, FlowBinding, FlowScope};
 pub trait FlowSensor: Send + Sync {
     fn flow_scope(&self) -> &FlowScope;
 
-    fn get_sensitive_datasets(&self) -> Vec<odf::DatasetID>;
+    fn get_sensitive_to_scopes(&self) -> Vec<FlowScope>;
 
     async fn on_sensitized(
         &self,

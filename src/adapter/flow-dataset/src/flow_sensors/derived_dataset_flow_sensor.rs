@@ -120,8 +120,11 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
         &self.flow_scope
     }
 
-    fn get_sensitive_datasets(&self) -> Vec<odf::DatasetID> {
-        self.sensitive_dataset_ids.iter().cloned().collect()
+    fn get_sensitive_to_scopes(&self) -> Vec<fs::FlowScope> {
+        self.sensitive_dataset_ids
+            .iter()
+            .map(|id| fs::FlowScope::for_dataset(id.clone()))
+            .collect()
     }
 
     async fn on_sensitized(
