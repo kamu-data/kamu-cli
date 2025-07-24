@@ -10,7 +10,7 @@
 use chrono::{Duration, Utc};
 use dill::Catalog;
 use futures::TryStreamExt;
-use kamu_adapter_flow_dataset as afs;
+use kamu_adapter_flow_dataset::ingest_dataset_binding;
 use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,10 +36,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let flow_binding = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id.clone()),
-    );
+    let flow_binding = ingest_dataset_binding(&dataset_id);
     let events: Vec<_> = event_store
         .get_events(&flow_binding, GetEventsOpts::default())
         .try_collect()
@@ -73,10 +70,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_binding_1 = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_1.clone()),
-    );
+    let flow_binding_1 = ingest_dataset_binding(&dataset_id_1);
 
     let event_1_1 = FlowTriggerEventCreated {
         event_time: Utc::now(),
@@ -105,10 +99,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(2, num_events);
 
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
-    let flow_binding_2 = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_2.clone()),
-    );
+    let flow_binding_2 = ingest_dataset_binding(&dataset_id_2);
 
     let event_2 = FlowTriggerEventCreated {
         event_time: Utc::now(),
@@ -199,10 +190,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
 
-    let flow_binding = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(odf::DatasetID::new_seeded_ed25519(b"foo")),
-    );
+    let flow_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
 
     let event_1 = FlowTriggerEventCreated {
         event_time: Utc::now(),
@@ -303,10 +291,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
     let unrelated_dataset_id = odf::DatasetID::new_seeded_ed25519(b"other");
 
     // Active trigger
-    let flow_active = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_active.clone()),
-    );
+    let flow_active = ingest_dataset_binding(&dataset_id_active);
     event_store
         .save_events(
             &flow_active,
@@ -325,10 +310,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     // Paused trigger
-    let flow_paused = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_paused.clone()),
-    );
+    let flow_paused = ingest_dataset_binding(&dataset_id_paused);
     event_store
         .save_events(
             &flow_paused,
@@ -347,10 +329,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     // Modified trigger: first active, then paused
-    let flow_modified_paused = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_modified_paused.clone()),
-    );
+    let flow_modified_paused = ingest_dataset_binding(&dataset_id_modified_paused);
     event_store
         .save_events(
             &flow_modified_paused,
@@ -376,10 +355,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     // Modified trigger: first paused, then active
-    let flow_modified_active = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_modified_active.clone()),
-    );
+    let flow_modified_active = ingest_dataset_binding(&dataset_id_modified_active);
     event_store
         .save_events(
             &flow_modified_active,
@@ -405,10 +381,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     // Removed trigger
-    let flow_removed = FlowBinding::new(
-        afs::FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_removed.clone()),
-    );
+    let flow_removed = ingest_dataset_binding(&dataset_id_removed);
     event_store
         .save_events(
             &flow_removed,

@@ -25,8 +25,8 @@ use crate::{
     DATASET_RESOURCE_TYPE,
     DatasetResourceUpdateDetails,
     DatasetUpdateSource,
-    FLOW_TYPE_DATASET_INGEST,
     MESSAGE_CONSUMER_KAMU_FLOW_DATASETS_EVENT_BRIDGE,
+    ingest_dataset_binding,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -222,10 +222,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDatasetsEventBrid
             return Ok(());
         }
 
-        let flow_binding = fs::FlowBinding::new(
-            FLOW_TYPE_DATASET_INGEST,
-            fs::FlowScope::for_dataset(dataset_id.clone()),
-        );
+        let flow_binding = ingest_dataset_binding(dataset_id);
 
         self.flow_sensor_dispatcher
             .dispatch_input_flow_success(

@@ -13,14 +13,14 @@ use chrono::{Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_adapter_flow_dataset::{
-    FLOW_TYPE_DATASET_COMPACT,
-    FLOW_TYPE_DATASET_INGEST,
-    FLOW_TYPE_DATASET_RESET,
-    FLOW_TYPE_DATASET_TRANSFORM,
     FlowConfigRuleCompact,
     FlowConfigRuleCompactFull,
     FlowConfigRuleIngest,
     FlowConfigRuleReset,
+    compaction_dataset_binding,
+    ingest_dataset_binding,
+    reset_dataset_binding,
+    transform_dataset_binding,
 };
 use kamu_adapter_task_dataset::{
     LogicalPlanDatasetHardCompact,
@@ -62,10 +62,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
     harness
         .set_dataset_flow_ingest(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
             },
@@ -76,10 +73,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
         )
         .await;
@@ -191,10 +185,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
         })
         .await;
 
-    let foo_ingest_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_ingest_binding = ingest_dataset_binding(&foo_id);
 
     // Remember start time
     let start_time = harness
@@ -383,10 +374,7 @@ async fn test_cron_config() {
                     harness
                       .set_flow_trigger(
                           harness.now_datetime(),
-                          FlowBinding::new(
-                              FLOW_TYPE_DATASET_INGEST,
-                              FlowScope::for_dataset(foo_id.clone()),
-                          ),
+                          ingest_dataset_binding(&foo_id),
                           FlowTriggerRule::Schedule(Schedule::Cron(ScheduleCron {
                             source_5component_cron_expression: String::from("<irrelevant>"),
                             cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
@@ -459,14 +447,8 @@ async fn test_manual_trigger() {
         })
         .await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
-    let bar_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(bar_id.clone()),
-    );
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+    let bar_flow_binding = ingest_dataset_binding(&bar_id);
 
     // Note: only "foo" has auto-schedule, "bar" hasn't
     harness
@@ -675,14 +657,8 @@ async fn test_ingest_trigger_with_ingest_config() {
         })
         .await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
-    let bar_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(bar_id.clone()),
-    );
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+    let bar_flow_binding = ingest_dataset_binding(&bar_id);
 
     harness
         .set_dataset_flow_ingest(
@@ -900,14 +876,8 @@ async fn test_manual_trigger_compaction() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
-    let bar_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(bar_id.clone()),
-    );
+    let foo_flow_binding = compaction_dataset_binding(&foo_id);
+    let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1047,10 +1017,7 @@ async fn test_manual_trigger_reset() {
     harness.eager_initialization().await;
     harness
         .set_dataset_flow_reset_rule(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_RESET,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            reset_dataset_binding(&foo_id),
             FlowConfigRuleReset {
                 new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                 old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
@@ -1059,10 +1026,7 @@ async fn test_manual_trigger_reset() {
         )
         .await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_RESET,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = reset_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1177,10 +1141,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
     harness
         .set_dataset_flow_reset_rule(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_RESET,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            reset_dataset_binding(&foo_id),
             FlowConfigRuleReset {
                 new_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
                 old_head_hash: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
@@ -1191,10 +1152,7 @@ async fn test_reset_trigger_keep_metadata_compaction_for_derivatives() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_RESET,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = reset_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1391,10 +1349,7 @@ async fn test_manual_trigger_compaction_with_config() {
     harness.eager_initialization().await;
     harness
         .set_dataset_flow_compaction_rule(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_COMPACT,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            compaction_dataset_binding(&foo_id),
             FlowConfigRuleCompact::Full(
                 FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records, false)
                     .unwrap(),
@@ -1402,10 +1357,7 @@ async fn test_manual_trigger_compaction_with_config() {
         )
         .await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = compaction_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1513,10 +1465,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
     harness
         .set_dataset_flow_compaction_rule(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_COMPACT,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            compaction_dataset_binding(&foo_id),
             FlowConfigRuleCompact::Full(
                 FlowConfigRuleCompactFull::new_checked(max_slice_size, max_slice_records, true)
                     .unwrap(),
@@ -1526,10 +1475,7 @@ async fn test_full_hard_compaction_trigger_keep_metadata_compaction_for_derivati
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = compaction_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1747,20 +1693,14 @@ async fn test_manual_trigger_keep_metadata_only_with_recursive_compaction() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_COMPACT,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            compaction_dataset_binding(&foo_id),
             FlowConfigRuleCompact::MetadataOnly { recursive: true },
         )
         .await;
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = compaction_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -1981,20 +1921,14 @@ async fn test_manual_trigger_keep_metadata_only_without_recursive_compaction() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_COMPACT,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            compaction_dataset_binding(&foo_id),
             FlowConfigRuleCompact::MetadataOnly { recursive: false },
         )
         .await;
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = compaction_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -2119,20 +2053,14 @@ async fn test_manual_trigger_keep_metadata_only_compaction_multiple_accounts() {
 
     harness
         .set_dataset_flow_compaction_rule(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_COMPACT,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            compaction_dataset_binding(&foo_id),
             FlowConfigRuleCompact::MetadataOnly { recursive: true },
         )
         .await;
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = compaction_dataset_binding(&foo_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -2285,20 +2213,14 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
         )
         .await;
@@ -2361,14 +2283,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
                 // 50ms: Pause both flow triggers in between completion 2 first tasks and queuing
                 harness.advance_time(Duration::milliseconds(50)).await;
-                harness.pause_flow(start_time + Duration::milliseconds(50), FlowBinding::new(
-                    FLOW_TYPE_DATASET_INGEST,
-                    FlowScope::for_dataset(foo_id.clone()),
-                )).await;
-                harness.pause_flow(start_time + Duration::milliseconds(50), FlowBinding::new(
-                    FLOW_TYPE_DATASET_INGEST,
-                    FlowScope::for_dataset(bar_id.clone()),
-                )).await;
+                harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&foo_id)).await;
+                harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&bar_id)).await;
 
                 // 80ms: Wake up after initially planned "foo" scheduling but before planned "bar" scheduling:
                 //  - "foo":
@@ -2378,16 +2294,10 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 //    - gets a trigger update for period of 70ms
                 //    - get queued for 100ms (last success at 30ms + period of 70ms)
                 harness.advance_time(Duration::milliseconds(30)).await;
-                harness.resume_flow(start_time + Duration::milliseconds(80), FlowBinding::new(
-                    FLOW_TYPE_DATASET_INGEST,
-                    FlowScope::for_dataset(foo_id.clone()),
-                )).await;
+                harness.resume_flow(start_time + Duration::milliseconds(80), ingest_dataset_binding(&foo_id)).await;
                 harness.set_flow_trigger(
                   start_time + Duration::milliseconds(80),
-                  FlowBinding::new(
-                      FLOW_TYPE_DATASET_INGEST,
-                      FlowScope::for_dataset(bar_id.clone()),
-                  ),
+                  ingest_dataset_binding(&bar_id),
                   FlowTriggerRule::Schedule(Duration::milliseconds(70).into()),
                 ).await;
                 test_flow_listener
@@ -2522,10 +2432,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
         )
         .await;
@@ -2533,10 +2440,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
         )
         .await;
@@ -2602,14 +2506,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
               // 50ms: Pause flow config before next flow runs
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), FlowBinding::new(
-                  FLOW_TYPE_DATASET_INGEST,
-                  FlowScope::for_dataset(foo_id.clone()),
-              )).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), FlowBinding::new(
-                  FLOW_TYPE_DATASET_INGEST,
-                  FlowScope::for_dataset(bar_id.clone()),
-              )).await;
+              harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&foo_id)).await;
+              harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&bar_id)).await;
 
               // 100ms: Wake up after initially planned "bar" scheduling but before planned "foo" scheduling:
               //  - "foo":
@@ -2621,14 +2519,9 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               //    - last success at 30ms
               //    - gets scheduled immediately (waited longer than 30ms last success + 60ms period)
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), FlowBinding::new(
-                  FLOW_TYPE_DATASET_INGEST,
-                  FlowScope::for_dataset(foo_id.clone()),
-              )).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), FlowBinding::new(
-                  FLOW_TYPE_DATASET_INGEST,
-                  FlowScope::for_dataset(bar_id.clone()),
-              )).await;
+              harness.resume_flow(start_time + Duration::milliseconds(100), ingest_dataset_binding(&foo_id)).await;
+              harness.resume_flow(start_time + Duration::milliseconds(100), ingest_dataset_binding(&bar_id)).await;
+
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::milliseconds(100))
                   .await;
@@ -2761,20 +2654,14 @@ async fn test_dataset_deleted() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(70).into()),
         )
         .await;
@@ -2951,10 +2838,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
         harness
             .set_flow_trigger(
                 harness.now_datetime(),
-                FlowBinding::new(
-                    FLOW_TYPE_DATASET_INGEST,
-                    FlowScope::for_dataset(dataset_id.clone()),
-                ),
+                ingest_dataset_binding(dataset_id),
                 FlowTriggerRule::Schedule(Duration::milliseconds(40).into()),
             )
             .await;
@@ -3166,10 +3050,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
         )
         .await;
@@ -3177,10 +3058,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_TRANSFORM,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::seconds(1)).unwrap()),
         )
         .await;
@@ -3414,10 +3292,7 @@ async fn test_throttling_manual_triggers() {
             account_name: None,
         })
         .await;
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
 
     // Enforce dependency graph initialization
     harness.eager_initialization().await;
@@ -3573,10 +3448,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
@@ -3584,10 +3456,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(150).into()),
         )
         .await;
@@ -3595,10 +3464,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_TRANSFORM,
-                FlowScope::for_dataset(baz_id.clone()),
-            ),
+            transform_dataset_binding(&baz_id),
             FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::hours(24)).unwrap()),
         )
         .await;
@@ -4109,10 +3975,7 @@ async fn test_batching_condition_records_reached() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
@@ -4120,10 +3983,7 @@ async fn test_batching_condition_records_reached() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_TRANSFORM,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(
                 BatchingRule::new_checked(10, Duration::milliseconds(120)).unwrap(),
             ),
@@ -4495,10 +4355,7 @@ async fn test_batching_condition_timeout() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
@@ -4506,10 +4363,7 @@ async fn test_batching_condition_timeout() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_TRANSFORM,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(
                 BatchingRule::new_checked(10, Duration::milliseconds(150)).unwrap(),
             ),
@@ -4827,10 +4681,7 @@ async fn test_batching_condition_watermark() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(40).into()),
         )
         .await;
@@ -4838,10 +4689,7 @@ async fn test_batching_condition_watermark() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_TRANSFORM,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(
                 BatchingRule::new_checked(10, Duration::milliseconds(200)).unwrap(),
             ),
@@ -5202,10 +5050,7 @@ async fn test_batching_condition_with_2_inputs() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
         )
         .await;
@@ -5213,10 +5058,7 @@ async fn test_batching_condition_with_2_inputs() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            ingest_dataset_binding(&bar_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(120).into()),
         )
         .await;
@@ -5224,10 +5066,7 @@ async fn test_batching_condition_with_2_inputs() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_TRANSFORM,
-                FlowScope::for_dataset(baz_id.clone()),
-            ),
+            transform_dataset_binding(&baz_id),
             FlowTriggerRule::Batching(
                 BatchingRule::new_checked(16, Duration::milliseconds(200)).unwrap(),
             ),
@@ -5719,14 +5558,8 @@ async fn test_list_all_flow_initiators() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
-    let bar_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(bar_id.clone()),
-    );
+    let foo_flow_binding = compaction_dataset_binding(&foo_id);
+    let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -5873,14 +5706,8 @@ async fn test_list_all_datasets_with_flow() {
 
     harness.eager_initialization().await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
-    let bar_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(bar_id.clone()),
-    );
+    let foo_flow_binding = compaction_dataset_binding(&foo_id);
+    let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -6047,10 +5874,7 @@ async fn test_abort_flow_before_scheduling_tasks() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
         )
         .await;
@@ -6141,10 +5965,7 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
@@ -6240,10 +6061,7 @@ async fn test_abort_flow_after_task_running_has_started() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
@@ -6328,10 +6146,7 @@ async fn test_abort_flow_after_task_finishes() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
         )
         .await;
@@ -6455,10 +6270,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
         )
         .await;
@@ -6466,10 +6278,7 @@ async fn test_respect_last_success_time_when_activate_configuration() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_TRANSFORM,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(BatchingRule::new_checked(1, Duration::seconds(10)).unwrap()),
         )
         .await;
@@ -6535,14 +6344,8 @@ async fn test_respect_last_success_time_when_activate_configuration() {
 
               // 50ms: Pause flow config before next flow runs
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), FlowBinding::new(
-                  FLOW_TYPE_DATASET_INGEST,
-                  FlowScope::for_dataset(foo_id.clone()),
-              )).await;
-              harness.pause_flow(start_time + Duration::milliseconds(50), FlowBinding::new(
-                  FLOW_TYPE_DATASET_TRANSFORM,
-                  FlowScope::for_dataset(bar_id.clone()),
-              )).await;
+              harness.pause_flow(start_time + Duration::milliseconds(50), ingest_dataset_binding(&foo_id)).await;
+              harness.pause_flow(start_time + Duration::milliseconds(50), transform_dataset_binding(&bar_id)).await;
 
               // 100ms: Wake up after initially planned "bar" scheduling but before planned "foo" scheduling:
               //  - "foo":
@@ -6554,14 +6357,8 @@ async fn test_respect_last_success_time_when_activate_configuration() {
               //    - last success at 30ms
               //    - gets scheduled immediately (waited longer than 30ms last success + 60ms period)
               harness.advance_time(Duration::milliseconds(50)).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), FlowBinding::new(
-                  FLOW_TYPE_DATASET_INGEST,
-                  FlowScope::for_dataset(foo_id.clone()),
-              )).await;
-              harness.resume_flow(start_time + Duration::milliseconds(100), FlowBinding::new(
-                  FLOW_TYPE_DATASET_TRANSFORM,
-                  FlowScope::for_dataset(bar_id.clone()),
-              )).await;
+              harness.resume_flow(start_time + Duration::milliseconds(100), ingest_dataset_binding(&foo_id)).await;
+              harness.resume_flow(start_time + Duration::milliseconds(100), transform_dataset_binding(&bar_id)).await;
               test_flow_listener
                   .make_a_snapshot(start_time + Duration::milliseconds(100))
                   .await;
@@ -6665,10 +6462,7 @@ async fn test_disable_trigger_on_flow_fail() {
 
     harness
         .set_dataset_flow_ingest(
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowConfigRuleIngest {
                 fetch_uncacheable: false,
             },
@@ -6681,10 +6475,7 @@ async fn test_disable_trigger_on_flow_fail() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             trigger_rule.clone(),
         )
         .await;
@@ -6780,10 +6571,7 @@ async fn test_disable_trigger_on_flow_fail() {
         )
     );
 
-    let foo_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_binding = ingest_dataset_binding(&foo_id);
 
     let current_trigger = harness
         .flow_trigger_service
@@ -6818,10 +6606,7 @@ async fn test_trigger_enable_during_flow_throttling() {
         })
         .await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
 
     // Enforce dependency graph initialization
     harness.eager_initialization().await;
@@ -6925,10 +6710,7 @@ async fn test_trigger_enable_during_flow_throttling() {
           harness
             .set_flow_trigger(
                 harness.now_datetime(),
-                FlowBinding::new(
-                    FLOW_TYPE_DATASET_INGEST,
-                    FlowScope::for_dataset(foo_id.clone()),
-                ),
+                ingest_dataset_binding(&foo_id),
                 FlowTriggerRule::Schedule(Duration::milliseconds(60).into()),
             )
             .await;
@@ -7048,10 +6830,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_INGEST,
-                FlowScope::for_dataset(foo_id.clone()),
-            ),
+            ingest_dataset_binding(&foo_id),
             FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
         )
         .await;
@@ -7059,10 +6838,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
     harness
         .set_flow_trigger(
             harness.now_datetime(),
-            FlowBinding::new(
-                FLOW_TYPE_DATASET_TRANSFORM,
-                FlowScope::for_dataset(bar_id.clone()),
-            ),
+            transform_dataset_binding(&bar_id),
             FlowTriggerRule::Batching(BatchingRule::empty()),
         )
         .await;
@@ -7292,10 +7068,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
         })
         .await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
     harness
         .set_dataset_flow_ingest(
             foo_flow_binding.clone(),
@@ -7444,10 +7217,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
         })
         .await;
 
-    let foo_flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
     harness
         .set_dataset_flow_ingest(
             foo_flow_binding.clone(),

@@ -12,7 +12,11 @@ use std::sync::Arc;
 use chrono::Utc;
 use dill::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
-use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowWebhooksEventBridge};
+use kamu_adapter_flow_webhook::{
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowWebhooksEventBridge,
+    webhook_deliver_binding,
+};
 use kamu_adapter_task_webhook as atw;
 use kamu_datasets::{
     DatasetEntry,
@@ -23,10 +27,8 @@ use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::{
     FlowActivationCause,
     FlowActivationCauseAutoPolling,
-    FlowBinding,
     FlowID,
     FlowRunService,
-    FlowScope,
     FlowState,
     FlowTimingRecords,
     MockFlowRunService,
@@ -333,12 +335,9 @@ impl TestWebhookDeliverySchedulerHarness {
 
                 Ok(FlowState {
                     flow_id: FlowID::new(1),
-                    flow_binding: FlowBinding::new(
-                        FLOW_TYPE_WEBHOOK_DELIVER,
-                        FlowScope::for_webhook_subscription(
-                            subscription_id.into_inner(),
-                            Some(dataset_id_clone_2.clone()),
-                        ),
+                    flow_binding: webhook_deliver_binding(
+                        subscription_id.into_inner(),
+                        Some(&dataset_id_clone_2),
                     ),
                     start_condition: None,
                     task_ids: vec![],

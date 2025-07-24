@@ -16,9 +16,9 @@ use database_common_macros::transactional_method1;
 use dill::*;
 use futures::TryStreamExt;
 use kamu_adapter_flow_dataset::{
-    FLOW_TYPE_DATASET_COMPACT,
-    FLOW_TYPE_DATASET_INGEST,
     FlowDatasetsEventBridge,
+    compaction_dataset_binding,
+    ingest_dataset_binding,
 };
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::*;
@@ -39,18 +39,9 @@ async fn test_visibility() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let binding_foo_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
-    let binding_foo_compaction = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
-    let binding_bar_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(bar_id.clone()),
-    );
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
+    let binding_foo_compaction = compaction_dataset_binding(&foo_id);
+    let binding_bar_ingest = ingest_dataset_binding(&bar_id);
 
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
@@ -92,10 +83,7 @@ async fn test_pause_resume_individual_dataset_flows() {
 
     // Make a dataset and configure daily ingestion schedule
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let binding_foo_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
@@ -150,19 +138,13 @@ async fn test_pause_resume_all_dataset_flows() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
 
     let foo_compaction_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_compaction = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let binding_foo_compaction = compaction_dataset_binding(&foo_id);
     harness
         .set_flow_trigger(
             binding_foo_compaction.clone(),
@@ -284,10 +266,7 @@ async fn test_dataset_deleted() {
     // Make a dataset and configure ingest trigger
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(foo_id.clone()),
-    );
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;

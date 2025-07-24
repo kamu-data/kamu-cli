@@ -11,7 +11,53 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetEntryServiceExt, DependencyGraphService};
 use kamu_flow_system as fs;
 
-use crate::{FLOW_TYPE_DATASET_COMPACT, FlowConfigRuleCompact};
+use crate::{
+    FLOW_TYPE_DATASET_COMPACT,
+    FLOW_TYPE_DATASET_INGEST,
+    FLOW_TYPE_DATASET_RESET,
+    FLOW_TYPE_DATASET_TRANSFORM,
+    FlowConfigRuleCompact,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[inline]
+pub fn ingest_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
+    fs::FlowBinding::new(
+        FLOW_TYPE_DATASET_INGEST,
+        fs::FlowScope::for_dataset(dataset_id.clone()),
+    )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[inline]
+pub fn transform_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
+    fs::FlowBinding::new(
+        FLOW_TYPE_DATASET_TRANSFORM,
+        fs::FlowScope::for_dataset(dataset_id.clone()),
+    )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[inline]
+pub fn compaction_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
+    fs::FlowBinding::new(
+        FLOW_TYPE_DATASET_COMPACT,
+        fs::FlowScope::for_dataset(dataset_id.clone()),
+    )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[inline]
+pub fn reset_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
+    fs::FlowBinding::new(
+        FLOW_TYPE_DATASET_RESET,
+        fs::FlowScope::for_dataset(dataset_id.clone()),
+    )
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,10 +83,7 @@ pub(crate) async fn trigger_metadata_only_hard_compaction_flow_for_own_downstrea
             .int_err()?;
 
         if owned {
-            let downstream_binding = fs::FlowBinding::new(
-                FLOW_TYPE_DATASET_COMPACT,
-                fs::FlowScope::for_dataset(downstream_dataset_id),
-            );
+            let downstream_binding = compaction_dataset_binding(&downstream_dataset_id);
             // Trigger hard compaction
             flow_run_service
                 .run_flow_automatically(

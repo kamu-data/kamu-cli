@@ -20,6 +20,8 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
+    compaction_dataset_binding,
+    ingest_dataset_binding,
 };
 use kamu_flow_system::*;
 use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult, TaskRunArguments};
@@ -1187,10 +1189,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
-    let binding_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id.clone()),
-    );
+    let binding_ingest = ingest_dataset_binding(&dataset_id);
 
     // No stats initially
     let stats = flow_event_store
@@ -1422,10 +1421,7 @@ pub async fn test_pending_flow_dataset_single_type_crud(catalog: &Catalog) {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
-    let flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id.clone()),
-    );
+    let flow_binding = ingest_dataset_binding(&dataset_id);
 
     // No pending yet
     let res = flow_event_store
@@ -1487,14 +1483,8 @@ pub async fn test_pending_flow_dataset_multiple_types_crud(catalog: &Catalog) {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
-    let flow_binding_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id.clone()),
-    );
-    let flow_binding_compact = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(dataset_id.clone()),
-    );
+    let flow_binding_ingest = ingest_dataset_binding(&dataset_id);
+    let flow_binding_compact = compaction_dataset_binding(&dataset_id);
 
     // No pending yet
     let res = flow_event_store
@@ -1602,18 +1592,9 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
     let dataset_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let dataset_bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let binding_foo_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_foo_id.clone()),
-    );
-    let binding_bar_ingest = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_bar_id.clone()),
-    );
-    let binding_foo_compact = FlowBinding::new(
-        FLOW_TYPE_DATASET_COMPACT,
-        FlowScope::for_dataset(dataset_foo_id.clone()),
-    );
+    let binding_foo_ingest = ingest_dataset_binding(&dataset_foo_id);
+    let binding_bar_ingest = ingest_dataset_binding(&dataset_bar_id);
+    let binding_foo_compact = compaction_dataset_binding(&dataset_foo_id);
 
     // No pending yet
     let res = flow_event_store
@@ -1789,10 +1770,7 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
     let flow_id = event_store.new_flow_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id.clone()),
-    );
+    let flow_binding = ingest_dataset_binding(&dataset_id);
 
     // Nothing stored yet, but prev stored event id sent => CM
     let res = event_store
@@ -1902,10 +1880,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
 
     let flow_id = event_store.new_flow_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id.clone()),
-    );
+    let flow_binding = ingest_dataset_binding(&dataset_id);
 
     let start_moment = Utc::now().trunc_subsecs(6);
     let activation_moment = start_moment + Duration::minutes(1);
@@ -2070,10 +2045,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
 
     let flow_id = event_store.new_flow_id().await.unwrap();
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_binding = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id.clone()),
-    );
+    let flow_binding = ingest_dataset_binding(&dataset_id);
 
     let start_moment = Utc::now().trunc_subsecs(6);
     let activation_moment = start_moment + Duration::minutes(1);
@@ -2167,18 +2139,9 @@ pub async fn test_flow_activation_multiple_flows(catalog: &Catalog) {
     let flow_id_bar = event_store.new_flow_id().await.unwrap();
     let flow_id_baz = event_store.new_flow_id().await.unwrap();
 
-    let flow_binding_foo = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_foo.clone()),
-    );
-    let flow_binding_bar = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_bar.clone()),
-    );
-    let flow_binding_baz = FlowBinding::new(
-        FLOW_TYPE_DATASET_INGEST,
-        FlowScope::for_dataset(dataset_id_baz.clone()),
-    );
+    let flow_binding_foo = ingest_dataset_binding(&dataset_id_foo);
+    let flow_binding_bar = ingest_dataset_binding(&dataset_id_bar);
+    let flow_binding_baz = ingest_dataset_binding(&dataset_id_baz);
 
     let start_moment = Utc::now().trunc_subsecs(6);
     let activation_moment_1 = start_moment + Duration::minutes(1);
