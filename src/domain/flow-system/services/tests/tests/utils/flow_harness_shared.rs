@@ -51,6 +51,7 @@ pub(crate) struct FlowHarness {
     pub outbox: Arc<dyn Outbox>,
     pub fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
     pub fake_system_time_source: FakeSystemTimeSource,
+    pub dataset_entry_service: Arc<dyn DatasetEntryService>,
 
     pub flow_configuration_service: Arc<dyn FlowConfigurationService>,
     pub flow_trigger_service: Arc<dyn FlowTriggerService>,
@@ -157,6 +158,7 @@ impl FlowHarness {
         Self {
             outbox: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
+            dataset_entry_service: catalog.get_one().unwrap(),
 
             flow_agent: catalog.get_one().unwrap(),
             flow_query_service: catalog.get_one().unwrap(),

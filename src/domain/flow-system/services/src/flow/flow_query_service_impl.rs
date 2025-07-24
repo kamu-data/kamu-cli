@@ -12,8 +12,6 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use dill::{component, interface};
 use futures::TryStreamExt;
-use internal_error::ResultIntoInternal;
-use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,7 +20,6 @@ use kamu_flow_system::*;
 #[interface(dyn FlowQueryService)]
 pub struct FlowQueryServiceImpl {
     flow_event_store: Arc<dyn FlowEventStore>,
-    dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,24 +90,14 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
     /// Returns datasets with flows associated with a given account
     /// ordered by creation time from newest to oldest.
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_id))]
-    async fn list_all_datasets_with_flow_by_account(
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn filter_flow_scopes_having_flows(
         &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        // Consider using ReBAC: not just owned, but any relation to account
-        let owned_dataset_ids = self
-            .dataset_entry_service
-            .get_owned_dataset_ids(account_id)
+        scopes: &[FlowScope],
+    ) -> Result<Vec<FlowScope>, InternalError> {
+        self.flow_event_store
+            .filter_flow_scopes_having_flows(scopes)
             .await
-            .int_err()?;
-
-        let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
-
-        Ok(self
-            .flow_event_store
-            .filter_datasets_having_flows(&owned_dataset_id_refs)
-            .await?)
     }
 
     /// Returns current state of a given flow

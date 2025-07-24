@@ -31,7 +31,7 @@ use kamu_adapter_task_dataset::{
     TaskResultDatasetUpdate,
 };
 use kamu_core::{CompactionResult, PullResult, ResetResult};
-use kamu_datasets::DatasetIntervalIncrement;
+use kamu_datasets::{DatasetEntryServiceExt, DatasetIntervalIncrement};
 use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
@@ -5811,19 +5811,47 @@ async fn test_list_all_datasets_with_flow() {
 
     pretty_assertions::assert_eq!([bar_account_id.clone()], *bar_dataset_initiators_list);
 
-    let all_datasets_with_flow: Vec<_> = harness
-        .flow_query_service
-        .list_all_datasets_with_flow_by_account(&foo_account_id)
+    let foo_datasets: Vec<_> = harness
+        .dataset_entry_service
+        .get_owned_dataset_ids(&foo_account_id)
         .await
         .unwrap();
+
+    let all_datasets_with_flow: Vec<_> = harness
+        .flow_query_service
+        .filter_flow_scopes_having_flows(
+            &foo_datasets
+                .into_iter()
+                .map(FlowScope::for_dataset)
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .filter_map(|flow_scope| flow_scope.dataset_id().cloned())
+        .collect();
 
     pretty_assertions::assert_eq!([foo_id], *all_datasets_with_flow);
 
-    let all_datasets_with_flow: Vec<_> = harness
-        .flow_query_service
-        .list_all_datasets_with_flow_by_account(&bar_account_id)
+    let bar_datasets: Vec<_> = harness
+        .dataset_entry_service
+        .get_owned_dataset_ids(&bar_account_id)
         .await
         .unwrap();
+
+    let all_datasets_with_flow: Vec<_> = harness
+        .flow_query_service
+        .filter_flow_scopes_having_flows(
+            &bar_datasets
+                .into_iter()
+                .map(FlowScope::for_dataset)
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .filter_map(|flow_scope| flow_scope.dataset_id().cloned())
+        .collect();
 
     pretty_assertions::assert_eq!([bar_id], *all_datasets_with_flow);
 }

@@ -811,37 +811,33 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
-    async fn filter_datasets_having_flows(
+    async fn filter_flow_scopes_having_flows(
         &self,
-        dataset_ids: &[&odf::DatasetID],
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        flow_scopes: &[FlowScope],
+    ) -> Result<Vec<FlowScope>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
+        let scope_json_parts = flow_scopes
+            .iter()
+            .map(|scope| serde_json::to_value(scope).unwrap())
+            .collect::<Vec<_>>();
 
-        let filtered_dataset_ids = sqlx::query!(
+        let filtered_flow_scopes = sqlx::query!(
             r#"
-            SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id
+            SELECT DISTINCT scope_data
             FROM flows
             WHERE
-                scope_data->>'dataset_id' = ANY($1)
+                scope_data = ANY($1)
             "#,
-            &ids,
+            &scope_json_parts,
         )
-        .map(|flow_row| {
-            odf::DatasetID::from_did_str(
-                &flow_row
-                    .dataset_id
-                    .expect("Must have a dataset id with this WHERE clause"),
-            )
-            .unwrap()
-        })
+        .map(|flow_row| serde_json::from_value::<FlowScope>(flow_row.scope_data).unwrap())
         .fetch_all(connection_mut)
         .await
         .int_err()?;
 
-        Ok(filtered_dataset_ids)
+        Ok(filtered_flow_scopes)
     }
 }
 

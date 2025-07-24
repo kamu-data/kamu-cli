@@ -2407,16 +2407,26 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
     assert_eq!(total_flow_ids, expected_flow_ids);
 
     // Test dataset having flows
-    let mut dataset_ids_with_empty = dataset_ids.clone();
+    let mut flow_scopes = Vec::new();
+    for dataset_id in &dataset_ids {
+        flow_scopes.push(FlowScope::Dataset {
+            dataset_id: (*dataset_id).clone(),
+        });
+    }
     let empty_dataset_id = odf::DatasetID::new_seeded_ed25519(b"empty");
-    dataset_ids_with_empty.push(&empty_dataset_id);
+    flow_scopes.push(FlowScope::Dataset {
+        dataset_id: empty_dataset_id.clone(),
+    });
 
-    let filtered_dataset_ids = flow_event_store
-        .filter_datasets_having_flows(dataset_ids_with_empty.as_slice())
+    let filtered_flow_scopes = flow_event_store
+        .filter_flow_scopes_having_flows(&flow_scopes)
         .await
         .unwrap();
 
-    let mut result: Vec<&odf::DatasetID> = filtered_dataset_ids.iter().collect();
+    let mut result: Vec<&odf::DatasetID> = filtered_flow_scopes
+        .iter()
+        .map(|scope| scope.dataset_id().unwrap())
+        .collect();
     result.sort();
 
     assert_eq!(dataset_ids, result);

@@ -139,15 +139,32 @@ impl<'a> AccountFlowRuns<'a> {
             return Ok(DatasetConnection::new(Vec::new(), 0, 0, 0));
         }
 
-        let (flow_query_service, dataset_registry) =
-            from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetRegistry);
+        let (flow_query_service, dataset_entry_service, dataset_registry) = from_catalog_n!(
+            ctx,
+            dyn fs::FlowQueryService,
+            dyn DatasetEntryService,
+            dyn DatasetRegistry
+        );
 
-        let dataset_ids = flow_query_service
-            .list_all_datasets_with_flow_by_account(&self.account.id)
+        // Consider using ReBAC: not just owned, but perhaps "Maintain" too,
+        // which allows launching flows
+        let owned_dataset_ids = dataset_entry_service
+            .get_owned_dataset_ids(&self.account.id)
             .await
-            .int_err()?
+            .int_err()?;
+
+        let input_flow_scopes = owned_dataset_ids
             .into_iter()
-            .map(Cow::Owned)
+            .map(fs::FlowScope::for_dataset)
+            .collect::<Vec<_>>();
+
+        let filtered_flow_scopes = flow_query_service
+            .filter_flow_scopes_having_flows(&input_flow_scopes)
+            .await?;
+
+        let dataset_ids = filtered_flow_scopes
+            .iter()
+            .filter_map(|flow_scope| flow_scope.dataset_id().map(Cow::Borrowed))
             .collect::<Vec<_>>();
 
         let dataset_handles_resolution = dataset_registry

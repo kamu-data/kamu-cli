@@ -12,7 +12,7 @@ use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
 
-use crate::{FlowFilters, FlowID, FlowScopeQuery, FlowState};
+use crate::{FlowFilters, FlowID, FlowScope, FlowScopeQuery, FlowState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,13 +41,11 @@ pub trait FlowQueryService: Sync + Send {
         scope_query: FlowScopeQuery,
     ) -> Result<FlowInitiatorListing, InternalError>;
 
-    /// Returns datasets with flows associated with a given account
-    /// ordered by creation time from newest to oldest.
-    /// Applies specified pagination
-    async fn list_all_datasets_with_flow_by_account(
+    /// Returns subset of input scopes that have at least one flow
+    async fn filter_flow_scopes_having_flows(
         &self,
-        account_id: &odf::AccountID,
-    ) -> Result<Vec<odf::DatasetID>, InternalError>;
+        scopes: &[FlowScope],
+    ) -> Result<Vec<FlowScope>, InternalError>;
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;

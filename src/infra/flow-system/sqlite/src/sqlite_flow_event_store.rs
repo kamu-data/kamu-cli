@@ -943,37 +943,46 @@ impl FlowEventStore for SqliteFlowEventStore {
         })
     }
 
-    async fn filter_datasets_having_flows(
+    async fn filter_flow_scopes_having_flows(
         &self,
-        dataset_ids: &[&odf::DatasetID],
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
+        flow_scopes: &[FlowScope],
+    ) -> Result<Vec<FlowScope>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
+        let scope_json_parts = flow_scopes
+            .iter()
+            .map(|scope| serde_json::to_value(scope).unwrap())
+            .collect::<Vec<_>>();
 
         let query_str = format!(
             r#"
-            SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id
+            SELECT DISTINCT scope_data
             FROM flows
             WHERE
-                scope_data->>'dataset_id' IN ({})
+                scope_data IN ({})
             "#,
-            sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(1).unwrap())
+            sqlite_generate_placeholders_list(
+                scope_json_parts.len(),
+                NonZeroUsize::new(1).unwrap()
+            )
         );
 
         let mut query = sqlx::query(&query_str);
 
-        for dataset_id in ids {
-            query = query.bind(dataset_id);
+        for scope_json in scope_json_parts {
+            query = query.bind(scope_json);
         }
 
-        let query_result = query.fetch_all(connection_mut).await.int_err()?;
+        let filtered_flow_scopes = query
+            .map(|flow_row: SqliteRow| {
+                serde_json::from_value::<FlowScope>(flow_row.get("scope_data")).unwrap()
+            })
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
 
-        Ok(query_result
-            .into_iter()
-            .map(|row| odf::DatasetID::from_did_str(row.get(0)).unwrap())
-            .collect())
+        Ok(filtered_flow_scopes)
     }
 }
 

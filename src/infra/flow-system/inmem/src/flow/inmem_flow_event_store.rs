@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
@@ -27,9 +26,7 @@ pub struct InMemoryFlowEventStore {
 struct State {
     events: Vec<FlowEvent>,
     last_flow_id: Option<FlowID>,
-    all_flows_by_dataset: HashMap<odf::DatasetID, Vec<FlowID>>,
-    all_flows_by_webhook_subscription: HashMap<uuid::Uuid, Vec<FlowID>>,
-    all_system_flows: Vec<FlowID>,
+    all_flows_by_scope: HashMap<FlowScope, Vec<FlowID>>,
     all_flows: Vec<FlowID>,
     flow_search_index: HashMap<FlowID, FlowIndexEntry>,
     flow_binding_by_flow_id: HashMap<FlowID, FlowBinding>,
@@ -134,6 +131,12 @@ impl InMemoryFlowEventStore {
                 .flow_binding_by_flow_id
                 .insert(e.flow_id, e.flow_binding.clone());
 
+            state
+                .all_flows_by_scope
+                .entry(e.flow_binding.scope.clone())
+                .or_default()
+                .push(e.flow_id);
+
             state.flow_search_index.insert(
                 event.flow_id(),
                 FlowIndexEntry {
@@ -142,26 +145,6 @@ impl InMemoryFlowEventStore {
                     initiator: e.activation_cause.initiator_account_id().cloned(),
                 },
             );
-
-            match &e.flow_binding.scope {
-                FlowScope::Dataset { dataset_id } => {
-                    Self::register_dataset_entry(state, dataset_id, event);
-                }
-
-                FlowScope::WebhookSubscription {
-                    subscription_id,
-                    dataset_id,
-                } => {
-                    Self::register_webhook_entry(state, subscription_id, event);
-                    if let Some(dataset_id) = dataset_id {
-                        Self::register_dataset_entry(state, dataset_id, event);
-                    }
-                }
-
-                FlowScope::System => {
-                    state.all_system_flows.push(event.flow_id());
-                }
-            }
 
             state.all_flows.push(event.flow_id());
         }
@@ -222,25 +205,6 @@ impl InMemoryFlowEventStore {
             let flow_id = event.flow_id();
             Self::remove_flow_scheduling_record(state, flow_id);
         }
-    }
-
-    fn register_dataset_entry(state: &mut State, dataset_id: &odf::DatasetID, event: &FlowEvent) {
-        let all_dataset_entries = match state.all_flows_by_dataset.entry(dataset_id.clone()) {
-            Entry::Occupied(v) => v.into_mut(),
-            Entry::Vacant(v) => v.insert(Vec::default()),
-        };
-        all_dataset_entries.push(event.flow_id());
-    }
-
-    fn register_webhook_entry(state: &mut State, subscription_id: &uuid::Uuid, event: &FlowEvent) {
-        let all_webhook_entries = match state
-            .all_flows_by_webhook_subscription
-            .entry(*subscription_id)
-        {
-            Entry::Occupied(v) => v.into_mut(),
-            Entry::Vacant(v) => v.insert(Vec::default()),
-        };
-        all_webhook_entries.push(event.flow_id());
     }
 
     fn insert_flow_scheduling_record(
@@ -345,44 +309,16 @@ impl FlowEventStore for InMemoryFlowEventStore {
             by_initiator: None,
         };
 
-        Ok(match &flow_binding.scope {
-            FlowScope::Dataset { dataset_id } => g
-                .all_flows_by_dataset
-                .get(dataset_id)
-                .map(|dataset_flow_ids| {
-                    dataset_flow_ids.iter().rev().find(|flow_id| {
-                        g.matches_flow(**flow_id, &waiting_filter)
-                            || g.matches_flow(**flow_id, &running_filter)
-                    })
-                })
-                .unwrap_or_default()
-                .copied(),
-
-            FlowScope::WebhookSubscription {
-                subscription_id,
-                dataset_id: _,
-            } => g
-                .all_flows_by_webhook_subscription
-                .get(subscription_id)
-                .map(|subscription_flow_ids| {
-                    subscription_flow_ids.iter().rev().find(|flow_id| {
-                        g.matches_flow(**flow_id, &waiting_filter)
-                            || g.matches_flow(**flow_id, &running_filter)
-                    })
-                })
-                .unwrap_or_default()
-                .copied(),
-
-            FlowScope::System => g
-                .all_system_flows
-                .iter()
-                .rev()
-                .find(|flow_id| {
+        Ok(g.all_flows_by_scope
+            .get(&flow_binding.scope)
+            .map(|scope_flow_ids| {
+                scope_flow_ids.iter().rev().find(|flow_id| {
                     g.matches_flow(**flow_id, &waiting_filter)
                         || g.matches_flow(**flow_id, &running_filter)
                 })
-                .copied(),
-        })
+            })
+            .unwrap_or_default()
+            .copied())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
@@ -411,55 +347,21 @@ impl FlowEventStore for InMemoryFlowEventStore {
             by_initiator: None,
         };
 
-        Ok(match flow_scope {
-            FlowScope::Dataset { dataset_id } => g
-                .all_flows_by_dataset
-                .get(dataset_id)
-                .map(|dataset_flow_ids| {
-                    dataset_flow_ids
-                        .iter()
-                        .rev()
-                        .filter(|flow_id| {
-                            g.matches_flow(**flow_id, &waiting_filter)
-                                || g.matches_flow(**flow_id, &retrying_filter)
-                                || g.matches_flow(**flow_id, &running_filter)
-                        })
-                        .copied()
-                        .collect()
-                })
-                .unwrap_or_default(),
-
-            FlowScope::WebhookSubscription {
-                subscription_id, ..
-            } => g
-                .all_flows_by_webhook_subscription
-                .get(subscription_id)
-                .map(|subscription_flow_ids| {
-                    subscription_flow_ids
-                        .iter()
-                        .rev()
-                        .filter(|flow_id| {
-                            g.matches_flow(**flow_id, &waiting_filter)
-                                || g.matches_flow(**flow_id, &retrying_filter)
-                                || g.matches_flow(**flow_id, &running_filter)
-                        })
-                        .copied()
-                        .collect()
-                })
-                .unwrap_or_default(),
-
-            FlowScope::System => g
-                .all_system_flows
-                .iter()
-                .rev()
-                .filter(|flow_id| {
-                    g.matches_flow(**flow_id, &waiting_filter)
-                        || g.matches_flow(**flow_id, &retrying_filter)
-                        || g.matches_flow(**flow_id, &running_filter)
-                })
-                .copied()
-                .collect(),
-        })
+        Ok(g.all_flows_by_scope
+            .get(flow_scope)
+            .map(|scope_flow_ids| {
+                scope_flow_ids
+                    .iter()
+                    .rev()
+                    .filter(|flow_id| {
+                        g.matches_flow(**flow_id, &waiting_filter)
+                            || g.matches_flow(**flow_id, &retrying_filter)
+                            || g.matches_flow(**flow_id, &running_filter)
+                    })
+                    .copied()
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
@@ -669,25 +571,23 @@ impl FlowEventStore for InMemoryFlowEventStore {
         })
     }
 
-    async fn filter_datasets_having_flows(
+    async fn filter_flow_scopes_having_flows(
         &self,
-        dataset_ids: &[&odf::DatasetID],
-    ) -> Result<Vec<odf::DatasetID>, InternalError> {
-        let dataset_ids: HashSet<_> = dataset_ids.iter().copied().collect();
-
+        flow_scopes: &[FlowScope],
+    ) -> Result<Vec<FlowScope>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
-        let mut filtered_dataset_ids = HashSet::new();
+        let mut filtered_flow_scopes = HashSet::new();
         for flow_id in &g.all_flows {
             let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
-            if let Some(dataset_id) = flow_binding.dataset_id()
-                && dataset_ids.contains(dataset_id)
+            if flow_scopes.contains(&flow_binding.scope)
+                && !filtered_flow_scopes.contains(&flow_binding.scope)
             {
-                filtered_dataset_ids.insert(dataset_id.clone());
+                filtered_flow_scopes.insert(flow_binding.scope.clone());
             }
         }
-        Ok(filtered_dataset_ids.into_iter().collect())
+        Ok(filtered_flow_scopes.into_iter().collect())
     }
 }
 
