@@ -35,66 +35,27 @@ impl FlowSchedulingHelper {
     pub(crate) async fn activate_flow_trigger(
         &self,
         target_catalog: &dill::Catalog,
-        start_time: DateTime<Utc>,
+        activation_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         rule: FlowTriggerRule,
     ) -> Result<(), InternalError> {
         tracing::trace!(?flow_binding, ?rule, "Activating flow trigger");
 
-        match &flow_binding.scope {
-            FlowScope::Dataset { .. } => match &rule {
-                FlowTriggerRule::Batching(batching_rule) => {
-                    let flow_run_stats = self
-                        .flow_event_store
-                        .get_flow_run_stats(flow_binding)
-                        .await?;
-                    if flow_run_stats.last_success_time.is_some() {
-                        self.trigger_flow_common(
-                            flow_binding,
-                            Some(FlowTriggerRule::Batching(*batching_rule)),
-                            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-                                activation_time: start_time,
-                            }),
-                            None,
-                            None,
-                        )
-                        .await?;
-                    } else {
-                        self.schedule_auto_polling_flow_unconditionally(start_time, flow_binding)
-                            .await?;
-                    }
-
-                    let flow_controller =
-                        get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)?;
-                    flow_controller
-                        .register_flow_sensor(flow_binding, rule)
-                        .await
-                        .int_err()?;
-                }
-                FlowTriggerRule::Schedule(schedule_rule) => {
-                    self.schedule_auto_polling_flow(start_time, flow_binding, schedule_rule)
-                        .await?;
-                }
-            },
-            FlowScope::WebhookSubscription { .. } => {
-                // Don't schedule webhook flows, they are triggered by events solely.
-                // But register necessary sensors
+        match &rule {
+            // Reactive batching action
+            FlowTriggerRule::Batching(batching_rule) => {
                 let flow_controller =
                     get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)?;
                 flow_controller
-                    .register_flow_sensor(flow_binding, rule)
+                    .register_flow_sensor(flow_binding, activation_time, *batching_rule)
                     .await
                     .int_err()?;
             }
-            FlowScope::System => {
-                if let FlowTriggerRule::Schedule(schedule) = &rule {
-                    self.schedule_auto_polling_flow(start_time, flow_binding, schedule)
-                        .await?;
-                } else {
-                    unimplemented!(
-                        "Doubt will ever need to schedule system flows via batching rules"
-                    )
-                }
+
+            // Scheduled action
+            FlowTriggerRule::Schedule(schedule_rule) => {
+                self.schedule_auto_polling_flow(activation_time, flow_binding, schedule_rule)
+                    .await?;
             }
         }
 
@@ -131,24 +92,6 @@ impl FlowSchedulingHelper {
         self.trigger_flow_common(
             flow_binding,
             Some(FlowTriggerRule::Schedule(schedule.clone())),
-            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-                activation_time: start_time,
-            }),
-            None,
-            None,
-        )
-        .await
-    }
-
-    pub(crate) async fn schedule_auto_polling_flow_unconditionally(
-        &self,
-        start_time: DateTime<Utc>,
-        flow_binding: &FlowBinding,
-    ) -> Result<FlowState, InternalError> {
-        // Very similar to manual trigger, but automatic reasons
-        self.trigger_flow_common(
-            flow_binding,
-            None,
             FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
                 activation_time: start_time,
             }),

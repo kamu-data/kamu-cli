@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system as fs;
 
@@ -69,6 +70,7 @@ impl DerivedDatasetFlowSensor {
         &self,
         activation_cause: &fs::FlowActivationCause,
         flow_run_service: &dyn fs::FlowRunService,
+        with_batching_rule: bool,
     ) -> Result<(), InternalError> {
         let target_flow_binding = fs::FlowBinding::for_dataset(
             self.flow_scope.dataset_id().unwrap().clone(),
@@ -78,7 +80,11 @@ impl DerivedDatasetFlowSensor {
             .run_flow_automatically(
                 &target_flow_binding,
                 activation_cause.clone(),
-                Some(fs::FlowTriggerRule::Batching(self.batching_rule)),
+                if with_batching_rule {
+                    Some(fs::FlowTriggerRule::Batching(self.batching_rule))
+                } else {
+                    None
+                },
                 None,
                 None,
             )
@@ -127,12 +133,47 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
             .collect()
     }
 
+    async fn on_activated(
+        &self,
+        catalog: &dill::Catalog,
+        activation_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        tracing::info!(?self.flow_scope, "Derived dataset flow sensor activated");
+
+        // Activate transform flow for the target dataset
+
+        let flow_event_store = catalog.get_one::<dyn fs::FlowEventStore>().unwrap();
+        let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
+
+        let flow_binding =
+            fs::FlowBinding::from_scope(FLOW_TYPE_DATASET_TRANSFORM, self.flow_scope.clone());
+
+        let activation_cause =
+            fs::FlowActivationCause::AutoPolling(fs::FlowActivationCauseAutoPolling {
+                activation_time,
+            });
+
+        // If the flow had ever run, use the batching condition,
+        //  otherwise schedule unconditionally
+        let flow_run_stats = flow_event_store.get_flow_run_stats(&flow_binding).await?;
+        self.run_transform_flow(
+            &activation_cause,
+            flow_run_service.as_ref(),
+            flow_run_stats.last_success_time.is_some(),
+        )
+        .await?;
+
+        Ok(())
+    }
+
     async fn on_sensitized(
         &self,
         catalog: &dill::Catalog,
         input_flow_binding: &fs::FlowBinding,
         activation_cause: &fs::FlowActivationCause,
     ) -> Result<(), InternalError> {
+        tracing::info!(?self.flow_scope, ?input_flow_binding, ?activation_cause, "Derived dataset flow sensor sensitized");
+
         // First we should ensure we are sensitized with a valid input dataset
         let input_dataset_id = input_flow_binding.get_dataset_id_or_die()?;
         if !self.sensitive_dataset_ids.contains(&input_dataset_id) {
@@ -152,7 +193,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                 // Dataset was normally updated, there is new data available to process
                 fs::DatasetChanges::NewData { .. } => {
                     // Trigger transform flow for the target dataset
-                    self.run_transform_flow(activation_cause, flow_run_service.as_ref())
+                    self.run_transform_flow(activation_cause, flow_run_service.as_ref(), true)
                         .await?;
                 }
                 // Note: will not be activated for now

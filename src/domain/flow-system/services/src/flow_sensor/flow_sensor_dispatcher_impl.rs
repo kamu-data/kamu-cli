@@ -10,6 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_flow_system::{
     FlowActivationCause,
@@ -50,7 +51,12 @@ struct State {
 
 #[async_trait::async_trait]
 impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
-    async fn register_sensor(&self, flow_sensor: Arc<dyn FlowSensor>) -> Result<(), InternalError> {
+    async fn register_sensor(
+        &self,
+        catalog: &dill::Catalog,
+        activation_time: DateTime<Utc>,
+        flow_sensor: Arc<dyn FlowSensor>,
+    ) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
 
         // Get the flow scope for this sensor
@@ -76,7 +82,10 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
         }
 
         // Store the sensor
-        state.sensors.insert(flow_scope, flow_sensor);
+        state.sensors.insert(flow_scope, flow_sensor.clone());
+
+        // Notify the sensor that it has been activated
+        flow_sensor.on_activated(catalog, activation_time).await?;
 
         Ok(())
     }

@@ -32,6 +32,7 @@ use crate::{DatasetUpdatedWebhookSensor, FLOW_TYPE_WEBHOOK_DELIVER};
     flow_type: FLOW_TYPE_WEBHOOK_DELIVER,
 })]
 pub struct FlowControllerWebhookDeliver {
+    catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
 }
 
@@ -44,13 +45,16 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
     async fn register_flow_sensor(
         &self,
         flow_binding: &fs::FlowBinding,
-        flow_trigger_rule: fs::FlowTriggerRule,
+        activation_time: DateTime<Utc>,
+        batching_rule: fs::BatchingRule,
     ) -> Result<(), InternalError> {
+        let sensor = Arc::new(DatasetUpdatedWebhookSensor::new(
+            flow_binding.scope.clone(),
+            batching_rule,
+        ));
+
         self.flow_sensor_dispatcher
-            .register_sensor(Arc::new(DatasetUpdatedWebhookSensor::new(
-                flow_binding.scope.clone(),
-                flow_trigger_rule,
-            )))
+            .register_sensor(&self.catalog, activation_time, sensor)
             .await?;
 
         Ok(())

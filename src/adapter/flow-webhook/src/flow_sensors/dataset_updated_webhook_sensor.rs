@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
 use kamu_flow_system as fs;
@@ -17,18 +18,15 @@ use crate::FLOW_TYPE_WEBHOOK_DELIVER;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetUpdatedWebhookSensor {
-    webhook_subscription_flow_scope: fs::FlowScope,
-    trigger_rule: fs::FlowTriggerRule,
+    webhook_flow_scope: fs::FlowScope,
+    batching_rule: fs::BatchingRule,
 }
 
 impl DatasetUpdatedWebhookSensor {
-    pub fn new(
-        webhook_subscription_flow_scope: fs::FlowScope,
-        trigger_rule: fs::FlowTriggerRule,
-    ) -> Self {
+    pub fn new(webhook_flow_scope: fs::FlowScope, batching_rule: fs::BatchingRule) -> Self {
         Self {
-            webhook_subscription_flow_scope,
-            trigger_rule,
+            webhook_flow_scope,
+            batching_rule,
         }
     }
 }
@@ -36,16 +34,23 @@ impl DatasetUpdatedWebhookSensor {
 #[async_trait::async_trait]
 impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
     fn flow_scope(&self) -> &fs::FlowScope {
-        &self.webhook_subscription_flow_scope
+        &self.webhook_flow_scope
     }
 
     fn get_sensitive_to_scopes(&self) -> Vec<fs::FlowScope> {
         vec![fs::FlowScope::for_dataset(
-            self.webhook_subscription_flow_scope
-                .dataset_id()
-                .unwrap()
-                .clone(),
+            self.webhook_flow_scope.dataset_id().unwrap().clone(),
         )]
+    }
+
+    async fn on_activated(
+        &self,
+        _catalog: &dill::Catalog,
+        _activation_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        tracing::info!(?self.webhook_flow_scope, "DatasetUpdatedWebhookSensor activated");
+        // TODO
+        Ok(())
     }
 
     async fn on_sensitized(
@@ -54,15 +59,17 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         input_flow_binding: &fs::FlowBinding,
         activation_cause: &fs::FlowActivationCause,
     ) -> Result<(), InternalError> {
+        tracing::info!(?self.webhook_flow_scope, ?input_flow_binding, ?activation_cause, "DatasetUpdatedWebhookSensor sensitized");
+
         // Ensure sensitized for right dataset id
         let input_dataset_id = input_flow_binding.dataset_id().ok_or_else(|| {
             InternalError::new("Input flow binding does not have a dataset ID".to_string())
         })?;
-        if input_dataset_id != self.webhook_subscription_flow_scope.dataset_id().unwrap() {
+        if input_dataset_id != self.webhook_flow_scope.dataset_id().unwrap() {
             return Err(InternalError::new(format!(
                 "FlowBinding dataset ID {} does not match sensor dataset ID {}",
                 input_dataset_id,
-                self.webhook_subscription_flow_scope.dataset_id().unwrap()
+                self.webhook_flow_scope.dataset_id().unwrap()
             )));
         }
 
@@ -86,13 +93,13 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
             // Trigger webhook flow, regardless of the change type
             let target_flow_binding = fs::FlowBinding::from_scope(
                 FLOW_TYPE_WEBHOOK_DELIVER,
-                self.webhook_subscription_flow_scope.clone(),
+                self.webhook_flow_scope.clone(),
             );
             flow_run_service
                 .run_flow_automatically(
                     &target_flow_binding,
                     activation_cause.clone(),
-                    Some(self.trigger_rule.clone()),
+                    Some(fs::FlowTriggerRule::Batching(self.batching_rule)),
                     None,
                     Some(
                         TaskRunArgumentsWebhookDeliver {

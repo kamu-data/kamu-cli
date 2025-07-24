@@ -6838,7 +6838,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
         .set_flow_trigger(
             harness.now_datetime(),
             FlowBinding::for_dataset(bar_id.clone(), FLOW_TYPE_DATASET_TRANSFORM),
-            FlowTriggerRule::Batching(BatchingRule::new_checked(0, Duration::seconds(0)).unwrap()),
+            FlowTriggerRule::Batching(BatchingRule::empty()),
         )
         .await;
 

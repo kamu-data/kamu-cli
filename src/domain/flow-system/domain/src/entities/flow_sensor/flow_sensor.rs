@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
 use crate::{FlowActivationCause, FlowBinding, FlowScope};
@@ -18,6 +19,12 @@ pub trait FlowSensor: Send + Sync {
     fn flow_scope(&self) -> &FlowScope;
 
     fn get_sensitive_to_scopes(&self) -> Vec<FlowScope>;
+
+    async fn on_activated(
+        &self,
+        catalog: &dill::Catalog,
+        activation_time: DateTime<Utc>,
+    ) -> Result<(), InternalError>;
 
     async fn on_sensitized(
         &self,

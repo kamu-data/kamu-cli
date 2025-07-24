@@ -40,15 +40,10 @@ impl fs::FlowController for FlowControllerTransform {
     async fn register_flow_sensor(
         &self,
         flow_binding: &fs::FlowBinding,
-        trigger_rule: fs::FlowTriggerRule,
+        activation_time: DateTime<Utc>,
+        batching_rule: fs::BatchingRule,
     ) -> Result<(), InternalError> {
         let dataset_id = flow_binding.get_dataset_id_or_die()?;
-
-        let fs::FlowTriggerRule::Batching(batching_rule) = trigger_rule else {
-            return Err(InternalError::new(
-                "FlowControllerTransform expects a BatchingRule for registering sensors",
-            ));
-        };
 
         use futures::StreamExt;
         let upstream_dataset_ids = self
@@ -60,7 +55,7 @@ impl fs::FlowController for FlowControllerTransform {
 
         let sensor = DerivedDatasetFlowSensor::new(dataset_id, upstream_dataset_ids, batching_rule);
         self.flow_sensor_dispatcher
-            .register_sensor(Arc::new(sensor))
+            .register_sensor(&self.catalog, activation_time, Arc::new(sensor))
             .await?;
 
         Ok(())
