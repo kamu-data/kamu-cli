@@ -7,21 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system as fs;
-
-use crate::FLOW_TYPE_WEBHOOK_DELIVER;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[inline]
-pub fn webhook_deliver_binding(
-    subscription_id: uuid::Uuid,
-    dataset_id: Option<&odf::DatasetID>,
-) -> fs::FlowBinding {
-    fs::FlowBinding::new(
-        FLOW_TYPE_WEBHOOK_DELIVER,
-        fs::FlowScope::for_webhook_subscription(subscription_id, dataset_id),
-    )
+pub trait IntoOwned<T> {
+    fn into_owned(self) -> T;
+}
+
+impl<T: Clone> IntoOwned<T> for &T {
+    fn into_owned(self) -> T {
+        self.clone()
+    }
+}
+
+impl<T> IntoOwned<T> for T {
+    fn into_owned(self) -> T {
+        self
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

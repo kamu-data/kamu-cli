@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use lang_utils::IntoOwned;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,18 +27,20 @@ pub enum FlowScope {
 
 impl FlowScope {
     #[inline]
-    pub fn for_dataset(dataset_id: odf::DatasetID) -> Self {
-        FlowScope::Dataset { dataset_id }
+    pub fn for_dataset(dataset_id: impl IntoOwned<odf::DatasetID>) -> Self {
+        FlowScope::Dataset {
+            dataset_id: dataset_id.into_owned(),
+        }
     }
 
     #[inline]
     pub fn for_webhook_subscription(
         subscription_id: uuid::Uuid,
-        dataset_id: Option<odf::DatasetID>,
+        dataset_id: Option<impl IntoOwned<odf::DatasetID>>,
     ) -> Self {
         FlowScope::WebhookSubscription {
             subscription_id,
-            dataset_id,
+            dataset_id: dataset_id.map(IntoOwned::into_owned),
         }
     }
 

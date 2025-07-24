@@ -12,8 +12,8 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
-use async_utils::AsyncReadObj;
 use bytes::Bytes;
+use lang_utils::AsyncReadObj;
 use odf_metadata::*;
 use odf_storage::*;
 use url::Url;

@@ -69,11 +69,10 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
-        let dataset_handle = self.dataset_request_state.dataset_handle();
 
         let flow_binding = FlowBinding::new(
             map_dataset_flow_type(dataset_flow_type),
-            FlowScope::for_dataset(dataset_handle.id.clone()),
+            FlowScope::for_dataset(self.dataset_request_state.dataset_id()),
         );
 
         let res = flow_trigger_service
@@ -95,10 +94,9 @@ impl<'a> DatasetFlowTriggersMut<'a> {
     ) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_id = self.dataset_request_state.dataset_id();
         let flow_binding = FlowBinding::new(
             map_dataset_flow_type(dataset_flow_type),
-            FlowScope::for_dataset(dataset_id.clone()),
+            FlowScope::for_dataset(self.dataset_request_state.dataset_id()),
         );
 
         flow_trigger_service
@@ -113,9 +111,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
     async fn pause_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_id = self.dataset_request_state.dataset_id();
-        let flow_scope = FlowScope::for_dataset(dataset_id.clone());
-
+        let flow_scope = FlowScope::for_dataset(self.dataset_request_state.dataset_id());
         flow_trigger_service
             .pause_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
             .await?;
@@ -132,10 +128,9 @@ impl<'a> DatasetFlowTriggersMut<'a> {
     ) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_id = self.dataset_request_state.dataset_id();
         let flow_binding = FlowBinding::new(
             map_dataset_flow_type(dataset_flow_type),
-            FlowScope::for_dataset(dataset_id.clone()),
+            FlowScope::for_dataset(self.dataset_request_state.dataset_id()),
         );
 
         flow_trigger_service
@@ -150,9 +145,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
     async fn resume_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_id = self.dataset_request_state.dataset_id();
-        let flow_scope = FlowScope::for_dataset(dataset_id.clone());
-
+        let flow_scope = FlowScope::for_dataset(self.dataset_request_state.dataset_id());
         flow_trigger_service
             .resume_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
             .await?;

@@ -22,8 +22,8 @@ doctest = false
 
 
 [dependencies]
-async-utils = { workspace = true }
 common-macros = { workspace = true }
+lang-utils = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
 

@@ -2401,7 +2401,7 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
     // Test dataset having flows
     let mut flow_scopes = Vec::new();
     for dataset_id in &dataset_ids {
-        flow_scopes.push(FlowScope::for_dataset((*dataset_id).clone()));
+        flow_scopes.push(FlowScope::for_dataset(*dataset_id));
     }
     flow_scopes.push(FlowScope::for_dataset(odf::DatasetID::new_seeded_ed25519(
         b"empty",
@@ -2474,7 +2474,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
         // The flow should still be pending, because of retrying status
         let pending_flows = flow_event_store
-            .try_get_all_scope_pending_flows(&FlowScope::for_dataset(dataset_id.clone()))
+            .try_get_all_scope_pending_flows(&FlowScope::for_dataset(&dataset_id))
             .await
             .unwrap();
         assert_eq!(pending_flows.len(), 1);
@@ -2500,7 +2500,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
     // The flow should no longer be pending
     let pending_flows = flow_event_store
-        .try_get_all_scope_pending_flows(&FlowScope::for_dataset(dataset_id.clone()))
+        .try_get_all_scope_pending_flows(&FlowScope::for_dataset(dataset_id))
         .await
         .unwrap();
     assert!(pending_flows.is_empty());
@@ -2771,7 +2771,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         let mut flow = Flow::new(
             creation_moment,
             flow_id,
-            FlowBinding::new(flow_type, FlowScope::for_dataset(self.dataset_id.clone())),
+            FlowBinding::new(flow_type, FlowScope::for_dataset(self.dataset_id)),
             initial_activation_cause,
             config_snapshot,
             retry_policy,

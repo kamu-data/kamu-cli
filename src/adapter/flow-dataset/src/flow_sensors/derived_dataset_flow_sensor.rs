@@ -127,7 +127,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
     fn get_sensitive_to_scopes(&self) -> Vec<fs::FlowScope> {
         self.sensitive_dataset_ids
             .iter()
-            .map(|id| fs::FlowScope::for_dataset(id.clone()))
+            .map(|id| fs::FlowScope::for_dataset(id))
             .collect()
     }
 

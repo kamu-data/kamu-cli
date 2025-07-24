@@ -37,7 +37,7 @@ impl<'a> DatasetFlowConfigs<'a> {
     ) -> Result<Option<FlowConfiguration>> {
         let flow_binding = FlowBinding::new(
             map_dataset_flow_type(dataset_flow_type),
-            FlowScope::for_dataset(self.dataset_request_state.dataset_id().clone()),
+            FlowScope::for_dataset(self.dataset_request_state.dataset_id()),
         );
 
         let flow_config_service = from_catalog_n!(ctx, dyn FlowConfigurationService);

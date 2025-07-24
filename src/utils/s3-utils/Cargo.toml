@@ -22,9 +22,9 @@ doctest = false
 
 
 [dependencies]
-async-utils = { workspace = true }
 common-macros = { workspace = true }
 internal-error = { workspace = true }
+lang-utils = { workspace = true }
 observability = { workspace = true, features = ["prometheus"] }
 
 aws-config = { version = "1", default-features = false }

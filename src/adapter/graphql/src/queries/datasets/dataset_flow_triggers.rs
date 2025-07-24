@@ -37,7 +37,7 @@ impl<'a> DatasetFlowTriggers<'a> {
     ) -> Result<Option<FlowTrigger>> {
         let flow_binding = FlowBinding::new(
             map_dataset_flow_type(dataset_flow_type),
-            FlowScope::for_dataset(self.dataset_request_state.dataset_id().clone()),
+            FlowScope::for_dataset(self.dataset_request_state.dataset_id()),
         );
 
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
@@ -54,8 +54,7 @@ impl<'a> DatasetFlowTriggers<'a> {
     async fn all_paused(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
-        let dataset_id = self.dataset_request_state.dataset_handle().id.clone();
-        let scope = FlowScope::for_dataset(dataset_id);
+        let scope = FlowScope::for_dataset(self.dataset_request_state.dataset_id());
 
         let has_active_triggers = flow_trigger_service
             .has_active_triggers_for_scopes(&[scope])

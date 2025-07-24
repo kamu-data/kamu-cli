@@ -25,7 +25,7 @@ use crate::{
 pub fn ingest_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_INGEST,
-        fs::FlowScope::for_dataset(dataset_id.clone()),
+        fs::FlowScope::for_dataset(dataset_id),
     )
 }
 
@@ -35,7 +35,7 @@ pub fn ingest_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
 pub fn transform_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_TRANSFORM,
-        fs::FlowScope::for_dataset(dataset_id.clone()),
+        fs::FlowScope::for_dataset(dataset_id),
     )
 }
 
@@ -45,7 +45,7 @@ pub fn transform_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding
 pub fn compaction_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_COMPACT,
-        fs::FlowScope::for_dataset(dataset_id.clone()),
+        fs::FlowScope::for_dataset(dataset_id),
     )
 }
 
@@ -55,7 +55,7 @@ pub fn compaction_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBindin
 pub fn reset_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_RESET,
-        fs::FlowScope::for_dataset(dataset_id.clone()),
+        fs::FlowScope::for_dataset(dataset_id),
     )
 }
 

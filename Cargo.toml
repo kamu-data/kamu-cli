@@ -1,7 +1,6 @@
 [workspace]
 members = [
     # Utils
-    "src/utils/async-utils",
     "src/utils/common-macros",
     "src/utils/container-runtime",
     "src/utils/crypto-utils",
@@ -17,6 +16,7 @@ members = [
     "src/utils/init-on-startup",
     "src/utils/internal-error",
     "src/utils/kamu-cli-puppet",
+    "src/utils/lang-utils",
     "src/utils/messaging-outbox",
     "src/utils/multiformats",
     "src/utils/observability",
@@ -137,7 +137,6 @@ aws-sdk-s3 = "=1.68.0"
 kamu-cli = { version = "0.245.2", path = "src/app/cli", default-features = false }
 
 # Utils
-async-utils = { version = "0.245.2", path = "src/utils/async-utils", default-features = false }
 common-macros = { version = "0.245.2", path = "src/utils/common-macros", default-features = false }
 container-runtime = { version = "0.245.2", path = "src/utils/container-runtime", default-features = false }
 crypto-utils = { version = "0.245.2", path = "src/utils/crypto-utils", default-features = false }
@@ -153,6 +152,7 @@ init-on-startup = { version = "0.245.2", path = "src/utils/init-on-startup", def
 internal-error = { version = "0.245.2", path = "src/utils/internal-error", default-features = false }
 kamu-cli-puppet = { version = "0.245.2", path = "src/utils/kamu-cli-puppet", default-features = false }
 kamu-datafusion-cli = { version = "0.245.2", path = "src/utils/datafusion-cli", default-features = false }
+lang-utils = { version = "0.245.2", path = "src/utils/lang-utils", default-features = false }
 messaging-outbox = { version = "0.245.2", path = "src/utils/messaging-outbox", default-features = false }
 multiformats = { version = "0.245.2", path = "src/utils/multiformats", default-features = false }
 observability = { version = "0.245.2", path = "src/utils/observability", default-features = false }

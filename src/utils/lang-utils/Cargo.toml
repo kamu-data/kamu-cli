@@ -1,6 +1,6 @@
 [package]
-name = "async-utils"
-description = "Simple utilities to streamline asynchronous work with std::core::Result"
+name = "lang-utils"
+description = "Simple utilities to at the language level"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

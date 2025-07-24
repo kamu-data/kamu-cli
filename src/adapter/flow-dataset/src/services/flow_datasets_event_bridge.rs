@@ -73,7 +73,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowDatasetsEventBridge {
             // Dataset resource is removed,
             // so we need to wipe all the related data in the flow system
             DatasetLifecycleMessage::Deleted(deleted_message) => {
-                let flow_scope = fs::FlowScope::for_dataset(deleted_message.dataset_id.clone());
+                let flow_scope = fs::FlowScope::for_dataset(&deleted_message.dataset_id);
 
                 tracing::debug!(
                     ?flow_scope,

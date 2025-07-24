@@ -424,10 +424,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     async fn test(store: &dyn FlowTriggerEventStore, ids: &[odf::DatasetID]) -> bool {
-        let scopes: Vec<_> = ids
-            .iter()
-            .map(|dataset_id: &odf::DatasetID| FlowScope::for_dataset(dataset_id.clone()))
-            .collect();
+        let scopes: Vec<_> = ids.iter().map(FlowScope::for_dataset).collect();
         store.has_active_triggers_for_scopes(&scopes).await.unwrap()
     }
 

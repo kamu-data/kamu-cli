@@ -160,7 +160,7 @@ async fn test_pause_resume_all_dataset_flows() {
     assert_eq!(2, harness.trigger_events_count());
 
     // Now, pause all flows of this dataset
-    harness.pause_all_dataset_flows(foo_id.clone()).await;
+    harness.pause_all_dataset_flows(&foo_id).await;
 
     // Both should disappear from the list of enabled triggers,
     // and both should produce events
@@ -192,7 +192,7 @@ async fn test_pause_resume_all_dataset_flows() {
     );
 
     // Now, resume all triggers
-    harness.resume_all_dataset_flows(foo_id.clone()).await;
+    harness.resume_all_dataset_flows(&foo_id).await;
 
     // They should be visible in the list of active triggers again, and again,we
     // should get 2 extra events
@@ -426,7 +426,7 @@ impl FlowTriggerHarness {
             .unwrap();
     }
 
-    async fn pause_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
+    async fn pause_all_dataset_flows(&self, dataset_id: &odf::DatasetID) {
         let lookup_scopes = vec![FlowScope::for_dataset(dataset_id)];
         self.flow_trigger_service
             .pause_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
@@ -441,7 +441,7 @@ impl FlowTriggerHarness {
             .unwrap();
     }
 
-    async fn resume_all_dataset_flows(&self, dataset_id: odf::DatasetID) {
+    async fn resume_all_dataset_flows(&self, dataset_id: &odf::DatasetID) {
         let lookup_scopes = vec![FlowScope::for_dataset(dataset_id)];
         self.flow_trigger_service
             .resume_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)

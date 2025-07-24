@@ -30,6 +30,7 @@ database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
+lang-utils = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
 kamu-task-system = { workspace = true }

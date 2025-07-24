@@ -1471,14 +1471,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-utils"
-version = "0.245.2"
-dependencies = [
- "async-trait",
- "tokio",
-]
-
-[[package]]
 name = "async_io_stream"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7249,7 +7241,6 @@ dependencies = [
  "async-graphql",
  "async-graphql-axum",
  "async-trait",
- "async-utils",
  "axum 0.8.4",
  "cfg-if",
  "chrono",
@@ -7334,6 +7325,7 @@ dependencies = [
  "kamu-webhooks-postgres",
  "kamu-webhooks-services",
  "kamu-webhooks-sqlite",
+ "lang-utils",
  "libc",
  "merge",
  "messaging-outbox",
@@ -7742,6 +7734,7 @@ dependencies = [
  "kamu-accounts",
  "kamu-core",
  "kamu-task-system",
+ "lang-utils",
  "messaging-outbox",
  "mockall",
  "opendatafabric",
@@ -8406,6 +8399,14 @@ name = "lalrpop-util"
 version = "0.19.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3c48237b9604c5a4702de6b824e02006c3214327564636aef27c1028a8fa0ed"
+
+[[package]]
+name = "lang-utils"
+version = "0.245.2"
+dependencies = [
+ "async-trait",
+ "tokio",
+]
 
 [[package]]
 name = "langtag"
@@ -9626,12 +9627,12 @@ name = "opendatafabric-storage"
 version = "0.245.2"
 dependencies = [
  "async-trait",
- "async-utils",
  "bytes",
  "chrono",
  "dashmap",
  "http 1.3.1",
  "internal-error",
+ "lang-utils",
  "mockall",
  "opendatafabric-metadata",
  "opendatafabric-storage-lfs",
@@ -9648,12 +9649,12 @@ name = "opendatafabric-storage-http"
 version = "0.245.2"
 dependencies = [
  "async-trait",
- "async-utils",
  "bytes",
  "common-macros",
  "futures",
  "http 1.3.1",
  "internal-error",
+ "lang-utils",
  "opendatafabric-metadata",
  "opendatafabric-storage",
  "reqwest",
@@ -9671,9 +9672,9 @@ name = "opendatafabric-storage-inmem"
 version = "0.245.2"
 dependencies = [
  "async-trait",
- "async-utils",
  "bytes",
  "common-macros",
+ "lang-utils",
  "opendatafabric-metadata",
  "opendatafabric-storage",
  "sha3",
@@ -9687,11 +9688,11 @@ name = "opendatafabric-storage-lfs"
 version = "0.245.2"
 dependencies = [
  "async-trait",
- "async-utils",
  "bytes",
  "common-macros",
  "digest 0.10.7",
  "internal-error",
+ "lang-utils",
  "opendatafabric-data-utils",
  "opendatafabric-metadata",
  "opendatafabric-storage",
@@ -9707,7 +9708,6 @@ name = "opendatafabric-storage-s3"
 version = "0.245.2"
 dependencies = [
  "async-trait",
- "async-utils",
  "aws-sdk-s3",
  "bytes",
  "chrono",
@@ -9715,6 +9715,7 @@ dependencies = [
  "digest 0.10.7",
  "http 1.3.1",
  "internal-error",
+ "lang-utils",
  "opendatafabric-metadata",
  "opendatafabric-storage",
  "rand 0.8.5",
@@ -11636,7 +11637,6 @@ checksum = "700de91d5fd6091442d00fdd9ee790af6d4f0f480562b0f5a1e8f59e90aafe73"
 name = "s3-utils"
 version = "0.245.2"
 dependencies = [
- "async-utils",
  "aws-config",
  "aws-sdk-s3",
  "aws-smithy-types",
@@ -11644,6 +11644,7 @@ dependencies = [
  "common-macros",
  "dill",
  "internal-error",
+ "lang-utils",
  "observability",
  "prometheus",
  "reqwest",
