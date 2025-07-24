@@ -88,8 +88,6 @@ impl FlowQueryService for FlowQueryServiceImpl {
         })
     }
 
-    /// Returns datasets with flows associated with a given account
-    /// ordered by creation time from newest to oldest.
     #[tracing::instrument(level = "debug", skip_all)]
     async fn filter_flow_scopes_having_flows(
         &self,
@@ -100,7 +98,6 @@ impl FlowQueryService for FlowQueryServiceImpl {
             .await
     }
 
-    /// Returns current state of a given flow
     #[tracing::instrument(level = "debug", skip_all, fields(%flow_id))]
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;

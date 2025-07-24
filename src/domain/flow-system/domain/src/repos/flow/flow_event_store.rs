@@ -60,8 +60,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
         pagination: PaginationOpts,
     ) -> FlowIDStream;
 
-    /// Returns number of flows associated with the specified dataset and
-    /// matching filters, if specified
+    /// Returns number of flows associated matching filters, if specified
     async fn get_count_flows_matching_scope_query(
         &self,
         flow_scope_query: &FlowScopeQuery,

@@ -125,7 +125,6 @@ impl FlowTriggerServiceImpl {
 
 #[async_trait::async_trait]
 impl FlowTriggerService for FlowTriggerServiceImpl {
-    /// Find current trigger of a certain type
     async fn find_trigger(
         &self,
         flow_binding: &FlowBinding,
@@ -135,7 +134,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         Ok(maybe_flow_trigger.map(Into::into))
     }
 
-    /// Set or modify flow trigger
     async fn set_trigger(
         &self,
         request_time: DateTime<Utc>,
@@ -176,7 +174,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         Ok(flow_trigger.into())
     }
 
-    /// Lists all flow triggers, which are currently enabled
     fn list_enabled_triggers(&self) -> FlowTriggerStateStream {
         Box::pin(async_stream::try_stream! {
             use futures::stream::{self, StreamExt, TryStreamExt};
@@ -192,7 +189,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         })
     }
 
-    /// Pauses particular flow trigger
     async fn pause_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
@@ -211,7 +207,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         Ok(())
     }
 
-    /// Resumes particular flow trigger
     async fn resume_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
@@ -288,7 +283,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         Ok(())
     }
 
-    /// Find all triggers by datasets
     #[tracing::instrument(level = "info", skip_all, fields(?scopes))]
     async fn has_active_triggers_for_scopes(
         &self,
@@ -304,7 +298,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
 
 #[async_trait::async_trait]
 impl FlowScopeRemovalHandler for FlowTriggerServiceImpl {
-    /// Handles the removal of a resource associated with the flow scope
     #[tracing::instrument(level = "debug", skip_all, fields(flow_scope = ?flow_scope))]
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let flow_bindings = self

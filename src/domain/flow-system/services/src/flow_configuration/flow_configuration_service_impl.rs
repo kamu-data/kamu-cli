@@ -41,8 +41,6 @@ impl FlowConfigurationServiceImpl {
 
 #[async_trait::async_trait]
 impl FlowConfigurationService for FlowConfigurationServiceImpl {
-    /// Find the current schedule, which may or may not be associated with the
-    /// given dataset
     #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
     async fn find_configuration(
         &self,
@@ -53,7 +51,6 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Ok(maybe_flow_configuration.map(Into::into))
     }
 
-    /// Set or modify dataset update schedule
     #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
     async fn set_configuration(
         &self,
@@ -94,7 +91,6 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         Ok(flow_configuration.into())
     }
 
-    /// Lists all active configurations
     fn list_active_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
@@ -138,7 +134,7 @@ impl FlowScopeRemovalHandler for FlowConfigurationServiceImpl {
 
             if let Some(mut flow_configuration) = maybe_flow_configuration {
                 flow_configuration
-                    .notify_dataset_removed(self.time_source.now())
+                    .notify_scope_removed(self.time_source.now())
                     .int_err()?;
 
                 flow_configuration

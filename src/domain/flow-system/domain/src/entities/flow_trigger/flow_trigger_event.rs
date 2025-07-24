@@ -57,7 +57,7 @@ impl FlowTriggerEvent {
         match self {
             Self::Created(_) => "FlowTriggerEventCreated",
             Self::Modified(_) => "FlowTriggerEventModified",
-            Self::ScopeRemoved(_) => "FlowTriggerEventDatasetRemoved",
+            Self::ScopeRemoved(_) => "FlowTriggerEventScopeRemoved",
         }
     }
 

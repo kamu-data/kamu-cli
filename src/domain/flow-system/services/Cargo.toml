@@ -1,6 +1,6 @@
 [package]
 name = "kamu-flow-system-services"
-description = "Service model of the flows management for scheduled dataset and system activities"
+description = "Service model of the flows management for scheduled & reactive computation activities"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

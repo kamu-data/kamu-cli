@@ -34,7 +34,7 @@ pub enum FlowEvent {
     TaskRunning(FlowEventTaskRunning),
     /// Finished task
     TaskFinished(FlowEventTaskFinished),
-    /// Aborted flow (system factor, such as dataset delete)
+    /// Aborted flow (not by user)
     Aborted(FlowEventAborted),
 }
 

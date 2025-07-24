@@ -79,7 +79,7 @@ impl Projection for FlowTriggerState {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
                     E::Modified(FlowTriggerEventModified { paused, rule, .. }) => {
-                        // Note: when deleted dataset is re-added with the same id, we have to
+                        // Note: when deleted scope is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowTriggerState {
                             status: if *paused {
