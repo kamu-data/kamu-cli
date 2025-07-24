@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, DatasetResourceUpdateDetails};
 use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
 use kamu_flow_system as fs;
 use kamu_webhooks::{WebhookEventTypeCatalog, WebhookPayloadBuilder};
@@ -74,7 +75,17 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         }
 
         // React to dataset updates
-        if let fs::FlowActivationCause::DatasetUpdate(update) = activation_cause {
+        if let fs::FlowActivationCause::ResourceUpdate(update) = activation_cause {
+            // Decode dataset update
+            if update.resource_type != DATASET_RESOURCE_TYPE {
+                return Err(InternalError::new(format!(
+                    "Unexpected resource type: {}",
+                    update.resource_type
+                )));
+            }
+            let dataset_update_details: DatasetResourceUpdateDetails =
+                serde_json::from_value(update.details.clone()).int_err()?;
+
             // Extract necessary services
             let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
             let webhook_payload_builder = catalog.get_one::<dyn WebhookPayloadBuilder>().unwrap();
@@ -84,8 +95,8 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 .build_dataset_ref_updated_payload(
                     input_dataset_id,
                     &odf::BlockRef::Head,
-                    &update.new_head,
-                    update.old_head_maybe.as_ref(),
+                    &dataset_update_details.new_head,
+                    dataset_update_details.old_head_maybe.as_ref(),
                 )
                 .await
                 .int_err()?;

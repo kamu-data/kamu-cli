@@ -7,6 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_adapter_flow_dataset::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
+    DatasetUpdateSource,
+};
 use kamu_core::DatasetRegistry;
 use kamu_flow_system::{self as fs};
 
@@ -27,7 +32,7 @@ impl FlowActivationCause {
         activation_cause: &fs::FlowActivationCause,
         ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
-        Ok(match &activation_cause {
+        Ok(match activation_cause {
             fs::FlowActivationCause::Manual(manual) => {
                 let initiator =
                     Account::from_account_id(ctx, manual.initiator_account_id.clone()).await?;
@@ -36,11 +41,22 @@ impl FlowActivationCause {
             fs::FlowActivationCause::AutoPolling(auto_polling) => {
                 Self::AutoPolling(auto_polling.clone().into())
             }
-            fs::FlowActivationCause::DatasetUpdate(update) => {
+            fs::FlowActivationCause::ResourceUpdate(update) => {
+                assert!(
+                    update.resource_type == DATASET_RESOURCE_TYPE,
+                    "Unexpected resource type: {}",
+                    update.resource_type
+                );
+
+                let update_dataset_details: DatasetResourceUpdateDetails =
+                    serde_json::from_value(update.details.clone()).int_err()?;
+
                 let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
 
                 let hdl = dataset_registry
-                    .resolve_dataset_handle_by_ref(&update.dataset_id.as_local_ref())
+                    .resolve_dataset_handle_by_ref(
+                        &update_dataset_details.dataset_id.as_local_ref(),
+                    )
                     .await
                     .int_err()?;
                 let account = Account::from_dataset_alias(ctx, &hdl.alias)
@@ -48,14 +64,14 @@ impl FlowActivationCause {
                     .expect("Account must exist");
                 Self::DatasetUpdate(FlowActivationCauseDatasetUpdate {
                     dataset: Dataset::new_access_checked(account, hdl),
-                    source: match update.source {
-                        fs::DatasetUpdateSource::UpstreamFlow { .. } => {
+                    source: match update_dataset_details.source {
+                        DatasetUpdateSource::UpstreamFlow { .. } => {
                             FlowActivationCauseDatasetUpdateSource::UpstreamFlow
                         }
-                        fs::DatasetUpdateSource::HttpIngest { .. } => {
+                        DatasetUpdateSource::HttpIngest { .. } => {
                             FlowActivationCauseDatasetUpdateSource::HttpIngest
                         }
-                        fs::DatasetUpdateSource::SmartProtocolPush { .. } => {
+                        DatasetUpdateSource::SmartProtocolPush { .. } => {
                             FlowActivationCauseDatasetUpdateSource::SmartProtocolPush
                         }
                     },

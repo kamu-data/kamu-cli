@@ -6785,6 +6785,7 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-accounts",
+ "kamu-adapter-flow-dataset",
  "kamu-adapter-task-webhook",
  "kamu-datasets",
  "kamu-datasets-services",

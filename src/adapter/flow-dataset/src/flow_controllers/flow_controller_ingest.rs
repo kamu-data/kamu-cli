@@ -15,7 +15,13 @@ use kamu_core::PullResult;
 use kamu_datasets::DatasetIncrementQueryService;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
-use crate::{FLOW_TYPE_DATASET_INGEST, FlowConfigRuleIngest};
+use crate::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
+    DatasetUpdateSource,
+    FLOW_TYPE_DATASET_INGEST,
+    FlowConfigRuleIngest,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,23 +84,30 @@ impl fs::FlowController for FlowControllerIngest {
                     .await
                     .int_err()?;
 
-                let activation_cause =
-                    fs::FlowActivationCause::DatasetUpdate(fs::FlowActivationCauseDatasetUpdate {
+                let activation_cause = fs::FlowActivationCause::ResourceUpdate(
+                    fs::FlowActivationCauseResourceUpdate {
                         activation_time: finish_time,
-                        dataset_id,
-                        source: fs::DatasetUpdateSource::UpstreamFlow {
-                            flow_id: success_flow_state.flow_id,
-                            flow_type: success_flow_state.flow_binding.flow_type.clone(),
-                            maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
-                        },
-                        new_head,
-                        old_head_maybe: old_head,
-                        changes: fs::DatasetChanges::NewData {
+                        changes: fs::ResourceChanges::NewData {
                             blocks_added: dataset_increment.num_blocks,
                             records_added: dataset_increment.num_records,
                             new_watermark: dataset_increment.updated_watermark,
                         },
-                    });
+                        resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                        details: serde_json::to_value(DatasetResourceUpdateDetails {
+                            dataset_id,
+                            source: DatasetUpdateSource::UpstreamFlow {
+                                flow_id: success_flow_state.flow_id,
+                                flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                                maybe_flow_config_snapshot: success_flow_state
+                                    .config_snapshot
+                                    .clone(),
+                            },
+                            new_head,
+                            old_head_maybe: old_head,
+                        })
+                        .int_err()?,
+                    },
+                );
 
                 self.flow_sensor_dispatcher
                     .dispatch_input_flow_success(

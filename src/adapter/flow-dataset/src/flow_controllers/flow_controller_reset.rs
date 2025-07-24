@@ -16,6 +16,9 @@ use kamu_flow_system::FlowRunService;
 use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
+    DatasetUpdateSource,
     FLOW_TYPE_DATASET_RESET,
     FlowConfigRuleReset,
     trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets,
@@ -108,17 +111,21 @@ impl fs::FlowController for FlowControllerReset {
             let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
 
             let activation_cause =
-                fs::FlowActivationCause::DatasetUpdate(fs::FlowActivationCauseDatasetUpdate {
+                fs::FlowActivationCause::ResourceUpdate(fs::FlowActivationCauseResourceUpdate {
                     activation_time: finish_time,
-                    dataset_id: success_flow_state.flow_binding.get_dataset_id_or_die()?,
-                    source: fs::DatasetUpdateSource::UpstreamFlow {
-                        flow_type: success_flow_state.flow_binding.flow_type.clone(),
-                        flow_id: success_flow_state.flow_id,
-                        maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
-                    },
-                    new_head: reset_result.new_head,
-                    old_head_maybe: reset_result.old_head,
-                    changes: fs::DatasetChanges::Breaking,
+                    changes: fs::ResourceChanges::Breaking,
+                    resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                    details: serde_json::to_value(DatasetResourceUpdateDetails {
+                        dataset_id: success_flow_state.flow_binding.get_dataset_id_or_die()?,
+                        source: DatasetUpdateSource::UpstreamFlow {
+                            flow_type: success_flow_state.flow_binding.flow_type.clone(),
+                            flow_id: success_flow_state.flow_id,
+                            maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
+                        },
+                        new_head: reset_result.new_head,
+                        old_head_maybe: reset_result.old_head,
+                    })
+                    .int_err()?,
                 });
 
             trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets(

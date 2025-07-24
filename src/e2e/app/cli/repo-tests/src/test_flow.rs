@@ -321,7 +321,6 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     }
                     ... on FlowDescriptionDatasetPushIngest {
                       sourceName
-                      inputRecordsCount
                       ingestResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
@@ -1603,7 +1602,6 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
             }
             ... on FlowDescriptionDatasetPushIngest {
               sourceName
-              inputRecordsCount
               ingestResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable

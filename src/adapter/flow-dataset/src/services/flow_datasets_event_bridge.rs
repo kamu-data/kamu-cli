@@ -21,7 +21,13 @@ use kamu_flow_system as fs;
 use messaging_outbox::*;
 use time_source::SystemTimeSource;
 
-use crate::{FLOW_TYPE_DATASET_INGEST, MESSAGE_CONSUMER_KAMU_FLOW_DATASETS_EVENT_BRIDGE};
+use crate::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
+    DatasetUpdateSource,
+    FLOW_TYPE_DATASET_INGEST,
+    MESSAGE_CONSUMER_KAMU_FLOW_DATASETS_EVENT_BRIDGE,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -121,19 +127,23 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDatasetsEventBrid
                     .await
                     .int_err()?;
                 (
-                    fs::FlowActivationCauseDatasetUpdate {
+                    fs::FlowActivationCauseResourceUpdate {
                         activation_time: self.time_source.now(),
-                        dataset_id: ingest_message.dataset_id.clone(),
-                        source: fs::DatasetUpdateSource::HttpIngest {
-                            source_name: ingest_message.maybe_source_name.clone(),
-                        },
-                        new_head: ingest_message.new_block_hash.clone(),
-                        old_head_maybe: ingest_message.maybe_prev_block_hash.clone(),
-                        changes: fs::DatasetChanges::NewData {
+                        changes: fs::ResourceChanges::NewData {
                             blocks_added: increment.num_blocks,
                             records_added: increment.num_records,
                             new_watermark: increment.updated_watermark,
                         },
+                        resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                        details: serde_json::to_value(DatasetResourceUpdateDetails {
+                            dataset_id: ingest_message.dataset_id.clone(),
+                            source: DatasetUpdateSource::HttpIngest {
+                                source_name: ingest_message.maybe_source_name.clone(),
+                            },
+                            new_head: ingest_message.new_block_hash.clone(),
+                            old_head_maybe: ingest_message.maybe_prev_block_hash.clone(),
+                        })
+                        .int_err()?,
                     },
                     &ingest_message.dataset_id,
                 )
@@ -148,20 +158,24 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDatasetsEventBrid
                     .await
                 {
                     Ok(increment) => (
-                        fs::FlowActivationCauseDatasetUpdate {
+                        fs::FlowActivationCauseResourceUpdate {
                             activation_time: self.time_source.now(),
-                            dataset_id: sync_message.dataset_id.clone(),
-                            source: fs::DatasetUpdateSource::SmartProtocolPush {
-                                account_name: sync_message.account_name.clone(),
-                                is_force: sync_message.is_force,
-                            },
-                            new_head: sync_message.new_block_hash.clone(),
-                            old_head_maybe: sync_message.maybe_prev_block_hash.clone(),
-                            changes: fs::DatasetChanges::NewData {
+                            changes: fs::ResourceChanges::NewData {
                                 blocks_added: increment.num_blocks,
                                 records_added: increment.num_records,
                                 new_watermark: increment.updated_watermark,
                             },
+                            resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                            details: serde_json::to_value(DatasetResourceUpdateDetails {
+                                dataset_id: sync_message.dataset_id.clone(),
+                                source: DatasetUpdateSource::SmartProtocolPush {
+                                    account_name: sync_message.account_name.clone(),
+                                    is_force: sync_message.is_force,
+                                },
+                                new_head: sync_message.new_block_hash.clone(),
+                                old_head_maybe: sync_message.maybe_prev_block_hash.clone(),
+                            })
+                            .int_err()?,
                         },
                         &sync_message.dataset_id,
                     ),
@@ -171,16 +185,20 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDatasetsEventBrid
                             "Invalid interval for dataset increment query, breaking change"
                         );
                         (
-                            fs::FlowActivationCauseDatasetUpdate {
+                            fs::FlowActivationCauseResourceUpdate {
                                 activation_time: self.time_source.now(),
-                                dataset_id: sync_message.dataset_id.clone(),
-                                source: fs::DatasetUpdateSource::SmartProtocolPush {
-                                    account_name: sync_message.account_name.clone(),
-                                    is_force: sync_message.is_force,
-                                },
-                                new_head: sync_message.new_block_hash.clone(),
-                                old_head_maybe: sync_message.maybe_prev_block_hash.clone(),
-                                changes: fs::DatasetChanges::Breaking,
+                                changes: fs::ResourceChanges::Breaking,
+                                resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                                details: serde_json::to_value(DatasetResourceUpdateDetails {
+                                    dataset_id: sync_message.dataset_id.clone(),
+                                    source: DatasetUpdateSource::SmartProtocolPush {
+                                        account_name: sync_message.account_name.clone(),
+                                        is_force: sync_message.is_force,
+                                    },
+                                    new_head: sync_message.new_block_hash.clone(),
+                                    old_head_maybe: sync_message.maybe_prev_block_hash.clone(),
+                                })
+                                .int_err()?,
                             },
                             &sync_message.dataset_id,
                         )
@@ -211,7 +229,7 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDatasetsEventBrid
             .dispatch_input_flow_success(
                 target_catalog,
                 &flow_binding,
-                fs::FlowActivationCause::DatasetUpdate(update_cause),
+                fs::FlowActivationCause::ResourceUpdate(update_cause),
             )
             .await
             .int_err()?;

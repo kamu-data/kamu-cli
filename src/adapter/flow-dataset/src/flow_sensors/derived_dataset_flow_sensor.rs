@@ -185,19 +185,19 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
 
         // Depending on what happened to the input dataset,
         // we may need to trigger a specific flow run
-        if let fs::FlowActivationCause::DatasetUpdate(dataset_update) = activation_cause {
+        if let fs::FlowActivationCause::ResourceUpdate(dataset_update) = activation_cause {
             // Extract flow run service
             let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
 
             match dataset_update.changes {
                 // Dataset was normally updated, there is new data available to process
-                fs::DatasetChanges::NewData { .. } => {
+                fs::ResourceChanges::NewData { .. } => {
                     // Trigger transform flow for the target dataset
                     self.run_transform_flow(activation_cause, flow_run_service.as_ref(), true)
                         .await?;
                 }
                 // Note: will not be activated for now
-                fs::DatasetChanges::Breaking => {
+                fs::ResourceChanges::Breaking => {
                     /*
                     // Trigger metadata-only compaction
                     let maybe_config_snapshot = dataset_update.source.maybe_flow_config_snapshot();

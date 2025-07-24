@@ -3906,7 +3906,6 @@ impl FlowRunsHarness {
                                             }
                                             ... on FlowDescriptionDatasetPushIngest {
                                                 sourceName
-                                                inputRecordsCount
                                                 ingestResult {
                                                     __typename
                                                     ... on FlowDescriptionUpdateResultUpToDate {

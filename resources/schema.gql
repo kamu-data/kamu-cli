@@ -2102,7 +2102,6 @@ type FlowDescriptionDatasetPollingIngest {
 
 type FlowDescriptionDatasetPushIngest {
 	sourceName: String
-	inputRecordsCount: Int!
 	ingestResult: FlowDescriptionUpdateResult
 	message: String!
 }

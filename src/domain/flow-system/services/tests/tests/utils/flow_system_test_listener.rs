@@ -15,6 +15,8 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
 use kamu_adapter_flow_dataset::{
+    DatasetResourceUpdateDetails,
+    DatasetUpdateSource,
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
@@ -210,21 +212,28 @@ impl std::fmt::Display for FlowSystemTestListener {
                             match flow_state.primary_activation_cause() {
                                 FlowActivationCause::Manual(_) => String::from("Manual"),
                                 FlowActivationCause::AutoPolling(_) => String::from("AutoPolling"),
-                                FlowActivationCause::DatasetUpdate(update) =>
-                                    match &update.source {
-                                        DatasetUpdateSource::HttpIngest { .. } =>
-                                            String::from("HttpIngest"),
-                                        DatasetUpdateSource::SmartProtocolPush { .. } =>
-                                            String::from("SmartProtocolPush"),
+                                FlowActivationCause::ResourceUpdate(update) => {
+                                    let update_details: DatasetResourceUpdateDetails =
+                                        serde_json::from_value(update.details.clone()).unwrap();
+                                    match &update_details.source {
+                                        DatasetUpdateSource::HttpIngest { .. } => {
+                                            String::from("HttpIngest")
+                                        }
+                                        DatasetUpdateSource::SmartProtocolPush { .. } => {
+                                            String::from("SmartProtocolPush")
+                                        }
                                         DatasetUpdateSource::UpstreamFlow { .. } => format!(
                                             "Input({})",
                                             state
                                                 .dataset_display_names
-                                                .get(&update.dataset_id)
+                                                .get(&update_details.dataset_id)
                                                 .cloned()
-                                                .unwrap_or_else(|| update.dataset_id.to_string())
+                                                .unwrap_or_else(|| update_details
+                                                    .dataset_id
+                                                    .to_string())
                                         ),
-                                    },
+                                    }
+                                }
                             }
                         )?;
                     }

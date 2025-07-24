@@ -11,6 +11,8 @@ use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use kamu_adapter_flow_dataset::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
@@ -82,7 +84,6 @@ pub(crate) struct FlowDescriptionDatasetPollingIngest {
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPushIngest {
     source_name: Option<String>,
-    input_records_count: u64,
     ingest_result: Option<FlowDescriptionUpdateResult>,
     message: String,
     // TODO: SetPushSource
@@ -570,16 +571,32 @@ impl FlowDescriptionBuilder {
                         polling_source: polling_source.clone().into(),
                     })
                 } else {
-                    let source_name = flow_state.primary_activation_cause().push_source_name();
-                    let activation_cause_description = flow_state
-                        .primary_activation_cause()
-                        .activation_cause_description()
-                        .unwrap();
+                    let (maybe_push_source_name, activation_descrtiption) =
+                        match flow_state.primary_activation_cause() {
+                            fs::FlowActivationCause::Manual(_) => {
+                                (None, "Flow activated manually".to_string())
+                            }
+                            fs::FlowActivationCause::AutoPolling(_) => {
+                                (None, "Flow activated automatically".to_string())
+                            }
+                            fs::FlowActivationCause::ResourceUpdate(update) => {
+                                if update.resource_type == DATASET_RESOURCE_TYPE {
+                                    let dataset_update_details: DatasetResourceUpdateDetails =
+                                        serde_json::from_value(update.details.clone()).int_err()?;
+                                    (
+                                        dataset_update_details.push_source_name(),
+                                        dataset_update_details.flow_description(),
+                                    )
+                                } else {
+                                    panic!("Unexpected resource type: {}", update.resource_type);
+                                }
+                            }
+                        };
+
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
-                        source_name,
-                        input_records_count: 0, // TODO
+                        source_name: maybe_push_source_name,
                         ingest_result,
-                        message: activation_cause_description,
+                        message: activation_descrtiption,
                     })
                 }
             }

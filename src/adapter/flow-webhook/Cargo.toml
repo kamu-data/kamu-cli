@@ -27,6 +27,7 @@ testing = []
 
 
 [dependencies]
+kamu-adapter-flow-dataset = { workspace = true }
 kamu-adapter-task-webhook = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
