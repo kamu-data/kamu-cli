@@ -2347,9 +2347,7 @@ pub async fn test_get_all_scope_pending_flows(catalog: &Catalog) {
 
     // Call the method under test
     let pending_flows = flow_event_store
-        .try_get_all_scope_pending_flows(&FlowScope::Dataset {
-            dataset_id: dataset_id.clone(),
-        })
+        .try_get_all_scope_pending_flows(&FlowScope::for_dataset(dataset_id))
         .await
         .unwrap();
 
@@ -2409,14 +2407,11 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
     // Test dataset having flows
     let mut flow_scopes = Vec::new();
     for dataset_id in &dataset_ids {
-        flow_scopes.push(FlowScope::Dataset {
-            dataset_id: (*dataset_id).clone(),
-        });
+        flow_scopes.push(FlowScope::for_dataset((*dataset_id).clone()));
     }
-    let empty_dataset_id = odf::DatasetID::new_seeded_ed25519(b"empty");
-    flow_scopes.push(FlowScope::Dataset {
-        dataset_id: empty_dataset_id.clone(),
-    });
+    flow_scopes.push(FlowScope::for_dataset(odf::DatasetID::new_seeded_ed25519(
+        b"empty",
+    )));
 
     let filtered_flow_scopes = flow_event_store
         .filter_flow_scopes_having_flows(&flow_scopes)
@@ -2485,9 +2480,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
         // The flow should still be pending, because of retrying status
         let pending_flows = flow_event_store
-            .try_get_all_scope_pending_flows(&FlowScope::Dataset {
-                dataset_id: dataset_id.clone(),
-            })
+            .try_get_all_scope_pending_flows(&FlowScope::for_dataset(dataset_id.clone()))
             .await
             .unwrap();
         assert_eq!(pending_flows.len(), 1);
@@ -2513,9 +2506,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
     // The flow should no longer be pending
     let pending_flows = flow_event_store
-        .try_get_all_scope_pending_flows(&FlowScope::Dataset {
-            dataset_id: dataset_id.clone(),
-        })
+        .try_get_all_scope_pending_flows(&FlowScope::for_dataset(dataset_id.clone()))
         .await
         .unwrap();
     assert!(pending_flows.is_empty());

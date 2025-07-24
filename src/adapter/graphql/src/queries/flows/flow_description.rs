@@ -360,13 +360,7 @@ impl FlowDescriptionBuilder {
     fn collect_unique_dataset_ids(flow_states: &[fs::FlowState]) -> Vec<odf::DatasetID> {
         flow_states
             .iter()
-            .filter_map(|flow_state| {
-                if let fs::FlowScope::Dataset { dataset_id } = &flow_state.flow_binding.scope {
-                    Some(dataset_id.clone())
-                } else {
-                    None
-                }
-            })
+            .filter_map(|flow_state| flow_state.flow_binding.dataset_id().cloned())
             .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<_>>()
