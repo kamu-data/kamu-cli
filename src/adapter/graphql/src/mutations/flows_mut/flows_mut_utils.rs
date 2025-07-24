@@ -42,7 +42,7 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
 
     match flow_query_service.get_flow(flow_id.into()).await {
         Ok(flow_state) => {
-            if let Some(flow_dataset_id) = flow_state.flow_binding.dataset_id() {
+            if let Some(flow_dataset_id) = flow_state.flow_binding.scope.dataset_id() {
                 if flow_dataset_id != dataset_id {
                     return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }

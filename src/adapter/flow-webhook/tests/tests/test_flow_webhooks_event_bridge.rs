@@ -26,6 +26,7 @@ use kamu_flow_system::{
     FlowBinding,
     FlowID,
     FlowRunService,
+    FlowScope,
     FlowState,
     FlowTimingRecords,
     MockFlowRunService,
@@ -319,8 +320,11 @@ impl TestWebhookDeliverySchedulerHarness {
                     assert!(maybe_forced_flow_config_rule.is_none());
                     assert!(maybe_flow_run_arguments.is_some());
 
-                    flow_binding.dataset_id() == Some(&dataset_id_clone_1)
-                        && flow_binding.get_webhook_subscription_id_or_die().unwrap()
+                    flow_binding.scope.dataset_id() == Some(&dataset_id_clone_1)
+                        && flow_binding
+                            .scope
+                            .get_webhook_subscription_id_or_die()
+                            .unwrap()
                             == subscription_id.into_inner()
                 },
             )
@@ -329,10 +333,12 @@ impl TestWebhookDeliverySchedulerHarness {
 
                 Ok(FlowState {
                     flow_id: FlowID::new(1),
-                    flow_binding: FlowBinding::for_webhook_subscription(
-                        subscription_id.into_inner(),
-                        Some(dataset_id_clone_2.clone()),
+                    flow_binding: FlowBinding::new(
                         FLOW_TYPE_WEBHOOK_DELIVER,
+                        FlowScope::for_webhook_subscription(
+                            subscription_id.into_inner(),
+                            Some(dataset_id_clone_2.clone()),
+                        ),
                     ),
                     start_condition: None,
                     task_ids: vec![],

@@ -37,8 +37,10 @@ pub(crate) async fn trigger_metadata_only_hard_compaction_flow_for_own_downstrea
             .int_err()?;
 
         if owned {
-            let downstream_binding =
-                fs::FlowBinding::for_dataset(downstream_dataset_id, FLOW_TYPE_DATASET_COMPACT);
+            let downstream_binding = fs::FlowBinding::new(
+                FLOW_TYPE_DATASET_COMPACT,
+                fs::FlowScope::for_dataset(downstream_dataset_id),
+            );
             // Trigger hard compaction
             flow_run_service
                 .run_flow_automatically(

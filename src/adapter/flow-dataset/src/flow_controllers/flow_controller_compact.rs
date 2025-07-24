@@ -53,7 +53,7 @@ impl fs::FlowController for FlowControllerCompact {
         maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
         _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = flow_binding.get_dataset_id_or_die()?;
+        let dataset_id = flow_binding.scope.get_dataset_id_or_die()?;
 
         let mut max_slice_size: Option<u64> = None;
         let mut max_slice_records: Option<u64> = None;
@@ -100,7 +100,10 @@ impl fs::FlowController for FlowControllerCompact {
                 old_num_blocks: _,
                 new_num_blocks: _,
             } => {
-                let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
+                let dataset_id = success_flow_state
+                    .flow_binding
+                    .scope
+                    .get_dataset_id_or_die()?;
 
                 let activation_cause = fs::FlowActivationCause::ResourceUpdate(
                     fs::FlowActivationCauseResourceUpdate {
@@ -126,7 +129,10 @@ impl fs::FlowController for FlowControllerCompact {
                 if let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
                     && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
                 {
-                    let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
+                    let dataset_id = success_flow_state
+                        .flow_binding
+                        .scope
+                        .get_dataset_id_or_die()?;
 
                     let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
                     if compaction_rule.recursive() {

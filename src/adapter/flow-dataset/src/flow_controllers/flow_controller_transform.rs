@@ -49,7 +49,7 @@ impl fs::FlowController for FlowControllerTransform {
         activation_time: DateTime<Utc>,
         batching_rule: fs::BatchingRule,
     ) -> Result<(), InternalError> {
-        let dataset_id = flow_binding.get_dataset_id_or_die()?;
+        let dataset_id = flow_binding.scope.get_dataset_id_or_die()?;
 
         use futures::StreamExt;
         let upstream_dataset_ids = self
@@ -73,7 +73,7 @@ impl fs::FlowController for FlowControllerTransform {
         _maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
         _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = flow_binding.get_dataset_id_or_die()?;
+        let dataset_id = flow_binding.scope.get_dataset_id_or_die()?;
 
         Ok(ats::LogicalPlanDatasetUpdate {
             dataset_id,
@@ -94,7 +94,10 @@ impl fs::FlowController for FlowControllerTransform {
         match task_result_update.pull_result {
             PullResult::UpToDate(_) => return Ok(()),
             PullResult::Updated { old_head, new_head } => {
-                let dataset_id = success_flow_state.flow_binding.get_dataset_id_or_die()?;
+                let dataset_id = success_flow_state
+                    .flow_binding
+                    .scope
+                    .get_dataset_id_or_die()?;
 
                 let dataset_increment = self
                     .dataset_increment_query_service

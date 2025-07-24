@@ -64,9 +64,9 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 
-        let flow_binding = fs::FlowBinding::for_dataset(
-            self.dataset_request_state.dataset_id().clone(),
+        let flow_binding = fs::FlowBinding::new(
             afs::FLOW_TYPE_DATASET_INGEST,
+            fs::FlowScope::for_dataset(self.dataset_request_state.dataset_id().clone()),
         );
 
         let res = flow_config_service
@@ -120,9 +120,9 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 
-        let flow_binding = fs::FlowBinding::for_dataset(
-            self.dataset_request_state.dataset_id().clone(),
+        let flow_binding = fs::FlowBinding::new(
             afs::FLOW_TYPE_DATASET_COMPACT,
+            fs::FlowScope::for_dataset(self.dataset_request_state.dataset_id().clone()),
         );
 
         let res = flow_config_service

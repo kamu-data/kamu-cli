@@ -94,6 +94,7 @@ impl Flow {
     async fn dataset_id(&self) -> Option<DatasetID<'static>> {
         self.flow_state
             .flow_binding
+            .scope
             .dataset_id()
             .map(|dataset_id| dataset_id.clone().into())
     }

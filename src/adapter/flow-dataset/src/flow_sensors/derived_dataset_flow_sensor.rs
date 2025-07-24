@@ -72,10 +72,8 @@ impl DerivedDatasetFlowSensor {
         flow_run_service: &dyn fs::FlowRunService,
         with_batching_rule: bool,
     ) -> Result<(), InternalError> {
-        let target_flow_binding = fs::FlowBinding::for_dataset(
-            self.flow_scope.dataset_id().unwrap().clone(),
-            FLOW_TYPE_DATASET_TRANSFORM,
-        );
+        let target_flow_binding =
+            fs::FlowBinding::new(FLOW_TYPE_DATASET_TRANSFORM, self.flow_scope.clone());
         flow_run_service
             .run_flow_automatically(
                 &target_flow_binding,
@@ -146,7 +144,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
         let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
 
         let flow_binding =
-            fs::FlowBinding::from_scope(FLOW_TYPE_DATASET_TRANSFORM, self.flow_scope.clone());
+            fs::FlowBinding::new(FLOW_TYPE_DATASET_TRANSFORM, self.flow_scope.clone());
 
         let activation_cause =
             fs::FlowActivationCause::AutoPolling(fs::FlowActivationCauseAutoPolling {
@@ -175,7 +173,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
         tracing::info!(?self.flow_scope, ?input_flow_binding, ?activation_cause, "Derived dataset flow sensor sensitized");
 
         // First we should ensure we are sensitized with a valid input dataset
-        let input_dataset_id = input_flow_binding.get_dataset_id_or_die()?;
+        let input_dataset_id = input_flow_binding.scope.get_dataset_id_or_die()?;
         if !self.sensitive_dataset_ids.contains(&input_dataset_id) {
             return Err(InternalError::new(format!(
                 "Flow sensor {:?} received an input dataset {} that is not in the sensitivity list",

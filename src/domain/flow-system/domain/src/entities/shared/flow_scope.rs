@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -23,8 +25,20 @@ pub enum FlowScope {
 }
 
 impl FlowScope {
+    #[inline]
     pub fn for_dataset(dataset_id: odf::DatasetID) -> Self {
         FlowScope::Dataset { dataset_id }
+    }
+
+    #[inline]
+    pub fn for_webhook_subscription(
+        subscription_id: uuid::Uuid,
+        dataset_id: Option<odf::DatasetID>,
+    ) -> Self {
+        FlowScope::WebhookSubscription {
+            subscription_id,
+            dataset_id,
+        }
     }
 
     pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
@@ -42,6 +56,20 @@ impl FlowScope {
             } => Some(*subscription_id),
             FlowScope::Dataset { .. } | FlowScope::System => None,
         }
+    }
+
+    #[inline]
+    pub fn get_dataset_id_or_die(&self) -> Result<odf::DatasetID, InternalError> {
+        self.dataset_id().cloned().ok_or_else(|| {
+            InternalError::new("Expecting dataset or webhook flow binding scope with dataset_id")
+        })
+    }
+
+    #[inline]
+    pub fn get_webhook_subscription_id_or_die(&self) -> Result<uuid::Uuid, InternalError> {
+        self.webhook_subscription_id().ok_or_else(|| {
+            InternalError::new("Expecting webhook flow binding scope with subscription_id")
+        })
     }
 
     pub fn matches_query(&self, query: &FlowScopeQuery) -> bool {

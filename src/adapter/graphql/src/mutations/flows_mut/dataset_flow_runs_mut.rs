@@ -76,8 +76,10 @@ impl<'a> DatasetFlowRunsMut<'a> {
         let maybe_forced_configuration_rule =
             maybe_ingest_config_rule.map(afs::FlowConfigRuleIngest::into_flow_config);
 
-        let flow_binding =
-            fs::FlowBinding::for_dataset(dataset_handle.id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+        let flow_binding = fs::FlowBinding::new(
+            afs::FLOW_TYPE_DATASET_INGEST,
+            fs::FlowScope::for_dataset(dataset_handle.id.clone()),
+        );
 
         let flow_state = flow_run_service
             .run_flow_manually(
@@ -124,9 +126,9 @@ impl<'a> DatasetFlowRunsMut<'a> {
         let logged_account = utils::get_logged_account(ctx);
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        let flow_binding = fs::FlowBinding::for_dataset(
-            dataset_handle.id.clone(),
+        let flow_binding = fs::FlowBinding::new(
             afs::FLOW_TYPE_DATASET_TRANSFORM,
+            fs::FlowScope::for_dataset(dataset_handle.id.clone()),
         );
 
         let flow_state = flow_run_service
@@ -197,8 +199,10 @@ impl<'a> DatasetFlowRunsMut<'a> {
         let maybe_forced_configuration_rule =
             maybe_compact_config_rule.map(afs::FlowConfigRuleCompact::into_flow_config);
 
-        let flow_binding =
-            fs::FlowBinding::for_dataset(dataset_handle.id.clone(), afs::FLOW_TYPE_DATASET_COMPACT);
+        let flow_binding = fs::FlowBinding::new(
+            afs::FLOW_TYPE_DATASET_COMPACT,
+            fs::FlowScope::for_dataset(dataset_handle.id.clone()),
+        );
 
         let flow_state = flow_run_service
             .run_flow_manually(
@@ -283,8 +287,10 @@ impl<'a> DatasetFlowRunsMut<'a> {
         };
         let maybe_forced_flow_config_rule = Some(reset_config_rule.into_flow_config());
 
-        let flow_binding =
-            fs::FlowBinding::for_dataset(dataset_handle.id.clone(), afs::FLOW_TYPE_DATASET_RESET);
+        let flow_binding = fs::FlowBinding::new(
+            afs::FLOW_TYPE_DATASET_RESET,
+            fs::FlowScope::for_dataset(dataset_handle.id.clone()),
+        );
 
         let flow_state = flow_run_service
             .run_flow_manually(

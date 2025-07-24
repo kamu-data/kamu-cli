@@ -222,8 +222,10 @@ impl MessageConsumerT<DatasetExternallyChangedMessage> for FlowDatasetsEventBrid
             return Ok(());
         }
 
-        let flow_binding =
-            fs::FlowBinding::for_dataset(dataset_id.clone(), FLOW_TYPE_DATASET_INGEST);
+        let flow_binding = fs::FlowBinding::new(
+            FLOW_TYPE_DATASET_INGEST,
+            fs::FlowScope::for_dataset(dataset_id.clone()),
+        );
 
         self.flow_sensor_dispatcher
             .dispatch_input_flow_success(

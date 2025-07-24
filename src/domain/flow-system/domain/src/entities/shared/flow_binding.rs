@@ -20,64 +20,12 @@ pub struct FlowBinding {
 }
 
 impl FlowBinding {
-    pub fn from_scope(flow_type: &str, scope: FlowScope) -> Self {
+    #[inline]
+    pub fn new(flow_type: &str, scope: FlowScope) -> Self {
         Self {
             flow_type: flow_type.to_string(),
             scope,
         }
-    }
-
-    pub fn for_dataset(dataset_id: odf::DatasetID, flow_type: &str) -> Self {
-        Self {
-            flow_type: flow_type.to_string(),
-            scope: FlowScope::for_dataset(dataset_id),
-        }
-    }
-
-    pub fn for_system(flow_type: &str) -> Self {
-        Self {
-            flow_type: flow_type.to_string(),
-            scope: FlowScope::System,
-        }
-    }
-
-    pub fn for_webhook_subscription(
-        subscription_id: uuid::Uuid,
-        dataset_id: Option<odf::DatasetID>,
-        flow_type: &str,
-    ) -> Self {
-        Self {
-            flow_type: flow_type.to_string(),
-            scope: FlowScope::WebhookSubscription {
-                subscription_id,
-                dataset_id,
-            },
-        }
-    }
-
-    pub fn dataset_id(&self) -> Option<&odf::DatasetID> {
-        self.scope.dataset_id()
-    }
-
-    pub fn webhook_subscription_id(&self) -> Option<uuid::Uuid> {
-        match &self.scope {
-            FlowScope::WebhookSubscription {
-                subscription_id, ..
-            } => Some(*subscription_id),
-            _ => None,
-        }
-    }
-
-    pub fn get_dataset_id_or_die(&self) -> Result<odf::DatasetID, InternalError> {
-        self.dataset_id().cloned().ok_or_else(|| {
-            InternalError::new("Expecting dataset or webhook flow binding scope with dataset_id")
-        })
-    }
-
-    pub fn get_webhook_subscription_id_or_die(&self) -> Result<uuid::Uuid, InternalError> {
-        self.webhook_subscription_id().ok_or_else(|| {
-            InternalError::new("Expecting webhook flow binding scope with subscription_id")
-        })
     }
 }
 

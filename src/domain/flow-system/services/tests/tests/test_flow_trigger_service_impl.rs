@@ -39,10 +39,18 @@ async fn test_visibility() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    let binding_foo_ingest = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
-    let binding_foo_compaction =
-        FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
-    let binding_bar_ingest = FlowBinding::for_dataset(bar_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_ingest = FlowBinding::new(
+        FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(foo_id.clone()),
+    );
+    let binding_foo_compaction = FlowBinding::new(
+        FLOW_TYPE_DATASET_COMPACT,
+        FlowScope::for_dataset(foo_id.clone()),
+    );
+    let binding_bar_ingest = FlowBinding::new(
+        FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(bar_id.clone()),
+    );
 
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
@@ -84,7 +92,10 @@ async fn test_pause_resume_individual_dataset_flows() {
 
     // Make a dataset and configure daily ingestion schedule
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let binding_foo_ingest = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_ingest = FlowBinding::new(
+        FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(foo_id.clone()),
+    );
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
@@ -139,14 +150,19 @@ async fn test_pause_resume_all_dataset_flows() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_ingest = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_ingest = FlowBinding::new(
+        FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(foo_id.clone()),
+    );
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
 
     let foo_compaction_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_compaction =
-        FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_COMPACT);
+    let binding_foo_compaction = FlowBinding::new(
+        FLOW_TYPE_DATASET_COMPACT,
+        FlowScope::for_dataset(foo_id.clone()),
+    );
     harness
         .set_flow_trigger(
             binding_foo_compaction.clone(),
@@ -215,7 +231,7 @@ async fn test_pause_resume_individual_system_flows() {
 
     // Configure GC schedule
     let gc_schedule: Schedule = Duration::minutes(30).into();
-    let binding_gc = FlowBinding::for_system(FLOW_TYPE_SYSTEM_GC);
+    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::System);
     harness
         .set_system_flow_schedule(FLOW_TYPE_SYSTEM_GC, gc_schedule.clone())
         .await
@@ -268,7 +284,10 @@ async fn test_dataset_deleted() {
     // Make a dataset and configure ingest trigger
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let foo_ingest_trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
-    let binding_foo_ingest = FlowBinding::for_dataset(foo_id.clone(), FLOW_TYPE_DATASET_INGEST);
+    let binding_foo_ingest = FlowBinding::new(
+        FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(foo_id.clone()),
+    );
     harness
         .set_flow_trigger(binding_foo_ingest.clone(), foo_ingest_trigger.clone())
         .await;
@@ -366,7 +385,7 @@ impl FlowTriggerHarness {
         flow_trigger_service
             .set_trigger(
                 Utc::now(),
-                FlowBinding::for_system(system_flow_type),
+                FlowBinding::new(system_flow_type, FlowScope::System),
                 false,
                 FlowTriggerRule::Schedule(schedule),
             )
@@ -403,7 +422,7 @@ impl FlowTriggerHarness {
         system_flow_type: &str,
         expected_schedule: &Schedule,
     ) {
-        let flow_binding = FlowBinding::for_system(system_flow_type);
+        let flow_binding = FlowBinding::new(system_flow_type, FlowScope::System);
         assert_matches!(
             enabled_triggers.get(&flow_binding),
             Some(FlowTriggerState {

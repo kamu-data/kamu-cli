@@ -61,10 +61,12 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
         match message {
             WebhookSubscriptionEventChangesMessage::EventEnabled(message) => {
                 if message.event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
-                    let flow_binding = fs::FlowBinding::for_webhook_subscription(
-                        message.webhook_subscription_id.into_inner(),
-                        message.dataset_id.clone(),
+                    let flow_binding = fs::FlowBinding::new(
                         FLOW_TYPE_WEBHOOK_DELIVER,
+                        fs::FlowScope::for_webhook_subscription(
+                            message.webhook_subscription_id.into_inner(),
+                            message.dataset_id.clone(),
+                        ),
                     );
                     self.flow_trigger_service
                         .set_trigger(
@@ -79,10 +81,12 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
             }
             WebhookSubscriptionEventChangesMessage::EventDisabled(message) => {
                 if message.event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
-                    let flow_binding = fs::FlowBinding::for_webhook_subscription(
-                        message.webhook_subscription_id.into_inner(),
-                        message.dataset_id.clone(),
+                    let flow_binding = fs::FlowBinding::new(
                         FLOW_TYPE_WEBHOOK_DELIVER,
+                        fs::FlowScope::for_webhook_subscription(
+                            message.webhook_subscription_id.into_inner(),
+                            message.dataset_id.clone(),
+                        ),
                     );
                     self.flow_trigger_service
                         .set_trigger(

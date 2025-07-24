@@ -63,7 +63,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         tracing::info!(?self.webhook_flow_scope, ?input_flow_binding, ?activation_cause, "DatasetUpdatedWebhookSensor sensitized");
 
         // Ensure sensitized for right dataset id
-        let input_dataset_id = input_flow_binding.dataset_id().ok_or_else(|| {
+        let input_dataset_id = input_flow_binding.scope.dataset_id().ok_or_else(|| {
             InternalError::new("Input flow binding does not have a dataset ID".to_string())
         })?;
         if input_dataset_id != self.webhook_flow_scope.dataset_id().unwrap() {
@@ -102,10 +102,8 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                 .int_err()?;
 
             // Trigger webhook flow, regardless of the change type
-            let target_flow_binding = fs::FlowBinding::from_scope(
-                FLOW_TYPE_WEBHOOK_DELIVER,
-                self.webhook_flow_scope.clone(),
-            );
+            let target_flow_binding =
+                fs::FlowBinding::new(FLOW_TYPE_WEBHOOK_DELIVER, self.webhook_flow_scope.clone());
             flow_run_service
                 .run_flow_automatically(
                     &target_flow_binding,

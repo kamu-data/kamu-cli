@@ -27,7 +27,10 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
 
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let flow_binding = FlowBinding::for_dataset(dataset_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let flow_binding = FlowBinding::new(
+        afs::FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(dataset_id.clone()),
+    );
 
     let events: Vec<_> = event_store
         .get_events(&flow_binding, GetEventsOpts::default())
@@ -64,8 +67,10 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .unwrap();
 
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let flow_binding_1 =
-        FlowBinding::for_dataset(dataset_id_1.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let flow_binding_1 = FlowBinding::new(
+        afs::FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(dataset_id_1.clone()),
+    );
 
     let event_1_1 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
@@ -98,8 +103,10 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(2, num_events);
 
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
-    let flow_binding_2 =
-        FlowBinding::for_dataset(dataset_id_2.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let flow_binding_2 = FlowBinding::new(
+        afs::FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(dataset_id_2.clone()),
+    );
 
     let event_2 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
@@ -117,7 +124,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(3, num_events);
 
-    let flow_binding_3 = FlowBinding::for_system(FLOW_TYPE_SYSTEM_GC);
+    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::System);
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),
@@ -203,9 +210,9 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         .get_one::<dyn FlowConfigurationEventStore>()
         .unwrap();
 
-    let flow_binding = FlowBinding::for_dataset(
-        odf::DatasetID::new_seeded_ed25519(b"foo"),
+    let flow_binding = FlowBinding::new(
         afs::FLOW_TYPE_DATASET_INGEST,
+        FlowScope::for_dataset(odf::DatasetID::new_seeded_ed25519(b"foo")),
     );
 
     let event_1 = FlowConfigurationEventCreated {

@@ -66,7 +66,7 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
         _maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
         maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let subscription_id = flow_binding.get_webhook_subscription_id_or_die()?;
+        let subscription_id = flow_binding.scope.get_webhook_subscription_id_or_die()?;
 
         let delivery_args = if let Some(task_run_arguments) = maybe_task_run_arguments
             && task_run_arguments.arguments_type == atw::TaskRunArgumentsWebhookDeliver::TYPE_ID

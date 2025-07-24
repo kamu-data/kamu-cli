@@ -71,9 +71,9 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        let flow_binding = FlowBinding::for_dataset(
-            dataset_handle.id.clone(),
+        let flow_binding = FlowBinding::new(
             map_dataset_flow_type(dataset_flow_type),
+            FlowScope::for_dataset(dataset_handle.id.clone()),
         );
 
         let res = flow_trigger_service
@@ -96,8 +96,10 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let dataset_id = self.dataset_request_state.dataset_id();
-        let flow_binding =
-            FlowBinding::for_dataset(dataset_id.clone(), map_dataset_flow_type(dataset_flow_type));
+        let flow_binding = FlowBinding::new(
+            map_dataset_flow_type(dataset_flow_type),
+            FlowScope::for_dataset(dataset_id.clone()),
+        );
 
         flow_trigger_service
             .pause_flow_trigger(Utc::now(), &flow_binding)
@@ -131,8 +133,10 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
 
         let dataset_id = self.dataset_request_state.dataset_id();
-        let flow_binding =
-            FlowBinding::for_dataset(dataset_id.clone(), map_dataset_flow_type(dataset_flow_type));
+        let flow_binding = FlowBinding::new(
+            map_dataset_flow_type(dataset_flow_type),
+            FlowScope::for_dataset(dataset_id.clone()),
+        );
 
         flow_trigger_service
             .resume_flow_trigger(Utc::now(), &flow_binding)
