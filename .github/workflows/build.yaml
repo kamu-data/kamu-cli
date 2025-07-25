@@ -62,8 +62,8 @@ jobs:
         with:
           components: rustfmt
       # We use nix flake to install flatc, protoc and other tools needed for codegen
-      - uses: cachix/install-nix-action@v25
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v16
         with:
           name: kamu
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
