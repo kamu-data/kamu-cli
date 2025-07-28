@@ -24,6 +24,7 @@ use kamu::domain::upload_service::{
 use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
+    AuthConfig,
     DEFAULT_ACCOUNT_ID,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
@@ -103,6 +104,7 @@ impl Harness {
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add_value(DidSecretEncryptionConfig::sample())
                 .add_value(JwtAuthenticationConfig::default())
+                .add_value(AuthConfig::sample())
                 .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
                 .add_value(FileUploadLimitConfig::new_in_bytes(100))
                 .add::<UploadServiceLocal>()

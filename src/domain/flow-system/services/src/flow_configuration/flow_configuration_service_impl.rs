@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use database_common::PaginationOpts;
 use dill::*;
 use kamu_datasets::DatasetLifecycleMessage;
 use kamu_flow_system::*;
@@ -46,66 +45,47 @@ impl FlowConfigurationServiceImpl {
 impl FlowConfigurationService for FlowConfigurationServiceImpl {
     /// Find the current schedule, which may or may not be associated with the
     /// given dataset
-    #[tracing::instrument(level = "info", skip_all, fields(?flow_key))]
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
     async fn find_configuration(
         &self,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError> {
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await?;
+            FlowConfiguration::try_load(flow_binding, self.event_store.as_ref()).await?;
         Ok(maybe_flow_configuration.map(Into::into))
     }
 
-    /// Find all configurations by datasets
-    #[tracing::instrument(level = "info", skip_all, fields(?dataset_ids))]
-    async fn find_configurations_by_datasets(
-        &self,
-        dataset_ids: Vec<odf::DatasetID>,
-    ) -> FlowConfigurationStateStream {
-        Box::pin(async_stream::try_stream! {
-            for dataset_flow_type in DatasetFlowType::all() {
-                for dataset_id in &dataset_ids {
-                    let maybe_flow_configuration =
-                        FlowConfiguration::try_load(
-                            FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()
-                        )
-                        .await
-                        .int_err()?;
-                    if let Some(flow_configuration) = maybe_flow_configuration {
-                        yield flow_configuration.into();
-                    }
-                }
-            }
-        })
-    }
-
     /// Set or modify dataset update schedule
-    #[tracing::instrument(level = "info", skip_all, fields(?flow_key))]
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
     async fn set_configuration(
         &self,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         rule: FlowConfigurationRule,
+        retry_policy: Option<RetryPolicy>,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
         tracing::info!(
-            flow_key = ?flow_key,
+            flow_binding = ?flow_binding,
             rule = ?rule,
+            retry_policy = ?retry_policy,
             "Setting flow configuration"
         );
 
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
+            FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref()).await?;
 
         let mut flow_configuration = match maybe_flow_configuration {
             // Modification
             Some(mut flow_configuration) => {
                 flow_configuration
-                    .modify_configuration(self.time_source.now(), rule)
+                    .modify_configuration(self.time_source.now(), rule, retry_policy)
                     .int_err()?;
 
                 flow_configuration
             }
             // New configuration
-            None => FlowConfiguration::new(self.time_source.now(), flow_key.clone(), rule),
+            None => {
+                FlowConfiguration::new(self.time_source.now(), flow_binding, rule, retry_policy)
+            }
         };
 
         flow_configuration
@@ -120,33 +100,21 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     fn list_active_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
-            for system_flow_type in SystemFlowType::all() {
-                let flow_key = (*system_flow_type).into();
-                let maybe_flow_configuration = FlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await.int_err()?;
+            use futures::stream::{self, StreamExt, TryStreamExt};
+            let flow_bindings: Vec<_> = self.event_store.stream_all_existing_flow_bindings().try_collect().await.int_err()?;
 
-                if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
-                    yield flow_configuration.into();
+            let flow_configurations = FlowConfiguration::load_multi_simple(flow_bindings, self.event_store.as_ref()).await.int_err()?;
+            let stream = stream::iter(flow_configurations)
+                .filter_map(|flow_configuration| async {
+                if flow_configuration.is_active() {
+                    Some(Ok::<_, InternalError>(flow_configuration.into()))
+                } else {
+                    None
                 }
-            }
+            });
 
-            let dataset_list_per_page = 10;
-            let mut current_page = 0;
-            let datasets_count = self.event_store.all_dataset_ids_count().await?;
-
-            while datasets_count > current_page * dataset_list_per_page {
-                let dataset_ids: Vec<_> = self.event_store.list_dataset_ids(
-                    &PaginationOpts::from_page(current_page, dataset_list_per_page)
-                ).await?;
-
-                for dataset_id in dataset_ids {
-                    for dataset_flow_type in DatasetFlowType::all() {
-                        let maybe_flow_configuration = FlowConfiguration::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()).await.int_err()?;
-                        if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
-                            yield flow_configuration.into();
-                        }
-                    }
-                }
-                current_page += 1;
+            for await item in stream {
+                yield item?;
             }
         })
     }
@@ -174,13 +142,16 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowConfigurationServiceImpl 
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
-                for flow_type in DatasetFlowType::all() {
-                    let maybe_flow_configuration = FlowConfiguration::try_load(
-                        FlowKeyDataset::new(message.dataset_id.clone(), *flow_type).into(),
-                        self.event_store.as_ref(),
-                    )
-                    .await
-                    .int_err()?;
+                let flow_bindings = self
+                    .event_store
+                    .all_bindings_for_dataset_flows(&message.dataset_id)
+                    .await?;
+
+                for flow_binding in flow_bindings {
+                    let maybe_flow_configuration =
+                        FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
+                            .await
+                            .int_err()?;
 
                     if let Some(mut flow_configuration) = maybe_flow_configuration {
                         flow_configuration

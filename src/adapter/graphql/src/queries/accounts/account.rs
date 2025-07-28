@@ -20,6 +20,7 @@ use tokio::sync::OnceCell;
 
 use super::AccountFlows;
 use crate::prelude::*;
+use crate::queries::AccountAccessTokens;
 use crate::utils::check_logged_account_id_match;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,6 +38,7 @@ pub enum AccountType {
     Organization,
 }
 
+#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
 #[Object]
 impl Account {
     #[graphql(skip)]
@@ -216,6 +218,12 @@ impl Account {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(AccountFlows::new(full_account_info))
+    }
+
+    /// Access to the flow configurations of this account
+    #[expect(clippy::unused_async)]
+    async fn access_tokens(&self) -> Result<AccountAccessTokens> {
+        Ok(AccountAccessTokens::new(&self.account_id))
     }
 }
 

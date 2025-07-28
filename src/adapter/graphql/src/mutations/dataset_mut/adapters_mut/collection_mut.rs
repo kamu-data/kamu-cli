@@ -43,7 +43,7 @@ impl<'a> CollectionMut<'a> {
 
         let mut ndjson = Vec::<u8>::new();
         for (op, entry) in entries {
-            let mut record = entry.to_record_data();
+            let mut record = entry.into_record_data();
             record["op"] = u8::from(op).into();
             writeln!(&mut ndjson, "{record}").int_err()?;
         }
@@ -133,9 +133,10 @@ impl<'a> CollectionMut<'a> {
                     .await
                     .int_err()?
                     .into_iter()
-                    .map(CollectionEntry::from_json)
-                    .map(|entry| (entry.path.clone(), entry))
-                    .collect()
+                    .map(|record| {
+                        CollectionEntry::from_json(record).map(|entry| (entry.path.clone(), entry))
+                    })
+                    .collect::<Result<_, _>>()?
             }
         };
 

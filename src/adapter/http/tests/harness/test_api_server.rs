@@ -32,7 +32,7 @@ impl TestAPIServer {
         let (router, _api) = OpenApiRouter::new()
             .merge(kamu_adapter_http::data::root_router())
             .merge(kamu_adapter_http::general::root_router())
-            .nest("/platform", kamu_adapter_http::platform::root_router())
+            .nest("/platform", kamu_adapter_http::platform::root_router(true))
             .nest(
                 match tenancy_config {
                     TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",

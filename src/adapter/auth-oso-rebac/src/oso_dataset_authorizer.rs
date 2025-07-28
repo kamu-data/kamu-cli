@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -108,7 +109,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
         let dataset_ids = dataset_handles
             .iter()
-            .map(|hdl| hdl.id.clone())
+            .map(|hdl| Cow::Borrowed(&hdl.id))
             .collect::<Vec<_>>();
         let dataset_resources_resolution = self
             .oso_resource_service
@@ -157,7 +158,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
         let dataset_ids = dataset_handles
             .iter()
-            .map(|hdl| hdl.id.clone())
+            .map(|hdl| Cow::Borrowed(&hdl.id))
             .collect::<Vec<_>>();
         let dataset_resources_resolution = self
             .oso_resource_service
@@ -203,9 +204,9 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, %action))]
-    async fn classify_dataset_ids_by_allowance(
-        &self,
-        dataset_ids: Vec<odf::DatasetID>,
+    async fn classify_dataset_ids_by_allowance<'a>(
+        &'a self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         let user_actor = self.user_actor().await?;
@@ -214,7 +215,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
         let dataset_resources_resolution = self
             .oso_resource_service
-            .get_multiple_dataset_resources(&dataset_ids)
+            .get_multiple_dataset_resources(dataset_ids)
             .await
             .int_err()?;
 

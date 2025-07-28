@@ -65,7 +65,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = kamu_auth_rebac_repo_tests::test_try_insert_duplicate_entities_relation,
+    fixture = kamu_auth_rebac_repo_tests::test_upsert_entities_relations,
     harness = PostgresRebacRepositoryHarness
 );
 
@@ -73,15 +73,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = kamu_auth_rebac_repo_tests::test_try_insert_another_entities_relation,
-    harness = PostgresRebacRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
-    fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relation,
+    fixture = kamu_auth_rebac_repo_tests::test_delete_entities_relations,
     harness = PostgresRebacRepositoryHarness
 );
 

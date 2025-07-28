@@ -6,8 +6,9 @@
   - [Run Linters](#run-linters)
   - [Run Tests](#run-tests)
   - [Build Speed Tweaks (Optional)](#build-speed-tweaks-optional)
-    - [Building](#building)
-    - [Linking](#linking)
+    - [Artifact reuse (shared target dir)](#artifact-reuse-shared-target-dir)
+    - [Artifact reuse (sscache)](#artifact-reuse-sscache)
+    - [Faster linker](#faster-linker)
   - [Building with Web UI (Optional)](#building-with-web-ui-optional)
   - [Code Generation](#code-generation)
 - [Code Structure](#code-structure)
@@ -55,6 +56,7 @@ Prerequisites:
     * `cargo binstall cargo-nextest -y` - advanced test runner
     * `cargo binstall bunyan -y` - for pretty-printing the JSON logs
     * `cargo binstall cargo-llvm-cov -y` - for test coverage
+    * `cargo binstall cargo-cache -y` - to keep track of cargo cache usage
   * Optional - if you will be doing releases:
     * `cargo binstall cargo-edit -y` - for setting crate versions during release
     * `cargo binstall cargo-update -y` - for keeping up with major dependency updates
@@ -209,19 +211,35 @@ cargo nextest run -p opendatafabric
 
 ### Build Speed Tweaks (Optional)
 
-#### Building
+#### Artifact reuse (shared target dir)
+Working on `kamu` often involves switching between multiple related repositories that depend on a similar set of crates. To avoid wasting a lot of time and disk space recompiling them it is advisable to setup a shared `/target` directory.
 
-Given the native nature of Rust, we often have to rebuild very similar source code revisions (e.g. switching between git branches).
+For example if you have projects layed out like so:
+```sh
+/home/me/code/kamu/
+  /kamu-cli
+  /kamu-node
+  /kamu-engine-datafusion
+```
 
-This is where [sccache](https://github.com/mozilla/sccache#installation) can help us save the compilation cache and our time (dramatically). 
-After installing in a way that is convenient for you, configure as follows (`$CARGO_HOME/config.toml`):
+Create a file `/home/me/code/kamu/.cargo/config.toml` that contains:
+```toml
+[build]
+target-dir = "/home/me/code/kamu/.target"
+```
+
+This way all projects you build under `/kamu` directory will share one target directory, reusing all artifacts.
+
+#### Artifact reuse (sscache)
+Alternatively to reuse build artifacts you can use [sccache](https://github.com/mozilla/sccache#installation).
+After installing in a way that is convenient for you, configure `$CARGO_HOME/config.toml` as follows:
 
 ```toml
 [build]
 rustc-wrapper = "/path/to/sccache"
 ```
 
-Alternatively you can use the environment variable `RUSTC_WRAPPER`:
+Same can be achieved using environment variable `RUSTC_WRAPPER`:
 
 ```shell
 export RUSTC_WRAPPER=/path/to/sccache # for your convenience, save it to your $SHELL configuration file (e.g. `.bashrc`, `.zshrc, etc)
@@ -229,7 +247,7 @@ cargo build
 ```
 
 
-#### Linking
+#### Faster linker
 
 Consider configuring Rust to use `lld` linker, which is much faster than the default `ld` (may improve link times by ~10-20x).
 
@@ -240,7 +258,7 @@ To do so install `lld`, then update `$CARGO_HOME/config.toml` file with the foll
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 ```
 
-One more alternative is to use `mold` linker, which is also much faster than the default `ld`.
+Another alternative is `mold` linker, which is also much faster than the default `ld`.
 
 To do so install `mold` or build it with `clang++` compiler from [mold sources](https://github.com/rui314/mold#how-to-build) then update `$CARGO_HOME/config.toml` file with the following contents:
 

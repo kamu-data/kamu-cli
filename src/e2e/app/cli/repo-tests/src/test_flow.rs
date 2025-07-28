@@ -22,7 +22,6 @@ use kamu_cli_e2e_common::{
     RequestBody,
 };
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_flow_system::DatasetFlowType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -266,10 +265,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     byId(datasetId: $datasetId) {
                       flows {
                         runs {
-                          triggerFlow(
-                            datasetFlowType: $datasetFlowType
-                            flowRunConfiguration: $flowRunConfiguration
-                          ) {
+                          triggerTransformFlow {
                             ... on TriggerFlowSuccess {
                               flow {
                                 ...FlowSummaryData
@@ -308,7 +304,6 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                 fragment FlowSummaryData on Flow {
                   description {
                     ... on FlowDescriptionDatasetPollingIngest {
-                      # datasetId
                       ingestResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
@@ -325,7 +320,6 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       __typename
                     }
                     ... on FlowDescriptionDatasetPushIngest {
-                      # datasetId
                       sourceName
                       inputRecordsCount
                       ingestResult {
@@ -344,7 +338,6 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       __typename
                     }
                     ... on FlowDescriptionDatasetExecuteTransform {
-                      # datasetId
                       transformResult {
                         ... on FlowDescriptionUpdateResultUpToDate {
                           uncacheable
@@ -361,7 +354,6 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       __typename
                     }
                     ... on FlowDescriptionDatasetHardCompaction {
-                      # datasetId
                       compactionResult {
                         ... on FlowDescriptionHardCompactionSuccess {
                           originalBlocksCount
@@ -383,7 +375,6 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                       __typename
                     }
                     ... on FlowDescriptionDatasetReset {
-                      datasetId
                       resetResult {
                         newHead
                         __typename
@@ -405,7 +396,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                   timing {
                     awaitingExecutorSince
                     runningSince
-                    finishedAt
+                    lastAttemptFinishedAt
                     __typename
                   }
                   startCondition {
@@ -440,12 +431,12 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     }
                   }
                   configSnapshot {
-                    ... on FlowConfigurationIngest {
+                    ... on FlowConfigRuleIngest {
                       fetchUncacheable
                       __typename
                     }
-                    ... on FlowConfigurationCompactionRule {
-                      compactionRule {
+                    ... on FlowConfigRuleCompaction {
+                      compactionMode {
                         __typename
                       }
                       __typename
@@ -472,11 +463,11 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                   }
                   ... on FlowFailedError {
                     reason {
-                      ... on FlowFailureReasonGeneral {
+                      ... on TaskFailureReasonGeneral {
                         message
                         __typename
                       }
-                      ... on FlowFailureReasonInputDatasetCompacted {
+                      ... on TaskFailureReasonInputDatasetCompacted {
                         message
                         inputDataset {
                           ...DatasetBasics
@@ -524,12 +515,10 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                     "$accountId",
                     "\"did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f\"",
                 )
-                .replace("$datasetFlowType", "\"EXECUTE_TRANSFORM\"")
                 .replace(
                     "$datasetId",
                     &format!("\"{derivative_dataset_id}\""),
                 )
-                .replace("$flowRunConfiguration", "null")
                 .as_str(),
             Ok(indoc::indoc!(
                 r#"
@@ -542,7 +531,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                         "__typename": "DatasetFlowsMut",
                         "runs": {
                           "__typename": "DatasetFlowRunsMut",
-                          "triggerFlow": {
+                          "triggerTransformFlow": {
                             "__typename": "TriggerFlowSuccess",
                             "flow": {
                               "__typename": "Flow",
@@ -566,7 +555,7 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
                               "timing": {
                                 "__typename": "FlowTimingRecords",
                                 "awaitingExecutorSince": null,
-                                "finishedAt": null,
+                                "lastAttemptFinishedAt": null,
                                 "runningSince": null
                               }
                             },
@@ -590,149 +579,155 @@ pub async fn test_gql_dataset_trigger_flow(mut kamu_api_server_client: KamuApiSe
     kamu_api_server_client
         .graphql_api_call_assert(
             &get_dataset_list_flows_query(&derivative_dataset_id),
-            Ok(indoc::indoc!(
-                r#"
-                {
-                  "datasets": {
-                    "__typename": "Datasets",
-                    "byId": {
-                      "__typename": "Dataset",
-                      "alias": "leaderboard",
-                      "flows": {
-                        "__typename": "DatasetFlows",
-                        "runs": {
-                          "__typename": "DatasetFlowRuns",
-                          "table": {
-                            "__typename": "FlowConnection",
-                            "edges": [
-                              {
-                                "__typename": "FlowEdge",
-                                "node": {
-                                  "__typename": "Flow",
-                                  "configSnapshot": null,
-                                  "description": {
-                                    "__typename": "FlowDescriptionDatasetExecuteTransform",
-                                    "transformResult": {
-                                      "__typename": "FlowDescriptionUpdateResultSuccess",
-                                      "numBlocks": 2,
-                                      "numRecords": 2,
-                                      "updatedWatermark": "2000-01-01T00:00:00+00:00"
+            Ok(
+                indoc::indoc!(
+                    r#"
+                    {
+                      "datasets": {
+                        "__typename": "Datasets",
+                        "byId": {
+                          "__typename": "Dataset",
+                          "alias": "leaderboard",
+                          "flows": {
+                            "__typename": "DatasetFlows",
+                            "runs": {
+                              "__typename": "DatasetFlowRuns",
+                              "table": {
+                                "__typename": "FlowConnection",
+                                "edges": [
+                                  {
+                                    "__typename": "FlowEdge",
+                                    "node": {
+                                      "__typename": "Flow",
+                                      "configSnapshot": null,
+                                      "datasetId": $datasetId,
+                                      "description": {
+                                        "__typename": "FlowDescriptionDatasetExecuteTransform",
+                                        "transformResult": {
+                                          "__typename": "FlowDescriptionUpdateResultSuccess",
+                                          "numBlocks": 2,
+                                          "numRecords": 2,
+                                          "updatedWatermark": "2000-01-01T00:00:00+00:00"
+                                        }
+                                      },
+                                      "initiator": {
+                                        "__typename": "Account",
+                                        "accountName": "kamu",
+                                        "accountType": "USER",
+                                        "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
+                                        "displayName": "kamu",
+                                        "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                        "isAdmin": true
+                                      },
+                                      "outcome": {
+                                        "__typename": "FlowSuccessResult",
+                                        "message": "SUCCESS"
+                                      },
+                                      "startCondition": null,
+                                      "status": "FINISHED",
+                                      "timing": {
+                                        "__typename": "FlowTimingRecords"
+                                      }
                                     }
-                                  },
-                                  "initiator": {
-                                    "__typename": "Account",
-                                    "accountName": "kamu",
-                                    "accountType": "USER",
-                                    "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
-                                    "displayName": "kamu",
-                                    "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
-                                    "isAdmin": true
-                                  },
-                                  "outcome": {
-                                    "__typename": "FlowSuccessResult",
-                                    "message": "SUCCESS"
-                                  },
-                                  "startCondition": null,
-                                  "status": "FINISHED",
-                                  "timing": {
-                                    "__typename": "FlowTimingRecords"
                                   }
-                                }
-                              }
-                            ],
-                            "nodes": [
-                              {
-                                "__typename": "Flow",
-                                "configSnapshot": null,
-                                "description": {
-                                  "__typename": "FlowDescriptionDatasetExecuteTransform",
-                                  "transformResult": {
-                                    "__typename": "FlowDescriptionUpdateResultSuccess",
-                                    "numBlocks": 2,
-                                    "numRecords": 2,
-                                    "updatedWatermark": "2000-01-01T00:00:00+00:00"
+                                ],
+                                "nodes": [
+                                  {
+                                    "__typename": "Flow",
+                                    "configSnapshot": null,
+                                    "datasetId": $datasetId,
+                                    "description": {
+                                      "__typename": "FlowDescriptionDatasetExecuteTransform",
+                                      "transformResult": {
+                                        "__typename": "FlowDescriptionUpdateResultSuccess",
+                                        "numBlocks": 2,
+                                        "numRecords": 2,
+                                        "updatedWatermark": "2000-01-01T00:00:00+00:00"
+                                      }
+                                    },
+                                    "initiator": {
+                                      "__typename": "Account",
+                                      "accountName": "kamu",
+                                      "accountType": "USER",
+                                      "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
+                                      "displayName": "kamu",
+                                      "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
+                                      "isAdmin": true
+                                    },
+                                    "outcome": {
+                                      "__typename": "FlowSuccessResult",
+                                      "message": "SUCCESS"
+                                    },
+                                    "startCondition": null,
+                                    "status": "FINISHED",
+                                    "timing": {
+                                      "__typename": "FlowTimingRecords"
+                                    }
                                   }
+                                ],
+                                "pageInfo": {
+                                  "__typename": "PageBasedInfo",
+                                  "currentPage": 0,
+                                  "hasNextPage": false,
+                                  "hasPreviousPage": false,
+                                  "totalPages": 1
                                 },
-                                "initiator": {
-                                  "__typename": "Account",
-                                  "accountName": "kamu",
-                                  "accountType": "USER",
-                                  "avatarUrl": "https://avatars.githubusercontent.com/u/50896974?s=200&v=4",
-                                  "displayName": "kamu",
-                                  "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f",
-                                  "isAdmin": true
-                                },
-                                "outcome": {
-                                  "__typename": "FlowSuccessResult",
-                                  "message": "SUCCESS"
-                                },
-                                "startCondition": null,
-                                "status": "FINISHED",
-                                "timing": {
-                                  "__typename": "FlowTimingRecords"
-                                }
+                                "totalCount": 1
+                              },
+                              "tiles": {
+                                "__typename": "FlowConnection",
+                                "nodes": [
+                                  {
+                                    "__typename": "Flow",
+                                    "initiator": {
+                                      "__typename": "Account",
+                                      "accountName": "kamu"
+                                    },
+                                    "outcome": {
+                                      "__typename": "FlowSuccessResult",
+                                      "message": "SUCCESS"
+                                    },
+                                    "status": "FINISHED",
+                                    "timing": {
+                                      "__typename": "FlowTimingRecords"
+                                    }
+                                  }
+                                ],
+                                "totalCount": 1
                               }
-                            ],
-                            "pageInfo": {
-                              "__typename": "PageBasedInfo",
-                              "currentPage": 0,
-                              "hasNextPage": false,
-                              "hasPreviousPage": false,
-                              "totalPages": 1
-                            },
-                            "totalCount": 1
-                          },
-                          "tiles": {
-                            "__typename": "FlowConnection",
-                            "nodes": [
-                              {
-                                "__typename": "Flow",
-                                "initiator": {
-                                  "__typename": "Account",
-                                  "accountName": "kamu"
-                                },
-                                "outcome": {
-                                  "__typename": "FlowSuccessResult",
-                                  "message": "SUCCESS"
-                                },
-                                "status": "FINISHED",
-                                "timing": {
-                                  "__typename": "FlowTimingRecords"
-                                }
-                              }
-                            ],
-                            "totalCount": 1
-                          }
-                        }
-                      },
-                      "kind": "DERIVATIVE",
-                      "metadata": {
-                        "__typename": "DatasetMetadata",
-                        "currentPollingSource": null,
-                        "currentTransform": {
-                          "__typename": "SetTransform",
-                          "inputs": [
-                            {
-                              "__typename": "TransformInput"
                             }
-                          ],
-                          "transform": {
-                            "__typename": "TransformSql",
-                            "engine": "datafusion"
+                          },
+                          "kind": "DERIVATIVE",
+                          "metadata": {
+                            "__typename": "DatasetMetadata",
+                            "currentPollingSource": null,
+                            "currentTransform": {
+                              "__typename": "SetTransform",
+                              "inputs": [
+                                {
+                                  "__typename": "TransformInput"
+                                }
+                              ],
+                              "transform": {
+                                "__typename": "TransformSql",
+                                "engine": "datafusion"
+                              }
+                            }
+                          },
+                          "name": "leaderboard",
+                          "owner": {
+                            "__typename": "Account",
+                            "accountName": "kamu",
+                            "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f"
                           }
                         }
-                      },
-                      "name": "leaderboard",
-                      "owner": {
-                        "__typename": "Account",
-                        "accountName": "kamu",
-                        "id": "did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f"
                       }
                     }
-                  }
-                }
-                "#
-            )),
+                    "#
+                )
+                .replace("$datasetId", &format!("\"{derivative_dataset_id}\""))
+                .as_str(),
+            ),
         )
         .await;
 }
@@ -822,7 +817,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .trigger_ingest(&root_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -866,7 +861,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .trigger_ingest(&root_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -923,7 +918,7 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::Ingest)
+            .trigger_ingest(&root_dataset_id)
             .await,
         FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetPollingSource event defined'"
@@ -955,7 +950,7 @@ pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: Kam
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
+            .trigger_transform(&derivative_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1010,7 +1005,7 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&derivative_dataset_id, DatasetFlowType::ExecuteTransform)
+            .trigger_transform(&derivative_dataset_id)
             .await,
         FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetTransform event defined'"
@@ -1086,7 +1081,7 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::HardCompaction)
+            .trigger_compaction(&root_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1166,7 +1161,7 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&root_dataset_id, DatasetFlowType::Reset)
+            .trigger_reset(&root_dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1191,7 +1186,7 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServerClient) {
+pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServerClient) {
     let temp_dir = tempfile::tempdir().unwrap();
 
     let root_dataset_snapshot = indoc::formatdoc!(
@@ -1249,7 +1244,7 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
     assert_matches!(
         kamu_api_server_client
             .flow()
-            .trigger(&dataset_id, DatasetFlowType::Ingest)
+            .trigger_ingest(&dataset_id)
             .await,
         FlowTriggerResponse::Success(_)
     );
@@ -1279,9 +1274,9 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
                                 "node": {
                                   "__typename": "Flow",
                                   "configSnapshot": null,
+                                  "datasetId": $datasetId,
                                   "description": {
                                     "__typename": "FlowDescriptionDatasetPollingIngest",
-                                    "datasetId": $datasetId,
                                     "ingestResult": null
                                   },
                                   "initiator": {
@@ -1296,7 +1291,7 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
                                   "outcome": {
                                     "__typename": "FlowFailedError",
                                     "reason": {
-                                      "__typename": "FlowFailureReasonGeneral",
+                                      "__typename": "TaskFailureReasonGeneral",
                                       "message": "FAILED"
                                     }
                                   },
@@ -1312,9 +1307,9 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
                               {
                                 "__typename": "Flow",
                                 "configSnapshot": null,
+                                "datasetId": $datasetId,
                                 "description": {
                                   "__typename": "FlowDescriptionDatasetPollingIngest",
-                                  "datasetId": $datasetId,
                                   "ingestResult": null
                                 },
                                 "initiator": {
@@ -1329,7 +1324,7 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
                                 "outcome": {
                                   "__typename": "FlowFailedError",
                                   "reason": {
-                                    "__typename": "FlowFailureReasonGeneral",
+                                    "__typename": "TaskFailureReasonGeneral",
                                     "message": "FAILED"
                                   }
                                 },
@@ -1361,7 +1356,7 @@ pub async fn test_flow_planing_failure(mut kamu_api_server_client: KamuApiServer
                                 "outcome": {
                                   "__typename": "FlowFailedError",
                                   "reason": {
-                                    "__typename": "FlowFailureReasonGeneral",
+                                    "__typename": "TaskFailureReasonGeneral",
                                     "message": "FAILED"
                                   }
                                 },
@@ -1420,7 +1415,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
     // - search FlowItemWidgetData.timing:
     //   - awaitingExecutorSince
     //   - runningSince
-    //   - finishedAt
+    //   - lastAttemptFinishedAt
     // - search FlowSummaryData (flowId)
 
     indoc::indoc!(
@@ -1588,9 +1583,9 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
         }
 
         fragment FlowSummaryData on Flow {
+          datasetId
           description {
             ... on FlowDescriptionDatasetPollingIngest {
-              datasetId
               ingestResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable
@@ -1607,7 +1602,6 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               __typename
             }
             ... on FlowDescriptionDatasetPushIngest {
-              datasetId
               sourceName
               inputRecordsCount
               ingestResult {
@@ -1626,7 +1620,6 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               __typename
             }
             ... on FlowDescriptionDatasetExecuteTransform {
-              # datasetId
               transformResult {
                 ... on FlowDescriptionUpdateResultUpToDate {
                   uncacheable
@@ -1643,7 +1636,6 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               __typename
             }
             ... on FlowDescriptionDatasetHardCompaction {
-              # datasetId
               compactionResult {
                 ... on FlowDescriptionHardCompactionSuccess {
                   originalBlocksCount
@@ -1665,7 +1657,6 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
               __typename
             }
             ... on FlowDescriptionDatasetReset {
-              datasetId
               resetResult {
                 newHead
                 __typename
@@ -1719,15 +1710,13 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
             }
           }
           configSnapshot {
-            ... on FlowConfigurationIngest {
+            ... on FlowConfigRuleIngest {
               fetchUncacheable
-              __typename
             }
-            ... on FlowConfigurationCompactionRule {
-              compactionRule {
-                __typename
+            ... on FlowConfigRuleCompaction {
+              compactionMode {
+                  __typename
               }
-              __typename
             }
             __typename
           }
@@ -1751,11 +1740,11 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
           }
           ... on FlowFailedError {
             reason {
-              ... on FlowFailureReasonGeneral {
+              ... on TaskFailureReasonGeneral {
                 message
                 __typename
               }
-              ... on FlowFailureReasonInputDatasetCompacted {
+              ... on TaskFailureReasonInputDatasetCompacted {
                 message
                 inputDataset {
                   ...DatasetBasics
@@ -1810,7 +1799,7 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
           timing {
             # awaitingExecutorSince
             # runningSince
-            # finishedAt
+            # lastAttemptFinishedAt
             __typename
           }
           __typename

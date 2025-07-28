@@ -20,23 +20,11 @@ use kamu_core::{DatasetRegistry, ResolvedDataset, auth};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[dill::component(pub)]
+#[dill::interface(dyn RebacDatasetRegistryFacade)]
 pub struct RebacDatasetRegistryFacadeImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-}
-
-#[dill::component(pub)]
-#[dill::interface(dyn RebacDatasetRegistryFacade)]
-impl RebacDatasetRegistryFacadeImpl {
-    pub fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-    ) -> Self {
-        Self {
-            dataset_registry,
-            dataset_action_authorizer,
-        }
-    }
 }
 
 #[async_trait::async_trait]

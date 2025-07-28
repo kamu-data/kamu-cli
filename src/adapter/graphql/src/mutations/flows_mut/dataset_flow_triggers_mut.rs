@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_flow_system::{FlowKeyDataset, FlowTriggerRule, FlowTriggerService};
+use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService};
 
 use super::{
     FlowIncompatibleDatasetKind,
@@ -51,8 +51,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }
 
         if let Some(e) =
-            ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type, None)
-                .await?
+            ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type).await?
         {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }
@@ -72,13 +71,13 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
+        let flow_binding = FlowBinding::for_dataset(
+            dataset_handle.id.clone(),
+            map_dataset_flow_type(dataset_flow_type),
+        );
+
         let res = flow_trigger_service
-            .set_trigger(
-                Utc::now(),
-                FlowKeyDataset::new(dataset_handle.id.clone(), dataset_flow_type.into()).into(),
-                paused,
-                trigger_rule,
-            )
+            .set_trigger(Utc::now(), flow_binding, paused, trigger_rule)
             .await
             .int_err()?;
 
@@ -102,7 +101,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             .pause_dataset_flows(
                 Utc::now(),
                 &dataset_handle.id,
-                dataset_flow_type.map(Into::into),
+                dataset_flow_type.map(map_dataset_flow_type),
             )
             .await?;
 
@@ -124,7 +123,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
             .resume_dataset_flows(
                 Utc::now(),
                 &dataset_handle.id,
-                dataset_flow_type.map(Into::into),
+                dataset_flow_type.map(map_dataset_flow_type),
             )
             .await?;
 

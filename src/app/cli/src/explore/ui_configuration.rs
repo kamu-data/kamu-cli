@@ -28,6 +28,7 @@ pub(crate) struct UIFeatureFlags {
     pub(crate) enable_scheduling: bool,
     pub(crate) enable_dataset_env_vars_management: bool,
     pub(crate) enable_terms_of_service: bool,
+    pub(crate) allow_anonymous: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

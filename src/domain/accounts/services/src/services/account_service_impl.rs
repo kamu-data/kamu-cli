@@ -10,11 +10,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::Utc;
 use crypto_utils::{Argon2Hasher, PasswordHashingMode};
 use database_common::PaginationOpts;
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::*;
+use odf::metadata::DidPkh;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 
@@ -202,6 +204,25 @@ impl AccountService for AccountServiceImpl {
         }
 
         Ok(account)
+    }
+
+    async fn create_wallet_account(&self, did_pkh: &DidPkh) -> Result<Account, CreateAccountError> {
+        let wallet_address = did_pkh.wallet_address();
+        let new_account = Account {
+            id: did_pkh.clone().into(),
+            account_name: odf::AccountName::new_unchecked(wallet_address),
+            email: Email::parse(&format!("{wallet_address}@example.com")).unwrap(),
+            display_name: AccountDisplayName::from(wallet_address),
+            account_type: AccountType::User,
+            avatar_url: None,
+            registered_at: Utc::now(),
+            provider: AccountProvider::Web3Wallet.to_string(),
+            provider_identity_key: wallet_address.to_string(),
+        };
+
+        self.account_repo.save_account(&new_account).await?;
+
+        Ok(new_account)
     }
 
     async fn rename_account(

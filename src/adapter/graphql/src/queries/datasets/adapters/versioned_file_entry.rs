@@ -48,45 +48,35 @@ pub struct VersionedFileEntry {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl VersionedFileEntry {
-    pub fn from_json(dataset: ResolvedDataset, record: serde_json::Value) -> Self {
-        let serde_json::Value::Object(mut record) = record else {
-            unreachable!()
-        };
+    pub fn from_json(
+        dataset: ResolvedDataset,
+        record: serde_json::Value,
+    ) -> Result<Self, InternalError> {
+        let mut event: VersionedFileEvent = serde_json::from_value(record).int_err()?;
 
-        // Parse system columns
         let vocab = odf::metadata::DatasetVocabulary::default();
-        record.remove(&vocab.offset_column);
-        record.remove(&vocab.operation_type_column);
-        let system_time = DateTime::parse_from_rfc3339(
-            record
-                .remove(&vocab.system_time_column)
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap()
-        .into();
-        let event_time = DateTime::parse_from_rfc3339(
-            record
-                .remove(&vocab.event_time_column)
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap()
-        .into();
+        event.record.extra_data.remove(&vocab.offset_column);
+        event.record.extra_data.remove(&vocab.operation_type_column);
 
-        let versioned_file_entity = VersionedFileEntity::from_last_record(record.clone().into());
-
-        Self {
+        Ok(Self {
             dataset,
-            system_time,
-            event_time,
-            version: versioned_file_entity.version,
-            content_length: versioned_file_entity.content_length,
-            content_type: versioned_file_entity.content_type,
-            content_hash: versioned_file_entity.content_hash.into(),
-            extra_data: ExtraData::new(record.into()),
+            system_time: event.system_time,
+            event_time: event.event_time,
+            version: event.record.version,
+            content_length: event.record.content_length,
+            content_type: event.record.content_type,
+            content_hash: event.record.content_hash.into(),
+            extra_data: ExtraData::new(event.record.extra_data),
+        })
+    }
+
+    pub fn into_input_record(self) -> VersionedFileRecord {
+        VersionedFileRecord {
+            version: self.version,
+            content_type: self.content_type,
+            content_length: self.content_length,
+            content_hash: self.content_hash.into(),
+            extra_data: self.extra_data.into(),
         }
     }
 }
@@ -159,6 +149,32 @@ pub struct VersionedFileContentDownload {
 
     /// Download URL expiration timestamp
     pub expires_at: Option<DateTime<Utc>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Used to serialize/deserialize entry from a dataset
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct VersionedFileRecord {
+    pub version: FileVersion,
+    pub content_type: String,
+    pub content_length: usize,
+    pub content_hash: odf::Multihash,
+
+    #[serde(flatten)]
+    pub extra_data: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct VersionedFileEvent {
+    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+
+    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
+    pub event_time: DateTime<Utc>,
+
+    #[serde(flatten)]
+    pub record: VersionedFileRecord,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

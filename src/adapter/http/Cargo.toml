@@ -66,6 +66,7 @@ ed25519-dalek = { version = "2", default-features = false, features = [
 ] }
 flate2 = "1" # GZip decoder
 futures = "0.3"
+graphql-parser = "0.4"
 headers = { version = "0.4", default-features = false }
 http = "1"
 indoc = "2"
@@ -115,7 +116,7 @@ kamu-auth-rebac-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
-observability = { workspace = true }
+observability = { workspace = true, features = ["dill"] }
 test-utils = { workspace = true }
 
 fs_extra = "1.3"                                               # Recursive folder copy

@@ -7,24 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system as fs;
+use std::collections::HashMap;
+
+use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
-use super::{
-    FlowConfigurationSnapshot,
-    FlowEvent,
-    FlowOutcome,
-    FlowStartCondition,
-    FlowTriggerType,
-};
+use super::{FlowEvent, FlowOutcome, FlowStartCondition, FlowTriggerInstance};
 use crate::prelude::*;
-use crate::queries::{Account, Task};
-use crate::utils;
+use crate::queries::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct Flow {
     flow_state: Box<fs::FlowState>,
+    flow_task_states: Vec<ts::TaskState>,
     description: FlowDescription,
 }
 
@@ -41,10 +37,22 @@ impl Flow {
         let mut flow_description_builder =
             FlowDescriptionBuilder::prepare(ctx, &flow_states).await?;
 
+        // Load task states associated with the flows
+        let mut flow_task_states_by_id =
+            Self::load_flow_task_states(flow_states.clone(), ctx).await?;
+
         for flow_state in flow_states {
+            // Extract task states associated with the flow
+            let flow_task_states = flow_state
+                .task_ids
+                .iter()
+                .filter_map(|task_id| flow_task_states_by_id.remove(task_id))
+                .collect::<Vec<_>>();
+
             let flow_description = flow_description_builder.build(ctx, &flow_state).await?;
             result.push(Self {
                 flow_state: Box::new(flow_state),
+                flow_task_states,
                 description: flow_description,
             });
         }
@@ -52,9 +60,42 @@ impl Flow {
         Ok(result)
     }
 
+    #[graphql(skip)]
+    async fn load_flow_task_states(
+        flow_states: Vec<fs::FlowState>,
+        ctx: &Context<'_>,
+    ) -> Result<HashMap<ts::TaskID, ts::TaskState>> {
+        let task_event_store = from_catalog_n!(ctx, dyn ts::TaskEventStore);
+
+        let flow_task_ids: Vec<_> = flow_states
+            .iter()
+            .flat_map(|flow_state| flow_state.task_ids.iter().copied())
+            .collect();
+        let flow_task_states: Vec<ts::TaskState> =
+            ts::Task::load_multi_simple(flow_task_ids, task_event_store.as_ref())
+                .await
+                .int_err()?
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<_>>();
+
+        Ok(flow_task_states
+            .into_iter()
+            .map(|task_state| (task_state.task_id, task_state))
+            .collect::<HashMap<_, _>>())
+    }
+
     /// Unique identifier of the flow
     async fn flow_id(&self) -> FlowID {
         self.flow_state.flow_id.into()
+    }
+
+    /// Associated dataset ID, if any
+    async fn dataset_id(&self) -> Option<DatasetID<'static>> {
+        self.flow_state
+            .flow_binding
+            .dataset_id()
+            .map(|dataset_id| dataset_id.clone().into())
     }
 
     /// Description of key flow parameters
@@ -69,27 +110,42 @@ impl Flow {
 
     /// Outcome of the flow (Finished state only)
     async fn outcome(&self, ctx: &Context<'_>) -> Result<Option<FlowOutcome>> {
-        Ok(
-            FlowOutcome::from_maybe_flow_outcome(self.flow_state.outcome.as_ref(), ctx)
-                .await
-                .int_err()?,
-        )
+        match self.flow_state.outcome {
+            Some(ref outcome) => {
+                let maybe_task_outcome = self
+                    .flow_task_states
+                    .last()
+                    .and_then(|task_state| task_state.outcome.as_ref());
+
+                Ok(Some(
+                    FlowOutcome::from_flow_and_task_outcomes(ctx, outcome, maybe_task_outcome)
+                        .await
+                        .int_err()?,
+                ))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Timing records associated with the flow lifecycle
     async fn timing(&self) -> FlowTimingRecords {
-        self.flow_state.timing.into()
+        FlowTimingRecords {
+            initiated_at: self.flow_state.primary_trigger().trigger_time(),
+            scheduled_at: self.flow_state.timing.scheduled_for_activation_at,
+            awaiting_executor_since: self.flow_state.timing.awaiting_executor_since,
+            running_since: self.flow_state.timing.running_since,
+            last_attempt_finished_at: self.flow_state.timing.last_attempt_finished_at,
+        }
     }
 
-    /// Associated tasks
-    #[tracing::instrument(level = "info", name = Flow_tasks, skip_all)]
-    async fn tasks(&self, ctx: &Context<'_>) -> Result<Vec<Task>> {
-        let mut tasks = Vec::new();
-        for task_id in &self.flow_state.task_ids {
-            let ts_task = utils::get_task(ctx, *task_id).await?;
-            tasks.push(Task::new(ts_task));
-        }
-        Ok(tasks)
+    /// IDs of associated tasks
+    async fn task_ids(&self) -> Vec<TaskID> {
+        self.flow_state
+            .task_ids
+            .iter()
+            .copied()
+            .map(Into::into)
+            .collect()
     }
 
     /// History of flow events
@@ -122,8 +178,11 @@ impl Flow {
     }
 
     /// Primary flow trigger
-    async fn primary_trigger(&self, ctx: &Context<'_>) -> Result<FlowTriggerType, InternalError> {
-        FlowTriggerType::build(self.flow_state.primary_trigger(), ctx).await
+    async fn primary_trigger(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<FlowTriggerInstance, InternalError> {
+        FlowTriggerInstance::build(self.flow_state.primary_trigger(), ctx).await
     }
 
     /// Start condition
@@ -147,8 +206,13 @@ impl Flow {
     }
 
     /// Flow config snapshot
-    async fn config_snapshot(&self) -> Option<FlowConfigurationSnapshot> {
+    async fn config_snapshot(&self) -> Option<FlowConfigRule> {
         self.flow_state.config_snapshot.clone().map(Into::into)
+    }
+
+    /// Flow retry policy
+    async fn retry_policy(&self) -> Option<FlowRetryPolicy> {
+        self.flow_state.retry_policy.map(Into::into)
     }
 }
 

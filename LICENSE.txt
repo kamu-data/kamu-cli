@@ -1,7 +1,7 @@
 Kamu CLI is licensed under the Business Source License agreement below.
 
 For a simple explanation of this license please visit:
-https://docs.kamu.dev/contrib/license/
+https://docs.kamu.dev/license/
 
 -----------------------------------------------------------------------------
 
@@ -11,20 +11,20 @@ Business Source License 1.1
 
 Licensor:                  Kamu Data, Inc.
 
-Licensed Work:             Kamu CLI Version 0.242.1
-                           The Licensed Work is © 2023 Kamu Data, Inc.
+Licensed Work:             Kamu CLI Version 0.245.2
+                           The Licensed Work is © 2025 Kamu Data, Inc.
 
-Additional Use Grant:      You may use the Licensed Work for any purpose,
-                           provided that you may not use the Licensed Work for
-                           a Data Service.
-
-                           A "Data Service" is a commercial offering that allows
-                           third parties (other than your employees and
+Additional Use Grant:      You may not use the Licensed Work for a Data Service,
+                           where "Data Service" is a commercial offering that
+                           allows third parties (other than your employees and
                            contractors) to access the functionality of the
                            Licensed Work where data or transformations are
                            controlled by such third parties.
 
-Change Date:               2029-06-17
+                           Further, you may not distribute the Licensed Work
+                           under a different name or a brand.
+
+Change Date:               2029-07-16
 
 Change License:            Apache License, Version 2.0
 

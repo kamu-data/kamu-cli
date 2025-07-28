@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use kamu_task_system as ts;
 
 use crate::prelude::*;
+use crate::queries::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,8 +44,15 @@ impl Task {
 
     /// Describes a certain final outcome of the task once it reaches the
     /// "finished" status
-    async fn outcome(&self) -> Option<TaskOutcome> {
-        self.state.outcome().map(Into::into)
+    async fn outcome(&self, ctx: &Context<'_>) -> Result<Option<TaskOutcome>> {
+        match self.state.outcome {
+            Some(ref outcome) => Ok(Some(
+                TaskOutcome::from_task_outcome(ctx, outcome)
+                    .await
+                    .int_err()?,
+            )),
+            None => Ok(None),
+        }
     }
 
     /// Time when task was originally created and placed in a queue

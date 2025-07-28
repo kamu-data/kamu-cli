@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod access_token;
+mod view_access_token;
 
 pub(crate) use access_token::*;
+pub(crate) use view_access_token::*;

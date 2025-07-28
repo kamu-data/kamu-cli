@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use email_utils::Email;
@@ -18,9 +19,11 @@ use kamu_accounts::{
     CreateAccountError,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
+    CreateMultiWalletAccountsError,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     Password,
 };
+use odf::metadata::DidPkh;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -103,6 +106,49 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         self.notify_account_created(&created_account).await?;
 
         Ok(created_account)
+    }
+
+    async fn execute_multi_wallet_accounts(
+        &self,
+        mut wallet_addresses: HashSet<DidPkh>,
+    ) -> Result<Vec<Account>, CreateMultiWalletAccountsError> {
+        let account_ids = wallet_addresses
+            .iter()
+            .map(|wa| wa.clone().into())
+            .collect::<Vec<odf::AccountID>>();
+        let existing_accounts = self
+            .account_service
+            .get_accounts_by_ids(&account_ids)
+            .await?;
+
+        if existing_accounts.len() == wallet_addresses.len() {
+            return Ok(existing_accounts);
+        }
+
+        for existing_account in &existing_accounts {
+            // SAFETY: input IDs are originally did:pkh
+            let did_pkh = existing_account.id.as_did_pkh().unwrap();
+            wallet_addresses.remove(did_pkh);
+        }
+
+        let mut created_accounts = Vec::new();
+        for wallet_address in wallet_addresses {
+            let created_account = self
+                .account_service
+                .create_wallet_account(&wallet_address)
+                .await
+                .int_err()?;
+
+            created_accounts.push(created_account);
+        }
+
+        for created_account in &created_accounts {
+            self.notify_account_created(created_account).await?;
+        }
+
+        created_accounts.extend(existing_accounts);
+
+        Ok(created_accounts)
     }
 }
 

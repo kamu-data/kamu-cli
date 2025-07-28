@@ -38,6 +38,7 @@ pub struct AuthenticationServiceImpl {
     access_token_svc: Arc<dyn AccessTokenService>,
     outbox: Arc<dyn Outbox>,
     maybe_dummy_token_account: Option<Account>,
+    auth_config: Arc<AuthConfig>,
     oauth_device_code_service: Arc<dyn OAuthDeviceCodeService>,
 }
 
@@ -55,6 +56,7 @@ impl AuthenticationServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
         outbox: Arc<dyn Outbox>,
+        auth_config: Arc<AuthConfig>,
         oauth_device_code_service: Arc<dyn OAuthDeviceCodeService>,
     ) -> Self {
         let mut authentication_providers_by_method = HashMap::new();
@@ -80,6 +82,7 @@ impl AuthenticationServiceImpl {
             access_token_svc,
             outbox,
             oauth_device_code_service,
+            auth_config,
             maybe_dummy_token_account: config.maybe_dummy_token_account.clone(),
         }
     }
@@ -259,6 +262,10 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
             // Account does not exist and needs to be created
             None => {
+                if !self.auth_config.allow_anonymous.unwrap() {
+                    return Err(LoginError::RestrictedLogin);
+                }
+
                 // Create a new account
                 let new_account = Account {
                     id: provider_response.account_id,

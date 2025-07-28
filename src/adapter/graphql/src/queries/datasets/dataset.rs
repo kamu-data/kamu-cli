@@ -9,7 +9,7 @@
 
 use chrono::prelude::*;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_core::{ServerUrlConfig, auth};
+use kamu_core::{ResolvedDataset, ServerUrlConfig, auth};
 use kamu_datasets::{CONTENT_HASH_COLUMN_NAME, VERSION_COLUMN_NAME};
 use odf::dataset::MetadataChainExt;
 
@@ -71,8 +71,18 @@ impl Dataset {
         }
     }
 
-    async fn push_source_has_columns(&self, ctx: &Context<'_>, columns: &[&str]) -> Result<bool> {
-        let dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+    pub(crate) async fn is_versioned_file(dataset: &ResolvedDataset) -> Result<bool> {
+        // TODO: Currently guessing whether its OK to cast by push source. Replace with
+        // some archetype metadata on ODF layer.
+        Self::push_source_has_columns(dataset, &[VERSION_COLUMN_NAME, CONTENT_HASH_COLUMN_NAME])
+            .await
+    }
+
+    pub(crate) async fn is_collection(dataset: &ResolvedDataset) -> Result<bool> {
+        Self::push_source_has_columns(dataset, &["path", "ref"]).await
+    }
+
+    async fn push_source_has_columns(dataset: &ResolvedDataset, columns: &[&str]) -> Result<bool> {
         let (source, _merge) = match dataset
             .as_metadata_chain()
             .accept_one(kamu_core::WriterSourceEventVisitor::new(None))
@@ -156,7 +166,7 @@ impl Dataset {
         Ok(visibility)
     }
 
-    /// Quck access to `head` block hash
+    /// Quick access to `head` block hash
     async fn head(&self, ctx: &Context<'_>) -> Result<Multihash<'static>> {
         let head = self
             .dataset_request_state
@@ -301,12 +311,9 @@ impl Dataset {
     }
 
     /// Downcast a dataset to a versioned file interface
+    #[tracing::instrument(level = "info", name = Dataset_as_versioned_file, skip_all)]
     async fn as_versioned_file(&self, ctx: &Context<'_>) -> Result<Option<VersionedFile>> {
-        // TODO: Currently guessing whether its OK to cast by push source. Replace with
-        // some archetype metadata on ODF layer.
-        if !self
-            .push_source_has_columns(ctx, &[VERSION_COLUMN_NAME, CONTENT_HASH_COLUMN_NAME])
-            .await?
+        if !Self::is_versioned_file(self.dataset_request_state.resolved_dataset(ctx).await?).await?
         {
             return Ok(None);
         }
@@ -320,10 +327,9 @@ impl Dataset {
     }
 
     /// Downcast a dataset to a collection interface
+    #[tracing::instrument(level = "info", name = Dataset_as_collection, skip_all)]
     async fn as_collection(&self, ctx: &Context<'_>) -> Result<Option<Collection>> {
-        // TODO: Currently guessing whether its OK to cast by push source. Replace with
-        // some archetype metadata on ODF layer.
-        if !self.push_source_has_columns(ctx, &["path", "ref"]).await? {
+        if !Self::is_collection(self.dataset_request_state.resolved_dataset(ctx).await?).await? {
             return Ok(None);
         }
 

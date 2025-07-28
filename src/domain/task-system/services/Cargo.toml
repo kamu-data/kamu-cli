@@ -28,11 +28,8 @@ init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 observability = { workspace = true }
-kamu-core = { workspace = true }
-kamu-datasets = { workspace = true }
 time-source = { workspace = true }
 kamu-task-system = { workspace = true }
-kamu-webhooks  = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
@@ -45,6 +42,8 @@ tracing = { version = "0.1", default-features = false }
 [dev-dependencies]
 kamu = { workspace = true }
 kamu-accounts = { workspace = true, features = ["testing"] }
+kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }

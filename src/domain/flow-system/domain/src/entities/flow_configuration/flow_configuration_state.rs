@@ -15,10 +15,12 @@ use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationState {
-    /// Flow key
-    pub flow_key: FlowKey,
+    /// Flow binding
+    pub flow_binding: FlowBinding,
     /// Flow configuration rule
     pub rule: FlowConfigurationRule,
+    /// Retry policy
+    pub retry_policy: Option<RetryPolicy>,
     /// Configuration status
     pub status: FlowConfigurationStatus,
 }
@@ -27,36 +29,12 @@ impl FlowConfigurationState {
     pub fn is_active(&self) -> bool {
         self.status.is_active()
     }
-
-    pub fn try_get_ingest_rule(self) -> Option<IngestRule> {
-        if let FlowConfigurationRule::IngestRule(ingest_rule) = self.rule {
-            Some(ingest_rule)
-        } else {
-            None
-        }
-    }
-
-    pub fn try_get_compaction_rule(self) -> Option<CompactionRule> {
-        if let FlowConfigurationRule::CompactionRule(compation_rule) = self.rule {
-            Some(compation_rule)
-        } else {
-            None
-        }
-    }
-
-    pub fn try_get_reset_rule(self) -> Option<ResetRule> {
-        if let FlowConfigurationRule::ResetRule(reset_rule) = self.rule {
-            Some(reset_rule)
-        } else {
-            None
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl Projection for FlowConfigurationState {
-    type Query = FlowKey;
+    type Query = FlowBinding;
     type Event = FlowConfigurationEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
@@ -64,30 +42,39 @@ impl Projection for FlowConfigurationState {
 
         match (state, event) {
             (None, event) => match event {
-                E::Created(FlowConfigurationEventCreated { flow_key, rule, .. }) => Ok(Self {
-                    flow_key,
+                E::Created(FlowConfigurationEventCreated {
+                    flow_binding,
+                    rule,
+                    retry_policy,
+                    ..
+                }) => Ok(Self {
+                    flow_binding,
                     rule,
                     status: FlowConfigurationStatus::Active,
+                    retry_policy,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
-                assert_eq!(&s.flow_key, event.flow_key());
+                assert_eq!(&s.flow_binding, event.flow_binding());
 
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(FlowConfigurationEventModified { rule, .. }) => {
+                    E::Modified(FlowConfigurationEventModified {
+                        rule, retry_policy, ..
+                    }) => {
                         // Note: when deleted dataset is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowConfigurationState {
                             rule: rule.clone(),
+                            retry_policy: *retry_policy,
                             ..s
                         })
                     }
 
                     E::DatasetRemoved(_) => {
-                        if let FlowKey::Dataset(_) = &s.flow_key {
+                        if let FlowScope::Dataset { .. } = &s.flow_binding.scope {
                             if s.status == FlowConfigurationStatus::Deleted {
                                 Ok(s) // idempotent DELETE
                             } else {
@@ -108,9 +95,9 @@ impl Projection for FlowConfigurationState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ProjectionEvent<FlowKey> for FlowConfigurationEvent {
-    fn matches_query(&self, query: &FlowKey) -> bool {
-        self.flow_key() == query
+impl ProjectionEvent<FlowBinding> for FlowConfigurationEvent {
+    fn matches_query(&self, query: &FlowBinding) -> bool {
+        self.flow_binding() == query
     }
 }
 

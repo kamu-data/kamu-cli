@@ -9,8 +9,10 @@
 
 mod auth_mut;
 
+mod account_access_token_mut;
 mod account_mut;
 mod accounts_mut;
+mod collaboration_mut;
 mod dataset_env_vars_mut;
 mod dataset_metadata_mut;
 mod dataset_mut;
@@ -19,9 +21,11 @@ mod flows_mut;
 mod metadata_chain_mut;
 mod webhooks_mut;
 
+pub(crate) use account_access_token_mut::*;
 pub(crate) use account_mut::*;
 pub(crate) use accounts_mut::*;
 pub(crate) use auth_mut::*;
+pub(crate) use collaboration_mut::*;
 pub(crate) use dataset_env_vars_mut::*;
 pub(crate) use dataset_metadata_mut::*;
 pub(crate) use dataset_mut::*;

@@ -12,7 +12,9 @@
 mod entities;
 mod repos;
 mod services;
+mod use_cases;
 
 pub use entities::*;
 pub use repos::*;
 pub use services::*;
+pub use use_cases::*;

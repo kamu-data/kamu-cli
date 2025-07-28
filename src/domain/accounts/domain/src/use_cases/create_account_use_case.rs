@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use email_utils::Email;
+use internal_error::InternalError;
+use odf::metadata::DidPkh;
 
 use crate::{Account, CreateAccountError, Password};
 
@@ -21,6 +25,11 @@ pub trait CreateAccountUseCase: Send + Sync {
         account_name: &odf::AccountName,
         options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
+
+    async fn execute_multi_wallet_accounts(
+        &self,
+        wallet_addresses: HashSet<DidPkh>,
+    ) -> Result<Vec<Account>, CreateMultiWalletAccountsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +38,16 @@ pub trait CreateAccountUseCase: Send + Sync {
 pub struct CreateAccountUseCaseOptions {
     pub email: Option<Email>,
     pub password: Option<Password>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum CreateMultiWalletAccountsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

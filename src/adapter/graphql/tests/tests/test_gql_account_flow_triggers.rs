@@ -13,10 +13,11 @@ use async_graphql::value;
 use chrono::Duration;
 use indoc::indoc;
 use kamu::MetadataQueryServiceImpl;
-use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_adapter_flow_dataset::*;
 use kamu_core::*;
 use kamu_datasets::*;
+use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::FlowAgentConfig;
 use kamu_flow_system_inmem::{
     InMemoryFlowConfigurationEventStore,
@@ -43,7 +44,7 @@ async fn test_list_account_flows() {
     let schema = kamu_adapter_graphql::schema_quiet();
 
     let request_code =
-        FlowTriggerHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -74,9 +75,9 @@ async fn test_list_account_flows() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "WAITING",
@@ -84,9 +85,9 @@ async fn test_list_account_flows() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
                                         },
@@ -126,11 +127,9 @@ async fn test_list_datasets_with_flow() {
     let _bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
     let ingest_mutation_code =
-        FlowTriggerHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
-    let compaction_mutation_code = FlowTriggerHarness::trigger_flow_mutation(
-        &create_result.dataset_handle.id,
-        "HARD_COMPACTION",
-    );
+        FlowTriggerHarness::trigger_ingest_flow_mutation(&create_result.dataset_handle.id);
+    let compaction_mutation_code =
+        FlowTriggerHarness::trigger_compaction_flow_mutation(&create_result.dataset_handle.id);
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -223,7 +222,7 @@ async fn test_pause_resume_account_flows() {
     let foo_create_result = harness.create_root_dataset(foo_dataset_alias).await;
 
     let request_code =
-        FlowTriggerHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_ingest_flow_mutation(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -253,9 +252,9 @@ async fn test_pause_resume_account_flows() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": foo_create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": foo_create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "WAITING",
@@ -263,9 +262,9 @@ async fn test_pause_resume_account_flows() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
 
@@ -423,7 +422,7 @@ async fn test_account_triggers_all_paused() {
     let bar_create_result = harness.create_root_dataset(bar_dataset_alias).await;
 
     let request_code =
-        FlowTriggerHarness::trigger_flow_mutation(&foo_create_result.dataset_handle.id, "INGEST");
+        FlowTriggerHarness::trigger_ingest_flow_mutation(&foo_create_result.dataset_handle.id);
     let response = schema
         .execute(
             async_graphql::Request::new(request_code.clone())
@@ -453,9 +452,9 @@ async fn test_account_triggers_all_paused() {
                                 "nodes": [
                                     {
                                         "flowId": "0",
+                                        "datasetId": foo_create_result.dataset_handle.id.to_string(),
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
-                                            "datasetId": foo_create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
                                         "status": "WAITING",
@@ -463,9 +462,9 @@ async fn test_account_triggers_all_paused() {
                                         "timing": {
                                             "awaitingExecutorSince": null,
                                             "runningSince": null,
-                                            "finishedAt": null,
+                                            "lastAttemptFinishedAt": null,
                                         },
-                                        "tasks": [],
+                                        "taskIds": [],
                                         "primaryTrigger": {
                                             "__typename": "FlowTriggerManual",
 
@@ -594,8 +593,8 @@ impl FlowTriggerHarness {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
             b.add::<MetadataQueryServiceImpl>()
-                .add_value(MockDatasetChangesService::default())
-                .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+                .add_value(MockDatasetIncrementQueryService::default())
+                .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
                 .add::<InMemoryFlowConfigurationEventStore>()
                 .add::<InMemoryFlowTriggerEventStore>()
                 .add::<InMemoryFlowEventStore>()
@@ -604,7 +603,8 @@ impl FlowTriggerHarness {
                     Duration::minutes(1),
                 ))
                 .add::<TaskSchedulerImpl>()
-                .add::<InMemoryTaskEventStore>();
+                .add::<InMemoryTaskEventStore>()
+                .add::<FlowSupportServiceImpl>();
 
             kamu_flow_system_services::register_dependencies(&mut b);
 
@@ -650,10 +650,10 @@ impl FlowTriggerHarness {
                               listFlows {
                                   nodes {
                                       flowId
+                                      datasetId
                                       description {
                                           __typename
                                           ... on FlowDescriptionDatasetHardCompaction {
-                                              datasetId
                                               compactionResult {
                                                   ... on FlowDescriptionHardCompactionSuccess {
                                                       originalBlocksCount
@@ -666,7 +666,6 @@ impl FlowTriggerHarness {
                                               }
                                           }
                                           ... on FlowDescriptionDatasetExecuteTransform {
-                                              datasetId
                                               transformResult {
                                                 __typename
                                                 ... on FlowDescriptionUpdateResultUpToDate {
@@ -679,7 +678,6 @@ impl FlowTriggerHarness {
                                               }
                                           }
                                           ... on FlowDescriptionDatasetPollingIngest {
-                                            datasetId
                                             ingestResult {
                                                 __typename
                                                 ... on FlowDescriptionUpdateResultUpToDate {
@@ -692,7 +690,6 @@ impl FlowTriggerHarness {
                                             }
                                           }
                                           ... on FlowDescriptionDatasetPushIngest {
-                                              datasetId
                                               sourceName
                                               inputRecordsCount
                                               ingestResult {
@@ -717,10 +714,10 @@ impl FlowTriggerHarness {
                                           }
                                           ...on FlowFailedError {
                                               reason {
-                                                  ...on FlowFailureReasonGeneral {
+                                                  ...on TaskFailureReasonGeneral {
                                                       message
                                                   }
-                                                  ...on FlowFailureReasonInputDatasetCompacted {
+                                                  ...on TaskFailureReasonInputDatasetCompacted {
                                                       message
                                                       inputDataset {
                                                           id
@@ -732,13 +729,9 @@ impl FlowTriggerHarness {
                                       timing {
                                           awaitingExecutorSince
                                           runningSince
-                                          finishedAt
+                                          lastAttemptFinishedAt
                                       }
-                                      tasks {
-                                          taskId
-                                          status
-                                          outcome
-                                      }
+                                      taskIds
                                       primaryTrigger {
                                           __typename
                                           ... on FlowTriggerInputDatasetFlow {
@@ -794,7 +787,7 @@ impl FlowTriggerHarness {
         .replace("<accountName>", account_name.as_ref())
     }
 
-    fn trigger_flow_mutation(id: &odf::DatasetID, dataset_flow_type: &str) -> String {
+    fn trigger_ingest_flow_mutation(id: &odf::DatasetID) -> String {
         indoc!(
             r#"
           mutation {
@@ -802,9 +795,7 @@ impl FlowTriggerHarness {
                   byId (datasetId: "<id>") {
                       flows {
                           runs {
-                              triggerFlow (
-                                  datasetFlowType: "<dataset_flow_type>",
-                              ) {
+                              triggerIngestFlow {
                                   __typename,
                                   message
                                   ... on TriggerFlowSuccess {
@@ -821,10 +812,10 @@ impl FlowTriggerHarness {
                                               }
                                               ...on FlowFailedError {
                                                   reason {
-                                                    ...on FlowFailureReasonGeneral {
+                                                    ...on TaskFailureReasonGeneral {
                                                         message
                                                     }
-                                                    ...on FlowFailureReasonInputDatasetCompacted {
+                                                    ...on TaskFailureReasonInputDatasetCompacted {
                                                           message
                                                           inputDataset {
                                                               id
@@ -844,7 +835,50 @@ impl FlowTriggerHarness {
           "#
         )
         .replace("<id>", &id.to_string())
-        .replace("<dataset_flow_type>", dataset_flow_type)
+    }
+
+    fn trigger_compaction_flow_mutation(id: &odf::DatasetID) -> String {
+        indoc!(
+            r#"
+          mutation {
+              datasets {
+                  byId (datasetId: "<id>") {
+                      flows {
+                          runs {
+                              triggerCompactionFlow {
+                                  __typename,
+                                  message
+                                  ... on TriggerFlowSuccess {
+                                      flow {
+                                          __typename
+                                          flowId
+                                          status
+                                          outcome {
+                                              ...on FlowSuccessResult {
+                                                  message
+                                              }
+                                              ...on FlowAbortedResult {
+                                                  message
+                                              }
+                                              ...on FlowFailedError {
+                                                  reason {
+                                                    ...on TaskFailureReasonGeneral {
+                                                        message
+                                                    }
+                                                  }
+                                              }
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          "#
+        )
+        .replace("<id>", &id.to_string())
     }
 
     fn pause_account_flows(account_name: &odf::AccountName) -> String {

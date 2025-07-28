@@ -52,53 +52,29 @@ impl CollectionEntry {
         }
     }
 
-    pub fn from_json(record: serde_json::Value) -> Self {
-        let serde_json::Value::Object(mut record) = record else {
-            unreachable!()
-        };
+    pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
+        let mut event: CollectionEntryEvent = serde_json::from_value(record).int_err()?;
 
-        // Parse system columns
         let vocab = odf::metadata::DatasetVocabulary::default();
-        record.remove(&vocab.offset_column);
-        record.remove(&vocab.operation_type_column);
-        let system_time = DateTime::parse_from_rfc3339(
-            record
-                .remove(&vocab.system_time_column)
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap()
-        .into();
-        let event_time = DateTime::parse_from_rfc3339(
-            record
-                .remove(&vocab.event_time_column)
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap()
-        .into();
+        event.record.extra_data.remove(&vocab.offset_column);
+        event.record.extra_data.remove(&vocab.operation_type_column);
 
-        // Parse core columns
-        let path = String::from(record.remove("path").unwrap().as_str().unwrap());
-        let reference =
-            odf::DatasetID::from_did_str(record.remove("ref").unwrap().as_str().unwrap()).unwrap();
-
-        Self {
-            system_time,
-            event_time,
-            path: path.into(),
-            reference: reference.into(),
-            extra_data: ExtraData::new(record.into()),
-        }
+        Ok(Self {
+            system_time: event.system_time,
+            event_time: event.event_time,
+            path: event.record.path.into(),
+            reference: event.record.reference.into(),
+            extra_data: ExtraData::new(event.record.extra_data),
+        })
     }
 
-    pub fn to_record_data(&self) -> serde_json::Value {
-        let mut record = self.extra_data.clone().into_inner();
-        record["path"] = self.path.clone().into();
-        record["ref"] = self.reference.to_string().into();
-        record
+    pub fn into_record_data(self) -> serde_json::Value {
+        serde_json::to_value(CollectionEntryRecord {
+            path: self.path.into(),
+            reference: self.reference.into(),
+            extra_data: self.extra_data.into(),
+        })
+        .unwrap()
     }
 }
 
@@ -124,5 +100,31 @@ page_based_connection!(
     CollectionEntryConnection,
     CollectionEntryEdge
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Used to serialize/deserialize entry from a dataset
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CollectionEntryRecord {
+    pub path: String,
+
+    #[serde(rename = "ref")]
+    pub reference: odf::DatasetID,
+
+    #[serde(flatten)]
+    pub extra_data: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CollectionEntryEvent {
+    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+
+    #[serde(with = "odf::serde::yaml::datetime_rfc3339")]
+    pub event_time: DateTime<Utc>,
+
+    #[serde(flatten)]
+    pub record: CollectionEntryRecord,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::PaginationOpts;
 use dill::*;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_flow_system::{FlowTriggerEventStore, *};
@@ -70,7 +69,7 @@ impl FlowTriggerServiceImpl {
     ) -> Result<(), InternalError> {
         let message = FlowTriggerUpdatedMessage {
             event_time: request_time,
-            flow_key: state.flow_key.clone(),
+            flow_binding: state.flow_binding.clone(),
             rule: state.rule.clone(),
             paused: !state.is_active(),
         };
@@ -80,38 +79,33 @@ impl FlowTriggerServiceImpl {
             .await
     }
 
-    fn get_dataset_flow_keys(
+    async fn get_dataset_flow_bindings(
+        &self,
         dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<DatasetFlowType>,
-    ) -> Vec<FlowKey> {
+        maybe_dataset_flow_type: Option<&str>,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
         if let Some(dataset_flow_type) = maybe_dataset_flow_type {
-            vec![FlowKey::Dataset(FlowKeyDataset {
-                dataset_id: dataset_id.clone(),
-                flow_type: dataset_flow_type,
-            })]
+            Ok(vec![FlowBinding::for_dataset(
+                dataset_id.clone(),
+                dataset_flow_type,
+            )])
         } else {
-            DatasetFlowType::all()
-                .iter()
-                .map(|dft| {
-                    FlowKey::Dataset(FlowKeyDataset {
-                        dataset_id: dataset_id.clone(),
-                        flow_type: *dft,
-                    })
-                })
-                .collect()
+            self.event_store
+                .all_trigger_bindings_for_dataset_flows(dataset_id)
+                .await
         }
     }
 
-    fn get_system_flow_keys(maybe_system_flow_type: Option<SystemFlowType>) -> Vec<FlowKey> {
+    async fn get_system_flow_bindings(
+        &self,
+        maybe_system_flow_type: Option<&str>,
+    ) -> Result<Vec<FlowBinding>, InternalError> {
         if let Some(system_flow_type) = maybe_system_flow_type {
-            vec![FlowKey::System(FlowKeySystem {
-                flow_type: system_flow_type,
-            })]
+            Ok(vec![FlowBinding::for_system(system_flow_type)])
         } else {
-            SystemFlowType::all()
-                .iter()
-                .map(|sft| FlowKey::System(FlowKeySystem { flow_type: *sft }))
-                .collect()
+            self.event_store
+                .all_trigger_bindings_for_system_flows()
+                .await
         }
     }
 }
@@ -123,9 +117,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     /// Find current trigger of a certain type
     async fn find_trigger(
         &self,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowTriggerState>, FindFlowTriggerError> {
-        let maybe_flow_trigger = FlowTrigger::try_load(flow_key, self.event_store.as_ref()).await?;
+        let maybe_flow_trigger =
+            FlowTrigger::try_load(flow_binding, self.event_store.as_ref()).await?;
         Ok(maybe_flow_trigger.map(Into::into))
     }
 
@@ -133,18 +128,18 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     async fn set_trigger(
         &self,
         request_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: FlowBinding,
         paused: bool,
         rule: FlowTriggerRule,
     ) -> Result<FlowTriggerState, SetFlowTriggerError> {
         tracing::info!(
-            flow_key = ?flow_key,
+            flow_binding = ?flow_binding,
             rule = ?rule,
             "Setting flow trigger"
         );
 
         let maybe_flow_trigger =
-            FlowTrigger::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
+            FlowTrigger::try_load(&flow_binding, self.event_store.as_ref()).await?;
 
         let mut flow_trigger = match maybe_flow_trigger {
             // Modification
@@ -156,7 +151,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
                 flow_trigger
             }
             // New trigger
-            None => FlowTrigger::new(self.time_source.now(), flow_key.clone(), paused, rule),
+            None => FlowTrigger::new(self.time_source.now(), flow_binding, paused, rule),
         };
 
         flow_trigger
@@ -172,35 +167,16 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
 
     /// Lists all flow triggers, which are currently enabled
     fn list_enabled_triggers(&self) -> FlowTriggerStateStream {
-        // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
-            for system_flow_type in SystemFlowType::all() {
-                let flow_key = (*system_flow_type).into();
-                let maybe_flow_trigger = FlowTrigger::try_load(flow_key, self.event_store.as_ref()).await.int_err()?;
+            use futures::stream::{self, StreamExt, TryStreamExt};
+            let flow_bindings: Vec<_> = self.event_store.stream_all_active_flow_bindings().try_collect().await.int_err()?;
 
-                if let Some(flow_trigger) = maybe_flow_trigger && flow_trigger.is_active() {
-                    yield flow_trigger.into();
-                }
-            }
+            let flow_triggers = FlowTrigger::load_multi_simple(flow_bindings, self.event_store.as_ref()).await.int_err()?;
+            let stream = stream::iter(flow_triggers)
+                .map(|flow_trigger| Ok::<_, InternalError>(flow_trigger.into()));
 
-            let dataset_list_per_page = 10;
-            let mut current_page = 0;
-            let datasets_count = self.event_store.all_dataset_ids_count().await?;
-
-            while datasets_count > current_page * dataset_list_per_page {
-                let dataset_ids: Vec<_> = self.event_store.list_dataset_ids(
-                    &PaginationOpts::from_page(current_page, dataset_list_per_page)
-                ).await?;
-
-                for dataset_id in dataset_ids {
-                    for dataset_flow_type in DatasetFlowType::all() {
-                        let maybe_flow_trigger = FlowTrigger::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()).await.int_err()?;
-                        if let Some(flow_trigger) = maybe_flow_trigger && flow_trigger.is_active() {
-                            yield flow_trigger.into();
-                        }
-                    }
-                }
-                current_page += 1;
+            for await item in stream {
+                yield item?;
             }
         })
     }
@@ -209,9 +185,9 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     async fn pause_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
-        let maybe_flow_trigger = FlowTrigger::try_load(flow_key.clone(), self.event_store.as_ref())
+        let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
             .await
             .int_err()?;
 
@@ -233,9 +209,9 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     async fn resume_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        flow_key: FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<(), InternalError> {
-        let maybe_flow_trigger = FlowTrigger::try_load(flow_key.clone(), self.event_store.as_ref())
+        let maybe_flow_trigger = FlowTrigger::try_load(flow_binding, self.event_store.as_ref())
             .await
             .int_err()?;
 
@@ -259,12 +235,14 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<DatasetFlowType>,
+        maybe_dataset_flow_type: Option<&str>,
     ) -> Result<(), InternalError> {
-        let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
+        let flow_bindings = self
+            .get_dataset_flow_bindings(dataset_id, maybe_dataset_flow_type)
+            .await?;
 
-        for flow_key in flow_keys {
-            self.pause_flow_trigger(request_time, flow_key).await?;
+        for flow_binding in flow_bindings {
+            self.pause_flow_trigger(request_time, &flow_binding).await?;
         }
 
         Ok(())
@@ -275,12 +253,14 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     async fn pause_system_flows(
         &self,
         request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<SystemFlowType>,
+        maybe_system_flow_type: Option<&str>,
     ) -> Result<(), InternalError> {
-        let flow_keys = Self::get_system_flow_keys(maybe_system_flow_type);
+        let flow_bindings = self
+            .get_system_flow_bindings(maybe_system_flow_type)
+            .await?;
 
-        for flow_key in flow_keys {
-            self.pause_flow_trigger(request_time, flow_key).await?;
+        for flow_binding in flow_bindings {
+            self.pause_flow_trigger(request_time, &flow_binding).await?;
         }
 
         Ok(())
@@ -292,12 +272,15 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         &self,
         request_time: DateTime<Utc>,
         dataset_id: &odf::DatasetID,
-        maybe_dataset_flow_type: Option<DatasetFlowType>,
+        maybe_dataset_flow_type: Option<&str>,
     ) -> Result<(), InternalError> {
-        let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
+        let flow_bindings = self
+            .get_dataset_flow_bindings(dataset_id, maybe_dataset_flow_type)
+            .await?;
 
-        for flow_key in flow_keys {
-            self.resume_flow_trigger(request_time, flow_key).await?;
+        for flow_binding in flow_bindings {
+            self.resume_flow_trigger(request_time, &flow_binding)
+                .await?;
         }
 
         Ok(())
@@ -309,12 +292,15 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
     async fn resume_system_flows(
         &self,
         request_time: DateTime<Utc>,
-        maybe_system_flow_type: Option<SystemFlowType>,
+        maybe_system_flow_type: Option<&str>,
     ) -> Result<(), InternalError> {
-        let flow_keys = Self::get_system_flow_keys(maybe_system_flow_type);
+        let flow_bindings = self
+            .get_system_flow_bindings(maybe_system_flow_type)
+            .await?;
 
-        for flow_key in flow_keys {
-            self.resume_flow_trigger(request_time, flow_key).await?;
+        for flow_binding in flow_bindings {
+            self.resume_flow_trigger(request_time, &flow_binding)
+                .await?;
         }
 
         Ok(())
@@ -354,13 +340,16 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowTriggerServiceImpl {
 
         match message {
             DatasetLifecycleMessage::Deleted(message) => {
-                for flow_type in DatasetFlowType::all() {
-                    let maybe_flow_trigger = FlowTrigger::try_load(
-                        FlowKeyDataset::new(message.dataset_id.clone(), *flow_type).into(),
-                        self.event_store.as_ref(),
-                    )
+                let flow_bindings = self
+                    .get_dataset_flow_bindings(&message.dataset_id, None)
                     .await
                     .int_err()?;
+
+                for flow_binding in flow_bindings {
+                    let maybe_flow_trigger =
+                        FlowTrigger::try_load(&flow_binding, self.event_store.as_ref())
+                            .await
+                            .int_err()?;
 
                     if let Some(mut flow_trigger) = maybe_flow_trigger {
                         flow_trigger

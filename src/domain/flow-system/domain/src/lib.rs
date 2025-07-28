@@ -17,7 +17,6 @@ mod flow_messages_types;
 
 mod agents;
 mod aggregates;
-mod dataset_flow_key;
 mod entities;
 mod jobs;
 mod repos;
@@ -25,7 +24,6 @@ mod services;
 
 pub use agents::*;
 pub use aggregates::*;
-pub use dataset_flow_key::*;
 pub use entities::*;
 pub use flow_messages_types::*;
 pub use jobs::*;

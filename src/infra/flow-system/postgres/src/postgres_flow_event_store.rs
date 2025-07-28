@@ -54,37 +54,21 @@ impl PostgresFlowEventStore {
 
         let flow_id: i64 = e.flow_id.try_into().unwrap();
 
-        match &e.flow_key {
-            FlowKey::Dataset(fk_dataset) => {
-                sqlx::query!(
-                r#"
-                INSERT INTO flows (flow_id, dataset_id, dataset_flow_type, initiator, flow_status, last_event_id)
-                    VALUES ($1, $2, $3, $4, 'waiting'::flow_status_type, NULL)
-                "#,
-                flow_id,
-                fk_dataset.dataset_id.to_string(),
-                fk_dataset.flow_type as DatasetFlowType,
-                initiator,
-            )
-                .execute(connection_mut)
-                .await
-                .int_err()?;
-            }
-            FlowKey::System(fk_system) => {
-                sqlx::query!(
-                    r#"
-                INSERT INTO flows (flow_id, system_flow_type, initiator, flow_status, last_event_id)
-                    VALUES ($1, $2, $3, 'waiting'::flow_status_type, NULL)
-                "#,
-                    flow_id,
-                    fk_system.flow_type as SystemFlowType,
-                    initiator,
-                )
-                .execute(connection_mut)
-                .await
-                .int_err()?;
-            }
-        }
+        let scope_data_json = serde_json::to_value(&e.flow_binding.scope).int_err()?;
+
+        sqlx::query!(
+            r#"
+            INSERT INTO flows (flow_id, flow_type, scope_data, initiator, flow_status, last_event_id)
+                VALUES ($1, $2, $3, $4, 'waiting'::flow_status_type, NULL)
+            "#,
+            flow_id,
+            e.flow_binding.flow_type,
+            scope_data_json,
+            initiator,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
 
         Ok(())
     }
@@ -114,6 +98,11 @@ impl PostgresFlowEventStore {
                 FlowEvent::ScheduledForActivation(e) => {
                     maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
                 }
+                FlowEvent::TaskFinished(e) => {
+                    if let Some(next_activation_time) = e.next_attempt_at {
+                        maybe_scheduled_for_activation_at = Some(next_activation_time);
+                    }
+                }
                 FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) => {
                     maybe_scheduled_for_activation_at = None;
                     reset_scheduled_for_activation_at = true;
@@ -128,10 +117,10 @@ impl PostgresFlowEventStore {
             let connection_mut = tr.connection_mut().await?;
             maybe_scheduled_for_activation_at = sqlx::query!(
                 r#"
-                            SELECT scheduled_for_activation_at as activation_time
-                                FROM flows
-                                WHERE flow_id = $1
-                        "#,
+                SELECT scheduled_for_activation_at as activation_time
+                    FROM flows
+                    WHERE flow_id = $1
+                "#,
                 flow_id
             )
             .map(|result| result.activation_time)
@@ -143,15 +132,15 @@ impl PostgresFlowEventStore {
         let connection_mut = tr.connection_mut().await?;
         let rows = sqlx::query!(
             r#"
-                UPDATE flows
-                    SET flow_status = CASE WHEN $2::flow_status_type IS NOT NULL THEN $2::flow_status_type ELSE flow_status END,
-                    last_event_id = $3,
-                    scheduled_for_activation_at = $4
-                WHERE flow_id = $1 AND (
-                    last_event_id IS NULL AND CAST($5 as BIGINT) IS NULL OR
-                    last_event_id IS NOT NULL AND CAST($5 as BIGINT) IS NOT NULL AND last_event_id = $5
-                )
-                RETURNING flow_id
+            UPDATE flows
+                SET flow_status = CASE WHEN $2::flow_status_type IS NOT NULL THEN $2::flow_status_type ELSE flow_status END,
+                last_event_id = $3,
+                scheduled_for_activation_at = $4
+            WHERE flow_id = $1 AND (
+                last_event_id IS NULL AND CAST($5 as BIGINT) IS NULL OR
+                last_event_id IS NOT NULL AND CAST($5 as BIGINT) IS NOT NULL AND last_event_id = $5
+            )
+            RETURNING flow_id
             "#,
             flow_id,
             maybe_latest_status as Option<FlowStatus>,
@@ -208,125 +197,6 @@ impl PostgresFlowEventStore {
 
         let last_event_id = rows.last().unwrap().event_id;
         Ok(EventID::new(last_event_id))
-    }
-
-    async fn get_dataset_flow_run_stats(
-        &self,
-        dataset_id: &odf::DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<FlowRunStats, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_attempt_result = sqlx::query!(
-            r#"
-            SELECT attempt.last_event_time as last_attempt_time
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                    FROM flow_events e
-                    INNER JOIN flows f ON f.flow_id = e.flow_id
-                    WHERE
-                        e.event_type = 'FlowEventTaskFinished' AND
-                        f.dataset_id = $1 AND
-                        f.dataset_flow_type = $2
-                    ORDER BY e.event_id DESC
-                    LIMIT 1
-            ) AS attempt
-            "#,
-            dataset_id.to_string(),
-            flow_type as DatasetFlowType
-        )
-        .map(|event_row| event_row.last_attempt_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_success_result = sqlx::query!(
-            r#"
-            SELECT success.last_event_time as last_success_time
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                    FROM flow_events e
-                    INNER JOIN flows f ON f.flow_id = e.flow_id
-                    WHERE
-                        e.event_type = 'FlowEventTaskFinished' AND
-                        e.event_payload::json#>'{TaskFinished,task_outcome,Success}' IS NOT NULL AND
-                        f.dataset_id = $1 AND
-                        f.dataset_flow_type = $2
-                    ORDER BY e.event_id DESC
-                    LIMIT 1
-            ) AS success
-            "#,
-            dataset_id.to_string(),
-            flow_type as DatasetFlowType
-        )
-        .map(|event_row| event_row.last_success_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(FlowRunStats {
-            last_attempt_time: maybe_attempt_result,
-            last_success_time: maybe_success_result,
-        })
-    }
-
-    async fn get_system_flow_run_stats(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<FlowRunStats, InternalError> {
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_attempt_result = sqlx::query!(
-            r#"
-            SELECT attempt.last_event_time as last_attempt_time
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                    FROM flow_events e
-                    INNER JOIN flows f ON f.flow_id = e.flow_id
-                    WHERE
-                        e.event_type = 'FlowEventTaskFinished' AND
-                        f.system_flow_type = $1
-                    ORDER BY e.event_id DESC
-                    LIMIT 1
-            ) AS attempt
-            "#,
-            flow_type as SystemFlowType
-        )
-        .map(|event_row| event_row.last_attempt_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        let connection_mut = tr.connection_mut().await?;
-        let maybe_success_result = sqlx::query!(
-            r#"
-            SELECT success.last_event_time as last_success_time
-            FROM (
-                SELECT e.event_id as event_id, e.event_time AS last_event_time
-                    FROM flow_events e
-                    INNER JOIN flows f ON f.flow_id = e.flow_id
-                    WHERE
-                        e.event_type = 'FlowEventTaskFinished' AND
-                        e.event_payload::json#>'{TaskFinished,task_outcome,Success}' IS NOT NULL AND
-                        f.system_flow_type = $1
-                    ORDER BY e.event_id DESC
-                    LIMIT 1
-            ) AS success
-            "#,
-            flow_type as SystemFlowType
-        )
-        .map(|event_row| event_row.last_success_time)
-        .fetch_optional(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(FlowRunStats {
-            last_attempt_time: maybe_attempt_result,
-            last_success_time: maybe_success_result,
-        })
     }
 }
 
@@ -491,62 +361,125 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     async fn try_get_pending_flow(
         &self,
-        flow_key: &FlowKey,
+        flow_binding: &FlowBinding,
     ) -> Result<Option<FlowID>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let maybe_flow_id = match flow_key {
-            FlowKey::Dataset(flow_key_dataset) => sqlx::query!(
-                r#"
-                SELECT flow_id FROM flows
-                    WHERE dataset_id = $1 AND
-                          dataset_flow_type = $2 AND
-                          flow_status != 'finished'::flow_status_type
-                    ORDER BY flow_id DESC
-                    LIMIT 1
-                "#,
-                flow_key_dataset.dataset_id.to_string(),
-                flow_key_dataset.flow_type as DatasetFlowType,
-            )
-            .fetch_optional(connection_mut)
-            .await
-            .int_err()?
-            .map(|r| r.flow_id),
+        let flow_type = flow_binding.flow_type.as_str();
+        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
 
-            FlowKey::System(flow_key_system) => sqlx::query!(
-                r#"
-                SELECT flow_id FROM flows
-                    WHERE system_flow_type = $1 AND
-                          flow_status != 'finished'::flow_status_type
-                    ORDER BY flow_id DESC
-                    LIMIT 1
-                "#,
-                flow_key_system.flow_type as SystemFlowType,
-            )
-            .fetch_optional(connection_mut)
-            .await
-            .int_err()?
-            .map(|r| r.flow_id),
-        };
+        let maybe_flow_id = sqlx::query!(
+            r#"
+            SELECT flow_id FROM flows
+                WHERE
+                    flow_type = $1 AND
+                    scope_data = $2 AND
+                    flow_status != 'finished'::flow_status_type
+                ORDER BY flow_id DESC
+                LIMIT 1
+            "#,
+            flow_type,
+            scope_data_json,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?
+        .map(|r| r.flow_id);
 
         Ok(maybe_flow_id.map(|id| FlowID::try_from(id).unwrap()))
     }
 
-    async fn get_flow_run_stats(&self, flow_key: &FlowKey) -> Result<FlowRunStats, InternalError> {
-        match flow_key {
-            FlowKey::Dataset(dataset_flow_key) => {
-                self.get_dataset_flow_run_stats(
-                    &dataset_flow_key.dataset_id,
-                    dataset_flow_key.flow_type,
-                )
-                .await
-            }
-            FlowKey::System(system_flow_key) => {
-                self.get_system_flow_run_stats(system_flow_key.flow_type)
-                    .await
-            }
-        }
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    async fn try_get_all_dataset_pending_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<FlowID>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let dataset_id_str = dataset_id.to_string();
+        let flow_ids = sqlx::query!(
+            r#"
+            SELECT flow_id FROM flows
+                WHERE
+                    scope_data->>'type' = 'Dataset' AND
+                    scope_data->>'dataset_id' = $1 AND
+                    flow_status != 'finished'::flow_status_type
+                ORDER BY flow_id DESC
+            "#,
+            dataset_id_str,
+        )
+        .map(|row| FlowID::try_from(row.flow_id).unwrap())
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(flow_ids)
+    }
+
+    async fn get_flow_run_stats(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<FlowRunStats, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let flow_type = flow_binding.flow_type.as_str();
+        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+
+        let connection_mut = tr.connection_mut().await?;
+        let maybe_attempt_result = sqlx::query!(
+            r#"
+            SELECT attempt.last_event_time AS last_attempt_time
+            FROM (
+                SELECT e.event_id AS event_id, e.event_time AS last_event_time
+                FROM flow_events e
+                INNER JOIN flows f ON f.flow_id = e.flow_id
+                WHERE
+                    e.event_type = 'FlowEventTaskFinished' AND
+                    f.flow_type = $1 AND
+                    f.scope_data = $2
+                ORDER BY e.event_id DESC
+                LIMIT 1
+            ) AS attempt
+            "#,
+            flow_type,
+            &scope_data_json,
+        )
+        .map(|event_row| event_row.last_attempt_time)
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        let connection_mut = tr.connection_mut().await?;
+        let maybe_success_result = sqlx::query!(
+            r#"
+            SELECT success.last_event_time as last_success_time
+            FROM (
+                SELECT e.event_id as event_id, e.event_time AS last_event_time
+                FROM flow_events e
+                INNER JOIN flows f ON f.flow_id = e.flow_id
+                WHERE
+                    e.event_type = 'FlowEventTaskFinished' AND
+                    e.event_payload::json#>'{TaskFinished,task_outcome,Success}' IS NOT NULL AND
+                    f.flow_type = $1 AND
+                    f.scope_data = $2
+                ORDER BY e.event_id DESC
+                LIMIT 1
+            ) AS success
+            "#,
+            flow_type,
+            &scope_data_json,
+        )
+        .map(|event_row| event_row.last_success_time)
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(FlowRunStats {
+            last_attempt_time: maybe_attempt_result,
+            last_success_time: maybe_success_result,
+        })
     }
 
     /// Returns nearest time when one or more flows are scheduled for activation
@@ -560,7 +493,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 FROM flows f
                 WHERE
                     f.scheduled_for_activation_at IS NOT NULL AND
-                    f.flow_status = 'waiting'::flow_status_type
+                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)
                 ORDER BY f.scheduled_for_activation_at ASC
                 LIMIT 1
             "#,
@@ -591,7 +524,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 FROM flows f
                 WHERE
                     f.scheduled_for_activation_at = $1 AND
-                    f.flow_status = 'waiting'::flow_status_type
+                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)
                 ORDER BY f.flow_id ASC
             "#,
             scheduled_for_activation_at,
@@ -607,7 +540,7 @@ impl FlowEventStore for PostgresFlowEventStore {
     fn get_all_flow_ids_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: &DatasetFlowFilters,
+        filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
         let dataset_id = dataset_id.to_string();
@@ -617,7 +550,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let by_flow_type = filters.by_flow_type;
+        let by_flow_type = filters.by_flow_type.clone();
         let by_flow_status = filters.by_flow_status;
 
         Box::pin(async_stream::stream! {
@@ -630,15 +563,17 @@ impl FlowEventStore for PostgresFlowEventStore {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT flow_id FROM flows
-                    WHERE dataset_id = $1
-                    AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
+                WHERE
+                    scope_data->>'type' = 'Dataset'
+                    AND scope_data->>'dataset_id' = $1
+                    AND ($2::text IS NULL OR flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
                 ORDER BY flow_status, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                dataset_id,
-               by_flow_type as Option<DatasetFlowType>,
+               by_flow_type,
                by_flow_status as Option<FlowStatus>,
                maybe_initiators as Option<Vec<String>>,
                i64::try_from(pagination.limit).unwrap(),
@@ -658,7 +593,7 @@ impl FlowEventStore for PostgresFlowEventStore {
     async fn get_count_flows_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-        filters: &DatasetFlowFilters,
+        filters: &FlowFilters,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -672,13 +607,15 @@ impl FlowEventStore for PostgresFlowEventStore {
             r#"
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
-                WHERE dataset_id = $1
-                AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
+            WHERE
+                scope_data->>'type' = 'Dataset'
+                AND scope_data->>'dataset_id' = $1
+                AND ($2::text IS NULL OR flow_type = $2)
                 AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                 AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
             "#,
             dataset_id.to_string(),
-            filters.by_flow_type as Option<DatasetFlowType>,
+            filters.by_flow_type,
             filters.by_flow_status as Option<FlowStatus>,
             maybe_initiators as Option<Vec<String>>
         )
@@ -693,7 +630,7 @@ impl FlowEventStore for PostgresFlowEventStore {
     fn get_all_flow_ids_by_datasets(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: &DatasetFlowFilters,
+        filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
         let dataset_ids: Vec<_> = dataset_ids.iter().map(ToString::to_string).collect();
@@ -703,7 +640,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let by_flow_type = filters.by_flow_type;
+        let by_flow_type = filters.by_flow_type.clone();
         let by_flow_status = filters.by_flow_status;
 
         Box::pin(async_stream::stream! {
@@ -716,15 +653,17 @@ impl FlowEventStore for PostgresFlowEventStore {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT flow_id FROM flows
-                    WHERE dataset_id = ANY($1)
-                    AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
+                WHERE
+                    scope_data->>'type' = 'Dataset'
+                    AND scope_data->>'dataset_id' = ANY($1)
+                    AND ($2::text IS NULL OR flow_type = $2)
                     AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                     AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
                 ORDER BY flow_status, last_event_id DESC
                 LIMIT $5 OFFSET $6
                 "#,
                 dataset_ids as Vec<String>,
-                by_flow_type as Option<DatasetFlowType>,
+                by_flow_type,
                 by_flow_status as Option<FlowStatus>,
                 maybe_initiators as Option<Vec<String>>,
                 i64::try_from(pagination.limit).unwrap(),
@@ -757,7 +696,10 @@ impl FlowEventStore for PostgresFlowEventStore {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT DISTINCT(initiator) FROM flows
-                    WHERE dataset_id = $1 AND initiator != $2
+                WHERE
+                    scope_data->>'type' = 'Dataset'
+                    AND scope_data->>'dataset_id' = $1
+                    AND initiator != $2
                 "#,
                 dataset_id,
                 SYSTEM_INITIATOR,
@@ -774,7 +716,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     fn get_all_system_flow_ids(
         &self,
-        filters: &SystemFlowFilters,
+        filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream {
         let maybe_initiators = filters
@@ -782,7 +724,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let maybe_by_flow_type = filters.by_flow_type;
+        let maybe_by_flow_type = filters.by_flow_type.clone();
         let maybe_by_flow_status = filters.by_flow_status;
 
         Box::pin(async_stream::stream! {
@@ -795,14 +737,15 @@ impl FlowEventStore for PostgresFlowEventStore {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT flow_id FROM flows
-                    WHERE system_flow_type IS NOT NULL
-                    AND (cast($1 as system_flow_type) IS NULL OR system_flow_type = $1)
+                WHERE
+                    scope_data->>'type' = 'System'
+                    AND ($1::text IS NULL OR flow_type = $1)
                     AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
                     AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
                 ORDER BY flow_id DESC
                 LIMIT $4 OFFSET $5
                 "#,
-                maybe_by_flow_type as Option<SystemFlowType>,
+                maybe_by_flow_type,
                 maybe_by_flow_status as Option<FlowStatus>,
                 maybe_initiators as Option<Vec<String>>,
                 i64::try_from(pagination.limit).unwrap(),
@@ -819,10 +762,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
-    async fn get_count_system_flows(
-        &self,
-        filters: &SystemFlowFilters,
-    ) -> Result<usize, InternalError> {
+    async fn get_count_system_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -835,12 +775,13 @@ impl FlowEventStore for PostgresFlowEventStore {
             r#"
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
-                WHERE system_flow_type IS NOT NULL
-                AND (cast($1 as system_flow_type) IS NULL OR system_flow_type = $1)
+            WHERE
+                scope_data->>'type' = 'System'
+                AND ($1::text IS NULL OR flow_type = $1)
                 AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
                 AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
             "#,
-            filters.by_flow_type as Option<SystemFlowType>,
+            filters.by_flow_type,
             filters.by_flow_status as Option<FlowStatus>,
             maybe_initiators as Option<Vec<String>>,
         )
@@ -854,7 +795,7 @@ impl FlowEventStore for PostgresFlowEventStore {
 
     fn get_all_flow_ids(
         &self,
-        filters: &AllFlowFilters,
+        filters: &FlowFilters,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_> {
         let maybe_initiators = filters
@@ -863,6 +804,8 @@ impl FlowEventStore for PostgresFlowEventStore {
             .map(Self::prepare_initiator_filter);
 
         let maybe_by_flow_status = filters.by_flow_status;
+
+        let maybe_by_flow_type = filters.by_flow_type.clone();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -875,11 +818,13 @@ impl FlowEventStore for PostgresFlowEventStore {
                 r#"
                 SELECT flow_id FROM flows
                 WHERE
-                    (cast($1 as flow_status_type) IS NULL or flow_status = $1)
-                    AND (cast($2 as TEXT[]) IS NULL OR initiator = ANY($2))
+                    ($1::text IS NULL OR flow_type = $1)
+                    AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
+                    AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
                 ORDER BY flow_id DESC
-                LIMIT $3 OFFSET $4
+                LIMIT $4 OFFSET $5
                 "#,
+                maybe_by_flow_type,
                 maybe_by_flow_status as Option<FlowStatus>,
                 maybe_initiators as Option<Vec<String>>,
                 i64::try_from(pagination.limit).unwrap(),
@@ -896,7 +841,7 @@ impl FlowEventStore for PostgresFlowEventStore {
         })
     }
 
-    async fn get_count_all_flows(&self, filters: &AllFlowFilters) -> Result<usize, InternalError> {
+    async fn get_count_all_flows(&self, filters: &FlowFilters) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -907,14 +852,18 @@ impl FlowEventStore for PostgresFlowEventStore {
 
         let maybe_by_flow_status = filters.by_flow_status;
 
+        let maybe_by_flow_type = filters.by_flow_type.as_deref();
+
         let query_result = sqlx::query!(
             r#"
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
                 WHERE
-                    (cast($1 as flow_status_type) IS NULL or flow_status = $1)
-                    AND (cast($2 as TEXT[]) IS NULL OR initiator = ANY($2))
+                    ($1::text IS NULL OR flow_type = $1)
+                    AND (cast($2 as flow_status_type) IS NULL or flow_status = $2)
+                    AND (cast($3 as TEXT[]) IS NULL OR initiator = ANY($3))
             "#,
+            maybe_by_flow_type,
             maybe_by_flow_status as Option<FlowStatus>,
             maybe_initiators as Option<Vec<String>>,
         )
@@ -944,7 +893,7 @@ impl FlowEventStore for PostgresFlowEventStore {
     async fn get_count_flows_by_multiple_datasets(
         &self,
         dataset_ids: &[&odf::DatasetID],
-        filters: &DatasetFlowFilters,
+        filters: &FlowFilters,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -954,7 +903,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .as_ref()
             .map(Self::prepare_initiator_filter);
 
-        let by_flow_type = filters.by_flow_type;
+        let by_flow_type = filters.by_flow_type.as_deref();
         let by_flow_status = filters.by_flow_status;
 
         let ids: Vec<String> = dataset_ids.iter().map(ToString::to_string).collect();
@@ -963,13 +912,15 @@ impl FlowEventStore for PostgresFlowEventStore {
             r#"
             SELECT COUNT(flow_id) AS flows_count
             FROM flows
-                WHERE dataset_id = ANY($1)
-                AND (cast($2 as dataset_flow_type) IS NULL OR dataset_flow_type = $2)
+            WHERE
+                scope_data->>'type' = 'Dataset'
+                AND scope_data->>'dataset_id' = ANY($1)
+                AND ($2::text IS NULL OR flow_type = $2)
                 AND (cast($3 as flow_status_type) IS NULL OR flow_status = $3)
                 AND (cast($4 as TEXT[]) IS NULL OR initiator = ANY($4))
             "#,
             ids as Vec<String>,
-            by_flow_type as Option<DatasetFlowType>,
+            by_flow_type,
             by_flow_status as Option<FlowStatus>,
             maybe_initiators as Option<Vec<String>>,
         )
@@ -992,9 +943,11 @@ impl FlowEventStore for PostgresFlowEventStore {
 
         let filtered_dataset_ids = sqlx::query!(
             r#"
-            SELECT DISTINCT(dataset_id) as dataset_id
-                FROM flows
-                WHERE dataset_id = ANY($1)
+            SELECT DISTINCT scope_data->>'dataset_id' AS dataset_id
+            FROM flows
+            WHERE
+                scope_data->>'type' = 'Dataset'
+                AND scope_data->>'dataset_id' = ANY($1)
             "#,
             &ids,
         )

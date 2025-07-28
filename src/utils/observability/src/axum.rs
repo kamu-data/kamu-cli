@@ -34,6 +34,7 @@ pub struct OnRequest;
 impl<B> tower_http::trace::OnRequest<B> for OnRequest {
     fn on_request(&mut self, request: &http::Request<B>, _: &tracing::Span) {
         tracing::info!(
+            method = %request.method(),
             uri = %request.uri(),
             version = ?request.version(),
             headers = ?request.headers(),
@@ -160,6 +161,7 @@ pub async fn unknown_fallback_handler(
     request: axum::http::Request<axum::body::Body>,
 ) -> impl axum::response::IntoResponse {
     tracing::warn!(
+        method = %request.method(),
         uri = %request.uri(),
         version = ?request.version(),
         headers = ?request.headers(),

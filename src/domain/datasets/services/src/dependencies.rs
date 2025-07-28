@@ -39,6 +39,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add::<DependencyGraphServiceImpl>();
     b.add::<DatasetReferenceServiceImpl>();
     b.add::<DatasetStatisticsServiceImpl>();
+    b.add::<DatasetIncrementQueryServiceImpl>();
 
     b.add::<DatasetAliasUpdateHandler>();
     b.add::<DatasetKeyBlockUpdateHandler>();

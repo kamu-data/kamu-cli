@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use internal_error::InternalError;
 use thiserror::Error;
 
@@ -30,7 +32,7 @@ pub trait DatasetRegistry: odf::dataset::DatasetHandleResolver {
 
     async fn resolve_multiple_dataset_handles_by_ids(
         &self,
-        dataset_ids: Vec<odf::DatasetID>,
+        dataset_ids: &[Cow<odf::DatasetID>],
     ) -> Result<DatasetHandlesResolution, GetMultipleDatasetsError>;
 
     async fn get_dataset_by_handle(&self, dataset_handle: &odf::DatasetHandle) -> ResolvedDataset;

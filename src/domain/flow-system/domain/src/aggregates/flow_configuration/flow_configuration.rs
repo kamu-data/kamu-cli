@@ -21,14 +21,20 @@ pub struct FlowConfiguration(
 
 impl FlowConfiguration {
     /// Creates a flow configuration
-    pub fn new(now: DateTime<Utc>, flow_key: FlowKey, rule: FlowConfigurationRule) -> Self {
+    pub fn new(
+        now: DateTime<Utc>,
+        flow_binding: FlowBinding,
+        rule: FlowConfigurationRule,
+        retry_policy: Option<RetryPolicy>,
+    ) -> Self {
         Self(
             Aggregate::new(
-                flow_key.clone(),
+                flow_binding.clone(),
                 FlowConfigurationEventCreated {
                     event_time: now,
-                    flow_key,
+                    flow_binding,
                     rule,
+                    retry_policy,
                 },
             )
             .unwrap(),
@@ -40,11 +46,13 @@ impl FlowConfiguration {
         &mut self,
         now: DateTime<Utc>,
         new_rule: FlowConfigurationRule,
+        new_retry_policy: Option<RetryPolicy>,
     ) -> Result<(), ProjectionError<FlowConfigurationState>> {
         let event = FlowConfigurationEventModified {
             event_time: now,
-            flow_key: self.flow_key.clone(),
+            flow_binding: self.flow_binding.clone(),
             rule: new_rule,
+            retry_policy: new_retry_policy,
         };
         self.apply(event)
     }
@@ -56,7 +64,7 @@ impl FlowConfiguration {
     ) -> Result<(), ProjectionError<FlowConfigurationState>> {
         let event = FlowConfigurationEventDatasetRemoved {
             event_time: now,
-            flow_key: self.flow_key.clone(),
+            flow_binding: self.flow_binding.clone(),
         };
         self.apply(event)
     }

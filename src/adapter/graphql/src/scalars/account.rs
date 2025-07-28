@@ -80,3 +80,34 @@ pub enum AccountProvider {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DidPkh(pub odf::metadata::DidPkh);
+
+impl From<DidPkh> for odf::metadata::DidPkh {
+    fn from(value: DidPkh) -> Self {
+        value.0
+    }
+}
+
+#[Scalar]
+/// Wallet address in did:pkh format.
+///
+/// Example: did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a
+impl ScalarType for DidPkh {
+    fn parse(value: Value) -> InputValueResult<Self> {
+        if let Value::String(value) = &value {
+            let did_pkh = odf::metadata::DidPkh::from_did_str(value)
+                .map_err(|e| InputValueError::custom(format!("Invalid DidPkh: {e}")))?;
+
+            Ok(Self(did_pkh))
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.0.as_did_str().to_string())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

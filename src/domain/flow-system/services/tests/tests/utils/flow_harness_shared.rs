@@ -12,19 +12,12 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
-use kamu::testing::MockDatasetChangesService;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
-use kamu_core::*;
-use kamu_datasets::{
-    DatasetDependenciesMessage,
-    DatasetEntry,
-    DatasetLifecycleMessage,
-    MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-};
+use kamu_adapter_flow_dataset::*;
+use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use kamu_datasets_services::testing::FakeDatasetEntryService;
+use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrementQueryService};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -70,7 +63,7 @@ pub(crate) struct FlowHarness {
 pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
-    pub mock_dataset_changes: Option<MockDatasetChangesService>,
+    pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
 }
 
 impl FlowHarness {
@@ -114,7 +107,7 @@ impl FlowHarness {
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add_value(mock_dataset_changes)
-            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
+            .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<TaskSchedulerImpl>()
@@ -125,6 +118,7 @@ impl FlowHarness {
             NoOpDatabasePlugin::init_database_components(&mut b);
 
             kamu_flow_system_services::register_dependencies(&mut b);
+            kamu_adapter_flow_dataset::register_dependencies(&mut b);
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
@@ -273,105 +267,76 @@ impl FlowHarness {
             .unwrap();
     }
 
-    pub async fn set_dataset_flow_trigger(
+    pub async fn set_flow_trigger(
         &self,
         request_time: DateTime<Utc>,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
+        flow_binding: FlowBinding,
         trigger_rule: FlowTriggerRule,
     ) {
         self.flow_trigger_service
-            .set_trigger(
-                request_time,
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                false,
-                trigger_rule,
-            )
+            .set_trigger(request_time, flow_binding, false, trigger_rule)
             .await
             .unwrap();
     }
 
     pub async fn set_dataset_flow_ingest(
         &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-        ingest_rule: IngestRule,
+        flow_binding: FlowBinding,
+        ingest_rule: FlowConfigRuleIngest,
+        retry_policy: Option<RetryPolicy>,
     ) {
         self.flow_configuration_service
-            .set_configuration(
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                FlowConfigurationRule::IngestRule(ingest_rule),
-            )
+            .set_configuration(flow_binding, ingest_rule.into_flow_config(), retry_policy)
             .await
             .unwrap();
     }
 
     pub async fn set_dataset_flow_reset_rule(
         &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-        reset_rule: ResetRule,
+        flow_binding: FlowBinding,
+        reset_rule: FlowConfigRuleReset,
     ) {
         self.flow_configuration_service
-            .set_configuration(
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                FlowConfigurationRule::ResetRule(reset_rule),
-            )
+            .set_configuration(flow_binding, reset_rule.into_flow_config(), None)
             .await
             .unwrap();
     }
 
     pub async fn set_dataset_flow_compaction_rule(
         &self,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-        compaction_rule: CompactionRule,
+        flow_binding: FlowBinding,
+        compaction_rule: FlowConfigRuleCompact,
     ) {
         self.flow_configuration_service
-            .set_configuration(
-                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
-                FlowConfigurationRule::CompactionRule(compaction_rule),
-            )
+            .set_configuration(flow_binding, compaction_rule.into_flow_config(), None)
             .await
             .unwrap();
     }
 
-    pub async fn pause_dataset_flow(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-    ) {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+    pub async fn pause_flow(&self, request_time: DateTime<Utc>, flow_binding: FlowBinding) {
         let current_trigger = self
             .flow_trigger_service
-            .find_trigger(flow_key.clone())
+            .find_trigger(&flow_binding)
             .await
             .unwrap()
             .unwrap();
 
         self.flow_trigger_service
-            .set_trigger(request_time, flow_key, true, current_trigger.rule)
+            .set_trigger(request_time, flow_binding, true, current_trigger.rule)
             .await
             .unwrap();
     }
 
-    pub async fn resume_dataset_flow(
-        &self,
-        request_time: DateTime<Utc>,
-        dataset_id: odf::DatasetID,
-        dataset_flow_type: DatasetFlowType,
-    ) {
-        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+    pub async fn resume_flow(&self, request_time: DateTime<Utc>, flow_binding: FlowBinding) {
         let current_trigger = self
             .flow_trigger_service
-            .find_trigger(flow_key.clone())
+            .find_trigger(&flow_binding)
             .await
             .unwrap()
             .unwrap();
 
         self.flow_trigger_service
-            .set_trigger(request_time, flow_key, false, current_trigger.rule)
+            .set_trigger(request_time, flow_binding, false, current_trigger.rule)
             .await
             .unwrap();
     }

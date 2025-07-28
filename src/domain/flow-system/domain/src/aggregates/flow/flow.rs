@@ -23,9 +23,10 @@ impl Flow {
     pub fn new(
         now: DateTime<Utc>,
         flow_id: FlowID,
-        flow_key: FlowKey,
-        trigger: FlowTriggerType,
+        flow_binding: FlowBinding,
+        trigger: FlowTriggerInstance,
         config_snapshot: Option<FlowConfigurationRule>,
+        retry_policy: Option<RetryPolicy>,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -33,9 +34,10 @@ impl Flow {
                 FlowEventInitiated {
                     event_time: now,
                     flow_id,
-                    flow_key,
+                    flow_binding,
                     trigger,
                     config_snapshot,
+                    retry_policy,
                 },
             )
             .unwrap(),
@@ -79,7 +81,7 @@ impl Flow {
     pub fn add_trigger_if_unique(
         &mut self,
         now: DateTime<Utc>,
-        trigger: FlowTriggerType,
+        trigger: FlowTriggerInstance,
     ) -> Result<bool, ProjectionError<FlowState>> {
         if trigger.is_unique_vs(&self.triggers) {
             let event = FlowEventTriggerAdded {
@@ -144,11 +146,21 @@ impl Flow {
         task_id: TaskID,
         task_outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<FlowState>> {
+        // Compute if there will be a next attempt and when
+        let next_attempt_at = if task_outcome.is_failed()
+            && let Some(retry_policy) = &self.retry_policy
+        {
+            retry_policy.next_attempt_at(u32::try_from(self.task_ids.len()).unwrap(), now)
+        } else {
+            None
+        };
+
         let event = FlowEventTaskFinished {
             event_time: now,
             flow_id: self.flow_id,
             task_id,
             task_outcome,
+            next_attempt_at,
         };
         self.apply(event)
     }

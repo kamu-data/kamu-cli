@@ -32,7 +32,10 @@ use time_source::SystemTimeSourceDefault;
 
 #[test_log::test(tokio::test)]
 async fn test_pre_run_requeues_running_tasks() {
-    let harness = TaskAgentHarness::new(MockOutbox::new(), MockTaskRunner::new());
+    let mock_task_planner = MockTaskDefinitionPlanner::new();
+    let mock_task_runner = MockTaskRunner::new();
+
+    let harness = TaskAgentHarness::new(MockOutbox::new(), mock_task_planner, mock_task_runner);
 
     // Schedule 3 tasks
     let task_id_1 = harness
@@ -82,7 +85,13 @@ async fn test_run_single_task() {
     TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
 
     // Expect logical plan runner to run probe
+    let mut mock_task_planner = MockTaskDefinitionPlanner::new();
     let mut mock_task_runner = MockTaskRunner::new();
+    TaskAgentHarness::add_plan_probe_plan_expectations(
+        &mut mock_task_planner,
+        LogicalPlanProbe::default(),
+        1,
+    );
     TaskAgentHarness::add_run_probe_plan_expectations(
         &mut mock_task_runner,
         LogicalPlanProbe::default(),
@@ -90,7 +99,7 @@ async fn test_run_single_task() {
     );
 
     // Schedule the only task
-    let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
+    let harness = TaskAgentHarness::new(mock_outbox, mock_task_planner, mock_task_runner);
     let task_id = harness
         .schedule_probe_task(LogicalPlanProbe::default())
         .await;
@@ -115,7 +124,13 @@ async fn test_run_two_of_three_tasks() {
     TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
 
     // Expect logical plan runner to run probe twice
+    let mut mock_task_planner = MockTaskDefinitionPlanner::new();
     let mut mock_task_runner = MockTaskRunner::new();
+    TaskAgentHarness::add_plan_probe_plan_expectations(
+        &mut mock_task_planner,
+        LogicalPlanProbe::default(),
+        2,
+    );
     TaskAgentHarness::add_run_probe_plan_expectations(
         &mut mock_task_runner,
         LogicalPlanProbe::default(),
@@ -123,7 +138,7 @@ async fn test_run_two_of_three_tasks() {
     );
 
     // Schedule 3 tasks
-    let harness = TaskAgentHarness::new(mock_outbox, mock_task_runner);
+    let harness = TaskAgentHarness::new(mock_outbox, mock_task_planner, mock_task_runner);
     let task_id_1 = harness
         .schedule_probe_task(LogicalPlanProbe::default())
         .await;
@@ -165,7 +180,11 @@ struct TaskAgentHarness {
 }
 
 impl TaskAgentHarness {
-    pub fn new(mock_outbox: MockOutbox, mock_task_runner: MockTaskRunner) -> Self {
+    pub fn new(
+        mock_outbox: MockOutbox,
+        mock_task_planner: MockTaskDefinitionPlanner,
+        mock_task_runner: MockTaskRunner,
+    ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let datasets_dir = tempdir.path().join("datasets");
@@ -179,10 +198,11 @@ impl TaskAgentHarness {
             .add::<DidGeneratorDefault>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
-            .add::<TaskDefinitionPlannerImpl>()
+            .add_value(mock_outbox)
             .add_value(mock_task_runner)
             .bind::<dyn TaskRunner, MockTaskRunner>()
-            .add_value(mock_outbox)
+            .add_value(mock_task_planner)
+            .bind::<dyn TaskDefinitionPlanner, MockTaskDefinitionPlanner>()
             .bind::<dyn Outbox, MockOutbox>()
             .add::<SystemTimeSourceDefault>()
             .add::<PullRequestPlannerImpl>()
@@ -210,6 +230,8 @@ impl TaskAgentHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_value(TaskAgentConfig::new(chrono::Duration::seconds(1)))
+            .add::<ProbeTaskPlanner>()
+            .add::<ProbeTaskRunner>()
             .add_value(DatasetEnvVarsConfig::sample());
 
         NoOpDatabasePlugin::init_database_components(&mut b);
@@ -228,8 +250,10 @@ impl TaskAgentHarness {
     }
 
     async fn schedule_probe_task(&self, probe_plan: LogicalPlanProbe) -> TaskID {
+        let probe_plan = probe_plan.into_logical_plan();
+
         self.task_scheduler
-            .create_task(probe_plan.into(), None)
+            .create_task(probe_plan, None)
             .await
             .unwrap()
             .task_id
@@ -280,6 +304,26 @@ impl TaskAgentHarness {
             .times(1)
             .returning(|_, _, _| Ok(()));
     }
+    fn add_plan_probe_plan_expectations(
+        mock_task_planner: &mut MockTaskDefinitionPlanner,
+        probe: LogicalPlanProbe,
+        times: usize,
+    ) {
+        let probe_clone = probe.clone();
+
+        mock_task_planner
+            .expect_prepare_task_definition()
+            .withf(move |_task_id, plan| {
+                plan.plan_type == LogicalPlanProbe::TYPE_ID
+                    && LogicalPlanProbe::from_logical_plan(plan).unwrap() == probe_clone
+            })
+            .times(times)
+            .returning(move |_, _| {
+                Ok(TaskDefinition::new(TaskDefinitionProbe {
+                    probe: probe.clone(),
+                }))
+            });
+    }
 
     fn add_run_probe_plan_expectations(
         mock_task_runner: &mut MockTaskRunner,
@@ -291,18 +335,15 @@ impl TaskAgentHarness {
         mock_task_runner
             .expect_run_task()
             .withf(move |td| {
-                matches!(
-                    td,
-                    TaskDefinition::Probe(TaskDefinitionProbe { probe: probe_ })
-                    if probe_ == &probe_plan
-                )
+                td.downcast_ref::<TaskDefinitionProbe>()
+                    .is_some_and(|task_probe| task_probe.probe == probe_plan)
             })
             .times(times)
             .returning(move |_| {
                 Ok(probe
                     .end_with_outcome
                     .clone()
-                    .unwrap_or(TaskOutcome::Success(TaskResult::Empty)))
+                    .unwrap_or(TaskOutcome::Success(TaskResult::empty())))
             });
     }
 }
@@ -315,6 +356,21 @@ mockall::mock! {
     #[async_trait::async_trait]
     impl TaskRunner for TaskRunner {
         async fn run_task(&self, task_definition: TaskDefinition) -> Result<TaskOutcome, InternalError>;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+mockall::mock! {
+    pub TaskDefinitionPlanner {}
+
+    #[async_trait::async_trait]
+    impl TaskDefinitionPlanner for TaskDefinitionPlanner {
+        async fn prepare_task_definition(
+            &self,
+            task_id: TaskID,
+            logical_plan: &LogicalPlan,
+        ) -> Result<TaskDefinition, InternalError>;
     }
 }
 

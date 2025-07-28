@@ -49,7 +49,7 @@ file-utils = { workspace = true }
 http-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-observability = { workspace = true, features = ["prometheus"] }
+observability = { workspace = true, features = ["dill", "prometheus"] }
 time-source = { workspace = true }
 server-console = { workspace = true }
 
@@ -58,6 +58,9 @@ kamu = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-auth-web3 = { workspace = true, features = ["did-pkh"] }
 kamu-adapter-flight-sql = { workspace = true }
+kamu-adapter-flow-dataset = { workspace = true }
+kamu-adapter-task-dataset = { workspace = true }
+kamu-adapter-task-webhook = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
     "e2e",
@@ -68,11 +71,13 @@ kamu-datafusion-cli = { workspace = true }
 odf = { workspace = true, features = ["http", "s3"] }
 random-strings = { workspace = true }
 
+kamu-flow-system = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-postgres = { workspace = true }
 kamu-flow-system-sqlite = { workspace = true }
 
+kamu-task-system = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-postgres = { workspace = true }
@@ -102,6 +107,7 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-auth-rebac-postgres = { workspace = true }
 kamu-auth-rebac-sqlite = { workspace = true }
 
+kamu-webhooks = { workspace = true }
 kamu-webhooks-services = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-postgres = { workspace = true }
@@ -156,7 +162,7 @@ axum = { version = "0.8", features = ["ws"] }
 http = "1"
 serde_json = "1"
 tonic = { version = "0.12", default-features = false }
-tower = "0.5"
+tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["trace", "cors", "catch-panic"] }
 utoipa = { version = "5", default-features = true, features = ["macros"] }
 utoipa-axum = { version = "0.2", default-features = true, features = [] }
@@ -194,7 +200,14 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1" # Conditional compilation
-datafusion = { version = "48", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
+datafusion = { version = "48", default-features = false, features = [
+    "crypto_expressions",
+    "encoding_expressions",
+    "parquet",
+    "regex_expressions",
+    "unicode_expressions",
+    "compression",
+] }
 dill = { version = "0.14", default-features = false }
 dirs = "6"
 fs_extra = "1.3"

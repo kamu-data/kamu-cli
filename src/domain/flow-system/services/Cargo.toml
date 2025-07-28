@@ -27,7 +27,6 @@ database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
-kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
@@ -46,8 +45,10 @@ tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
-kamu = { workspace = true, features = ["testing"] }
 kamu-accounts = { workspace = true }
+kamu-adapter-flow-dataset = { workspace = true }
+kamu-adapter-task-dataset = { workspace = true }
+kamu-core ={ workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
@@ -59,5 +60,6 @@ cron = { version = "0.15", default-features = false }
 indoc = "2"
 mockall = "0.13"
 pretty_assertions = "1"
+serde_json = { version = "1", default-features = false }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

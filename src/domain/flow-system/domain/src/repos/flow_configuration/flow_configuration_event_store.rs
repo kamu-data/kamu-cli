@@ -23,6 +23,15 @@ pub trait FlowConfigurationEventStore: EventStore<FlowConfigurationState> {
     ) -> Result<Vec<odf::DatasetID>, InternalError>;
 
     async fn all_dataset_ids_count(&self) -> Result<usize, InternalError>;
+
+    /// Returns all existing flow bindings, where configurations exist
+    fn stream_all_existing_flow_bindings(&self) -> FlowBindingStream;
+
+    /// Returns all bindings for a given dataset ID where configs exist
+    async fn all_bindings_for_dataset_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<FlowBinding>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
