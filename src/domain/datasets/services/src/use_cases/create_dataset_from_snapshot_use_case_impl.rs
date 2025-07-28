@@ -73,12 +73,18 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
-    #[tracing::instrument(level = "info", name = CreateDatasetFromSnapshotUseCaseImpl_execute, skip_all, fields(?snapshot, ?options))]
+    #[tracing::instrument(level = "info", name = CreateDatasetFromSnapshotUseCaseImpl_execute, skip_all)]
     async fn execute(
         &self,
         mut snapshot: odf::DatasetSnapshot,
         options: CreateDatasetUseCaseOptions,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+        tracing::info!(
+            ?snapshot,
+            ?options,
+            "Initiating creation of dataset from snapshot"
+        );
+
         // There must be a logged-in user
         let subject = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(subj) => subj,

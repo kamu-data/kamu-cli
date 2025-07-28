@@ -6984,6 +6984,7 @@ name = "kamu-adapter-task-dataset"
 version = "0.245.2"
 dependencies = [
  "async-trait",
+ "common-macros",
  "database-common",
  "database-common-macros",
  "dill",
@@ -7777,6 +7778,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "common-macros",
  "cron",
  "database-common",
  "database-common-macros",
