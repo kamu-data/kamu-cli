@@ -66,7 +66,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
             WebhookSubscriptionEventChangesMessage::EventEnabled(message) => {
                 if message.event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
                     let flow_binding = webhook_deliver_binding(
-                        message.webhook_subscription_id.into_inner(),
+                        message.webhook_subscription_id,
                         message.dataset_id.as_ref(),
                     );
                     self.flow_trigger_service
@@ -83,7 +83,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
             WebhookSubscriptionEventChangesMessage::EventDisabled(message) => {
                 if message.event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
                     let flow_binding = webhook_deliver_binding(
-                        message.webhook_subscription_id.into_inner(),
+                        message.webhook_subscription_id,
                         message.dataset_id.as_ref(),
                     );
                     self.flow_trigger_service
@@ -124,7 +124,7 @@ impl MessageConsumerT<WebhookSubscriptionLifecycleMessage> for FlowWebhooksEvent
             // so we need to wipe all the related data in the flow system
             WebhookSubscriptionLifecycleMessage::Deleted(deleted_message) => {
                 let flow_scope = FlowScopeSubscription::make_scope(
-                    deleted_message.webhook_subscription_id.into_inner(),
+                    deleted_message.webhook_subscription_id,
                     deleted_message.dataset_id.as_ref(),
                 );
 

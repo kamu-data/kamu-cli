@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_flow_system as fs;
+use kamu_webhooks::WebhookSubscriptionID;
 
 use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 
@@ -15,7 +16,7 @@ use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 
 #[inline]
 pub fn webhook_deliver_binding(
-    subscription_id: uuid::Uuid,
+    subscription_id: WebhookSubscriptionID,
     dataset_id: Option<&odf::DatasetID>,
 ) -> fs::FlowBinding {
     fs::FlowBinding::new(

@@ -10,9 +10,8 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common_macros::{transactional_method1, transactional_method3};
+use database_common_macros::{transactional_method1, transactional_method2};
 use dill::{component, interface};
-use kamu_task_system as ts;
 use kamu_webhooks::*;
 
 use crate::*;
@@ -34,27 +33,21 @@ impl WebhookDeliveryWorkerImpl {
         level="debug",
         skip_all,
         fields(
-            task_id = %task_id,
-            webhook_subscription_id = %webhook_subscription_id,
-            webhook_event_id = %webhook_event_id
+            %webhook_delivery_id,
+            %webhook_subscription_id,
         )
     )]
-    #[transactional_method3(
+    #[transactional_method2(
         webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
-        webhook_event_repo: Arc<dyn WebhookEventRepository>,
         webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>
     )]
     async fn prepare_delivery(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
         webhook_subscription_id: WebhookSubscriptionID,
-        webhook_event_id: WebhookEventID,
+        event_type: WebhookEventType,
+        payload: serde_json::Value,
     ) -> Result<WebhookDeliveryData, InternalError> {
-        let event = webhook_event_repo
-            .get_event_by_id(webhook_event_id)
-            .await
-            .int_err()?;
-
         let subscription = WebhookSubscription::load(
             &webhook_subscription_id,
             webhook_subscription_event_store.as_ref(),
@@ -62,22 +55,29 @@ impl WebhookDeliveryWorkerImpl {
         .await
         .int_err()?;
 
-        let payload_raw_bytes = serde_json::to_vec(&event.payload).int_err()?;
+        let payload_raw_bytes = serde_json::to_vec(&payload).int_err()?;
         let payload_bytes = bytes::Bytes::from(payload_raw_bytes);
 
         let created_at = Utc::now();
 
-        let headers = self.generate_headers(&subscription, &event, &payload_bytes, created_at)?;
+        let headers = self.generate_headers(
+            &subscription,
+            &webhook_delivery_id,
+            &event_type,
+            &payload_bytes,
+            created_at,
+        )?;
 
         tracing::debug!(?headers, "Webhook delivery headers generated");
 
         let delivery = WebhookDelivery::new(
-            task_id,
+            webhook_delivery_id,
             subscription.id(),
-            event.id,
+            event_type,
             WebhookRequest {
                 headers: headers.clone(),
                 started_at: created_at,
+                payload,
             },
         );
 
@@ -93,7 +93,8 @@ impl WebhookDeliveryWorkerImpl {
     fn generate_headers(
         &self,
         subscription: &WebhookSubscription,
-        event: &WebhookEvent,
+        delivery_id: &WebhookDeliveryID,
+        event_type: &WebhookEventType,
         payload_bytes: &[u8],
         created_at: DateTime<Utc>,
     ) -> Result<http::HeaderMap, InternalError> {
@@ -134,8 +135,8 @@ impl WebhookDeliveryWorkerImpl {
             http::HeaderValue::from_str(&created_at.timestamp().to_string()).int_err()?,
         );
         headers.insert(
-            http::header::HeaderName::from_static(HEADER_WEBHOOK_EVENT_ID),
-            http::HeaderValue::from_str(&event.id.to_string()).int_err()?,
+            http::header::HeaderName::from_static(HEADER_WEBHOOK_DELIVERY_ID),
+            http::HeaderValue::from_str(&delivery_id.to_string()).int_err()?,
         );
         headers.insert(
             http::header::HeaderName::from_static(HEADER_WEBHOOK_SUBSCRIPTION_ID),
@@ -143,7 +144,7 @@ impl WebhookDeliveryWorkerImpl {
         );
         headers.insert(
             http::header::HeaderName::from_static(HEADER_WEBHOOK_EVENT_TYPE),
-            http::HeaderValue::from_str(event.event_type.as_ref()).int_err()?,
+            http::HeaderValue::from_str(event_type.as_ref()).int_err()?,
         );
         headers.insert(
             http::header::HeaderName::from_static(HEADER_WEBHOOK_DELIVERY_ATTEMPT),
@@ -153,15 +154,15 @@ impl WebhookDeliveryWorkerImpl {
         Ok(headers)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%task_id))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%webhook_delivery_id))]
     #[transactional_method1(webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>)]
     async fn write_delivery_response(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
         webhook_response: WebhookResponse,
     ) -> Result<(), InternalError> {
         webhook_delivery_repo
-            .update_response(task_id, webhook_response)
+            .update_response(webhook_delivery_id, webhook_response)
             .await
             .int_err()
     }
@@ -173,12 +174,18 @@ impl WebhookDeliveryWorkerImpl {
 impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
     async fn deliver_webhook(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
         webhook_subscription_id: WebhookSubscriptionID,
-        webhook_event_id: WebhookEventID,
+        event_type: WebhookEventType,
+        payload: serde_json::Value,
     ) -> Result<(), internal_error::InternalError> {
         let delivery_data = self
-            .prepare_delivery(task_id, webhook_subscription_id, webhook_event_id)
+            .prepare_delivery(
+                webhook_delivery_id,
+                webhook_subscription_id,
+                event_type,
+                payload,
+            )
             .await?;
 
         let webhook_response = self
@@ -191,7 +198,7 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
             .await
             .int_err()?;
 
-        self.write_delivery_response(task_id, webhook_response)
+        self.write_delivery_response(webhook_delivery_id, webhook_response)
             .await?;
 
         Ok(())

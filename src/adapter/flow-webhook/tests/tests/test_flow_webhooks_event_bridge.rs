@@ -323,7 +323,7 @@ impl TestWebhookDeliverySchedulerHarness {
 
                     let webhook_scope = FlowScopeSubscription::new(&flow_binding.scope);
                     webhook_scope.dataset_id().as_ref() == Some(&dataset_id_clone_1)
-                        && webhook_scope.webhook_subscription_id() == subscription_id.into_inner()
+                        && webhook_scope.webhook_subscription_id() == subscription_id
                 },
             )
             .returning(move |_, _, _, _, _| {
@@ -332,7 +332,7 @@ impl TestWebhookDeliverySchedulerHarness {
                 Ok(FlowState {
                     flow_id: FlowID::new(1),
                     flow_binding: webhook_deliver_binding(
-                        subscription_id.into_inner(),
+                        subscription_id,
                         Some(&dataset_id_clone_2),
                     ),
                     start_condition: None,

@@ -11,11 +11,9 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use database_common::NoOpDatabasePlugin;
-use kamu_task_system::{self as ts};
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::{
     InMemoryWebhookDeliveryRepository,
-    InMemoryWebhookEventRepository,
     InMemoryWebhookSubscriptionEventStore,
 };
 use kamu_webhooks_services::*;
@@ -25,39 +23,48 @@ use url::Url;
 
 #[test_log::test(tokio::test)]
 async fn test_deliver_webhook() {
-    let event_id = WebhookEventID::new(uuid::Uuid::new_v4());
     let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let webhook_delivery_id = WebhookDeliveryID::new(uuid::Uuid::new_v4());
 
     let mut mock_webhook_sender = MockWebhookSender::new();
     TestWebhookDeliveryWorkerHarness::add_success_sender_expectation(
         &mut mock_webhook_sender,
         url::Url::parse("https://example.com/webhook").unwrap(),
-        event_id,
+        webhook_delivery_id,
         subscription_id,
     );
 
     let harness = TestWebhookDeliveryWorkerHarness::new(mock_webhook_sender);
 
-    let task_id = ts::TaskID::new(153);
-
-    harness.new_webhook_event(event_id).await;
     harness.new_webhook_subscription(subscription_id).await;
 
     harness
         .webhook_delivery_worker
-        .deliver_webhook(task_id, subscription_id, event_id)
+        .deliver_webhook(
+            webhook_delivery_id,
+            subscription_id,
+            WebhookEventTypeCatalog::dataset_ref_updated(),
+            serde_json::json!({"key": "value"}),
+        )
         .await
         .unwrap();
 
     let delivery = harness
         .webhook_delivery_repo
-        .get_by_task_id(task_id)
+        .get_by_webhook_delivery_id(webhook_delivery_id)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(delivery.webhook_subscription_id, subscription_id);
-    assert_eq!(delivery.webhook_event_id, event_id);
-    assert_eq!(delivery.task_id, task_id);
+    assert_eq!(
+        delivery.event_type,
+        WebhookEventTypeCatalog::dataset_ref_updated()
+    );
+    assert_eq!(delivery.webhook_delivery_id, webhook_delivery_id);
+    assert_eq!(
+        delivery.request.payload,
+        serde_json::json!({"key": "value"})
+    );
 
     assert!(delivery.is_successful());
 }
@@ -66,40 +73,49 @@ async fn test_deliver_webhook() {
 
 #[test_log::test(tokio::test)]
 async fn test_deliver_webhook_failed() {
-    let event_id = WebhookEventID::new(uuid::Uuid::new_v4());
     let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let webhook_delivery_id = WebhookDeliveryID::new(uuid::Uuid::new_v4());
 
     let mut mock_webhook_sender = MockWebhookSender::new();
     TestWebhookDeliveryWorkerHarness::add_failing_sender_expectation(
         &mut mock_webhook_sender,
         url::Url::parse("https://example.com/webhook").unwrap(),
-        event_id,
+        webhook_delivery_id,
         subscription_id,
     );
 
     let harness = TestWebhookDeliveryWorkerHarness::new(mock_webhook_sender);
 
-    let task_id = ts::TaskID::new(153);
-
-    harness.new_webhook_event(event_id).await;
     harness.new_webhook_subscription(subscription_id).await;
 
     harness
         .webhook_delivery_worker
-        .deliver_webhook(task_id, subscription_id, event_id)
+        .deliver_webhook(
+            webhook_delivery_id,
+            subscription_id,
+            WebhookEventTypeCatalog::dataset_ref_updated(),
+            serde_json::json!({"key": "value"}),
+        )
         .await
         .unwrap();
 
     let delivery = harness
         .webhook_delivery_repo
-        .get_by_task_id(task_id)
+        .get_by_webhook_delivery_id(webhook_delivery_id)
         .await
         .unwrap()
         .unwrap();
 
     assert_eq!(delivery.webhook_subscription_id, subscription_id);
-    assert_eq!(delivery.webhook_event_id, event_id);
-    assert_eq!(delivery.task_id, task_id);
+    assert_eq!(delivery.webhook_delivery_id, webhook_delivery_id);
+    assert_eq!(
+        delivery.request.payload,
+        serde_json::json!({"key": "value"})
+    );
+    assert_eq!(
+        delivery.event_type,
+        WebhookEventTypeCatalog::dataset_ref_updated()
+    );
 
     assert!(!delivery.is_successful());
 }
@@ -107,7 +123,6 @@ async fn test_deliver_webhook_failed() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TestWebhookDeliveryWorkerHarness {
-    webhook_event_repo: Arc<dyn WebhookEventRepository>,
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>,
     webhook_delivery_worker: Arc<dyn WebhookDeliveryWorker>,
@@ -121,8 +136,7 @@ impl TestWebhookDeliveryWorkerHarness {
             .add_value(mock_sender)
             .bind::<dyn WebhookSender, MockWebhookSender>()
             .add::<InMemoryWebhookSubscriptionEventStore>()
-            .add::<InMemoryWebhookDeliveryRepository>()
-            .add::<InMemoryWebhookEventRepository>();
+            .add::<InMemoryWebhookDeliveryRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -130,31 +144,9 @@ impl TestWebhookDeliveryWorkerHarness {
 
         Self {
             webhook_subscription_event_store: catalog.get_one().unwrap(),
-            webhook_event_repo: catalog.get_one().unwrap(),
             webhook_delivery_repo: catalog.get_one().unwrap(),
             webhook_delivery_worker: catalog.get_one().unwrap(),
         }
-    }
-
-    async fn new_webhook_event(&self, event_id: WebhookEventID) {
-        let webhook_event = WebhookEvent::new(
-            event_id,
-            WebhookEventTypeCatalog::dataset_ref_updated(),
-            serde_json::json!({
-              "version": "1",
-              "datasetId": odf::DatasetID::new_seeded_ed25519(b"test_dataset_id").to_string(),
-              "ownerAccountId": odf::AccountID::new_seeded_ed25519(b"test_account_id").to_string(),
-              "blockRef": "head",
-              "oldHash": odf::Multihash::from_digest_sha3_256(b"old_hash").to_string(),
-              "newHash": odf::Multihash::from_digest_sha3_256(b"new_hash").to_string(),
-            }),
-            Utc::now(),
-        );
-
-        self.webhook_event_repo
-            .create_event(&webhook_event)
-            .await
-            .unwrap();
     }
 
     async fn new_webhook_subscription(&self, subscription_id: WebhookSubscriptionID) {
@@ -176,7 +168,7 @@ impl TestWebhookDeliveryWorkerHarness {
     fn add_success_sender_expectation(
         mock_webhook_sender: &mut MockWebhookSender,
         target_url: Url,
-        event_id: WebhookEventID,
+        delivery_id: WebhookDeliveryID,
         subscription_id: WebhookSubscriptionID,
     ) {
         mock_webhook_sender
@@ -191,9 +183,9 @@ impl TestWebhookDeliveryWorkerHarness {
 
                 assert_eq!(
                     headers
-                        .get(HEADER_WEBHOOK_EVENT_ID)
+                        .get(HEADER_WEBHOOK_DELIVERY_ID)
                         .map(|h| h.to_str().unwrap()),
-                    Some(event_id.into_inner().to_string().as_str())
+                    Some(delivery_id.into_inner().to_string().as_str())
                 );
                 assert_eq!(
                     headers
@@ -233,7 +225,7 @@ impl TestWebhookDeliveryWorkerHarness {
     fn add_failing_sender_expectation(
         mock_webhook_sender: &mut MockWebhookSender,
         target_url: Url,
-        event_id: WebhookEventID,
+        delivery_id: WebhookDeliveryID,
         subscription_id: WebhookSubscriptionID,
     ) {
         mock_webhook_sender
@@ -248,9 +240,9 @@ impl TestWebhookDeliveryWorkerHarness {
 
                 assert_eq!(
                     headers
-                        .get(HEADER_WEBHOOK_EVENT_ID)
+                        .get(HEADER_WEBHOOK_DELIVERY_ID)
                         .map(|h| h.to_str().unwrap()),
-                    Some(event_id.into_inner().to_string().as_str())
+                    Some(delivery_id.into_inner().to_string().as_str())
                 );
                 assert_eq!(
                     headers

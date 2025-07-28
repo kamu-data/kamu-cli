@@ -9,6 +9,7 @@
 
 use kamu_adapter_flow_dataset::FLOW_SCOPE_ATTRIBUTE_DATASET_ID;
 use kamu_flow_system as fs;
+use kamu_webhooks::WebhookSubscriptionID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +30,7 @@ impl<'a> FlowScopeSubscription<'a> {
     }
 
     pub fn make_scope(
-        subscription_id: uuid::Uuid,
+        subscription_id: WebhookSubscriptionID,
         dataset_id: Option<&odf::DatasetID>,
     ) -> fs::FlowScope {
         let mut payload = serde_json::json!({
@@ -45,11 +46,12 @@ impl<'a> FlowScopeSubscription<'a> {
         fs::FlowScope::new(payload)
     }
 
-    pub fn webhook_subscription_id(&self) -> uuid::Uuid {
+    pub fn webhook_subscription_id(&self) -> WebhookSubscriptionID {
         self.0
             .get_attribute(FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID)
             .and_then(|value| value.as_str())
             .and_then(|id_str| uuid::Uuid::parse_str(id_str).ok())
+            .map(WebhookSubscriptionID::new)
             .unwrap_or_else(|| {
                 panic!(
                     "FlowScopeSubscription must have a '{FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID}' \

@@ -8,9 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_task_system as ts;
 
-use crate::{WebhookEventID, WebhookSubscriptionID};
+use crate::{WebhookDeliveryID, WebhookEventType, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,9 +17,10 @@ use crate::{WebhookEventID, WebhookSubscriptionID};
 pub trait WebhookDeliveryWorker: Send + Sync {
     async fn deliver_webhook(
         &self,
-        task_id: ts::TaskID,
+        webhook_delivery_id: WebhookDeliveryID,
         webhook_subscription_id: WebhookSubscriptionID,
-        webhook_event_id: WebhookEventID,
+        event_type: WebhookEventType,
+        payload: serde_json::Value,
     ) -> Result<(), InternalError>;
 }
 

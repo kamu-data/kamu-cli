@@ -14,7 +14,7 @@ pub const HEADER_SIGNATURE: &str = "signature";
 pub const HEADER_SIGNATURE_INPUT: &str = "signature-input";
 
 pub const HEADER_WEBHOOK_TIMESTAMP: &str = "x-webhook-timestamp";
-pub const HEADER_WEBHOOK_EVENT_ID: &str = "x-webhook-event-id";
+pub const HEADER_WEBHOOK_DELIVERY_ID: &str = "x-webhook-delivery-id";
 pub const HEADER_WEBHOOK_SUBSCRIPTION_ID: &str = "x-webhook-subscription-id";
 pub const HEADER_WEBHOOK_EVENT_TYPE: &str = "x-webhook-event-type";
 pub const HEADER_WEBHOOK_DELIVERY_ATTEMPT: &str = "x-webhook-delivery-attempt";
