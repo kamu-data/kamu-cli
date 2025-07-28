@@ -36,7 +36,6 @@ use kamu_flow_system::{
 };
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
-use kamu_webhooks_services::WebhookPayloadBuilderImpl;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -237,7 +236,6 @@ impl TestWebhookDeliverySchedulerHarness {
     fn new(mock_flow_run_service: MockFlowRunService) -> Self {
         let mut b = CatalogBuilder::new();
         b.add::<FlowWebhooksEventBridge>()
-            .add::<WebhookPayloadBuilderImpl>()
             .add_builder(
                 messaging_outbox::OutboxImmediateImpl::builder()
                     .with_consumer_filter(messaging_outbox::ConsumerFilter::AllConsumers),

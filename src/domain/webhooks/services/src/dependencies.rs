@@ -14,7 +14,6 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<WebhookPayloadBuilderImpl>();
     catalog_builder.add::<WebhookDeliveryWorkerImpl>();
     catalog_builder.add::<WebhookSignerImpl>();
     catalog_builder.add::<WebhookSenderImpl>();

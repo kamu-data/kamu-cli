@@ -57,7 +57,6 @@ kamu-accounts = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system = { workspace = true, features = ["testing"] }
 kamu-webhooks-inmem = { workspace = true }
-kamu-webhooks-services = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }

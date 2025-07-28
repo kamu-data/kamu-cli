@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod flow_scope_subscription;
+mod webhook_dataset_ref_updated_payload;
 
 pub use flow_scope_subscription::*;
+pub(crate) use webhook_dataset_ref_updated_payload::*;

@@ -8,14 +8,12 @@
 // by the Apache License, Version 2.0.
 
 mod webhook_delivery_worker;
-mod webhook_payload_builder;
 mod webhook_secret_generator;
 mod webhook_sender;
 mod webhook_signer;
 mod webhook_subscription_query_service;
 
 pub use webhook_delivery_worker::*;
-pub use webhook_payload_builder::*;
 pub use webhook_secret_generator::*;
 pub use webhook_sender::*;
 pub use webhook_signer::*;

@@ -7,19 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) const WEBHOOK_DATASET_REF_UPDATED_VERSION: u32 = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait WebhookPayloadBuilder: Send + Sync {
-    async fn build_dataset_ref_updated_payload(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-        new_block_hash: &odf::Multihash,
-        maybe_prev_block_hash: Option<&odf::Multihash>,
-    ) -> Result<serde_json::Value, InternalError>;
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct WebhookDatasetRefUpdatedPayload {
+    pub version: u32,
+    pub dataset_id: String,
+    pub owner_account_id: String,
+    pub block_ref: String,
+    pub new_hash: String,
+    pub old_hash: Option<String>,
+    pub is_breaking_change: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

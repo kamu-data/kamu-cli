@@ -55,7 +55,3 @@ serde_with = { version = "3", default-features = false, features = [
 ] }
 
 mockall = { optional = true, version = "0.13", default-features = false }
-
-[dev-dependencies]
-kamu-accounts = { workspace = true }
-kamu-core = { workspace = true }

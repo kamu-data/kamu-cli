@@ -15,10 +15,16 @@ use kamu_adapter_flow_dataset::{
     FlowScopeDataset,
 };
 use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
+use kamu_datasets::DatasetEntryService;
 use kamu_flow_system as fs;
-use kamu_webhooks::{WebhookEventTypeCatalog, WebhookPayloadBuilder};
+use kamu_webhooks::WebhookEventTypeCatalog;
 
-use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
+use crate::{
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowScopeSubscription,
+    WEBHOOK_DATASET_REF_UPDATED_VERSION,
+    WebhookDatasetRefUpdatedPayload,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,20 +97,27 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
 
             // Extract necessary services
             let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
-            let webhook_payload_builder = catalog.get_one::<dyn WebhookPayloadBuilder>().unwrap();
+            let dataset_entry_service = catalog.get_one::<dyn DatasetEntryService>().unwrap();
 
-            // Build webhook payload
-            let webhook_payload = webhook_payload_builder
-                .build_dataset_ref_updated_payload(
-                    &input_dataset_id,
-                    &odf::BlockRef::Head,
-                    &dataset_update_details.new_head,
-                    dataset_update_details.old_head_maybe.as_ref(),
-                )
+            // Find out who is the owner of the dataset
+            let dataset_entry = dataset_entry_service
+                .get_entry(&self.dataset_id)
                 .await
                 .int_err()?;
 
-            // Trigger webhook flow, regardless of the change type
+            // Build webhook payload
+            let webhook_payload = serde_json::to_value(WebhookDatasetRefUpdatedPayload {
+                version: WEBHOOK_DATASET_REF_UPDATED_VERSION,
+                dataset_id: input_dataset_id.to_string(),
+                owner_account_id: dataset_entry.owner_id.to_string(),
+                block_ref: odf::BlockRef::Head.to_string(),
+                new_hash: dataset_update_details.new_head.to_string(),
+                old_hash: dataset_update_details.old_head_maybe.map(|h| h.to_string()),
+                is_breaking_change: matches!(update.changes, fs::ResourceChanges::Breaking),
+            })
+            .int_err()?;
+
+            // Trigger webhook flow
             let target_flow_binding =
                 fs::FlowBinding::new(FLOW_TYPE_WEBHOOK_DELIVER, self.webhook_flow_scope.clone());
             flow_run_service
