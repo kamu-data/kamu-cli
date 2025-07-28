@@ -16,7 +16,11 @@ use kamu_webhooks::*;
 use messaging_outbox::*;
 use time_source::SystemTimeSource;
 
-use crate::{MESSAGE_CONSUMER_KAMU_FLOW_WEBHOOKS_EVENT_BRIDGE, webhook_deliver_binding};
+use crate::{
+    FlowScopeSubscription,
+    MESSAGE_CONSUMER_KAMU_FLOW_WEBHOOKS_EVENT_BRIDGE,
+    webhook_deliver_binding,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -119,10 +123,10 @@ impl MessageConsumerT<WebhookSubscriptionLifecycleMessage> for FlowWebhooksEvent
             // Webhook resource is removed,
             // so we need to wipe all the related data in the flow system
             WebhookSubscriptionLifecycleMessage::Deleted(deleted_message) => {
-                let flow_scope = fs::FlowScope::WebhookSubscription {
-                    subscription_id: deleted_message.webhook_subscription_id.into_inner(),
-                    dataset_id: deleted_message.dataset_id.clone(),
-                };
+                let flow_scope = FlowScopeSubscription::make_scope(
+                    deleted_message.webhook_subscription_id.into_inner(),
+                    deleted_message.dataset_id.as_ref(),
+                );
 
                 tracing::debug!(
                     ?flow_scope,

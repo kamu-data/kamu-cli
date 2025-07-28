@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use {kamu_flow_system as fs, kamu_task_system as ts};
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs, kamu_task_system as ts};
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
 use super::{FlowActivationCause, FlowEvent, FlowOutcome, FlowStartCondition};
@@ -92,11 +92,8 @@ impl Flow {
 
     /// Associated dataset ID, if any
     async fn dataset_id(&self) -> Option<DatasetID<'static>> {
-        self.flow_state
-            .flow_binding
-            .scope
-            .dataset_id()
-            .map(|dataset_id| dataset_id.clone().into())
+        afs::FlowScopeDataset::maybe_dataset_id_in_scope(&self.flow_state.flow_binding.scope)
+            .map(Into::into)
     }
 
     /// Description of key flow parameters

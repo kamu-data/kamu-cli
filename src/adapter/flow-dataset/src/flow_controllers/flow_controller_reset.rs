@@ -21,6 +21,7 @@ use crate::{
     DatasetUpdateSource,
     FLOW_TYPE_DATASET_RESET,
     FlowConfigRuleReset,
+    FlowScopeDataset,
     trigger_metadata_only_hard_compaction_flow_for_own_downstream_datasets,
 };
 
@@ -66,7 +67,7 @@ impl fs::FlowController for FlowControllerReset {
         maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
         _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = flow_binding.scope.get_dataset_id_or_die()?;
+        let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
 
         if let Some(config_snapshot) = maybe_config_snapshot
             && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
@@ -108,10 +109,8 @@ impl fs::FlowController for FlowControllerReset {
         // turned on. Datasets of other users will stay unaffected and would
         // break on next update attempt
         if self.is_recursive_mode(success_flow_state.config_snapshot.as_ref())? {
-            let dataset_id = success_flow_state
-                .flow_binding
-                .scope
-                .get_dataset_id_or_die()?;
+            let dataset_id =
+                FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
             let activation_cause =
                 fs::FlowActivationCause::ResourceUpdate(fs::FlowActivationCauseResourceUpdate {
@@ -119,10 +118,7 @@ impl fs::FlowController for FlowControllerReset {
                     changes: fs::ResourceChanges::Breaking,
                     resource_type: DATASET_RESOURCE_TYPE.to_string(),
                     details: serde_json::to_value(DatasetResourceUpdateDetails {
-                        dataset_id: success_flow_state
-                            .flow_binding
-                            .scope
-                            .get_dataset_id_or_die()?,
+                        dataset_id: dataset_id.clone(),
                         source: DatasetUpdateSource::UpstreamFlow {
                             flow_type: success_flow_state.flow_binding.flow_type.clone(),
                             flow_id: success_flow_state.flow_id,

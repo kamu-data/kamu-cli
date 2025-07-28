@@ -14,10 +14,10 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system as fs;
 
 use crate::{
+    FLOW_TYPE_DATASET_TRANSFORM, /* FlowConfigRuleCompact,
+                                  * FlowConfigRuleReset, */
     // FLOW_TYPE_DATASET_COMPACT,
-    FLOW_TYPE_DATASET_TRANSFORM,
-    // FlowConfigRuleCompact,
-    // FlowConfigRuleReset,
+    FlowScopeDataset,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,12 +30,12 @@ pub struct DerivedDatasetFlowSensor {
 
 impl DerivedDatasetFlowSensor {
     pub fn new(
-        dataset_id: odf::DatasetID,
+        dataset_id: &odf::DatasetID,
         input_dataset_ids: Vec<odf::DatasetID>,
         batching_rule: fs::BatchingRule,
     ) -> Self {
         Self {
-            flow_scope: fs::FlowScope::for_dataset(dataset_id),
+            flow_scope: FlowScopeDataset::make_scope(dataset_id),
             sensitive_dataset_ids: HashSet::from_iter(input_dataset_ids),
             batching_rule,
         }
@@ -127,7 +127,7 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
     fn get_sensitive_to_scopes(&self) -> Vec<fs::FlowScope> {
         self.sensitive_dataset_ids
             .iter()
-            .map(|id| fs::FlowScope::for_dataset(id))
+            .map(FlowScopeDataset::make_scope)
             .collect()
     }
 
@@ -173,7 +173,8 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
         tracing::info!(?self.flow_scope, ?input_flow_binding, ?activation_cause, "Derived dataset flow sensor sensitized");
 
         // First we should ensure we are sensitized with a valid input dataset
-        let input_dataset_id = input_flow_binding.scope.get_dataset_id_or_die()?;
+
+        let input_dataset_id = FlowScopeDataset::new(&input_flow_binding.scope).dataset_id();
         if !self.sensitive_dataset_ids.contains(&input_dataset_id) {
             return Err(InternalError::new(format!(
                 "Flow sensor {:?} received an input dataset {} that is not in the sensitivity list",

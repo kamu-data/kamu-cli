@@ -25,8 +25,8 @@ testing = ["dep:pretty_assertions"]
 
 
 [dependencies]
+async-utils = { workspace = true }
 internal-error = { workspace = true }
-lang-utils = { workspace = true }
 odf-metadata = { workspace = true }
 random-strings = { workspace = true }
 

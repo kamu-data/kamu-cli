@@ -9,7 +9,7 @@
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetEntryServiceExt, DependencyGraphService};
-use kamu_flow_system as fs;
+use kamu_flow_system::{self as fs};
 
 use crate::{
     FLOW_TYPE_DATASET_COMPACT,
@@ -17,6 +17,7 @@ use crate::{
     FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowConfigRuleCompact,
+    FlowScopeDataset,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +26,7 @@ use crate::{
 pub fn ingest_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_INGEST,
-        fs::FlowScope::for_dataset(dataset_id),
+        FlowScopeDataset::make_scope(dataset_id),
     )
 }
 
@@ -35,7 +36,7 @@ pub fn ingest_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
 pub fn transform_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_TRANSFORM,
-        fs::FlowScope::for_dataset(dataset_id),
+        FlowScopeDataset::make_scope(dataset_id),
     )
 }
 
@@ -45,7 +46,7 @@ pub fn transform_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding
 pub fn compaction_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_COMPACT,
-        fs::FlowScope::for_dataset(dataset_id),
+        FlowScopeDataset::make_scope(dataset_id),
     )
 }
 
@@ -55,7 +56,7 @@ pub fn compaction_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBindin
 pub fn reset_dataset_binding(dataset_id: &odf::DatasetID) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_DATASET_RESET,
-        fs::FlowScope::for_dataset(dataset_id),
+        FlowScopeDataset::make_scope(dataset_id),
     )
 }
 

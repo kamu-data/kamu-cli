@@ -114,7 +114,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(3, num_events);
 
-    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::System);
+    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
     let event_3 = FlowConfigurationEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),

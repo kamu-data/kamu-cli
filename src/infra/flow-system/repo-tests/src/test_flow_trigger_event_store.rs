@@ -10,7 +10,7 @@
 use chrono::{Duration, Utc};
 use dill::Catalog;
 use futures::TryStreamExt;
-use kamu_adapter_flow_dataset::ingest_dataset_binding;
+use kamu_adapter_flow_dataset::{FlowScopeDataset, ingest_dataset_binding};
 use kamu_flow_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +51,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     assert_eq!(bindings, []);
 
     let system_bindings = event_store
-        .all_trigger_bindings_for_scope(&FlowScope::System)
+        .all_trigger_bindings_for_scope(&FlowScope::make_system_scope())
         .await
         .unwrap();
     assert_eq!(system_bindings, []);
@@ -117,7 +117,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
 
     assert_eq!(3, num_events);
 
-    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::System);
+    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
     let event_3 = FlowTriggerEventCreated {
         event_time: Utc::now(),
         flow_binding: flow_binding_3.clone(),
@@ -405,7 +405,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     // System trigger (should be ignored)
-    let flow_system = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::System);
+    let flow_system = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
     event_store
         .save_events(
             &flow_system,
@@ -424,7 +424,7 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .unwrap();
 
     async fn test(store: &dyn FlowTriggerEventStore, ids: &[odf::DatasetID]) -> bool {
-        let scopes: Vec<_> = ids.iter().map(FlowScope::for_dataset).collect();
+        let scopes: Vec<_> = ids.iter().map(FlowScopeDataset::make_scope).collect();
         store.has_active_triggers_for_scopes(&scopes).await.unwrap()
     }
 

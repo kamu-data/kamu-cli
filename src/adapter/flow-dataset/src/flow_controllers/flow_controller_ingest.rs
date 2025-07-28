@@ -21,6 +21,7 @@ use crate::{
     DatasetUpdateSource,
     FLOW_TYPE_DATASET_INGEST,
     FlowConfigRuleIngest,
+    FlowScopeDataset,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,7 +49,7 @@ impl fs::FlowController for FlowControllerIngest {
         maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
         _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = flow_binding.scope.get_dataset_id_or_die()?;
+        let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
 
         let mut fetch_uncacheable = false;
         if let Some(config_snapshot) = maybe_config_snapshot
@@ -76,10 +77,8 @@ impl fs::FlowController for FlowControllerIngest {
         match task_result_update.pull_result {
             PullResult::UpToDate(_) => return Ok(()),
             PullResult::Updated { old_head, new_head } => {
-                let dataset_id = success_flow_state
-                    .flow_binding
-                    .scope
-                    .get_dataset_id_or_die()?;
+                let dataset_id =
+                    FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
                 let dataset_increment = self
                     .dataset_increment_query_service

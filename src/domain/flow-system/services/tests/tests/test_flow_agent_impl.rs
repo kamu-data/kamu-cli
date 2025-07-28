@@ -17,6 +17,7 @@ use kamu_adapter_flow_dataset::{
     FlowConfigRuleCompactFull,
     FlowConfigRuleIngest,
     FlowConfigRuleReset,
+    FlowScopeDataset,
     compaction_dataset_binding,
     ingest_dataset_binding,
     reset_dataset_binding,
@@ -5642,7 +5643,7 @@ async fn test_list_all_flow_initiators() {
 
     let foo_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
-        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(&foo_id))
+        .list_scoped_flow_initiators(FlowScopeDataset::query_for_single_dataset(&foo_id))
         .await
         .unwrap()
         .matched_stream
@@ -5654,7 +5655,7 @@ async fn test_list_all_flow_initiators() {
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
-        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(&bar_id))
+        .list_scoped_flow_initiators(FlowScopeDataset::query_for_single_dataset(&bar_id))
         .await
         .unwrap()
         .matched_stream
@@ -5790,7 +5791,7 @@ async fn test_list_all_datasets_with_flow() {
 
     let foo_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
-        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(&foo_id))
+        .list_scoped_flow_initiators(FlowScopeDataset::query_for_single_dataset(&foo_id))
         .await
         .unwrap()
         .matched_stream
@@ -5802,7 +5803,7 @@ async fn test_list_all_datasets_with_flow() {
 
     let bar_dataset_initiators_list: Vec<_> = harness
         .flow_query_service
-        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(&bar_id))
+        .list_scoped_flow_initiators(FlowScopeDataset::query_for_single_dataset(&bar_id))
         .await
         .unwrap()
         .matched_stream
@@ -5822,14 +5823,14 @@ async fn test_list_all_datasets_with_flow() {
         .flow_query_service
         .filter_flow_scopes_having_flows(
             &foo_datasets
-                .into_iter()
-                .map(FlowScope::for_dataset)
+                .iter()
+                .map(FlowScopeDataset::make_scope)
                 .collect::<Vec<_>>(),
         )
         .await
         .unwrap()
         .into_iter()
-        .filter_map(|flow_scope| flow_scope.dataset_id().cloned())
+        .map(|flow_scope| FlowScopeDataset::new(&flow_scope).dataset_id())
         .collect();
 
     pretty_assertions::assert_eq!([foo_id], *all_datasets_with_flow);
@@ -5844,14 +5845,14 @@ async fn test_list_all_datasets_with_flow() {
         .flow_query_service
         .filter_flow_scopes_having_flows(
             &bar_datasets
-                .into_iter()
-                .map(FlowScope::for_dataset)
+                .iter()
+                .map(FlowScopeDataset::make_scope)
                 .collect::<Vec<_>>(),
         )
         .await
         .unwrap()
         .into_iter()
-        .filter_map(|flow_scope| flow_scope.dataset_id().cloned())
+        .map(|flow_scope| FlowScopeDataset::new(&flow_scope).dataset_id())
         .collect();
 
     pretty_assertions::assert_eq!([bar_id], *all_datasets_with_flow);

@@ -9,7 +9,7 @@
 
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::{ResolvedDataset, auth};
-use kamu_flow_system as fs;
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::FlowNotFound;
 use crate::prelude::*;
@@ -42,8 +42,10 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
 
     match flow_query_service.get_flow(flow_id.into()).await {
         Ok(flow_state) => {
-            if let Some(flow_dataset_id) = flow_state.flow_binding.scope.dataset_id() {
-                if flow_dataset_id != dataset_id {
+            if let Some(flow_dataset_id) =
+                afs::FlowScopeDataset::maybe_dataset_id_in_scope(&flow_state.flow_binding.scope)
+            {
+                if flow_dataset_id != *dataset_id {
                     return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }
             } else {

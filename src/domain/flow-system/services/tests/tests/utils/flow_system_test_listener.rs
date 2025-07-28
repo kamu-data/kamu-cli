@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use core::panic;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -17,11 +18,14 @@ use internal_error::InternalError;
 use kamu_adapter_flow_dataset::{
     DatasetResourceUpdateDetails,
     DatasetUpdateSource,
+    FLOW_SCOPE_TYPE_DATASET,
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
+    FlowScopeDataset,
 };
+use kamu_adapter_flow_webhook::{FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION, FlowScopeSubscription};
 use kamu_flow_system::*;
 use kamu_flow_system_services::{
     MESSAGE_PRODUCER_KAMU_FLOW_AGENT,
@@ -137,38 +141,50 @@ impl std::fmt::Display for FlowSystemTestListener {
                 .map(|flow_binding| {
                     (
                         flow_binding,
-                        match &flow_binding.scope {
-                            FlowScope::Dataset { dataset_id } => format!(
-                                "\"{}\" {}",
-                                state
-                                    .dataset_display_names
-                                    .get(dataset_id)
-                                    .cloned()
-                                    .unwrap_or_else(|| dataset_id.to_string()),
-                                Self::display_flow_type(flow_binding.flow_type.as_str())
-                            ),
-                            FlowScope::WebhookSubscription {
-                                subscription_id,
-                                dataset_id,
-                            } => format!(
-                                "\"{}\" Subscription: {} {}",
-                                match dataset_id {
-                                    Some(dataset_id) => state
+                        match flow_binding.scope.scope_type() {
+                            FLOW_SCOPE_TYPE_DATASET => {
+                                let dataset_id =
+                                    FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+                                format!(
+                                    "\"{}\" {}",
+                                    state
                                         .dataset_display_names
-                                        .get(dataset_id)
+                                        .get(&dataset_id)
                                         .cloned()
                                         .unwrap_or_else(|| dataset_id.to_string()),
-                                    None => "<None>".to_string(),
-                                },
-                                subscription_id,
-                                Self::display_flow_type(flow_binding.flow_type.as_str())
-                            ),
-                            FlowScope::System => {
+                                    Self::display_flow_type(flow_binding.flow_type.as_str())
+                                )
+                            }
+                            FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
+                                let subscription_scope =
+                                    FlowScopeSubscription::new(&flow_binding.scope);
+                                let subscription_id = subscription_scope.webhook_subscription_id();
+                                let maybe_dataset_id = subscription_scope.dataset_id();
+
+                                format!(
+                                    "\"{}\" Subscription: {} {}",
+                                    match maybe_dataset_id {
+                                        Some(dataset_id) => state
+                                            .dataset_display_names
+                                            .get(&dataset_id)
+                                            .cloned()
+                                            .unwrap_or_else(|| dataset_id.to_string()),
+                                        None => "<None>".to_string(),
+                                    },
+                                    subscription_id,
+                                    Self::display_flow_type(flow_binding.flow_type.as_str())
+                                )
+                            }
+                            FLOW_SCOPE_TYPE_SYSTEM => {
                                 format!(
                                     "System {}",
                                     Self::display_flow_type(flow_binding.flow_type.as_str())
                                 )
                             }
+                            _ => panic!(
+                                "Unexpected flow scope type: {}",
+                                flow_binding.scope.scope_type()
+                            ),
                         },
                     )
                 })

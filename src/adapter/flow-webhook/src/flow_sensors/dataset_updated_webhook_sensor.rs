@@ -9,23 +9,31 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, DatasetResourceUpdateDetails};
+use kamu_adapter_flow_dataset::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
+    FlowScopeDataset,
+};
 use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
 use kamu_flow_system as fs;
 use kamu_webhooks::{WebhookEventTypeCatalog, WebhookPayloadBuilder};
 
-use crate::FLOW_TYPE_WEBHOOK_DELIVER;
+use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetUpdatedWebhookSensor {
     webhook_flow_scope: fs::FlowScope,
+    dataset_id: odf::DatasetID,
     batching_rule: fs::BatchingRule,
 }
 
 impl DatasetUpdatedWebhookSensor {
     pub fn new(webhook_flow_scope: fs::FlowScope, batching_rule: fs::BatchingRule) -> Self {
         Self {
+            dataset_id: FlowScopeSubscription::new(&webhook_flow_scope)
+                .dataset_id()
+                .unwrap(),
             webhook_flow_scope,
             batching_rule,
         }
@@ -39,9 +47,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
     }
 
     fn get_sensitive_to_scopes(&self) -> Vec<fs::FlowScope> {
-        vec![fs::FlowScope::for_dataset(
-            self.webhook_flow_scope.dataset_id().unwrap(),
-        )]
+        vec![FlowScopeDataset::make_scope(&self.dataset_id)]
     }
 
     async fn on_activated(
@@ -63,14 +69,11 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         tracing::info!(?self.webhook_flow_scope, ?input_flow_binding, ?activation_cause, "DatasetUpdatedWebhookSensor sensitized");
 
         // Ensure sensitized for right dataset id
-        let input_dataset_id = input_flow_binding.scope.dataset_id().ok_or_else(|| {
-            InternalError::new("Input flow binding does not have a dataset ID".to_string())
-        })?;
-        if input_dataset_id != self.webhook_flow_scope.dataset_id().unwrap() {
+        let input_dataset_id = FlowScopeDataset::new(&input_flow_binding.scope).dataset_id();
+        if input_dataset_id != self.dataset_id {
             return Err(InternalError::new(format!(
                 "FlowBinding dataset ID {} does not match sensor dataset ID {}",
-                input_dataset_id,
-                self.webhook_flow_scope.dataset_id().unwrap()
+                input_dataset_id, self.dataset_id
             )));
         }
 
@@ -93,7 +96,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
             // Build webhook payload
             let webhook_payload = webhook_payload_builder
                 .build_dataset_ref_updated_payload(
-                    input_dataset_id,
+                    &input_dataset_id,
                     &odf::BlockRef::Head,
                     &dataset_update_details.new_head,
                     dataset_update_details.old_head_maybe.as_ref(),

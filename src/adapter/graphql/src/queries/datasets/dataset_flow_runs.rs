@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use database_common::PaginationOpts;
 use futures::TryStreamExt;
 use kamu_accounts::AccountService;
-use kamu_flow_system as fs;
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use crate::mutations::{FlowInDatasetError, FlowNotFound, check_if_flow_belongs_to_dataset};
 use crate::prelude::*;
@@ -106,7 +106,7 @@ impl<'a> DatasetFlowRuns<'a> {
 
         let flows_state_listing = flow_query_service
             .list_scoped_flows(
-                fs::FlowScopeQuery::build_for_single_dataset(
+                afs::FlowScopeDataset::query_for_single_dataset(
                     self.dataset_request_state.dataset_id(),
                 ),
                 maybe_filters.unwrap_or_default(),
@@ -131,7 +131,7 @@ impl<'a> DatasetFlowRuns<'a> {
         let flow_query_service = from_catalog_n!(ctx, dyn fs::FlowQueryService);
 
         let flow_initiator_ids: Vec<_> = flow_query_service
-            .list_scoped_flow_initiators(fs::FlowScopeQuery::build_for_single_dataset(
+            .list_scoped_flow_initiators(afs::FlowScopeDataset::query_for_single_dataset(
                 self.dataset_request_state.dataset_id(),
             ))
             .await

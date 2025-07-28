@@ -9,7 +9,7 @@
 
 use kamu_flow_system as fs;
 
-use crate::FLOW_TYPE_WEBHOOK_DELIVER;
+use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ pub fn webhook_deliver_binding(
 ) -> fs::FlowBinding {
     fs::FlowBinding::new(
         FLOW_TYPE_WEBHOOK_DELIVER,
-        fs::FlowScope::for_webhook_subscription(subscription_id, dataset_id),
+        FlowScopeSubscription::make_scope(subscription_id, dataset_id),
     )
 }
 

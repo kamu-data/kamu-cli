@@ -22,7 +22,7 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use {kamu_adapter_task_webhook as atw, kamu_flow_system as fs, kamu_task_system as ts};
 
-use crate::{DatasetUpdatedWebhookSensor, FLOW_TYPE_WEBHOOK_DELIVER};
+use crate::{DatasetUpdatedWebhookSensor, FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,7 +66,8 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
         _maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
         maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let subscription_id = flow_binding.scope.get_webhook_subscription_id_or_die()?;
+        let subscription_id =
+            FlowScopeSubscription::new(&flow_binding.scope).webhook_subscription_id();
 
         let delivery_args = if let Some(task_run_arguments) = maybe_task_run_arguments
             && task_run_arguments.arguments_type == atw::TaskRunArgumentsWebhookDeliver::TYPE_ID

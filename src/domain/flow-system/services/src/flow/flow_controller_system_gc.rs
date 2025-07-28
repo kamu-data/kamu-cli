@@ -33,7 +33,7 @@ impl FlowController for FlowControllerSystemGC {
         _maybe_config_snapshot: Option<&FlowConfigurationRule>,
         _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        if !matches!(flow_binding.scope, FlowScope::System) {
+        if !flow_binding.scope.is_system_scope() {
             return InternalError::bail("Expecting system flow binding scope for GC dispatcher");
         }
 

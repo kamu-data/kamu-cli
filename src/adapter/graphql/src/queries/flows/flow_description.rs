@@ -13,12 +13,18 @@ use chrono::{DateTime, Utc};
 use kamu_adapter_flow_dataset::{
     DATASET_RESOURCE_TYPE,
     DatasetResourceUpdateDetails,
+    FLOW_SCOPE_TYPE_DATASET,
     FLOW_TYPE_DATASET_COMPACT,
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
+    FlowScopeDataset,
 };
-use kamu_adapter_flow_webhook::FLOW_TYPE_WEBHOOK_DELIVER;
+use kamu_adapter_flow_webhook::{
+    FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION,
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowScopeSubscription,
+};
 use kamu_adapter_task_dataset::{
     TaskResultDatasetHardCompact,
     TaskResultDatasetReset,
@@ -27,7 +33,7 @@ use kamu_adapter_task_dataset::{
 use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
 use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
-use kamu_flow_system::FLOW_TYPE_SYSTEM_GC;
+use kamu_flow_system::{FLOW_SCOPE_TYPE_SYSTEM, FLOW_TYPE_SYSTEM_GC};
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::prelude::*;
@@ -361,7 +367,9 @@ impl FlowDescriptionBuilder {
     fn collect_unique_dataset_ids(flow_states: &[fs::FlowState]) -> Vec<odf::DatasetID> {
         flow_states
             .iter()
-            .filter_map(|flow_state| flow_state.flow_binding.scope.dataset_id().cloned())
+            .filter_map(|flow_state| {
+                FlowScopeDataset::maybe_dataset_id_in_scope(&flow_state.flow_binding.scope)
+            })
             .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<_>>()
@@ -453,24 +461,40 @@ impl FlowDescriptionBuilder {
         flow_state: &fs::FlowState,
     ) -> Result<FlowDescription> {
         let flow_type = flow_state.flow_binding.flow_type.as_str();
-        Ok(match &flow_state.flow_binding.scope {
-            fs::FlowScope::Dataset { dataset_id } => FlowDescription::Dataset(
-                self.dataset_flow_description(ctx, flow_state, flow_type, dataset_id)
-                    .await?,
-            ),
-            fs::FlowScope::WebhookSubscription {
-                subscription_id, ..
-            } => {
+        Ok(match flow_state.flow_binding.scope.scope_type() {
+            FLOW_SCOPE_TYPE_DATASET => {
+                let dataset_id = FlowScopeDataset::new(&flow_state.flow_binding.scope).dataset_id();
+                FlowDescription::Dataset(
+                    self.dataset_flow_description(ctx, flow_state, flow_type, &dataset_id)
+                        .await?,
+                )
+            }
+
+            FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
+                let subscription_id = FlowScopeSubscription::new(&flow_state.flow_binding.scope)
+                    .webhook_subscription_id();
                 self.webhook_flow_description(
                     ctx,
                     flow_state,
                     flow_type,
-                    kamu_webhooks::WebhookSubscriptionID::new(*subscription_id),
+                    kamu_webhooks::WebhookSubscriptionID::new(subscription_id),
                 )
                 .await?
             }
-            fs::FlowScope::System => {
+
+            FLOW_SCOPE_TYPE_SYSTEM => {
                 FlowDescription::System(self.system_flow_description(flow_type)?)
+            }
+
+            _ => {
+                tracing::error!(
+                    "Unexpected flow scope type: {}",
+                    flow_state.flow_binding.scope.scope_type()
+                );
+                return Err(GqlError::Internal(InternalError::new(format!(
+                    "Unexpected flow scope type: {}",
+                    flow_state.flow_binding.scope.scope_type()
+                ))));
             }
         })
     }

@@ -15,7 +15,7 @@ use futures::TryStreamExt;
 use kamu_accounts::Account as AccountEntity;
 use kamu_core::DatasetRegistry;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
-use kamu_flow_system as fs;
+use {kamu_adapter_flow_dataset as afs, kamu_flow_system as fs};
 
 use super::Account;
 use crate::prelude::*;
@@ -113,7 +113,7 @@ impl<'a> AccountFlowRuns<'a> {
 
         let flows_state_listing = flow_query_service
             .list_scoped_flows(
-                fs::FlowScopeQuery::build_for_multiple_datasets(&dataset_id_refs),
+                afs::FlowScopeDataset::query_for_multiple_datasets(&dataset_id_refs),
                 dataset_flow_filters,
                 PaginationOpts::from_page(page, per_page),
             )
@@ -154,8 +154,8 @@ impl<'a> AccountFlowRuns<'a> {
             .int_err()?;
 
         let input_flow_scopes = owned_dataset_ids
-            .into_iter()
-            .map(fs::FlowScope::for_dataset)
+            .iter()
+            .map(afs::FlowScopeDataset::make_scope)
             .collect::<Vec<_>>();
 
         let filtered_flow_scopes = flow_query_service
@@ -164,7 +164,9 @@ impl<'a> AccountFlowRuns<'a> {
 
         let dataset_ids = filtered_flow_scopes
             .iter()
-            .filter_map(|flow_scope| flow_scope.dataset_id().map(Cow::Borrowed))
+            .filter_map(|flow_scope| {
+                afs::FlowScopeDataset::maybe_dataset_id_in_scope(flow_scope).map(Cow::Owned)
+            })
             .collect::<Vec<_>>();
 
         let dataset_handles_resolution = dataset_registry

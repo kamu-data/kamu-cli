@@ -10,6 +10,7 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
+use async_utils::AsyncReadObj;
 use aws_config::{BehaviorVersion, SdkConfig};
 use aws_sdk_s3::Client;
 use aws_sdk_s3::config::SharedCredentialsProvider;
@@ -21,7 +22,6 @@ use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::presigning::{PresignedRequest, PresigningConfig};
 use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectCannedAcl, ObjectIdentifier};
 use internal_error::{InternalError, ResultIntoInternal, *};
-use lang_utils::AsyncReadObj;
 use url::Url;
 
 use crate::S3Metrics;

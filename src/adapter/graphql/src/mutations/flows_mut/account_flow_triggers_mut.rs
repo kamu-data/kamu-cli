@@ -9,8 +9,9 @@
 
 use chrono::Utc;
 use kamu_accounts::Account;
+use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
-use kamu_flow_system::{FlowScope, FlowTriggerService};
+use kamu_flow_system::FlowTriggerService;
 
 use crate::prelude::*;
 
@@ -45,8 +46,8 @@ impl<'a> AccountFlowTriggersMut<'a> {
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
         let lookup_scopes = account_dataset_ids
-            .into_iter()
-            .map(FlowScope::for_dataset)
+            .iter()
+            .map(FlowScopeDataset::make_scope)
             .collect::<Vec<_>>();
 
         flow_trigger_service
@@ -63,8 +64,8 @@ impl<'a> AccountFlowTriggersMut<'a> {
 
         let account_dataset_ids = self.get_account_dataset_ids(ctx).await?;
         let lookup_scopes = account_dataset_ids
-            .into_iter()
-            .map(FlowScope::for_dataset)
+            .iter()
+            .map(FlowScopeDataset::make_scope)
             .collect::<Vec<_>>();
 
         flow_trigger_service

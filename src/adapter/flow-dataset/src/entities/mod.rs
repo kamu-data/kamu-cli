@@ -9,6 +9,8 @@
 
 mod dataset_resource_update_details;
 mod flow_config_rules;
+mod flow_scope_dataset;
 
 pub use dataset_resource_update_details::*;
 pub use flow_config_rules::*;
+pub use flow_scope_dataset::*;

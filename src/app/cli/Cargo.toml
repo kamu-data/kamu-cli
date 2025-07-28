@@ -40,6 +40,7 @@ web-ui = ["rust-embed"]
 
 [dependencies]
 # Kamu
+async-utils = { workspace = true }
 container-runtime = { workspace = true }
 crypto-utils = { workspace = true }
 database-common = { workspace = true }
@@ -48,7 +49,6 @@ file-utils = { workspace = true }
 http-common = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-lang-utils = { workspace = true }
 observability = { workspace = true, features = ["dill", "prometheus"] }
 time-source = { workspace = true }
 server-console = { workspace = true }

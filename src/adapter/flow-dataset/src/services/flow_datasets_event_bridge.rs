@@ -25,6 +25,7 @@ use crate::{
     DATASET_RESOURCE_TYPE,
     DatasetResourceUpdateDetails,
     DatasetUpdateSource,
+    FlowScopeDataset,
     MESSAGE_CONSUMER_KAMU_FLOW_DATASETS_EVENT_BRIDGE,
     ingest_dataset_binding,
 };
@@ -73,7 +74,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for FlowDatasetsEventBridge {
             // Dataset resource is removed,
             // so we need to wipe all the related data in the flow system
             DatasetLifecycleMessage::Deleted(deleted_message) => {
-                let flow_scope = fs::FlowScope::for_dataset(&deleted_message.dataset_id);
+                let flow_scope = FlowScopeDataset::make_scope(&deleted_message.dataset_id);
 
                 tracing::debug!(
                     ?flow_scope,

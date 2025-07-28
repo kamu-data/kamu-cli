@@ -1,6 +1,6 @@
 [package]
-name = "lang-utils"
-description = "Simple utilities to at the language level"
+name = "async-utils"
+description = "Simple utilities to work with async code"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

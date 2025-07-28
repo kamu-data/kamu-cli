@@ -20,6 +20,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_INGEST,
     FLOW_TYPE_DATASET_RESET,
     FLOW_TYPE_DATASET_TRANSFORM,
+    FlowScopeDataset,
     compaction_dataset_binding,
     ingest_dataset_binding,
 };
@@ -670,7 +671,7 @@ pub async fn test_dataset_get_flow_initiators(catalog: &Catalog) {
     let foo_cases = make_dataset_test_case(flow_event_store.clone()).await;
 
     let res: HashSet<_> = flow_event_store
-        .list_scoped_flow_initiators(FlowScopeQuery::build_for_single_dataset(
+        .list_scoped_flow_initiators(FlowScopeDataset::query_for_single_dataset(
             &foo_cases.dataset_id,
         ))
         .try_collect()
@@ -1306,7 +1307,7 @@ pub async fn test_dataset_flow_run_stats(catalog: &Catalog) {
 pub async fn test_system_flow_run_stats(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::System);
+    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
 
     // No stats initially
     let stats = flow_event_store
@@ -1709,7 +1710,7 @@ pub async fn test_pending_flow_multiple_datasets_crud(catalog: &Catalog) {
 pub async fn test_pending_flow_system_flow_crud(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
-    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::System);
+    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
 
     // No pending yet
 
@@ -2341,7 +2342,7 @@ pub async fn test_get_all_scope_pending_flows(catalog: &Catalog) {
 
     // Call the method under test
     let pending_flows = flow_event_store
-        .try_get_all_scope_pending_flows(&FlowScope::for_dataset(dataset_id))
+        .try_get_all_scope_pending_flows(&FlowScopeDataset::make_scope(&dataset_id))
         .await
         .unwrap();
 
@@ -2370,7 +2371,7 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
     ]
     .concat();
 
-    let flow_scope_query = FlowScopeQuery::build_for_multiple_datasets(&dataset_ids);
+    let flow_scope_query = FlowScopeDataset::query_for_multiple_datasets(&dataset_ids);
 
     let total_count = flow_event_store
         .get_count_flows_matching_scope_query(&flow_scope_query, &FlowFilters::default())
@@ -2401,24 +2402,27 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
     // Test dataset having flows
     let mut flow_scopes = Vec::new();
     for dataset_id in &dataset_ids {
-        flow_scopes.push(FlowScope::for_dataset(*dataset_id));
+        flow_scopes.push(FlowScopeDataset::make_scope(dataset_id));
     }
-    flow_scopes.push(FlowScope::for_dataset(odf::DatasetID::new_seeded_ed25519(
-        b"empty",
-    )));
+    flow_scopes.push(FlowScopeDataset::make_scope(
+        &odf::DatasetID::new_seeded_ed25519(b"empty"),
+    ));
 
     let filtered_flow_scopes = flow_event_store
         .filter_flow_scopes_having_flows(&flow_scopes)
         .await
         .unwrap();
 
-    let mut result: Vec<&odf::DatasetID> = filtered_flow_scopes
+    let mut result: Vec<odf::DatasetID> = filtered_flow_scopes
         .iter()
-        .map(|scope| scope.dataset_id().unwrap())
+        .map(|scope| FlowScopeDataset::new(scope).dataset_id())
         .collect();
     result.sort();
 
-    assert_eq!(dataset_ids, result);
+    assert_eq!(result.len(), dataset_ids.len());
+    for (i, dataset_id) in dataset_ids.iter().enumerate() {
+        assert_eq!(result[i], **dataset_id);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2474,7 +2478,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
         // The flow should still be pending, because of retrying status
         let pending_flows = flow_event_store
-            .try_get_all_scope_pending_flows(&FlowScope::for_dataset(&dataset_id))
+            .try_get_all_scope_pending_flows(&FlowScopeDataset::make_scope(&dataset_id))
             .await
             .unwrap();
         assert_eq!(pending_flows.len(), 1);
@@ -2500,7 +2504,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
 
     // The flow should no longer be pending
     let pending_flows = flow_event_store
-        .try_get_all_scope_pending_flows(&FlowScope::for_dataset(dataset_id))
+        .try_get_all_scope_pending_flows(&FlowScopeDataset::make_scope(&dataset_id))
         .await
         .unwrap();
     assert!(pending_flows.is_empty());
@@ -2662,7 +2666,8 @@ async fn assert_dataset_flow_expectations(
     expected_total_count: usize,
     expected_flow_ids: Vec<FlowID>,
 ) {
-    let flow_scope_query = FlowScopeQuery::build_for_single_dataset(&dataset_test_case.dataset_id);
+    let flow_scope_query =
+        FlowScopeDataset::query_for_single_dataset(&dataset_test_case.dataset_id);
 
     let total_flows_count = flow_event_store
         .get_count_flows_matching_scope_query(&flow_scope_query, &filters)
@@ -2686,7 +2691,7 @@ async fn assert_multiple_dataset_flow_expectations(
     expected_flow_ids: Vec<FlowID>,
 ) {
     let dataset_id_refs: Vec<_> = dataset_ids.iter().collect();
-    let flow_scope_query = FlowScopeQuery::build_for_multiple_datasets(&dataset_id_refs);
+    let flow_scope_query = FlowScopeDataset::query_for_multiple_datasets(&dataset_id_refs);
 
     let flow_ids: Vec<_> = flow_event_store
         .get_all_flow_ids_matching_scope_query(flow_scope_query, &filters, pagination)
@@ -2771,7 +2776,7 @@ impl<'a> DatasetFlowGenerator<'a> {
         let mut flow = Flow::new(
             creation_moment,
             flow_id,
-            FlowBinding::new(flow_type, FlowScope::for_dataset(self.dataset_id)),
+            FlowBinding::new(flow_type, FlowScopeDataset::make_scope(self.dataset_id)),
             initial_activation_cause,
             config_snapshot,
             retry_policy,
@@ -2843,7 +2848,7 @@ impl SystemFlowGenerator {
         let mut flow = Flow::new(
             creation_moment,
             flow_id,
-            FlowBinding::new(flow_type, FlowScope::System),
+            FlowBinding::new(flow_type, FlowScope::make_system_scope()),
             initial_activation_cause,
             config_snapshot,
             None,

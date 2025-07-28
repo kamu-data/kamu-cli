@@ -17,6 +17,7 @@ use dill::*;
 use futures::TryStreamExt;
 use kamu_adapter_flow_dataset::{
     FlowDatasetsEventBridge,
+    FlowScopeDataset,
     compaction_dataset_binding,
     ingest_dataset_binding,
 };
@@ -213,7 +214,7 @@ async fn test_pause_resume_individual_system_flows() {
 
     // Configure GC schedule
     let gc_schedule: Schedule = Duration::minutes(30).into();
-    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::System);
+    let binding_gc = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
     harness
         .set_system_flow_schedule(FLOW_TYPE_SYSTEM_GC, gc_schedule.clone())
         .await
@@ -364,7 +365,7 @@ impl FlowTriggerHarness {
         flow_trigger_service
             .set_trigger(
                 Utc::now(),
-                FlowBinding::new(system_flow_type, FlowScope::System),
+                FlowBinding::new(system_flow_type, FlowScope::make_system_scope()),
                 false,
                 FlowTriggerRule::Schedule(schedule),
             )
@@ -401,7 +402,7 @@ impl FlowTriggerHarness {
         system_flow_type: &str,
         expected_schedule: &Schedule,
     ) {
-        let flow_binding = FlowBinding::new(system_flow_type, FlowScope::System);
+        let flow_binding = FlowBinding::new(system_flow_type, FlowScope::make_system_scope());
         assert_matches!(
             enabled_triggers.get(&flow_binding),
             Some(FlowTriggerState {
@@ -427,7 +428,7 @@ impl FlowTriggerHarness {
     }
 
     async fn pause_all_dataset_flows(&self, dataset_id: &odf::DatasetID) {
-        let lookup_scopes = vec![FlowScope::for_dataset(dataset_id)];
+        let lookup_scopes = vec![FlowScopeDataset::make_scope(dataset_id)];
         self.flow_trigger_service
             .pause_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
             .await
@@ -442,7 +443,7 @@ impl FlowTriggerHarness {
     }
 
     async fn resume_all_dataset_flows(&self, dataset_id: &odf::DatasetID) {
-        let lookup_scopes = vec![FlowScope::for_dataset(dataset_id)];
+        let lookup_scopes = vec![FlowScopeDataset::make_scope(dataset_id)];
         self.flow_trigger_service
             .resume_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
             .await

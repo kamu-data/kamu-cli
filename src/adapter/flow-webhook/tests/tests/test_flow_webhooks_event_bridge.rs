@@ -14,6 +14,7 @@ use dill::*;
 use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
 use kamu_adapter_flow_webhook::{
     FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowScopeSubscription,
     FlowWebhooksEventBridge,
     webhook_deliver_binding,
 };
@@ -322,12 +323,9 @@ impl TestWebhookDeliverySchedulerHarness {
                     assert!(maybe_forced_flow_config_rule.is_none());
                     assert!(maybe_flow_run_arguments.is_some());
 
-                    flow_binding.scope.dataset_id() == Some(&dataset_id_clone_1)
-                        && flow_binding
-                            .scope
-                            .get_webhook_subscription_id_or_die()
-                            .unwrap()
-                            == subscription_id.into_inner()
+                    let webhook_scope = FlowScopeSubscription::new(&flow_binding.scope);
+                    webhook_scope.dataset_id().as_ref() == Some(&dataset_id_clone_1)
+                        && webhook_scope.webhook_subscription_id() == subscription_id.into_inner()
                 },
             )
             .returning(move |_, _, _, _, _| {

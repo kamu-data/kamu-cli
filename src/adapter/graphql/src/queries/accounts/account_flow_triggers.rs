@@ -8,8 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use kamu_accounts::Account as AccountEntity;
+use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
-use kamu_flow_system::{FlowScope, FlowTriggerService};
+use kamu_flow_system::FlowTriggerService;
 
 use crate::prelude::*;
 
@@ -39,8 +40,8 @@ impl<'a> AccountFlowTriggers<'a> {
             .int_err()?;
 
         let lookup_scopes = owned_dataset_ids
-            .into_iter()
-            .map(FlowScope::for_dataset)
+            .iter()
+            .map(FlowScopeDataset::make_scope)
             .collect::<Vec<_>>();
 
         let has_active_triggers = flow_trigger_service
