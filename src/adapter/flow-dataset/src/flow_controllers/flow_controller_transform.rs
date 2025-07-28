@@ -71,11 +71,9 @@ impl fs::FlowController for FlowControllerTransform {
 
     async fn build_task_logical_plan(
         &self,
-        flow_binding: &fs::FlowBinding,
-        _maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
-        _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
+        flow: &fs::FlowState,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+        let dataset_id = FlowScopeDataset::new(&flow.flow_binding.scope).dataset_id();
 
         Ok(ats::LogicalPlanDatasetUpdate {
             dataset_id,

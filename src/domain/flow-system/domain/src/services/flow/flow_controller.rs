@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_task_system as ts;
 
-use crate::{BatchingRule, FlowBinding, FlowConfigurationRule, FlowState};
+use crate::{BatchingRule, FlowBinding, FlowState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,9 +38,7 @@ pub trait FlowController: Send + Sync {
 
     async fn build_task_logical_plan(
         &self,
-        flow_binding: &FlowBinding,
-        maybe_config_snapshot: Option<&FlowConfigurationRule>,
-        maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
+        flow: &FlowState,
     ) -> Result<ts::LogicalPlan, InternalError>;
 
     async fn propagate_success(

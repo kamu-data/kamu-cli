@@ -21,8 +21,6 @@ use crate::{LogicalPlanWebhookDeliver, TaskDefinitionWebhookDeliver};
 })]
 pub struct DeliverWebhookTaskPlanner {}
 
-impl DeliverWebhookTaskPlanner {}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]

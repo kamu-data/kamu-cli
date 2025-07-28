@@ -29,11 +29,9 @@ impl FlowController for FlowControllerSystemGC {
 
     async fn build_task_logical_plan(
         &self,
-        flow_binding: &FlowBinding,
-        _maybe_config_snapshot: Option<&FlowConfigurationRule>,
-        _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
+        flow: &FlowState,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        if !flow_binding.scope.is_system_scope() {
+        if !flow.flow_binding.scope.is_system_scope() {
             return InternalError::bail("Expecting system flow binding scope for GC dispatcher");
         }
 

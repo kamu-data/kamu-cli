@@ -167,7 +167,6 @@ impl FlowAgentImpl {
                                 activation_time: start_time,
                             }),
                             None,
-                            flow.run_arguments,
                         )
                         .await?;
                 }
@@ -329,11 +328,7 @@ impl FlowAgentImpl {
 
         // Controller should create a logical plan that corresponds to the flow type
         let logical_plan = flow_controller
-            .build_task_logical_plan(
-                &flow.flow_binding,
-                flow.config_snapshot.as_ref(),
-                flow.run_arguments.as_ref(),
-            )
+            .build_task_logical_plan(flow)
             .await
             .int_err()?;
 

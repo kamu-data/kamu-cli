@@ -67,6 +67,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                 if message.event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
                     let flow_binding = webhook_deliver_binding(
                         message.webhook_subscription_id,
+                        &message.event_type,
                         message.dataset_id.as_ref(),
                     );
                     self.flow_trigger_service
@@ -84,6 +85,7 @@ impl MessageConsumerT<WebhookSubscriptionEventChangesMessage> for FlowWebhooksEv
                 if message.event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
                     let flow_binding = webhook_deliver_binding(
                         message.webhook_subscription_id,
+                        &message.event_type,
                         message.dataset_id.as_ref(),
                     );
                     self.flow_trigger_service
@@ -123,20 +125,23 @@ impl MessageConsumerT<WebhookSubscriptionLifecycleMessage> for FlowWebhooksEvent
             // Webhook resource is removed,
             // so we need to wipe all the related data in the flow system
             WebhookSubscriptionLifecycleMessage::Deleted(deleted_message) => {
-                let flow_scope = FlowScopeSubscription::make_scope(
-                    deleted_message.webhook_subscription_id,
-                    deleted_message.dataset_id.as_ref(),
-                );
+                for event_type in &deleted_message.event_types {
+                    let flow_scope = FlowScopeSubscription::make_scope(
+                        deleted_message.webhook_subscription_id,
+                        event_type,
+                        deleted_message.dataset_id.as_ref(),
+                    );
 
-                tracing::debug!(
-                    ?flow_scope,
-                    "Handling flow scope removal for deleted webhook subscription"
-                );
-                let flow_scope_removal_handlers = catalog
-                    .get::<dill::AllOf<dyn fs::FlowScopeRemovalHandler>>()
-                    .unwrap();
-                for handler in flow_scope_removal_handlers {
-                    handler.handle_flow_scope_removal(&flow_scope).await?;
+                    tracing::debug!(
+                        ?flow_scope,
+                        "Handling flow scope removal for deleted webhook subscription"
+                    );
+                    let flow_scope_removal_handlers = catalog
+                        .get::<dill::AllOf<dyn fs::FlowScopeRemovalHandler>>()
+                        .unwrap();
+                    for handler in flow_scope_removal_handlers {
+                        handler.handle_flow_scope_removal(&flow_scope).await?;
+                    }
                 }
             }
         }

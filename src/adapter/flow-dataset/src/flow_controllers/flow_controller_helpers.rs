@@ -94,7 +94,6 @@ pub(crate) async fn trigger_metadata_only_hard_compaction_flow_for_own_downstrea
                     Some(
                         FlowConfigRuleCompact::MetadataOnly { recursive: true }.into_flow_config(),
                     ),
-                    None,
                 )
                 .await
                 .int_err()?;

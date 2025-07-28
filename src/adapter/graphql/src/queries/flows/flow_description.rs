@@ -30,7 +30,6 @@ use kamu_adapter_task_dataset::{
     TaskResultDatasetReset,
     TaskResultDatasetUpdate,
 };
-use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
 use kamu_core::{CompactionResult, PullResultUpToDate};
 use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
 use kamu_flow_system::{FLOW_SCOPE_TYPE_SYSTEM, FLOW_TYPE_SYSTEM_GC};
@@ -519,25 +518,14 @@ impl FlowDescriptionBuilder {
                         )))
                     })?;
 
-                let run_arguments = flow_state.run_arguments.as_ref().ok_or_else(|| {
-                    GqlError::Internal(InternalError::new(format!(
-                        "Flow run arguments not found for flow state: {flow_state:?}",
-                    )))
-                })?;
-
-                let webhook_run_arguments =
-                    TaskRunArgumentsWebhookDeliver::from_task_run_arguments(run_arguments)
-                        .map_err(|e| {
-                            GqlError::Internal(InternalError::new(format!(
-                                "Failed to parse webhook run arguments: {e}",
-                            )))
-                        })?;
+                let subscription_scope = FlowScopeSubscription::new(&flow_state.flow_binding.scope);
+                let event_type = subscription_scope.event_type();
 
                 Ok(FlowDescription::Webhook(FlowDescriptionWebhook::Deliver(
                     FlowDescriptionWebhookDeliver {
                         target_url: subscription.target_url().clone(),
                         label: subscription.label().to_string(),
-                        event_type: webhook_run_arguments.event_type.to_string(),
+                        event_type: event_type.to_string(),
                     },
                 )))
             }

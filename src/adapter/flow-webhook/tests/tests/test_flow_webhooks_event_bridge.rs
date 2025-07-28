@@ -18,7 +18,6 @@ use kamu_adapter_flow_webhook::{
     FlowWebhooksEventBridge,
     webhook_deliver_binding,
 };
-use kamu_adapter_task_webhook as atw;
 use kamu_datasets::{
     DatasetEntry,
     DatasetReferenceMessage,
@@ -37,7 +36,6 @@ use kamu_flow_system::{
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
-use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,26 +311,25 @@ impl TestWebhookDeliverySchedulerHarness {
                 move |flow_binding: &kamu_flow_system::FlowBinding,
                       _,
                       maybe_flow_trigger_rule,
-                      maybe_forced_flow_config_rule,
-                      maybe_flow_run_arguments| {
+                      maybe_forced_flow_config_rule| {
                     assert_eq!(flow_binding.flow_type, FLOW_TYPE_WEBHOOK_DELIVER);
 
                     assert!(maybe_flow_trigger_rule.is_none());
                     assert!(maybe_forced_flow_config_rule.is_none());
-                    assert!(maybe_flow_run_arguments.is_some());
 
                     let webhook_scope = FlowScopeSubscription::new(&flow_binding.scope);
-                    webhook_scope.dataset_id().as_ref() == Some(&dataset_id_clone_1)
+                    webhook_scope.maybe_dataset_id().as_ref() == Some(&dataset_id_clone_1)
                         && webhook_scope.webhook_subscription_id() == subscription_id
                 },
             )
-            .returning(move |_, _, _, _, _| {
+            .returning(move |_, _, _, _| {
                 let now = Utc::now();
 
                 Ok(FlowState {
                     flow_id: FlowID::new(1),
                     flow_binding: webhook_deliver_binding(
                         subscription_id,
+                        &WebhookEventTypeCatalog::dataset_ref_updated(),
                         Some(&dataset_id_clone_2),
                     ),
                     start_condition: None,
@@ -351,15 +348,6 @@ impl TestWebhookDeliverySchedulerHarness {
                     },
                     config_snapshot: None,
                     retry_policy: None,
-                    run_arguments: Some(
-                        atw::TaskRunArgumentsWebhookDeliver {
-                            event_type: WebhookEventTypeCatalog::dataset_ref_updated(),
-                            payload: json!({
-                                "foo": "bar",
-                            }),
-                        }
-                        .into_task_run_arguments(),
-                    ),
                 })
             });
     }

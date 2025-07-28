@@ -9,22 +9,10 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_adapter_flow_dataset::{
-    DATASET_RESOURCE_TYPE,
-    DatasetResourceUpdateDetails,
-    FlowScopeDataset,
-};
-use kamu_adapter_task_webhook::TaskRunArgumentsWebhookDeliver;
-use kamu_datasets::DatasetEntryService;
+use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, FlowScopeDataset};
 use kamu_flow_system as fs;
-use kamu_webhooks::WebhookEventTypeCatalog;
 
-use crate::{
-    FLOW_TYPE_WEBHOOK_DELIVER,
-    FlowScopeSubscription,
-    WEBHOOK_DATASET_REF_UPDATED_VERSION,
-    WebhookDatasetRefUpdatedPayload,
-};
+use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,7 +26,7 @@ impl DatasetUpdatedWebhookSensor {
     pub fn new(webhook_flow_scope: fs::FlowScope, batching_rule: fs::BatchingRule) -> Self {
         Self {
             dataset_id: FlowScopeSubscription::new(&webhook_flow_scope)
-                .dataset_id()
+                .maybe_dataset_id()
                 .unwrap(),
             webhook_flow_scope,
             batching_rule,
@@ -92,30 +80,9 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                     update.resource_type
                 )));
             }
-            let dataset_update_details: DatasetResourceUpdateDetails =
-                serde_json::from_value(update.details.clone()).int_err()?;
 
             // Extract necessary services
             let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
-            let dataset_entry_service = catalog.get_one::<dyn DatasetEntryService>().unwrap();
-
-            // Find out who is the owner of the dataset
-            let dataset_entry = dataset_entry_service
-                .get_entry(&self.dataset_id)
-                .await
-                .int_err()?;
-
-            // Build webhook payload
-            let webhook_payload = serde_json::to_value(WebhookDatasetRefUpdatedPayload {
-                version: WEBHOOK_DATASET_REF_UPDATED_VERSION,
-                dataset_id: input_dataset_id.to_string(),
-                owner_account_id: dataset_entry.owner_id.to_string(),
-                block_ref: odf::BlockRef::Head.to_string(),
-                new_hash: dataset_update_details.new_head.to_string(),
-                old_hash: dataset_update_details.old_head_maybe.map(|h| h.to_string()),
-                is_breaking_change: matches!(update.changes, fs::ResourceChanges::Breaking),
-            })
-            .int_err()?;
 
             // Trigger webhook flow
             let target_flow_binding =
@@ -126,13 +93,6 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
                     activation_cause.clone(),
                     Some(fs::FlowTriggerRule::Batching(self.batching_rule)),
                     None,
-                    Some(
-                        TaskRunArgumentsWebhookDeliver {
-                            event_type: WebhookEventTypeCatalog::dataset_ref_updated(),
-                            payload: webhook_payload,
-                        }
-                        .into_task_run_arguments(),
-                    ),
                 )
                 .await
                 .int_err()?;

@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
-use kamu_task_system::{TaskID, TaskOutcome, TaskRunArguments};
+use kamu_task_system::{TaskID, TaskOutcome};
 
 use crate::*;
 
@@ -27,7 +27,6 @@ impl Flow {
         activation_cause: FlowActivationCause,
         config_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
-        run_arguments: Option<TaskRunArguments>,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -39,7 +38,6 @@ impl Flow {
                     activation_cause,
                     config_snapshot,
                     retry_policy,
-                    run_arguments,
                 },
             )
             .unwrap(),

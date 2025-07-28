@@ -63,13 +63,11 @@ impl fs::FlowController for FlowControllerReset {
 
     async fn build_task_logical_plan(
         &self,
-        flow_binding: &fs::FlowBinding,
-        maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
-        _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
+        flow: &fs::FlowState,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+        let dataset_id = FlowScopeDataset::new(&flow.flow_binding.scope).dataset_id();
 
-        if let Some(config_snapshot) = maybe_config_snapshot
+        if let Some(config_snapshot) = flow.config_snapshot.as_ref()
             && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
         {
             let reset_rule = FlowConfigRuleReset::from_flow_config(config_snapshot)?;

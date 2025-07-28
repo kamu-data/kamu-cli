@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use enum_variants::*;
-use kamu_task_system::{TaskID, TaskOutcome, TaskRunArguments};
+use kamu_task_system::{TaskID, TaskOutcome};
 use serde::{Deserialize, Serialize};
 
 use crate::*;
@@ -64,7 +64,6 @@ pub struct FlowEventInitiated {
     pub activation_cause: FlowActivationCause,
     pub config_snapshot: Option<FlowConfigurationRule>,
     pub retry_policy: Option<RetryPolicy>,
-    pub run_arguments: Option<TaskRunArguments>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

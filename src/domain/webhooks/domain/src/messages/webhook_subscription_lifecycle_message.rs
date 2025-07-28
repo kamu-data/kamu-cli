@@ -10,7 +10,7 @@
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::WebhookSubscriptionID;
+use crate::{WebhookEventType, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,10 +28,12 @@ impl WebhookSubscriptionLifecycleMessage {
     pub fn deleted(
         webhook_subscription_id: WebhookSubscriptionID,
         dataset_id: Option<odf::DatasetID>,
+        event_types: Vec<WebhookEventType>,
     ) -> Self {
         Self::Deleted(WebhookSubscriptionLifecycleMessageDeleted {
             webhook_subscription_id,
             dataset_id,
+            event_types,
         })
     }
 }
@@ -48,6 +50,7 @@ impl Message for WebhookSubscriptionLifecycleMessage {
 pub struct WebhookSubscriptionLifecycleMessageDeleted {
     pub webhook_subscription_id: WebhookSubscriptionID,
     pub dataset_id: Option<odf::DatasetID>,
+    pub event_types: Vec<WebhookEventType>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

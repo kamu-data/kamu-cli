@@ -50,17 +50,15 @@ impl fs::FlowController for FlowControllerCompact {
 
     async fn build_task_logical_plan(
         &self,
-        flow_binding: &fs::FlowBinding,
-        maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
-        _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
+        flow: &fs::FlowState,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+        let dataset_id = FlowScopeDataset::new(&flow.flow_binding.scope).dataset_id();
 
         let mut max_slice_size: Option<u64> = None;
         let mut max_slice_records: Option<u64> = None;
         let mut keep_metadata_only = false;
 
-        if let Some(config_snapshot) = maybe_config_snapshot
+        if let Some(config_snapshot) = flow.config_snapshot.as_ref()
             && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
         {
             let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;

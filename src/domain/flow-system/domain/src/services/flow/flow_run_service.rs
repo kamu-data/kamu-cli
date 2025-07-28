@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_task_system as ts;
 
 use crate::{
     FlowActivationCause,
@@ -34,7 +33,6 @@ pub trait FlowRunService: Sync + Send {
         flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
-        maybe_task_run_arguments: Option<ts::TaskRunArguments>,
     ) -> Result<FlowState, RunFlowError>;
 
     /// Initiates the specified flow with custom activation cause,
@@ -45,7 +43,6 @@ pub trait FlowRunService: Sync + Send {
         activation_cause: FlowActivationCause,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
         maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
-        maybe_task_run_arguments: Option<ts::TaskRunArguments>,
     ) -> Result<FlowState, RunFlowError>;
 
     /// Attempts to cancel the tasks already scheduled for the given flow

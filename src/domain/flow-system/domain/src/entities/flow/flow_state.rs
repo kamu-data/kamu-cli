@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
-use kamu_task_system::{self as ts, TaskRunArguments};
+use kamu_task_system::{self as ts};
 
 use crate::*;
 
@@ -35,8 +35,6 @@ pub struct FlowState {
     pub config_snapshot: Option<FlowConfigurationRule>,
     /// Retry policy used
     pub retry_policy: Option<RetryPolicy>,
-    /// Optional run arguments
-    pub run_arguments: Option<TaskRunArguments>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -98,7 +96,6 @@ impl Projection for FlowState {
                     activation_cause,
                     config_snapshot,
                     retry_policy,
-                    run_arguments,
                 }) => Ok(Self {
                     flow_id,
                     flow_binding,
@@ -114,7 +111,6 @@ impl Projection for FlowState {
                     config_snapshot,
                     outcome: None,
                     retry_policy,
-                    run_arguments,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },

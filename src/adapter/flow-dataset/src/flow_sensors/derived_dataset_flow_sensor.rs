@@ -84,7 +84,6 @@ impl DerivedDatasetFlowSensor {
                     None
                 },
                 None,
-                None,
             )
             .await
             .int_err()?;

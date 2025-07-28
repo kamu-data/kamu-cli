@@ -45,14 +45,12 @@ impl fs::FlowController for FlowControllerIngest {
 
     async fn build_task_logical_plan(
         &self,
-        flow_binding: &fs::FlowBinding,
-        maybe_config_snapshot: Option<&fs::FlowConfigurationRule>,
-        _maybe_task_run_arguments: Option<&ts::TaskRunArguments>,
+        flow: &fs::FlowState,
     ) -> Result<ts::LogicalPlan, InternalError> {
-        let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+        let dataset_id = FlowScopeDataset::new(&flow.flow_binding.scope).dataset_id();
 
         let mut fetch_uncacheable = false;
-        if let Some(config_snapshot) = maybe_config_snapshot
+        if let Some(config_snapshot) = flow.config_snapshot.as_ref()
             && config_snapshot.rule_type == FlowConfigRuleIngest::TYPE_ID
         {
             let ingest_rule = FlowConfigRuleIngest::from_flow_config(config_snapshot)?;

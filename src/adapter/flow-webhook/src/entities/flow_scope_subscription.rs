@@ -9,7 +9,7 @@
 
 use kamu_adapter_flow_dataset::FLOW_SCOPE_ATTRIBUTE_DATASET_ID;
 use kamu_flow_system as fs;
-use kamu_webhooks::WebhookSubscriptionID;
+use kamu_webhooks::{WebhookEventType, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,6 +20,7 @@ pub struct FlowScopeSubscription<'a>(&'a fs::FlowScope);
 pub const FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION: &str = "WebhookSubscription";
 
 pub const FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID: &str = "subscription_id";
+pub const FLOW_SCOPE_ATTRIBUTE_EVENT_TYPE: &str = "event_type";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,11 +32,13 @@ impl<'a> FlowScopeSubscription<'a> {
 
     pub fn make_scope(
         subscription_id: WebhookSubscriptionID,
+        event_type: &WebhookEventType,
         dataset_id: Option<&odf::DatasetID>,
     ) -> fs::FlowScope {
         let mut payload = serde_json::json!({
             fs::FLOW_SCOPE_ATTRIBUTE_TYPE: FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION,
             FLOW_SCOPE_ATTRIBUTE_SUBSCRIPTION_ID: subscription_id.to_string(),
+            FLOW_SCOPE_ATTRIBUTE_EVENT_TYPE: event_type.to_string(),
         });
 
         if let Some(dataset_id) = dataset_id {
@@ -60,7 +63,20 @@ impl<'a> FlowScopeSubscription<'a> {
             })
     }
 
-    pub fn dataset_id(&self) -> Option<odf::DatasetID> {
+    pub fn event_type(&self) -> WebhookEventType {
+        self.0
+            .get_attribute(FLOW_SCOPE_ATTRIBUTE_EVENT_TYPE)
+            .and_then(|value| value.as_str())
+            .and_then(|event_type_str| WebhookEventType::try_new(event_type_str).ok())
+            .unwrap_or_else(|| {
+                panic!(
+                    "FlowScopeSubscription must have a '{FLOW_SCOPE_ATTRIBUTE_EVENT_TYPE}' \
+                     attribute",
+                )
+            })
+    }
+
+    pub fn maybe_dataset_id(&self) -> Option<odf::DatasetID> {
         self.0
             .get_attribute(FLOW_SCOPE_ATTRIBUTE_DATASET_ID)
             .and_then(|value| value.as_str())
