@@ -80,7 +80,7 @@ impl CollectionEntry {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[ComplexObject]
 impl CollectionEntry {
     /// Resolves the reference to linked dataset

@@ -44,7 +44,11 @@ impl DatabaseTransactionRunner {
         Self { catalog }
     }
 
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(
+        name = "DatabaseTransactionRunner::transactional",
+        level = "debug",
+        skip_all
+    )]
     pub async fn transactional<H, HFut, HFutResultT, HFutResultE>(
         &self,
         callback: H,
@@ -74,7 +78,9 @@ impl DatabaseTransactionRunner {
                 .build();
 
             callback(catalog_with_transaction)
-                .instrument(tracing::debug_span!("Transaction Body"))
+                .instrument(tracing::trace_span!(
+                    "DatabaseTransactionRunner::transactional::callback"
+                ))
                 .await
         };
 

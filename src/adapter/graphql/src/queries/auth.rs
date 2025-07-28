@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 pub struct Auth;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Auth {
     #[allow(clippy::unused_async)]

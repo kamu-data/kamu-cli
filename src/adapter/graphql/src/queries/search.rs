@@ -23,7 +23,7 @@ use crate::utils::from_catalog_n;
 
 pub struct Search;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Search {
     const DEFAULT_RESULTS_PER_PAGE: usize = 15;
