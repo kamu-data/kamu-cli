@@ -509,6 +509,7 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                     let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
                         .await
                         .int_err()?;
+
                     if flow.status() != FlowStatus::Finished {
                         flow.on_task_finished(
                             message.event_time,
@@ -574,32 +575,47 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                 .await?;
                         }
 
-                        // In case of failure:
-                        //  - disable trigger
-                        if message.outcome.is_failed() {
-                            let flow_trigger_service =
-                                target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
-                            flow_trigger_service
-                                .pause_flow_trigger(finish_time, &flow.flow_binding)
+                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
+
+                        // The outcome might not be final in case of retrying flows.
+                        // If the flow is still retrying, await for the result of the next task
+                        if let Some(flow_outcome) = flow.outcome.as_ref() {
+                            // In case of failure after retries:
+                            //  - disable trigger
+                            if message.outcome.is_failed() {
+                                let flow_trigger_service =
+                                    target_catalog.get_one::<dyn FlowTriggerService>().unwrap();
+                                flow_trigger_service
+                                    .pause_flow_trigger(finish_time, &flow.flow_binding)
+                                    .await?;
+                            }
+
+                            // Notify about finished flow
+                            outbox
+                                .post_message(
+                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                                    FlowProgressMessage::finished(
+                                        message.event_time,
+                                        flow_id,
+                                        flow_outcome.clone(),
+                                    ),
+                                )
+                                .await?;
+                        } else {
+                            // Notify about scheduled retry
+                            outbox
+                                .post_message(
+                                    MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
+                                    FlowProgressMessage::retry_scheduled(
+                                        message.event_time,
+                                        flow_id,
+                                        flow.timing
+                                            .scheduled_for_activation_at
+                                            .expect("Flow must have scheduled activation time"),
+                                    ),
+                                )
                                 .await?;
                         }
-
-                        let outbox = target_catalog.get_one::<dyn Outbox>().unwrap();
-                        outbox
-                            .post_message(
-                                MESSAGE_PRODUCER_KAMU_FLOW_PROGRESS_SERVICE,
-                                FlowProgressMessage::finished(
-                                    message.event_time,
-                                    flow_id,
-                                    flow.outcome
-                                        .as_ref()
-                                        .expect("Outcome must be attached by now")
-                                        .clone(),
-                                ),
-                            )
-                            .await?;
-
-                        // TODO: retry logic in case of failed outcome
                     } else {
                         tracing::info!(
                             flow_id = %flow.flow_id,

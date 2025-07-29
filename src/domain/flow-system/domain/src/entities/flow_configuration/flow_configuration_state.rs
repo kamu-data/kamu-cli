@@ -19,6 +19,8 @@ pub struct FlowConfigurationState {
     pub flow_binding: FlowBinding,
     /// Flow configuration rule
     pub rule: FlowConfigurationRule,
+    /// Retry policy
+    pub retry_policy: Option<RetryPolicy>,
     /// Configuration status
     pub status: FlowConfigurationStatus,
 }
@@ -41,11 +43,15 @@ impl Projection for FlowConfigurationState {
         match (state, event) {
             (None, event) => match event {
                 E::Created(FlowConfigurationEventCreated {
-                    flow_binding, rule, ..
+                    flow_binding,
+                    rule,
+                    retry_policy,
+                    ..
                 }) => Ok(Self {
                     flow_binding,
                     rule,
                     status: FlowConfigurationStatus::Active,
+                    retry_policy,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -55,11 +61,14 @@ impl Projection for FlowConfigurationState {
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(FlowConfigurationEventModified { rule, .. }) => {
+                    E::Modified(FlowConfigurationEventModified {
+                        rule, retry_policy, ..
+                    }) => {
                         // Note: when deleted dataset is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowConfigurationState {
                             rule: rule.clone(),
+                            retry_policy: *retry_policy,
                             ..s
                         })
                     }

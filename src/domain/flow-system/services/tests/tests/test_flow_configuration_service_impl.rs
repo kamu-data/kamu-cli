@@ -46,7 +46,7 @@ async fn test_visibility() {
     .into_flow_config();
 
     harness
-        .set_dataset_flow_config(foo_ingest_binding.clone(), foo_ingest_config.clone())
+        .set_dataset_flow_config(foo_ingest_binding.clone(), foo_ingest_config.clone(), None)
         .await;
 
     let foo_compaction_binding =
@@ -59,6 +59,7 @@ async fn test_visibility() {
         .set_dataset_flow_config(
             foo_compaction_binding.clone(),
             foo_compaction_config.clone(),
+            None, // No retry policy
         )
         .await;
 
@@ -72,6 +73,7 @@ async fn test_visibility() {
         .set_dataset_flow_config(
             bar_compaction_binding.clone(),
             bar_compaction_config.clone(),
+            None, // No retry policy
         )
         .await;
 
@@ -83,7 +85,7 @@ async fn test_visibility() {
         (&foo_compaction_binding, &foo_compaction_config),
         (&bar_compaction_binding, &bar_compaction_config),
     ] {
-        harness.expect_dataset_flow_config(&configs, flow_binding, config);
+        harness.expect_dataset_flow_config(&configs, flow_binding, config, None);
     }
 }
 
@@ -107,13 +109,19 @@ async fn test_modify() {
         .set_dataset_flow_config(
             foo_compaction_binding.clone(),
             foo_compaction_config.clone(),
+            None, // No retry policy
         )
         .await;
 
     // It should be visible in the list of configs
     let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_config(&configs, &foo_compaction_binding, &foo_compaction_config);
+    harness.expect_dataset_flow_config(
+        &configs,
+        &foo_compaction_binding,
+        &foo_compaction_config,
+        None,
+    );
 
     // Now make the config with different parameters
     let foo_compaction_config_2 =
@@ -124,13 +132,60 @@ async fn test_modify() {
         .set_dataset_flow_config(
             foo_compaction_binding.clone(),
             foo_compaction_config_2.clone(),
+            None, // No retry policy
         )
         .await;
 
     // Observe the updated config
     let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_config(&configs, &foo_compaction_binding, &foo_compaction_config_2);
+    harness.expect_dataset_flow_config(
+        &configs,
+        &foo_compaction_binding,
+        &foo_compaction_config_2,
+        None,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_config_with_retry() {
+    let harness = FlowConfigurationHarness::new();
+    assert!(harness.list_active_configurations().await.is_empty());
+    assert_eq!(0, harness.configuration_events_count());
+
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let foo_ingest_binding =
+        FlowBinding::for_dataset(foo_id.clone(), afs::FLOW_TYPE_DATASET_INGEST);
+    let foo_ingest_config = FlowConfigRuleIngest {
+        fetch_uncacheable: false,
+    }
+    .into_flow_config();
+
+    let retry_policy = RetryPolicy {
+        max_attempts: 3,
+        min_delay_seconds: 30,
+        backoff_type: RetryBackoffType::Exponential,
+    };
+
+    harness
+        .set_dataset_flow_config(
+            foo_ingest_binding.clone(),
+            foo_ingest_config.clone(),
+            Some(retry_policy),
+        )
+        .await;
+
+    // It should be visible in the list of configs
+    let configs = harness.list_active_configurations().await;
+    assert_eq!(1, configs.len());
+    harness.expect_dataset_flow_config(
+        &configs,
+        &foo_ingest_binding,
+        &foo_ingest_config,
+        Some(retry_policy),
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,13 +205,13 @@ async fn test_dataset_deleted() {
     .into_flow_config();
 
     harness
-        .set_dataset_flow_config(foo_ingest_binding.clone(), foo_ingest_config.clone())
+        .set_dataset_flow_config(foo_ingest_binding.clone(), foo_ingest_config.clone(), None)
         .await;
 
     // It should be visible in the list of configs
     let configs = harness.list_active_configurations().await;
     assert_eq!(1, configs.len());
-    harness.expect_dataset_flow_config(&configs, &foo_ingest_binding, &foo_ingest_config);
+    harness.expect_dataset_flow_config(&configs, &foo_ingest_binding, &foo_ingest_config, None);
 
     // Now, pretend dataset was deleted
     harness.issue_dataset_deleted(&foo_id).await;
@@ -243,9 +298,10 @@ impl FlowConfigurationHarness {
         &self,
         flow_binding: FlowBinding,
         configuration_rule: FlowConfigurationRule,
+        maybe_retry_policy: Option<RetryPolicy>,
     ) {
         self.flow_configuration_service
-            .set_configuration(flow_binding, configuration_rule)
+            .set_configuration(flow_binding, configuration_rule, maybe_retry_policy)
             .await
             .unwrap();
     }
@@ -255,14 +311,16 @@ impl FlowConfigurationHarness {
         configurations: &HashMap<FlowBinding, FlowConfigurationState>,
         flow_binding: &FlowBinding,
         expected_rule: &FlowConfigurationRule,
+        expected_retry_policy: Option<RetryPolicy>,
     ) {
         assert_matches!(
             configurations.get(flow_binding),
             Some(FlowConfigurationState {
                 status: FlowConfigurationStatus::Active,
                 rule: actual_rule,
+                retry_policy: actual_retry_policy,
                 ..
-            }) if actual_rule == expected_rule
+            }) if actual_rule == expected_rule && *actual_retry_policy == expected_retry_policy
         );
     }
 

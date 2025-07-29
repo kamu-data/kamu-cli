@@ -43,7 +43,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = dataset_key_blocks_repo::test_filter_datasets_having_blocks,
+    fixture = dataset_key_blocks_repo::test_match_datasets_having_blocks,
     harness = SqliteDatasetKeyBlockRepositoryHarness
 );
 
