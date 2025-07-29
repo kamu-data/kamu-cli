@@ -16,7 +16,7 @@ use crate::prelude::*;
 
 pub struct DataQueries;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl DataQueries {
     const DEFAULT_QUERY_LIMIT: u64 = 100;

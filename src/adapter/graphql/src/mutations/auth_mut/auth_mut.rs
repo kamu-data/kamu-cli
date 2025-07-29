@@ -15,7 +15,7 @@ use crate::queries::Account;
 
 pub(crate) struct AuthMut;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AuthMut {
     /// Web3-related functionality group
