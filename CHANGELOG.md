@@ -11,7 +11,7 @@ Recommendation: for ease of reading, use the following order:
 - Fixed
 -->
 
-## [Unreleased]
+## [0.245.3] - 2025-07-29
 ### Fixed
 - GQL playground is accessible in anonymous mode
 ### Changed
