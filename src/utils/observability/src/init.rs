@@ -15,16 +15,27 @@ use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
 
 use super::config::Config;
+use crate::config::Mode;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Uses heuristics to pick the right mode
+pub fn auto(cfg: Config) -> Guard {
+    match cfg.mode.unwrap_or_else(auto_detect_mode) {
+        Mode::Dev => dev(cfg),
+        Mode::Service => service(cfg),
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// If application is started under a terminal will use the [`dev`] mode,
-/// otherwise will use [`service`] mode.
-pub fn auto(cfg: Config) -> Guard {
+/// otherwise will use [`service`] mode. Mode can be overridden via config.
+pub fn auto_detect_mode() -> Mode {
     if std::io::stderr().is_terminal() {
-        dev(cfg)
+        Mode::Dev
     } else {
-        service(cfg)
+        Mode::Service
     }
 }
 
@@ -56,18 +67,13 @@ pub fn dev(cfg: Config) -> Guard {
         )
     };
 
+    let reg = tracing_subscriber::registry().with(env_filter);
     #[cfg(feature = "opentelemetry")]
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(otel_layer)
-        .with(text_layer)
-        .init();
-
-    #[cfg(not(feature = "opentelemetry"))]
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(text_layer)
-        .init();
+    let reg = reg.with(otel_layer);
+    #[cfg(feature = "tracing-error")]
+    let reg = reg.with(tracing_error::ErrorLayer::default());
+    let reg = reg.with(text_layer);
+    reg.init();
 
     Guard {
         non_blocking_appender: None,
@@ -107,18 +113,13 @@ pub fn service(cfg: Config) -> Guard {
         )
     };
 
+    let reg = tracing_subscriber::registry().with(env_filter);
     #[cfg(feature = "opentelemetry")]
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(otel_layer)
-        .with(text_layer)
-        .init();
-
-    #[cfg(not(feature = "opentelemetry"))]
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(text_layer)
-        .init();
+    let reg = reg.with(otel_layer);
+    #[cfg(feature = "tracing-error")]
+    let reg = reg.with(tracing_error::ErrorLayer::default());
+    let reg = reg.with(text_layer);
+    reg.init();
 
     Guard {
         non_blocking_appender: Some(guard),
@@ -170,7 +171,6 @@ fn init_otel_tracer(cfg: &Config) -> opentelemetry_sdk::trace::Tracer {
 
 #[must_use]
 #[allow(dead_code)]
-#[derive(Default)]
 pub struct Guard {
     pub non_blocking_appender: Option<tracing_appender::non_blocking::WorkerGuard>,
 

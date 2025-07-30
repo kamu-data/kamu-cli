@@ -155,7 +155,7 @@ impl<'a> VersionedFileMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl VersionedFileMut<'_> {
     /// Uploads a new version of content in-band. Can be used for very small

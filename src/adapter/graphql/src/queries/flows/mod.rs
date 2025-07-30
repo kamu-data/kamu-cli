@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod flow;
-mod flow_config_snapshot;
 mod flow_description;
 mod flow_event;
 mod flow_outcome;
@@ -16,7 +15,6 @@ mod flow_start_condition;
 mod flow_trigger;
 
 pub(crate) use flow::*;
-pub(crate) use flow_config_snapshot::*;
 pub(crate) use flow_event::*;
 pub(crate) use flow_outcome::*;
 pub(crate) use flow_start_condition::*;

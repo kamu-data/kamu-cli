@@ -67,13 +67,15 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
         level = "info",
         name = CommitDatasetEventUseCaseImpl_execute,
         skip_all,
-        fields(dataset_handle, ?event)
+        fields(dataset_handle),
     )]
     async fn execute(
         &self,
         dataset_handle: &odf::DatasetHandle,
         event: odf::MetadataEvent,
     ) -> Result<odf::dataset::CommitResult, CommitError> {
+        tracing::info!(?event, "Initiating event commit");
+
         let resolved_dataset = self
             .rebac_dataset_registry_facade
             .resolve_dataset_by_ref(&dataset_handle.as_local_ref(), auth::DatasetAction::Write)

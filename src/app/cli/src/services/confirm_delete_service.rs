@@ -30,11 +30,13 @@ impl ConfirmDeleteService {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_handles))]
+    #[tracing::instrument(level = "debug", skip_all)]
     pub async fn confirm_delete(
         &self,
         dataset_handles: &[odf::DatasetHandle],
     ) -> Result<(), CLIError> {
+        tracing::debug!(?dataset_handles, "Asking to confirm deletion of datasets");
+
         for hdl in dataset_handles {
             let statuses = self.push_status_service.check_remotes_status(hdl).await?;
 

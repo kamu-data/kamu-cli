@@ -27,6 +27,7 @@ testing = []
 
 
 [dependencies]
+common-macros = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-task-system = { workspace = true }

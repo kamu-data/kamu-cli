@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 pub(crate) struct AuthWeb3Mut;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AuthWeb3Mut {
     #[tracing::instrument(level = "info", name = AuthWeb3Mut_eip4361_auth_nonce, skip_all, fields(%account))]

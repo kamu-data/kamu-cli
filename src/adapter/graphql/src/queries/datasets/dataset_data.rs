@@ -18,7 +18,7 @@ pub struct DatasetData<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetData<'a> {
     const DEFAULT_TAIL_LIMIT: u64 = 20;

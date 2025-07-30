@@ -111,7 +111,7 @@ impl VersionedFileEntry {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[ComplexObject]
 impl VersionedFileEntry {
     /// Returns encoded content in-band. Should be used for small files only and

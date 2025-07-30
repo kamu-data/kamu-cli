@@ -22,7 +22,7 @@ pub struct WebhookSubscriptionMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl WebhookSubscriptionMut {
     #[graphql(skip)]

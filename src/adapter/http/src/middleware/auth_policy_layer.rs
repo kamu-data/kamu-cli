@@ -12,6 +12,7 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::Response;
+use graphql_parser::query::{Definition, parse_query};
 use http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use kamu_accounts::CurrentAccountSubject;
@@ -62,6 +63,11 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
     pub async fn is_auth_graphql_operation_request(
         request: Request<Body>,
     ) -> (Request<Body>, bool) {
+        // '/graphql' GET endpoint is a GQL playground. Ignore auth policy checks.
+        if request.method() == http::Method::GET {
+            return (request, true);
+        }
+
         let (parts, body) = request.into_parts();
 
         let body_bytes = match body.collect().await {
@@ -78,9 +84,29 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
             return (Request::from_parts(parts, Body::from(body_bytes)), false);
         };
 
-        let lower = query_str.to_lowercase();
-        let is_auth =
-            (lower.contains("query") || lower.contains("mutation")) && lower.contains("auth");
+        let Ok(parsed_query) = parse_query::<&str>(query_str) else {
+            return (Request::from_parts(parts, Body::from(body_bytes)), false);
+        };
+
+        let is_auth = parsed_query.definitions.iter().any(|def| match def {
+            Definition::Operation(op) => {
+                let selection_set = match op {
+                    graphql_parser::query::OperationDefinition::Query(q) => &q.selection_set,
+                    graphql_parser::query::OperationDefinition::Mutation(m) => &m.selection_set,
+                    graphql_parser::query::OperationDefinition::Subscription(_) => return false,
+                    graphql_parser::query::OperationDefinition::SelectionSet(s) => s,
+                };
+
+                selection_set.items.iter().any(|sel| {
+                    if let graphql_parser::query::Selection::Field(field) = sel {
+                        field.name.to_lowercase().contains("auth")
+                    } else {
+                        false
+                    }
+                })
+            }
+            _ => false,
+        });
 
         (Request::from_parts(parts, Body::from(body_bytes)), is_auth)
     }

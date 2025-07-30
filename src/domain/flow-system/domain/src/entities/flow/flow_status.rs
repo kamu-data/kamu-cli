@@ -14,6 +14,7 @@
 pub enum FlowStatus {
     Waiting,
     Running,
+    Retrying,
     Finished,
 }
 

@@ -31,7 +31,7 @@ pub trait FlowRunService: Sync + Send {
         trigger_time: DateTime<Utc>,
         flow_binding: &FlowBinding,
         initiator_account_id: odf::AccountID,
-        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
+        maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError>;
 
     /// Initiates the specified flow with custom trigger instance,
@@ -41,7 +41,7 @@ pub trait FlowRunService: Sync + Send {
         flow_binding: &FlowBinding,
         trigger_instance: FlowTriggerInstance,
         maybe_flow_trigger_rule: Option<FlowTriggerRule>,
-        maybe_flow_config_snapshot: Option<FlowConfigurationRule>,
+        maybe_forced_flow_config_rule: Option<FlowConfigurationRule>,
     ) -> Result<FlowState, RunFlowError>;
 
     /// Attempts to cancel the tasks already scheduled for the given flow

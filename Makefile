@@ -305,6 +305,9 @@ codegen-odf-serde-flatbuffers:
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 
+	# Applying patch for https://github.com/kamu-data/kamu-cli/issues/1084
+	patch -p0 < src/odf/metadata/schemas/flatc-issue-1084.patch
+
 	$(call odf_codegen, rust-serde-flatbuffers, $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
@@ -353,13 +356,3 @@ codegen: codegen-odf-dtos \
 	codegen-odf-serde-yaml \
 	codegen-engine-tonic \
 	codegen-graphql
-
-
-.PHONY: codegen-graphql-schema
-codegen-graphql-schema:
-	cargo nextest run -p kamu-adapter-graphql update_graphql_schema
-
-
-.PHONY: codegen-cli-reference
-codegen-cli-reference:
-	cargo nextest run -p kamu-cli generate_reference_markdown

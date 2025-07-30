@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+common-macros = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }
@@ -48,7 +49,7 @@ tracing = { version = "0.1", default-features = false }
 kamu-accounts = { workspace = true }
 kamu-adapter-flow-dataset = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
-kamu-core ={ workspace = true }
+kamu-core = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }

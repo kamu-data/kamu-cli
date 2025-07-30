@@ -61,10 +61,12 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         &self,
         flow_binding: FlowBinding,
         rule: FlowConfigurationRule,
+        retry_policy: Option<RetryPolicy>,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
         tracing::info!(
             flow_binding = ?flow_binding,
             rule = ?rule,
+            retry_policy = ?retry_policy,
             "Setting flow configuration"
         );
 
@@ -75,13 +77,15 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
             // Modification
             Some(mut flow_configuration) => {
                 flow_configuration
-                    .modify_configuration(self.time_source.now(), rule)
+                    .modify_configuration(self.time_source.now(), rule, retry_policy)
                     .int_err()?;
 
                 flow_configuration
             }
             // New configuration
-            None => FlowConfiguration::new(self.time_source.now(), flow_binding, rule),
+            None => {
+                FlowConfiguration::new(self.time_source.now(), flow_binding, rule, retry_policy)
+            }
         };
 
         flow_configuration

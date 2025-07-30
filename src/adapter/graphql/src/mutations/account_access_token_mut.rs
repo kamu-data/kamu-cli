@@ -19,7 +19,7 @@ pub struct AccountAccessTokensMut<'a> {
     account: &'a Account,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountAccessTokensMut<'a> {
     #[graphql(skip)]

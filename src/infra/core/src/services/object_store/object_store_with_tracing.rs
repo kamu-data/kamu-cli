@@ -76,7 +76,7 @@ where
     async fn put_multipart_opts(
         &self,
         location: &Path,
-        opts: PutMultipartOpts,
+        opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         self.0.put_multipart_opts(location, opts).await
     }

@@ -302,6 +302,52 @@ async fn test_name_lookup_accounts() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_search_by_id() {
+    let harness = GqlSearchHarness::new().await;
+
+    use odf::metadata::testing::alias;
+
+    let created_datasets = harness.create_datasets([alias(&"kamu", &"foo")]).await;
+
+    let search_query: String = created_datasets
+        .first()
+        .unwrap()
+        .dataset_handle
+        .id
+        .as_did_str()
+        .to_stack_string()
+        .chars()
+        .skip(10)
+        .take(8)
+        .collect();
+
+    pretty_assertions::assert_eq!(
+        harness
+            .search_authorized(&search_query, SearchOptions::default())
+            .await
+            .data,
+        value!({
+            "search": {
+                "query": {
+                    "nodes": [{
+                        "__typename": "Dataset",
+                        "name": "foo",
+                    }],
+                    "totalCount": 1,
+                    "pageInfo": {
+                        "totalPages": 1,
+                        "hasNextPage": false,
+                        "hasPreviousPage": false,
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_name_lookup_accounts_with_excluding() {
     let harness = GqlSearchHarness::new().await;
 
@@ -373,25 +419,30 @@ impl GqlSearchHarness {
     pub async fn create_datasets(
         &self,
         dataset_aliases: impl IntoIterator<Item = odf::DatasetAlias>,
-    ) {
+    ) -> Vec<CreateDatasetResult> {
         let create_dataset = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
 
+        let mut results = Vec::new();
         for dataset_alias in dataset_aliases {
-            create_dataset
-                .execute(
-                    MetadataFactory::dataset_snapshot()
-                        .name(dataset_alias)
-                        .kind(odf::DatasetKind::Root)
-                        .push_event(MetadataFactory::set_polling_source().build())
-                        .build(),
-                    Default::default(),
-                )
-                .await
-                .unwrap();
+            results.push(
+                create_dataset
+                    .execute(
+                        MetadataFactory::dataset_snapshot()
+                            .name(dataset_alias)
+                            .kind(odf::DatasetKind::Root)
+                            .push_event(MetadataFactory::set_polling_source().build())
+                            .build(),
+                        Default::default(),
+                    )
+                    .await
+                    .unwrap(),
+            );
         }
+
+        results
     }
 
     pub async fn execute_anonymous(&self, request: &str) -> Response {

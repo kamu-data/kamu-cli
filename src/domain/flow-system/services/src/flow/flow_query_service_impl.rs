@@ -27,18 +27,21 @@ pub struct FlowQueryServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl FlowQueryService for FlowQueryServiceImpl {
     /// Returns states of flows associated with a given dataset
     /// ordered by creation time from newest to oldest
     /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
+    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flows_by_dataset, level = "debug", skip_all, fields(%dataset_id))]
     async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
         filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
+        tracing::debug!(?filters, ?pagination, "Listing flows by dataset");
+
         let total_count = self
             .flow_event_store
             .get_count_flows_by_dataset(dataset_id, &filters)
@@ -60,7 +63,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
     /// Returns initiators of flows associated with a given dataset
     /// ordered by creation time from newest to oldest
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flow_initiators_by_dataset, level = "debug", skip_all, fields(%dataset_id))]
     async fn list_all_flow_initiators_by_dataset(
         &self,
         dataset_id: &odf::DatasetID,
@@ -75,13 +78,15 @@ impl FlowQueryService for FlowQueryServiceImpl {
     /// Returns states of flows associated with a given account
     /// ordered by creation time from newest to oldest
     /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_id, ?filters, ?pagination))]
+    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flows_by_account, level = "debug", skip_all, fields(%account_id))]
     async fn list_all_flows_by_account(
         &self,
         account_id: &odf::AccountID,
         filters: AccountFlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
+        tracing::debug!(?filters, ?pagination, "Listing flows by account");
+
         let owned_dataset_ids = self
             .dataset_entry_service
             .get_owned_dataset_ids(account_id)
@@ -113,6 +118,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
         .await
     }
 
+    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flows_by_dataset_ids, level = "debug", skip_all)]
     async fn list_all_flows_by_dataset_ids(
         &self,
         dataset_ids: &[&odf::DatasetID],
@@ -140,7 +146,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
     /// Returns datasets with flows associated with a given account
     /// ordered by creation time from newest to oldest.
-    #[tracing::instrument(level = "debug", skip_all, fields(%account_id))]
+    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_datasets_with_flow_by_account, level = "debug", skip_all, fields(%account_id))]
     async fn list_all_datasets_with_flow_by_account(
         &self,
         account_id: &odf::AccountID,
@@ -163,12 +169,14 @@ impl FlowQueryService for FlowQueryServiceImpl {
     /// Returns states of system flows
     /// ordered by creation time from newest to oldest
     /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(?filters, ?pagination))]
+    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_system_flows, level = "debug", skip_all)]
     async fn list_all_system_flows(
         &self,
         filters: FlowFilters,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError> {
+        tracing::debug!(?filters, ?pagination, "Listing system flows");
+
         let total_count = self
             .flow_event_store
             .get_count_system_flows(&filters)
@@ -191,11 +199,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
     /// Returns state of all flows, whether they are system-level or
     /// dataset-bound, ordered by creation time from newest to oldest
-    #[tracing::instrument(level = "debug", skip_all, fields(?pagination))]
+    #[tracing::instrument(name = FlowQueryServiceImpl_list_all_flows, level = "debug", skip_all)]
     async fn list_all_flows(
         &self,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsError> {
+        tracing::debug!(?pagination, "Listing all flows");
+
         let empty_filters = FlowFilters::default();
         let total_count = self
             .flow_event_store
@@ -216,7 +226,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     }
 
     /// Returns current state of a given flow
-    #[tracing::instrument(level = "debug", skip_all, fields(%flow_id))]
+    #[tracing::instrument(name = FlowQueryServiceImpl_get_flow, level = "debug", skip_all, fields(%flow_id))]
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
         Ok(flow.into())

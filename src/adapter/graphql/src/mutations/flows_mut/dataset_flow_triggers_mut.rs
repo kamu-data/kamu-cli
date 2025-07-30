@@ -27,7 +27,7 @@ pub struct DatasetFlowTriggersMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowTriggersMut<'a> {
     #[graphql(skip)]
@@ -51,8 +51,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }
 
         if let Some(e) =
-            ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type, None)
-                .await?
+            ensure_expected_dataset_kind(ctx, self.dataset_request_state, dataset_flow_type).await?
         {
             return Ok(SetFlowTriggerResult::IncompatibleDatasetKind(e));
         }

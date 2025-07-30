@@ -106,6 +106,10 @@ pub enum FlowProgressMessage {
     /// Message indicating that a flow is currently running
     Running(FlowProgressMessageRunning),
 
+    /// Message indicating that a flow has finished with a failure,
+    /// and a retry is scheduled
+    RetryScheduled(FlowProgressMessageRetryScheduled),
+
     /// Message indicating that a flow has finished execution
     Finished(FlowProgressMessageFinished),
 
@@ -136,6 +140,18 @@ impl FlowProgressMessage {
         Self::Running(FlowProgressMessageRunning {
             event_time,
             flow_id,
+        })
+    }
+
+    pub fn retry_scheduled(
+        event_time: DateTime<Utc>,
+        flow_id: FlowID,
+        scheduled_for_activation_at: DateTime<Utc>,
+    ) -> Self {
+        Self::RetryScheduled(FlowProgressMessageRetryScheduled {
+            event_time,
+            flow_id,
+            scheduled_for_activation_at,
         })
     }
 
@@ -176,6 +192,19 @@ pub struct FlowProgressMessageRunning {
 
     /// The unique identifier of the flow
     pub flow_id: FlowID,
+}
+
+/// Contains details about a retrying flow
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowProgressMessageRetryScheduled {
+    /// The time at which the event was recorded
+    pub event_time: DateTime<Utc>,
+
+    /// The unique identifier of the flow
+    pub flow_id: FlowID,
+
+    /// The scheduled activation time for the flow
+    pub scheduled_for_activation_at: DateTime<Utc>,
 }
 
 /// Contains details about a finished flow

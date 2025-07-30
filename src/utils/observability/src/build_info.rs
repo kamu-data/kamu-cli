@@ -33,6 +33,7 @@ pub struct BuildInfo {
 
 /// Axum handler for serving the build info. Depends on [`dill::Catalog`] and it
 /// having [`BuildInfo`] available.
+#[cfg(feature = "dill")]
 #[expect(clippy::unused_async)]
 pub async fn build_info_handler(
     axum::Extension(catalog): axum::Extension<dill::Catalog>,

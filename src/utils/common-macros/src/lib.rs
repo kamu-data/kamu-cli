@@ -57,10 +57,10 @@ use syn::{Ident, ImplItem, LitStr, Token, Type, parse_macro_input};
 ///
 /// ```compile_fail
 /// /* 3. Macro combination with options */
-/// #[method_names_consts(const_value_prefix = "GQL: ")]
+/// #[method_names_consts(const_value_prefix = "Gql::")]
 /// #[Object]
 /// impl Search {
-///     // Logged as: "GQL: Search::query"
+///     // Logged as: "Gql::Search::query"
 ///     #[tracing::instrument(level = "info", name = Search_query, skip_all)]
 ///     async fn query(/* ... */) -> Result<SearchResultConnection> {
 ///         /* ... */

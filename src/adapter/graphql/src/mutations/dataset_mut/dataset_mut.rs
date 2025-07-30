@@ -24,7 +24,7 @@ pub struct DatasetMut {
     dataset_request_state: DatasetRequestState,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl DatasetMut {
     #[graphql(skip)]

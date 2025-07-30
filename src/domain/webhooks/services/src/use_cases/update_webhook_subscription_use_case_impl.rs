@@ -29,7 +29,7 @@ impl UpdateWebhookSubscriptionUseCase for UpdateWebhookSubscriptionUseCaseImpl {
         level = "info",
         name = UpdateWebhookSubscriptionUseCaseImpl_execute,
         skip_all,
-        fields(subscription_id=%subscription.id(), %target_url, ?event_types, %label)
+        fields(subscription_id=%subscription.id()),
     )]
     async fn execute(
         &self,
@@ -39,6 +39,14 @@ impl UpdateWebhookSubscriptionUseCase for UpdateWebhookSubscriptionUseCaseImpl {
         label: WebhookSubscriptionLabel,
     ) -> Result<(), UpdateWebhookSubscriptionError> {
         use super::helpers::*;
+
+        tracing::info!(
+            %target_url,
+            ?event_types,
+            %label,
+            "Initiating update of webhook subscription",
+        );
+
         validate_webhook_target_url(&target_url)?;
         validate_webhook_event_types(&event_types)?;
         deduplicate_event_types(&mut event_types);

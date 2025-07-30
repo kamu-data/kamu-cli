@@ -11,9 +11,10 @@ use std::sync::Arc;
 
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{
     DatasetStatisticsRepository,
+    GetDatasetEntryError,
     JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
     JOB_KAMU_DATASETS_DATASET_STATISTICS_INDEXER,
 };
@@ -21,11 +22,6 @@ use kamu_datasets::{
 use crate::compute_dataset_statistics_increment;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DatasetStatisticsIndexer {
-    dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-    dataset_statistics_repo: Arc<dyn DatasetStatisticsRepository>,
-}
 
 #[component(pub)]
 #[interface(dyn InitOnStartup)]
@@ -36,17 +32,13 @@ pub struct DatasetStatisticsIndexer {
     ],
     requires_transaction: true,
 })]
-impl DatasetStatisticsIndexer {
-    pub fn new(
-        dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-        dataset_statistics_repo: Arc<dyn DatasetStatisticsRepository>,
-    ) -> Self {
-        Self {
-            dataset_storage_unit,
-            dataset_statistics_repo,
-        }
-    }
+pub struct DatasetStatisticsIndexer {
+    dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
+    dataset_entry_repo: Arc<dyn kamu_datasets::DatasetEntryRepository>,
+    dataset_statistics_repo: Arc<dyn DatasetStatisticsRepository>,
+}
 
+impl DatasetStatisticsIndexer {
     async fn has_any_stats(&self) -> Result<bool, InternalError> {
         self.dataset_statistics_repo.has_any_stats().await
     }
@@ -71,6 +63,18 @@ impl DatasetStatisticsIndexer {
                 .get_stored_dataset_by_id(&dataset_id)
                 .await
                 .int_err()?;
+
+            match self.dataset_entry_repo.get_dataset_entry(&dataset_id).await {
+                Ok(_) => {}
+                Err(GetDatasetEntryError::NotFound(_)) => {
+                    tracing::warn!(
+                        "Dataset entry for dataset {} not found, skipping statistics indexing",
+                        dataset_id
+                    );
+                    continue;
+                }
+                Err(e) => return Err(e.int_err()),
+            }
 
             let head = dataset
                 .as_metadata_chain()

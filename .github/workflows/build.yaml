@@ -61,12 +61,16 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: rustfmt
-      # TODO: Generate all artifacts (requires containerizing tools like flatc and protoc)
+      # We use nix flake to install flatc, protoc and other tools needed for codegen
+      - uses: cachix/install-nix-action@v25
+      - uses: cachix/cachix-action@v15
+        with:
+          name: kamu
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
       - name: Generate artifacts
         run: |
           cd kamu-cli
-          make codegen-odf-flatbuffers-schema
-          make codegen-graphql
+          nix develop .config -c make codegen
       - name: Check generated files
         run: cd kamu-cli && git diff && git diff-index --quiet HEAD
 

@@ -17,7 +17,7 @@ use crate::queries::*;
 
 pub struct Datasets;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Datasets {
     const DEFAULT_PER_PAGE: usize = 15;
