@@ -25,6 +25,73 @@ pub struct DatasetMetadata<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+impl<'a> DatasetMetadata<'a> {
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_polling_source(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::SetPollingSource>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let result = metadata_query_service
+            .get_active_polling_source(resolved_dataset)
+            .await
+            .int_err()?;
+
+        Ok(result)
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_push_sources(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Vec<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::AddPushSource>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+
+        let result = metadata_query_service
+            .get_active_push_sources(resolved_dataset)
+            .await
+            .int_err()?;
+
+        Ok(result)
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn get_current_transform(
+        &'a self,
+        ctx: &Context<'_>,
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            odf::metadata::MetadataBlockTyped<odf::metadata::SetTransform>,
+        )>,
+    > {
+        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+
+        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
+        let result = metadata_query_service
+            .get_active_transform(resolved_dataset)
+            .await?;
+
+        Ok(result)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetMetadata<'a> {
@@ -140,27 +207,17 @@ impl<'a> DatasetMetadata<'a> {
     /// Current polling source used by the root dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_polling_source, skip_all)]
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+        let source_maybe = self.get_current_polling_source(ctx).await?;
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let source = metadata_query_service
-            .get_active_polling_source(resolved_dataset)
-            .await
-            .int_err()?;
-
-        Ok(source.map(|(_hash, block)| block.event.into()))
+        Ok(source_maybe.map(|(_hash, block)| block.event.into()))
     }
 
     /// Current push sources used by the root dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_push_sources, skip_all)]
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
-
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let mut push_sources: Vec<AddPushSource> = metadata_query_service
-            .get_active_push_sources(resolved_dataset)
-            .await
-            .int_err()?
+        let mut push_sources: Vec<AddPushSource> = self
+            .get_current_push_sources(ctx)
+            .await?
             .into_iter()
             .map(|(_hash, block)| block.event.into())
             .collect();
@@ -185,14 +242,9 @@ impl<'a> DatasetMetadata<'a> {
     /// Current transformation used by the derivative dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_transform, skip_all)]
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
-        let metadata_query_service = from_catalog_n!(ctx, dyn kamu_core::MetadataQueryService);
+        let source_maybe = self.get_current_transform(ctx).await?;
 
-        let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
-        let source = metadata_query_service
-            .get_active_transform(resolved_dataset)
-            .await?;
-
-        if let Some((_hash, block)) = source {
+        if let Some((_hash, block)) = source_maybe {
             Ok(Some(
                 SetTransform::with_extended_aliases(ctx, block.event)
                     .await?
@@ -272,6 +324,62 @@ impl<'a> DatasetMetadata<'a> {
             .int_err()?
             .into_event()
             .map(Into::into))
+    }
+
+    #[tracing::instrument(level = "info", name = DatasetMetadata_extended_blocks_by_event_type, skip_all)]
+    async fn extended_blocks_by_event_type(
+        &self,
+        ctx: &Context<'_>,
+        event_type: MetadataEventType,
+    ) -> Result<Vec<MetadataBlockExtended>> {
+        let account =
+            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
+                .await?
+                .expect("Account must exist");
+
+        let block_infos: Vec<(odf::Multihash, odf::metadata::MetadataBlock)> = match event_type {
+            MetadataEventType::SetPollingSource => {
+                let mut blocks = vec![];
+                if let Some((hash, block)) = self.get_current_polling_source(ctx).await? {
+                    blocks.push((hash, block.into()));
+                }
+                blocks
+            }
+            MetadataEventType::AddPushSource => self
+                .get_current_push_sources(ctx)
+                .await?
+                .into_iter()
+                .map(|(hash, block)| (hash, block.into()))
+                .collect(),
+            MetadataEventType::SetTransform => {
+                let mut blocks = vec![];
+                if let Some((hash, block)) = self.get_current_transform(ctx).await? {
+                    blocks.push((hash, block.into()));
+                }
+                blocks
+            }
+            _ => {
+                return Err(GqlError::gql(
+                    "Unsupported metadata event type for extended block retrieval",
+                ));
+            }
+        };
+
+        let mut result = vec![];
+        for (hash, block) in block_infos {
+            result.push(
+                MetadataBlockExtended::new(
+                    ctx,
+                    hash,
+                    block,
+                    account.clone(),
+                    Some(MetadataManifestFormat::Yaml),
+                )
+                .await?,
+            );
+        }
+
+        Ok(result)
     }
 }
 
