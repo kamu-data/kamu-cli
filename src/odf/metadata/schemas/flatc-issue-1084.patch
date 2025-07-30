@@ -1,0 +1,21 @@
+diff --git src/odf/metadata/src/serde/flatbuffers/proxies_generated.rs src/odf/metadata/src/serde/flatbuffers/proxies_generated.rs
+index 5aa74e21f..e14fc9beb 100644
+--- src/odf/metadata/src/serde/flatbuffers/proxies_generated.rs
++++ src/odf/metadata/src/serde/flatbuffers/proxies_generated.rs
+@@ -1632,10 +1632,12 @@ impl<'b> flatbuffers::Push for Timestamp {
+         );
+         dst.copy_from_slice(src);
+     }
+-    #[inline]
+-    fn alignment() -> flatbuffers::PushAlignment {
+-        flatbuffers::PushAlignment::new(4)
+-    }
++
++    // FIXME: https://github.com/kamu-data/kamu-cli/issues/1084
++    // #[inline]
++    // fn alignment() -> flatbuffers::PushAlignment {
++    //     flatbuffers::PushAlignment::new(4)
++    // }
+ }
+ 
+ impl<'a> flatbuffers::Verifiable for Timestamp {

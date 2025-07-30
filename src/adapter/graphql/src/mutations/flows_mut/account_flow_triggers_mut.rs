@@ -20,7 +20,7 @@ pub struct AccountFlowTriggersMut<'a> {
     account: &'a Account,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountFlowTriggersMut<'a> {
     #[graphql(skip)]

@@ -18,6 +18,31 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
 
+## [0.245.3] - 2025-07-29
+### Fixed
+- GQL playground is accessible in anonymous mode
+### Changed
+- GQL: `search` also filters dataset by id
+
+## [0.245.2] - 2025-07-19
+### Added
+- Made `observability` crate compatible with `tracing-error` to pave the road for more informative error.
+
+## [0.245.1] - 2025-07-17
+### Fixed
+- Performance regression: avoid loading full task model in flow listings, list of IDs is enough
+
+## [0.245.0] - 2025-07-16
+### Added
+- Flow system extended with retry policy support:
+  - Retry policy model: includes number of attempts, base delay, and four delay growth functions
+  - Retry policies can be associated with flow configurations
+  - A retry policy snapshot is selected for each scheduled flow. If defined, it's used to relaunch a failing task after calculating the appropriate delay based on the configured policy
+  - GQL API extensions for retry policies, along with related task-level and flow-level attributes to populate the UI.
+### Changed
+- Optimized GQL API for flow listings by including already resolved `SetPollingSource` and `SetTransform` event copies into flow descriptions, eliminating the need for costly secondary queries from the UI.
+- Significantly reworked flow configuration and triggering GQL API for improved ease of use and maintainability
+
 ## [0.244.2] - 2025-07-15
 ### Added
 - Migration to update flow event payloads

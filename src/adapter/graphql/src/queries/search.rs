@@ -23,7 +23,7 @@ use crate::utils::from_catalog_n;
 
 pub struct Search;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Search {
     const DEFAULT_RESULTS_PER_PAGE: usize = 15;
@@ -58,6 +58,7 @@ impl Search {
         let filtered_all_dataset_handles_stream =
             filter_dataset_handle_stream(dataset_registry.all_dataset_handles(), |hdl| {
                 hdl.alias.to_string().contains(&query)
+                    || hdl.id.as_did_str().to_stack_string().contains(&query)
             });
         let mut readable_dataset_handles = dataset_action_authorizer
             .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetAction::Read)

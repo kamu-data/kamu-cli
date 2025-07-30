@@ -12,16 +12,9 @@ use std::collections::HashMap;
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
-use super::{
-    FlowConfigurationSnapshot,
-    FlowEvent,
-    FlowOutcome,
-    FlowStartCondition,
-    FlowTriggerInstance,
-};
+use super::{FlowEvent, FlowOutcome, FlowStartCondition, FlowTriggerInstance};
 use crate::prelude::*;
-use crate::queries::{Account, Task};
-use crate::utils;
+use crate::queries::Account;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +24,7 @@ pub struct Flow {
     description: FlowDescription,
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Flow {
     #[graphql(skip)]
@@ -97,6 +90,14 @@ impl Flow {
         self.flow_state.flow_id.into()
     }
 
+    /// Associated dataset ID, if any
+    async fn dataset_id(&self) -> Option<DatasetID<'static>> {
+        self.flow_state
+            .flow_binding
+            .dataset_id()
+            .map(|dataset_id| dataset_id.clone().into())
+    }
+
     /// Description of key flow parameters
     async fn description(&self) -> &FlowDescription {
         &self.description
@@ -128,18 +129,23 @@ impl Flow {
 
     /// Timing records associated with the flow lifecycle
     async fn timing(&self) -> FlowTimingRecords {
-        self.flow_state.timing.into()
+        FlowTimingRecords {
+            initiated_at: self.flow_state.primary_trigger().trigger_time(),
+            scheduled_at: self.flow_state.timing.scheduled_for_activation_at,
+            awaiting_executor_since: self.flow_state.timing.awaiting_executor_since,
+            running_since: self.flow_state.timing.running_since,
+            last_attempt_finished_at: self.flow_state.timing.last_attempt_finished_at,
+        }
     }
 
-    /// Associated tasks
-    #[tracing::instrument(level = "info", name = Flow_tasks, skip_all)]
-    async fn tasks(&self, ctx: &Context<'_>) -> Result<Vec<Task>> {
-        let mut tasks = Vec::new();
-        for task_id in &self.flow_state.task_ids {
-            let ts_task = utils::get_task(ctx, *task_id).await?;
-            tasks.push(Task::new(ts_task));
-        }
-        Ok(tasks)
+    /// IDs of associated tasks
+    async fn task_ids(&self) -> Vec<TaskID> {
+        self.flow_state
+            .task_ids
+            .iter()
+            .copied()
+            .map(Into::into)
+            .collect()
     }
 
     /// History of flow events
@@ -200,8 +206,13 @@ impl Flow {
     }
 
     /// Flow config snapshot
-    async fn config_snapshot(&self) -> Option<FlowConfigurationSnapshot> {
+    async fn config_snapshot(&self) -> Option<FlowConfigRule> {
         self.flow_state.config_snapshot.clone().map(Into::into)
+    }
+
+    /// Flow retry policy
+    async fn retry_policy(&self) -> Option<FlowRetryPolicy> {
+        self.flow_state.retry_policy.map(Into::into)
     }
 }
 

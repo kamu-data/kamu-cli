@@ -11,6 +11,8 @@
 
 #[derive(Debug, Clone)]
 pub struct Config {
+    /// Mode to use - auto-detects if not specified
+    pub mode: Option<Mode>,
     /// Name of the service that will appear e.g. in OTEL traces
     pub service_name: String,
     /// Version of the service that will appear e.g. in OTEL traces
@@ -26,6 +28,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            mode: None,
             service_name: "unnamed-service".to_string(),
             service_version: "0.0.0".to_string(),
             default_log_levels: "info".to_string(),
@@ -41,7 +44,20 @@ impl Config {
     }
 
     pub fn from_env_with_prefix(prefix: &str) -> Self {
+        // TODO: Use configuration crate like confique to avoid boilerplate?
         let mut cfg = Self::default();
+
+        if let Some(mode) = std::env::var(format!("{prefix}MODE"))
+            .ok()
+            .map(|s| s.to_lowercase())
+            .filter(|v| !v.is_empty())
+        {
+            cfg.mode = match mode.to_ascii_lowercase().as_ref() {
+                "dev" => Some(Mode::Dev),
+                "service" => Some(Mode::Service),
+                _ => None,
+            };
+        }
         if let Some(service_name) = std::env::var(format!("{prefix}SERVICE_NAME"))
             .ok()
             .filter(|v| !v.is_empty())
@@ -137,6 +153,18 @@ impl Config {
         self.span_limits.max_attributes_per_link = value;
         self
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+pub enum Mode {
+    /// Allipation is running in development mode with human-readable
+    /// well-formatted output for traces and errors directed to STDERR
+    Dev,
+    /// Application is running in a service mode (e.g. deployed in kubernetes)
+    /// with machine-readable JSON output directed to STDERR
+    Service,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

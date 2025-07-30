@@ -16,7 +16,7 @@ use crate::prelude::*;
 #[derive(Debug)]
 pub struct CollaborationMut;
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl CollaborationMut {
     /// Batch application of relations between accounts and datasets

@@ -52,7 +52,7 @@ impl FlowAbortHelper {
             .int_err()?;
 
         match flow.status() {
-            FlowStatus::Waiting | FlowStatus::Running => {
+            FlowStatus::Waiting | FlowStatus::Retrying | FlowStatus::Running => {
                 // Abort flow itself
                 flow.abort(self.time_source.now()).int_err()?;
                 flow.save(self.flow_event_store.as_ref()).await.int_err()?;

@@ -98,6 +98,11 @@ impl PostgresFlowEventStore {
                 FlowEvent::ScheduledForActivation(e) => {
                     maybe_scheduled_for_activation_at = Some(e.scheduled_for_activation_at);
                 }
+                FlowEvent::TaskFinished(e) => {
+                    if let Some(next_activation_time) = e.next_attempt_at {
+                        maybe_scheduled_for_activation_at = Some(next_activation_time);
+                    }
+                }
                 FlowEvent::Aborted(_) | FlowEvent::TaskScheduled(_) => {
                     maybe_scheduled_for_activation_at = None;
                     reset_scheduled_for_activation_at = true;
@@ -488,7 +493,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 FROM flows f
                 WHERE
                     f.scheduled_for_activation_at IS NOT NULL AND
-                    f.flow_status = 'waiting'::flow_status_type
+                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)
                 ORDER BY f.scheduled_for_activation_at ASC
                 LIMIT 1
             "#,
@@ -519,7 +524,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 FROM flows f
                 WHERE
                     f.scheduled_for_activation_at = $1 AND
-                    f.flow_status = 'waiting'::flow_status_type
+                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)
                 ORDER BY f.flow_id ASC
             "#,
             scheduled_for_activation_at,

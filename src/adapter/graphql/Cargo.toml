@@ -45,7 +45,7 @@ kamu-flow-system-services = { workspace = true }
 kamu-search = { workspace = true }
 kamu-webhooks = { workspace = true }
 kamu-task-system = { workspace = true }
-observability = { workspace = true }
+observability = { workspace = true, features = ["dill"] }
 odf = { workspace = true, default-features = false, features = [
     "arrow",
     "http",

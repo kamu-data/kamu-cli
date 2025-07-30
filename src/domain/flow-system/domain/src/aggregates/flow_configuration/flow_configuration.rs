@@ -21,7 +21,12 @@ pub struct FlowConfiguration(
 
 impl FlowConfiguration {
     /// Creates a flow configuration
-    pub fn new(now: DateTime<Utc>, flow_binding: FlowBinding, rule: FlowConfigurationRule) -> Self {
+    pub fn new(
+        now: DateTime<Utc>,
+        flow_binding: FlowBinding,
+        rule: FlowConfigurationRule,
+        retry_policy: Option<RetryPolicy>,
+    ) -> Self {
         Self(
             Aggregate::new(
                 flow_binding.clone(),
@@ -29,6 +34,7 @@ impl FlowConfiguration {
                     event_time: now,
                     flow_binding,
                     rule,
+                    retry_policy,
                 },
             )
             .unwrap(),
@@ -40,11 +46,13 @@ impl FlowConfiguration {
         &mut self,
         now: DateTime<Utc>,
         new_rule: FlowConfigurationRule,
+        new_retry_policy: Option<RetryPolicy>,
     ) -> Result<(), ProjectionError<FlowConfigurationState>> {
         let event = FlowConfigurationEventModified {
             event_time: now,
             flow_binding: self.flow_binding.clone(),
             rule: new_rule,
+            retry_policy: new_retry_policy,
         };
         self.apply(event)
     }

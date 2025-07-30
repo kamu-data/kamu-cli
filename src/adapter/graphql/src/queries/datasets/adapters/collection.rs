@@ -60,7 +60,7 @@ impl Collection {
     }
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Collection {
     #[graphql(skip)]
@@ -96,7 +96,7 @@ impl CollectionProjection {
     }
 }
 
-#[common_macros::method_names_consts(const_value_prefix = "GQL: ")]
+#[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl CollectionProjection {
     const DEFAULT_ENTRIES_PER_PAGE: usize = 100;
