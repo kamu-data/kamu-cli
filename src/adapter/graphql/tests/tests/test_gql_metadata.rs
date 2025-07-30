@@ -126,8 +126,9 @@ async fn test_current_push_source_blocks() {
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
-            DatasetMetadataHarness::get_dataset_push_source_blocks_request(
+            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
                 &create_result.dataset_handle.id.to_string(),
+                "ADD_PUSH_SOURCE",
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -140,7 +141,7 @@ async fn test_current_push_source_blocks() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "currentPushSourceBlocks": []
+                        "extendedBlocksByEventType": []
                     }
                 }
             }
@@ -181,8 +182,9 @@ async fn test_current_push_source_blocks() {
 
     let res = schema
         .execute(
-            DatasetMetadataHarness::get_dataset_push_source_blocks_request(
+            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
                 &create_result.dataset_handle.id.to_string(),
+                "ADD_PUSH_SOURCE",
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -195,21 +197,25 @@ async fn test_current_push_source_blocks() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "currentPushSourceBlocks": [{
+                        "extendedBlocksByEventType": [ {
+                            "__typename": "MetadataBlockExtended",
                             "event": {
-                                "sourceName": "source1",
-                                "read": {
-                                    "__typename": "ReadStepCsv",
-                                }
-                            }
-                        }, {
-                            "event": {
+                                "__typename": "AddPushSource",
                                 "sourceName": "source2",
                                 "read": {
                                     "__typename": "ReadStepNdJson",
                                 }
                             }
-                         }]
+                         }, {
+                            "__typename": "MetadataBlockExtended",
+                            "event": {
+                                "__typename": "AddPushSource",
+                                "sourceName": "source1",
+                                "read": {
+                                    "__typename": "ReadStepCsv",
+                                }
+                            }
+                        }]
                     }
                 }
             }
@@ -296,8 +302,9 @@ async fn test_current_polling_source_block() {
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
-            DatasetMetadataHarness::get_dataset_polling_source_block_metadata_request(
+            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
                 create_result.dataset_handle.id.to_string().as_str(),
+                "SET_POLLING_SOURCE",
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -309,14 +316,15 @@ async fn test_current_polling_source_block() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "currentPollingSourceBlock": {
+                        "extendedBlocksByEventType": [{
                             "__typename": "MetadataBlockExtended",
                             "event": {
+                                "__typename": "SetPollingSource",
                                 "read": {
                                     "__typename": "ReadStepCsv",
                                 },
                             }
-                        }
+                        }]
                     }
                 }
             }
@@ -374,8 +382,9 @@ async fn test_current_set_transform_block() {
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
-            DatasetMetadataHarness::get_dataset_set_transform_block_metadata_request(
+            DatasetMetadataHarness::get_dataset_metadata_blocks_request(
                 create_derived_result.dataset_handle.id.to_string().as_str(),
+                "SET_TRANSFORM",
             )
             .data(harness.catalog_authorized.clone()),
         )
@@ -387,15 +396,16 @@ async fn test_current_set_transform_block() {
             "datasets": {
                 "byId": {
                     "metadata": {
-                        "currentTransformBlock": {
+                        "extendedBlocksByEventType": [{
                             "__typename": "MetadataBlockExtended",
                             "event": {
+                                "__typename": "SetTransform",
                                 "inputs": [{
                                     "datasetRef": create_root_result.dataset_handle.id.to_string(),
                                     "alias": create_root_result.dataset_handle.alias.to_string(),
                                 }],
                             }
-                        }
+                        }]
                     }
                 }
             }
@@ -566,49 +576,33 @@ impl DatasetMetadataHarness {
         })))
     }
 
-    fn get_dataset_set_transform_block_metadata_request(
+    fn get_dataset_metadata_blocks_request(
         dataset_id: &str,
+        event_type: &str,
     ) -> async_graphql::Request {
         async_graphql::Request::new(indoc!(
             r#"
-            query ($datasetId: DatasetID!) {
-                datasets {
-                    byId(
-                        datasetId: "<dataset_id>"
-                    ) {
-                        metadata {
-                            currentTransformBlock {
-                                __typename
-                                event {
-                                    ...on SetTransform {
-                                        read {
-                                            __typename
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            "#
-        ))
-        .variables(async_graphql::Variables::from_json(json!({
-            "datasetId": dataset_id,
-        })))
-    }
-
-    fn get_dataset_push_source_blocks_request(dataset_id: &str) -> async_graphql::Request {
-        async_graphql::Request::new(indoc!(
-            r#"
-            query ($datasetId: DatasetID!) {
+            query ($datasetId: DatasetID!, $eventType: MetadataEventType!) {
                 datasets {
                     byId(
                         datasetId: $datasetId
                     ) {
                         metadata {
-                            currentPushSourceBlocks {
+                            extendedBlocksByEventType (eventType: $eventType) {
+                                __typename
                                 event {
+                                    __typename
+                                    ... on SetPollingSource {
+                                        read {
+                                            __typename
+                                        }
+                                    }
+                                    ... on SetTransform {
+                                        inputs {
+                                            datasetRef
+                                            alias
+                                        }
+                                    }
                                     ...on AddPushSource {
                                         sourceName
                                         read {
@@ -617,38 +611,6 @@ impl DatasetMetadataHarness {
                                     }
                                 }
                             }
-                    }
-                    }
-                }
-            }
-            "#
-        ))
-        .variables(async_graphql::Variables::from_json(json!({
-            "datasetId": dataset_id,
-        })))
-    }
-
-    fn get_dataset_polling_source_block_metadata_request(
-        dataset_id: &str,
-    ) -> async_graphql::Request {
-        async_graphql::Request::new(indoc!(
-            r#"
-            query ($datasetId: DatasetID!) {
-                datasets {
-                    byId(
-                        datasetId: $datasetId
-                    ) {
-                        metadata {
-                            currentPollingSourceBlock {
-                                __typename
-                                event {
-                                    ... on SetPollingSource {
-                                        read {
-                                            __typename
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -657,6 +619,7 @@ impl DatasetMetadataHarness {
         ))
         .variables(async_graphql::Variables::from_json(json!({
             "datasetId": dataset_id,
+            "eventType": event_type,
         })))
     }
 }

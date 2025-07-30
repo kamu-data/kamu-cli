@@ -212,35 +212,6 @@ impl<'a> DatasetMetadata<'a> {
         Ok(source_maybe.map(|(_hash, block)| block.event.into()))
     }
 
-    /// Current polling source block used by the root dataset
-    #[tracing::instrument(level = "info", name = DatasetMetadata_current_polling_source_block, skip_all)]
-    async fn current_polling_source_block(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Option<MetadataBlockExtended>> {
-        let source_maybe = self.get_current_polling_source(ctx).await?;
-
-        let account =
-            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
-                .await?
-                .expect("Account must exist");
-
-        Ok(if let Some((hash, block)) = source_maybe {
-            Some(
-                MetadataBlockExtended::new(
-                    ctx,
-                    hash,
-                    block.into(),
-                    account,
-                    Some(MetadataManifestFormat::Yaml),
-                )
-                .await?,
-            )
-        } else {
-            None
-        })
-    }
-
     /// Current push sources used by the root dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_push_sources, skip_all)]
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
@@ -254,43 +225,6 @@ impl<'a> DatasetMetadata<'a> {
         push_sources.sort_by(|a, b| a.source_name.cmp(&b.source_name));
 
         Ok(push_sources)
-    }
-
-    /// Current push source blocks used by the root dataset
-    #[tracing::instrument(level = "info", name = DatasetMetadata_current_push_source_blocks, skip_all)]
-    async fn current_push_source_blocks(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Vec<MetadataBlockExtended>> {
-        let push_sources = self.get_current_push_sources(ctx).await?;
-
-        let mut result = Vec::new();
-        let account =
-            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
-                .await?
-                .expect("Account must exist");
-
-        for (hash, block) in push_sources {
-            result.push(
-                MetadataBlockExtended::new(
-                    ctx,
-                    hash,
-                    block.into(),
-                    account.clone(),
-                    Some(MetadataManifestFormat::Yaml),
-                )
-                .await?,
-            );
-        }
-
-        result.sort_by(|a, b| match (&a.event, &b.event) {
-            (MetadataEvent::AddPushSource(a_event), MetadataEvent::AddPushSource(b_event)) => {
-                a_event.source_name.cmp(&b_event.source_name)
-            }
-            _ => unreachable!("Expected only AddPushSource type"),
-        });
-
-        Ok(result)
     }
 
     /// Sync statuses of push remotes
@@ -319,35 +253,6 @@ impl<'a> DatasetMetadata<'a> {
         } else {
             Ok(None)
         }
-    }
-
-    /// Current transformation block used by the derivative dataset
-    #[tracing::instrument(level = "info", name = DatasetMetadata_current_transform_block, skip_all)]
-    async fn current_transform_block(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Option<MetadataBlockExtended>> {
-        let source_maybe = self.get_current_transform(ctx).await?;
-
-        let account =
-            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
-                .await?
-                .expect("Account must exist");
-
-        Ok(if let Some((hash, block)) = source_maybe {
-            Some(
-                MetadataBlockExtended::new(
-                    ctx,
-                    hash,
-                    block.into(),
-                    account,
-                    Some(MetadataManifestFormat::Yaml),
-                )
-                .await?,
-            )
-        } else {
-            None
-        })
     }
 
     /// Current descriptive information about the dataset
@@ -419,6 +324,62 @@ impl<'a> DatasetMetadata<'a> {
             .int_err()?
             .into_event()
             .map(Into::into))
+    }
+
+    #[tracing::instrument(level = "info", name = DatasetMetadata_extended_blocks_by_event_type, skip_all)]
+    async fn extended_blocks_by_event_type(
+        &self,
+        ctx: &Context<'_>,
+        event_type: MetadataEventType,
+    ) -> Result<Vec<MetadataBlockExtended>> {
+        let account =
+            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
+                .await?
+                .expect("Account must exist");
+
+        let block_infos: Vec<(odf::Multihash, odf::metadata::MetadataBlock)> = match event_type {
+            MetadataEventType::SetPollingSource => {
+                let mut blocks = vec![];
+                if let Some((hash, block)) = self.get_current_polling_source(ctx).await? {
+                    blocks.push((hash, block.into()));
+                }
+                blocks
+            }
+            MetadataEventType::AddPushSource => self
+                .get_current_push_sources(ctx)
+                .await?
+                .into_iter()
+                .map(|(hash, block)| (hash, block.into()))
+                .collect(),
+            MetadataEventType::SetTransform => {
+                let mut blocks = vec![];
+                if let Some((hash, block)) = self.get_current_transform(ctx).await? {
+                    blocks.push((hash, block.into()));
+                }
+                blocks
+            }
+            _ => {
+                return Err(GqlError::gql(
+                    "Unsupported metadata event type for extended block retrieval",
+                ));
+            }
+        };
+
+        let mut result = vec![];
+        for (hash, block) in block_infos {
+            result.push(
+                MetadataBlockExtended::new(
+                    ctx,
+                    hash,
+                    block,
+                    account.clone(),
+                    Some(MetadataManifestFormat::Yaml),
+                )
+                .await?,
+            );
+        }
+
+        Ok(result)
     }
 }
 
