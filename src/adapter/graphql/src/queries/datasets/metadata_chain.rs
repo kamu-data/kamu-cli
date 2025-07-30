@@ -75,7 +75,7 @@ impl<'a> MetadataChain<'a> {
                 .await?
                 .expect("Account must exist");
         Ok(if let Some(block) = block_maybe {
-            Some(MetadataBlockExtended::new(ctx, hash, block, account).await?)
+            Some(MetadataBlockExtended::new(ctx, hash, block, account, None).await?)
         } else {
             None
         })
@@ -145,7 +145,7 @@ impl<'a> MetadataChain<'a> {
             )
             .await?
             .expect("Account must exist");
-            let block = MetadataBlockExtended::new(ctx, hash, block, account).await?;
+            let block = MetadataBlockExtended::new(ctx, hash, block, account, None).await?;
             nodes.push(block);
         }
 
