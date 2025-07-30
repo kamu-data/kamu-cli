@@ -7869,6 +7869,7 @@ dependencies = [
  "kamu-adapter-flow-webhook",
  "kamu-adapter-task-dataset",
  "kamu-core",
+ "kamu-datasets",
  "kamu-datasets-inmem",
  "kamu-datasets-services",
  "kamu-flow-system",

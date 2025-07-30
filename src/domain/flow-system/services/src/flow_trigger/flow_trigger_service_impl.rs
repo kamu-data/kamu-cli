@@ -288,7 +288,7 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         &self,
         scopes: &[FlowScope],
     ) -> Result<bool, InternalError> {
-        tracing::info!(?dataset_ids, "Checking for active triggers for datasets");
+        tracing::info!(?scopes, "Checking for active triggers for scopes");
 
         self.event_store
             .has_active_triggers_for_scopes(scopes)

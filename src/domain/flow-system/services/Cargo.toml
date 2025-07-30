@@ -50,6 +50,7 @@ kamu-adapter-flow-dataset = { workspace = true }
 kamu-adapter-flow-webhook = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
 kamu-core = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system-inmem = { workspace = true }
